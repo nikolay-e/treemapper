@@ -52,7 +52,7 @@ def build_tree(dir_path: Path, base_dir: Path, combined_spec: pathspec.PathSpec)
     try:
         for entry in sorted(dir_path.iterdir()):
             relative_path = entry.relative_to(base_dir).as_posix()
-            if should_ignore(relative_path, combined_spec) or not entry.exists():
+            if should_ignore(relative_path, combined_spec) or not entry.exists() or entry.is_symlink():
                 continue
 
             node = {
@@ -60,7 +60,7 @@ def build_tree(dir_path: Path, base_dir: Path, combined_spec: pathspec.PathSpec)
                 "type": "directory" if entry.is_dir() else "file"
             }
 
-            if entry.is_dir() and not entry.is_symlink():
+            if entry.is_dir():
                 children = build_tree(entry, base_dir, combined_spec)
                 if children:
                     node["children"] = children
