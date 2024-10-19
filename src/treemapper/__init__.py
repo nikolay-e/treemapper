@@ -1,2 +1,2 @@
-__version__ = "0.0.6"
+from .version import __version__
 from .treemapper import main

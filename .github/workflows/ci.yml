@@ -1,10 +1,11 @@
 name: TreeMapper CI
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ '**' ]
+  push:
+    branches:
+      - main
 
 jobs:
   test:
@@ -13,38 +14,49 @@ jobs:
         os: [ubuntu-latest, ubuntu-20.04, ubuntu-22.04, macos-latest, windows-latest]
         python-version: [3.7, 3.8, 3.9, '3.10', '3.11']
         exclude:
-          # Exclude older Python versions on newer Ubuntu to reduce matrix size
           - os: ubuntu-22.04
             python-version: 3.7
           - os: ubuntu-22.04
             python-version: 3.8
-          # Exclude Python 3.7 on macOS as it's unsupported
           - os: macos-latest
             python-version: 3.7
 
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4  # Updated to v4 for latest features
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Cache pip
-      uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.cfg') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest pyyaml pathspec
-        pip install -e .
-    - name: Run tests
-      run: |
-        pytest
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.cfg') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Build with PyInstaller
+        run: |
+          python -m PyInstaller --clean -y --dist ./dist/${{ runner.os }} --workpath /tmp treemapper.spec
+
+      - name: Build with python -m build
+        run: |
+          python -m build
+
+      - name: Run Tests
+        run: |
+          pytest
 
   test-pypy:
     runs-on: ubuntu-latest
@@ -53,16 +65,33 @@ jobs:
         python-version: [pypy-3.7, pypy-3.8, pypy-3.9]
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up PyPy
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest pyyaml pathspec
-        pip install -e .
-    - name: Run tests
-      run: |
-        pytest
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up PyPy ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pypy-pip-${{ hashFiles('**/setup.cfg') }}
+          restore-keys: |
+            pypy-pip-
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          pip install build pytest
+
+      - name: Build with python -m build
+        run: |
+          python -m build
+
+      - name: Run Tests
+        run: |
+          pytest
