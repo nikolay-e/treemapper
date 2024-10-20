@@ -1,16 +1,21 @@
 # TreeMapper
 
-TreeMapper is a Python tool designed to represent directory structures in YAML format. 
+TreeMapper is a Python tool designed to convert directory structures into a YAML format, primarily for use with Large Language Models (LLMs).
+
+## Motivation
+
+The main motivation behind TreeMapper is to provide a simple way to convert code repositories or directory structures into a format that can be easily parsed and understood by LLMs. This allows for more effective code analysis, project structure understanding, and potentially more accurate code generation or modification suggestions from AI models.
 
 ## Features
 
 - Generates YAML representation of directory structures
 - Includes file contents in the output
 - Respects `.gitignore` files and a custom ignore list (`.treemapperignore`)
+- Provides a format suitable for input to LLMs
 
 ## Installation
 
-You can install TreeMapper using pip:
+Install TreeMapper using pip:
 
 ```
 pip install treemapper
@@ -18,17 +23,15 @@ pip install treemapper
 
 ## Usage
 
-After installation, you can run TreeMapper from the command line:
+Basic usage:
 
 ```
 treemapper [directory_path] [-i IGNORE_FILE] [-o OUTPUT_FILE]
 ```
 
 - `directory_path`: The directory to analyze (default: current directory)
-- `-i IGNORE_FILE, --ignore-file IGNORE_FILE`: Path to the ignore file (default: `.treemapperignore` in the current directory)
-- `-o OUTPUT_FILE, --output-file OUTPUT_FILE`: Path to the output YAML file (default: `directory_tree.yaml` in the current directory)
-
-If no directory path is provided, TreeMapper will analyze the current directory.
+- `-i IGNORE_FILE, --ignore-file IGNORE_FILE`: Path to a custom ignore file
+- `-o OUTPUT_FILE, --output-file OUTPUT_FILE`: Path for the output YAML file
 
 ## Example Output
 
@@ -52,14 +55,11 @@ children:
 
 ## Configuration
 
-TreeMapper uses a `.treemapperignore` file to exclude certain files and directories from the analysis. The format is similar to `.gitignore`. You can create this file in the directory you're analyzing or specify a custom ignore file using the `-i` option.
+Use a `.treemapperignore` file in your project directory to exclude specific files or directories. The format is similar to `.gitignore`.
 
-Example `.treemapperignore`:
-```
-*.log
-node_modules
-__pycache__
-```
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 

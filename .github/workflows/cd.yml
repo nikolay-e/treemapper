@@ -6,6 +6,9 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Version to release'
+        required: true
       publish_to_pypi:
         description: 'Publish to PyPI'
         required: true
@@ -34,10 +37,9 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
 
-      - name: Get version
-        id: get_version
+      - name: Set version
         run: |
-          echo "VERSION=$(python -c "from src.treemapper.version import __version__; print(__version__)")" >> $GITHUB_OUTPUT
+          sed -i 's/__version__ = ".*"/__version__ = "${{ github.event.inputs.version }}"/' src/treemapper/version.py
 
       - name: Create Release
         id: create_release
@@ -45,14 +47,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.get_version.outputs.VERSION }}
-          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          tag_name: v${{ github.event.inputs.version }}
+          release_name: Release ${{ github.event.inputs.version }}
           draft: false
           prerelease: false
+          body: "Release ${{ github.event.inputs.version }}"
 
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.VERSION }}
+      version: ${{ github.event.inputs.version }}
+      release_id: ${{ steps.create_release.outputs.id }}
 
   build-and-upload:
     name: Build and Upload Assets
@@ -84,9 +88,28 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
 
+      - name: Set version
+        run: |
+          sed -i 's/__version__ = ".*"/__version__ = "${{ github.event.inputs.version }}"/' src/treemapper/version.py
+
       - name: Build with PyInstaller
         run: |
           python -m PyInstaller --clean -y --dist ./dist/${{ matrix.os }} --workpath /tmp treemapper.spec
+
+      - name: Prepare asset for Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          mv ./dist/${{ matrix.os }}/treemapper.exe ./dist/${{ matrix.os }}/treemapper-${{ github.event.inputs.version }}-win.exe
+
+      - name: Prepare asset for macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          mv ./dist/${{ matrix.os }}/TreeMapper.app ./dist/${{ matrix.os }}/TreeMapper-${{ github.event.inputs.version }}.app
+
+      - name: Prepare asset for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mv ./dist/${{ matrix.os }}/treemapper ./dist/${{ matrix.os }}/treemapper-${{ github.event.inputs.version }}-linux
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -94,9 +117,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/${{ matrix.os }}/treemapper${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          asset_name: treemapper-${{ matrix.os }}-v${{ needs.create-release.outputs.version }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
-          asset_content_type: application/octet-stream
+          asset_path: ${{ matrix.os == 'windows-latest' && './dist/windows-latest/treemapper-${{ github.event.inputs.version }}-win.exe' || matrix.os == 'macos-latest' && './dist/macos-latest/TreeMapper-${{ github.event.inputs.version }}.app' || './dist/ubuntu-latest/treemapper-${{ github.event.inputs.version }}-linux' }}
+          asset_name: ${{ matrix.os == 'windows-latest' && 'treemapper-${{ github.event.inputs.version }}-win.exe' || matrix.os == 'macos-latest' && 'TreeMapper-${{ github.event.inputs.version }}.app' || 'treemapper-${{ github.event.inputs.version }}-linux' }}
+          asset_content_type: ${{ matrix.os == 'macos-latest' && 'application/x-apple-diskimage' || 'application/octet-stream' }}
 
   publish-to-pypi:
     name: Publish to PyPI
@@ -125,6 +148,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set version
+        run: |
+          sed -i 's/__version__ = ".*"/__version__ = "${{ github.event.inputs.version }}"/' src/treemapper/version.py
+
       - name: Build and Publish to PyPI
         env:
           TWINE_USERNAME: __token__
@@ -132,6 +159,18 @@ jobs:
         run: |
           python -m build
           python -m twine upload dist/* --verbose
+
+      - name: Update Release Description
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              body: 'Release ${{ github.event.inputs.version }}\n\nPyPI: https://pypi.org/project/treemapper/${{ github.event.inputs.version }}/'
+            })
 
   update-main-branch:
     name: Update main branch
