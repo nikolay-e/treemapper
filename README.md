@@ -1,37 +1,68 @@
 # TreeMapper
 
-TreeMapper is a Python tool designed to convert directory structures into a YAML format, primarily for use with Large Language Models (LLMs).
+[![Build Status](https://img.shields.io/github/actions/workflow/status/nikolay-e/TreeMapper/ci.yml)](https://github.com/nikolay-e/TreeMapper/actions)  
+[![PyPI](https://img.shields.io/pypi/v/treemapper)](https://pypi.org/project/treemapper)  
+[![License](https://img.shields.io/github/license/nikolay-e/TreeMapper)](https://github.com/nikolay-e/TreeMapper/blob/main/LICENSE)
 
-## Motivation
+TreeMapper is a Python tool designed to convert directory structures and file contents into a YAML format, primarily for use with Large Language Models (LLMs). It helps in codebase analysis, project documentation, and interacting with AI tools by providing a readable representation of your project’s structure.
 
-The main motivation behind TreeMapper is to provide a simple way to convert code repositories or directory structures into a format that can be easily parsed and understood by LLMs. This allows for more effective code analysis, project structure understanding, and potentially more accurate code generation or modification suggestions from AI models.
+## Key Features
 
-## Features
-
-- Generates YAML representation of directory structures
-- Includes file contents in the output
-- Respects `.gitignore` files and a custom ignore list (`.treemapperignore`)
-- Provides a format suitable for input to LLMs
+- Converts directory structures into a **YAML format**
+- Captures **file contents** and includes them in the output
+- Supports `.gitignore` and custom ignore files (`.treemapperignore`)
+- Easy-to-use **CLI tool** with flexible options for input and output paths
+- Works cross-platform (Linux, macOS, and Windows)
 
 ## Installation
 
-Install TreeMapper using pip:
+TreeMapper requires **Python 3.9 or higher**.
 
-```
+You can install TreeMapper using pip:
+
+```bash
 pip install treemapper
+```
+
+## Quick Start
+
+To quickly generate a YAML representation of the current directory and save it to `output.yaml`, run:
+
+```bash
+treemapper . -o output.yaml
 ```
 
 ## Usage
 
-Basic usage:
+TreeMapper can be run from the command line with the following options:
 
-```
-treemapper [directory_path] [-i IGNORE_FILE] [-o OUTPUT_FILE]
+```bash
+treemapper [directory_path] [-i IGNORE_FILE] [-o OUTPUT_FILE] [--no-git-ignore]
 ```
 
-- `directory_path`: The directory to analyze (default: current directory)
-- `-i IGNORE_FILE, --ignore-file IGNORE_FILE`: Path to a custom ignore file
-- `-o OUTPUT_FILE, --output-file OUTPUT_FILE`: Path for the output YAML file
+| Option                | Description                                                      |
+|-----------------------|------------------------------------------------------------------|
+| `directory_path`       | The directory to analyze (default: current directory)            |
+| `-i, --ignore-file`    | Path to a custom ignore file                                     |
+| `-o, --output-file`    | Path for the output YAML file (default: `./directory_tree.yaml`) |
+| `--no-git-ignore`      | Disable git-related default ignores                              |
+
+### Example Commands
+
+1. Analyze the current directory, respecting `.gitignore` and `.treemapperignore`:
+```bash
+python -m treemapper .
+```
+
+2. Analyze a specific directory with a custom ignore file:
+```bash
+python -m treemapper ./my_project -i custom_ignore.txt
+```
+
+3. Output the YAML representation to a different file:
+```bash
+python -m treemapper ./my_project -o project_structure.yaml
+```
 
 ## Example Output
 
@@ -55,14 +86,11 @@ children:
 
 ## Configuration
 
-Use a `.treemapperignore` file in your project directory to exclude specific files or directories. The format is similar to `.gitignore`.
+You can use a `.treemapperignore` file in your project directory to exclude specific files or directories from the YAML output. The format is similar to `.gitignore`.
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
-## Contact
+---
 
-Nikolay Eremeev - nikolay.eremeev@outlook.com
-
-Project Link: [https://github.com/nikolay-e/TreeMapper](https://github.com/nikolay-e/TreeMapper)

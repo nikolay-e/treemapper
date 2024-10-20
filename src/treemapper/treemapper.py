@@ -1,10 +1,15 @@
-import fnmatch
+import argparse
 import os
 import sys
-import argparse
 from pathlib import Path
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any
+
 import pathspec
+
+
+def eprint(*args, **kwargs):
+    """Print to stderr."""
+    print(*args, file=sys.stderr, **kwargs)
 
 
 def read_ignore_file(file_path: Path) -> List[str]:
@@ -16,17 +21,114 @@ def read_ignore_file(file_path: Path) -> List[str]:
                 line = line.strip()
                 if line and not line.startswith('#'):
                     ignore_patterns.append(line)
+    eprint(f"Read ignore patterns from {file_path}: {ignore_patterns}")
     return ignore_patterns
 
 
-def load_pathspec(patterns: List[str], syntax='gitwildmatch') -> pathspec.PathSpec:
+def load_pathspec(
+        patterns: List[str],
+        syntax='gitwildmatch') -> pathspec.PathSpec:
     """Load pathspec from a list of patterns."""
-    return pathspec.PathSpec.from_lines(syntax, patterns)
+    spec = pathspec.PathSpec.from_lines(syntax, patterns)
+    eprint(f"Loaded pathspec with patterns: {patterns}")
+    return spec
 
 
 def should_ignore(file_path: str, combined_spec: pathspec.PathSpec) -> bool:
-    """Check if a file or directory should be ignored based on combined pathspec."""
-    return combined_spec.match_file(file_path)
+    """
+    Check if a file or directory should be ignored based on combined pathspec.
+    Appends a trailing slash for directories to match directory-specific patterns.
+    """
+    paths_to_check = [file_path]
+
+    # Append '/' if the file_path represents a directory
+    if file_path.endswith('/'):
+        paths_to_check.append(file_path)
+
+    # Append trailing slash for all parent directories
+    for part in Path(file_path).parents:
+        if part != Path('.'):
+            paths_to_check.append(part.as_posix() + '/')
+
+    # Check if any pattern matches
+    result = any(combined_spec.match_file(path) for path in paths_to_check)
+    eprint(
+        f"Should ignore '{file_path}': {result} (checking paths: {paths_to_check})")
+    return result
+
+
+def build_tree(dir_path: Path,
+               base_dir: Path,
+               combined_spec: pathspec.PathSpec,
+               gitignore_specs: Dict[Path,
+                                     pathspec.PathSpec]) -> List[Dict[str,
+                                                                      Any]]:
+    """Build the directory tree structure."""
+    tree = []
+    try:
+        for entry in sorted(dir_path.iterdir()):
+            relative_path = entry.relative_to(base_dir).as_posix()
+            if entry.is_dir():
+                relative_path += '/'  # Append '/' for directories
+
+            # Explicit check for .git directory
+            if entry.name == '.git':
+                eprint(f"Skipping .git directory: {relative_path}")
+                continue
+
+            if should_ignore(relative_path, combined_spec):
+                eprint(f"Ignoring '{relative_path}' based on combined_spec")
+                continue
+
+            # Check if the entry should be ignored based on any applicable
+            # .gitignore
+            ignore_entry = False
+            for git_dir, git_spec in gitignore_specs.items():
+                try:
+                    if entry.is_relative_to(git_dir):
+                        rel_path = entry.relative_to(git_dir).as_posix()
+                        if git_spec.match_file(
+                                rel_path + '/'):  # Append '/' if it's a directory
+                            eprint(
+                                f"Ignoring '{relative_path}' based on .gitignore in '{git_dir}'")
+                            ignore_entry = True
+                            break
+                except ValueError:
+                    # entry is not relative to git_dir
+                    continue
+            if ignore_entry:
+                continue
+
+            if not entry.exists() or entry.is_symlink():
+                eprint(
+                    f"Skipping '{relative_path}' as it does not exist or is a symlink")
+                continue
+
+            node = {
+                "name": entry.name,
+                "type": "directory" if entry.is_dir() else "file"
+            }
+
+            if entry.is_dir():
+                children = build_tree(
+                    entry, base_dir, combined_spec, gitignore_specs)
+                if children:
+                    node["children"] = children
+            elif entry.is_file():
+                try:
+                    node["content"] = entry.read_text(encoding='utf-8')
+                except UnicodeDecodeError:
+                    node["content"] = entry.read_bytes().decode(
+                        'utf-8', errors='replace')
+                except IOError:
+                    node["content"] = "<unreadable content>"
+
+            tree.append(node)
+            eprint(f"Added node: {node}")
+    except (PermissionError, OSError) as e:
+        eprint(f"Error accessing {dir_path}: {e}")
+
+    return tree
 
 
 def write_yaml_node(file, node: Dict[str, Any], indent: str = '') -> None:
@@ -46,57 +148,36 @@ def write_yaml_node(file, node: Dict[str, Any], indent: str = '') -> None:
             write_yaml_node(file, child, indent + '  ')
 
 
-def build_tree(dir_path: Path, base_dir: Path, combined_spec: pathspec.PathSpec) -> List[Dict[str, Any]]:
-    """Build the directory tree structure."""
-    tree = []
-    try:
-        for entry in sorted(dir_path.iterdir()):
-            relative_path = entry.relative_to(base_dir).as_posix()
-            if should_ignore(relative_path, combined_spec) or not entry.exists() or entry.is_symlink():
-                continue
-
-            node = {
-                "name": entry.name,
-                "type": "directory" if entry.is_dir() else "file"
-            }
-
-            if entry.is_dir():
-                children = build_tree(entry, base_dir, combined_spec)
-                if children:
-                    node["children"] = children
-            elif entry.is_file():
-                try:
-                    node["content"] = entry.read_text(encoding='utf-8')
-                except UnicodeDecodeError:
-                    node["content"] = entry.read_bytes().decode('utf-8', errors='replace')
-                except IOError:
-                    node["content"] = "<unreadable content>"
-
-            tree.append(node)
-    except (PermissionError, OSError) as e:
-        print(f"Error accessing {dir_path}: {e}", file=sys.stderr)
-
-    return tree
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Generate a YAML representation of a directory structure.")
-    parser.add_argument("directory", nargs="?", default=".",
-                        help="The directory to analyze (default: current directory)")
+    parser = argparse.ArgumentParser(
+        description="Generate a YAML representation of a directory structure.")
+    parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="The directory to analyze (default: current directory)")
     parser.add_argument("-i", "--ignore-file", default=None,
                         help="Path to the custom ignore file (optional)")
-    parser.add_argument("-o", "--output-file", default="directory_tree.yaml",
-                        help="Path to the output YAML file (default: directory_tree.yaml in the current directory)")
+    parser.add_argument(
+        "-o",
+        "--output-file",
+        default="directory_tree.yaml",
+        help="Path to the output YAML file (default: directory_tree.yaml in the current directory)")
+    parser.add_argument("--no-git-ignore", action="store_true",
+                        help="Disable git-related default ignores")
     args = parser.parse_args()
 
     root_dir = Path(args.directory).resolve()
+    eprint(f"Analyzing directory: {root_dir}")
+
     if not root_dir.is_dir():
-        print(f"Error: The path '{root_dir}' is not a valid directory.", file=sys.stderr)
+        eprint(f"Error: The path '{root_dir}' is not a valid directory.")
         sys.exit(1)
 
     # Read default .treemapperignore
     default_ignore_file = root_dir / '.treemapperignore'
     default_patterns = read_ignore_file(default_ignore_file)
+    eprint(f"Default ignore patterns: {default_patterns}")
 
     # Read custom ignore file if provided
     if args.ignore_file:
@@ -105,44 +186,67 @@ def main():
             custom_ignore_file = root_dir / custom_ignore_file
         if custom_ignore_file.is_file():
             custom_patterns = read_ignore_file(custom_ignore_file)
+            eprint(f"Custom ignore patterns: {custom_patterns}")
         else:
-            print(f"Warning: Custom ignore file '{custom_ignore_file}' not found. Proceeding without custom ignore patterns.", file=sys.stderr)
+            eprint(
+                f"Warning: Custom ignore file '{custom_ignore_file}' not found. Proceeding without custom ignore patterns.")
             custom_patterns = []
     else:
         custom_patterns = []
 
-    # Read .gitignore patterns
-    gitignore_file = root_dir / '.gitignore'
-    gitignore_patterns = read_ignore_file(gitignore_file) if gitignore_file.is_file() else []
+    # Add default .git ignore unless disabled
+    if not args.no_git_ignore:
+        # Explicitly ignore the .git directory
+        default_patterns.append('.git/')
+        default_patterns.append('.git/**')  # Ignore all contents within .git
+        eprint("Added default .git ignore patterns")
 
     # Combine all patterns
-    combined_patterns = default_patterns + custom_patterns + gitignore_patterns
+    combined_patterns = default_patterns + custom_patterns
+    eprint(f"Combined ignore patterns: {combined_patterns}")
 
     # Load pathspec with combined patterns
     combined_spec = load_pathspec(combined_patterns)
 
+    # Find all .gitignore files and create pathspecs for each
+    gitignore_specs = {}
+    if not args.no_git_ignore:
+        for dirpath, dirnames, filenames in os.walk(root_dir):
+            if '.gitignore' in filenames:
+                gitignore_path = Path(dirpath) / '.gitignore'
+                gitignore_patterns = read_ignore_file(gitignore_path)
+                gitignore_specs[Path(dirpath)] = load_pathspec(
+                    gitignore_patterns)
+                eprint(
+                    f"Loaded .gitignore from '{gitignore_path}' with patterns: {gitignore_patterns}")
+
     output_file = Path(args.output_file)
     if not output_file.is_absolute():
         output_file = Path.cwd() / output_file
+    eprint(f"Output YAML file will be saved to: {output_file}")
 
     directory_tree = {
         "name": root_dir.name,
         "type": "directory",
-        "children": build_tree(root_dir, root_dir, combined_spec)
-    }
+        "children": build_tree(
+            root_dir,
+            root_dir,
+            combined_spec,
+            gitignore_specs)}
 
     try:
         with output_file.open('w', encoding='utf-8') as f:
-            f.write("name: {}\n".format(directory_tree['name']))
-            f.write("type: {}\n".format(directory_tree['type']))
+            f.write(f"name: {directory_tree['name']}\n")
+            f.write(f"type: {directory_tree['type']}\n")
             if 'children' in directory_tree and directory_tree['children']:
                 f.write("children:\n")
                 for child in directory_tree['children']:
                     write_yaml_node(f, child, '  ')
-        print(f"Directory tree saved to {output_file}")
+        eprint(f"Directory tree saved to {output_file}")
     except IOError as e:
-        print(f"Error: Unable to write to file '{output_file}': {e}", file=sys.stderr)
+        eprint(f"Unable to write to file '{output_file}': {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

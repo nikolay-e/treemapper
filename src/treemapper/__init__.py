@@ -1,2 +1,2 @@
-from .version import __version__
 from .treemapper import main
+from .version import __version__
