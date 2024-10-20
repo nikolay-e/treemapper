@@ -37,15 +37,16 @@ treemapper . -o output.yaml
 TreeMapper can be run from the command line with the following options:
 
 ```bash
-treemapper [directory_path] [-i IGNORE_FILE] [-o OUTPUT_FILE] [--no-git-ignore]
+treemapper [-i IGNORE_FILE] [-o OUTPUT_FILE] [--no-git-ignore] [-v VERBOSITY] [directory_path]
 ```
 
 | Option                | Description                                                      |
 |-----------------------|------------------------------------------------------------------|
-| `directory_path`       | The directory to analyze (default: current directory)            |
-| `-i, --ignore-file`    | Path to a custom ignore file                                     |
-| `-o, --output-file`    | Path for the output YAML file (default: `./directory_tree.yaml`) |
-| `--no-git-ignore`      | Disable git-related default ignores                              |
+| `directory_path`      | The directory to analyze (default: current directory)            |
+| `-i, --ignore-file`   | Path to a custom ignore file                                     |
+| `-o, --output-file`   | Path for the output YAML file (default: `./directory_tree.yaml`) |
+| `--no-git-ignore`     | Disable git-related default ignores                              |
+| `-v, --verbosity`     | Set verbosity level (0: ERROR, 1: WARNING, 2: INFO, 3: DEBUG)    |
 
 ### Example Commands
 

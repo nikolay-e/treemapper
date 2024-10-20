@@ -60,7 +60,6 @@ jobs:
           release_name: Release ${{ github.event.inputs.version }}
           draft: false
           prerelease: false
-          body: "Release ${{ github.event.inputs.version }}"
 
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
@@ -190,17 +189,6 @@ jobs:
           python -m build
           python -m twine upload dist/* --verbose
 
-      - name: Update Release Description
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.name,
-              release_id: ${{ needs.create-release.outputs.release_id }},
-              body: 'Release ${{ github.event.inputs.version }}\n\nPyPI: https://pypi.org/project/treemapper/${{ github.event.inputs.version }}/'
-            })
 
   update-main-branch:
     name: Update main branch
