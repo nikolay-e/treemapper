@@ -15,8 +15,8 @@ on:
         default: 'false'
         type: choice
         options:
-        - 'true'
-        - 'false'
+          - 'true'
+          - 'false'
 
 jobs:
   create-release:
@@ -143,7 +143,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    needs: [create-release, build-and-upload]
+    needs: [ create-release, build-and-upload ]
     if: github.event.inputs.publish_to_pypi == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -192,7 +192,7 @@ jobs:
 
   update-main-branch:
     name: Update main branch
-    needs: [publish-to-pypi]
+    needs: [ publish-to-pypi ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main branch
