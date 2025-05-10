@@ -1,5 +1,6 @@
 # tests/test_errors.py
 import logging
+import os
 import stat
 import sys
 from pathlib import Path
@@ -34,7 +35,11 @@ def test_input_path_is_file(run_mapper, temp_project, capsys):
     assert "not a valid directory" in captured.err
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="os.chmod limited on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    reason="os.chmod limited on Windows/WSL",
+)
 def test_unreadable_file(temp_project, run_mapper, set_perms, caplog):
     """Тест: файл без прав на чтение."""
     unreadable_file = temp_project / "unreadable.txt"
@@ -56,7 +61,11 @@ def test_unreadable_file(temp_project, run_mapper, set_perms, caplog):
     ), "Expected ERROR log message about reading failure not found"
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="os.chmod limited on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    reason="os.chmod limited on Windows/WSL",
+)
 def test_unwritable_output_dir(temp_project, run_mapper, set_perms, caplog):
     """Тест: попытка записи в директорию без прав на запись."""
     unwritable_dir = temp_project / "locked_dir"

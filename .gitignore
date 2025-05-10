@@ -163,3 +163,4 @@ cython_debug/
 directory_tree.yaml
 
 .pypirc
+**/.claude/settings.local.json

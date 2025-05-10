@@ -29,7 +29,7 @@ def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
         "--verbosity",
         type=int,
         choices=range(0, 4),
-        default=2,
+        default=0,
         metavar="[0-3]",
         help="Set verbosity level (0: ERROR, 1: WARNING, 2: INFO, 3: DEBUG)",
     )

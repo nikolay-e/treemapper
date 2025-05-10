@@ -1,5 +1,6 @@
 # tests/test_ignore.py
 import logging
+import os
 import sys
 
 import pytest
@@ -223,7 +224,11 @@ def test_no_default_ignores_flag(temp_project, run_mapper):
     ), f"Output file {output_path.name} should still be ignored even with --no-default-ignores"
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="os.chmod limited on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    reason="os.chmod limited on Windows/WSL",
+)
 def test_unreadable_ignore_file(temp_project, run_mapper, set_perms, caplog):
     """Тест: файл .treemapperignore не имеет прав на чтение."""
     ignore_file = temp_project / ".treemapperignore"

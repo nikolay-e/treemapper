@@ -64,6 +64,20 @@ def set_perms(request):
     def _set_perms(path: Path, perms: int):
         if sys.platform == "win32":
             pytest.skip("Permission tests skipped on Windows.")
+
+        # Check if running in WSL environment
+        is_wsl = False
+        try:
+            with open("/proc/version", "r") as f:
+                if "microsoft" in f.read().lower():
+                    is_wsl = True
+        except FileNotFoundError:
+            pass
+
+        # Skip tests on Windows paths in WSL
+        if is_wsl and "/mnt/" in str(path):
+            pytest.skip(f"Permission tests skipped on Windows-mounted paths in WSL: {path}")
+
         if not path.exists():
             pytest.skip(f"Path does not exist, cannot set permissions: {path}")
         try:

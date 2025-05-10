@@ -1,4 +1,5 @@
 # src/treemapper/ignore.py
+import fnmatch
 import logging
 import os
 from pathlib import Path
@@ -6,7 +7,8 @@ from pathlib import Path
 # ---> ИЗМЕНЕНИЕ: Добавляем импорты из typing <---
 from typing import Dict, List, Optional, Tuple
 
-import pathspec
+# pathspec doesn't have type stubs
+import pathspec  # type: ignore
 
 
 def read_ignore_file(file_path: Path) -> List[str]:
@@ -14,10 +16,13 @@ def read_ignore_file(file_path: Path) -> List[str]:
     ignore_patterns = []
     if file_path.is_file():
         try:
+            # Try to read directly and handle all possible errors
             with file_path.open("r", encoding="utf-8") as f:
                 ignore_patterns = [line.strip() for line in f if line.strip() and not line.startswith("#")]
             logging.info(f"Using ignore patterns from {file_path}")
             logging.debug(f"Read ignore patterns from {file_path}: {ignore_patterns}")
+        except PermissionError:
+            logging.warning(f"Could not read ignore file {file_path}: Permission denied")
         except IOError as e:
             logging.warning(f"Could not read ignore file {file_path}: {e}")
         except UnicodeDecodeError as e:
@@ -79,7 +84,19 @@ def get_default_patterns(root_dir: Path, no_default_ignores: bool, output_file: 
     if no_default_ignores:
         return []
 
-    patterns = []
+    # Add common patterns to default ignores
+    patterns = [
+        "**/__pycache__/",
+        "**/*.py[cod]",
+        "**/*.so",
+        "**/.pytest_cache/",
+        "**/.coverage",
+        "**/.mypy_cache/",
+        "**/*.egg-info/",
+        "**/.git/",
+        "**/.eggs/",
+    ]
+
     treemapper_ignore_file = root_dir / ".treemapperignore"
     patterns.extend(read_ignore_file(treemapper_ignore_file))
 
@@ -121,11 +138,36 @@ def get_gitignore_specs(root_dir: Path, no_default_ignores: bool) -> Dict[Path, 
     if no_default_ignores:
         return {}
 
+    # Define common directories to always ignore regardless of ignore patterns
+    common_ignore_dirs = {
+        "__pycache__",
+        ".pytest_cache",
+        "node_modules",
+        ".git",
+        ".eggs",
+        "*.egg-info",
+        "dist",
+        "build",
+        ".tox",
+        ".coverage",
+        ".mypy_cache",
+        ".venv",
+        "venv",
+        "env",
+    }
+
     gitignore_specs = {}
     try:
         for dirpath_str, dirnames, filenames in os.walk(root_dir, topdown=True):
-            if ".git" in dirnames:
-                dirnames.remove(".git")
+            # Filter out directories we want to skip
+            for ignore_dir in list(dirnames):
+                # Skip directories that match common ignore patterns
+                if ignore_dir in common_ignore_dirs or any(
+                    fnmatch.fnmatch(ignore_dir, pattern) for pattern in common_ignore_dirs
+                ):
+                    dirnames.remove(ignore_dir)
+                    logging.debug(f"Skipping ignored directory: {os.path.join(dirpath_str, ignore_dir)}")
+
             if ".gitignore" in filenames:
                 gitignore_path = Path(dirpath_str) / ".gitignore"
                 patterns = read_ignore_file(gitignore_path)

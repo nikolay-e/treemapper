@@ -42,7 +42,13 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           echo "Setting version to $VERSION"
-          sed -i -E "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" src/treemapper/version.py
+          # More robust version updating using Python to ensure consistent formatting
+          python -c "
+          with open('src/treemapper/version.py', 'r') as f:
+              content = f.read()
+          with open('src/treemapper/version.py', 'w') as f:
+              f.write(content.replace('__version__ = \"' + content.split('\"')[1] + '\"', '__version__ = \"$VERSION\"'))
+          "
           echo "version.py content after change:"
           cat src/treemapper/version.py
 
@@ -51,6 +57,11 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          # Get current branch name for explicit push target
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "Current branch: $CURRENT_BRANCH"
+
           git add src/treemapper/version.py
           if ! git diff --staged --quiet; then
             git commit -m "Release version ${{ github.event.inputs.version }}"
@@ -60,9 +71,10 @@ jobs:
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "Commit SHA: $COMMIT_SHA"
           echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-          # Отправляем коммит в текущую ветку (важно для следующего шага)
-          # Тег будет создан действием create-release
-          git push origin HEAD
+
+          # Explicitly push to the current branch by name instead of using HEAD
+          # This prevents ambiguity about which branch is being updated
+          git push origin $CURRENT_BRANCH
 
       - name: Create GitHub Release and Tag
         id: create_release

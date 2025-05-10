@@ -49,7 +49,7 @@ Options:
   -o, --output-file FILE      Output YAML file (default: directory_tree.yaml)
   -i, --ignore-file FILE      Custom ignore patterns file
   --no-default-ignores        Disable all default ignores
-  -v, --verbosity [0-3]       Logging verbosity (default: 2)
+  -v, --verbosity [0-3]       Logging verbosity (default: 0)
                              0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG
   -h, --help                  Show this help
 ```
