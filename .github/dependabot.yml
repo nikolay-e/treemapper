@@ -1,0 +1,25 @@
+version: 2
+multi-ecosystem-groups:
+  all-dependencies:
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    assignees:
+      - "nikolay-e"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    multi-ecosystem-group: "all-dependencies"
+    patterns:
+      - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    multi-ecosystem-group: "all-dependencies"
+    patterns:
+      - "*"

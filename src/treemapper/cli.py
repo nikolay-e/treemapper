@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 
-# ---> ИЗМЕНЕНИЕ: Возвращаем Path для output_file, т.к. он всегда Path <---
+# ---> CHANGE: Return types are correct, no change needed here.
 def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -18,7 +18,8 @@ def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
 
     parser.add_argument("-i", "--ignore-file", default=None, help="Path to the custom ignore file (optional)")
 
-    parser.add_argument("-o", "--output-file", default="./directory_tree.yaml", help="Path to the output YAML file")
+    # ---> CHANGE: Default output is now explicitly relative to the current directory.
+    parser.add_argument("-o", "--output-file", default="directory_tree.yaml", help="Path to the output YAML file")
 
     parser.add_argument(
         "--no-default-ignores", action="store_true", help="Disable default ignores (.treemapperignore, .gitignore, output file)"
@@ -37,6 +38,7 @@ def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
     args = parser.parse_args()
 
     try:
+        # The target directory to be read. This is correct as is.
         root_dir = Path(args.directory).resolve(strict=True)
         if not root_dir.is_dir():
             print(f"Error: The path '{root_dir}' is not a valid directory.", file=sys.stderr)
@@ -48,14 +50,14 @@ def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
         print(f"Error resolving directory path '{args.directory}': {e}", file=sys.stderr)
         sys.exit(1)
 
-    output_file = Path(args.output_file)
-    if not output_file.is_absolute():
-        output_file = Path.cwd() / output_file
+    # ---> CHANGE: Resolve output file relative to the current working directory.
+    # .resolve() makes the path absolute from CWD if it's relative.
+    output_file = Path(args.output_file).resolve()
 
     ignore_file_path: Optional[Path] = None
     if args.ignore_file:
-        ignore_file_path = Path(args.ignore_file)
-        if not ignore_file_path.is_absolute():
-            ignore_file_path = Path.cwd() / ignore_file_path
+        # ---> CHANGE: Resolve custom ignore file relative to CWD.
+        # We don't use strict=True here because the ignore.py will handle non-existent files with a warning.
+        ignore_file_path = Path(args.ignore_file).resolve()
 
     return root_dir, ignore_file_path, output_file, args.no_default_ignores, args.verbosity

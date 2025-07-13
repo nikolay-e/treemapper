@@ -46,7 +46,8 @@ def get_ignore_specs(
 ) -> Tuple[pathspec.PathSpec, Dict[Path, pathspec.PathSpec]]:
     """Get combined ignore specs and git ignore specs."""
     default_patterns = get_default_patterns(root_dir, no_default_ignores, output_file)
-    custom_patterns = get_custom_patterns(root_dir, custom_ignore_file)
+    # ---> CHANGE: No longer pass root_dir to get_custom_patterns.
+    custom_patterns = get_custom_patterns(custom_ignore_file)
 
     if no_default_ignores:
         combined_patterns = custom_patterns
@@ -97,11 +98,14 @@ def get_default_patterns(root_dir: Path, no_default_ignores: bool, output_file: 
         "**/.eggs/",
     ]
 
-    treemapper_ignore_file = root_dir / ".treemapperignore"
+    # ---> CHANGE: Look for .treemapperignore in the CURRENT WORKING DIRECTORY, not the root_dir.
+    treemapper_ignore_file = Path.cwd() / ".treemapperignore"
     patterns.extend(read_ignore_file(treemapper_ignore_file))
 
     if output_file:
         try:
+            # This logic correctly ignores the output file if it's inside the scanned directory.
+            # It should remain as is.
             resolved_output = output_file.resolve()
             resolved_root = root_dir.resolve()
             try:
@@ -111,24 +115,25 @@ def get_default_patterns(root_dir: Path, no_default_ignores: bool, output_file: 
                 logging.debug(f"Adding output file to default ignores: {output_pattern}")
             except ValueError:
                 logging.debug(f"Output file {output_file} is outside root directory {root_dir}, not adding to default ignores.")
+            except Exception as e:
+                logging.warning(f"Could not determine relative path for output file {output_file}: {e}")
         except Exception as e:
             logging.warning(f"Could not determine relative path for output file {output_file}: {e}")
 
     return patterns
 
 
-# ---> ИЗМЕНЕНИЕ: Заменяем | None на Optional[...] <---
-def get_custom_patterns(root_dir: Path, custom_ignore_file: Optional[Path]) -> List[str]:
+# ---> CHANGE: Remove the unused 'root_dir' parameter for clarity.
+def get_custom_patterns(custom_ignore_file: Optional[Path]) -> List[str]:
     """Retrieve custom ignore patterns from the file specified with -i."""
     if not custom_ignore_file:
         return []
 
-    if not custom_ignore_file.is_absolute():
-        custom_ignore_file = Path.cwd() / custom_ignore_file
-
+    # No need to resolve path here, cli.py already did it.
     if custom_ignore_file.is_file():
         return read_ignore_file(custom_ignore_file)
     else:
+        # This case is now handled in cli.py, but we keep it as a safeguard.
         logging.warning(f"Custom ignore file '{custom_ignore_file}' not found.")
         return []
 
