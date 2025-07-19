@@ -30,7 +30,7 @@ jobs:
         with:
          
           path: ~/.cache/pip
-          key: ${{ runner.os }}-lint-pip-${{ hashFiles('**/setup.cfg') }}
+          key: ${{ runner.os }}-lint-pip-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-lint-pip-
 
@@ -77,7 +77,7 @@ jobs:
         with:
           path: ~/.cache/pip
          
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/setup.cfg') }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
@@ -130,7 +130,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pypy-${{ matrix.python-version }}-pip-${{ hashFiles('**/setup.cfg') }}
+          key: pypy-${{ matrix.python-version }}-pip-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             pypy-${{ matrix.python-version }}-pip-
 
