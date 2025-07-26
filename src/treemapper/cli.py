@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 
-# ---> CHANGE: Return types are correct, no change needed here.
-def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
+# ---> CHANGE: Updated return type to reflect that output_file can now be None.
+def parse_args() -> Tuple[Path, Optional[Path], Optional[Path], bool, int]:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         prog="treemapper",
@@ -18,8 +18,8 @@ def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
 
     parser.add_argument("-i", "--ignore-file", default=None, help="Path to the custom ignore file (optional)")
 
-    # ---> CHANGE: Default output is now explicitly relative to the current directory.
-    parser.add_argument("-o", "--output-file", default="directory_tree.yaml", help="Path to the output YAML file")
+    # ---> CHANGE: Default output is now stdout (None). Only write to file when explicitly specified.
+    parser.add_argument("-o", "--output-file", default=None, help="Path to the output YAML file (default: stdout)")
 
     parser.add_argument(
         "--no-default-ignores", action="store_true", help="Disable default ignores (.treemapperignore, .gitignore, output file)"
@@ -52,7 +52,10 @@ def parse_args() -> Tuple[Path, Optional[Path], Path, bool, int]:
 
     # ---> CHANGE: Resolve output file relative to the current working directory.
     # .resolve() makes the path absolute from CWD if it's relative.
-    output_file = Path(args.output_file).resolve()
+    # If no output file is specified or "-" is used, output_file will be None
+    output_file = None
+    if args.output_file and args.output_file != "-":
+        output_file = Path(args.output_file).resolve()
 
     ignore_file_path: Optional[Path] = None
     if args.ignore_file:

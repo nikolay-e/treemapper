@@ -21,7 +21,7 @@ docs/
 .gitignore
 """
     )
-    assert run_mapper([".", "-i", str(ignore_file)])
+    assert run_mapper([".", "-i", str(ignore_file), "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
     assert not any(isinstance(f, str) and f.endswith(".py") for f in all_files)
@@ -38,7 +38,7 @@ def test_gitignore_patterns(temp_project, run_mapper):
     (temp_project / "__pycache__" / "cachefile").touch()
     (temp_project / "src" / "local_only.py").touch()
     (temp_project / "src" / "allowed.py").touch()
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
     assert "test.pyc" not in all_files
@@ -77,7 +77,7 @@ def test_symlinks_and_special_files(temp_project, run_mapper):
             can_symlink = False
 
     (temp_project / ".treemapperignore").write_text(".*\n!.gitignore\n")
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
     assert ".hidden_dir" not in all_files
@@ -236,7 +236,7 @@ def test_unreadable_ignore_file(temp_project, run_mapper, set_perms, caplog):
     set_perms(ignore_file, 0o000)
 
     with caplog.at_level(logging.WARNING):
-        assert run_mapper(["."])
+        assert run_mapper([".", "-o", "directory_tree.yaml"])
 
     assert any(
         "Could not read ignore file" in rec.message and ignore_file.name in rec.message
@@ -255,7 +255,7 @@ def test_bad_encoding_ignore_file(temp_project, run_mapper, caplog):
         pytest.skip("CP1251 codec not found")
 
     with caplog.at_level(logging.WARNING):
-        assert run_mapper(["."])
+        assert run_mapper([".", "-o", "directory_tree.yaml"])
 
     assert any(
         "Could not decode ignore file" in rec.message and ignore_file.name in rec.message and "UTF-8" in rec.message
@@ -267,7 +267,7 @@ def test_bad_encoding_ignore_file(temp_project, run_mapper, caplog):
 
     (temp_project / "папка_игнор").mkdir()
 
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
     assert "папка_игнор" in all_files

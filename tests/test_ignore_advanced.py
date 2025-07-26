@@ -15,7 +15,7 @@ def test_ignore_precedence_subdir_over_root(temp_project, run_mapper):
     (temp_project / "subdir" / "ignore.txt").touch()
     (temp_project / "subdir" / "allow.txt").touch()
 
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
 
@@ -32,7 +32,7 @@ def test_ignore_precedence_treemapper_over_git(temp_project, run_mapper):
     (temp_project / "file.log").touch()
     (temp_project / "file.txt").touch()
 
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
 
@@ -53,7 +53,7 @@ def test_ignore_precedence_custom_over_defaults(temp_project, run_mapper):
     (temp_project / "file.tmp").touch()
     (temp_project / "file.txt").touch()
 
-    assert run_mapper([".", "-i", str(custom_ignore)])
+    assert run_mapper([".", "-i", str(custom_ignore), "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
 

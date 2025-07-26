@@ -31,7 +31,7 @@ def normalize_tree(tree):
 
 def test_basic_mapping(temp_project, run_mapper):
     """Test basic directory mapping with default settings."""
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     output_file = temp_project / "directory_tree.yaml"
     assert output_file.exists()
     result = load_yaml(output_file)
@@ -49,7 +49,7 @@ def test_basic_mapping(temp_project, run_mapper):
 
 def test_directory_content(temp_project, run_mapper):
     """Test directory structure and content preservation."""
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     src_dir = find_node_by_path(result, ["src"])
     assert src_dir is not None and src_dir["type"] == "directory"
@@ -93,7 +93,7 @@ def test_file_content_encoding(temp_project, run_mapper):
     (temp_project / "multiline.txt").write_text(multiline_content_orig)
     (temp_project / "empty.txt").write_text(empty_content_orig)
 
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
 
     ascii_node = find_node_by_path(result, ["ascii.txt"])
@@ -116,7 +116,7 @@ def test_nested_structures(temp_project, run_mapper):
         contents[i] = content_str
         (current / f"file{i}.txt").write_text(content_str)
 
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
 
     current_node = result

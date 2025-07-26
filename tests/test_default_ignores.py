@@ -37,7 +37,7 @@ def test_default_python_ignores(temp_project, run_mapper):
     (temp_project / "actual_module.py").touch()
 
     # Run TreeMapper and check results
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
 
@@ -76,7 +76,7 @@ def test_git_directory_ignored(temp_project, run_mapper):
     (temp_project / "README.md").touch()
 
     # Run TreeMapper and check results
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     result = load_yaml(temp_project / "directory_tree.yaml")
     all_files = get_all_files_in_tree(result)
 
@@ -101,7 +101,7 @@ def test_default_verbosity(temp_project, run_mapper, capfd):
     capfd.readouterr()
 
     # Run with default verbosity (ERROR)
-    assert run_mapper(["."])
+    assert run_mapper([".", "-o", "directory_tree.yaml"])
     out, err = capfd.readouterr()
 
     # At ERROR level, there should be no INFO messages
