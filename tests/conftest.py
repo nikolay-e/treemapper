@@ -92,17 +92,14 @@ def set_perms(request):
 
     logging.debug(f"Cleaning up permissions for: {paths_changed}")
     for path in paths_changed:
-
         if path.exists() and path in original_perms:
             try:
-
                 if original_perms[path] is not None:
                     os.chmod(path, original_perms[path])
                     logging.debug(f"Restored permissions for {path}")
                 else:
                     logging.warning(f"Original permissions for {path} were None, not restoring.")
             except OSError as e:
-
                 logging.warning(f"Could not restore permissions for {path}: {e}")
 
 

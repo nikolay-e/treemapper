@@ -89,7 +89,6 @@ def test_output_path_is_directory(temp_project, run_mapper, caplog):
     output_should_be_file.mkdir()
 
     with caplog.at_level(logging.ERROR):
-
         run_mapper([".", "-o", str(output_should_be_file)])
 
     assert any(

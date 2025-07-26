@@ -154,7 +154,6 @@ def create_node(
             if children:
                 node["children"] = children
         elif node_type == "file":
-
             node_content: Optional[str] = None
             try:
                 # Try to read the file directly, and handle all possible errors

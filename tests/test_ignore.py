@@ -249,7 +249,6 @@ def test_bad_encoding_ignore_file(temp_project, run_mapper, caplog):
     """Тест: файл .treemapperignore имеет не-UTF8 кодировку."""
     ignore_file = temp_project / ".treemapperignore"
     try:
-
         ignore_file.write_text(".git/\nпапка_игнор/\n", encoding="cp1251")
     except LookupError:
         pytest.skip("CP1251 codec not found")

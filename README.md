@@ -4,8 +4,8 @@ A tool for converting directory structures to YAML format, designed for use with
 TreeMapper maps your entire codebase into a structured YAML file, making it easy to analyze code, document projects, and
 work with AI tools.
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/nikolay-e/TreeMapper/ci.yml)](https://github.com/nikolay-e/TreeMapper/actions)  
-[![PyPI](https://img.shields.io/pypi/v/treemapper)](https://pypi.org/project/treemapper)  
+[![Build Status](https://img.shields.io/github/actions/workflow/status/nikolay-e/TreeMapper/ci.yml)](https://github.com/nikolay-e/TreeMapper/actions)
+[![PyPI](https://img.shields.io/pypi/v/treemapper)](https://pypi.org/project/treemapper)
 [![License](https://img.shields.io/github/license/nikolay-e/TreeMapper)](https://github.com/nikolay-e/TreeMapper/blob/main/LICENSE)
 
 ## Installation
@@ -22,7 +22,7 @@ Generate a YAML tree of a directory:
 
 ```bash
 # Map current directory
-treemapper . 
+treemapper .
 
 # Map specific directory
 treemapper /path/to/dir
