@@ -44,14 +44,15 @@ def write_tree_to_file(tree: Dict[str, Any], output_file: Optional[Path]) -> Non
         # Write to stdout with proper UTF-8 encoding
         # On Windows, sys.stdout might use cp1252 encoding which can't handle Unicode
         # We need to ensure UTF-8 encoding for proper Unicode support
-        if hasattr(sys.stdout, 'reconfigure'):
+        if hasattr(sys.stdout, "reconfigure"):
             # Python 3.7+ has reconfigure method
-            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stdout.reconfigure(encoding="utf-8")
             write_tree_content(sys.stdout)
         else:
             # Fallback for older Python versions or systems without reconfigure
             import io
-            utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+            utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
             write_tree_content(utf8_stdout)
             utf8_stdout.flush()
         logging.info("Directory tree written to stdout")
