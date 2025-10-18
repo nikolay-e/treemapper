@@ -1,10 +1,15 @@
 # tests/conftest.py
 import logging
 import os
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+# Add project root/src to PYTHONPATH for subprocess tests
+PROJECT_ROOT = Path(__file__).parent.parent
+SRC_DIR = PROJECT_ROOT / "src"
 
 
 # --- Фикстура для создания временного проекта ---
@@ -52,6 +57,45 @@ def run_mapper(monkeypatch, temp_project):
                 return False
 
     return _run
+
+
+# --- Helper for running treemapper as subprocess ---
+def run_treemapper_subprocess(args, cwd=None, **kwargs):
+    """Run treemapper as a subprocess with proper environment setup.
+
+    Args:
+        args: Command line arguments to pass to treemapper
+        cwd: Working directory for the subprocess
+        **kwargs: Additional arguments to pass to subprocess.run
+
+    Returns:
+        CompletedProcess object
+    """
+    command = [sys.executable, "-m", "treemapper"] + args
+
+    # Ensure subprocess can find the treemapper module
+    env = os.environ.copy()
+    pythonpath = str(SRC_DIR)
+    if "PYTHONPATH" in env:
+        pythonpath = f"{pythonpath}{os.pathsep}{env['PYTHONPATH']}"
+    env["PYTHONPATH"] = pythonpath
+
+    # Merge with any env provided in kwargs
+    if "env" in kwargs:
+        env.update(kwargs["env"])
+    kwargs["env"] = env
+
+    # Set default values for common parameters
+    if "capture_output" not in kwargs:
+        kwargs["capture_output"] = True
+    if "text" not in kwargs:
+        kwargs["text"] = True
+    if "encoding" not in kwargs:
+        kwargs["encoding"] = "utf-8"
+    if "errors" not in kwargs:
+        kwargs["errors"] = "replace"
+
+    return subprocess.run(command, cwd=cwd, **kwargs)
 
 
 # ---> НАЧАЛО: Перенесенная фикстура set_perms <---

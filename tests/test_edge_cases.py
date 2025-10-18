@@ -5,7 +5,7 @@ from .utils import get_all_files_in_tree, load_yaml
 
 
 def test_empty_directory(temp_project, run_mapper):
-    """Тест: пустая директория в качестве входной."""
+    """Test: empty directory as input."""
     empty_dir = temp_project / "empty_test_dir"
     empty_dir.mkdir()
 
@@ -19,7 +19,7 @@ def test_empty_directory(temp_project, run_mapper):
 
 
 def test_directory_with_only_ignored(temp_project, run_mapper):
-    """Тест: директория содержит только игнорируемые файлы/папки."""
+    """Test: directory contains only ignored files/folders."""
     ignored_dir = temp_project / "ignored_only_dir"
     ignored_dir.mkdir()
     (ignored_dir / ".DS_Store").touch()
@@ -38,7 +38,7 @@ def test_directory_with_only_ignored(temp_project, run_mapper):
 
 
 def test_filenames_with_special_yaml_chars(temp_project, run_mapper):
-    """Тест: имена файлов со спецсимволами YAML (проверка ручного writer'а)."""
+    """Test: file names with YAML special characters (manual writer check)."""
 
     # Basic special characters
     (temp_project / "-startswithdash.txt").touch()

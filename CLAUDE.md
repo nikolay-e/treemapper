@@ -60,7 +60,55 @@ mypy src/treemapper
 
 # Run autoflake to remove unused imports
 autoflake --remove-all-unused-imports -i src/treemapper/*.py
+
+# Run pre-commit hooks on all files
+pre-commit run --all-files
+
+# Run isort (import sorting)
+isort src/treemapper tests
 ```
+
+## Code Quality Tools
+
+The project includes comprehensive code quality checks via CI and pre-commit hooks:
+
+```bash
+# Complexity analysis
+radon cc src/treemapper/ --min B  # Cyclomatic complexity
+radon mi src/treemapper/ --min B  # Maintainability index
+
+# Mutation testing (test effectiveness)
+mutmut run --paths-to-mutate=src/treemapper/
+
+# Architecture checks (import contracts)
+lint-imports
+
+# Coverage reporting
+pytest --cov=src/treemapper --cov-report=html
+open htmlcov/index.html
+```
+
+### CI/CD Workflows
+
+The project has two CI/CD workflows:
+
+1. **Main CI** (`.github/workflows/ci.yml`): Comprehensive quality checks
+   - Pre-commit hook validation (all hooks)
+   - Linting and type checking (flake8, black, mypy)
+   - Cross-platform testing (Linux, macOS, Windows)
+   - Python version matrix (3.9, 3.10, 3.11, 3.12)
+   - PyPy compatibility testing (pypy-3.9, pypy-3.10)
+   - Test coverage with 80% threshold and branch analysis
+   - Mutation testing (test effectiveness validation)
+   - Complexity and maintainability metrics (radon)
+   - Architecture/import contract validation (import-linter)
+   - SonarCloud quality gate (code quality analysis)
+
+2. **CD (Release)** (`.github/workflows/cd.yml`): Atomic releases
+   - Version bump with git bundles
+   - Multi-platform binary builds (Linux, macOS, Windows)
+   - PyPI publishing (optional)
+   - GitHub release creation with assets
 
 ## Project Architecture
 

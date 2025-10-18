@@ -21,14 +21,17 @@ pip install treemapper
 Generate a YAML tree of a directory:
 
 ```bash
-# Map current directory
+# Map current directory to stdout
 treemapper .
 
-# Map specific directory
+# Map specific directory to stdout
 treemapper /path/to/dir
 
-# Custom output file
+# Save to a file
 treemapper . -o my-tree.yaml
+
+# Use "-" to explicitly output to stdout
+treemapper . -o -
 
 # Custom ignore patterns
 treemapper . -i ignore.txt
@@ -46,11 +49,13 @@ Arguments:
   DIRECTORY                    Directory to analyze (default: current directory)
 
 Options:
-  -o, --output-file FILE      Output YAML file (default: directory_tree.yaml)
+  -o, --output-file FILE      Output YAML file (default: stdout)
+                             Use "-" to force stdout output
   -i, --ignore-file FILE      Custom ignore patterns file
-  --no-default-ignores        Disable all default ignores
+  --no-default-ignores        Disable all default ignores (.gitignore, .treemapperignore, etc.)
   -v, --verbosity [0-3]       Logging verbosity (default: 0)
                              0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG
+  --version                   Show version and exit
   -h, --help                  Show this help
 ```
 
@@ -58,10 +63,13 @@ Options:
 
 By default, TreeMapper ignores:
 
-- The output file itself
+- The output file itself (when using `-o`)
 - All `.git` directories
-- Patterns from `.gitignore` files
-- Patterns from `.treemapperignore` file
+- Python cache directories (`__pycache__`, `.pytest_cache`, `.mypy_cache`, etc.)
+- Python build artifacts (`*.pyc`, `*.egg-info`, `dist/`, `build/`, etc.)
+- Patterns from `.gitignore` files (in the scanned directory and subdirectories)
+- Patterns from `.treemapperignore` file (in the scanned root directory)
+- Symbolic links (always skipped)
 
 Use `--no-default-ignores` to disable all default ignores and only use patterns from `-i/--ignore-file`.
 

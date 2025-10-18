@@ -6,7 +6,6 @@ import pytest  # Used for test decorators
 
 from .utils import find_node_by_path, get_all_files_in_tree, load_yaml
 
-
 # Skip tests on Windows since they may behave differently
 skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Skipping on Windows")
 

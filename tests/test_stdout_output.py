@@ -1,18 +1,16 @@
 # tests/test_stdout_output.py
-import subprocess
 import sys
 
 import pytest
 import yaml
 
+from .conftest import run_treemapper_subprocess
 from .utils import load_yaml
 
 
 def run_cli_command(args, cwd):
     """Run treemapper as a separate process."""
-    command = [sys.executable, "-m", "treemapper"] + args
-    result = subprocess.run(command, capture_output=True, text=True, cwd=cwd, encoding="utf-8", errors="replace")
-    return result
+    return run_treemapper_subprocess(args, cwd=cwd)
 
 
 def test_stdout_output_with_dash(temp_project):
