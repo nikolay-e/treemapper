@@ -270,8 +270,8 @@ pylint-report.txt
 # ==============================================================================
 # PyInstaller builds
 *.spec.bak
-treemapper
-treemapper.exe
+/treemapper
+/treemapper.exe
 
 # GitHub release artifacts
 release-notes.md

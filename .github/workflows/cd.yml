@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Need full history for git bundle
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -45,8 +47,9 @@ jobs:
           fi
 
       - name: Set version in version.py
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
           echo "Setting version to $VERSION"
           python - <<'PY'
           import os, re, pathlib
@@ -248,6 +251,9 @@ jobs:
         run: |
           git clone repo.bundle repo
           cd repo
+          git checkout main
+          echo "Current branch: $(git branch --show-current)"
+          echo "Current commit: $(git rev-parse HEAD)"
 
       - name: Push commit and tag to main
         working-directory: ./repo
