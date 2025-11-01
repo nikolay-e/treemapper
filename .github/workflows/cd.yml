@@ -1,5 +1,5 @@
 # .github/workflows/cd.yml
-name: TreeMapper CD
+name: treemapper CD
 
 permissions:
   contents: write

@@ -1,5 +1,5 @@
 # .github/workflows/ci.yml
-name: TreeMapper CI
+name: treemapper CI
 
 permissions:
   contents: read
@@ -377,7 +377,7 @@ jobs:
       - name: Create sonar-project.properties
         run: |
           cat > sonar-project.properties <<EOF
-          sonar.projectKey=nikolay-e_TreeMapper
+          sonar.projectKey=nikolay-e_treemapper
           sonar.organization=nikolay-e
           sonar.sources=src/treemapper
           sonar.tests=tests

@@ -1,12 +1,12 @@
-# TreeMapper
+# treemapper
 
 A tool for converting directory structures to structured formats (YAML, JSON, or text), designed for use with Large Language Models (LLMs).
-TreeMapper maps your entire codebase into a structured file, making it easy to analyze code, document projects, and
+treemapper maps your entire codebase into a structured file, making it easy to analyze code, document projects, and
 work with AI tools.
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/nikolay-e/TreeMapper/ci.yml)](https://github.com/nikolay-e/TreeMapper/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/nikolay-e/treemapper/ci.yml)](https://github.com/nikolay-e/treemapper/actions)
 [![PyPI](https://img.shields.io/pypi/v/treemapper)](https://pypi.org/project/treemapper)
-[![License](https://img.shields.io/github/license/nikolay-e/TreeMapper)](https://github.com/nikolay-e/TreeMapper/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/nikolay-e/treemapper)](https://github.com/nikolay-e/treemapper/blob/main/LICENSE)
 
 ## Installation
 
@@ -84,7 +84,7 @@ Options:
 
 ### Ignore Patterns
 
-By default, TreeMapper ignores:
+By default, treemapper ignores:
 
 - The output file itself (when using `-o`)
 - All `.git` directories
