@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nikolay-e/TreeMapper"
+Homepage = "https://github.com/nikolay-e/treemapper"
 
 [project.scripts]
 treemapper = "treemapper.treemapper:main"
