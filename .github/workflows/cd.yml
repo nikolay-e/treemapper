@@ -129,6 +129,15 @@ jobs:
           cd repo
           git checkout ${{ needs.prepare-version.outputs.tag_name }}
 
+          # Debug: verify we're in the right state
+          echo "Current directory: $(pwd)"
+          echo "Current tag: $(git describe --tags --exact-match 2>/dev/null || echo 'no tag')"
+          echo "Current commit: $(git rev-parse HEAD)"
+          echo "Version file content:"
+          cat src/treemapper/version.py || echo "ERROR: version.py not found!"
+          echo "Directory structure:"
+          ls -la src/treemapper/ || echo "ERROR: src/treemapper not found!"
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -147,12 +156,27 @@ jobs:
         working-directory: ./repo
         run: |
           python -m pip install --upgrade pip
-          pip install .[dev]
+          # Install in editable mode to ensure version.py changes are picked up
+          pip install -e .[dev]
+
+          # Verify the installed version matches what we expect
+          echo "Verifying installed version:"
+          python -c "from treemapper.version import __version__; print(f'Version in module: {__version__}')"
+          echo "Expected version: ${{ needs.prepare-version.outputs.version }}"
 
       - name: Build with PyInstaller
         working-directory: ./repo
         run: |
-          python -m PyInstaller --clean -y --dist ./dist/${{ matrix.asset_name }} treemapper.spec
+          # Ensure PyInstaller can find the modules
+          export PYTHONPATH="${PWD}/src:${PYTHONPATH}"
+          echo "PYTHONPATH: $PYTHONPATH"
+
+          # Run PyInstaller with explicit paths
+          python -m PyInstaller --clean -y --dist ./dist/${{ matrix.asset_name }} --paths ./src treemapper.spec
+
+          # Verify the built executable exists (cross-platform)
+          echo "Checking for built executable in: ./dist/${{ matrix.asset_name }}/"
+          ls -la "./dist/${{ matrix.asset_name }}/" || echo "ERROR: dist directory not found!"
 
       - name: Determine architecture
         id: arch
@@ -211,6 +235,15 @@ jobs:
           cd repo
           git checkout ${{ needs.prepare-version.outputs.tag_name }}
 
+          # Debug: verify we're in the right state
+          echo "Current directory: $(pwd)"
+          echo "Current tag: $(git describe --tags --exact-match 2>/dev/null || echo 'no tag')"
+          echo "Current commit: $(git rev-parse HEAD)"
+          echo "Version file content:"
+          cat src/treemapper/version.py || echo "ERROR: version.py not found!"
+          echo "Directory structure:"
+          ls -la src/treemapper/ || echo "ERROR: src/treemapper not found!"
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -222,9 +255,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
+          # Verify version.py has the correct version
+          echo "Version in version.py:"
+          cat src/treemapper/version.py
+          echo "Expected version: ${{ needs.prepare-version.outputs.version }}"
+
       - name: Build sdist and wheel
         working-directory: ./repo
-        run: python -m build
+        run: |
+          # Build the distribution packages
+          python -m build
+
+          # Verify the built packages have correct version in filename
+          echo "Built packages:"
+          ls -la dist/
+          echo "Looking for version ${{ needs.prepare-version.outputs.version }} in package names..."
+          ls dist/*${{ needs.prepare-version.outputs.version }}* || echo "WARNING: No packages found with expected version!"
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -254,6 +300,12 @@ jobs:
           git checkout main
           echo "Current branch: $(git branch --show-current)"
           echo "Current commit: $(git rev-parse HEAD)"
+
+          # Set up remote to point to the actual GitHub repository
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
+          # Verify remote is set up correctly
+          git remote -v
 
       - name: Push commit and tag to main
         working-directory: ./repo
