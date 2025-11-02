@@ -1,17 +1,4 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-**IMPORTANT: Workspace-Level Configuration Inheritance**
-
-This project inherits configuration from the workspace root:
-- Read `../CLAUDE.md` for core development principles (testing, documentation, git workflow)
-- Read `../private/SYSTEM_SETUP.md` for workspace infrastructure and communication guidelines
-- `.claude/settings.json` → symlink to `../../.claude/settings.json` (hooks, permissions, automation)
-- `.claude/commands/` → symlink to `../../.claude/commands/` (slash commands: /setup, /review, /test, /commit, /bl)
-- Local overrides: `.claude/settings.local.json` (project-specific settings)
-
-**Communication:** Always use Russian with user, English for code/comments/docs.
+# CLAUDE.md - TreeMapper
 
 ## Project Overview
 
