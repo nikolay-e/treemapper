@@ -221,7 +221,7 @@ jobs:
           verbose: true
 
       - name: Upload coverage for SonarCloud
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: matrix.python-version == '3.12'
         with:
           name: coverage-report
@@ -362,7 +362,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download coverage reports
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-report
           path: .
