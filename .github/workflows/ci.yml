@@ -116,7 +116,8 @@ jobs:
 
       - name: Run Tests with Coverage
         run: |
-          pytest -v --cov=src/treemapper --cov-report=xml --cov-report=term-missing --cov-branch --junitxml=test-results.xml
+          pytest -v --cov=src/treemapper --cov-report=xml \
+            --cov-report=term-missing --cov-branch --junitxml=test-results.xml
 
       - name: Coverage report with threshold
         if: runner.os == 'Linux' && matrix.python-version == '3.12'
