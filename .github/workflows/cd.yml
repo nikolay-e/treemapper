@@ -133,6 +133,7 @@ jobs:
           name: git-repo-bundle
 
       - name: Restore repository from bundle
+        shell: bash
         run: |
           git clone repo.bundle repo
           cd repo
@@ -181,7 +182,7 @@ jobs:
           echo "PYTHONPATH: $PYTHONPATH"
 
           # Run PyInstaller with explicit paths
-          python -m PyInstaller --clean -y --dist ./dist/${{ matrix.asset_name }} --paths ./src treemapper.spec
+          python -m PyInstaller --clean -y --dist ./dist/${{ matrix.asset_name }} treemapper.spec
 
           # Verify the built executable exists (cross-platform)
           echo "Checking for built executable in: ./dist/${{ matrix.asset_name }}/"
@@ -207,7 +208,7 @@ jobs:
         working-directory: ./repo
         run: |
           ASSET_NAME="treemapper-${{ matrix.asset_name }}-${{ steps.arch.outputs.arch }}"
-          ASSET_NAME="${ASSET_NAME}-v${{ needs.prepare-version.outputs.version }}"
+          ASSET_NAME="${ASSET_NAME}-${{ needs.prepare-version.outputs.version }}"
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             ASSET_NAME="${ASSET_NAME}.exe"
             mv "./dist/${{ matrix.asset_name }}/treemapper.exe" "./dist/${ASSET_NAME}"
@@ -239,6 +240,7 @@ jobs:
           name: git-repo-bundle
 
       - name: Restore repository from bundle
+        shell: bash
         run: |
           git clone repo.bundle repo
           cd repo
