@@ -283,7 +283,7 @@ jobs:
           ls dist/*${VERSION}* || echo "WARNING: No packages found!"
 
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # release/v1
         with:
           packages-dir: ./repo/dist/
 
@@ -303,6 +303,8 @@ jobs:
           name: git-repo-bundle
 
       - name: Restore repository from bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git clone repo.bundle repo
           cd repo
@@ -311,9 +313,7 @@ jobs:
           echo "Current commit: $(git rev-parse HEAD)"
 
           # Set up remote to point to the actual GitHub repository
-          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}"
-          REPO_URL="${REPO_URL}@github.com/${{ github.repository }}.git"
-          git remote add origin "${REPO_URL}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
 
           # Verify remote is set up correctly
           git remote -v
@@ -338,7 +338,7 @@ jobs:
           path: ./artifacts
 
       - name: Create GitHub Release with assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@5be0e66d93ac7ed76da52eca8bb058f665c3a5fe  # v2
         with:
           tag_name: ${{ needs.prepare-version.outputs.tag_name }}
           name: Release ${{ needs.prepare-version.outputs.version }}
