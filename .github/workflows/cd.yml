@@ -175,6 +175,7 @@ jobs:
           echo "Expected version: ${{ needs.prepare-version.outputs.version }}"
 
       - name: Build with PyInstaller
+        shell: bash
         working-directory: ./repo
         run: |
           # Ensure PyInstaller can find the modules
