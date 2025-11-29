@@ -4,7 +4,7 @@ name: treemapper CD
 permissions:
   contents: write
 
-on:
+'on':
   workflow_dispatch:
     inputs:
       version:
@@ -269,8 +269,9 @@ jobs:
           # Verify the built packages have correct version in filename
           echo "Built packages:"
           ls -la dist/
-          echo "Looking for version ${{ needs.prepare-version.outputs.version }} in package names..."
-          ls dist/*${{ needs.prepare-version.outputs.version }}* || echo "WARNING: No packages found with expected version!"
+          VERSION="${{ needs.prepare-version.outputs.version }}"
+          echo "Looking for version ${VERSION} in package names..."
+          ls dist/*${VERSION}* || echo "WARNING: No packages found!"
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -302,7 +303,9 @@ jobs:
           echo "Current commit: $(git rev-parse HEAD)"
 
           # Set up remote to point to the actual GitHub repository
-          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}"
+          REPO_URL="${REPO_URL}@github.com/${{ github.repository }}.git"
+          git remote add origin "${REPO_URL}"
 
           # Verify remote is set up correctly
           git remote -v
