@@ -317,7 +317,7 @@ jobs:
           echo "Current commit: $(git rev-parse HEAD)"
 
           # Set up remote to point to the actual GitHub repository
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
 
           # Verify remote is set up correctly
           git remote -v
