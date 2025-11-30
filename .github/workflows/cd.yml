@@ -163,6 +163,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install Dependencies (including PyInstaller)
+        shell: bash
         working-directory: ./repo
         run: |
           python -m pip install --upgrade pip
