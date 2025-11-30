@@ -1,6 +1,6 @@
 import io
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 from .ignore import get_ignore_specs
 from .tree import TreeBuildContext, build_tree
