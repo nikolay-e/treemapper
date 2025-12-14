@@ -1,5 +1,7 @@
 # TreeMapper
 
+> Extends [../CLAUDE.md](../CLAUDE.md)
+
 [![PyPI](https://img.shields.io/pypi/v/treemapper)](https://pypi.org/project/treemapper/)
 [![Downloads](https://img.shields.io/pypi/dm/treemapper)](https://pypi.org/project/treemapper/)
 [![License](https://img.shields.io/github/license/nikolay-e/treemapper)](https://github.com/nikolay-e/treemapper/blob/main/LICENSE)
@@ -73,6 +75,10 @@ pip install -e ".[dev]"
 pytest
 pre-commit run --all-files
 ```
+
+## Testing
+
+Integration tests only - test against real filesystem. No mocking.
 
 ## Architecture
 
