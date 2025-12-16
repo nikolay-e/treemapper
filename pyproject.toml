@@ -60,6 +60,8 @@ dev = [
     "build>=0.10,<2.0",
     "twine>=4.0,<7.0",
     "pyinstaller>=5.0,<7.0",
+    # Security fixes
+    "urllib3>=2.6.0",
 ]
 
 [tool.setuptools.dynamic]
