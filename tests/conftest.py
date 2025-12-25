@@ -11,6 +11,10 @@ import pytest
 PROJECT_ROOT = Path(__file__).parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 
+# Constants for ignore file names
+GITIGNORE = ".gitignore"
+TREEMAPPERIGNORE = ".treemapperignore"
+
 
 # --- Фикстура для создания временного проекта ---
 @pytest.fixture
@@ -26,8 +30,8 @@ def temp_project(tmp_path):
     (temp_dir / "output").mkdir()
     (temp_dir / ".git").mkdir()
     (temp_dir / ".git" / "config").write_text("git config file", encoding="utf-8")
-    (temp_dir / ".gitignore").write_text("*.pyc\n__pycache__/\n", encoding="utf-8")
-    (temp_dir / ".treemapperignore").write_text("output/\n.git/\n", encoding="utf-8")
+    (temp_dir / GITIGNORE).write_text("*.pyc\n__pycache__/\n", encoding="utf-8")
+    (temp_dir / TREEMAPPERIGNORE).write_text("output/\n.git/\n", encoding="utf-8")
     yield temp_dir
 
 
@@ -181,13 +185,13 @@ def project_builder(tmp_path):
             return dir_path
 
         def add_gitignore(self, patterns: List[str], subdir: str = "") -> Path:
-            path = self.root / subdir / ".gitignore" if subdir else self.root / ".gitignore"
+            path = self.root / subdir / GITIGNORE if subdir else self.root / GITIGNORE
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
             return path
 
         def add_treemapperignore(self, patterns: List[str]) -> Path:
-            path = self.root / ".treemapperignore"
+            path = self.root / TREEMAPPERIGNORE
             path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
             return path
 
