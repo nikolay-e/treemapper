@@ -45,19 +45,19 @@ def _get_output_file_pattern(output_file: Optional[Path], root_dir: Path) -> Opt
         return None
 
 
-def _aggregate_gitignore_patterns(root: Path) -> List[str]:
+def _aggregate_ignore_patterns(root: Path, ignore_filename: str) -> List[str]:
     out: List[str] = []
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         dirnames.sort()
         filenames.sort()
 
-        if ".gitignore" not in filenames:
+        if ignore_filename not in filenames:
             continue
 
-        gitdir = Path(dirpath)
-        rel = "" if gitdir == root else gitdir.relative_to(root).as_posix()
+        ignore_dir = Path(dirpath)
+        rel = "" if ignore_dir == root else ignore_dir.relative_to(root).as_posix()
 
-        for line in read_ignore_file(gitdir / ".gitignore"):
+        for line in read_ignore_file(ignore_dir / ignore_filename):
             neg = line.startswith("!")
             pat = line[1:] if neg else line
 
@@ -68,27 +68,48 @@ def _aggregate_gitignore_patterns(root: Path) -> List[str]:
 
             out.append(("!" + full) if neg else full)
 
-    logging.debug(f"Aggregated {len(out)} gitignore patterns from {root}")
+    logging.debug(f"Aggregated {len(out)} {ignore_filename} patterns from {root}")
     return out
 
 
 DEFAULT_IGNORE_PATTERNS = [
+    # Version control
+    "**/.git/",
+    "**/.svn/",
+    "**/.hg/",
+    # Python
     "**/__pycache__/",
     "**/*.py[cod]",
     "**/*.so",
-    "**/.pytest_cache/",
     "**/.coverage",
-    "**/.mypy_cache/",
     "**/*.egg-info/",
     "**/.eggs/",
-    "**/.git/",
-    "**/node_modules/",
     "**/venv/",
     "**/.venv/",
     "**/.tox/",
     "**/.nox/",
+    # JavaScript/Node
+    "**/node_modules/",
+    "**/.npm/",
+    # Java/JVM
+    "**/target/",
+    "**/.gradle/",
+    # .NET
+    "**/bin/",
+    "**/obj/",
+    # Go
+    "**/vendor/",
+    # Generic build/cache
     "**/dist/",
     "**/build/",
+    "**/out/",
+    "**/.*_cache/",
+    # IDE
+    "**/.idea/",
+    "**/.vscode/",
+    # OS files
+    "**/.DS_Store",
+    "**/Thumbs.db",
 ]
 
 
@@ -102,8 +123,8 @@ def get_ignore_specs(
 
     if not no_default_ignores:
         patterns.extend(DEFAULT_IGNORE_PATTERNS)
-        patterns.extend(read_ignore_file(root_dir / ".treemapperignore"))
-        patterns.extend(_aggregate_gitignore_patterns(root_dir))
+        patterns.extend(_aggregate_ignore_patterns(root_dir, ".treemapperignore"))
+        patterns.extend(_aggregate_ignore_patterns(root_dir, ".gitignore"))
 
     if custom_ignore_file:
         patterns.extend(read_ignore_file(custom_ignore_file))

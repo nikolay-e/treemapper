@@ -148,3 +148,99 @@ def set_perms(request):
 
 
 # ---> КОНЕЦ: Перенесенная фикстура set_perms <---
+
+
+# --- New fixtures for test modernization ---
+
+
+@pytest.fixture
+def project_builder(tmp_path):
+    """Builder pattern for creating test project structures."""
+    from typing import List
+
+    class ProjectBuilder:
+        def __init__(self, base_path: Path):
+            self.root = base_path / "treemapper_test_project"
+            self.root.mkdir()
+
+        def add_file(self, path: str, content: str = "") -> Path:
+            file_path = self.root / path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content, encoding="utf-8")
+            return file_path
+
+        def add_binary(self, path: str, content: bytes = b"\x00\x01\x02") -> Path:
+            file_path = self.root / path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_bytes(content)
+            return file_path
+
+        def add_dir(self, path: str) -> Path:
+            dir_path = self.root / path
+            dir_path.mkdir(parents=True, exist_ok=True)
+            return dir_path
+
+        def add_gitignore(self, patterns: List[str], subdir: str = "") -> Path:
+            path = self.root / subdir / ".gitignore" if subdir else self.root / ".gitignore"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
+            return path
+
+        def add_treemapperignore(self, patterns: List[str]) -> Path:
+            path = self.root / ".treemapperignore"
+            path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
+            return path
+
+        def create_nested(self, depth: int, files_per_level: int = 1) -> None:
+            current = self.root
+            for i in range(depth):
+                current = current / f"level{i}"
+                current.mkdir(exist_ok=True)
+                for j in range(files_per_level):
+                    (current / f"file{j}.txt").write_text(f"Content {i}-{j}")
+
+    return ProjectBuilder(tmp_path)
+
+
+@pytest.fixture
+def cli_runner(temp_project):
+    """Simplified CLI runner with automatic success assertion."""
+
+    def _run(args, cwd=None, expect_success=True):
+        result = run_treemapper_subprocess(args, cwd=cwd or temp_project)
+        if expect_success:
+            assert result.returncode == 0, f"CLI failed with stderr: {result.stderr}"
+        return result
+
+    return _run
+
+
+@pytest.fixture
+def run_and_verify(run_mapper, temp_project):
+    """Run mapper and verify tree structure."""
+    from tests.utils import get_all_files_in_tree, load_yaml
+
+    def _run(
+        args=None,
+        expected_files=None,
+        excluded_files=None,
+        output_name="output.yaml",
+    ):
+        output_path = temp_project / output_name
+        full_args = ["."] + (args or []) + ["-o", str(output_path)]
+        success = run_mapper(full_args)
+        assert success, f"Mapper failed with args: {full_args}"
+
+        result = load_yaml(output_path)
+        all_files = get_all_files_in_tree(result)
+
+        if expected_files:
+            for f in expected_files:
+                assert f in all_files, f"Expected file '{f}' not found in tree"
+        if excluded_files:
+            for f in excluded_files:
+                assert f not in all_files, f"File '{f}' should be excluded from tree"
+
+        return result
+
+    return _run
