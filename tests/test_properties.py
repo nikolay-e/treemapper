@@ -2,7 +2,9 @@ import tempfile
 from pathlib import Path
 
 import yaml
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from treemapper import to_yaml
 from treemapper.ignore import read_ignore_file
 from treemapper.tree import _is_binary_file, _read_file_content
