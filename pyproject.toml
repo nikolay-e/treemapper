@@ -42,6 +42,7 @@ dev = [
     # Testing
     "pytest>=7.0,<9.0",
     "pytest-cov>=3.0,<8.0",
+    "pytest-xdist>=3.0,<4.0",
     "hypothesis>=6.0,<7.0",
     "mutmut>=2.0,<4.0",
     "coverage>=7.0,<8.0",
@@ -77,3 +78,4 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 norecursedirs = ["mutants", ".git", ".mypy_cache", ".pytest_cache", "__pycache__"]
+addopts = "-n auto --dist loadfile"

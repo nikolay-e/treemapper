@@ -99,3 +99,337 @@ def test_output_path_is_directory(temp_project, run_mapper, caplog):
 
     assert output_should_be_file.is_dir()
     assert not list(output_should_be_file.iterdir())
+
+
+# --- CLI argument validation tests ---
+
+
+def test_negative_max_depth(temp_project):
+    from .conftest import run_treemapper_subprocess
+
+    result = run_treemapper_subprocess([".", "--max-depth", "-1"], cwd=temp_project)
+    assert result.returncode != 0
+    assert "Error:" in result.stderr
+    assert "max-depth" in result.stderr.lower()
+
+
+def test_negative_max_file_bytes(temp_project):
+    from .conftest import run_treemapper_subprocess
+
+    result = run_treemapper_subprocess([".", "--max-file-bytes", "-1"], cwd=temp_project)
+    assert result.returncode != 0
+    assert "Error:" in result.stderr
+    assert "max-file-bytes" in result.stderr.lower()
+
+
+def test_oserror_accessing_directory(temp_project, monkeypatch, capsys):
+    import sys
+
+    from treemapper.cli import parse_args
+
+    test_dir = temp_project / "testdir"
+    test_dir.mkdir()
+
+    original_resolve = Path.resolve
+
+    def mock_resolve(self, strict=False):
+        if strict and self.name == "testdir":
+            raise OSError("Simulated OSError: disk I/O error")
+        return original_resolve(self, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", mock_resolve)
+    monkeypatch.setattr(sys, "argv", ["treemapper", str(test_dir)])
+
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args()
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert "Error:" in captured.err
+    assert "Cannot access" in captured.err
+
+
+# --- Logger coverage tests ---
+
+
+def test_logger_with_existing_handlers(caplog):
+    import logging
+
+    from treemapper.logger import setup_logging
+
+    root_logger = logging.getLogger()
+    original_handlers = root_logger.handlers[:]
+    original_level = root_logger.level
+
+    try:
+        test_handler = logging.StreamHandler()
+        root_logger.addHandler(test_handler)
+
+        setup_logging(3)
+
+        assert test_handler.level == logging.DEBUG
+        assert test_handler.formatter is not None
+    finally:
+        root_logger.handlers = original_handlers
+        root_logger.setLevel(original_level)
+
+
+def test_logger_with_handler_without_formatter():
+    import logging
+
+    from treemapper.logger import setup_logging
+
+    root_logger = logging.getLogger()
+    original_handlers = root_logger.handlers[:]
+    original_level = root_logger.level
+
+    try:
+        root_logger.handlers.clear()
+        test_handler = logging.StreamHandler()
+        root_logger.addHandler(test_handler)
+
+        setup_logging(2)
+
+        assert test_handler.formatter is not None
+    finally:
+        root_logger.handlers = original_handlers
+        root_logger.setLevel(original_level)
+
+
+def test_logger_no_handlers():
+    import logging
+
+    from treemapper.logger import setup_logging
+
+    root_logger = logging.getLogger()
+    original_handlers = root_logger.handlers[:]
+    original_level = root_logger.level
+
+    try:
+        root_logger.handlers.clear()
+
+        setup_logging(1)
+
+        assert len(root_logger.handlers) == 1
+        assert root_logger.handlers[0].level == logging.WARNING
+    finally:
+        root_logger.handlers = original_handlers
+        root_logger.setLevel(original_level)
+
+
+# --- tree.py coverage tests ---
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    reason="os.chmod limited on Windows/WSL",
+)
+def test_unreadable_directory(temp_project, set_perms):
+    from .conftest import run_treemapper_subprocess
+
+    unreadable_dir = temp_project / "locked"
+    unreadable_dir.mkdir()
+    (unreadable_dir / "secret.txt").write_text("hidden", encoding="utf-8")
+    set_perms(unreadable_dir, 0o000)
+
+    output_path = temp_project / "output.yaml"
+    result = run_treemapper_subprocess([".", "-o", str(output_path), "-v", "1"], cwd=temp_project)
+
+    assert result.returncode == 0
+    assert "Permission denied" in result.stderr
+
+    tree = load_yaml(output_path)
+    dir_names = [c["name"] for c in tree.get("children", [])]
+    assert "locked" in dir_names
+
+
+def test_file_with_null_bytes_detected_as_binary(temp_project, run_mapper, caplog):
+    file_with_nulls = temp_project / "with_nulls.txt"
+    file_with_nulls.write_bytes(b"hello\x00world\x00test")
+
+    output_path = temp_project / "output.yaml"
+    with caplog.at_level(logging.WARNING):
+        assert run_mapper([".", "-o", str(output_path)])
+
+    result = load_yaml(output_path)
+    file_node = find_node_by_path(result, ["with_nulls.txt"])
+
+    assert file_node is not None
+    assert "<binary file" in file_node.get("content", "")
+
+
+def test_file_with_null_bytes_after_sample_size(temp_project):
+    from .conftest import run_treemapper_subprocess
+
+    file_with_late_null = temp_project / "late_null.txt"
+    content = b"x" * 8200 + b"\x00" + b"y" * 100
+    file_with_late_null.write_bytes(content)
+
+    output_path = temp_project / "output.yaml"
+    result = run_treemapper_subprocess([".", "-o", str(output_path), "-v", "1"], cwd=temp_project)
+
+    assert result.returncode == 0
+    assert "Removed NULL bytes" in result.stderr
+
+    tree = load_yaml(output_path)
+    file_node = find_node_by_path(tree, ["late_null.txt"])
+
+    assert file_node is not None
+    assert "\x00" not in file_node.get("content", "")
+
+
+def test_ioerror_during_read(temp_project, run_mapper, monkeypatch, caplog):
+
+    test_file = temp_project / "test.txt"
+    test_file.write_text("test content", encoding="utf-8")
+
+    original_read_text = Path.read_text
+
+    def mock_read_text(self, *args, **kwargs):
+        if self.name == "test.txt":
+            raise IOError("Simulated IO error")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", mock_read_text)
+
+    output_path = temp_project / "output.yaml"
+    with caplog.at_level(logging.ERROR):
+        assert run_mapper([".", "-o", str(output_path)])
+
+    result = load_yaml(output_path)
+    file_node = find_node_by_path(result, ["test.txt"])
+
+    assert file_node is not None
+    assert "<unreadable content>" in file_node.get("content", "")
+
+
+# --- ignore.py edge case tests ---
+
+
+def test_read_ignore_file_nonexistent():
+    from treemapper.ignore import read_ignore_file
+
+    result = read_ignore_file(Path("/nonexistent/path/.gitignore"))
+    assert result == []
+
+
+def test_read_ignore_file_ioerror(temp_project, monkeypatch, caplog):
+    from treemapper.ignore import read_ignore_file
+
+    ignore_file = temp_project / ".testignore"
+    ignore_file.write_text("*.txt\n")
+
+    original_open = Path.open
+
+    def mock_open(self, *args, **kwargs):
+        if self.name == ".testignore":
+            raise IOError("Simulated IO error")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", mock_open)
+
+    with caplog.at_level(logging.WARNING):
+        result = read_ignore_file(ignore_file)
+
+    assert result == []
+    assert any("Could not read ignore file" in rec.message for rec in caplog.records)
+
+
+def test_get_output_file_pattern_oserror(temp_project, monkeypatch):
+    from treemapper.ignore import _get_output_file_pattern
+
+    output_file = temp_project / "output.yaml"
+
+    def mock_resolve(self):
+        raise OSError("Simulated resolve error")
+
+    monkeypatch.setattr(Path, "resolve", mock_resolve)
+
+    result = _get_output_file_pattern(output_file, temp_project)
+    assert result is None
+
+
+# --- tree.py edge case tests ---
+
+
+def test_is_output_file_oserror(temp_project, monkeypatch):
+    import pathspec
+
+    from treemapper.tree import TreeBuildContext
+
+    output_file = temp_project / "output.yaml"
+    spec = pathspec.PathSpec.from_lines("gitwildmatch", [])
+    ctx = TreeBuildContext(
+        base_dir=temp_project,
+        combined_spec=spec,
+        output_file=output_file,
+    )
+
+    test_entry = temp_project / "test.txt"
+    test_entry.touch()
+
+    original_resolve = Path.resolve
+
+    def mock_resolve(self):
+        if self.name in ("test.txt", "output.yaml"):
+            raise OSError("Simulated resolve error")
+        return original_resolve(self)
+
+    monkeypatch.setattr(Path, "resolve", mock_resolve)
+
+    assert ctx.is_output_file(test_entry) is False
+
+
+def test_process_entry_oserror(temp_project, monkeypatch, caplog):
+    import pathspec
+
+    from treemapper.tree import TreeBuildContext, _process_entry
+
+    test_file = temp_project / "problem.txt"
+    test_file.write_text("content")
+
+    spec = pathspec.PathSpec.from_lines("gitwildmatch", [])
+    ctx = TreeBuildContext(base_dir=temp_project, combined_spec=spec)
+
+    original_relative_to = Path.relative_to
+
+    def mock_relative_to(self, *args, **kwargs):
+        if self.name == "problem.txt":
+            raise OSError("Simulated relative_to error")
+        return original_relative_to(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "relative_to", mock_relative_to)
+
+    with caplog.at_level(logging.WARNING):
+        result = _process_entry(test_file, ctx, 0)
+
+    assert result is None
+    assert any("Could not process path" in rec.message for rec in caplog.records)
+
+
+def test_create_node_exception(temp_project, monkeypatch, caplog):
+    import pathspec
+
+    from treemapper.tree import TreeBuildContext, _create_node
+
+    test_file = temp_project / "broken.txt"
+    test_file.write_text("content")
+
+    spec = pathspec.PathSpec.from_lines("gitwildmatch", [])
+    ctx = TreeBuildContext(base_dir=temp_project, combined_spec=spec)
+
+    original_is_dir = Path.is_dir
+
+    def mock_is_dir(self):
+        if self.name == "broken.txt":
+            raise RuntimeError("Simulated is_dir error")
+        return original_is_dir(self)
+
+    monkeypatch.setattr(Path, "is_dir", mock_is_dir)
+
+    with caplog.at_level(logging.ERROR):
+        result = _create_node(test_file, ctx, 0)
+
+    assert result is None
+    assert any("Failed to create node" in rec.message for rec in caplog.records)

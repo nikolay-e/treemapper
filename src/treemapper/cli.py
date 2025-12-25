@@ -20,11 +20,31 @@ class ParsedArgs:
     max_file_bytes: Optional[int]
 
 
+DEFAULT_IGNORES_HELP = """
+Default ignored patterns (use --no-default-ignores to include all):
+  .git/, .svn/, .hg/    Version control directories
+  __pycache__/, *.py[cod], *.so, venv/, .venv/, .tox/, .nox/  Python
+  node_modules/, .npm/  JavaScript/Node
+  target/, .gradle/     Java/Maven/Gradle
+  bin/, obj/            .NET
+  vendor/               Go/PHP
+  dist/, build/, out/   Generic build output
+  .*_cache/             All cache dirs (.pytest_cache, .mypy_cache, etc.)
+  .idea/, .vscode/      IDE configurations
+  .DS_Store, Thumbs.db  OS-specific files
+
+Ignore files (hierarchical, like git):
+  .gitignore            Standard git ignore patterns
+  .treemapperignore     TreeMapper-specific patterns
+"""
+
+
 def parse_args() -> ParsedArgs:
     parser = argparse.ArgumentParser(
         prog="treemapper",
         description="Generate a structured representation of a directory tree (YAML, JSON, or text).",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        epilog=DEFAULT_IGNORES_HELP,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")

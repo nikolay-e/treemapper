@@ -12,6 +12,10 @@ class LiteralStr(str):
     pass
 
 
+class QuotedStr(str):
+    pass
+
+
 _yaml_representer_registered = False
 
 
@@ -20,18 +24,26 @@ def _ensure_yaml_representer() -> None:
     if _yaml_representer_registered:
         return
 
-    def representer(dumper: yaml.SafeDumper, data: LiteralStr) -> yaml.ScalarNode:
+    def literal_representer(dumper: yaml.SafeDumper, data: LiteralStr) -> yaml.ScalarNode:
         style = "|" if data and not data.endswith("\n") else "|+"
         return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
 
-    yaml.add_representer(LiteralStr, representer, Dumper=yaml.SafeDumper)
+    def quoted_representer(dumper: yaml.SafeDumper, data: QuotedStr) -> yaml.ScalarNode:
+        # Use double-quote style to properly escape NEL (U+0085) and other special chars
+        return dumper.represent_scalar("tag:yaml.org,2002:str", str(data), style='"')
+
+    yaml.add_representer(LiteralStr, literal_representer, Dumper=yaml.SafeDumper)
+    yaml.add_representer(QuotedStr, quoted_representer, Dumper=yaml.SafeDumper)
     _yaml_representer_registered = True
 
 
 def _prepare_tree_for_yaml(node: Dict[str, Any]) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
     for key, value in node.items():
-        if key == "content" and isinstance(value, str) and "\n" in value:
+        if isinstance(value, str) and "\x85" in value:
+            # NEL (U+0085) must be quoted to preserve roundtrip - check FIRST
+            result[key] = QuotedStr(value)
+        elif key == "content" and isinstance(value, str) and "\n" in value:
             result[key] = LiteralStr(value)
         elif key == "children" and isinstance(value, list):
             result[key] = [_prepare_tree_for_yaml(child) for child in value]
