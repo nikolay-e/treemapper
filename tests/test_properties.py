@@ -1,7 +1,11 @@
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
+
+pytest.importorskip("hypothesis")
+
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -15,6 +19,8 @@ filename_chars_with_nel = st.text(
     min_size=1,
     max_size=30,
 )
+
+pattern_text = st.text(min_size=0, max_size=50).filter(lambda x: "\n" not in x and "\r" not in x)
 
 
 @given(st.text(max_size=5000))
@@ -43,9 +49,6 @@ def test_text_file_not_detected_as_binary(data):
         f = Path(tmp_dir) / "test.txt"
         f.write_bytes(data)
         assert _is_binary_file(f) is False
-
-
-pattern_text = st.text(min_size=0, max_size=50).filter(lambda x: "\n" not in x and "\r" not in x)
 
 
 @given(st.lists(pattern_text, min_size=0, max_size=20))
