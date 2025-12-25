@@ -78,4 +78,3 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 norecursedirs = ["mutants", ".git", ".mypy_cache", ".pytest_cache", "__pycache__"]
-addopts = "-n auto --dist loadfile"
