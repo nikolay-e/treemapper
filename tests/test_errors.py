@@ -279,19 +279,19 @@ def test_file_with_null_bytes_after_sample_size(temp_project):
     assert "\x00" not in file_node.get("content", "")
 
 
-def test_ioerror_during_read(temp_project, run_mapper, monkeypatch, caplog):
+def test_oserror_during_read(temp_project, run_mapper, monkeypatch, caplog):
 
     test_file = temp_project / "test.txt"
     test_file.write_text("test content", encoding="utf-8")
 
-    original_read_text = Path.read_text
+    original_open = Path.open
 
-    def mock_read_text(self, *args, **kwargs):
-        if self.name == "test.txt":
-            raise IOError("Simulated IO error")
-        return original_read_text(self, *args, **kwargs)
+    def mock_open(self, *args, **kwargs):
+        if self.name == "test.txt" and "rb" in args:
+            raise OSError("Simulated OS error")
+        return original_open(self, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "read_text", mock_read_text)
+    monkeypatch.setattr(Path, "open", mock_open)
 
     output_path = temp_project / "output.yaml"
     with caplog.at_level(logging.ERROR):

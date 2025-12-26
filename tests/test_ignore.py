@@ -458,3 +458,33 @@ def test_hierarchical_treemapperignore(temp_project, run_mapper):
     assert find_node_by_path(result, ["subdir", "nested.bak"]) is None
     assert find_node_by_path(result, ["subdir", "important.bak"]) is not None
     assert find_node_by_path(result, ["subdir", "keep.txt"]) is not None
+
+
+def test_hierarchical_ignore_applies_recursively(temp_project, run_mapper):
+    from .utils import find_node_by_path
+
+    (temp_project / "subdir").mkdir()
+    (temp_project / "subdir" / "deep").mkdir()
+    (temp_project / "subdir" / "deep" / "deeper").mkdir()
+    (temp_project / "subdir" / ".gitignore").write_text("*.bak\n")
+
+    (temp_project / "subdir" / "level1.bak").touch()
+    (temp_project / "subdir" / "level1.txt").touch()
+    (temp_project / "subdir" / "deep" / "level2.bak").touch()
+    (temp_project / "subdir" / "deep" / "level2.txt").touch()
+    (temp_project / "subdir" / "deep" / "deeper" / "level3.bak").touch()
+    (temp_project / "subdir" / "deep" / "deeper" / "level3.txt").touch()
+
+    (temp_project / "root.bak").touch()
+
+    output_path = temp_project / "recursive_output.yaml"
+    assert run_mapper([".", "-o", str(output_path)])
+    result = load_yaml(output_path)
+
+    assert find_node_by_path(result, ["root.bak"]) is not None
+    assert find_node_by_path(result, ["subdir", "level1.bak"]) is None
+    assert find_node_by_path(result, ["subdir", "level1.txt"]) is not None
+    assert find_node_by_path(result, ["subdir", "deep", "level2.bak"]) is None
+    assert find_node_by_path(result, ["subdir", "deep", "level2.txt"]) is not None
+    assert find_node_by_path(result, ["subdir", "deep", "deeper", "level3.bak"]) is None
+    assert find_node_by_path(result, ["subdir", "deep", "deeper", "level3.txt"]) is not None

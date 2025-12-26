@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-import pathspec  # type: ignore
+import pathspec
 
 
 def read_ignore_file(file_path: Path) -> List[str]:
@@ -67,10 +67,13 @@ def _aggregate_ignore_patterns(root: Path, ignore_filename: str) -> List[str]:
             neg = line.startswith("!")
             pat = line[1:] if neg else line
 
-            if pat.startswith("/"):
-                full = f"/{rel}{pat}" if rel else pat
+            if pat.startswith("/") or "/" in pat:
+                anchored_pat = pat.lstrip("/")
+                full = f"/{rel}/{anchored_pat}" if rel else f"/{anchored_pat}"
+            elif rel:
+                full = f"{rel}/**/{pat}"
             else:
-                full = f"{rel}/{pat}" if rel else pat
+                full = pat
 
             out.append(("!" + full) if neg else full)
 

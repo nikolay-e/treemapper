@@ -1,6 +1,5 @@
 # tests/test_coverage_gaps.py
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -316,6 +315,51 @@ def test_yaml_with_special_unicode_nel(tmp_path):
     assert parsed is not None
 
 
+def test_yaml_with_unicode_line_separators(tmp_path):
+    import yaml
+
+    project = tmp_path / "project"
+    project.mkdir()
+
+    ls_char = "\u2028"
+    ps_char = "\u2029"
+    (project / "line_sep.txt").write_text(f"line1{ls_char}line2")
+    (project / "para_sep.txt").write_text(f"para1{ps_char}para2")
+
+    tree = map_directory(project)
+    yaml_output = to_yaml(tree)
+
+    parsed = yaml.safe_load(yaml_output)
+    assert parsed is not None
+
+    line_sep_node = find_node_by_path(parsed, ["line_sep.txt"])
+    para_sep_node = find_node_by_path(parsed, ["para_sep.txt"])
+
+    assert line_sep_node is not None
+    assert ls_char in line_sep_node.get("content", "")
+    assert para_sep_node is not None
+    assert ps_char in para_sep_node.get("content", "")
+
+
+def test_yaml_literal_style_without_trailing_newline(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+
+    (project / "no_newline.txt").write_text("content without newline")
+
+    tree = map_directory(project)
+    yaml_output = to_yaml(tree)
+
+    assert "no_newline.txt" in yaml_output
+
+    import yaml
+
+    parsed = yaml.safe_load(yaml_output)
+    node = find_node_by_path(parsed, ["no_newline.txt"])
+    assert node is not None
+    assert "content without newline" in node.get("content", "")
+
+
 def test_empty_directory_handling(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
@@ -363,3 +407,76 @@ def test_all_verbosity_levels(tmp_path):
     finally:
         root_logger.setLevel(original_level)
         root_logger.handlers = original_handlers
+
+
+def test_binary_detection_at_exact_boundary(tmp_path):
+    from treemapper.tree import BINARY_DETECTION_SAMPLE_SIZE
+
+    project = tmp_path / "project"
+    project.mkdir()
+
+    null_at_boundary = project / "null_at_boundary.bin"
+    content = b"x" * (BINARY_DETECTION_SAMPLE_SIZE - 1) + b"\x00" + b"y" * 100
+    null_at_boundary.write_bytes(content)
+
+    null_after_boundary = project / "null_after_boundary.txt"
+    content2 = b"x" * BINARY_DETECTION_SAMPLE_SIZE + b"\x00" + b"y" * 100
+    null_after_boundary.write_bytes(content2)
+
+    tree = map_directory(project)
+
+    boundary_node = find_node_by_path(tree, ["null_at_boundary.bin"])
+    after_node = find_node_by_path(tree, ["null_after_boundary.txt"])
+
+    assert boundary_node is not None
+    assert "<binary file:" in boundary_node.get("content", "")
+
+    assert after_node is not None
+    assert "x" * 100 in after_node.get("content", "")
+
+
+def test_deep_nesting_with_ignore_patterns(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+
+    depth = 12
+    current = project
+    for i in range(depth):
+        current = current / f"level{i}"
+        current.mkdir()
+        (current / f"keep{i}.txt").write_text(f"keep{i}")
+        (current / f"ignore{i}.bak").write_text(f"ignore{i}")
+
+    (project / "level0" / ".gitignore").write_text("*.bak\n")
+
+    tree = map_directory(project)
+    names = get_all_files_in_tree(tree)
+
+    for i in range(depth):
+        assert f"keep{i}.txt" in names
+
+    assert "ignore0.bak" not in names
+    assert "ignore5.bak" not in names
+    assert "ignore11.bak" not in names
+
+
+def test_middle_slash_pattern_is_anchored(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+
+    (project / "subdir").mkdir()
+    (project / "subdir" / "docs").mkdir()
+    (project / "subdir" / "docs" / "api.txt").write_text("should be ignored")
+    (project / "subdir" / "other").mkdir()
+    (project / "subdir" / "other" / "docs").mkdir()
+    (project / "subdir" / "other" / "docs" / "api.txt").write_text("should be kept")
+
+    (project / "subdir" / ".gitignore").write_text("docs/api.txt\n")
+
+    tree = map_directory(project)
+
+    direct_node = find_node_by_path(tree, ["subdir", "docs", "api.txt"])
+    nested_node = find_node_by_path(tree, ["subdir", "other", "docs", "api.txt"])
+
+    assert direct_node is None
+    assert nested_node is not None
