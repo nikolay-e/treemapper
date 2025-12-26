@@ -575,7 +575,6 @@ class TestIgnorePatternEdgeCases:
         (project / ".gitignore").write_text("/config.json\n", encoding="utf-8")
 
         tree = map_directory(project)
-        names = get_all_files_in_tree(tree)
 
         root_node = find_node_by_path(tree, ["config.json"])
         nested_node = find_node_by_path(tree, ["src", "config.json"])
