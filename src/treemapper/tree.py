@@ -112,6 +112,7 @@ def _read_file_content(file_path: Path, max_file_bytes: Optional[int]) -> str:
             return f"<binary file: {file_size} bytes>\n"
 
         content = raw_bytes.decode("utf-8")
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
         cleaned = content.replace("\x00", "")
         if cleaned != content:
             logging.warning(f"Removed NULL bytes from content of {file_path.name}")
