@@ -3,9 +3,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import pathspec  # type: ignore
+import pathspec
 
 from .ignore import should_ignore
+
+BINARY_DETECTION_SAMPLE_SIZE = 8192
 
 
 @dataclass
@@ -49,7 +51,7 @@ def _process_entry(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Op
     try:
         relative_path = entry.relative_to(ctx.base_dir).as_posix()
         is_dir = entry.is_dir()
-    except OSError as e:
+    except (OSError, ValueError) as e:
         logging.warning(f"Could not process path for entry {entry}: {e}")
         return None
 
@@ -86,19 +88,31 @@ def _create_node(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Opti
         return None
 
 
+def _is_binary_file(file_path: Path, sample_size: int = BINARY_DETECTION_SAMPLE_SIZE) -> bool:
+    try:
+        with file_path.open("rb") as f:
+            return b"\x00" in f.read(sample_size)
+    except OSError:
+        return False
+
+
 def _read_file_content(file_path: Path, max_file_bytes: Optional[int]) -> str:
     try:
         file_size = file_path.stat().st_size
 
         if max_file_bytes is not None and file_size > max_file_bytes:
             logging.info(f"Skipping large file {file_path.name}: {file_size} bytes > {max_file_bytes} bytes")
-            return f"<file too large: {file_size} bytes>"
+            return f"<file too large: {file_size} bytes>\n"
 
-        if _is_binary_file(file_path):
+        with file_path.open("rb") as f:
+            raw_bytes = f.read()
+
+        if b"\x00" in raw_bytes[:BINARY_DETECTION_SAMPLE_SIZE]:
             logging.debug(f"Detected binary file {file_path.name}")
-            return f"<binary file: {file_size} bytes>"
+            return f"<binary file: {file_size} bytes>\n"
 
-        content = file_path.read_text(encoding="utf-8")
+        content = raw_bytes.decode("utf-8")
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
         cleaned = content.replace("\x00", "")
         if cleaned != content:
             logging.warning(f"Removed NULL bytes from content of {file_path.name}")
@@ -114,14 +128,6 @@ def _read_file_content(file_path: Path, max_file_bytes: Optional[int]) -> str:
     except UnicodeDecodeError:
         logging.error(f"Cannot decode {file_path.name} as UTF-8. Marking as unreadable.")
         return "<unreadable content: not utf-8>\n"
-    except IOError as e:
+    except OSError as e:
         logging.error(f"Could not read {file_path.name}: {e}")
         return "<unreadable content>\n"
-
-
-def _is_binary_file(file_path: Path, sample_size: int = 8192) -> bool:
-    try:
-        with file_path.open("rb") as f:
-            return b"\x00" in f.read(sample_size)
-    except (OSError, IOError):
-        return False

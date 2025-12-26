@@ -41,12 +41,16 @@ children:
 ```bash
 treemapper .                          # YAML to stdout
 treemapper . -o tree.yaml             # save to file
+treemapper . -o -                     # explicit stdout output
 treemapper . --format json            # JSON format
 treemapper . --format text            # tree-style text
 treemapper . --no-content             # structure only (no file contents)
 treemapper . --max-depth 3            # limit directory depth
 treemapper . --max-file-bytes 10000   # skip files larger than 10KB
 treemapper . -i custom.ignore         # custom ignore patterns
+treemapper . --no-default-ignores     # disable .gitignore/.treemapperignore (custom -i still works)
+treemapper . -v 2                     # verbose output (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)
+treemapper --version                  # show version
 ```
 
 ## Python API
@@ -54,9 +58,20 @@ treemapper . -i custom.ignore         # custom ignore patterns
 ```python
 from treemapper import map_directory, to_yaml, to_json, to_text
 
-# Get tree as dict
+# Full function signature
+tree = map_directory(
+    path,                              # directory path (str or Path)
+    max_depth=None,                    # limit traversal depth
+    no_content=False,                  # exclude file contents
+    max_file_bytes=None,               # skip files larger than N bytes
+    ignore_file=None,                  # custom ignore file path
+    no_default_ignores=False,          # disable .gitignore/.treemapperignore
+)
+
+# Examples
 tree = map_directory("./myproject")
 tree = map_directory("./src", max_depth=2, no_content=True)
+tree = map_directory(".", max_file_bytes=50000, ignore_file="custom.ignore")
 
 # Serialize to string
 yaml_str = to_yaml(tree)
@@ -67,6 +82,20 @@ text_str = to_text(tree)
 ## Ignore Patterns
 
 Respects `.gitignore` and `.treemapperignore` automatically. Use `--no-default-ignores` to include everything.
+
+Features:
+- Hierarchical: nested `.gitignore`/`.treemapperignore` files work at each directory level
+- Negation patterns: `!important.log` un-ignores a file
+- Anchored patterns: `/root_only.txt` matches only in root, `*.log` matches everywhere
+- Output file is always auto-ignored (prevents recursive inclusion)
+
+## Content Placeholders
+
+When file content cannot be read normally, placeholders are used:
+- `<file too large: N bytes>` — file exceeds `--max-file-bytes` limit
+- `<binary file: N bytes>` — file detected as binary (contains null bytes)
+- `<unreadable content: not utf-8>` — file is not valid UTF-8
+- `<unreadable content>` — file cannot be read (permission denied, I/O error)
 
 ## Development
 

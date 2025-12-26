@@ -2,10 +2,13 @@ import io
 import json
 import logging
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, Optional, TextIO
 
 import yaml
+
+YAML_PROBLEMATIC_CHARS = frozenset({"\x85", "\u2028", "\u2029"})
 
 
 class LiteralStr(str):
@@ -16,6 +19,7 @@ class QuotedStr(str):
     pass
 
 
+_yaml_representer_lock = threading.Lock()
 _yaml_representer_registered = False
 
 
@@ -23,25 +27,26 @@ def _ensure_yaml_representer() -> None:
     global _yaml_representer_registered
     if _yaml_representer_registered:
         return
+    with _yaml_representer_lock:
+        if _yaml_representer_registered:
+            return
 
-    def literal_representer(dumper: yaml.SafeDumper, data: LiteralStr) -> yaml.ScalarNode:
-        style = "|" if data and not data.endswith("\n") else "|+"
-        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+        def literal_representer(dumper: yaml.SafeDumper, data: LiteralStr) -> yaml.ScalarNode:
+            style = "|+" if data.endswith("\n") else "|"
+            return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
 
-    def quoted_representer(dumper: yaml.SafeDumper, data: QuotedStr) -> yaml.ScalarNode:
-        # Use double-quote style to properly escape NEL (U+0085) and other special chars
-        return dumper.represent_scalar("tag:yaml.org,2002:str", str(data), style='"')
+        def quoted_representer(dumper: yaml.SafeDumper, data: QuotedStr) -> yaml.ScalarNode:
+            return dumper.represent_scalar("tag:yaml.org,2002:str", str(data), style='"')
 
-    yaml.add_representer(LiteralStr, literal_representer, Dumper=yaml.SafeDumper)
-    yaml.add_representer(QuotedStr, quoted_representer, Dumper=yaml.SafeDumper)
-    _yaml_representer_registered = True
+        yaml.add_representer(LiteralStr, literal_representer, Dumper=yaml.SafeDumper)
+        yaml.add_representer(QuotedStr, quoted_representer, Dumper=yaml.SafeDumper)
+        _yaml_representer_registered = True
 
 
 def _prepare_tree_for_yaml(node: Dict[str, Any]) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
     for key, value in node.items():
-        if isinstance(value, str) and "\x85" in value:
-            # NEL (U+0085) must be quoted to preserve roundtrip - check FIRST
+        if isinstance(value, str) and any(c in value for c in YAML_PROBLEMATIC_CHARS):
             result[key] = QuotedStr(value)
         elif key == "content" and isinstance(value, str) and "\n" in value:
             result[key] = LiteralStr(value)
@@ -109,16 +114,19 @@ def write_tree_to_file(tree: Dict[str, Any], output_file: Optional[Path], output
         except AttributeError:
             buf = None
 
-        if buf:
-            utf8_stdout = io.TextIOWrapper(buf, encoding="utf-8", newline="")
-            try:
-                write_tree_content(utf8_stdout)
-                utf8_stdout.flush()
-            finally:
-                utf8_stdout.detach()
-        else:
-            write_tree_content(sys.stdout)
-            sys.stdout.flush()
+        try:
+            if buf:
+                utf8_stdout = io.TextIOWrapper(buf, encoding="utf-8", newline="")
+                try:
+                    write_tree_content(utf8_stdout)
+                    utf8_stdout.flush()
+                finally:
+                    utf8_stdout.detach()
+            else:
+                write_tree_content(sys.stdout)
+                sys.stdout.flush()
+        except BrokenPipeError:
+            pass
 
         logging.info(f"Directory tree written to stdout in {output_format} format")
     else:
@@ -127,14 +135,14 @@ def write_tree_to_file(tree: Dict[str, Any], output_file: Optional[Path], output
 
             if output_file.is_dir():
                 logging.error(f"Cannot write to '{output_file}': is a directory")
-                raise IOError(f"Is a directory: {output_file}")
+                raise IsADirectoryError(f"Is a directory: {output_file}")
 
             with output_file.open("w", encoding="utf-8") as f:
                 write_tree_content(f)
             logging.info(f"Directory tree saved to {output_file} in {output_format} format")
-        except PermissionError as e:
+        except PermissionError:
             logging.error(f"Unable to write to file '{output_file}': Permission denied")
-            raise IOError(f"Permission denied: {output_file}") from e
-        except IOError as e:
+            raise
+        except OSError as e:
             logging.error(f"Unable to write to file '{output_file}': {e}")
             raise
