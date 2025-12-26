@@ -302,7 +302,7 @@ def test_yaml_with_special_unicode_nel(tmp_path):
     project.mkdir()
 
     nel_char = "\u0085"
-    (project / "nel_file.txt").write_text(f"line1{nel_char}line2")
+    (project / "nel_file.txt").write_text(f"line1{nel_char}line2", encoding="utf-8")
 
     tree = map_directory(project)
     yaml_output = to_yaml(tree)
@@ -323,8 +323,8 @@ def test_yaml_with_unicode_line_separators(tmp_path):
 
     ls_char = "\u2028"
     ps_char = "\u2029"
-    (project / "line_sep.txt").write_text(f"line1{ls_char}line2")
-    (project / "para_sep.txt").write_text(f"para1{ps_char}para2")
+    (project / "line_sep.txt").write_text(f"line1{ls_char}line2", encoding="utf-8")
+    (project / "para_sep.txt").write_text(f"para1{ps_char}para2", encoding="utf-8")
 
     tree = map_directory(project)
     yaml_output = to_yaml(tree)
