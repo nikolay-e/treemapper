@@ -88,6 +88,14 @@ def _create_node(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Opti
         return None
 
 
+def _is_binary_file(file_path: Path, sample_size: int = BINARY_DETECTION_SAMPLE_SIZE) -> bool:
+    try:
+        with file_path.open("rb") as f:
+            return b"\x00" in f.read(sample_size)
+    except OSError:
+        return False
+
+
 def _read_file_content(file_path: Path, max_file_bytes: Optional[int]) -> str:
     try:
         file_size = file_path.stat().st_size
