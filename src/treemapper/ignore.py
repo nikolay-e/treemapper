@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-import pathspec  # type: ignore
+import pathspec
 
 
 def read_ignore_file(file_path: Path) -> List[str]:
@@ -13,7 +13,13 @@ def read_ignore_file(file_path: Path) -> List[str]:
 
     try:
         with file_path.open("r", encoding="utf-8") as f:
-            ignore_patterns = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+            for line in f:
+                stripped = line.rstrip("\n\r")
+                if not stripped.strip():
+                    continue
+                if stripped.startswith("#"):
+                    continue
+                ignore_patterns.append(stripped.rstrip())
         logging.info(f"Using ignore patterns from {file_path}")
         logging.debug(f"Read ignore patterns from {file_path}: {ignore_patterns}")
     except PermissionError:
@@ -61,10 +67,13 @@ def _aggregate_ignore_patterns(root: Path, ignore_filename: str) -> List[str]:
             neg = line.startswith("!")
             pat = line[1:] if neg else line
 
-            if pat.startswith("/"):
-                full = f"/{rel}{pat}" if rel else pat
+            if pat.startswith("/") or "/" in pat:
+                anchored_pat = pat.lstrip("/")
+                full = f"/{rel}/{anchored_pat}" if rel else f"/{anchored_pat}"
+            elif rel:
+                full = f"{rel}/**/{pat}"
             else:
-                full = f"{rel}/{pat}" if rel else pat
+                full = pat
 
             out.append(("!" + full) if neg else full)
 
@@ -123,8 +132,8 @@ def get_ignore_specs(
 
     if not no_default_ignores:
         patterns.extend(DEFAULT_IGNORE_PATTERNS)
-        patterns.extend(_aggregate_ignore_patterns(root_dir, ".treemapperignore"))
         patterns.extend(_aggregate_ignore_patterns(root_dir, ".gitignore"))
+        patterns.extend(_aggregate_ignore_patterns(root_dir, ".treemapperignore"))
 
     if custom_ignore_file:
         patterns.extend(read_ignore_file(custom_ignore_file))
