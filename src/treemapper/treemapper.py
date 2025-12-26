@@ -1,3 +1,37 @@
+import errno
+import os
+import sys
+from contextlib import contextmanager
+from typing import Generator
+
+
+@contextmanager
+def _handle_broken_pipe() -> Generator[None, None, None]:
+    try:
+        yield
+        sys.stdout.flush()
+    except BrokenPipeError:
+        _suppress_broken_pipe()
+    except ValueError:
+        _suppress_broken_pipe()
+    except OSError as e:
+        if e.errno in (errno.EINVAL, errno.EPIPE):
+            _suppress_broken_pipe()
+        raise
+
+
+def _suppress_broken_pipe() -> None:
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        try:
+            os.dup2(devnull, sys.stdout.fileno())
+        finally:
+            os.close(devnull)
+    except Exception:
+        pass
+    sys.exit(0)
+
+
 def main() -> None:
     from .cli import parse_args
     from .ignore import get_ignore_specs
@@ -23,7 +57,11 @@ def main() -> None:
         "children": build_tree(args.root_dir, ctx),
     }
 
-    write_tree_to_file(directory_tree, args.output_file, args.output_format)
+    if args.output_file is None:
+        with _handle_broken_pipe():
+            write_tree_to_file(directory_tree, args.output_file, args.output_format)
+    else:
+        write_tree_to_file(directory_tree, args.output_file, args.output_format)
 
 
 if __name__ == "__main__":

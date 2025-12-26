@@ -184,7 +184,7 @@ jobs:
           echo "PYTHONPATH: $PYTHONPATH"
 
           # Run PyInstaller with explicit paths
-          python -m PyInstaller --clean -y --dist ./dist/${{ matrix.asset_name }} treemapper.spec
+          python -m PyInstaller --clean -y --distpath "./dist/${{ matrix.asset_name }}" treemapper.spec
 
           # Verify the built executable exists (cross-platform)
           echo "Checking for built executable in: ./dist/${{ matrix.asset_name }}/"

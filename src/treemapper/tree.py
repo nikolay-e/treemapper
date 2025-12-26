@@ -92,11 +92,11 @@ def _read_file_content(file_path: Path, max_file_bytes: Optional[int]) -> str:
 
         if max_file_bytes is not None and file_size > max_file_bytes:
             logging.info(f"Skipping large file {file_path.name}: {file_size} bytes > {max_file_bytes} bytes")
-            return f"<file too large: {file_size} bytes>"
+            return f"<file too large: {file_size} bytes>\n"
 
         if _is_binary_file(file_path):
             logging.debug(f"Detected binary file {file_path.name}")
-            return f"<binary file: {file_size} bytes>"
+            return f"<binary file: {file_size} bytes>\n"
 
         content = file_path.read_text(encoding="utf-8")
         cleaned = content.replace("\x00", "")

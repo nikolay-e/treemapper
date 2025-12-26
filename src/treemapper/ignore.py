@@ -13,7 +13,13 @@ def read_ignore_file(file_path: Path) -> List[str]:
 
     try:
         with file_path.open("r", encoding="utf-8") as f:
-            ignore_patterns = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+            for line in f:
+                stripped = line.rstrip("\n\r")
+                if not stripped.strip():
+                    continue
+                if stripped.startswith("#"):
+                    continue
+                ignore_patterns.append(stripped.rstrip())
         logging.info(f"Using ignore patterns from {file_path}")
         logging.debug(f"Read ignore patterns from {file_path}: {ignore_patterns}")
     except PermissionError:
