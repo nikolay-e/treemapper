@@ -39,31 +39,49 @@ children:
 ## Usage
 
 ```bash
-treemapper .                          # YAML to stdout
+treemapper .                          # YAML to stdout + token count
 treemapper . -o tree.yaml             # save to file
+treemapper . -o                       # save to tree.yaml (default filename)
 treemapper . -o -                     # explicit stdout output
-treemapper . --format json            # JSON format
-treemapper . --format text            # tree-style text
+treemapper . -f json                  # JSON format
+treemapper . -f txt                   # plain text with indentation
+treemapper . -f md                    # Markdown with headings and fenced code blocks
+treemapper . -f yml                   # YAML format (alias for yaml)
 treemapper . --no-content             # structure only (no file contents)
 treemapper . --max-depth 3            # limit directory depth
 treemapper . --max-file-bytes 10000   # skip files larger than 10KB
+treemapper . --max-file-bytes 0       # no limit (include all files)
 treemapper . -i custom.ignore         # custom ignore patterns
 treemapper . --no-default-ignores     # disable .gitignore/.treemapperignore (custom -i still works)
-treemapper . -v 2                     # verbose output (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)
-treemapper . -c                       # copy output to clipboard (also outputs to stdout)
-treemapper . --copy-only              # copy to clipboard only (no stdout output)
-treemapper --version                  # show version
+treemapper . --log-level info         # log level (error/warning/info/debug)
+treemapper . -c                       # copy to clipboard (no stdout)
+treemapper . -c -o tree.yaml          # copy to clipboard + save to file
+treemapper -v                         # show version
 ```
+
+## Token Counting
+
+Token count and size are always displayed on stderr:
+
+```
+12,847 tokens (o200k_base), 52.3 KB
+Copied to clipboard
+```
+
+For large outputs (>1MB), approximate counts are shown with `~` prefix:
+```
+~125,000 tokens (o200k_base), 5.2 MB
+```
+
+Uses tiktoken with `o200k_base` encoding (GPT-4o tokenizer).
 
 ## Clipboard Support
 
 Copy output directly to clipboard with `-c` or `--copy`:
 
 ```bash
-treemapper . -c                       # copy to clipboard + stdout
+treemapper . -c                       # copy to clipboard (no stdout)
 treemapper . -c -o tree.yaml          # copy to clipboard + save to file
-treemapper . --copy-only              # copy to clipboard only
-treemapper . --copy-only -o tree.yaml # copy to clipboard + save to file (no stdout)
 ```
 
 **System Requirements:**
@@ -72,10 +90,12 @@ treemapper . --copy-only -o tree.yaml # copy to clipboard + save to file (no std
 - **Linux/FreeBSD (Wayland):** `wl-copy` (install: `sudo apt install wl-clipboard`)
 - **Linux/FreeBSD (X11):** `xclip` or `xsel` (install: `sudo apt install xclip`)
 
+If clipboard is unavailable, output falls back to stdout with a warning on stderr.
+
 ## Python API
 
 ```python
-from treemapper import map_directory, to_yaml, to_json, to_text
+from treemapper import map_directory, to_yaml, to_json, to_text, to_markdown
 
 # Full function signature
 tree = map_directory(
@@ -95,7 +115,8 @@ tree = map_directory(".", max_file_bytes=50000, ignore_file="custom.ignore")
 # Serialize to string
 yaml_str = to_yaml(tree)
 json_str = to_json(tree)
-text_str = to_text(tree)
+text_str = to_text(tree)    # or to_txt(tree)
+md_str = to_markdown(tree)  # or to_md(tree)
 ```
 
 ## Ignore Patterns
@@ -111,8 +132,8 @@ Features:
 ## Content Placeholders
 
 When file content cannot be read normally, placeholders are used:
-- `<file too large: N bytes>` — file exceeds `--max-file-bytes` limit
-- `<binary file: N bytes>` — file detected as binary (contains null bytes)
+- `<file too large: N bytes>` — file exceeds `--max-file-bytes` limit (default: 10 MB)
+- `<binary file: N bytes>` — binary file (detected by extension or null bytes)
 - `<unreadable content: not utf-8>` — file is not valid UTF-8
 - `<unreadable content>` — file cannot be read (permission denied, I/O error)
 
@@ -134,8 +155,9 @@ Integration tests only - test against real filesystem. No mocking.
 src/treemapper/
 ├── cli.py        # argument parsing
 ├── ignore.py     # gitignore/treemapperignore handling
+├── tokens.py     # token counting (tiktoken)
 ├── tree.py       # directory traversal
-├── writer.py     # YAML/JSON/text output
+├── writer.py     # YAML/JSON/text/Markdown output
 └── treemapper.py # main entry point
 ```
 

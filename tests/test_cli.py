@@ -11,16 +11,14 @@ def test_cli_help(temp_project, flag):
     assert "usage: treemapper" in result.stdout.lower()
     assert "--help" in result.stdout
     assert "--output-file" in result.stdout
-    assert "--verbosity" in result.stdout
+    assert "--log-level" in result.stdout
 
 
-@pytest.mark.parametrize("invalid_value", ["5", "-1"])
-def test_cli_invalid_verbosity(temp_project, invalid_value):
-    result = run_treemapper_subprocess(["-v", invalid_value], cwd=temp_project)
+@pytest.mark.parametrize("invalid_value", ["verbose", "quiet"])
+def test_cli_invalid_log_level(temp_project, invalid_value):
+    result = run_treemapper_subprocess(["--log-level", invalid_value], cwd=temp_project)
     assert result.returncode != 0
-    assert (
-        f"invalid choice: '{invalid_value}'" in result.stderr or f"invalid choice: {invalid_value}" in result.stderr
-    ), f"stderr: {result.stderr}"
+    assert "invalid choice" in result.stderr.lower(), f"stderr: {result.stderr}"
 
 
 def test_cli_version_display(temp_project):

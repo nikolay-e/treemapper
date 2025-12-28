@@ -234,7 +234,7 @@ def test_unreadable_ignore_file(temp_project, run_mapper, set_perms, caplog):
     set_perms(ignore_file, 0o000)
 
     with caplog.at_level(logging.WARNING):
-        assert run_mapper([".", "-o", "directory_tree.yaml", "-v", "1"])
+        assert run_mapper([".", "-o", "directory_tree.yaml", "--log-level", "warning"])
 
     assert any(
         "Could not read ignore file" in rec.message and ignore_file.name in rec.message
@@ -253,7 +253,7 @@ def test_bad_encoding_ignore_file(temp_project, run_mapper, caplog):
         pytest.skip("CP1251 codec not found")
 
     with caplog.at_level(logging.WARNING):
-        assert run_mapper([".", "-o", "directory_tree.yaml", "-v", "1"])
+        assert run_mapper([".", "-o", "directory_tree.yaml", "--log-level", "warning"])
 
     assert any(
         "Could not decode ignore file" in rec.message and ignore_file.name in rec.message and "UTF-8" in rec.message
@@ -488,3 +488,94 @@ def test_hierarchical_ignore_applies_recursively(temp_project, run_mapper):
     assert find_node_by_path(result, ["subdir", "deep", "level2.txt"]) is not None
     assert find_node_by_path(result, ["subdir", "deep", "deeper", "level3.bak"]) is None
     assert find_node_by_path(result, ["subdir", "deep", "deeper", "level3.txt"]) is not None
+
+
+def test_prune_dirs_skipped_during_aggregation():
+    from treemapper.ignore import PRUNE_DIRS
+
+    assert ".git" in PRUNE_DIRS
+    assert "node_modules" in PRUNE_DIRS
+    assert "__pycache__" in PRUNE_DIRS
+    assert "venv" in PRUNE_DIRS
+    assert ".venv" in PRUNE_DIRS
+
+
+def test_is_cache_dir_function():
+    from treemapper.ignore import _is_cache_dir
+
+    assert _is_cache_dir(".pytest_cache") is True
+    assert _is_cache_dir(".mypy_cache") is True
+    assert _is_cache_dir(".ruff_cache") is True
+
+    assert _is_cache_dir("pytest_cache") is False
+    assert _is_cache_dir("user_cache") is False
+    assert _is_cache_dir("api_cache_manager") is False
+    assert _is_cache_dir(".cache") is False
+    assert _is_cache_dir("cache") is False
+
+
+def test_aggregate_all_ignore_patterns_single_walk(tmp_path):
+    from treemapper.ignore import _aggregate_all_ignore_patterns
+
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / ".gitignore").write_text("*.pyc\n")
+    (root / ".treemapperignore").write_text("*.log\n")
+    (root / "subdir").mkdir()
+    (root / "subdir" / ".gitignore").write_text("local.txt\n")
+
+    patterns = _aggregate_all_ignore_patterns(root, [".gitignore", ".treemapperignore"])
+
+    assert "*.pyc" in patterns
+    assert "*.log" in patterns
+    assert any("local.txt" in p for p in patterns)
+
+
+def test_aggregate_all_ignore_patterns_empty_dir(tmp_path):
+    from treemapper.ignore import _aggregate_all_ignore_patterns
+
+    root = tmp_path / "empty_project"
+    root.mkdir()
+
+    patterns = _aggregate_all_ignore_patterns(root, [".gitignore", ".treemapperignore"])
+
+    assert patterns == []
+
+
+def test_process_ignore_line_anchored():
+    from treemapper.ignore import _process_ignore_line
+
+    assert _process_ignore_line("/root.txt", "") == "/root.txt"
+    assert _process_ignore_line("/root.txt", "subdir") == "/subdir/root.txt"
+
+    assert _process_ignore_line("dir/file.txt", "") == "/dir/file.txt"
+    assert _process_ignore_line("dir/file.txt", "sub") == "/sub/dir/file.txt"
+
+
+def test_process_ignore_line_unanchored():
+    from treemapper.ignore import _process_ignore_line
+
+    assert _process_ignore_line("*.log", "") == "*.log"
+    assert _process_ignore_line("*.log", "subdir") == "subdir/**/*.log"
+
+
+def test_process_ignore_line_negation():
+    from treemapper.ignore import _process_ignore_line
+
+    assert _process_ignore_line("!important.txt", "") == "!important.txt"
+    assert _process_ignore_line("!/root.txt", "sub") == "!/sub/root.txt"
+
+
+def test_cache_dirs_not_traversed_during_aggregation(tmp_path):
+    from treemapper.ignore import _aggregate_all_ignore_patterns
+
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / ".pytest_cache").mkdir()
+    (root / ".pytest_cache" / ".gitignore").write_text("should_not_be_found\n")
+    (root / ".gitignore").write_text("*.pyc\n")
+
+    patterns = _aggregate_all_ignore_patterns(root, [".gitignore"])
+
+    assert "*.pyc" in patterns
+    assert not any("should_not_be_found" in p for p in patterns)

@@ -6,12 +6,7 @@ import pytest
 import yaml
 
 from treemapper import map_directory, to_json, to_text, to_yaml
-from treemapper.writer import (
-    write_tree_json,
-    write_tree_text,
-    write_tree_to_file,
-    write_tree_yaml,
-)
+from treemapper.writer import write_tree_json, write_tree_text, write_tree_to_file, write_tree_yaml
 
 from .conftest import run_treemapper_subprocess
 from .utils import load_yaml
@@ -22,7 +17,7 @@ from .utils import load_yaml
     [
         ("yaml", ".yaml"),
         ("json", ".json"),
-        ("text", ".txt"),
+        ("txt", ".txt"),
     ],
 )
 def test_format_output_to_file(temp_project, fmt, ext):
@@ -42,10 +37,10 @@ def test_format_output_to_file(temp_project, fmt, ext):
         assert tree["type"] == "directory"
     else:
         assert f"{temp_project.name}/" in content
-        assert "├──" in content or "└──" in content
+        assert "  " in content
 
 
-@pytest.mark.parametrize("fmt", ["yaml", "json", "text"])
+@pytest.mark.parametrize("fmt", ["yaml", "json", "txt"])
 def test_format_output_to_stdout(temp_project, fmt):
     result = run_treemapper_subprocess([str(temp_project), "--format", fmt])
     assert result.returncode == 0
@@ -80,7 +75,7 @@ def test_format_with_file_content(temp_project):
     test_content = "Hello, format test!"
     test_file.write_text(test_content, encoding="utf-8")
 
-    for fmt in ["json", "text"]:
+    for fmt in ["json", "txt"]:
         output_file = temp_project / f"output.{fmt}"
         result = run_treemapper_subprocess([str(temp_project), "-o", str(output_file), "--format", fmt])
         assert result.returncode == 0
@@ -165,8 +160,7 @@ def test_write_tree_text_direct():
     result = output.getvalue()
 
     assert "test_project/" in result
-    assert "├──" in result or "└──" in result
-    assert "file.txt" in result
+    assert "  file.txt" in result
     assert "subdir/" in result
 
 
@@ -174,12 +168,20 @@ def test_write_tree_text_edge_cases():
     tree_empty = {"name": "test", "type": "directory", "children": [{"name": "empty.txt", "type": "file", "content": ""}]}
     output = io.StringIO()
     write_tree_text(output, tree_empty)
-    assert "empty.txt" in output.getvalue()
+    result = output.getvalue()
+    assert "empty.txt" in result
+    lines = result.strip().split("\n")
+    assert len(lines) == 2
+    assert lines[0] == "test/"
+    assert lines[1].strip() == "empty.txt"
 
     tree_no_content = {"name": "test", "type": "directory", "children": [{"name": "file.txt", "type": "file"}]}
     output = io.StringIO()
     write_tree_text(output, tree_no_content)
-    assert "file.txt" in output.getvalue()
+    result = output.getvalue()
+    assert "file.txt" in result
+    lines = result.strip().split("\n")
+    assert len(lines) == 2
 
 
 def test_write_tree_to_file_creates_parent_dirs(tmp_path):
@@ -190,7 +192,7 @@ def test_write_tree_to_file_creates_parent_dirs(tmp_path):
     assert output_file.parent.exists()
 
 
-@pytest.mark.parametrize("fmt", ["yaml", "json", "text"])
+@pytest.mark.parametrize("fmt", ["yaml", "json", "txt"])
 def test_write_tree_to_file_formats(tmp_path, fmt):
     tree = {"name": "test", "type": "directory", "children": [{"name": "file.txt", "type": "file", "content": "test\n"}]}
     output_file = tmp_path / f"output.{fmt}"
@@ -233,7 +235,7 @@ def test_write_tree_json_unicode():
     assert parsed["children"][0]["content"] == "Привет мир\n"
 
 
-@pytest.mark.parametrize("fmt", ["yaml", "json", "text"])
+@pytest.mark.parametrize("fmt", ["yaml", "json", "txt"])
 def test_write_tree_to_file_stdout(fmt):
     import sys
     from io import StringIO

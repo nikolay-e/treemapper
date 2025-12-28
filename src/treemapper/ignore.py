@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import pathspec
 
@@ -32,7 +33,7 @@ def read_ignore_file(file_path: Path) -> list[str]:
     return ignore_patterns
 
 
-def _get_output_file_pattern(output_file: Optional[Path], root_dir: Path) -> Optional[str]:
+def _get_output_file_pattern(output_file: Path | None, root_dir: Path) -> str | None:
     if not output_file:
         return None
 
@@ -51,33 +52,70 @@ def _get_output_file_pattern(output_file: Optional[Path], root_dir: Path) -> Opt
         return None
 
 
-def _aggregate_ignore_patterns(root: Path, ignore_filename: str) -> list[str]:
-    out: list[str] = []
-    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
-        dirnames.sort()
-        filenames.sort()
+PRUNE_DIRS = frozenset(
+    {
+        ".git",
+        ".svn",
+        ".hg",
+        "__pycache__",
+        "node_modules",
+        ".npm",
+        "venv",
+        ".venv",
+        ".tox",
+        ".nox",
+        "target",
+        ".gradle",
+        "bin",
+        "obj",
+        "vendor",
+        "dist",
+        "build",
+        "out",
+        ".idea",
+        ".vscode",
+    }
+)
 
-        if ignore_filename not in filenames:
+
+def _is_cache_dir(name: str) -> bool:
+    return name.startswith(".") and name.endswith("_cache")
+
+
+def _process_ignore_line(line: str, rel: str) -> str:
+    neg = line.startswith("!")
+    pat = line[1:] if neg else line
+
+    if pat.startswith("/") or "/" in pat:
+        anchored_pat = pat.lstrip("/")
+        full = f"/{rel}/{anchored_pat}" if rel else f"/{anchored_pat}"
+    elif rel:
+        full = f"{rel}/**/{pat}"
+    else:
+        full = pat
+
+    return ("!" + full) if neg else full
+
+
+def _aggregate_all_ignore_patterns(root: Path, ignore_filenames: list[str]) -> list[str]:
+    out: list[str] = []
+    filenames_set = set(ignore_filenames)
+
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+        dirnames[:] = sorted(d for d in dirnames if d not in PRUNE_DIRS and not _is_cache_dir(d))
+
+        found_files = filenames_set & set(filenames)
+        if not found_files:
             continue
 
         ignore_dir = Path(dirpath)
         rel = "" if ignore_dir == root else ignore_dir.relative_to(root).as_posix()
 
-        for line in read_ignore_file(ignore_dir / ignore_filename):
-            neg = line.startswith("!")
-            pat = line[1:] if neg else line
+        for ignore_filename in sorted(found_files):
+            for line in read_ignore_file(ignore_dir / ignore_filename):
+                out.append(_process_ignore_line(line, rel))
 
-            if pat.startswith("/") or "/" in pat:
-                anchored_pat = pat.lstrip("/")
-                full = f"/{rel}/{anchored_pat}" if rel else f"/{anchored_pat}"
-            elif rel:
-                full = f"{rel}/**/{pat}"
-            else:
-                full = pat
-
-            out.append(("!" + full) if neg else full)
-
-    logging.debug(f"Aggregated {len(out)} {ignore_filename} patterns from {root}")
+    logging.debug(f"Aggregated {len(out)} ignore patterns from {root}")
     return out
 
 
@@ -119,21 +157,26 @@ DEFAULT_IGNORE_PATTERNS = [
     # OS files
     "**/.DS_Store",
     "**/Thumbs.db",
+    # TreeMapper default output files
+    "**/tree.yaml",
+    "**/tree.yml",
+    "**/tree.json",
+    "**/tree.md",
+    "**/tree.txt",
 ]
 
 
 def get_ignore_specs(
     root_dir: Path,
-    custom_ignore_file: Optional[Path] = None,
+    custom_ignore_file: Path | None = None,
     no_default_ignores: bool = False,
-    output_file: Optional[Path] = None,
+    output_file: Path | None = None,
 ) -> pathspec.PathSpec:
     patterns: list[str] = []
 
     if not no_default_ignores:
         patterns.extend(DEFAULT_IGNORE_PATTERNS)
-        patterns.extend(_aggregate_ignore_patterns(root_dir, ".gitignore"))
-        patterns.extend(_aggregate_ignore_patterns(root_dir, ".treemapperignore"))
+        patterns.extend(_aggregate_all_ignore_patterns(root_dir, [".gitignore", ".treemapperignore"]))
 
     if custom_ignore_file:
         patterns.extend(read_ignore_file(custom_ignore_file))
@@ -149,5 +192,6 @@ def get_ignore_specs(
 
 def should_ignore(relative_path_str: str, combined_spec: pathspec.PathSpec) -> bool:
     is_ignored = combined_spec.match_file(relative_path_str)
-    logging.debug(f"Checking ignore for '{relative_path_str}': {is_ignored}")
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        logging.debug(f"Checking ignore for '{relative_path_str}': {is_ignored}")
     return is_ignored
