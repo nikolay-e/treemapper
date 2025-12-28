@@ -1,6 +1,6 @@
 import io
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 from .ignore import get_ignore_specs
 from .tree import TreeBuildContext, build_tree
@@ -10,9 +10,9 @@ from .writer import write_tree_json, write_tree_text, write_tree_yaml
 __all__ = [
     "__version__",
     "map_directory",
-    "to_yaml",
     "to_json",
     "to_text",
+    "to_yaml",
 ]
 
 
@@ -24,7 +24,7 @@ def map_directory(
     max_file_bytes: Optional[int] = None,
     ignore_file: Optional[Union[str, Path]] = None,
     no_default_ignores: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     root_dir = Path(path).resolve()
     if not root_dir.is_dir():
         raise ValueError(f"'{path}' is not a directory")
@@ -47,19 +47,19 @@ def map_directory(
     }
 
 
-def to_yaml(tree: Dict[str, Any]) -> str:
+def to_yaml(tree: dict[str, Any]) -> str:
     buf = io.StringIO()
     write_tree_yaml(buf, tree)
     return buf.getvalue()
 
 
-def to_json(tree: Dict[str, Any]) -> str:
+def to_json(tree: dict[str, Any]) -> str:
     buf = io.StringIO()
     write_tree_json(buf, tree)
     return buf.getvalue()
 
 
-def to_text(tree: Dict[str, Any]) -> str:
+def to_text(tree: dict[str, Any]) -> str:
     buf = io.StringIO()
     write_tree_text(buf, tree)
     return buf.getvalue()

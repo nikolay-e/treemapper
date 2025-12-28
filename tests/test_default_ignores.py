@@ -99,7 +99,7 @@ def test_default_verbosity(temp_project, run_mapper, capfd):
 
     # Run with default verbosity (ERROR)
     assert run_mapper([".", "-o", "directory_tree.yaml"])
-    out, err = capfd.readouterr()
+    _out, err = capfd.readouterr()
 
     # At ERROR level, there should be no INFO messages
     assert "INFO:" not in err

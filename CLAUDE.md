@@ -50,8 +50,27 @@ treemapper . --max-file-bytes 10000   # skip files larger than 10KB
 treemapper . -i custom.ignore         # custom ignore patterns
 treemapper . --no-default-ignores     # disable .gitignore/.treemapperignore (custom -i still works)
 treemapper . -v 2                     # verbose output (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)
+treemapper . -c                       # copy output to clipboard (also outputs to stdout)
+treemapper . --copy-only              # copy to clipboard only (no stdout output)
 treemapper --version                  # show version
 ```
+
+## Clipboard Support
+
+Copy output directly to clipboard with `-c` or `--copy`:
+
+```bash
+treemapper . -c                       # copy to clipboard + stdout
+treemapper . -c -o tree.yaml          # copy to clipboard + save to file
+treemapper . --copy-only              # copy to clipboard only
+treemapper . --copy-only -o tree.yaml # copy to clipboard + save to file (no stdout)
+```
+
+**System Requirements:**
+- **macOS:** `pbcopy` (pre-installed)
+- **Windows:** `clip` (pre-installed)
+- **Linux/FreeBSD (Wayland):** `wl-copy` (install: `sudo apt install wl-clipboard`)
+- **Linux/FreeBSD (X11):** `xclip` or `xsel` (install: `sudo apt install xclip`)
 
 ## Python API
 

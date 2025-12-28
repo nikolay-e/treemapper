@@ -1,43 +1,20 @@
-import errno
-import os
+import logging
 import sys
-from contextlib import contextmanager
-from typing import Generator
 
 
-@contextmanager
-def _handle_broken_pipe() -> Generator[None, None, None]:
-    try:
-        yield
-        sys.stdout.flush()
-    except BrokenPipeError:
-        _suppress_broken_pipe()
-    except ValueError:
-        _suppress_broken_pipe()
-    except OSError as e:
-        if e.errno in (errno.EINVAL, errno.EPIPE):
-            _suppress_broken_pipe()
-        raise
-
-
-def _suppress_broken_pipe() -> None:
-    try:
-        devnull = os.open(os.devnull, os.O_WRONLY)
-        try:
-            os.dup2(devnull, sys.stdout.fileno())
-        finally:
-            os.close(devnull)
-    except Exception:
-        pass
-    sys.exit(0)
+def _format_size(size_bytes: int) -> str:
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    return f"{size_bytes / 1024:.1f} KB"
 
 
 def main() -> None:
     from .cli import parse_args
+    from .clipboard import ClipboardError, copy_to_clipboard
     from .ignore import get_ignore_specs
     from .logger import setup_logging
     from .tree import TreeBuildContext, build_tree
-    from .writer import write_tree_to_file
+    from .writer import tree_to_string, write_string_to_file, write_tree_to_file
 
     args = parse_args()
     setup_logging(args.verbosity)
@@ -57,9 +34,20 @@ def main() -> None:
         "children": build_tree(args.root_dir, ctx),
     }
 
-    if args.output_file is None:
-        with _handle_broken_pipe():
-            write_tree_to_file(directory_tree, args.output_file, args.output_format)
+    output_content = None
+    if args.copy:
+        output_content = tree_to_string(directory_tree, args.output_format)
+        try:
+            byte_size = copy_to_clipboard(output_content)
+            print(f"Copied to clipboard ({_format_size(byte_size)})", file=sys.stderr)
+        except ClipboardError as e:
+            logging.warning(f"Clipboard: {e}")
+
+    if args.copy_only and args.output_file is None:
+        return
+
+    if output_content is not None:
+        write_string_to_file(output_content, args.output_file, args.output_format)
     else:
         write_tree_to_file(directory_tree, args.output_file, args.output_format)
 

@@ -1,13 +1,13 @@
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import pathspec
 
 
-def read_ignore_file(file_path: Path) -> List[str]:
-    ignore_patterns: List[str] = []
+def read_ignore_file(file_path: Path) -> list[str]:
+    ignore_patterns: list[str] = []
     if not file_path.is_file():
         return ignore_patterns
 
@@ -24,7 +24,7 @@ def read_ignore_file(file_path: Path) -> List[str]:
         logging.debug(f"Read ignore patterns from {file_path}: {ignore_patterns}")
     except PermissionError:
         logging.warning(f"Could not read ignore file {file_path}: Permission denied")
-    except IOError as e:
+    except OSError as e:
         logging.warning(f"Could not read ignore file {file_path}: {e}")
     except UnicodeDecodeError as e:
         logging.warning(f"Could not decode ignore file {file_path} as UTF-8: {e}")
@@ -51,8 +51,8 @@ def _get_output_file_pattern(output_file: Optional[Path], root_dir: Path) -> Opt
         return None
 
 
-def _aggregate_ignore_patterns(root: Path, ignore_filename: str) -> List[str]:
-    out: List[str] = []
+def _aggregate_ignore_patterns(root: Path, ignore_filename: str) -> list[str]:
+    out: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         dirnames.sort()
         filenames.sort()
@@ -128,7 +128,7 @@ def get_ignore_specs(
     no_default_ignores: bool = False,
     output_file: Optional[Path] = None,
 ) -> pathspec.PathSpec:
-    patterns: List[str] = []
+    patterns: list[str] = []
 
     if not no_default_ignores:
         patterns.extend(DEFAULT_IGNORE_PATTERNS)

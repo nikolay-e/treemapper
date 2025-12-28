@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import pathspec
 
@@ -28,11 +28,11 @@ class TreeBuildContext:
             return False
 
 
-def build_tree(dir_path: Path, ctx: TreeBuildContext, current_depth: int = 0) -> List[Dict[str, Any]]:
+def build_tree(dir_path: Path, ctx: TreeBuildContext, current_depth: int = 0) -> list[dict[str, Any]]:
     if ctx.max_depth is not None and current_depth >= ctx.max_depth:
         return []
 
-    tree: List[Dict[str, Any]] = []
+    tree: list[dict[str, Any]] = []
 
     try:
         for entry in sorted(dir_path.iterdir()):
@@ -47,7 +47,7 @@ def build_tree(dir_path: Path, ctx: TreeBuildContext, current_depth: int = 0) ->
     return tree
 
 
-def _process_entry(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Optional[Dict[str, Any]]:
+def _process_entry(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Optional[dict[str, Any]]:
     try:
         relative_path = entry.relative_to(ctx.base_dir).as_posix()
         is_dir = entry.is_dir()
@@ -70,10 +70,10 @@ def _process_entry(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Op
     return _create_node(entry, ctx, current_depth)
 
 
-def _create_node(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Optional[Dict[str, Any]]:
+def _create_node(entry: Path, ctx: TreeBuildContext, current_depth: int) -> Optional[dict[str, Any]]:
     try:
         is_dir = entry.is_dir()
-        node: Dict[str, Any] = {"name": entry.name, "type": "directory" if is_dir else "file"}
+        node: dict[str, Any] = {"name": entry.name, "type": "directory" if is_dir else "file"}
 
         if is_dir:
             children = build_tree(entry, ctx, current_depth + 1)

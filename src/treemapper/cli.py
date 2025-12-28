@@ -18,6 +18,8 @@ class ParsedArgs:
     max_depth: Optional[int]
     no_content: bool
     max_file_bytes: Optional[int]
+    copy: bool
+    copy_only: bool
 
 
 DEFAULT_IGNORES_HELP = """
@@ -56,6 +58,10 @@ def parse_args() -> ParsedArgs:
     parser.add_argument("--max-depth", type=int, default=None, metavar="N", help="Maximum traversal depth")
     parser.add_argument("--no-content", action="store_true", help="Skip file contents (structure only)")
     parser.add_argument("--max-file-bytes", type=int, default=None, metavar="N", help="Skip files larger than N bytes")
+    parser.add_argument("-c", "--copy", action="store_true", help="Copy output to clipboard")
+    parser.add_argument(
+        "--copy-only", action="store_true", help="Copy to clipboard, suppress stdout (file output with -o still works)"
+    )
     parser.add_argument(
         "-v",
         "--verbosity",
@@ -109,4 +115,6 @@ def parse_args() -> ParsedArgs:
         max_depth=args.max_depth,
         no_content=args.no_content,
         max_file_bytes=args.max_file_bytes,
+        copy=args.copy or args.copy_only,
+        copy_only=args.copy_only,
     )
