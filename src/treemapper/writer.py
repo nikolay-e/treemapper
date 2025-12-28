@@ -4,7 +4,7 @@ import logging
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Dict, Optional, TextIO
+from typing import Any, Optional, TextIO
 
 import yaml
 
@@ -28,8 +28,9 @@ def _ensure_yaml_representer() -> None:
     if _yaml_representer_registered:
         return
     with _yaml_representer_lock:
+        # Double-check locking: another thread may have set the flag while we waited for the lock
         if _yaml_representer_registered:
-            return
+            return  # type: ignore[unreachable]
 
         def literal_representer(dumper: yaml.SafeDumper, data: LiteralStr) -> yaml.ScalarNode:
             style = "|+" if data.endswith("\n") else "|"
@@ -43,8 +44,8 @@ def _ensure_yaml_representer() -> None:
         _yaml_representer_registered = True
 
 
-def _prepare_tree_for_yaml(node: Dict[str, Any]) -> Dict[str, Any]:
-    result: Dict[str, Any] = {}
+def _prepare_tree_for_yaml(node: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
     for key, value in node.items():
         if isinstance(value, str) and any(c in value for c in YAML_PROBLEMATIC_CHARS):
             result[key] = QuotedStr(value)
@@ -57,18 +58,18 @@ def _prepare_tree_for_yaml(node: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def write_tree_yaml(file: TextIO, tree: Dict[str, Any]) -> None:
+def write_tree_yaml(file: TextIO, tree: dict[str, Any]) -> None:
     _ensure_yaml_representer()
     prepared = _prepare_tree_for_yaml(tree)
     yaml.safe_dump(prepared, file, allow_unicode=True, sort_keys=False, default_flow_style=False)
 
 
-def write_tree_json(file: TextIO, tree: Dict[str, Any]) -> None:
+def write_tree_json(file: TextIO, tree: dict[str, Any]) -> None:
     json.dump(tree, file, ensure_ascii=False, indent=2)
     file.write("\n")
 
 
-def _write_tree_text_node(file: TextIO, node: Dict[str, Any], prefix: str, is_last: bool) -> None:
+def _write_tree_text_node(file: TextIO, node: dict[str, Any], prefix: str, is_last: bool) -> None:
     connector = "└── " if is_last else "├── "
     name = node.get("name", "")
     node_type = node.get("type", "")
@@ -90,7 +91,7 @@ def _write_tree_text_node(file: TextIO, node: Dict[str, Any], prefix: str, is_la
         _write_tree_text_node(file, child, child_prefix, i == len(children) - 1)
 
 
-def write_tree_text(file: TextIO, tree: Dict[str, Any]) -> None:
+def write_tree_text(file: TextIO, tree: dict[str, Any]) -> None:
     name = tree.get("name", "")
     file.write(f"{name}/\n")
 
@@ -99,7 +100,59 @@ def write_tree_text(file: TextIO, tree: Dict[str, Any]) -> None:
         _write_tree_text_node(file, child, "", i == len(children) - 1)
 
 
-def write_tree_to_file(tree: Dict[str, Any], output_file: Optional[Path], output_format: str = "yaml") -> None:
+def tree_to_string(tree: dict[str, Any], output_format: str = "yaml") -> str:
+    buf = io.StringIO()
+    if output_format == "json":
+        write_tree_json(buf, tree)
+    elif output_format == "text":
+        write_tree_text(buf, tree)
+    else:
+        write_tree_yaml(buf, tree)
+    return buf.getvalue()
+
+
+def write_string_to_file(content: str, output_file: Optional[Path], output_format: str = "yaml") -> None:
+    if output_file is None:
+        try:
+            buf = sys.stdout.buffer
+        except AttributeError:
+            buf = None
+
+        try:
+            if buf:
+                utf8_stdout = io.TextIOWrapper(buf, encoding="utf-8", newline="")
+                try:
+                    utf8_stdout.write(content)
+                    utf8_stdout.flush()
+                finally:
+                    utf8_stdout.detach()
+            else:
+                sys.stdout.write(content)
+                sys.stdout.flush()
+        except BrokenPipeError:
+            pass
+
+        logging.info(f"Directory tree written to stdout in {output_format} format")
+    else:
+        try:
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+
+            if output_file.is_dir():
+                logging.error(f"Cannot write to '{output_file}': is a directory")
+                raise IsADirectoryError(f"Is a directory: {output_file}")
+
+            with output_file.open("w", encoding="utf-8") as f:
+                f.write(content)
+            logging.info(f"Directory tree saved to {output_file} in {output_format} format")
+        except PermissionError:
+            logging.error(f"Unable to write to file '{output_file}': Permission denied")
+            raise
+        except OSError as e:
+            logging.error(f"Unable to write to file '{output_file}': {e}")
+            raise
+
+
+def write_tree_to_file(tree: dict[str, Any], output_file: Optional[Path], output_format: str = "yaml") -> None:
     def write_tree_content(f: TextIO) -> None:
         if output_format == "json":
             write_tree_json(f, tree)

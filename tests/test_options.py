@@ -200,7 +200,7 @@ def test_combined_options(temp_project):
     # Should be valid JSON
     import json
 
-    with open(output_file, "r", encoding="utf-8") as f:
+    with open(output_file, encoding="utf-8") as f:
         tree = json.load(f)
 
     assert tree["name"] == temp_project.name

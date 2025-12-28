@@ -1,12 +1,12 @@
 # tests/test_errors.py
 import logging
-import os
 import stat
 import sys
 from pathlib import Path
 
 import pytest
 
+from .conftest import IS_WSL
 from .utils import find_node_by_path, load_yaml
 
 # --- Tests for invalid input ---
@@ -36,8 +36,7 @@ def test_input_path_is_file(run_mapper, temp_project, capsys):
 
 
 @pytest.mark.skipif(
-    sys.platform == "win32"
-    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    sys.platform == "win32" or IS_WSL,
     reason="os.chmod limited on Windows/WSL",
 )
 def test_unreadable_file(temp_project, run_mapper, set_perms, caplog):
@@ -62,8 +61,7 @@ def test_unreadable_file(temp_project, run_mapper, set_perms, caplog):
 
 
 @pytest.mark.skipif(
-    sys.platform == "win32"
-    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    sys.platform == "win32" or IS_WSL,
     reason="os.chmod limited on Windows/WSL",
 )
 def test_unwritable_output_dir(temp_project, run_mapper, set_perms, caplog):
@@ -221,8 +219,7 @@ def test_logger_no_handlers():
 
 
 @pytest.mark.skipif(
-    sys.platform == "win32"
-    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    sys.platform == "win32" or IS_WSL,
     reason="os.chmod limited on Windows/WSL",
 )
 def test_unreadable_directory(temp_project, set_perms):
@@ -324,7 +321,7 @@ def test_read_ignore_file_ioerror(temp_project, monkeypatch, caplog):
 
     def mock_open(self, *args, **kwargs):
         if self.name == ".testignore":
-            raise IOError("Simulated IO error")
+            raise OSError("Simulated IO error")
         return original_open(self, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", mock_open)

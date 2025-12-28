@@ -1,10 +1,10 @@
 # tests/test_ignore.py
 import logging
-import os
 import sys
 
 import pytest
 
+from .conftest import IS_WSL
 from .utils import get_all_files_in_tree, load_yaml
 
 
@@ -224,8 +224,7 @@ def test_no_default_ignores_flag(temp_project, run_mapper):
 
 
 @pytest.mark.skipif(
-    sys.platform == "win32"
-    or ("microsoft" in open("/proc/version", "r").read().lower() if os.path.exists("/proc/version") else False),
+    sys.platform == "win32" or IS_WSL,
     reason="os.chmod limited on Windows/WSL",
 )
 def test_unreadable_ignore_file(temp_project, run_mapper, set_perms, caplog):
@@ -248,7 +247,8 @@ def test_bad_encoding_ignore_file(temp_project, run_mapper, caplog):
     """Test: .treemapperignore file has non-UTF8 encoding."""
     ignore_file = temp_project / ".treemapperignore"
     try:
-        ignore_file.write_text(".git/\nпапка_игнор/\n", encoding="cp1251")
+        # Cyrillic text intentional for CP1251 encoding test
+        ignore_file.write_text(".git/\nпапка_игнор/\n", encoding="cp1251")  # noqa: RUF001
     except LookupError:
         pytest.skip("CP1251 codec not found")
 

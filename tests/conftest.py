@@ -15,6 +15,10 @@ SRC_DIR = PROJECT_ROOT / "src"
 GITIGNORE = ".gitignore"
 TREEMAPPERIGNORE = ".treemapperignore"
 
+# WSL detection with proper file handle cleanup (shared across test files)
+_PROC_VERSION = Path("/proc/version")
+IS_WSL = _PROC_VERSION.exists() and "microsoft" in _PROC_VERSION.read_text(errors="ignore").lower()
+
 
 # --- Фикстура для создания временного проекта ---
 @pytest.fixture
@@ -44,7 +48,7 @@ def run_mapper(monkeypatch, temp_project):
         """Runs the main function with patched CWD and sys.argv."""
         with monkeypatch.context() as m:
             m.chdir(temp_project)
-            m.setattr(sys, "argv", ["treemapper"] + args)
+            m.setattr(sys, "argv", ["treemapper", *args])
             try:
                 from treemapper.treemapper import main
 
@@ -75,7 +79,7 @@ def run_treemapper_subprocess(args, cwd=None, **kwargs):
     Returns:
         CompletedProcess object
     """
-    command = [sys.executable, "-m", "treemapper"] + args
+    command = [sys.executable, "-m", "treemapper", *args]
 
     # Ensure subprocess can find the treemapper module
     env = os.environ.copy()
@@ -116,7 +120,7 @@ def set_perms(request):
         # Check if running in WSL environment
         is_wsl = False
         try:
-            with open("/proc/version", "r") as f:
+            with open("/proc/version") as f:
                 if "microsoft" in f.read().lower():
                     is_wsl = True
         except FileNotFoundError:
@@ -160,7 +164,6 @@ def set_perms(request):
 @pytest.fixture
 def project_builder(tmp_path):
     """Builder pattern for creating test project structures."""
-    from typing import List
 
     class ProjectBuilder:
         def __init__(self, base_path: Path):
@@ -184,13 +187,13 @@ def project_builder(tmp_path):
             dir_path.mkdir(parents=True, exist_ok=True)
             return dir_path
 
-        def add_gitignore(self, patterns: List[str], subdir: str = "") -> Path:
+        def add_gitignore(self, patterns: list[str], subdir: str = "") -> Path:
             path = self.root / subdir / GITIGNORE if subdir else self.root / GITIGNORE
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
             return path
 
-        def add_treemapperignore(self, patterns: List[str]) -> Path:
+        def add_treemapperignore(self, patterns: list[str]) -> Path:
             path = self.root / TREEMAPPERIGNORE
             path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
             return path

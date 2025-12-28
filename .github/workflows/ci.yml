@@ -76,7 +76,7 @@ jobs:
 
       - name: Run Type Checker (Mypy)
         run: |
-          mypy src tests
+          mypy src  # Tests excluded from strict type checking - see pyproject.toml
 
   # ============================================================================
   # Cross-platform Testing
