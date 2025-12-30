@@ -81,19 +81,16 @@ def test_unwritable_output_dir(temp_project, run_mapper, set_perms, caplog):
     assert not output_path.exists()
 
 
-def test_output_path_is_directory(temp_project, run_mapper, caplog):
+def test_output_path_is_directory(temp_project, run_mapper, capsys):
     """Test: output path (-o) points to existing directory."""
     output_should_be_file = temp_project / "i_am_a_directory"
     output_should_be_file.mkdir()
 
-    with caplog.at_level(logging.ERROR):
-        run_mapper([".", "-o", str(output_should_be_file)])
+    assert not run_mapper([".", "-o", str(output_should_be_file)])
+    captured = capsys.readouterr()
 
-    assert any(
-        "Unable to write to file" in rec.message and str(output_should_be_file) in rec.message
-        for rec in caplog.records
-        if rec.levelno >= logging.ERROR
-    ), f"Expected ERROR log message about writing failure to directory {output_should_be_file} not found"
+    assert "Error:" in captured.err
+    assert "is a directory" in captured.err
 
     assert output_should_be_file.is_dir()
     assert not list(output_should_be_file.iterdir())
@@ -231,7 +228,7 @@ def test_unreadable_directory(temp_project, set_perms):
     set_perms(unreadable_dir, 0o000)
 
     output_path = temp_project / "output.yaml"
-    result = run_treemapper_subprocess([".", "-o", str(output_path), "-v", "1"], cwd=temp_project)
+    result = run_treemapper_subprocess([".", "-o", str(output_path), "--log-level", "warning"], cwd=temp_project)
 
     assert result.returncode == 0
     assert "Permission denied" in result.stderr
@@ -264,16 +261,15 @@ def test_file_with_null_bytes_after_sample_size(temp_project):
     file_with_late_null.write_bytes(content)
 
     output_path = temp_project / "output.yaml"
-    result = run_treemapper_subprocess([".", "-o", str(output_path), "-v", "1"], cwd=temp_project)
+    result = run_treemapper_subprocess([".", "-o", str(output_path), "--log-level", "warning"], cwd=temp_project)
 
     assert result.returncode == 0
-    assert "Removed NULL bytes" in result.stderr
 
     tree = load_yaml(output_path)
     file_node = find_node_by_path(tree, ["late_null.txt"])
 
     assert file_node is not None
-    assert "\x00" not in file_node.get("content", "")
+    assert "<binary file:" in file_node.get("content", "")
 
 
 def test_oserror_during_read(temp_project, run_mapper, monkeypatch, caplog):
@@ -416,17 +412,18 @@ def test_create_node_exception(temp_project, monkeypatch, caplog):
     spec = pathspec.PathSpec.from_lines("gitwildmatch", [])
     ctx = TreeBuildContext(base_dir=temp_project, combined_spec=spec)
 
-    original_is_dir = Path.is_dir
+    original_open = Path.open
 
-    def mock_is_dir(self):
+    def mock_open(self, *args, **kwargs):
         if self.name == "broken.txt":
-            raise RuntimeError("Simulated is_dir error")
-        return original_is_dir(self)
+            raise OSError("Simulated open error")
+        return original_open(self, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "is_dir", mock_is_dir)
+    monkeypatch.setattr(Path, "open", mock_open)
 
     with caplog.at_level(logging.ERROR):
-        result = _create_node(test_file, ctx, 0)
+        result = _create_node(test_file, ctx, 0, is_dir=False)
 
-    assert result is None
-    assert any("Failed to create node" in rec.message for rec in caplog.records)
+    assert result is not None
+    assert result["content"] == "<unreadable content>\n"
+    assert any("Could not read" in rec.message for rec in caplog.records)

@@ -5,13 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from tests.conftest import run_treemapper_subprocess
-from treemapper.clipboard import (
-    ClipboardError,
-    clipboard_available,
-    copy_to_clipboard,
-    detect_clipboard_command,
-)
-from treemapper.treemapper import _format_size
+from treemapper.clipboard import ClipboardError, clipboard_available, copy_to_clipboard, detect_clipboard_command
+from treemapper.tokens import _format_size
 
 
 @pytest.fixture
@@ -149,6 +144,14 @@ class TestFormatSize:
         assert _format_size(1024) == "1.0 KB"
         assert _format_size(2048) == "2.0 KB"
         assert _format_size(1536) == "1.5 KB"
+        assert _format_size(1024 * 1024 - 1) == "1024.0 KB"
+
+    def test_megabytes(self):
+        assert _format_size(1024 * 1024) == "1.0 MB"
+        assert _format_size(2 * 1024 * 1024) == "2.0 MB"
+        assert _format_size(1536 * 1024) == "1.5 MB"
+        assert _format_size(100 * 1024 * 1024) == "100.0 MB"
+        assert _format_size(1024 * 1024 * 1024) == "1024.0 MB"
 
 
 class TestCliCopyFlags:
@@ -156,42 +159,59 @@ class TestCliCopyFlags:
         result = run_treemapper_subprocess(["--help"], cwd=temp_project)
         assert "-c" in result.stdout
         assert "--copy" in result.stdout
-        assert "--copy-only" in result.stdout
 
     def test_copy_flag_accepted(self, temp_project):
         result = run_treemapper_subprocess([".", "-c"], cwd=temp_project)
         assert result.returncode == 0
 
-    def test_copy_only_suppresses_stdout(self, temp_project):
-        result = run_treemapper_subprocess([".", "--copy-only"], cwd=temp_project)
+    @pytest.mark.skipif(not clipboard_available(), reason="Clipboard not available (no display or clipboard tool)")
+    def test_copy_suppresses_stdout(self, temp_project):
+        result = run_treemapper_subprocess([".", "-c"], cwd=temp_project)
         assert result.returncode == 0
         assert result.stdout == ""
 
-    def test_copy_only_with_file_still_writes_file(self, temp_project):
-        result = run_treemapper_subprocess([".", "--copy-only", "-o", "out.yaml"], cwd=temp_project)
-        assert result.returncode == 0
-        assert result.stdout == ""
-        assert (temp_project / "out.yaml").exists()
-
-    def test_copy_with_file_writes_file_no_stdout(self, temp_project):
+    def test_copy_with_file_still_writes_file(self, temp_project):
         result = run_treemapper_subprocess([".", "-c", "-o", "out.yaml"], cwd=temp_project)
         assert result.returncode == 0
         assert result.stdout == ""
         assert (temp_project / "out.yaml").exists()
 
-    def test_copy_without_file_outputs_to_stdout(self, temp_project):
-        result = run_treemapper_subprocess([".", "-c"], cwd=temp_project)
-        assert result.returncode == 0
-        assert result.stdout != ""
-        assert "name:" in result.stdout
-
 
 class TestClipboardWarnings:
     @patch("treemapper.clipboard.detect_clipboard_command", return_value=None)
-    def test_no_clipboard_logs_warning(self, mock_detect, temp_project, caplog, monkeypatch):
+    def test_no_clipboard_prints_warning(self, mock_detect, temp_project, capsys, monkeypatch):
         monkeypatch.chdir(temp_project)
-        monkeypatch.setattr("sys.argv", ["treemapper", ".", "-c", "-v", "1"])
+        monkeypatch.setattr("sys.argv", ["treemapper", ".", "-c"])
         from treemapper.treemapper import main
 
         main()
-        assert "No clipboard tool found" in caplog.text
+        captured = capsys.readouterr()
+        assert "Clipboard unavailable" in captured.err
+        assert "No clipboard tool found" in captured.err
+        # When clipboard fails, output should go to stdout as fallback
+        assert captured.out.strip() != ""
+
+
+class TestForceStdout:
+    def test_explicit_stdout_with_copy_flag(self, temp_project):
+        """Test that -o - forces stdout output even when --copy succeeds."""
+        result = run_treemapper_subprocess([".", "-c", "-o", "-"], cwd=temp_project)
+        assert result.returncode == 0
+        # With -o -, output should always go to stdout (force_stdout=True)
+        assert result.stdout != ""
+        assert "file.txt" in result.stdout
+
+    def test_explicit_stdout_without_copy(self, temp_project):
+        """Test that -o - outputs to stdout normally."""
+        result = run_treemapper_subprocess([".", "-o", "-"], cwd=temp_project)
+        assert result.returncode == 0
+        assert result.stdout != ""
+        assert "file.txt" in result.stdout
+
+    @pytest.mark.skipif(not clipboard_available(), reason="Clipboard not available (no display or clipboard tool)")
+    def test_copy_without_explicit_stdout_suppresses_output(self, temp_project):
+        """Test that -c without -o - suppresses stdout when clipboard succeeds."""
+        result = run_treemapper_subprocess([".", "-c"], cwd=temp_project)
+        assert result.returncode == 0
+        # Without -o -, stdout should be suppressed when clipboard succeeds
+        assert result.stdout == ""

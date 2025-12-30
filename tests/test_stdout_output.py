@@ -37,7 +37,7 @@ def test_stdout_output_flags(temp_project, output_flag):
 
 
 def test_stdout_output_preserves_stderr_logging(temp_project):
-    result = run_treemapper_subprocess([".", "-o", "-", "-v", "2"], cwd=temp_project)
+    result = run_treemapper_subprocess([".", "-o", "-", "--log-level", "info"], cwd=temp_project)
 
     assert result.returncode == 0
     assert result.stdout.strip() != ""
@@ -151,7 +151,7 @@ def test_stdout_output_with_permission_errors(temp_project, set_perms):
     unreadable.write_text("cannot read", encoding="utf-8")
     set_perms(unreadable, 0o000)
 
-    result = run_treemapper_subprocess([".", "-o", "-", "-v", "3"], cwd=temp_project)
+    result = run_treemapper_subprocess([".", "-o", "-", "--log-level", "debug"], cwd=temp_project)
     assert result.returncode == 0
 
     tree_data = yaml.safe_load(result.stdout)

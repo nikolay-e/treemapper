@@ -11,7 +11,7 @@ from hypothesis import strategies as st
 
 from treemapper import to_yaml
 from treemapper.ignore import read_ignore_file
-from treemapper.tree import _is_binary_file, _read_file_content
+from treemapper.tree import _read_file_content
 
 # Include problematic NEL character (U+0085) that was causing YAML roundtrip failures
 filename_chars_with_nel = st.text(
@@ -39,7 +39,8 @@ def test_binary_detection_with_null_byte(data):
     with tempfile.TemporaryDirectory() as tmp_dir:
         f = Path(tmp_dir) / "test.bin"
         f.write_bytes(b"\x00" + data)
-        assert _is_binary_file(f) is True
+        result = _read_file_content(f, max_file_bytes=None)
+        assert "<binary file:" in result
 
 
 @given(st.binary(min_size=10, max_size=1000).filter(lambda x: b"\x00" not in x))
@@ -48,7 +49,8 @@ def test_text_file_not_detected_as_binary(data):
     with tempfile.TemporaryDirectory() as tmp_dir:
         f = Path(tmp_dir) / "test.txt"
         f.write_bytes(data)
-        assert _is_binary_file(f) is False
+        result = _read_file_content(f, max_file_bytes=None)
+        assert "<binary file:" not in result or "<unreadable content" in result
 
 
 @given(st.lists(pattern_text, min_size=0, max_size=20))
@@ -90,7 +92,8 @@ def test_max_file_bytes_respected(max_bytes):
 
 
 def test_yaml_roundtrip_multiline_with_nel():
-    node = {"name": "test", "type": "file", "content": "line1\x85line2\nline3"}
-    yaml_str = to_yaml(node)
+    file_node = {"name": "test.txt", "type": "file", "content": "line1\x85line2\nline3"}
+    tree = {"name": "root", "type": "directory", "children": [file_node]}
+    yaml_str = to_yaml(tree)
     parsed = yaml.safe_load(yaml_str)
-    assert parsed["content"] == node["content"]
+    assert parsed["children"][0]["content"] == file_node["content"]

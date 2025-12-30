@@ -289,7 +289,6 @@ def test_text_format_preserves_structure(tmp_path):
     tree = map_directory(project)
     text_output = to_text(tree)
 
-    assert "├──" in text_output or "└──" in text_output
     assert "dir_a" in text_output
     assert "dir_b" in text_output
     assert "file1.txt" in text_output
@@ -432,7 +431,7 @@ def test_binary_detection_at_exact_boundary(tmp_path):
     assert "<binary file:" in boundary_node.get("content", "")
 
     assert after_node is not None
-    assert "x" * 100 in after_node.get("content", "")
+    assert "<binary file:" in after_node.get("content", "")
 
 
 def test_deep_nesting_with_ignore_patterns(tmp_path):
@@ -480,3 +479,109 @@ def test_middle_slash_pattern_is_anchored(tmp_path):
 
     assert direct_node is None
     assert nested_node is not None
+
+
+class TestYamlEscaping:
+    def test_escape_yaml_string_newline(self):
+        from treemapper.writer import _escape_yaml_string
+
+        result = _escape_yaml_string("file\nname.txt")
+        assert "\\n" in result
+        assert "\n" not in result
+
+    def test_escape_yaml_string_carriage_return(self):
+        from treemapper.writer import _escape_yaml_string
+
+        result = _escape_yaml_string("file\rname.txt")
+        assert "\\r" in result
+        assert "\r" not in result
+
+    def test_escape_yaml_string_null_byte(self):
+        from treemapper.writer import _escape_yaml_string
+
+        result = _escape_yaml_string("file\x00name.txt")
+        assert "\\0" in result
+        assert "\x00" not in result
+
+    def test_escape_yaml_string_combined(self):
+        from treemapper.writer import _escape_yaml_string
+
+        result = _escape_yaml_string('test\n\r\x00"\\name')
+        assert "\\n" in result
+        assert "\\r" in result
+        assert "\\0" in result
+        assert '\\"' in result
+        assert "\\\\" in result
+
+    def test_escape_yaml_content_null_byte(self):
+        from treemapper.writer import _escape_yaml_content
+
+        result = _escape_yaml_content("content\x00with\x00nulls")
+        assert "\\0" in result
+        assert "\x00" not in result
+
+    def test_escape_yaml_content_all_special_chars(self):
+        from treemapper.writer import _escape_yaml_content
+
+        input_str = 'test\n\t\r\x00\x85\u2028\u2029"\\'
+        result = _escape_yaml_content(input_str)
+
+        assert "\\n" in result
+        assert "\\t" in result
+        assert "\\r" in result
+        assert "\\0" in result
+        assert "\\x85" in result
+        assert "\\u2028" in result
+        assert "\\u2029" in result
+        assert '\\"' in result
+        assert "\\\\" in result
+
+    def test_yaml_output_with_escaped_filename(self, tmp_path):
+        import io
+
+        from treemapper.writer import write_tree_yaml
+
+        tree = {
+            "name": "project",
+            "type": "directory",
+            "children": [{"name": 'file"with"quotes.txt', "type": "file", "content": "test\n"}],
+        }
+        output = io.StringIO()
+        write_tree_yaml(output, tree)
+        result = output.getvalue()
+
+        import yaml
+
+        parsed = yaml.safe_load(result)
+        assert parsed["children"][0]["name"] == 'file"with"quotes.txt'
+
+    def test_has_problematic_chars_function(self):
+        from treemapper.writer import _has_problematic_chars
+
+        assert _has_problematic_chars("normal text") is False
+        assert _has_problematic_chars("text with newline\n") is False
+
+        assert _has_problematic_chars("text\x85with NEL") is True
+        assert _has_problematic_chars("text\u2028with line sep") is True
+        assert _has_problematic_chars("text\u2029with para sep") is True
+
+        assert _has_problematic_chars("") is False
+
+    def test_has_problematic_chars_early_exit(self):
+        from treemapper.writer import _has_problematic_chars
+
+        long_text = "a" * 100000 + "\x85" + "b" * 100000
+        assert _has_problematic_chars(long_text) is True
+
+        normal_long_text = "a" * 200000
+        assert _has_problematic_chars(normal_long_text) is False
+
+
+class TestTokenCountAlwaysDisplayed:
+    def test_token_count_displayed_to_stderr(self, temp_project):
+        from .conftest import run_treemapper_subprocess
+
+        (temp_project / "test.txt").write_text("hello world")
+        result = run_treemapper_subprocess([str(temp_project)])
+        assert result.returncode == 0
+        assert "tokens" in result.stderr

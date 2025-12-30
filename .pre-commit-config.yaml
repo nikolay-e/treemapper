@@ -28,7 +28,7 @@ repos:
   # Order matters: isort must run before black to avoid conflicts
   # ============================================================================
   - repo: https://github.com/pycqa/isort
-    rev: 7.0.0
+    rev: 5.13.2
     hooks:
       - id: isort
 

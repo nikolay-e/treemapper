@@ -319,7 +319,7 @@ class TestCLIFeatures:
         assert "--max-file-bytes" in result.stdout
         assert "-i" in result.stdout or "--ignore-file" in result.stdout
         assert "--no-default-ignores" in result.stdout
-        assert "-v" in result.stdout or "--verbosity" in result.stdout
+        assert "--log-level" in result.stdout
 
     def test_help_flag_long(self, temp_project):
         result = run_treemapper_subprocess(["--help"], cwd=temp_project)
@@ -352,21 +352,22 @@ class TestCLIFeatures:
         assert "name" in parsed
         assert "type" in parsed
 
-    def test_text_format_stdout(self, temp_project):
-        result = run_treemapper_subprocess([".", "--format", "text"], cwd=temp_project)
+    def test_txt_format_stdout(self, temp_project):
+        result = run_treemapper_subprocess([".", "--format", "txt"], cwd=temp_project)
         assert result.returncode == 0
-        assert "├──" in result.stdout or "└──" in result.stdout
+        assert temp_project.name in result.stdout
+        assert "  " in result.stdout
 
-    def test_all_verbosity_levels_cli(self, temp_project):
-        for level in range(4):
-            result = run_treemapper_subprocess([".", "-v", str(level)], cwd=temp_project)
+    def test_all_log_levels_cli(self, temp_project):
+        for level in ["error", "warning", "info", "debug"]:
+            result = run_treemapper_subprocess([".", "--log-level", level], cwd=temp_project)
             assert result.returncode == 0
 
-    def test_invalid_verbosity_cli(self, temp_project):
-        result = run_treemapper_subprocess([".", "-v", "5"], cwd=temp_project)
+    def test_invalid_log_level_cli(self, temp_project):
+        result = run_treemapper_subprocess([".", "--log-level", "verbose"], cwd=temp_project)
         assert result.returncode != 0
 
-        result = run_treemapper_subprocess([".", "-v", "-1"], cwd=temp_project)
+        result = run_treemapper_subprocess([".", "--log-level", "quiet"], cwd=temp_project)
         assert result.returncode != 0
 
 
