@@ -230,11 +230,39 @@ def _write_yaml_node(file: TextIO, node: dict[str, Any], indent: str = "") -> No
             _write_yaml_node(file, child, indent + "  ")
 
 
+def _write_yaml_fragment(file: TextIO, frag: dict[str, Any], indent: str = "") -> None:
+    file.write(f"{indent}- path: \"{_escape_yaml_string(frag.get('path', ''))}\"\n")
+    file.write(f"{indent}  lines: \"{frag.get('lines', '')}\"\n")
+    file.write(f"{indent}  kind: {frag.get('kind', 'unknown')}\n")
+
+    if frag.get("symbol"):
+        file.write(f"{indent}  symbol: \"{_escape_yaml_string(frag['symbol'])}\"\n")
+
+    if "content" in frag:
+        content = frag["content"]
+        if content:
+            if _has_problematic_chars(content):
+                escaped = _escape_yaml_content(content)
+                file.write(f'{indent}  content: "{escaped}"\n')
+            else:
+                file.write(f"{indent}  content: |\n")
+                lines = content.rstrip("\n").split("\n")
+                for line in lines:
+                    file.write(f"{indent}    {line}\n")
+        else:
+            file.write(f'{indent}  content: ""\n')
+
+
 def write_tree_yaml(file: TextIO, tree: dict[str, Any]) -> None:
     name = _escape_yaml_string(str(tree["name"]))
     file.write(f'name: "{name}"\n')
     file.write(f"type: {tree['type']}\n")
-    if tree.get("children"):
+
+    if tree.get("type") == "diff_context" and tree.get("fragments"):
+        file.write("fragments:\n")
+        for frag in tree["fragments"]:
+            _write_yaml_fragment(file, frag, "  ")
+    elif tree.get("children"):
         file.write("children:\n")
         for child in tree["children"]:
             _write_yaml_node(file, child, "  ")
@@ -265,11 +293,34 @@ def _write_tree_text_node(file: TextIO, node: dict[str, Any], indent: str = "") 
             _write_tree_text_node(file, child, indent + "  ")
 
 
+def _write_text_fragment(file: TextIO, frag: dict[str, Any], indent: str = "") -> None:
+    path = frag.get("path", "")
+    lines = frag.get("lines", "")
+    kind = frag.get("kind", "")
+    symbol = frag.get("symbol", "")
+
+    header = f"{path}:{lines}"
+    if symbol:
+        header += f" ({symbol})"
+    if kind:
+        header += f" [{kind}]"
+    file.write(f"{indent}{header}\n")
+
+    if frag.get("content"):
+        content = frag["content"]
+        content_indent = indent + "  "
+        for line in content.rstrip("\n").split("\n"):
+            file.write(f"{content_indent}{line}\n")
+
+
 def write_tree_text(file: TextIO, tree: dict[str, Any]) -> None:
     name = tree.get("name", "")
     file.write(f"{name}/\n")
 
-    if tree.get("children"):
+    if tree.get("type") == "diff_context" and tree.get("fragments"):
+        for frag in tree["fragments"]:
+            _write_text_fragment(file, frag, "  ")
+    elif tree.get("children"):
         for child in tree["children"]:
             _write_tree_text_node(file, child, "  ")
 
@@ -339,11 +390,40 @@ def _write_markdown_node(file: TextIO, node: dict[str, Any], depth: int) -> None
             _write_markdown_node(file, child, depth + 1)
 
 
+def _write_markdown_fragment(file: TextIO, frag: dict[str, Any]) -> None:
+    path = frag.get("path", "")
+    lines = frag.get("lines", "")
+    kind = frag.get("kind", "")
+    symbol = frag.get("symbol", "")
+
+    header = f"`{path}:{lines}`"
+    if symbol:
+        header += f" **{symbol}**"
+    if kind:
+        header += f" _{kind}_"
+    file.write(f"## {header}\n\n")
+
+    if frag.get("content"):
+        content = frag["content"]
+        lang = _infer_language(path.split("/")[-1] if "/" in path else path)
+        fence_len = _get_fence_length(content)
+        fence = "`" * fence_len
+        file.write(f"{fence}{lang}\n")
+        for line in content.splitlines(keepends=True):
+            file.write(line)
+        if not content.endswith("\n"):
+            file.write("\n")
+        file.write(f"{fence}\n\n")
+
+
 def write_tree_markdown(file: TextIO, tree: dict[str, Any]) -> None:
     name = tree.get("name", "")
     file.write(f"# {name}/\n\n")
 
-    if tree.get("children"):
+    if tree.get("type") == "diff_context" and tree.get("fragments"):
+        for frag in tree["fragments"]:
+            _write_markdown_fragment(file, frag)
+    elif tree.get("children"):
         for child in tree["children"]:
             _write_markdown_node(file, child, 1)
 

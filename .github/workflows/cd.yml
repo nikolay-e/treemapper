@@ -86,7 +86,7 @@ jobs:
           fi
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "Commit SHA: $COMMIT_SHA"
-          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Check tag doesn't already exist
         run: |
@@ -121,8 +121,8 @@ jobs:
       - name: Set outputs
         id: set_outputs
         run: |
-          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
 
   build-assets:
     name: Build Assets
@@ -218,7 +218,7 @@ jobs:
               echo "Detected ARM on macOS"
           fi
           echo "Determined ARCH: $ARCH"
-          echo "arch=$ARCH" >> $GITHUB_OUTPUT
+          echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
 
       - name: Rename asset with proper name
         shell: bash

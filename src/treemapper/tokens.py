@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import sys
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Optional
+from typing import Any
 
 CHUNK_SIZE = 500_000
 CHUNK_THRESHOLD = 1_000_000
@@ -17,7 +19,7 @@ class TokenCountResult:
 
 
 @lru_cache(maxsize=4)
-def _get_encoder(encoding: str) -> Optional[Any]:
+def _get_encoder(encoding: str) -> Any | None:
     try:
         import tiktoken
 
