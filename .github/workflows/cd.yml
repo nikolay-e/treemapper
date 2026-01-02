@@ -77,6 +77,7 @@ jobs:
         id: commit_version
         run: |
           git config user.name "github-actions[bot]"
+          # 41898282 is GitHub's bot user ID for github-actions[bot]
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/treemapper/version.py
           if ! git diff --staged --quiet; then
@@ -86,7 +87,7 @@ jobs:
           fi
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "Commit SHA: $COMMIT_SHA"
-          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Check tag doesn't already exist
         run: |
@@ -112,7 +113,7 @@ jobs:
           git bundle create repo.bundle --all
 
       - name: Upload bundle as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: git-repo-bundle
           path: repo.bundle
@@ -121,8 +122,8 @@ jobs:
       - name: Set outputs
         id: set_outputs
         run: |
-          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          echo "tag_name=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
 
   build-assets:
     name: Build Assets
@@ -143,7 +144,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Download git bundle
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: git-repo-bundle
 
@@ -218,7 +219,7 @@ jobs:
               echo "Detected ARM on macOS"
           fi
           echo "Determined ARCH: $ARCH"
-          echo "arch=$ARCH" >> $GITHUB_OUTPUT
+          echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
 
       - name: Rename asset with proper name
         shell: bash
@@ -234,7 +235,7 @@ jobs:
           fi
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}-binary
           path: ./repo/dist/treemapper-*
@@ -252,7 +253,7 @@ jobs:
       id-token: write
     steps:
       - name: Download git bundle
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: git-repo-bundle
 
@@ -317,7 +318,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download git bundle
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           name: git-repo-bundle
 
@@ -342,6 +343,7 @@ jobs:
         working-directory: ./repo
         run: |
           git config user.name "github-actions[bot]"
+          # 41898282 is GitHub's bot user ID for github-actions[bot]
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # Push the version bump commit to main
@@ -353,7 +355,7 @@ jobs:
           echo "Successfully pushed version commit and tag"
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 

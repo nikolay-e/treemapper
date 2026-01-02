@@ -251,3 +251,55 @@ def run_and_verify(run_mapper, temp_project):
         return result
 
     return _run
+
+
+@pytest.fixture
+def git_repo(tmp_path):
+    """Create a real git repository for testing diff-context mode."""
+    repo_path = tmp_path / "git_test_repo"
+    repo_path.mkdir()
+
+    subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=repo_path, capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, capture_output=True, check=True)
+
+    return repo_path
+
+
+@pytest.fixture
+def git_with_commits(git_repo):
+    """Helper for creating git repos with commits."""
+
+    class GitHelper:
+        def __init__(self, repo_path: Path):
+            self.repo = repo_path
+
+        def add_file(self, path: str, content: str) -> Path:
+            file_path = self.repo / path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content, encoding="utf-8")
+            return file_path
+
+        def commit(self, message: str) -> str:
+            subprocess.run(["git", "add", "-A"], cwd=self.repo, capture_output=True, check=True)
+            subprocess.run(["git", "commit", "-m", message], cwd=self.repo, capture_output=True, check=True)
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip()
+
+        def get_head_sha(self) -> str:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip()
+
+    return GitHelper(git_repo)

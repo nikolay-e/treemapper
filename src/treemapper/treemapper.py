@@ -18,20 +18,39 @@ def main() -> None:
         args = parse_args()
         setup_logging(args.verbosity)
 
-        ctx = TreeBuildContext(
-            base_dir=args.root_dir,
-            combined_spec=get_ignore_specs(args.root_dir, args.ignore_file, args.no_default_ignores, args.output_file),
-            output_file=args.output_file,
-            max_depth=args.max_depth,
-            no_content=args.no_content,
-            max_file_bytes=args.max_file_bytes,
-        )
+        if args.diff_range:
+            from .diffctx import GitError, build_diff_context
 
-        directory_tree = {
-            "name": args.root_dir.name,
-            "type": "directory",
-            "children": build_tree(args.root_dir, ctx),
-        }
+            try:
+                directory_tree = build_diff_context(
+                    root_dir=args.root_dir,
+                    diff_range=args.diff_range,
+                    budget_tokens=args.budget,
+                    alpha=args.alpha,
+                    tau=args.tau,
+                    no_content=args.no_content,
+                    ignore_file=args.ignore_file,
+                    no_default_ignores=args.no_default_ignores,
+                    full=args.full_diff,
+                )
+            except GitError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+        else:
+            ctx = TreeBuildContext(
+                base_dir=args.root_dir,
+                combined_spec=get_ignore_specs(args.root_dir, args.ignore_file, args.no_default_ignores, args.output_file),
+                output_file=args.output_file,
+                max_depth=args.max_depth,
+                no_content=args.no_content,
+                max_file_bytes=args.max_file_bytes,
+            )
+
+            directory_tree = {
+                "name": args.root_dir.name,
+                "type": "directory",
+                "children": build_tree(args.root_dir, ctx),
+            }
 
         output_content = tree_to_string(directory_tree, args.output_format)
         print_token_summary(output_content)
@@ -47,6 +66,7 @@ def main() -> None:
 
         if args.output_file:
             write_string_to_file(output_content, args.output_file, args.output_format)
+            print(f"Saved to {args.output_file}", file=sys.stderr)
         elif args.force_stdout or not args.copy or not clipboard_ok:
             # force_stdout: -o - was explicitly passed (forces stdout even with --copy)
             sys.stdout.write(output_content)

@@ -13,14 +13,14 @@ line_length = 130
 
 [tool.ruff]
 line-length = 130
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "RUF"]
 ignore = ["E501"]  # Line length handled by black
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -35,6 +35,27 @@ warn_no_return = true
 warn_unreachable = true
 files = ["src"]
 
+[[tool.mypy.overrides]]
+module = [
+    "tree_sitter",
+    "tree_sitter_python",
+    "tree_sitter_javascript",
+    "tree_sitter_typescript",
+    "tree_sitter_typescript.tsx",
+    "tree_sitter_go",
+    "tree_sitter_rust",
+    "tree_sitter_java",
+    "tree_sitter_c",
+    "tree_sitter_cpp",
+    "tree_sitter_ruby",
+    "mistune",
+    "pysbd",
+    "ruamel.yaml",
+    "lxml",
+    "lxml.html",
+]
+ignore_missing_imports = true
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "v$version"
@@ -48,7 +69,7 @@ authors = [
 ]
 description = "Export codebase structure and contents for AI/LLM context"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 keywords = ["code-analysis", "directory-tree", "yaml", "json", "llm", "ai", "codebase", "context", "chatgpt", "claude", "code-context", "export", "tree", "gpt-context", "llm-context", "code-to-prompt", "claude-context"]
 classifiers = [
@@ -56,7 +77,6 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -80,6 +100,27 @@ Homepage = "https://github.com/nikolay-e/treemapper"
 treemapper = "treemapper.treemapper:main"
 
 [project.optional-dependencies]
+full = [
+    # Tree-sitter for code parsing (50+ languages)
+    "tree-sitter>=0.21,<1.0",
+    "tree-sitter-python>=0.21,<1.0",
+    "tree-sitter-javascript>=0.21,<1.0",
+    "tree-sitter-typescript>=0.21,<1.0",
+    "tree-sitter-go>=0.21,<1.0",
+    "tree-sitter-rust>=0.21,<1.0",
+    "tree-sitter-java>=0.21,<1.0",
+    "tree-sitter-c>=0.21,<1.0",
+    "tree-sitter-cpp>=0.22,<1.0",
+    "tree-sitter-ruby>=0.21,<1.0",
+    # Markdown parsing
+    "mistune>=3.0,<4.0",
+    # Sentence boundary detection
+    "pysbd>=0.3,<1.0",
+    # YAML with position tracking
+    "ruamel.yaml>=0.18,<1.0",
+    # HTML/XML parsing
+    "lxml>=5.0,<7.0",
+]
 dev = [
     # Testing
     "pytest>=7.0,<9.0",

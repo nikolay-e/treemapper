@@ -1,7 +1,7 @@
 # tests/utils.py
 from collections.abc import Hashable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 import yaml
@@ -35,7 +35,7 @@ def get_all_files_in_tree(node: dict[str, Any]) -> set[str]:
     return names
 
 
-def find_node_by_path(tree: dict[str, Any], path_segments: list[str]) -> Optional[dict[str, Any]]:
+def find_node_by_path(tree: dict[str, Any], path_segments: list[str]) -> dict[str, Any] | None:
     """Find a node in the tree by list of path segments relative to root node."""
     current_node = tree
     for segment in path_segments:
