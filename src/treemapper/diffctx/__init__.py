@@ -78,8 +78,8 @@ def build_diff_context(
     if not is_git_repo(root_dir):
         raise GitError(f"'{root_dir}' is not a git repository")
 
-    if not (0.0 <= alpha < 1.0):
-        raise ValueError(f"alpha must be in [0, 1), got {alpha}")
+    if not (0.0 < alpha < 1.0):
+        raise ValueError(f"alpha must be in (0, 1), got {alpha}")
     if tau < 0.0:
         raise ValueError(f"tau must be >= 0, got {tau}")
 
@@ -150,9 +150,14 @@ def build_diff_context(
             best = min(covering, key=lambda f: f.line_count)
             core_ids.add(best.id)
         else:
-            # Fallback: use enclosing fragment
-            enc = enclosing_fragment(frags, h_start)
-            if enc is not None:
+            # Check for fragments that OVERLAP with the hunk (partial coverage)
+            overlapping = [f for f in frags if f.start_line <= h_end and f.end_line >= h_start]
+            if overlapping:
+                # Add all overlapping fragments as core
+                for f in overlapping:
+                    core_ids.add(f.id)
+            elif (enc := enclosing_fragment(frags, h_start)) is not None:
+                # Fallback: use enclosing fragment
                 core_ids.add(enc.id)
             else:
                 # For hunks in gaps between fragments, find nearest adjacent fragments

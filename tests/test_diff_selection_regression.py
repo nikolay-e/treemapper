@@ -158,6 +158,61 @@ def func2():
         assert new_func is not None
 
 
+    def test_sel_core_004_new_function_at_end_of_file(self, diff_project):
+        """Regression test: new function added at end of file must be included.
+
+        The hunk may start on empty line before function definition,
+        but the function fragment must still be detected as core.
+        """
+        diff_project.add_file(
+            "calculator.py",
+            """\
+def add(a, b):
+    return a + b
+
+def sub(a, b):
+    return a - b
+
+def mul(a, b):
+    return a * b
+""",
+        )
+        diff_project.commit("Initial calculator")
+
+        diff_project.add_file(
+            "calculator.py",
+            """\
+def add(a, b):
+    return a + b
+
+def sub(a, b):
+    return a - b
+
+def mul(a, b):
+    return a * b
+
+def div(a, b):
+    if b == 0:
+        raise ValueError("division by zero")
+    return a / b
+""",
+        )
+        diff_project.commit("Add div function")
+
+        tree = build_diff_context(
+            root_dir=diff_project.repo,
+            diff_range="HEAD~1..HEAD",
+            budget_tokens=10000,
+        )
+
+        fragments = _extract_fragments_from_tree(tree)
+        div_func = next((f for f in fragments if "def div" in f.get("content", "")), None)
+        assert div_func is not None, "div function must be included in diff context"
+
+        mul_func = next((f for f in fragments if "def mul" in f.get("content", "")), None)
+        assert mul_func is None, "mul function should NOT be included (not changed)"
+
+
 class TestBudgetBehavior:
     def test_sel_budget_001_respects_token_limit(self):
         fragments = [

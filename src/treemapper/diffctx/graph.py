@@ -622,13 +622,7 @@ def _build_config_code_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId
     if not config_frags or not code_frags:
         return edges
 
-    # Build inverted index: key -> list of code fragments containing the key
     key_to_code_frags: dict[str, list[FragmentId]] = defaultdict(list)
-    for code_frag in code_frags:
-        content_lower = code_frag.content.lower()
-        for code_frag_inner in code_frags:
-            if code_frag_inner.id == code_frag.id:
-                continue
 
     # Extract keys from config files
     config_keys_by_frag: dict[FragmentId, set[str]] = {}

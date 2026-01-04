@@ -638,6 +638,21 @@ class TestParameterValidation:
                 alpha=-0.1,
             )
 
+    def test_invalid_alpha_zero(self, diff_project):
+        """alpha=0 should raise ValueError (must be in (0, 1))"""
+        diff_project.add_file("test.py", "x = 1")
+        diff_project.commit("Initial")
+        diff_project.add_file("test.py", "x = 2")
+        diff_project.commit("Modify")
+
+        with pytest.raises(ValueError):
+            build_diff_context(
+                root_dir=diff_project.repo,
+                diff_range="HEAD~1..HEAD",
+                budget_tokens=1000,
+                alpha=0.0,
+            )
+
     def test_invalid_alpha_greater_than_one(self, diff_project):
         """alpha >= 1 should raise ValueError"""
         diff_project.add_file("test.py", "x = 1")
@@ -669,18 +684,17 @@ class TestParameterValidation:
             )
 
     def test_valid_alpha_boundaries(self, diff_project):
-        """alpha=0.0 and alpha=0.99 should work"""
+        """alpha=0.01 and alpha=0.99 should work (0 and 1 are excluded)"""
         diff_project.add_file("test.py", "x = 1")
         diff_project.commit("Initial")
         diff_project.add_file("test.py", "x = 2")
         diff_project.commit("Modify")
 
-        # Should not raise
         tree1 = build_diff_context(
             root_dir=diff_project.repo,
             diff_range="HEAD~1..HEAD",
             budget_tokens=1000,
-            alpha=0.0,
+            alpha=0.01,
         )
         assert tree1 is not None
 
