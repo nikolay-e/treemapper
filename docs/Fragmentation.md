@@ -102,7 +102,7 @@ class FragmentRenderer(mistune.BaseRenderer):
     def __init__(self):
         self.fragments = []
         self.current_line = 1
-    
+
     def heading(self, text, level, raw=None):
         self.fragments.append({
             'kind': 'heading',
@@ -111,7 +111,7 @@ class FragmentRenderer(mistune.BaseRenderer):
             'line': self.current_line
         })
         return ''
-    
+
     def paragraph(self, text):
         self.fragments.append({
             'kind': 'paragraph',
@@ -119,7 +119,7 @@ class FragmentRenderer(mistune.BaseRenderer):
             'line': self.current_line
         })
         return ''
-    
+
     def block_code(self, code, info=None):
         self.fragments.append({
             'kind': 'code_block',
@@ -185,7 +185,7 @@ import pysbd
 def split_plain_text(text: str, language: str = 'en') -> list[Fragment]:
     seg = pysbd.Segmenter(language=language, clean=False)
     sentences = seg.segment(text)
-    
+
     fragments = []
     current_line = 1
     for sentence in sentences:
@@ -196,7 +196,7 @@ def split_plain_text(text: str, language: str = 'en') -> list[Fragment]:
             start_line=current_line
         ))
         current_line += sentence.count('\n')
-    
+
     return merge_into_paragraphs(fragments)
 ```
 
@@ -238,7 +238,7 @@ class FragmentationStrategy(Protocol):
 
 class TreeSitterStrategy:
     """Стратегия для кода через tree-sitter"""
-    
+
     SUPPORTED_EXTENSIONS = {
         '.py': 'python',
         '.js': 'javascript',
@@ -251,10 +251,10 @@ class TreeSitterStrategy:
         '.rb': 'ruby',
         # ... 50+ языков
     }
-    
+
     def can_handle(self, path: Path, content: str) -> bool:
         return path.suffix.lower() in self.SUPPORTED_EXTENSIONS
-    
+
     def fragment(self, path: Path, content: str) -> list[Fragment]:
         lang = self.SUPPORTED_EXTENSIONS[path.suffix.lower()]
         # Динамическая загрузка парсера
@@ -264,10 +264,10 @@ class TreeSitterStrategy:
 
 class MarkdownStrategy:
     """Стратегия для Markdown через mistune"""
-    
+
     def can_handle(self, path: Path, content: str) -> bool:
         return path.suffix.lower() in {'.md', '.markdown', '.mdx'}
-    
+
     def fragment(self, path: Path, content: str) -> list[Fragment]:
         # Используем mistune для парсинга
         fragments = []
@@ -276,10 +276,10 @@ class MarkdownStrategy:
 
 class ConfigStrategy:
     """Стратегия для конфигов (YAML, TOML, JSON)"""
-    
+
     def can_handle(self, path: Path, content: str) -> bool:
         return path.suffix.lower() in {'.yaml', '.yml', '.toml', '.json'}
-    
+
     def fragment(self, path: Path, content: str) -> list[Fragment]:
         if path.suffix.lower() in {'.yaml', '.yml'}:
             return self._fragment_yaml(path, content)
@@ -287,10 +287,10 @@ class ConfigStrategy:
 
 class PlainTextStrategy:
     """Fallback стратегия для plain text"""
-    
+
     def can_handle(self, path: Path, content: str) -> bool:
         return True  # Обрабатывает всё
-    
+
     def fragment(self, path: Path, content: str) -> list[Fragment]:
         # pySBD для sentence detection
         # Группировка в параграфы
@@ -299,7 +299,7 @@ class PlainTextStrategy:
 
 class FragmentationEngine:
     """Основной движок с chain of responsibility"""
-    
+
     def __init__(self):
         # Порядок важен — от специфичных к общим
         self.strategies: list[FragmentationStrategy] = [
@@ -309,7 +309,7 @@ class FragmentationEngine:
             HTMLStrategy(),
             PlainTextStrategy(),  # Fallback
         ]
-    
+
     def fragment(self, path: Path, content: str) -> list[Fragment]:
         for strategy in self.strategies:
             if strategy.can_handle(path, content):
@@ -318,7 +318,7 @@ class FragmentationEngine:
                 except Exception as e:
                     logging.warning(f"Strategy {strategy} failed: {e}")
                     continue
-        
+
         # Если всё упало — базовый chunk по строкам
         return self._fallback_chunk(path, content)
 ```
@@ -402,14 +402,14 @@ class TreeSitterStrategy:
     def __init__(self):
         self._parsers = {}
         self._available = self._check_availability()
-    
+
     def _check_availability(self) -> bool:
         try:
             import tree_sitter
             return True
         except ImportError:
             return False
-    
+
     def can_handle(self, path: Path, content: str) -> bool:
         if not self._available:
             return False

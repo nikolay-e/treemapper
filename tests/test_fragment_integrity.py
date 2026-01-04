@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import pytest
-
 from treemapper.diffctx.fragments import (
     GenericStrategy,
     ParagraphStrategy,
@@ -216,9 +214,7 @@ class TestParagraphStrategyIntegrity:
             content = frag.content.rstrip()
             if content and not content.endswith((".", "!", "?")):
                 last_word = content.split()[-1] if content.split() else ""
-                assert last_word.endswith(
-                    (".", "!", "?", '"')
-                ), f"Fragment should end at sentence boundary: ...{content[-50:]}"
+                assert last_word.endswith((".", "!", "?", '"')), f"Fragment should end at sentence boundary: ...{content[-50:]}"
 
 
 class TestSmartSplitPoint:
