@@ -37,6 +37,8 @@ _YAML_CONTENT_ESCAPE_MAP = {
 
 _BACKTICK_RUN_PATTERN = re.compile(r"`+")
 
+_MAX_MARKDOWN_HEADING_DEPTH = 5  # depth 0-5 → ## to ###### (6 levels), deeper uses list items
+
 EXTENSION_TO_LANG = {
     ".py": "python",
     ".pyw": "python",
@@ -357,11 +359,11 @@ def _write_markdown_node(file: TextIO, node: dict[str, Any], depth: int) -> None
     is_dir = node_type == "directory"
     display_name = f"{name}/" if is_dir else name
 
-    in_list = depth > 5
-    list_indent = "  " * (depth - 5) if in_list else ""
+    in_list = depth > _MAX_MARKDOWN_HEADING_DEPTH
+    list_indent = "  " * (depth - _MAX_MARKDOWN_HEADING_DEPTH) if in_list else ""
     content_indent = list_indent + "  " if in_list else ""
 
-    if depth <= 5:
+    if depth <= _MAX_MARKDOWN_HEADING_DEPTH:
         heading = "#" * (depth + 1)
         file.write(f"{heading} {display_name}\n\n")
     else:

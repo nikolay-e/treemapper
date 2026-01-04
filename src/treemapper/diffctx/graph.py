@@ -650,12 +650,18 @@ def _build_config_code_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId
 
         config_keys_by_frag[cfg.id] = config_keys
 
-    # Build inverted index: key -> list of code fragments containing the key as literal
+    # Build inverted index: key -> list of code fragments containing the key as word
+    # Use word boundary matching to avoid false positives (e.g., "id" matching "void")
+    key_patterns: dict[str, re.Pattern[str]] = {}
+    for keys in config_keys_by_frag.values():
+        for key in keys:
+            if key not in key_patterns:
+                key_patterns[key] = re.compile(rf"\b{re.escape(key)}\b", re.IGNORECASE)
+
     for code_frag in code_frags:
-        content_lower = code_frag.content.lower()
         for cfg_id, keys in config_keys_by_frag.items():
             for key in keys:
-                if key in content_lower:
+                if key_patterns[key].search(code_frag.content):
                     key_to_code_frags[key].append(code_frag.id)
 
     # Create edges with diminishing returns

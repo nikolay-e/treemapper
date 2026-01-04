@@ -157,7 +157,6 @@ def func2():
         new_func = next((f for f in fragments if "new_function" in f.get("content", "")), None)
         assert new_func is not None
 
-
     def test_sel_core_004_new_function_at_end_of_file(self, diff_project):
         """Regression test: new function added at end of file must be included.
 

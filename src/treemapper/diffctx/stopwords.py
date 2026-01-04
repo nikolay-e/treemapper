@@ -344,7 +344,7 @@ _DATA_STOPWORDS: frozenset[str] = frozenset(
     }
 )
 
-COMMON_STOPWORDS: frozenset[str] = _CODE_STOPWORDS
+CODE_STOPWORDS: frozenset[str] = _CODE_STOPWORDS
 
 
 class TokenProfile:

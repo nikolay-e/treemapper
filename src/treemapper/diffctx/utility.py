@@ -37,6 +37,7 @@ def _phi(x: float) -> float:
 
 _MIN_REL_FOR_BONUS = 0.15
 _RELATEDNESS_BONUS = 0.08
+_NO_CONCEPTS_FALLBACK_FACTOR = 0.1
 
 
 def marginal_gain(
@@ -45,9 +46,8 @@ def marginal_gain(
     concepts: frozenset[str],
     state: UtilityState,
 ) -> float:
-    # Fallback: if no concepts, use relevance score as proxy
     if not concepts:
-        return rel_score * 0.1
+        return rel_score * _NO_CONCEPTS_FALLBACK_FACTOR
 
     gain = 0.0
     covered = frag.identifiers & concepts

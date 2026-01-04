@@ -82,6 +82,8 @@ def build_diff_context(
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")
     if tau < 0.0:
         raise ValueError(f"tau must be >= 0, got {tau}")
+    if budget_tokens is not None and budget_tokens <= 0:
+        raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
     hunks = parse_diff(root_dir, diff_range)
     if not hunks:
@@ -182,8 +184,9 @@ def build_diff_context(
                 len(selected),
                 used,
             )
-        except Exception:
-            pass
+        except (TypeError, AttributeError) as e:
+            # nosemgrep: python-logger-credential-disclosure
+            logging.debug("diffctx: failed to compute token count: %s", e)
     else:
         graph = build_graph(all_fragments)
 
@@ -216,8 +219,9 @@ def build_diff_context(
                 alpha,
                 tau,
             )
-        except Exception:
-            pass
+        except (TypeError, AttributeError) as e:
+            # nosemgrep: python-logger-credential-disclosure
+            logging.debug("diffctx: failed to compute token count: %s", e)
 
     if no_content:
         for frag in selected:
