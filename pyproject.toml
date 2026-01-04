@@ -99,7 +99,7 @@ full = [
     # YAML with position tracking
     "ruamel.yaml>=0.18,<1.0",
     # HTML/XML parsing
-    "lxml>=5.0,<6.0",
+    "lxml>=5.0,<7.0",
 ]
 dev = [
     # Testing
