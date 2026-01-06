@@ -187,7 +187,8 @@ def get_ignore_specs(
         logging.debug(f"Adding output file to ignores: {output_pattern}")
 
     logging.debug(f"Combined ignore patterns: {patterns}")
-    return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+    spec: pathspec.PathSpec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+    return spec
 
 
 def should_ignore(relative_path_str: str, combined_spec: pathspec.PathSpec) -> bool:

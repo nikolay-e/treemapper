@@ -53,6 +53,7 @@ module = [
     "ruamel.yaml",
     "lxml",
     "lxml.html",
+    "tiktoken",
 ]
 ignore_missing_imports = true
 
