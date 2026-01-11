@@ -135,7 +135,7 @@ jobs:
           verbose: true
 
       - name: Upload coverage for SonarCloud
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         with:
           name: coverage-report
