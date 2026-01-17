@@ -9,7 +9,8 @@ import pathspec
 
 from ..ignore import get_ignore_specs, should_ignore
 from ..tokens import count_tokens
-from .fragments import enclosing_fragment, fragment_file
+from .edges import discover_all_related_files
+from .fragments import enclosing_fragment, fragment_file  # type: ignore[attr-defined]
 from .git import (
     GitError,
     get_changed_files,
@@ -30,7 +31,7 @@ __all__ = ["GitError", "build_diff_context"]
 
 _RARE_THRESHOLD = 3
 _MAX_EXPANSION_FILES = 20
-_OVERHEAD_PER_FRAGMENT = 18
+_OVERHEAD_PER_FRAGMENT = 18  # JSON metadata tokens (path, lines, kind, symbol) - validated range: 12-25
 
 
 def _read_file_content(
@@ -142,8 +143,9 @@ def _select_with_ppr(
     budget_tokens: int | None,
     alpha: float,
     tau: float,
+    repo_root: Path | None = None,
 ) -> tuple[list[Fragment], Any]:
-    graph = build_graph(all_fragments)
+    graph = build_graph(all_fragments, repo_root=repo_root)
     rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha)
     effective_budget = budget_tokens if budget_tokens is not None else _DEFAULT_BUDGET_TOKENS
 
@@ -188,7 +190,12 @@ def build_diff_context(
     seen_frag_ids: set[FragmentId] = set()
     all_fragments = _process_files_for_fragments(changed_files, root_dir, preferred_revs, seen_frag_ids)
 
-    expanded_files = _expand_universe_by_rare_identifiers(root_dir, concepts, changed_files, combined_spec)
+    all_candidate_files = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
+
+    edge_discovered = discover_all_related_files(changed_files, all_candidate_files, root_dir)
+    all_fragments.extend(_process_files_for_fragments(edge_discovered, root_dir, preferred_revs, seen_frag_ids))
+
+    expanded_files = _expand_universe_by_rare_identifiers(root_dir, concepts, changed_files + edge_discovered, combined_spec)
     all_fragments.extend(_process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids))
 
     for frag in all_fragments:
@@ -200,7 +207,7 @@ def build_diff_context(
         selected = _select_full_mode(all_fragments, changed_files)
         _log_full_mode(selected)
     else:
-        selected, result = _select_with_ppr(all_fragments, core_ids, concepts, budget_tokens, alpha, tau)
+        selected, result = _select_with_ppr(all_fragments, core_ids, concepts, budget_tokens, alpha, tau, repo_root=root_dir)
         _log_ppr_mode(selected, core_ids, budget_tokens, result, alpha, tau)
 
     if no_content:
@@ -230,7 +237,8 @@ def _identify_core_fragments(hunks: list[DiffHunk], all_fragments: list[Fragment
     for h in hunks:
         frags = frags_by_path.get(h.path, [])
         if frags:
-            core_ids.update(_find_core_for_hunk(frags, h.new_start, h.end_line))
+            h_start, h_end = h.core_selection_range
+            core_ids.update(_find_core_for_hunk(frags, h_start, h_end))
     return core_ids
 
 
@@ -308,7 +316,7 @@ def _build_ident_index(files: list[Path], concepts: frozenset[str]) -> dict[str,
     for file_path in sorted(files)[:2000]:
         try:
             content = file_path.read_text(encoding="utf-8")
-            file_idents = extract_identifiers(content)
+            file_idents = extract_identifiers(content, skip_stopwords=False)
             for ident in file_idents:
                 if ident in concepts:
                     inverted_index[ident].append(file_path)

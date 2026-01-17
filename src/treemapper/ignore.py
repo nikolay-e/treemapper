@@ -119,6 +119,64 @@ def _aggregate_all_ignore_patterns(root: Path, ignore_filenames: list[str]) -> l
     return out
 
 
+def _transform_parent_pattern(line: str, rel_to_root: str) -> str | None:
+    neg = line.startswith("!")
+    pat = line[1:] if neg else line
+
+    if "**" in pat:
+        result = pat
+    elif "/" not in pat:
+        result = pat
+    elif pat.startswith("/"):
+        anchored = pat[1:]
+        if anchored.startswith(rel_to_root + "/"):
+            result = "/" + anchored[len(rel_to_root) + 1 :]
+        elif anchored == rel_to_root or anchored == rel_to_root + "/":
+            return None
+        else:
+            return None
+    else:
+        if pat.startswith(rel_to_root + "/"):
+            result = "/" + pat[len(rel_to_root) + 1 :]
+        elif pat == rel_to_root or pat == rel_to_root + "/":
+            return None
+        else:
+            return None
+
+    return ("!" + result) if neg else result
+
+
+def _collect_parent_ignore_patterns(root: Path, ignore_filenames: list[str]) -> list[str]:
+    out: list[str] = []
+    resolved_root = root.resolve()
+
+    current = resolved_root.parent
+    while current != current.parent:
+        is_git_root = (current / ".git").exists()
+
+        for filename in ignore_filenames:
+            ignore_file = current / filename
+            if ignore_file.is_file():
+                try:
+                    rel_to_root = resolved_root.relative_to(current).as_posix()
+                except ValueError:
+                    continue
+
+                for line in read_ignore_file(ignore_file):
+                    pattern = _transform_parent_pattern(line, rel_to_root)
+                    if pattern:
+                        out.append(pattern)
+
+        if is_git_root:
+            break
+
+        current = current.parent
+
+    if out:
+        logging.debug(f"Collected {len(out)} patterns from parent directories")
+    return out
+
+
 DEFAULT_IGNORE_PATTERNS = [
     # Version control
     "**/.git/",
@@ -176,6 +234,7 @@ def get_ignore_specs(
 
     if not no_default_ignores:
         patterns.extend(DEFAULT_IGNORE_PATTERNS)
+        patterns.extend(_collect_parent_ignore_patterns(root_dir, [".gitignore", ".treemapperignore"]))
         patterns.extend(_aggregate_all_ignore_patterns(root_dir, [".gitignore", ".treemapperignore"]))
 
     if custom_ignore_file:

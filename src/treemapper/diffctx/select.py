@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 import logging
 import statistics
 from dataclasses import dataclass, field
@@ -67,56 +68,65 @@ def _log_skipped_core(skipped: list[Fragment]) -> None:
         )
 
 
-def _compute_upper_bounds(
+@dataclass
+class _HeapEntry:
+    neg_density: float
+    frag_id: FragmentId
+    version: int
+
+    def __lt__(self, other: _HeapEntry) -> bool:
+        return self.neg_density < other.neg_density
+
+
+def _build_initial_heap(
     candidates: list[Fragment],
     rel: dict[FragmentId, float],
     concepts: frozenset[str],
     state: UtilityState,
-) -> dict[FragmentId, float]:
-    upper_bounds: dict[FragmentId, float] = {}
+    id_to_frag: dict[FragmentId, Fragment],
+) -> list[_HeapEntry]:
+    heap: list[_HeapEntry] = []
     for frag in candidates:
         if frag.token_count > 0:
-            upper_bounds[frag.id] = compute_density(frag, rel.get(frag.id, 0.0), concepts, state)
-        else:
-            upper_bounds[frag.id] = 0.0
-    return upper_bounds
+            density = compute_density(frag, rel.get(frag.id, 0.0), concepts, state)
+            heapq.heappush(heap, _HeapEntry(-density, frag.id, 0))
+            id_to_frag[frag.id] = frag
+    return heap
 
 
-def _find_best_candidate(
-    candidates: list[Fragment],
+def _find_best_candidate_heap(
+    heap: list[_HeapEntry],
+    current_version: int,
+    id_to_frag: dict[FragmentId, Fragment],
     selected_ids: set[FragmentId],
     remaining_budget: int,
     rel: dict[FragmentId, float],
     concepts: frozenset[str],
     state: UtilityState,
-    upper_bounds: dict[FragmentId, float],
-) -> tuple[Fragment | None, float, list[Fragment]]:
-    best_frag = None
-    best_density = 0.0
-    filtered: list[Fragment] = []
+) -> tuple[Fragment | None, float, int]:
+    while heap:
+        entry = heapq.heappop(heap)
+        frag = id_to_frag.get(entry.frag_id)
 
-    for frag in candidates:
+        if frag is None:
+            continue
         if frag.token_count > remaining_budget:
             continue
         if _overlaps_with_selected(frag, selected_ids):
             continue
-        filtered.append(frag)
 
-    filtered.sort(key=lambda f: upper_bounds.get(f.id, 0.0), reverse=True)
+        if entry.version < current_version:
+            new_density = compute_density(frag, rel.get(frag.id, 0.0), concepts, state)
+            heapq.heappush(heap, _HeapEntry(-new_density, frag.id, current_version))
+            continue
 
-    for i, frag in enumerate(filtered):
-        actual_gain = marginal_gain(frag, rel.get(frag.id, 0.0), concepts, state)
-        actual_density = actual_gain / frag.token_count if frag.token_count > 0 else 0.0
-        upper_bounds[frag.id] = actual_density
+        actual_density = -entry.neg_density
+        if actual_density <= 0:
+            return None, 0.0, current_version
 
-        if actual_density > best_density:
-            best_frag = frag
-            best_density = actual_density
+        return frag, actual_density, current_version + 1
 
-        if i + 1 < len(filtered) and actual_density >= upper_bounds.get(filtered[i + 1].id, 0.0):
-            break
-
-    return best_frag, best_density, filtered
+    return None, 0.0, current_version
 
 
 def _find_best_singleton(
@@ -180,9 +190,10 @@ def lazy_greedy_select(
     base_budget = state.remaining_budget
 
     candidates = [f for f in non_core_fragments if not _overlaps_with_selected(f, state.selected_ids)]
-    upper_bounds = _compute_upper_bounds(candidates, rel, concepts, state.utility_state)
+    id_to_frag: dict[FragmentId, Fragment] = {}
+    heap = _build_initial_heap(candidates, rel, concepts, state.utility_state, id_to_frag)
 
-    selections_for_baseline, threshold = _run_greedy_loop(candidates, state, rel, concepts, upper_bounds, tau)
+    selections_for_baseline, threshold = _run_greedy_loop_heap(heap, id_to_frag, state, rel, concepts, tau)
 
     greedy_utility = utility_value(state.utility_state)
     base_selected_ids = {f.id for f in base_selected}
@@ -203,25 +214,33 @@ def lazy_greedy_select(
         return singleton_result
 
     return _determine_final_result(
-        state, base_selected, budget_tokens, greedy_utility, selections_for_baseline, threshold, candidates, core_ids
+        state, base_selected, budget_tokens, greedy_utility, selections_for_baseline, threshold, bool(heap), core_ids
     )
 
 
-def _run_greedy_loop(
-    candidates: list[Fragment],
+def _run_greedy_loop_heap(
+    heap: list[_HeapEntry],
+    id_to_frag: dict[FragmentId, Fragment],
     state: _SelectionState,
     rel: dict[FragmentId, float],
     concepts: frozenset[str],
-    upper_bounds: dict[FragmentId, float],
     tau: float,
 ) -> tuple[int, float]:
     baseline_densities: list[float] = []
     threshold = 0.0
     selections_for_baseline = 0
+    current_version = 0
 
-    while candidates and state.remaining_budget > 0:
-        best_frag, best_density, candidates = _find_best_candidate(
-            candidates, state.selected_ids, state.remaining_budget, rel, concepts, state.utility_state, upper_bounds
+    while heap and state.remaining_budget > 0:
+        best_frag, best_density, current_version = _find_best_candidate_heap(
+            heap,
+            current_version,
+            id_to_frag,
+            state.selected_ids,
+            state.remaining_budget,
+            rel,
+            concepts,
+            state.utility_state,
         )
 
         if best_frag is None or best_density <= 0:
@@ -240,8 +259,6 @@ def _run_greedy_loop(
         state.selected_ids.add(best_frag.id)
         state.remaining_budget -= best_frag.token_count
         apply_fragment(best_frag, rel.get(best_frag.id, 0.0), concepts, state.utility_state)
-
-        candidates = [f for f in candidates if f.id != best_frag.id]
 
     return selections_for_baseline, threshold
 
@@ -286,7 +303,7 @@ def _determine_final_result(
     greedy_utility: float,
     selections_for_baseline: int,
     threshold: float,
-    candidates: list[Fragment],
+    has_remaining_candidates: bool,
     core_ids: set[FragmentId],
 ) -> SelectionResult:
     used = budget_tokens - state.remaining_budget
@@ -297,7 +314,7 @@ def _determine_final_result(
         reason = "no_utility"
     elif not state.selected or len(state.selected) == len(base_selected):
         reason = "budget_exhausted" if state.skipped_core else "no_candidates"
-    elif selections_for_baseline >= _BASELINE_K and threshold > 0 and candidates:
+    elif selections_for_baseline >= _BASELINE_K and threshold > 0 and has_remaining_candidates:
         reason = "stopped_by_tau"
     else:
         reason = "no_candidates"
@@ -314,9 +331,7 @@ def _overlaps_with_selected(frag: Fragment, selected_ids: set[FragmentId]) -> bo
             continue
         if sel_id == frag.id:
             continue
-        if frag.start_line <= sel_id.start_line and sel_id.end_line <= frag.end_line:
-            return True
-        if sel_id.start_line <= frag.start_line and frag.end_line <= sel_id.end_line:
+        if max(frag.start_line, sel_id.start_line) <= min(frag.end_line, sel_id.end_line):
             return True
     return False
 

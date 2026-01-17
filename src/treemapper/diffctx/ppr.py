@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+import math
+
 from .graph import Graph
 from .types import FragmentId
 
@@ -64,14 +67,34 @@ def personalized_pagerank(
         return {n: 1.0 / len(nodes) for n in nodes}
 
     p, scores = _initialize_ppr_scores(nodes, valid_seeds)
-    out_sum = {n: sum(graph.neighbors(n).values()) for n in nodes}
+    out_sum = {}
+    for n in nodes:
+        total = sum(w for w in graph.neighbors(n).values() if math.isfinite(w))
+        out_sum[n] = total if math.isfinite(total) else 0.0
     base = {n: (1.0 - alpha) * p[n] for n in nodes}
 
-    for _ in range(max_iter):
+    iteration = 0
+    delta = float("inf")
+
+    for iteration in range(max_iter):
         new_scores = _ppr_iteration(nodes, graph, scores, out_sum, base, p, alpha)
         delta = sum(abs(new_scores[n] - scores[n]) for n in nodes)
         scores = new_scores
         if delta < tol:
-            break
+            logging.debug(
+                "PPR converged at iteration %d (delta=%.6f, tol=%.6f, nodes=%d)",
+                iteration + 1,
+                delta,
+                tol,
+                len(nodes),
+            )
+            return _normalize_scores(scores)
 
+    logging.warning(
+        "PPR reached max_iter=%d without convergence (delta=%.6f, tol=%.6f, nodes=%d)",
+        max_iter,
+        delta,
+        tol,
+        len(nodes),
+    )
     return _normalize_scores(scores)

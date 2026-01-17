@@ -1,7 +1,9 @@
+import re
 import subprocess
 
 import pytest
 
+from tests.utils import DiffTestCase, DiffTestRunner
 from treemapper.diffctx import GitError, build_diff_context
 from treemapper.diffctx.git import get_changed_files, parse_diff, split_diff_range
 
@@ -25,13 +27,114 @@ def _extract_files_from_tree(tree: dict) -> set[str]:
     return files
 
 
+OPERATIONS_TEST_CASES = [
+    DiffTestCase(
+        name="git_new_file_with_inheritance",
+        initial_files={
+            "features/__init__.py": "",
+            "features/base.py": """class BaseFeature:
+    def run(self):
+        return "base"
+""",
+        },
+        changed_files={
+            "features/new_feature.py": """from .base import BaseFeature
+
+class NewFeature(BaseFeature):
+    def run(self):
+        return "new"
+""",
+        },
+        must_include=["new_feature.py", "BaseFeature"],
+        commit_message="Add new feature",
+    ),
+    DiffTestCase(
+        name="ignore_node_modules",
+        initial_files={
+            "main.py": "x = 1",
+            "node_modules/pkg/index.js": "module.exports = {}",
+        },
+        changed_files={
+            "main.py": "x = 2",
+            "node_modules/pkg/index.js": "module.exports = {v: 1}",
+        },
+        must_include=["main.py"],
+        must_not_include=["index.js", "node_modules"],
+        commit_message="Modify both",
+    ),
+    DiffTestCase(
+        name="ignore_venv",
+        initial_files={
+            "main.py": "x = 1",
+            ".venv/lib/site.py": "x = 1",
+        },
+        changed_files={
+            "main.py": "x = 2",
+            ".venv/lib/site.py": "x = 2",
+        },
+        must_include=["main.py"],
+        must_not_include=["site.py"],
+        commit_message="Modify files",
+    ),
+    DiffTestCase(
+        name="ignore_pycache",
+        initial_files={
+            "main.py": "x = 1",
+            "__pycache__/main.cpython-311.pyc": "binary",
+        },
+        changed_files={
+            "main.py": "x = 2",
+        },
+        must_include=["main.py"],
+        must_not_include=["cpython-311.pyc"],
+        commit_message="Modify main",
+    ),
+    DiffTestCase(
+        name="treemapperignore_excludes_file",
+        initial_files={
+            ".treemapperignore": "*.tmp\n",
+            "main.py": "x = 1",
+            "cache.tmp": "temp data",
+        },
+        changed_files={
+            "main.py": "x = 2",
+            "cache.tmp": "new temp data",
+        },
+        must_include=["main.py"],
+        must_not_include=["cache.tmp"],
+        commit_message="Modify files",
+    ),
+    DiffTestCase(
+        name="full_mode_all_changed_files",
+        initial_files={
+            "a.py": "def func_a():\n    return 1\n",
+            "b.py": "def func_b():\n    return 2\n",
+            "c.py": "def func_c():\n    return 3\n",
+        },
+        changed_files={
+            "a.py": "def func_a():\n    return 10\n",
+            "b.py": "def func_b():\n    return 20\n",
+            "c.py": "def func_c():\n    return 30\n",
+        },
+        must_include=["a.py", "b.py", "c.py"],
+        commit_message="Modify all",
+    ),
+]
+
+
+@pytest.mark.parametrize("case", OPERATIONS_TEST_CASES, ids=lambda c: c.name)
+def test_operations_cases(diff_test_runner: DiffTestRunner, case: DiffTestCase):
+    context = diff_test_runner.run_test_case(case)
+    diff_test_runner.verify_assertions(context, case)
+
+
 @pytest.fixture
 def diff_project(git_with_commits):
     return git_with_commits
 
 
-class TestFileOperations:
-    def test_git_001_file_renamed_find_old_references(self, diff_project):
+class TestGitFileOperations:
+    def test_file_renamed(self, diff_project):
         diff_project.add_file(
             "utils/helpers.py",
             """def helper_func():
@@ -62,26 +165,18 @@ def main():
             budget_tokens=10000,
         )
 
-        # Rename detection is a known limitation - verify algo doesn't crash
-        # and returns valid tree structure (may be empty for pure renames)
         assert tree is not None
         assert tree.get("type") in ("directory", "diff_context")
 
-    def test_git_002_file_moved_to_different_package(self, diff_project):
-        diff_project.add_file(
-            "old_package/__init__.py",
-            "",
-        )
+    def test_file_moved_to_different_package(self, diff_project):
+        diff_project.add_file("old_package/__init__.py", "")
         diff_project.add_file(
             "old_package/module.py",
             """def module_func():
     return "module"
 """,
         )
-        diff_project.add_file(
-            "new_package/__init__.py",
-            "",
-        )
+        diff_project.add_file("new_package/__init__.py", "")
         diff_project.commit("Initial")
 
         subprocess.run(
@@ -98,12 +193,10 @@ def main():
             budget_tokens=10000,
         )
 
-        # File move detection is a known limitation - verify algo doesn't crash
-        # and returns valid tree structure (may be empty for pure moves)
         assert tree is not None
         assert tree.get("type") in ("directory", "diff_context")
 
-    def test_git_003_file_deleted(self, diff_project):
+    def test_file_deleted(self, diff_project):
         diff_project.add_file(
             "deprecated/old_helper.py",
             """def old_helper():
@@ -128,49 +221,13 @@ def main():
 
         hunks = parse_diff(diff_project.repo, "HEAD~1..HEAD")
 
-        # Verify deletion is detected correctly
         deleted_hunks = [h for h in hunks if h.is_deletion]
         assert len(deleted_hunks) == 1
         assert "old_helper.py" in str(deleted_hunks[0].path)
 
-    def test_git_004_new_file_added(self, diff_project):
-        diff_project.add_file(
-            "features/__init__.py",
-            "",
-        )
-        diff_project.add_file(
-            "features/base.py",
-            """class BaseFeature:
-    def run(self):
-        return "base"
-""",
-        )
-        diff_project.commit("Initial")
 
-        diff_project.add_file(
-            "features/new_feature.py",
-            """from .base import BaseFeature
-
-class NewFeature(BaseFeature):
-    def run(self):
-        return "new"
-""",
-        )
-        diff_project.commit("Add new feature")
-
-        tree = build_diff_context(
-            root_dir=diff_project.repo,
-            diff_range="HEAD~1..HEAD",
-            budget_tokens=10000,
-        )
-
-        selected = _extract_files_from_tree(tree)
-        assert "new_feature.py" in selected
-        assert "base.py" in selected
-
-
-class TestMergeConflictScenarios:
-    def test_git_010_diff_between_branches(self, diff_project):
+class TestBranchOperations:
+    def test_diff_between_branches(self, diff_project):
         diff_project.add_file(
             "main.py",
             """def main():
@@ -203,7 +260,7 @@ class TestMergeConflictScenarios:
         selected = _extract_files_from_tree(tree)
         assert "main.py" in selected
 
-    def test_git_011_three_dot_diff(self, diff_project):
+    def test_three_dot_diff_parsing(self, diff_project):
         diff_project.add_file(
             "main.py",
             """def main():
@@ -233,29 +290,29 @@ class TestMergeConflictScenarios:
 
 
 class TestDiffRangeParsing:
-    def test_split_diff_range_two_dot(self):
+    def test_split_two_dot(self):
         base, head = split_diff_range("main..feature")
         assert base == "main"
         assert head == "feature"
 
-    def test_split_diff_range_three_dot(self):
+    def test_split_three_dot(self):
         base, head = split_diff_range("main...feature")
         assert base == "main"
         assert head == "feature"
 
-    def test_split_diff_range_with_sha(self):
+    def test_split_with_sha(self):
         base, head = split_diff_range("abc1234..def5678")
         assert base == "abc1234"
         assert head == "def5678"
 
-    def test_split_diff_range_head_notation(self):
+    def test_split_head_notation(self):
         base, head = split_diff_range("HEAD~1..HEAD")
         assert base == "HEAD~1"
         assert head == "HEAD"
 
 
 class TestChangedFilesDetection:
-    def test_get_changed_files_single_file(self, diff_project):
+    def test_single_file(self, diff_project):
         diff_project.add_file("file1.py", "x = 1")
         diff_project.commit("Initial")
 
@@ -266,7 +323,7 @@ class TestChangedFilesDetection:
         assert len(changed) == 1
         assert changed[0].name == "file1.py"
 
-    def test_get_changed_files_multiple_files(self, diff_project):
+    def test_multiple_files(self, diff_project):
         diff_project.add_file("file1.py", "x = 1")
         diff_project.add_file("file2.py", "y = 1")
         diff_project.commit("Initial")
@@ -279,7 +336,7 @@ class TestChangedFilesDetection:
         names = {f.name for f in changed}
         assert names == {"file1.py", "file2.py"}
 
-    def test_get_changed_files_nested(self, diff_project):
+    def test_nested_files(self, diff_project):
         diff_project.add_file("src/lib/module.py", "x = 1")
         diff_project.commit("Initial")
 
@@ -292,7 +349,7 @@ class TestChangedFilesDetection:
 
 
 class TestParseDiff:
-    def test_parse_diff_single_hunk(self, diff_project):
+    def test_single_hunk(self, diff_project):
         diff_project.add_file(
             "test.py",
             """def hello():
@@ -313,7 +370,7 @@ class TestParseDiff:
         assert len(hunks) >= 1
         assert hunks[0].path.name == "test.py"
 
-    def test_parse_diff_multiple_hunks(self, diff_project):
+    def test_multiple_hunks(self, diff_project):
         diff_project.add_file(
             "test.py",
             """def func1():
@@ -343,7 +400,7 @@ def func2():
         hunks = parse_diff(diff_project.repo, "HEAD~1..HEAD")
         assert len(hunks) >= 2
 
-    def test_parse_diff_addition(self, diff_project):
+    def test_addition(self, diff_project):
         diff_project.add_file("test.py", "x = 1\n")
         diff_project.commit("Initial")
 
@@ -359,7 +416,7 @@ y = 2
         assert len(hunks) >= 1
         assert hunks[0].is_addition or hunks[0].new_len > 0
 
-    def test_parse_diff_deletion(self, diff_project):
+    def test_deletion(self, diff_project):
         diff_project.add_file(
             "test.py",
             """x = 1
@@ -374,7 +431,7 @@ y = 2
         hunks = parse_diff(diff_project.repo, "HEAD~1..HEAD")
         assert len(hunks) >= 1
 
-    def test_parse_diff_pure_deletion_hunk(self, diff_project):
+    def test_pure_deletion_hunk(self, diff_project):
         diff_project.add_file("test.py", "line1\nline2\nline3\n")
         diff_project.commit("Initial")
 
@@ -394,7 +451,7 @@ y = 2
         assert deletion_hunks[0].old_len > 0
 
 
-class TestNonGitRepo:
+class TestGitErrorHandling:
     def test_non_git_repo_raises_error(self, tmp_path):
         non_git = tmp_path / "non_git"
         non_git.mkdir()
@@ -406,8 +463,6 @@ class TestNonGitRepo:
                 budget_tokens=1000,
             )
 
-
-class TestGitErrorHandling:
     def test_invalid_diff_range_syntax(self, diff_project):
         diff_project.add_file("test.py", "x = 1")
         diff_project.commit("Initial")
@@ -440,3 +495,82 @@ class TestGitErrorHandling:
                 diff_range="HEAD~10..HEAD",
                 budget_tokens=1000,
             )
+
+
+class TestFullMode:
+    def test_full_mode_ignores_budget(self, diff_project):
+        content = "\n".join([f"def func{i}():\n    return {i}\n" for i in range(20)])
+        diff_project.add_file("large.py", content)
+        diff_project.commit("Initial")
+
+        modified = "\n".join([f"def func{i}():\n    return {i*10}\n" for i in range(20)])
+        diff_project.add_file("large.py", modified)
+        diff_project.commit("Modify")
+
+        full_tree = build_diff_context(
+            root_dir=diff_project.repo,
+            diff_range="HEAD~1..HEAD",
+            budget_tokens=50,
+            full=True,
+        )
+
+        smart_tree = build_diff_context(
+            root_dir=diff_project.repo,
+            diff_range="HEAD~1..HEAD",
+            budget_tokens=50,
+            full=False,
+        )
+
+        full_count = len(full_tree.get("fragments", []))
+        smart_count = len(smart_tree.get("fragments", []))
+
+        assert full_count >= smart_count
+
+
+class TestOutputStructure:
+    def test_output_type_is_diff_context(self, diff_project):
+        diff_project.add_file("test.py", "x = 1")
+        diff_project.commit("Initial")
+        diff_project.add_file("test.py", "x = 2")
+        diff_project.commit("Modify")
+
+        tree = build_diff_context(
+            root_dir=diff_project.repo,
+            diff_range="HEAD~1..HEAD",
+            budget_tokens=1000,
+        )
+
+        assert tree.get("type") == "diff_context"
+
+    def test_fragment_lines_format(self, diff_project):
+        diff_project.add_file("test.py", "def foo():\n    return 1\n")
+        diff_project.commit("Initial")
+        diff_project.add_file("test.py", "def foo():\n    return 2\n")
+        diff_project.commit("Modify")
+
+        tree = build_diff_context(
+            root_dir=diff_project.repo,
+            diff_range="HEAD~1..HEAD",
+            budget_tokens=1000,
+        )
+
+        for frag in tree.get("fragments", []):
+            if "lines" in frag:
+                assert re.match(r"^\d+-\d+$", frag["lines"])
+
+    def test_no_content_removes_content(self, diff_project):
+        diff_project.add_file("test.py", "def foo():\n    return 1\n")
+        diff_project.commit("Initial")
+        diff_project.add_file("test.py", "def foo():\n    return 2\n")
+        diff_project.commit("Modify")
+
+        tree = build_diff_context(
+            root_dir=diff_project.repo,
+            diff_range="HEAD~1..HEAD",
+            budget_tokens=1000,
+            no_content=True,
+        )
+
+        for frag in tree.get("fragments", []):
+            content = frag.get("content", "")
+            assert content == "" or content is None

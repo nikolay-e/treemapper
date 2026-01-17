@@ -14,7 +14,7 @@
 
 \author{
   Nikolay Eremeev \\
-  \texttt{your-email@example.com} \\
+  \texttt{nikolay.eremeev@outlook.com} \\
   \texttt{https://github.com/nikolay-e/treemapper}
 }
 
@@ -24,7 +24,7 @@
 \maketitle
 
 \begin{abstract}
-Retrieving optimal context for Large Language Models to understand code changes is a critical challenge in automated software engineering. Current approaches rely on naive windowing or purely lexical retrieval, missing complex structural dependencies. We formalize diff context selection as budgeted submodular maximization over Code Property Graphs, where relevance propagates via weighted structural dependencies from edited code using Personalized PageRank. This formulation enables: (1) principled optimization grounded in submodular function theory, (2) adaptive stopping based on marginal utility thresholds, and (3) unified treatment of structural and lexical signals as weighted graph edges. We propose a rigorous evaluation methodology using dependency coverage recall and fault localization accuracy as behavioral proxies for the latent notion of ``understanding.'' The framework offers a principled, scalable solution for processing diffs within strict token budgets imposed by LLM context windows.
+Retrieving optimal context for Large Language Models to understand code changes is a critical challenge in automated software engineering. Current approaches rely on naive windowing or purely lexical retrieval, missing complex structural dependencies. We formalize diff context selection as budgeted submodular maximization over Code Property Graphs, where relevance propagates via weighted structural dependencies from edited code using Personalized PageRank. This formulation enables: (1) optimization inspired by submodular function theory with empirically validated performance, (2) adaptive stopping based on marginal utility thresholds, and (3) unified treatment of structural and lexical signals as weighted graph edges. We propose a rigorous evaluation methodology using dependency coverage recall and fault localization accuracy as behavioral proxies for the latent notion of ``understanding.'' The framework offers a scalable solution for processing diffs within strict token budgets imposed by LLM context windows.
 \end{abstract}
 
 \section{Introduction}
@@ -97,7 +97,7 @@ Lexical overlap & 0.1--0.2 & TF-IDF on identifier tokens \\
 \label{tab:edges}
 \end{table}
 
-\textbf{Note on symbol reference edges}: We use lexical name matching within function scope as a heuristic approximation to data-flow analysis. True def-use chains require control-flow graph construction and reaching definitions analysis, which is infeasible for incomplete or unparsable code in git working trees. For dynamic languages (Python, JavaScript), static resolution captures approximately 60--70\% of actual dependencies.
+\textbf{Note on symbol reference edges}: We use lexical name matching within function scope as a heuristic approximation to data-flow analysis. True def-use chains require control-flow graph construction and reaching definitions analysis, which is infeasible for incomplete or unparsable code in git working trees. For dynamic languages (Python, JavaScript), static resolution coverage varies significantly by codebase characteristics: codebases with heavy metaprogramming or dynamic dispatch may achieve 40--60\% resolution, typical application code 50--70\%, and strongly typed code with type hints 70--85\%. These ranges require validation against runtime call graphs.
 
 Edge weights reflect empirical findings that developers predominantly follow structural links (call/data dependencies) rather than lexical search when navigating code~\cite{ko2006exploratory}. For typed languages, structural edges dominate; for dynamic languages, lexical signals compensate for incomplete static analysis.
 
@@ -222,7 +222,7 @@ We propose evaluation on 500+ bug-fix commits from established benchmarks (Defec
 \section{Discussion and Limitations}
 
 \paragraph{Language Coverage.}
-The framework requires language-specific tooling for AST parsing and name resolution. Planned initial support targets Python, TypeScript, Rust, and JavaScript. Dynamic languages present challenges due to incomplete static analysis of dynamic dispatch (estimated 60--70\% resolution rate).
+The framework requires language-specific tooling for AST parsing and name resolution. The current implementation supports Python, TypeScript, JavaScript, Go, Rust, Java, C, C++, Ruby, Kotlin, and Scala via tree-sitter parsing, with Python and JavaScript receiving dedicated semantic analysis. Dynamic languages present challenges due to incomplete static analysis of dynamic dispatch.
 
 \paragraph{Symbol Reference vs. Data-Flow.}
 Our ``symbol reference'' edges use lexical name matching within function scope as a heuristic. This is \textbf{not} true data-flow analysis, which requires CFG construction and reaching definitions computation---infeasible for incomplete code in git working trees. We explicitly acknowledge this limitation.
@@ -231,7 +231,7 @@ Our ``symbol reference'' edges use lexical name matching within function scope a
 The current PPR formulation propagates relevance along forward edges (callee direction). For understanding changes, backward dependencies (callers of modified functions, usages of modified variables) are often more important. Future work should add reverse edges or run PPR on the graph transpose.
 
 \paragraph{Hub Node Dominance.}
-Utility classes with high in-degree (Logger, Config, Utils) can accumulate excessive PPR mass. Mitigation: IDF-style damping $w'_{uv} = w_{uv} / \log(1 + \text{in\_degree}(v))$ for nodes exceeding the 95th percentile in-degree.
+Utility classes with high in-degree (Logger, Config, Utils) can accumulate excessive PPR mass. Our implementation applies IDF-style damping $w'_{uv} = w_{uv} / \log(1 + \text{in\_degree}(v))$ for nodes exceeding the 95th percentile in-degree. While this improves PPR distribution in preliminary testing, systematic validation across diverse codebases is required to confirm its effectiveness.
 
 \paragraph{Configuration Files.}
 Non-code files (YAML, JSON, TOML) lack structural dependencies. For these, lexical signals must dominate, with higher BM25 weights (0.4--0.5).
@@ -298,7 +298,9 @@ Lazy greedy & $O(|\mathcal{V}| \log |\mathcal{V}|)$ & $O(n)$ & Tested to $\sim$5
 
 The following tactics are useful in practice but lack strong theoretical or empirical grounding. They should be evaluated via ablation before deployment.
 
-\paragraph{Hub Suppression.} Apply IDF-style penalty to edges into high in-degree nodes: $w'_{uv} = w_{uv} / \log(1 + \text{in\_degree}(v))$ when $\text{in\_degree}(v)$ exceeds the 95th percentile.
+\paragraph{Relatedness Bonus.} The implementation includes a minimum marginal gain for fragments with high PPR relevance ($\geq 0.10$) and concept overlap: $\text{gain}_{\min} = \text{rel} \times 0.25 \times \min(|\text{covered}|, 5)$. This ensures semantically related fragments are included even when concepts are already covered by core fragments. Additionally, a fallback bonus of $\text{rel} \times 0.25$ applies to high-PPR fragments regardless of concept overlap, ensuring structurally related fragments (via call graph) are included. \textbf{Warning:} This modification may break strict submodularity of the utility function, invalidating worst-case approximation guarantees. Ablation studies comparing performance with and without the bonus are required.
+
+\paragraph{Hub Suppression.} Apply IDF-style penalty to edges into high in-degree nodes: $w'_{uv} = w_{uv} / \log(1 + \text{in\_degree}(v))$ when $\text{in\_degree}(v)$ exceeds the 95th percentile. This is implemented globally during graph construction.
 
 \paragraph{Backward Edge Weighting.} Weight caller$\to$callee edges at 0.7--0.8$\times$ of callee$\to$caller edges to prioritize impact analysis over dependency tracing.
 

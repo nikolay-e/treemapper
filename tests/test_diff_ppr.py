@@ -136,16 +136,16 @@ class TestGraphStructure:
         frag_a = Fragment(
             id=FragmentId(path=path, start_line=1, end_line=5),
             kind="function",
-            content="def a():\n    b()\n",
-            identifiers=frozenset(["a", "b"]),
+            content="def func_alpha():\n    func_beta()\n",
+            identifiers=frozenset(["func_alpha", "func_beta"]),
             token_count=50,
         )
 
         frag_b = Fragment(
             id=FragmentId(path=path, start_line=10, end_line=15),
             kind="function",
-            content="def b():\n    a()\n",
-            identifiers=frozenset(["b", "a"]),
+            content="def func_beta():\n    func_alpha()\n",
+            identifiers=frozenset(["func_beta", "func_alpha"]),
             token_count=50,
         )
 

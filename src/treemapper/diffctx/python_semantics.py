@@ -77,14 +77,37 @@ def _collect_type_refs(tree: ast.Module) -> set[str]:
 _EMPTY_INFO = PyFragmentInfo(frozenset(), frozenset(), frozenset(), frozenset())
 
 
+def _try_parse(code: str) -> ast.Module | None:
+    try:
+        return ast.parse(code)
+    except SyntaxError:
+        return None
+
+
+def _parse_with_fallbacks(code: str) -> ast.Module | None:
+    tree = _try_parse(code)
+    if tree is not None:
+        return tree
+
+    dedented = textwrap.dedent(code)
+    tree = _try_parse(dedented)
+    if tree is not None:
+        return tree
+
+    wrapped = f"def __wrapper__():\n{textwrap.indent(dedented, '    ')}\n"
+    tree = _try_parse(wrapped)
+    if tree is not None:
+        return tree
+
+    return None
+
+
 def analyze_python_fragment(code: str) -> PyFragmentInfo:
     if not code.strip():
         return _EMPTY_INFO
 
-    dedented = textwrap.dedent(code)
-    try:
-        tree = ast.parse(dedented)
-    except SyntaxError:
+    tree = _parse_with_fallbacks(code)
+    if tree is None:
         return _EMPTY_INFO
 
     defines = _collect_defines(tree)

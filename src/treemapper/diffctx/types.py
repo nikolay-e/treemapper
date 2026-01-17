@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .stopwords import TokenProfile
+from .tokenizer import extract_tokens as _extract_tokens_nlp
 
 _IDENT_RE = re.compile(r"[A-Za-z_]\w*")
 
@@ -79,16 +80,48 @@ class DiffHunk:
     def is_addition(self) -> bool:
         return self.old_len == 0 and self.new_len > 0
 
+    @property
+    def core_selection_range(self) -> tuple[int, int]:
+        if self.is_deletion:
+            anchor = max(1, self.new_start)
+            return (anchor, anchor)
+        return (self.new_start, self.end_line)
 
-def extract_identifiers(text: str, profile: str = "code") -> frozenset[str]:
+
+def extract_identifiers(
+    text: str,
+    profile: str = "code",
+    *,
+    skip_stopwords: bool = False,
+    use_nlp: bool = False,
+) -> frozenset[str]:
+    if use_nlp and profile != "code":
+        return _extract_tokens_nlp(text, profile=profile, use_nlp=True)
+
     raw = _IDENT_RE.findall(text)
-    stopwords = TokenProfile.get_stopwords(profile)
     min_len = TokenProfile.get_min_len(profile)
-    return frozenset({ident for ident in raw if len(ident) >= min_len and ident.lower() not in stopwords})
+    if skip_stopwords:
+        stopwords = TokenProfile.get_stopwords(profile)
+        return frozenset({ident.lower() for ident in raw if len(ident) >= min_len and ident.lower() not in stopwords})
+    # Normalize to lowercase to match concepts (also lowercase)
+    return frozenset({ident.lower() for ident in raw if len(ident) >= min_len})
 
 
-def extract_identifier_list(text: str, profile: str = "code") -> list[str]:
+def extract_identifier_list(
+    text: str,
+    profile: str = "code",
+    *,
+    skip_stopwords: bool = True,
+    use_nlp: bool = False,
+) -> list[str]:
+    if use_nlp and profile != "code":
+        from .tokenizer import extract_token_list
+
+        return extract_token_list(text, profile=profile, use_nlp=True)
+
     raw = _IDENT_RE.findall(text)
-    stopwords = TokenProfile.get_stopwords(profile)
     min_len = TokenProfile.get_min_len(profile)
-    return [ident for ident in raw if len(ident) >= min_len and ident.lower() not in stopwords]
+    if skip_stopwords:
+        stopwords = TokenProfile.get_stopwords(profile)
+        return [ident for ident in raw if len(ident) >= min_len and ident.lower() not in stopwords]
+    return [ident for ident in raw if len(ident) >= min_len]

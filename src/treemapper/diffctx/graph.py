@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import math
 import re
-from collections import defaultdict
+import subprocess
+from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from heapq import nlargest
 from pathlib import Path
 
-from .python_semantics import PyFragmentInfo, analyze_python_fragment
+from .constants import CODE_EXTENSIONS, CONFIG_EXTENSIONS
+from .edges import collect_all_edges
+from .edges.base import path_to_module
+from .embeddings import _build_embedding_edges
 from .stopwords import TokenProfile, filter_idents
 from .types import Fragment, FragmentId, extract_identifier_list
 
@@ -23,9 +27,6 @@ _MAX_DF_RATIO = 0.20
 _MIN_IDF = 1.6
 _MAX_POSTINGS = 200
 
-_CALL_WEIGHT = 0.85
-_SYMBOL_REF_WEIGHT = 0.95
-_TYPE_REF_WEIGHT = 0.60
 _CONTAINMENT_WEIGHT = 0.50
 _CONTAINMENT_REVERSE_WEIGHT = 0.35
 
@@ -42,7 +43,13 @@ _CONFIG_KEY_RE = re.compile(r"^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*:", re.MULTILINE)
 _TOML_KEY_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_-]*)\s*=", re.MULTILINE)
 _TOML_SECTION_RE = re.compile(r"^\[([a-zA-Z_][a-zA-Z0-9_.-]*)\]", re.MULTILINE)
 
-_SIBLING_WEIGHT = 0.15
+_SIBLING_WEIGHT = 0.05
+
+_COCHANGE_WEIGHT = 0.40
+_COCHANGE_MIN_COUNT = 2
+_COCHANGE_MAX_FILES_PER_COMMIT = 30
+_COCHANGE_COMMITS = 500
+_COCHANGE_TIMEOUT = 10
 
 _JAVA_EXT = ".java"
 _SCALA_EXT = ".scala"
@@ -120,6 +127,8 @@ class Graph:
         self.nodes.add(node)
 
     def add_edge(self, src: FragmentId, dst: FragmentId, weight: float) -> None:
+        if math.isnan(weight) or math.isinf(weight) or weight <= 0:
+            return
         if src not in self.adjacency:
             self.adjacency[src] = {}
         existing = self.adjacency[src].get(dst, 0.0)
@@ -131,7 +140,7 @@ class Graph:
         return self.adjacency.get(node, {})
 
 
-def build_graph(fragments: list[Fragment]) -> Graph:
+def build_graph(fragments: list[Fragment], repo_root: Path | None = None) -> Graph:
     graph = Graph()
 
     for frag in fragments:
@@ -141,7 +150,6 @@ def build_graph(fragments: list[Fragment]) -> Graph:
     all_edges: dict[tuple[FragmentId, FragmentId], float] = {}
 
     for edge_dict in [
-        _build_python_semantic_edges(fragments),
         _build_containment_edges(fragments),
         _build_import_edges(fragments),
         _build_test_edges(fragments),
@@ -151,6 +159,9 @@ def build_graph(fragments: list[Fragment]) -> Graph:
         _build_config_code_edges(fragments),
         _build_package_sibling_edges(fragments),
         _build_lexical_edges_sparse(fragments),
+        _build_embedding_edges(fragments, _clamp_lexical_weight),
+        _build_cochange_edges(fragments, repo_root),
+        collect_all_edges(fragments, repo_root),
     ]:
         for (src, dst), weight in edge_dict.items():
             all_edges[(src, dst)] = max(all_edges.get((src, dst), 0.0), weight)
@@ -162,55 +173,6 @@ def build_graph(fragments: list[Fragment]) -> Graph:
         graph.add_edge(src, dst, weight)
 
     return graph
-
-
-def _add_ref_edges(
-    edges: dict[tuple[FragmentId, FragmentId], float],
-    src_id: FragmentId,
-    names: set[str],
-    name_to_defs: dict[str, list[FragmentId]],
-    weight: float,
-    skip_self_defs: set[str] | None = None,
-) -> None:
-    for name in names:
-        if skip_self_defs and name in skip_self_defs:
-            continue
-        for dst in name_to_defs.get(name, []):
-            if dst == src_id:
-                continue
-            edges[(src_id, dst)] = max(edges.get((src_id, dst), 0.0), weight)
-            edges[(dst, src_id)] = max(edges.get((dst, src_id), 0.0), weight * _BACKWARD_WEIGHT_FACTOR)
-
-
-def _build_python_semantic_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
-    py_frags = [f for f in fragments if f.path.suffix.lower() == ".py"]
-    if not py_frags:
-        return {}
-
-    info_cache: dict[FragmentId, PyFragmentInfo] = {}
-    for f in py_frags:
-        info_cache[f.id] = analyze_python_fragment(f.content)
-
-    name_to_defs: dict[str, list[FragmentId]] = defaultdict(list)
-    frag_defines: dict[FragmentId, frozenset[str]] = {}
-
-    for f in py_frags:
-        info = info_cache[f.id]
-        frag_defines[f.id] = info.defines
-        for name in info.defines:
-            name_to_defs[name].append(f.id)
-
-    edges: dict[tuple[FragmentId, FragmentId], float] = {}
-
-    for f in py_frags:
-        info = info_cache[f.id]
-        self_defs = set(frag_defines.get(f.id, frozenset()))
-
-        _add_ref_edges(edges, f.id, set(filter_idents(info.calls, min_len=3)), name_to_defs, _CALL_WEIGHT)
-        _add_ref_edges(edges, f.id, set(filter_idents(info.references, min_len=3)), name_to_defs, _SYMBOL_REF_WEIGHT, self_defs)
-        _add_ref_edges(edges, f.id, set(filter_idents(info.type_refs, min_len=3)), name_to_defs, _TYPE_REF_WEIGHT, self_defs)
-
-    return edges
 
 
 def _build_containment_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
@@ -251,7 +213,7 @@ def _build_import_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, Fra
 
     for frag in fragments:
         frag_to_path[frag.id] = frag.path
-        module_name = _path_to_module_name(frag.path)
+        module_name = path_to_module(frag.path)
         if module_name:
             module_to_frags[module_name].append(frag.id)
             parts = module_name.split(".")
@@ -276,24 +238,8 @@ def _build_import_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, Fra
     return edges
 
 
-def _path_to_module_name(path: Path) -> str:
-    parts = list(path.parts)
-
-    for i, part in enumerate(parts):
-        if part in ("src", "lib", "packages"):
-            parts = parts[i + 1 :]
-            break
-
-    if parts and parts[-1].endswith(".py"):
-        parts[-1] = parts[-1][:-3]
-        if parts[-1] == "__init__":
-            parts = parts[:-1]
-
-    return ".".join(parts) if parts else ""
-
-
 def _resolve_relative_import(imported: str, source_path: Path, module_to_frags: dict[str, list[FragmentId]]) -> list[FragmentId]:
-    base_module = _path_to_module_name(source_path.parent)
+    base_module = path_to_module(source_path.parent)
     if not base_module:
         return []
 
@@ -395,7 +341,7 @@ def _is_test_file(path: Path) -> bool:
 
 
 def _has_direct_import(test_frag: Fragment, src_frag: Fragment) -> bool:
-    src_module = _path_to_module_name(src_frag.path)
+    src_module = path_to_module(src_frag.path)
     if not src_module:
         return False
     for match in _IMPORT_RE.finditer(test_frag.content):
@@ -662,8 +608,7 @@ _JSON_KEY_RE = re.compile(r'"([a-zA-Z_][a-zA-Z0-9_-]*)"\s*:')
 _INI_KEY_RE = re.compile(r"^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*=", re.MULTILINE)
 _ENV_KEY_RE = re.compile(r"^([A-Za-z_]\w*)\s*=", re.MULTILINE)
 
-_CONFIG_EXTS = {".yaml", ".yml", ".json", ".toml", ".ini", ".env"}
-_CODE_EXTS = {".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".go"} | _JVM_EXTENSIONS
+_CONFIG_EXTS = CONFIG_EXTENSIONS | {".ini", ".env"}
 
 _CONFIG_KEY_PATTERNS: dict[str, list[re.Pattern[str]]] = {
     ".yaml": [_CONFIG_KEY_RE],
@@ -686,7 +631,7 @@ def _extract_config_keys(suffix: str, content: str) -> set[str]:
 
 def _build_config_code_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
     config_frags = [f for f in fragments if f.path.suffix.lower() in _CONFIG_EXTS]
-    code_frags = [f for f in fragments if f.path.suffix.lower() in _CODE_EXTS]
+    code_frags = [f for f in fragments if f.path.suffix.lower() in CODE_EXTENSIONS]
 
     if not config_frags or not code_frags:
         return {}
@@ -717,19 +662,88 @@ def _build_config_code_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId
     return edges
 
 
+_MAX_SIBLING_FILES_PER_DIR = 20
+
+
 def _build_package_sibling_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
     edges: dict[tuple[FragmentId, FragmentId], float] = {}
 
-    by_dir: dict[Path, list[Fragment]] = defaultdict(list)
+    by_dir: dict[Path, set[Path]] = defaultdict(set)
     for f in fragments:
-        by_dir[f.path.parent].append(f)
+        by_dir[f.path.parent].add(f.path)
 
-    for dir_path, frags in by_dir.items():
-        if len(frags) < 2:
+    file_to_rep: dict[Path, FragmentId] = {}
+    for f in fragments:
+        if f.path not in file_to_rep:
+            file_to_rep[f.path] = f.id
+        elif f.token_count > 0:
+            existing = file_to_rep[f.path]
+            existing_frag = next((fr for fr in fragments if fr.id == existing), None)
+            if existing_frag and f.token_count > existing_frag.token_count:
+                file_to_rep[f.path] = f.id
+
+    for dir_path, files in by_dir.items():
+        file_list = sorted(files)
+        if len(file_list) > _MAX_SIBLING_FILES_PER_DIR:
+            file_list = file_list[:_MAX_SIBLING_FILES_PER_DIR]
+
+        if len(file_list) < 2:
             continue
-        for i, f1 in enumerate(frags):
-            for f2 in frags[i + 1 :]:
-                edges[(f1.id, f2.id)] = _SIBLING_WEIGHT
-                edges[(f2.id, f1.id)] = _SIBLING_WEIGHT
+
+        for i, f1_path in enumerate(file_list):
+            for f2_path in file_list[i + 1 :]:
+                f1_id = file_to_rep.get(f1_path)
+                f2_id = file_to_rep.get(f2_path)
+                if f1_id and f2_id:
+                    edges[(f1_id, f2_id)] = _SIBLING_WEIGHT
+                    edges[(f2_id, f1_id)] = _SIBLING_WEIGHT
+
+    return edges
+
+
+def _build_cochange_edges(fragments: list[Fragment], repo_root: Path | None) -> dict[tuple[FragmentId, FragmentId], float]:
+    if repo_root is None:
+        return {}
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "log", "--name-only", "--format=", f"-n{_COCHANGE_COMMITS}"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=_COCHANGE_TIMEOUT,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return {}
+
+    commits = [c.strip().split("\n") for c in result.stdout.split("\n\n") if c.strip()]
+
+    cochange: Counter[tuple[str, str]] = Counter()
+    for files in commits:
+        files = [f for f in files if f]
+        if len(files) > _COCHANGE_MAX_FILES_PER_COMMIT:
+            continue
+        for i, f1 in enumerate(files):
+            for f2 in files[i + 1 :]:
+                pair = (f1, f2) if f1 < f2 else (f2, f1)
+                cochange[pair] += 1
+
+    path_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
+    for f in fragments:
+        try:
+            rel = f.path.relative_to(repo_root).as_posix() if f.path.is_absolute() else f.path.as_posix()
+            path_to_frags[rel].append(f.id)
+        except ValueError:
+            continue
+
+    edges: dict[tuple[FragmentId, FragmentId], float] = {}
+    for (p1, p2), count in cochange.items():
+        if count < _COCHANGE_MIN_COUNT:
+            continue
+        weight = min(_COCHANGE_WEIGHT, 0.1 * math.log(1 + count))
+        for fid1 in path_to_frags.get(p1, []):
+            for fid2 in path_to_frags.get(p2, []):
+                edges[(fid1, fid2)] = max(edges.get((fid1, fid2), 0.0), weight)
+                edges[(fid2, fid1)] = max(edges.get((fid2, fid1), 0.0), weight)
 
     return edges

@@ -4,13 +4,13 @@ import math
 import re
 from dataclasses import dataclass, field
 
-from .stopwords import filter_idents
+from .tokenizer import extract_tokens
 from .types import Fragment
 
 _CONCEPT_RE = re.compile(r"[A-Za-z_]\w*")
 
 
-def concepts_from_diff_text(diff_text: str) -> frozenset[str]:
+def concepts_from_diff_text(diff_text: str, profile: str = "code", *, use_nlp: bool = False) -> frozenset[str]:
     diff_lines = []
     for line in diff_text.splitlines():
         is_added = line.startswith("+") and not line.startswith("+++")
@@ -18,9 +18,13 @@ def concepts_from_diff_text(diff_text: str) -> frozenset[str]:
         if is_added or is_removed:
             diff_lines.append(line[1:])
     text = "\n".join(diff_lines)
+
+    if use_nlp and profile != "code":
+        return extract_tokens(text, profile=profile, use_nlp=True)
+
     raw = _CONCEPT_RE.findall(text)
-    filtered = filter_idents(raw, min_len=3)
-    return frozenset(filtered)
+    # Normalize to lowercase to avoid "Order" vs "order" being different concepts
+    return frozenset(ident.lower() for ident in raw if len(ident) >= 3)
 
 
 @dataclass
@@ -35,8 +39,8 @@ def _phi(x: float) -> float:
     return math.sqrt(x) if x > 0 else 0.0
 
 
-_MIN_REL_FOR_BONUS = 0.15
-_RELATEDNESS_BONUS = 0.08
+_MIN_REL_FOR_BONUS = 0.10
+_RELATEDNESS_BONUS = 0.25
 _NO_CONCEPTS_FALLBACK_FACTOR = 0.1
 
 
@@ -63,6 +67,11 @@ def marginal_gain(
     if covered and rel_score >= _MIN_REL_FOR_BONUS:
         min_gain = rel_score * _RELATEDNESS_BONUS * min(len(covered), 5)
         gain = max(gain, min_gain)
+
+    # Fallback: high PPR score should contribute even without concept overlap
+    # This ensures structurally related fragments (via call graph) are included
+    if rel_score >= _MIN_REL_FOR_BONUS:
+        gain = max(gain, rel_score * _RELATEDNESS_BONUS)
 
     return gain
 

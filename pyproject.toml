@@ -54,6 +54,10 @@ module = [
     "lxml",
     "lxml.html",
     "tiktoken",
+    "sentence_transformers",
+    "spacy",
+    "spacy.cli",
+    "spacy.language",
 ]
 ignore_missing_imports = true
 
@@ -92,17 +96,7 @@ dependencies = [
     "pathspec>=0.11,<2.0",
     "pyyaml>=6.0.2,<8.0",
     "tiktoken>=0.7,<1.0",
-]
-
-[project.urls]
-Homepage = "https://github.com/nikolay-e/treemapper"
-
-[project.scripts]
-treemapper = "treemapper.treemapper:main"
-
-[project.optional-dependencies]
-full = [
-    # Tree-sitter for code parsing (50+ languages)
+    # Tree-sitter for code parsing (required for proper fragmentation)
     "tree-sitter>=0.21,<1.0",
     "tree-sitter-python>=0.21,<1.0",
     "tree-sitter-javascript>=0.21,<1.0",
@@ -113,14 +107,33 @@ full = [
     "tree-sitter-c>=0.21,<1.0",
     "tree-sitter-cpp>=0.22,<1.0",
     "tree-sitter-ruby>=0.21,<1.0",
+    "tree-sitter-c-sharp>=0.21,<1.0",
     # Markdown parsing
     "mistune>=3.0,<4.0",
-    # Sentence boundary detection
-    "pysbd>=0.3,<1.0",
     # YAML with position tracking
     "ruamel.yaml>=0.18,<1.0",
     # HTML/XML parsing
     "lxml>=5.0,<7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nikolay-e/treemapper"
+
+[project.scripts]
+treemapper = "treemapper.treemapper:main"
+
+[project.optional-dependencies]
+full = [
+    # Sentence boundary detection (optional, for better text splitting)
+    "pysbd>=0.3,<1.0",
+]
+embeddings = [
+    # Semantic code embeddings for diffctx
+    "sentence-transformers>=3.0,<4.0",
+]
+nlp = [
+    # Natural language processing for document tokenization
+    "spacy>=3.7,<4.0",
 ]
 dev = [
     # Testing
@@ -162,3 +175,4 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 norecursedirs = ["mutants", ".git", ".mypy_cache", ".pytest_cache", "__pycache__"]
+addopts = "-n 14 --dist loadfile"

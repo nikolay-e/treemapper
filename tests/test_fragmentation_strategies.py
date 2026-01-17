@@ -19,20 +19,14 @@ from treemapper.diffctx.fragments import (
 class TestTreeSitterStrategy:
     def test_can_handle_python(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         assert strategy.can_handle(Path("test.py"), "def foo(): pass")
 
     def test_can_handle_javascript(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         assert strategy.can_handle(Path("test.js"), "function foo() {}")
 
     def test_can_handle_typescript(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         assert strategy.can_handle(Path("test.ts"), "function foo(): void {}")
 
     def test_cannot_handle_unsupported(self):
@@ -41,8 +35,6 @@ class TestTreeSitterStrategy:
 
     def test_fragment_python_function(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         code = """def hello():
     print("Hello")
     return True
@@ -58,8 +50,6 @@ def world():
 
     def test_fragment_javascript_function(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         code = """function greet(name) {
     console.log("Hello " + name);
     return true;
@@ -74,8 +64,6 @@ function farewell(name) {
 
     def test_fragment_go_function(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         code = """package main
 
 func hello() string {
@@ -91,8 +79,6 @@ func world() string {
 
     def test_fragment_rust_function(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         code = """fn main() {
     println!("Hello");
 }
@@ -106,8 +92,6 @@ fn helper() -> i32 {
 
     def test_fragment_java_class(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         code = """public class Hello {
     public void greet() {
         System.out.println("Hello");
@@ -119,8 +103,6 @@ fn helper() -> i32 {
 
     def test_fragment_cpp_function(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         code = """#include <iostream>
 
 void hello() {
@@ -137,8 +119,6 @@ int main() {
 
     def test_fragment_ruby_method(self):
         strategy = TreeSitterStrategy()
-        if not strategy._available:
-            return
         code = """class Greeter
   def hello
     puts "Hello"
