@@ -430,7 +430,7 @@ def handler():
 
         frag_id = FragmentId(path=path, start_line=1, end_line=3)
         assert str(frag_id) == f"{path}:1-3"
-        assert hash(frag_id) is not None
+        assert isinstance(hash(frag_id), int)
 
 
 class TestZalgoText:
@@ -446,7 +446,6 @@ def process_data(items):
         fragments = fragment_file(path, code)
 
         assert fragments is not None
-        assert len(fragments) >= 0
 
     def test_zalgo_in_extract_identifiers(self):
         zalgo_text = "H̸̡̪̯ͨ͊̽̅̾̎Ȩ̬̩̾͛ͪ̈́̀́͘ func_name ̈́̈͊ͅC̷̱̲̥͎̾́͆̀O̵̝̟̞͙͆̈̓̔M̴̨̰̱̾̅̑̕Ę̷̡͎̰̐̊̾S̴̨̺̟̈̿̀͝"
@@ -1105,7 +1104,7 @@ def main():
 
         neighbors = graph.neighbors(frag_a.id)
         assert frag_b.id in neighbors
-        assert neighbors[frag_b.id] == 0.5
+        assert neighbors[frag_b.id] == pytest.approx(0.5)
 
         scores = personalized_pagerank(graph, seeds={frag_a.id}, alpha=0.6)
 
@@ -1661,6 +1660,19 @@ def version_2():
         )
         assert is_shallow.stdout.strip() == "true"
 
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=shallow_repo,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=shallow_repo,
+            capture_output=True,
+            check=True,
+        )
+
         (shallow_repo / "file_4.py").write_text(
             """def func_4():
     return 400
@@ -1786,7 +1798,7 @@ class TestSubmodularSelection:
         expansion_selected = [f for f in result.selected if f.id not in core_ids]
         assert len(expansion_selected) <= 1
 
-    def test_core_larger_than_budget_selects_subset(self):
+    def test_core_larger_than_budget_includes_all_core(self):
         core_frags = [
             _make_fragment("core1.py", 1, 10, frozenset(["concept_1"]), tokens=300),
             _make_fragment("core2.py", 1, 10, frozenset(["concept_2"]), tokens=300),
@@ -1808,12 +1820,14 @@ class TestSubmodularSelection:
             tau=0.0,
         )
 
-        assert result.used_tokens <= 500
-
         core_selected = [f for f in result.selected if f.id in core_ids]
-        assert 0 < len(core_selected) < len(core_frags)
+        assert len(core_selected) == len(core_frags)
 
-        assert result.reason in ("budget_exhausted", "no_candidates")
+        expansion_selected = [f for f in result.selected if f.id not in core_ids]
+        assert len(expansion_selected) == 0
+
+        assert result.used_tokens == 900
+        assert result.reason == "budget_exhausted"
 
     def test_empty_core_all_goes_to_expansion(self):
         expansion_frags = [

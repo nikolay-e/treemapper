@@ -9,6 +9,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TextIO
 
+from treemapper.diffctx.languages import (
+    EXTENSION_TO_LANGUAGE,
+    FILENAME_TO_LANGUAGE,
+    get_language_for_file,
+)
+
 YAML_PROBLEMATIC_CHARS = frozenset({"\x85", "\u2028", "\u2029"})
 
 _YAML_STRING_ESCAPE_PATTERN = re.compile(r'[\\"\n\r\x00\x85\u2028\u2029]')
@@ -40,151 +46,8 @@ _BACKTICK_RUN_PATTERN = re.compile(r"`+")
 
 _MAX_MARKDOWN_HEADING_DEPTH = 5  # depth 0-5 → ## to ###### (6 levels), deeper uses list items
 
-EXTENSION_TO_LANG = {
-    ".py": "python",
-    ".pyw": "python",
-    ".pyi": "python",
-    ".js": "javascript",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    ".jsx": "jsx",
-    ".ts": "typescript",
-    ".tsx": "tsx",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".json": "json",
-    ".yaml": "yaml",
-    ".yml": "yaml",
-    ".toml": "toml",
-    ".md": "markdown",
-    ".markdown": "markdown",
-    ".html": "html",
-    ".htm": "html",
-    ".css": "css",
-    ".scss": "scss",
-    ".sass": "sass",
-    ".less": "less",
-    ".xml": "xml",
-    ".svg": "xml",
-    ".sh": "bash",
-    ".bash": "bash",
-    ".zsh": "zsh",
-    ".fish": "fish",
-    ".ps1": "powershell",
-    ".psm1": "powershell",
-    ".bat": "batch",
-    ".cmd": "batch",
-    ".c": "c",
-    ".h": "c",
-    ".cpp": "cpp",
-    ".cc": "cpp",
-    ".cxx": "cpp",
-    ".hpp": "cpp",
-    ".hxx": "cpp",
-    ".cs": "csharp",
-    ".java": "java",
-    ".kt": "kotlin",
-    ".kts": "kotlin",
-    ".scala": "scala",
-    ".go": "go",
-    ".rs": "rust",
-    ".rb": "ruby",
-    ".php": "php",
-    ".swift": "swift",
-    ".m": "objectivec",
-    ".mm": "objectivec",
-    ".r": "r",
-    ".R": "r",
-    ".lua": "lua",
-    ".pl": "perl",
-    ".pm": "perl",
-    ".ex": "elixir",
-    ".exs": "elixir",
-    ".erl": "erlang",
-    ".hrl": "erlang",
-    ".hs": "haskell",
-    ".lhs": "haskell",
-    ".ml": "ocaml",
-    ".mli": "ocaml",
-    ".clj": "clojure",
-    ".cljs": "clojure",
-    ".cljc": "clojure",
-    ".sql": "sql",
-    ".graphql": "graphql",
-    ".gql": "graphql",
-    ".proto": "protobuf",
-    ".dockerfile": "dockerfile",
-    ".tf": "hcl",
-    ".hcl": "hcl",
-    ".vim": "vim",
-    ".el": "elisp",
-    ".lisp": "lisp",
-    ".scm": "scheme",
-    ".rkt": "racket",
-    ".zig": "zig",
-    ".nim": "nim",
-    ".v": "v",
-    ".d": "d",
-    ".dart": "dart",
-    ".groovy": "groovy",
-    ".gradle": "groovy",
-    ".ini": "ini",
-    ".cfg": "ini",
-    ".conf": "ini",
-    ".properties": "properties",
-    ".env": "dotenv",
-    ".gitignore": "gitignore",
-    ".dockerignore": "gitignore",
-    ".editorconfig": "editorconfig",
-    ".tex": "latex",
-    ".latex": "latex",
-    ".rst": "rst",
-    ".txt": "text",
-    ".log": "text",
-    ".diff": "diff",
-    ".patch": "diff",
-}
-
-FILENAME_TO_LANG = {
-    "makefile": "makefile",
-    "gnumakefile": "makefile",
-    "dockerfile": "dockerfile",
-    "containerfile": "dockerfile",
-    "vagrantfile": "ruby",
-    "gemfile": "ruby",
-    "rakefile": "ruby",
-    "guardfile": "ruby",
-    "brewfile": "ruby",
-    "podfile": "ruby",
-    "cmakelists.txt": "cmake",
-    "justfile": "just",
-    ".bashrc": "bash",
-    ".bash_profile": "bash",
-    ".bash_aliases": "bash",
-    ".zshrc": "zsh",
-    ".zshenv": "zsh",
-    ".zprofile": "zsh",
-    ".profile": "bash",
-    ".gitconfig": "gitconfig",
-    ".gitattributes": "gitattributes",
-    ".gitignore": "gitignore",
-    ".dockerignore": "gitignore",
-    ".treemapperignore": "gitignore",
-    ".npmrc": "ini",
-    ".yarnrc": "yaml",
-    ".prettierrc": "json",
-    ".eslintrc": "json",
-    "package.json": "json",
-    "tsconfig.json": "json",
-    "composer.json": "json",
-    "cargo.toml": "toml",
-    "pyproject.toml": "toml",
-    "go.mod": "gomod",
-    "go.sum": "gosum",
-    "requirements.txt": "text",
-    "pipfile": "toml",
-    "procfile": "text",
-}
+EXTENSION_TO_LANG = EXTENSION_TO_LANGUAGE
+FILENAME_TO_LANG = FILENAME_TO_LANGUAGE
 
 PLACEHOLDER_PATTERNS = [
     "<unreadable content>",
@@ -208,24 +71,25 @@ def _has_problematic_chars(s: str) -> bool:
     return any(c in s for c in YAML_PROBLEMATIC_CHARS)
 
 
+def _write_yaml_content(file: TextIO, content: str, base_indent: str) -> None:
+    content_indent = base_indent + "  "
+    if not content:
+        file.write(f'{base_indent}content: ""\n')
+    elif _has_problematic_chars(content):
+        file.write(f'{base_indent}content: "{_escape_yaml_content(content)}"\n')
+    else:
+        file.write(f"{base_indent}content: |\n")
+        for line in content.rstrip("\n").split("\n"):
+            file.write(f"{content_indent}{line}\n")
+
+
 def _write_yaml_node(file: TextIO, node: dict[str, Any], indent: str = "") -> None:
     name = _escape_yaml_string(str(node["name"]))
     file.write(f'{indent}- name: "{name}"\n')
     file.write(f"{indent}  type: {node['type']}\n")
 
     if "content" in node:
-        content = node["content"]
-        if content:
-            if _has_problematic_chars(content):
-                escaped = _escape_yaml_content(content)
-                file.write(f'{indent}  content: "{escaped}"\n')
-            else:
-                file.write(f"{indent}  content: |\n")
-                lines = content.rstrip("\n").split("\n")
-                for line in lines:
-                    file.write(f"{indent}    {line}\n")
-        else:
-            file.write(f'{indent}  content: ""\n')
+        _write_yaml_content(file, node["content"], indent + "  ")
 
     if node.get("children"):
         file.write(f"{indent}  children:\n")
@@ -242,18 +106,7 @@ def _write_yaml_fragment(file: TextIO, frag: dict[str, Any], indent: str = "") -
         file.write(f"{indent}  symbol: \"{_escape_yaml_string(frag['symbol'])}\"\n")
 
     if "content" in frag:
-        content = frag["content"]
-        if content:
-            if _has_problematic_chars(content):
-                escaped = _escape_yaml_content(content)
-                file.write(f'{indent}  content: "{escaped}"\n')
-            else:
-                file.write(f"{indent}  content: |\n")
-                lines = content.rstrip("\n").split("\n")
-                for line in lines:
-                    file.write(f"{indent}    {line}\n")
-        else:
-            file.write(f'{indent}  content: ""\n')
+        _write_yaml_content(file, frag["content"], indent + "  ")
 
 
 def write_tree_yaml(file: TextIO, tree: dict[str, Any]) -> None:
@@ -340,11 +193,7 @@ def _is_placeholder(content: str) -> bool:
 
 
 def _infer_language(filename: str) -> str:
-    name_lower = filename.lower()
-    if name_lower in FILENAME_TO_LANG:
-        return FILENAME_TO_LANG[name_lower]
-    ext = Path(filename).suffix.lower()
-    return EXTENSION_TO_LANG.get(ext, "")
+    return get_language_for_file(filename) or ""
 
 
 def _get_fence_length(content: str) -> int:
@@ -418,16 +267,8 @@ def _write_markdown_fragment(file: TextIO, frag: dict[str, Any]) -> None:
     file.write(f"## {header}\n\n")
 
     if frag.get("content"):
-        content = frag["content"]
         lang = _infer_language(path.split("/")[-1] if "/" in path else path)
-        fence_len = _get_fence_length(content)
-        fence = "`" * fence_len
-        file.write(f"{fence}{lang}\n")
-        for line in content.splitlines(keepends=True):
-            file.write(line)
-        if not content.endswith("\n"):
-            file.write("\n")
-        file.write(f"{fence}\n\n")
+        _write_md_code_block(file, frag["content"], lang, "")
 
 
 def write_tree_markdown(file: TextIO, tree: dict[str, Any]) -> None:
@@ -480,17 +321,17 @@ def _write_to_file_path(output_file: Path, writer: Callable[[TextIO], None]) -> 
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     if output_file.is_dir():
-        logging.error(f"Cannot write to '{output_file}': is a directory")
+        logging.error("Cannot write to '%s': is a directory", output_file)
         raise IsADirectoryError(f"Is a directory: {output_file}")
 
     try:
         with output_file.open("w", encoding="utf-8") as f:
             writer(f)
     except PermissionError:
-        logging.error(f"Unable to write to file '{output_file}': Permission denied")
+        logging.error("Unable to write to file '%s': Permission denied", output_file)
         raise
     except OSError as e:
-        logging.error(f"Unable to write to file '{output_file}': {e}")
+        logging.error("Unable to write to file '%s': %s", output_file, e)
         raise
 
 
@@ -500,10 +341,10 @@ def write_string_to_file(content: str, output_file: Path | None, output_format: 
 
     if output_file is None:
         _write_to_stdout_with_wrapper(writer)
-        logging.info(f"Directory tree written to stdout in {output_format} format")
+        logging.info("Directory tree written to stdout in %s format", output_format)
     else:
         _write_to_file_path(output_file, writer)
-        logging.info(f"Directory tree saved to {output_file} in {output_format} format")
+        logging.info("Directory tree saved to %s in %s format", output_file, output_format)
 
 
 def write_tree_to_file(tree: dict[str, Any], output_file: Path | None, output_format: str = "yaml") -> None:
@@ -519,7 +360,7 @@ def write_tree_to_file(tree: dict[str, Any], output_file: Path | None, output_fo
 
     if output_file is None:
         _write_to_stdout_with_wrapper(writer)
-        logging.info(f"Directory tree written to stdout in {output_format} format")
+        logging.info("Directory tree written to stdout in %s format", output_format)
     else:
         _write_to_file_path(output_file, writer)
-        logging.info(f"Directory tree saved to {output_file} in {output_format} format")
+        logging.info("Directory tree saved to %s in %s format", output_file, output_format)

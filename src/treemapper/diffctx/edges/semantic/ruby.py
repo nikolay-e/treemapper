@@ -21,8 +21,8 @@ _RUBY_DEF_RE = re.compile(r"^\s*def\s+(?:self\.)?([a-z_]\w*)", re.MULTILINE)
 _RUBY_INCLUDE_RE = re.compile(r"^\s*(?:include|extend|prepend)\s+([A-Z]\w*(?:::[A-Z]\w*)*)", re.MULTILINE)
 _RUBY_INHERIT_RE = re.compile(r"class\s+\w+\s*<\s*([A-Z]\w*(?:::[A-Z]\w*)*)")
 
-_RUBY_CONST_REF_RE = re.compile(r"(?<![a-z_])([A-Z][a-zA-Z0-9_]*(?:::[A-Z][a-zA-Z0-9_]*)*)")
-_RUBY_METHOD_CALL_RE = re.compile(r"\.([a-z_]\w*)\s*(?:\(|$|[^a-z_])")
+_RUBY_CONST_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*(?:::[A-Z]\w*)*)")
+_RUBY_METHOD_CALL_RE = re.compile(r"\.([a-z_]\w*)\s*(?:$|[^a-z_])")
 
 
 def _is_ruby_file(path: Path) -> bool:
@@ -83,6 +83,21 @@ def _underscore_to_camel(name: str) -> str:
     return "".join(part.capitalize() for part in name.split("_"))
 
 
+class _RubyIndex:
+    name_to_frags: dict[str, list[FragmentId]]
+    path_to_frags: dict[str, list[FragmentId]]
+    class_to_frags: dict[str, list[FragmentId]]
+    module_to_frags: dict[str, list[FragmentId]]
+    dir_to_frags: dict[Path, list[FragmentId]]
+
+    def __init__(self) -> None:
+        self.name_to_frags = defaultdict(list)
+        self.path_to_frags = defaultdict(list)
+        self.class_to_frags = defaultdict(list)
+        self.module_to_frags = defaultdict(list)
+        self.dir_to_frags = defaultdict(list)
+
+
 class RubyEdgeBuilder(EdgeBuilder):
     weight = 0.70
     require_weight = 0.75
@@ -97,97 +112,129 @@ class RubyEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
-
-        name_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-        path_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-        class_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-        module_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-
-        for f in ruby_frags:
-            stem = f.path.stem.lower()
-            name_to_frags[stem].append(f.id)
-
-            camel = _underscore_to_camel(stem).lower()
-            name_to_frags[camel].append(f.id)
-
-            if repo_root:
-                try:
-                    rel = f.path.relative_to(repo_root)
-                    path_to_frags[str(rel)].append(f.id)
-                    path_to_frags[rel.as_posix()].append(f.id)
-                    no_ext = str(rel.with_suffix(""))
-                    path_to_frags[no_ext].append(f.id)
-                except ValueError:
-                    pass
-
-            classes, modules, _ = _extract_definitions(f.content)
-            for cls in classes:
-                class_to_frags[cls.lower()].append(f.id)
-            for mod in modules:
-                module_to_frags[mod.lower()].append(f.id)
+        idx = self._build_index(ruby_frags, repo_root)
 
         for rf in ruby_frags:
-            requires, relative_requires = _extract_requires(rf.content)
-            includes = _extract_includes(rf.content)
-            const_refs = _extract_const_refs(rf.content)
-
-            for req in requires:
-                req_name = req.split("/")[-1].lower()
-                if req_name in name_to_frags:
-                    for fid in name_to_frags[req_name]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.require_weight)
-
-                for path_str, frag_ids in path_to_frags.items():
-                    if req in path_str or req.replace("/", "\\") in path_str:
-                        for fid in frag_ids:
-                            if fid != rf.id:
-                                self.add_edge(edges, rf.id, fid, self.require_weight)
-
-            for rel_req in relative_requires:
-                if repo_root:
-                    try:
-                        target = (rf.path.parent / rel_req).resolve()
-                        if not target.suffix:
-                            target = target.with_suffix(".rb")
-                        target_rel = str(target.relative_to(repo_root))
-                        if target_rel in path_to_frags:
-                            for fid in path_to_frags[target_rel]:
-                                if fid != rf.id:
-                                    self.add_edge(edges, rf.id, fid, self.require_weight)
-                    except (ValueError, OSError):
-                        pass
-
-                rel_name = rel_req.split("/")[-1].lower()
-                if rel_name in name_to_frags:
-                    for fid in name_to_frags[rel_name]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.require_weight)
-
-            for inc in includes:
-                inc_lower = inc.lower()
-                if inc_lower in class_to_frags:
-                    for fid in class_to_frags[inc_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.include_weight)
-                if inc_lower in module_to_frags:
-                    for fid in module_to_frags[inc_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.include_weight)
-
-            for const in const_refs:
-                const_lower = const.lower()
-                if const_lower in class_to_frags:
-                    for fid in class_to_frags[const_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.const_weight)
-                if const_lower in module_to_frags:
-                    for fid in module_to_frags[const_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.const_weight)
-
-            for f in ruby_frags:
-                if f.path.parent == rf.path.parent and f.id != rf.id:
-                    self.add_edge(edges, rf.id, f.id, self.same_dir_weight)
+            self._add_fragment_edges(rf, idx, edges, repo_root)
 
         return edges
+
+    def _build_index(self, ruby_frags: list[Fragment], repo_root: Path | None) -> _RubyIndex:
+        idx = _RubyIndex()
+        for f in ruby_frags:
+            self._index_fragment(f, idx, repo_root)
+        return idx
+
+    def _index_fragment(self, f: Fragment, idx: _RubyIndex, repo_root: Path | None) -> None:
+        stem = f.path.stem.lower()
+        idx.name_to_frags[stem].append(f.id)
+        idx.name_to_frags[_underscore_to_camel(stem).lower()].append(f.id)
+        idx.dir_to_frags[f.path.parent].append(f.id)
+
+        self._index_paths(f, idx, repo_root)
+        self._index_definitions(f, idx)
+
+    def _index_paths(self, f: Fragment, idx: _RubyIndex, repo_root: Path | None) -> None:
+        self.index_paths_for_fragment(f, idx.path_to_frags, repo_root)
+        if repo_root:
+            try:
+                rel = f.path.relative_to(repo_root)
+                idx.path_to_frags[str(rel.with_suffix(""))].append(f.id)
+            except ValueError:
+                pass
+
+    def _index_definitions(self, f: Fragment, idx: _RubyIndex) -> None:
+        classes, modules, _ = _extract_definitions(f.content)
+        for cls in classes:
+            idx.class_to_frags[cls.lower()].append(f.id)
+        for mod in modules:
+            idx.module_to_frags[mod.lower()].append(f.id)
+
+    def _add_fragment_edges(self, rf: Fragment, idx: _RubyIndex, edges: EdgeDict, repo_root: Path | None) -> None:
+        requires, relative_requires = _extract_requires(rf.content)
+        includes = _extract_includes(rf.content)
+        const_refs = _extract_const_refs(rf.content)
+
+        self._add_require_edges(rf.id, requires, idx, edges)
+        self._add_relative_require_edges(rf, relative_requires, idx, edges, repo_root)
+        self._add_include_edges(rf.id, includes, idx, edges)
+        self._add_const_edges(rf.id, const_refs, idx, edges)
+        self._add_same_dir_edges(rf, idx, edges)
+
+    def _add_require_edges(self, rf_id: FragmentId, requires: set[str], idx: _RubyIndex, edges: EdgeDict) -> None:
+        for req in requires:
+            self._link_require_by_name(rf_id, req, idx, edges)
+            self._link_require_by_path(rf_id, req, idx, edges)
+
+    def _link_require_by_name(self, rf_id: FragmentId, req: str, idx: _RubyIndex, edges: EdgeDict) -> None:
+        req_name = req.split("/")[-1].lower()
+        self.add_edges_from_ids(rf_id, idx.name_to_frags.get(req_name, []), self.require_weight, edges)
+
+    def _link_require_by_path(self, rf_id: FragmentId, req: str, idx: _RubyIndex, edges: EdgeDict) -> None:
+        for path_str, frag_ids in idx.path_to_frags.items():
+            if req in path_str or req.replace("/", "\\") in path_str:
+                self.add_edges_from_ids(rf_id, frag_ids, self.require_weight, edges)
+
+    def _add_relative_require_edges(
+        self,
+        rf: Fragment,
+        relative_requires: set[str],
+        idx: _RubyIndex,
+        edges: EdgeDict,
+        repo_root: Path | None,
+    ) -> None:
+        for rel_req in relative_requires:
+            self._link_relative_by_path(rf, rel_req, idx, edges, repo_root)
+            self._link_relative_by_name(rf.id, rel_req, idx, edges)
+
+    def _link_relative_by_path(
+        self,
+        rf: Fragment,
+        rel_req: str,
+        idx: _RubyIndex,
+        edges: EdgeDict,
+        repo_root: Path | None,
+    ) -> None:
+        if not repo_root:
+            return
+        try:
+            target = (rf.path.parent / rel_req).resolve()
+            if not target.suffix:
+                target = target.with_suffix(".rb")
+            target_rel = str(target.relative_to(repo_root))
+            for fid in idx.path_to_frags.get(target_rel, []):
+                if fid != rf.id:
+                    self.add_edge(edges, rf.id, fid, self.require_weight)
+        except (ValueError, OSError):
+            pass
+
+    def _link_relative_by_name(self, rf_id: FragmentId, rel_req: str, idx: _RubyIndex, edges: EdgeDict) -> None:
+        rel_name = rel_req.split("/")[-1].lower()
+        for fid in idx.name_to_frags.get(rel_name, []):
+            if fid != rf_id:
+                self.add_edge(edges, rf_id, fid, self.require_weight)
+
+    def _add_include_edges(self, rf_id: FragmentId, includes: set[str], idx: _RubyIndex, edges: EdgeDict) -> None:
+        for inc in includes:
+            inc_lower = inc.lower()
+            for fid in idx.class_to_frags.get(inc_lower, []):
+                if fid != rf_id:
+                    self.add_edge(edges, rf_id, fid, self.include_weight)
+            for fid in idx.module_to_frags.get(inc_lower, []):
+                if fid != rf_id:
+                    self.add_edge(edges, rf_id, fid, self.include_weight)
+
+    def _add_const_edges(self, rf_id: FragmentId, const_refs: set[str], idx: _RubyIndex, edges: EdgeDict) -> None:
+        for const in const_refs:
+            const_lower = const.lower()
+            for fid in idx.class_to_frags.get(const_lower, []):
+                if fid != rf_id:
+                    self.add_edge(edges, rf_id, fid, self.const_weight)
+            for fid in idx.module_to_frags.get(const_lower, []):
+                if fid != rf_id:
+                    self.add_edge(edges, rf_id, fid, self.const_weight)
+
+    def _add_same_dir_edges(self, rf: Fragment, idx: _RubyIndex, edges: EdgeDict) -> None:
+        for fid in idx.dir_to_frags.get(rf.path.parent, []):
+            if fid != rf.id:
+                self.add_edge(edges, rf.id, fid, self.same_dir_weight)

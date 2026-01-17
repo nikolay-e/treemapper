@@ -4,6 +4,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
+from .stopwords import CODE_STOPWORDS
 from .tokenizer import extract_tokens
 from .types import Fragment
 
@@ -23,8 +24,8 @@ def concepts_from_diff_text(diff_text: str, profile: str = "code", *, use_nlp: b
         return extract_tokens(text, profile=profile, use_nlp=True)
 
     raw = _CONCEPT_RE.findall(text)
-    # Normalize to lowercase to avoid "Order" vs "order" being different concepts
-    return frozenset(ident.lower() for ident in raw if len(ident) >= 3)
+    # Normalize to lowercase and filter stopwords to avoid matching common keywords
+    return frozenset(ident.lower() for ident in raw if len(ident) >= 3 and ident.lower() not in CODE_STOPWORDS)
 
 
 @dataclass

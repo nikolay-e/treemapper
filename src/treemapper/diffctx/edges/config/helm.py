@@ -63,6 +63,25 @@ def _get_chart_root(path: Path) -> Path | None:
     return None
 
 
+def _collect_chart_roots(paths: list[Path]) -> set[Path]:
+    roots: set[Path] = set()
+    for p in paths:
+        root = _get_chart_root(p)
+        if root:
+            roots.add(root)
+    return roots
+
+
+def _is_in_chart(candidate: Path, chart_roots: set[Path]) -> bool:
+    for chart_root in chart_roots:
+        try:
+            if candidate.is_relative_to(chart_root):
+                return True
+        except (ValueError, TypeError):
+            continue
+    return False
+
+
 class HelmEdgeBuilder(EdgeBuilder):
     weight = 0.70
     reverse_weight_factor = 0.45
@@ -79,34 +98,20 @@ class HelmEdgeBuilder(EdgeBuilder):
         if not templates and not values:
             return []
 
-        chart_roots: set[Path] = set()
-        for t in templates:
-            root = _get_chart_root(t)
-            if root:
-                chart_roots.add(root)
-        for v in values:
-            root = _get_chart_root(v)
-            if root:
-                chart_roots.add(root)
-
+        chart_roots = _collect_chart_roots(templates + values)
         if not chart_roots:
             return []
 
-        discovered: list[Path] = []
         changed_set = set(changed_files)
+        discovered: list[Path] = []
 
         for candidate in all_candidate_files:
             if candidate in changed_set:
                 continue
-
-            for chart_root in chart_roots:
-                try:
-                    if candidate.is_relative_to(chart_root):
-                        if _is_helm_template(candidate) or _is_helm_values(candidate) or _is_chart_yaml(candidate):
-                            discovered.append(candidate)
-                            break
-                except (ValueError, TypeError):
-                    continue
+            if not (_is_helm_template(candidate) or _is_helm_values(candidate) or _is_chart_yaml(candidate)):
+                continue
+            if _is_in_chart(candidate, chart_roots):
+                discovered.append(candidate)
 
         return discovered
 
@@ -119,50 +124,82 @@ class HelmEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
-
-        values_keys_by_chart: dict[Path, dict[str, list[FragmentId]]] = defaultdict(lambda: defaultdict(list))
-        for vf in values_files:
-            chart_root = _get_chart_root(vf.path) or vf.path.parent
-            keys = _extract_yaml_keys(vf.content)
-            for key in keys:
-                values_keys_by_chart[chart_root][key].append(vf.id)
-
-        define_defs: dict[str, list[FragmentId]] = defaultdict(list)
-        for tmpl in templates:
-            for match in _HELM_DEFINE_RE.finditer(tmpl.content):
-                define_name = match.group(1)
-                define_defs[define_name].append(tmpl.id)
+        values_idx = self._build_values_index(values_files)
+        define_defs = self._build_define_index(templates)
 
         for tmpl in templates:
-            chart_root = _get_chart_root(tmpl.path) or tmpl.path.parent.parent
-            values_keys = values_keys_by_chart.get(chart_root, {})
-
-            for match in _HELM_VALUES_RE.finditer(tmpl.content):
-                value_path = match.group(1)
-                parts = value_path.split(".")
-
-                for i in range(len(parts), 0, -1):
-                    partial = ".".join(parts[:i])
-                    for values_id in values_keys.get(partial, []):
-                        self.add_edge(edges, tmpl.id, values_id, self.weight)
-                        break
-                    else:
-                        continue
-                    break
-
-                if parts[0] in values_keys:
-                    for values_id in values_keys[parts[0]]:
-                        self.add_edge(edges, tmpl.id, values_id, self.weight * 0.8)
-
-            for match in _HELM_INCLUDE_RE.finditer(tmpl.content):
-                include_name = match.group(1)
-                for def_id in define_defs.get(include_name, []):
-                    if def_id != tmpl.id:
-                        self.add_edge(edges, tmpl.id, def_id, self.weight * 0.9)
-
-            for cf in chart_files:
-                cf_chart_root = _get_chart_root(cf.path) or cf.path.parent
-                if cf_chart_root == chart_root:
-                    self.add_edge(edges, tmpl.id, cf.id, self.weight * 0.5)
+            self._add_template_edges(tmpl, values_idx, define_defs, chart_files, edges)
 
         return edges
+
+    def _build_values_index(self, values_files: list[Fragment]) -> dict[Path, dict[str, list[FragmentId]]]:
+        idx: dict[Path, dict[str, list[FragmentId]]] = defaultdict(lambda: defaultdict(list))
+        for vf in values_files:
+            chart_root = _get_chart_root(vf.path) or vf.path.parent
+            for key in _extract_yaml_keys(vf.content):
+                idx[chart_root][key].append(vf.id)
+        return idx
+
+    def _build_define_index(self, templates: list[Fragment]) -> dict[str, list[FragmentId]]:
+        defs: dict[str, list[FragmentId]] = defaultdict(list)
+        for tmpl in templates:
+            for match in _HELM_DEFINE_RE.finditer(tmpl.content):
+                defs[match.group(1)].append(tmpl.id)
+        return defs
+
+    def _add_template_edges(
+        self,
+        tmpl: Fragment,
+        values_idx: dict[Path, dict[str, list[FragmentId]]],
+        define_defs: dict[str, list[FragmentId]],
+        chart_files: list[Fragment],
+        edges: EdgeDict,
+    ) -> None:
+        chart_root = _get_chart_root(tmpl.path) or tmpl.path.parent.parent
+        values_keys = values_idx.get(chart_root, {})
+
+        self._add_values_ref_edges(tmpl, values_keys, edges)
+        self._add_include_edges(tmpl, define_defs, edges)
+        self._add_chart_file_edges(tmpl, chart_root, chart_files, edges)
+
+    def _add_values_ref_edges(self, tmpl: Fragment, values_keys: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
+        for match in _HELM_VALUES_RE.finditer(tmpl.content):
+            parts = match.group(1).split(".")
+            self._link_longest_match(tmpl.id, parts, values_keys, edges)
+            self._link_root_key(tmpl.id, parts[0], values_keys, edges)
+
+    def _link_longest_match(
+        self,
+        tmpl_id: FragmentId,
+        parts: list[str],
+        values_keys: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for i in range(len(parts), 0, -1):
+            partial = ".".join(parts[:i])
+            values_ids = values_keys.get(partial, [])
+            if values_ids:
+                self.add_edge(edges, tmpl_id, values_ids[0], self.weight)
+                return
+
+    def _link_root_key(
+        self,
+        tmpl_id: FragmentId,
+        root_key: str,
+        values_keys: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for values_id in values_keys.get(root_key, []):
+            self.add_edge(edges, tmpl_id, values_id, self.weight * 0.8)
+
+    def _add_include_edges(self, tmpl: Fragment, define_defs: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
+        for match in _HELM_INCLUDE_RE.finditer(tmpl.content):
+            for def_id in define_defs.get(match.group(1), []):
+                if def_id != tmpl.id:
+                    self.add_edge(edges, tmpl.id, def_id, self.weight * 0.9)
+
+    def _add_chart_file_edges(self, tmpl: Fragment, chart_root: Path, chart_files: list[Fragment], edges: EdgeDict) -> None:
+        for cf in chart_files:
+            cf_root = _get_chart_root(cf.path) or cf.path.parent
+            if cf_root == chart_root:
+                self.add_edge(edges, tmpl.id, cf.id, self.weight * 0.5)

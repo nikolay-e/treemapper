@@ -34,7 +34,8 @@ def _validate_budget(budget: int | None) -> None:
 
 
 def _validate_alpha(alpha: float) -> None:
-    if not 0 < alpha < 1:
+    is_valid = 0 < alpha < 1
+    if not is_valid:
         _exit_error(f"--alpha must be between 0 and 1 (exclusive), got {alpha}")
 
 
@@ -57,18 +58,19 @@ def _resolve_root_dir(directory: str) -> Path:
 
 
 def _resolve_output_file(output_file_arg: str | None, output_format: str) -> tuple[Path | None, bool]:
-    force_stdout = output_file_arg == "-"
-    if output_file_arg is None or output_file_arg == "-":
-        return None, force_stdout
+    if output_file_arg is None:
+        return None, False
+    if output_file_arg == "-":
+        return None, True
 
     if output_file_arg == "":
         ext = "yaml" if output_format == "yaml" else output_format
-        return Path(f"tree.{ext}").resolve(), force_stdout
+        return Path(f"tree.{ext}").resolve(), False
 
     output_file = Path(output_file_arg).resolve()
     if output_file.is_dir():
         _exit_error(f"'{output_file_arg}' is a directory, not a file.")
-    return output_file, force_stdout
+    return output_file, False
 
 
 def _resolve_ignore_file(ignore_file_arg: str | None) -> Path | None:

@@ -25,7 +25,6 @@ class _SelectionState:
     selected_ids: set[FragmentId] = field(default_factory=set)
     remaining_budget: int = 0
     utility_state: UtilityState = field(default_factory=UtilityState)
-    skipped_core: list[Fragment] = field(default_factory=list)
 
 
 def _log_and_return(result: SelectionResult, core_ids: set[FragmentId]) -> SelectionResult:
@@ -47,25 +46,16 @@ def _select_core_fragments(
     concepts: frozenset[str],
     state: _SelectionState,
 ) -> None:
-    for frag in core_fragments:
-        if frag.token_count <= state.remaining_budget:
-            if not _is_subset_of_selected(frag, state.selected_ids):
-                state.selected.append(frag)
-                state.selected_ids.add(frag.id)
-                state.remaining_budget -= frag.token_count
-                apply_fragment(frag, rel.get(frag.id, 0.0), concepts, state.utility_state)
-        else:
-            state.skipped_core.append(frag)
+    sorted_core = sorted(core_fragments, key=lambda f: rel.get(f.id, 0.0), reverse=True)
 
+    for frag in sorted_core:
+        if _is_subset_of_selected(frag, state.selected_ids):
+            continue
 
-def _log_skipped_core(skipped: list[Fragment]) -> None:
-    if skipped:
-        skipped_tokens = sum(f.token_count for f in skipped)
-        logging.warning(
-            "Core fragments (%d tokens) exceed budget. %d core fragments skipped.",
-            skipped_tokens,
-            len(skipped),
-        )
+        state.selected.append(frag)
+        state.selected_ids.add(frag.id)
+        state.remaining_budget -= frag.token_count
+        apply_fragment(frag, rel.get(frag.id, 0.0), concepts, state.utility_state)
 
 
 @dataclass
@@ -171,7 +161,6 @@ def lazy_greedy_select(
 
     state = _SelectionState(remaining_budget=budget_tokens)
     _select_core_fragments(core_fragments, rel, concepts, state)
-    _log_skipped_core(state.skipped_core)
 
     if state.remaining_budget <= 0:
         used = budget_tokens - state.remaining_budget
@@ -313,7 +302,7 @@ def _determine_final_result(
     elif greedy_utility <= 0:
         reason = "no_utility"
     elif not state.selected or len(state.selected) == len(base_selected):
-        reason = "budget_exhausted" if state.skipped_core else "no_candidates"
+        reason = "no_candidates"
     elif selections_for_baseline >= _BASELINE_K and threshold > 0 and has_remaining_candidates:
         reason = "stopped_by_tau"
     else:

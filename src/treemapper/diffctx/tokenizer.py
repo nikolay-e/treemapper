@@ -9,7 +9,7 @@ from .constants import CODE_EXTENSIONS
 if TYPE_CHECKING:
     from spacy.language import Language
 
-_FALLBACK_WORD_RE = re.compile(r"\b[a-zA-Z][a-zA-Z0-9_]*\b")
+_FALLBACK_WORD_RE = re.compile(r"\b[a-zA-Z]\w*\b")
 _MIN_TOKEN_LEN = 3
 _MAX_TEXT_LEN = 50_000
 
@@ -30,7 +30,7 @@ def _get_nlp() -> Language | None:
             try:
                 _nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])
             except OSError:
-                from spacy.cli import download
+                from spacy.cli.download import download
 
                 download("en_core_web_sm")
                 _nlp = spacy.load("en_core_web_sm", disable=["ner", "parser"])

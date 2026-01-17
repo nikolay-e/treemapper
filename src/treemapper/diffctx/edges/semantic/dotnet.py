@@ -14,13 +14,13 @@ _DOTNET_EXTS = _CSHARP_EXTS | _FSHARP_EXTS
 _CS_USING_RE = re.compile(r"^\s*using\s+(?:static\s+)?([A-Z][a-zA-Z0-9_.]*);", re.MULTILINE)
 _CS_NAMESPACE_RE = re.compile(r"^\s*namespace\s+([A-Z][a-zA-Z0-9_.]*)", re.MULTILINE)
 _CS_CLASS_RE = re.compile(
-    r"^\s*(?:public|private|protected|internal)?\s*(?:static|sealed|abstract|partial)?\s*(?:class|interface|struct|record|enum)\s+([A-Z]\w*)",
+    r"^\s{0,20}(?:(?:public|private|protected|internal)\s{1,10})?(?:(?:static|sealed|abstract|partial)\s{1,10})?(?:class|interface|struct|record|enum)\s+([A-Z]\w{0,100})",
     re.MULTILINE,
 )
-_CS_INHERIT_RE = re.compile(r"(?:class|interface|struct|record)\s+\w+\s*(?:<[^>]+>)?\s*:\s*([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)")
+_CS_INHERIT_RE = re.compile(r"(?:class|struct|record)\s+\w+[^:\n]{0,200}:\s*([A-Z]\w*(?:,\s*[A-Z]\w*)*)")
 _CS_GENERIC_RE = re.compile(r"<([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)>")
 _CS_METHOD_RE = re.compile(
-    r"^\s*(?:public|private|protected|internal)?\s*(?:static|virtual|override|abstract|async)?\s*(?:[A-Z]\w*(?:<[^>]+>)?)\s+([A-Z][a-zA-Z0-9_]*)\s*\(",
+    r"^\s*(?:public |private |protected |internal )?(?:\w+ )?[A-Z]\w*(?:<[^>]+>)? ([A-Z]\w*)\s*\(",
     re.MULTILINE,
 )
 
@@ -28,10 +28,10 @@ _FS_OPEN_RE = re.compile(r"^\s*open\s+([A-Z][a-zA-Z0-9_.]*)", re.MULTILINE)
 _FS_MODULE_RE = re.compile(r"^\s*module\s+(?:rec\s+)?([A-Z][a-zA-Z0-9_.]*)", re.MULTILINE)
 _FS_NAMESPACE_RE = re.compile(r"^\s*namespace\s+(?:rec\s+)?([A-Z][a-zA-Z0-9_.]*)", re.MULTILINE)
 _FS_TYPE_RE = re.compile(r"^\s*type\s+(?:private\s+)?([A-Z]\w*)", re.MULTILINE)
-_FS_LET_RE = re.compile(r"^\s*let\s+(?:rec\s+)?(?:private\s+)?([a-z][a-zA-Z0-9_]*)", re.MULTILINE)
+_FS_LET_RE = re.compile(r"^\s*let\s+(?:rec\s+)?(?:private\s+)?([a-z]\w*)", re.MULTILINE)
 
-_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z][a-zA-Z0-9_]*)\b")
-_ATTRIBUTE_RE = re.compile(r"\[([A-Z][a-zA-Z0-9_]*)\]")
+_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
+_ATTRIBUTE_RE = re.compile(r"\[([A-Z]\w*)\]")
 
 
 def _is_dotnet_file(path: Path) -> bool:
@@ -103,7 +103,16 @@ class DotNetEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
+        indices = self._build_indices(dotnet_frags)
 
+        for df in dotnet_frags:
+            self._link_fragment(df, indices, edges)
+
+        return edges
+
+    def _build_indices(
+        self, dotnet_frags: list[Fragment]
+    ) -> tuple[dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]]:
         namespace_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         type_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         fqn_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
@@ -111,79 +120,110 @@ class DotNetEdgeBuilder(EdgeBuilder):
         for f in dotnet_frags:
             ns = _extract_namespace(f.content, f.path)
             if ns:
-                namespace_to_frags[ns.lower()].append(f.id)
-                for i in range(len(ns.split("."))):
-                    partial_ns = ".".join(ns.split(".")[: i + 1])
+                ns_parts = ns.split(".")
+                for i in range(len(ns_parts)):
+                    partial_ns = ".".join(ns_parts[: i + 1])
                     namespace_to_frags[partial_ns.lower()].append(f.id)
 
-            types = _extract_types(f.content, f.path)
-            for t in types:
+            for t in _extract_types(f.content, f.path):
                 type_to_frags[t.lower()].append(f.id)
                 if ns:
-                    fqn = f"{ns}.{t}"
-                    fqn_to_frags[fqn.lower()].append(f.id)
+                    fqn_to_frags[f"{ns}.{t}".lower()].append(f.id)
 
-        for df in dotnet_frags:
-            usings = _extract_usings(df.content, df.path)
-            inheritance = _extract_inheritance(df.content)
-            type_refs = _extract_type_refs(df.content)
-            attributes = _extract_attributes(df.content)
-            current_ns = _extract_namespace(df.content, df.path)
-            current_types = _extract_types(df.content, df.path)
+        return namespace_to_frags, type_to_frags, fqn_to_frags
 
-            for using in usings:
-                using_lower = using.lower()
-                if using_lower in namespace_to_frags:
-                    for fid in namespace_to_frags[using_lower]:
-                        if fid != df.id:
-                            self.add_edge(edges, df.id, fid, self.using_weight)
+    def _link_fragment(
+        self,
+        df: Fragment,
+        indices: tuple[dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]],
+        edges: EdgeDict,
+    ) -> None:
+        namespace_to_frags, type_to_frags, fqn_to_frags = indices
 
-                if using_lower in fqn_to_frags:
-                    for fid in fqn_to_frags[using_lower]:
-                        if fid != df.id:
-                            self.add_edge(edges, df.id, fid, self.using_weight)
+        self._link_usings(df, namespace_to_frags, fqn_to_frags, type_to_frags, edges)
+        self._link_refs(df, type_to_frags, edges)
+        self._link_same_namespace(df, namespace_to_frags, edges)
+        self._link_partial_classes(df, type_to_frags, edges)
 
-                parts = using.split(".")
-                if parts:
-                    type_name = parts[-1].lower()
-                    if type_name in type_to_frags:
-                        for fid in type_to_frags[type_name]:
-                            if fid != df.id:
-                                self.add_edge(edges, df.id, fid, self.using_weight)
+    def _link_usings(
+        self,
+        df: Fragment,
+        namespace_to_frags: dict[str, list[FragmentId]],
+        fqn_to_frags: dict[str, list[FragmentId]],
+        type_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for using in _extract_usings(df.content, df.path):
+            self._link_single_using(df.id, using, namespace_to_frags, fqn_to_frags, type_to_frags, edges)
 
-            for parent in inheritance:
-                parent_lower = parent.lower()
-                if parent_lower in type_to_frags:
-                    for fid in type_to_frags[parent_lower]:
-                        if fid != df.id:
-                            self.add_edge(edges, df.id, fid, self.inheritance_weight)
+    def _link_single_using(
+        self,
+        df_id: FragmentId,
+        using: str,
+        namespace_to_frags: dict[str, list[FragmentId]],
+        fqn_to_frags: dict[str, list[FragmentId]],
+        type_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        using_lower = using.lower()
+        self.add_edges_from_ids(df_id, namespace_to_frags.get(using_lower, []), self.using_weight, edges)
+        self.add_edges_from_ids(df_id, fqn_to_frags.get(using_lower, []), self.using_weight, edges)
 
-            for type_ref in type_refs:
-                ref_lower = type_ref.lower()
-                if ref_lower in type_to_frags:
-                    for fid in type_to_frags[ref_lower]:
-                        if fid != df.id:
-                            self.add_edge(edges, df.id, fid, self.type_weight)
+        parts = using.split(".")
+        if parts:
+            self.add_edges_from_ids(df_id, type_to_frags.get(parts[-1].lower(), []), self.using_weight, edges)
 
-            for attr in attributes:
-                attr_lower = attr.lower()
-                attr_full = (attr_lower + "attribute") if not attr_lower.endswith("attribute") else attr_lower
-                for lookup in [attr_lower, attr_full]:
-                    if lookup in type_to_frags:
-                        for fid in type_to_frags[lookup]:
-                            if fid != df.id:
-                                self.add_edge(edges, df.id, fid, self.attribute_weight)
+    def _link_refs(
+        self,
+        df: Fragment,
+        type_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        self._link_inheritance(df.id, df.content, type_to_frags, edges)
+        self._link_type_refs(df.id, df.content, type_to_frags, edges)
+        self._link_attributes(df.id, df.content, type_to_frags, edges)
 
-            if current_ns and current_ns.lower() in namespace_to_frags:
-                for fid in namespace_to_frags[current_ns.lower()]:
-                    if fid != df.id:
-                        self.add_edge(edges, df.id, fid, self.same_namespace_weight)
+    def _link_inheritance(
+        self, df_id: FragmentId, content: str, type_to_frags: dict[str, list[FragmentId]], edges: EdgeDict
+    ) -> None:
+        for parent in _extract_inheritance(content):
+            self.add_edges_from_ids(df_id, type_to_frags.get(parent.lower(), []), self.inheritance_weight, edges)
 
-            for current_type in current_types:
-                ct_lower = current_type.lower()
-                if ct_lower in type_to_frags:
-                    for fid in type_to_frags[ct_lower]:
-                        if fid != df.id:
-                            self.add_edge(edges, df.id, fid, self.partial_class_weight)
+    def _link_type_refs(
+        self, df_id: FragmentId, content: str, type_to_frags: dict[str, list[FragmentId]], edges: EdgeDict
+    ) -> None:
+        for type_ref in _extract_type_refs(content):
+            self.add_edges_from_ids(df_id, type_to_frags.get(type_ref.lower(), []), self.type_weight, edges)
 
-        return edges
+    def _link_attributes(
+        self, df_id: FragmentId, content: str, type_to_frags: dict[str, list[FragmentId]], edges: EdgeDict
+    ) -> None:
+        for attr in _extract_attributes(content):
+            attr_lower = attr.lower()
+            attr_full = attr_lower if attr_lower.endswith("attribute") else attr_lower + "attribute"
+            for lookup in [attr_lower, attr_full]:
+                self.add_edges_from_ids(df_id, type_to_frags.get(lookup, []), self.attribute_weight, edges)
+
+    def _link_same_namespace(
+        self,
+        df: Fragment,
+        namespace_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        current_ns = _extract_namespace(df.content, df.path)
+        if not current_ns:
+            return
+        for fid in namespace_to_frags.get(current_ns.lower(), []):
+            if fid != df.id:
+                self.add_edge(edges, df.id, fid, self.same_namespace_weight)
+
+    def _link_partial_classes(
+        self,
+        df: Fragment,
+        type_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for current_type in _extract_types(df.content, df.path):
+            for fid in type_to_frags.get(current_type.lower(), []):
+                if fid != df.id:
+                    self.add_edge(edges, df.id, fid, self.partial_class_weight)

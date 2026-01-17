@@ -7,7 +7,7 @@ try:
     logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.ERROR)
     # Force initialization of logging internals
     logging.getLogger()
-except Exception as e:
+except (OSError, ValueError) as e:
     # If logging initialization fails, warn but continue
     print(f"Warning: logging init failed: {e}", file=sys.stderr)
 

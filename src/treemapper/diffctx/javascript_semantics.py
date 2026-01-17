@@ -1,20 +1,12 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 
+from treemapper.diffctx.semantic_types import EMPTY_JS_SEMANTIC_INFO, JsSemanticInfo
 
-@dataclass(frozen=True)
-class JsFragmentInfo:
-    defines: frozenset[str]
-    references: frozenset[str]
-    calls: frozenset[str]
-    type_refs: frozenset[str]
-    imports: frozenset[str]
-    exports: frozenset[str]
+JsFragmentInfo = JsSemanticInfo
 
-
-_EMPTY_INFO = JsFragmentInfo(frozenset(), frozenset(), frozenset(), frozenset(), frozenset(), frozenset())
+_EMPTY_INFO = EMPTY_JS_SEMANTIC_INFO
 
 _NAMED_IMPORT_RE = re.compile(r"import\s*\{([^}]+)\}\s*from\s*['\"]([^'\"]+)['\"]", re.MULTILINE)
 _DEFAULT_IMPORT_RE = re.compile(r"import\s+(\w+)\s+from\s*['\"]([^'\"]+)['\"]", re.MULTILINE)
@@ -37,7 +29,7 @@ _FUNCTION_DECL_RE = re.compile(r"function\s+(\w+)\s*\(", re.MULTILINE)
 _ASYNC_FUNCTION_RE = re.compile(r"async\s+function\s+(\w+)\s*\(", re.MULTILINE)
 _ARROW_FUNCTION_RE = re.compile(r"(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>", re.MULTILINE)
 _CLASS_RE = re.compile(
-    r"class\s+(\w+)(?:\s+extends\s+([\w.]+))?(?:\s+implements\s+([\w,\s]+))?\s*\{",
+    r"class\s+(\w+)(?:\s+extends\s+([\w.]+))?(?:\s+implements\s+([A-Z][\w,\s]{0,200}))?\s*\{",
     re.MULTILINE,
 )
 
@@ -51,7 +43,7 @@ _GENERIC_TYPE_RE = re.compile(r"<\s*([A-Z]\w+)(?:\s*,\s*([A-Z]\w+))*\s*>", re.MU
 _EXTENDS_TYPE_RE = re.compile(r"extends\s+([A-Z]\w+)", re.MULTILINE)
 _IMPLEMENTS_TYPE_RE = re.compile(r"implements\s+([\w,\s]+)", re.MULTILINE)
 _TYPE_ALIAS_RE = re.compile(r"type\s+(\w+)(?:<[^>]+>)?\s*=", re.MULTILINE)
-_INTERFACE_RE = re.compile(r"interface\s+(\w+)(?:<[^>]+>)?(?:\s+extends\s+([\w,\s]+))?\s*\{", re.MULTILINE)
+_INTERFACE_RE = re.compile(r"interface\s+(\w+)(?:<[^>]+>)?(?:\s+extends\s+([A-Z][\w,\s]{0,200}))?\s*\{", re.MULTILINE)
 _RETURN_TYPE_RE = re.compile(r"\)\s*:\s*([A-Z]\w+)(?:<[^>]+>)?", re.MULTILINE)
 
 _UTILITY_TYPES = frozenset(
@@ -276,62 +268,98 @@ _BUILTIN_GLOBALS = frozenset(
 )
 
 
+def _parse_names_from_str(names_str: str, skip_type_prefix: bool = False) -> set[str]:
+    names: set[str] = set()
+    for name in names_str.split(","):
+        name = name.strip()
+        if " as " in name:
+            name = name.split(" as ")[0].strip()
+        if name and (not skip_type_prefix or not name.startswith("type ")):
+            names.add(name)
+    return names
+
+
+def _parse_destructured_names(destructured: str) -> set[str]:
+    names: set[str] = set()
+    for name in destructured.split(","):
+        name = name.strip()
+        if ":" in name:
+            name = name.split(":")[0].strip()
+        if name:
+            names.add(name)
+    return names
+
+
+def _extract_named_imports(code: str, sources: set[str], names: set[str]) -> None:
+    for match in _NAMED_IMPORT_RE.finditer(code):
+        sources.add(match.group(2))
+        names.update(_parse_names_from_str(match.group(1), skip_type_prefix=True))
+
+
+def _extract_default_imports(code: str, sources: set[str], names: set[str]) -> None:
+    for match in _DEFAULT_IMPORT_RE.finditer(code):
+        names.add(match.group(1))
+        sources.add(match.group(2))
+
+
+def _extract_namespace_imports(code: str, sources: set[str], names: set[str]) -> None:
+    for match in _NAMESPACE_IMPORT_RE.finditer(code):
+        names.add(match.group(1))
+        sources.add(match.group(2))
+
+
+def _extract_side_effect_imports(code: str, sources: set[str]) -> None:
+    for match in _SIDE_EFFECT_IMPORT_RE.finditer(code):
+        sources.add(match.group(1))
+
+
+def _extract_dynamic_imports(code: str, sources: set[str]) -> None:
+    for match in _DYNAMIC_IMPORT_RE.finditer(code):
+        sources.add(match.group(1))
+
+
+def _extract_type_imports(code: str, sources: set[str], names: set[str]) -> None:
+    for match in _TYPE_IMPORT_RE.finditer(code):
+        sources.add(match.group(2))
+        names.update(_parse_names_from_str(match.group(1)))
+
+
+def _extract_require_imports(code: str, sources: set[str], names: set[str]) -> None:
+    for match in _REQUIRE_RE.finditer(code):
+        sources.add(match.group(3))
+        if match.group(1):
+            names.update(_parse_destructured_names(match.group(1)))
+        if match.group(2):
+            names.add(match.group(2))
+
+
 def _extract_imports(code: str) -> tuple[frozenset[str], frozenset[str]]:
     import_sources: set[str] = set()
     imported_names: set[str] = set()
 
-    for match in _NAMED_IMPORT_RE.finditer(code):
-        names_str = match.group(1)
-        source = match.group(2)
-        import_sources.add(source)
-        for name in names_str.split(","):
-            name = name.strip()
-            if " as " in name:
-                name = name.split(" as ")[0].strip()
-            if name and not name.startswith("type "):
-                imported_names.add(name)
-
-    for match in _DEFAULT_IMPORT_RE.finditer(code):
-        imported_names.add(match.group(1))
-        import_sources.add(match.group(2))
-
-    for match in _NAMESPACE_IMPORT_RE.finditer(code):
-        imported_names.add(match.group(1))
-        import_sources.add(match.group(2))
-
-    for match in _SIDE_EFFECT_IMPORT_RE.finditer(code):
-        import_sources.add(match.group(1))
-
-    for match in _DYNAMIC_IMPORT_RE.finditer(code):
-        import_sources.add(match.group(1))
-
-    for match in _TYPE_IMPORT_RE.finditer(code):
-        names_str = match.group(1)
-        source = match.group(2)
-        import_sources.add(source)
-        for name in names_str.split(","):
-            name = name.strip()
-            if " as " in name:
-                name = name.split(" as ")[0].strip()
-            if name:
-                imported_names.add(name)
-
-    for match in _REQUIRE_RE.finditer(code):
-        destructured = match.group(1)
-        default_name = match.group(2)
-        source = match.group(3)
-        import_sources.add(source)
-        if destructured:
-            for name in destructured.split(","):
-                name = name.strip()
-                if ":" in name:
-                    name = name.split(":")[0].strip()
-                if name:
-                    imported_names.add(name)
-        if default_name:
-            imported_names.add(default_name)
+    _extract_named_imports(code, import_sources, imported_names)
+    _extract_default_imports(code, import_sources, imported_names)
+    _extract_namespace_imports(code, import_sources, imported_names)
+    _extract_side_effect_imports(code, import_sources)
+    _extract_dynamic_imports(code, import_sources)
+    _extract_type_imports(code, import_sources, imported_names)
+    _extract_require_imports(code, import_sources, imported_names)
 
     return frozenset(import_sources), frozenset(imported_names)
+
+
+def _parse_export_list(names_str: str, include_original: bool = True) -> set[str]:
+    exports: set[str] = set()
+    for name in names_str.split(","):
+        name = name.strip()
+        if " as " in name:
+            parts = name.split(" as ")
+            if include_original:
+                exports.add(parts[0].strip())
+            exports.add(parts[1].strip())
+        elif name:
+            exports.add(name)
+    return exports
 
 
 def _extract_exports(code: str) -> frozenset[str]:
@@ -347,24 +375,10 @@ def _extract_exports(code: str) -> frozenset[str]:
         exports.add("default")
 
     for match in _EXPORT_LIST_RE.finditer(code):
-        names_str = match.group(1)
-        for name in names_str.split(","):
-            name = name.strip()
-            if " as " in name:
-                parts = name.split(" as ")
-                exports.add(parts[0].strip())
-                exports.add(parts[1].strip())
-            elif name:
-                exports.add(name)
+        exports.update(_parse_export_list(match.group(1)))
 
     for match in _REEXPORT_RE.finditer(code):
-        names_str = match.group(1)
-        for name in names_str.split(","):
-            name = name.strip()
-            if " as " in name:
-                exports.add(name.split(" as ")[1].strip())
-            elif name:
-                exports.add(name)
+        exports.update(_parse_export_list(match.group(1), include_original=False))
 
     return frozenset(exports)
 
@@ -415,35 +429,46 @@ def _extract_calls(code: str) -> frozenset[str]:
     return frozenset(calls)
 
 
-def _extract_type_refs(code: str) -> frozenset[str]:
-    type_refs: set[str] = set()
+def _is_valid_type_ref(type_name: str, exclude_utility: bool = True) -> bool:
+    if not type_name:
+        return False
+    if type_name in _BUILTIN_GLOBALS:
+        return False
+    if exclude_utility and type_name in _UTILITY_TYPES:
+        return False
+    return True
 
-    for match in _TYPE_ANNOTATION_RE.finditer(code):
+
+def _add_type_from_pattern(code: str, pattern: re.Pattern[str], refs: set[str], exclude_utility: bool = True) -> None:
+    for match in pattern.finditer(code):
         type_name = match.group(1)
-        if type_name not in _UTILITY_TYPES and type_name not in _BUILTIN_GLOBALS:
-            type_refs.add(type_name)
+        if _is_valid_type_ref(type_name, exclude_utility):
+            refs.add(type_name)
 
+
+def _add_generic_types(code: str, refs: set[str]) -> None:
     for match in _GENERIC_TYPE_RE.finditer(code):
         for group in match.groups():
             if group and group not in _UTILITY_TYPES:
-                type_refs.add(group)
+                refs.add(group)
 
-    for match in _EXTENDS_TYPE_RE.finditer(code):
-        type_name = match.group(1)
-        if type_name not in _BUILTIN_GLOBALS:
-            type_refs.add(type_name)
 
+def _add_implements_types(code: str, refs: set[str]) -> None:
     for match in _IMPLEMENTS_TYPE_RE.finditer(code):
-        types_str = match.group(1)
-        for type_name in types_str.split(","):
+        for type_name in match.group(1).split(","):
             type_name = type_name.strip()
-            if type_name and type_name not in _BUILTIN_GLOBALS:
-                type_refs.add(type_name)
+            if _is_valid_type_ref(type_name, exclude_utility=False):
+                refs.add(type_name)
 
-    for match in _RETURN_TYPE_RE.finditer(code):
-        type_name = match.group(1)
-        if type_name not in _UTILITY_TYPES and type_name not in _BUILTIN_GLOBALS:
-            type_refs.add(type_name)
+
+def _extract_type_refs(code: str) -> frozenset[str]:
+    type_refs: set[str] = set()
+
+    _add_type_from_pattern(code, _TYPE_ANNOTATION_RE, type_refs)
+    _add_generic_types(code, type_refs)
+    _add_type_from_pattern(code, _EXTENDS_TYPE_RE, type_refs, exclude_utility=False)
+    _add_implements_types(code, type_refs)
+    _add_type_from_pattern(code, _RETURN_TYPE_RE, type_refs)
 
     return frozenset(type_refs)
 

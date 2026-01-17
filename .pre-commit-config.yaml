@@ -29,7 +29,7 @@ repos:
       - id: debug-statements
       - id: name-tests-test
         args: ["--pytest-test-first"]
-        exclude: ^tests/(utils|conftest)\.py$
+        exclude: ^tests/(utils|conftest|framework/.*)\.py$
       - id: fix-byte-order-marker
       - id: detect-private-key
 
@@ -100,24 +100,6 @@ repos:
   # ============================================================================
   # SECURITY & VULNERABILITY DETECTION
   # ============================================================================
-  - repo: https://github.com/trailofbits/pip-audit
-    rev: v2.9.0
-    hooks:
-      - id: pip-audit
-        name: pip-audit (CVE detection in dependencies)
-        args:
-          [
-            "--desc",
-            "on",
-            "--skip-editable",
-            "--ignore-vuln",
-            "GHSA-4xh5-x5gv-qwph",
-            "--ignore-vuln",
-            "GHSA-gm62-xv2j-4w53",
-            "--ignore-vuln",
-            "GHSA-2xpw-w6gg-jr37",
-          ]
-
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:

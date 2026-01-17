@@ -183,36 +183,49 @@ def _build_containment_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId
     edges: dict[tuple[FragmentId, FragmentId], float] = {}
 
     for _path, frags in by_path.items():
-        if len(frags) < 2:
-            continue
-
-        frags_sorted = sorted(frags, key=lambda x: (x.start_line, -x.end_line))
-        stack: list[Fragment] = []
-
-        for f in frags_sorted:
-            while stack and f.start_line > stack[-1].end_line:
-                stack.pop()
-
-            if stack:
-                parent = stack[-1]
-                if parent.start_line <= f.start_line and f.end_line <= parent.end_line and parent.id != f.id:
-                    edges[(f.id, parent.id)] = max(edges.get((f.id, parent.id), 0.0), _CONTAINMENT_WEIGHT)
-                    edges[(parent.id, f.id)] = max(edges.get((parent.id, f.id), 0.0), _CONTAINMENT_REVERSE_WEIGHT)
-
-            stack.append(f)
+        if len(frags) >= 2:
+            _process_file_containment(frags, edges)
 
     return edges
+
+
+def _process_file_containment(frags: list[Fragment], edges: dict[tuple[FragmentId, FragmentId], float]) -> None:
+    frags_sorted = sorted(frags, key=lambda x: (x.start_line, -x.end_line))
+    stack: list[Fragment] = []
+
+    for f in frags_sorted:
+        while stack and f.start_line > stack[-1].end_line:
+            stack.pop()
+
+        if stack:
+            _add_containment_edge(f, stack[-1], edges)
+
+        stack.append(f)
+
+
+def _add_containment_edge(child: Fragment, parent: Fragment, edges: dict[tuple[FragmentId, FragmentId], float]) -> None:
+    if parent.start_line <= child.start_line and child.end_line <= parent.end_line and parent.id != child.id:
+        edges[(child.id, parent.id)] = max(edges.get((child.id, parent.id), 0.0), _CONTAINMENT_WEIGHT)
+        edges[(parent.id, child.id)] = max(edges.get((parent.id, child.id), 0.0), _CONTAINMENT_REVERSE_WEIGHT)
 
 
 def _build_import_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
     if not fragments:
         return {}
 
-    module_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-    frag_to_path: dict[FragmentId, Path] = {}
+    module_to_frags = _build_module_index(fragments)
+    edges: dict[tuple[FragmentId, FragmentId], float] = {}
 
     for frag in fragments:
-        frag_to_path[frag.id] = frag.path
+        _add_import_edges_for_fragment(frag, module_to_frags, edges)
+
+    return edges
+
+
+def _build_module_index(fragments: list[Fragment]) -> dict[str, list[FragmentId]]:
+    module_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
+
+    for frag in fragments:
         module_name = path_to_module(frag.path)
         if module_name:
             module_to_frags[module_name].append(frag.id)
@@ -221,21 +234,22 @@ def _build_import_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, Fra
                 partial = ".".join(parts[:i])
                 module_to_frags[partial].append(frag.id)
 
-    edges: dict[tuple[FragmentId, FragmentId], float] = {}
+    return module_to_frags
 
-    for frag in fragments:
-        for match in _IMPORT_RE.finditer(frag.content):
-            imported = match.group(1) or match.group(2)
-            if not imported:
-                continue
 
-            target_frags = _resolve_import(imported, module_to_frags, frag.path)
-            for target_id in target_frags:
-                if target_id != frag.id:
-                    edges[(frag.id, target_id)] = _IMPORT_WEIGHT
-                    edges[(target_id, frag.id)] = _IMPORT_REVERSE_WEIGHT
+def _add_import_edges_for_fragment(
+    frag: Fragment, module_to_frags: dict[str, list[FragmentId]], edges: dict[tuple[FragmentId, FragmentId], float]
+) -> None:
+    for match in _IMPORT_RE.finditer(frag.content):
+        imported = match.group(1) or match.group(2)
+        if not imported:
+            continue
 
-    return edges
+        target_frags = _resolve_import(imported, module_to_frags, frag.path)
+        for target_id in target_frags:
+            if target_id != frag.id:
+                edges[(frag.id, target_id)] = _IMPORT_WEIGHT
+                edges[(target_id, frag.id)] = _IMPORT_REVERSE_WEIGHT
 
 
 def _resolve_relative_import(imported: str, source_path: Path, module_to_frags: dict[str, list[FragmentId]]) -> list[FragmentId]:
@@ -351,6 +365,28 @@ def _has_direct_import(test_frag: Fragment, src_frag: Fragment) -> bool:
     return False
 
 
+def _extract_target_name_from_test(test_name: str) -> str | None:
+    if test_name.startswith("test_"):
+        return test_name[5:]
+    if test_name.endswith("_test"):
+        return test_name[:-5]
+    if ".test" in test_name:
+        return test_name.split(".test")[0]
+    if ".spec" in test_name:
+        return test_name.split(".spec")[0]
+    return None
+
+
+def _add_test_source_edge(
+    edges: dict[tuple[FragmentId, FragmentId], float],
+    test_frag: Fragment,
+    src_frag: Fragment,
+) -> None:
+    weight = _TEST_WEIGHT_DIRECT if _has_direct_import(test_frag, src_frag) else _TEST_WEIGHT_NAMING
+    edges[(test_frag.id, src_frag.id)] = weight
+    edges[(src_frag.id, test_frag.id)] = _TEST_REVERSE_WEIGHT
+
+
 def _build_test_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
     edges: dict[tuple[FragmentId, FragmentId], float] = {}
 
@@ -364,30 +400,12 @@ def _build_test_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, Fragm
             by_base[f.path.stem.lower()].append(f)
 
     for test_frag in test_frags:
-        test_name = test_frag.path.stem.lower()
-
-        # Extract target name based on naming conventions
-        target_name = None
-        if test_name.startswith("test_"):
-            target_name = test_name[5:]
-        elif test_name.endswith("_test"):
-            target_name = test_name[:-5]
-        elif ".test" in test_name:
-            target_name = test_name.split(".test")[0]
-        elif ".spec" in test_name:
-            target_name = test_name.split(".spec")[0]
-
+        target_name = _extract_target_name_from_test(test_frag.path.stem.lower())
         if not target_name:
             continue
 
         for src_frag in by_base.get(target_name, []):
-            # Higher weight if test has direct import
-            if _has_direct_import(test_frag, src_frag):
-                weight = _TEST_WEIGHT_DIRECT
-            else:
-                weight = _TEST_WEIGHT_NAMING
-            edges[(test_frag.id, src_frag.id)] = weight
-            edges[(src_frag.id, test_frag.id)] = _TEST_REVERSE_WEIGHT
+            _add_test_source_edge(edges, test_frag, src_frag)
 
     return edges
 
@@ -412,8 +430,16 @@ def _build_document_structure_edges(fragments: list[Fragment]) -> dict[tuple[Fra
 
 
 def _build_anchor_link_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
+    anchor_index = _build_anchor_index(fragments)
     edges: dict[tuple[FragmentId, FragmentId], float] = {}
 
+    for f in fragments:
+        _add_anchor_link_edges_for_fragment(f, anchor_index, edges)
+
+    return edges
+
+
+def _build_anchor_index(fragments: list[Fragment]) -> dict[str, FragmentId]:
     anchor_index: dict[str, FragmentId] = {}
     for f in fragments:
         if f.kind == "section":
@@ -422,17 +448,18 @@ def _build_anchor_link_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId
             slug = _slugify(heading)
             if slug:
                 anchor_index[slug] = f.id
+    return anchor_index
 
-    for f in fragments:
-        for match in _MD_INTERNAL_LINK_RE.finditer(f.content):
-            target_slug = _slugify(match.group(2))
-            if target_slug in anchor_index:
-                target_id = anchor_index[target_slug]
-                if target_id != f.id:
-                    edges[(f.id, target_id)] = _ANCHOR_LINK_WEIGHT
-                    edges[(target_id, f.id)] = _ANCHOR_LINK_REVERSE_WEIGHT
 
-    return edges
+def _add_anchor_link_edges_for_fragment(
+    f: Fragment, anchor_index: dict[str, FragmentId], edges: dict[tuple[FragmentId, FragmentId], float]
+) -> None:
+    for match in _MD_INTERNAL_LINK_RE.finditer(f.content):
+        target_slug = _slugify(match.group(2))
+        target_id = anchor_index.get(target_slug)
+        if target_id and target_id != f.id:
+            edges[(f.id, target_id)] = _ANCHOR_LINK_WEIGHT
+            edges[(target_id, f.id)] = _ANCHOR_LINK_REVERSE_WEIGHT
 
 
 def _build_citation_edges_sparse(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
@@ -629,6 +656,31 @@ def _extract_config_keys(suffix: str, content: str) -> set[str]:
     return keys
 
 
+def _build_key_to_code_index(
+    code_frags: list[Fragment],
+    all_keys: set[str],
+) -> dict[str, list[FragmentId]]:
+    key_patterns = {key: re.compile(rf"\b{re.escape(key)}\b", re.IGNORECASE) for key in all_keys}
+    key_to_code_frags: dict[str, list[FragmentId]] = defaultdict(list)
+
+    for code_frag in code_frags:
+        for key in all_keys:
+            if key_patterns[key].search(code_frag.content):
+                key_to_code_frags[key].append(code_frag.id)
+
+    return key_to_code_frags
+
+
+def _add_config_code_edge(
+    edges: dict[tuple[FragmentId, FragmentId], float],
+    cfg_id: FragmentId,
+    code_id: FragmentId,
+    weight: float,
+) -> None:
+    edges[(cfg_id, code_id)] = max(edges.get((cfg_id, code_id), 0.0), weight)
+    edges[(code_id, cfg_id)] = max(edges.get((code_id, cfg_id), 0.0), weight * _BACKWARD_WEIGHT_FACTOR)
+
+
 def _build_config_code_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
     config_frags = [f for f in fragments if f.path.suffix.lower() in _CONFIG_EXTS]
     code_frags = [f for f in fragments if f.path.suffix.lower() in CODE_EXTENSIONS]
@@ -637,16 +689,8 @@ def _build_config_code_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId
         return {}
 
     config_keys_by_frag = {cfg.id: _extract_config_keys(cfg.path.suffix.lower(), cfg.content) for cfg in config_frags}
-
     all_keys = {k for keys in config_keys_by_frag.values() for k in keys}
-    key_patterns = {key: re.compile(rf"\b{re.escape(key)}\b", re.IGNORECASE) for key in all_keys}
-
-    key_to_code_frags: dict[str, list[FragmentId]] = defaultdict(list)
-    for code_frag in code_frags:
-        for cfg_id, keys in config_keys_by_frag.items():
-            for key in keys:
-                if key_patterns[key].search(code_frag.content):
-                    key_to_code_frags[key].append(code_frag.id)
+    key_to_code_frags = _build_key_to_code_index(code_frags, all_keys)
 
     edges: dict[tuple[FragmentId, FragmentId], float] = {}
     for cfg in config_frags:
@@ -656,8 +700,7 @@ def _build_config_code_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId
                 continue
             adjusted_weight = _CONFIG_CODE_WEIGHT * min(1.0, 3.0 / len(matching))
             for code_id in matching:
-                edges[(cfg.id, code_id)] = max(edges.get((cfg.id, code_id), 0.0), adjusted_weight)
-                edges[(code_id, cfg.id)] = max(edges.get((code_id, cfg.id), 0.0), adjusted_weight * _BACKWARD_WEIGHT_FACTOR)
+                _add_config_code_edge(edges, cfg.id, code_id, adjusted_weight)
 
     return edges
 
@@ -666,45 +709,60 @@ _MAX_SIBLING_FILES_PER_DIR = 20
 
 
 def _build_package_sibling_edges(fragments: list[Fragment]) -> dict[tuple[FragmentId, FragmentId], float]:
+    by_dir = _group_files_by_dir(fragments)
+    file_to_rep = _build_file_representative_map(fragments)
     edges: dict[tuple[FragmentId, FragmentId], float] = {}
 
-    by_dir: dict[Path, set[Path]] = defaultdict(set)
-    for f in fragments:
-        by_dir[f.path.parent].add(f.path)
-
-    file_to_rep: dict[Path, FragmentId] = {}
-    for f in fragments:
-        if f.path not in file_to_rep:
-            file_to_rep[f.path] = f.id
-        elif f.token_count > 0:
-            existing = file_to_rep[f.path]
-            existing_frag = next((fr for fr in fragments if fr.id == existing), None)
-            if existing_frag and f.token_count > existing_frag.token_count:
-                file_to_rep[f.path] = f.id
-
-    for dir_path, files in by_dir.items():
-        file_list = sorted(files)
-        if len(file_list) > _MAX_SIBLING_FILES_PER_DIR:
-            file_list = file_list[:_MAX_SIBLING_FILES_PER_DIR]
-
-        if len(file_list) < 2:
-            continue
-
-        for i, f1_path in enumerate(file_list):
-            for f2_path in file_list[i + 1 :]:
-                f1_id = file_to_rep.get(f1_path)
-                f2_id = file_to_rep.get(f2_path)
-                if f1_id and f2_id:
-                    edges[(f1_id, f2_id)] = _SIBLING_WEIGHT
-                    edges[(f2_id, f1_id)] = _SIBLING_WEIGHT
+    for _dir_path, files in by_dir.items():
+        _add_sibling_edges_for_dir(files, file_to_rep, edges)
 
     return edges
 
 
-def _build_cochange_edges(fragments: list[Fragment], repo_root: Path | None) -> dict[tuple[FragmentId, FragmentId], float]:
-    if repo_root is None:
-        return {}
+def _group_files_by_dir(fragments: list[Fragment]) -> dict[Path, set[Path]]:
+    by_dir: dict[Path, set[Path]] = defaultdict(set)
+    for f in fragments:
+        by_dir[f.path.parent].add(f.path)
+    return by_dir
 
+
+def _build_file_representative_map(fragments: list[Fragment]) -> dict[Path, FragmentId]:
+    file_to_rep: dict[Path, FragmentId] = {}
+    for f in fragments:
+        _update_file_representative(f, file_to_rep, fragments)
+    return file_to_rep
+
+
+def _update_file_representative(f: Fragment, file_to_rep: dict[Path, FragmentId], fragments: list[Fragment]) -> None:
+    if f.path not in file_to_rep:
+        file_to_rep[f.path] = f.id
+    elif f.token_count > 0:
+        existing = file_to_rep[f.path]
+        existing_frag = next((fr for fr in fragments if fr.id == existing), None)
+        if existing_frag and f.token_count > existing_frag.token_count:
+            file_to_rep[f.path] = f.id
+
+
+def _add_sibling_edges_for_dir(
+    files: set[Path], file_to_rep: dict[Path, FragmentId], edges: dict[tuple[FragmentId, FragmentId], float]
+) -> None:
+    file_list = sorted(files)
+    if len(file_list) > _MAX_SIBLING_FILES_PER_DIR:
+        file_list = file_list[:_MAX_SIBLING_FILES_PER_DIR]
+
+    if len(file_list) < 2:
+        return
+
+    for i, f1_path in enumerate(file_list):
+        for f2_path in file_list[i + 1 :]:
+            f1_id = file_to_rep.get(f1_path)
+            f2_id = file_to_rep.get(f2_path)
+            if f1_id and f2_id:
+                edges[(f1_id, f2_id)] = _SIBLING_WEIGHT
+                edges[(f2_id, f1_id)] = _SIBLING_WEIGHT
+
+
+def _get_git_log_files(repo_root: Path) -> list[list[str]] | None:
     try:
         result = subprocess.run(
             ["git", "-C", str(repo_root), "log", "--name-only", "--format=", f"-n{_COCHANGE_COMMITS}"],
@@ -714,10 +772,11 @@ def _build_cochange_edges(fragments: list[Fragment], repo_root: Path | None) -> 
             timeout=_COCHANGE_TIMEOUT,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        return {}
+        return None
+    return [c.strip().split("\n") for c in result.stdout.split("\n\n") if c.strip()]
 
-    commits = [c.strip().split("\n") for c in result.stdout.split("\n\n") if c.strip()]
 
+def _count_cochanges(commits: list[list[str]]) -> Counter[tuple[str, str]]:
     cochange: Counter[tuple[str, str]] = Counter()
     for files in commits:
         files = [f for f in files if f]
@@ -727,7 +786,10 @@ def _build_cochange_edges(fragments: list[Fragment], repo_root: Path | None) -> 
             for f2 in files[i + 1 :]:
                 pair = (f1, f2) if f1 < f2 else (f2, f1)
                 cochange[pair] += 1
+    return cochange
 
+
+def _build_path_to_frags_index(fragments: list[Fragment], repo_root: Path) -> dict[str, list[FragmentId]]:
     path_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
     for f in fragments:
         try:
@@ -735,6 +797,19 @@ def _build_cochange_edges(fragments: list[Fragment], repo_root: Path | None) -> 
             path_to_frags[rel].append(f.id)
         except ValueError:
             continue
+    return path_to_frags
+
+
+def _build_cochange_edges(fragments: list[Fragment], repo_root: Path | None) -> dict[tuple[FragmentId, FragmentId], float]:
+    if repo_root is None:
+        return {}
+
+    commits = _get_git_log_files(repo_root)
+    if commits is None:
+        return {}
+
+    cochange = _count_cochanges(commits)
+    path_to_frags = _build_path_to_frags_index(fragments, repo_root)
 
     edges: dict[tuple[FragmentId, FragmentId], float] = {}
     for (p1, p2), count in cochange.items():

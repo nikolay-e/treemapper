@@ -1,8 +1,7 @@
 # .github/workflows/cd.yml
 name: treemapper CD
 
-permissions:
-  contents: write
+permissions: {}
 
 'on':
   workflow_dispatch:
@@ -316,6 +315,8 @@ jobs:
       (needs.publish-to-pypi.result == 'success' ||
        needs.publish-to-pypi.result == 'skipped')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download git bundle
         uses: actions/download-artifact@v7

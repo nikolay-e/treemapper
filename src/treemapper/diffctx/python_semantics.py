@@ -2,15 +2,10 @@ from __future__ import annotations
 
 import ast
 import textwrap
-from dataclasses import dataclass
 
+from treemapper.diffctx.semantic_types import EMPTY_SEMANTIC_INFO, SemanticInfo
 
-@dataclass(frozen=True)
-class PyFragmentInfo:
-    defines: frozenset[str]
-    references: frozenset[str]
-    calls: frozenset[str]
-    type_refs: frozenset[str]
+PyFragmentInfo = SemanticInfo
 
 
 def _names_from_expr(expr: ast.AST | None) -> set[str]:
@@ -74,7 +69,7 @@ def _collect_type_refs(tree: ast.Module) -> set[str]:
     return type_refs
 
 
-_EMPTY_INFO = PyFragmentInfo(frozenset(), frozenset(), frozenset(), frozenset())
+_EMPTY_INFO = EMPTY_SEMANTIC_INFO
 
 
 def _try_parse(code: str) -> ast.Module | None:

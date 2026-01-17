@@ -16,7 +16,7 @@ _GO_TYPE_RE = re.compile(r"^type\s+(\w+)\s+(?:struct|interface|func)", re.MULTIL
 _GO_CONST_VAR_RE = re.compile(r"^(?:const|var)\s+(\w+)\s+", re.MULTILINE)
 
 _GO_FUNC_CALL_RE = re.compile(r"\b([A-Z]\w+)\s*\(")
-_GO_TYPE_REF_RE = re.compile(r"\*?([A-Z][a-zA-Z0-9]*)\b")
+_GO_TYPE_REF_RE = re.compile(r"\*?([A-Z]\w*)\b")
 _GO_PKG_CALL_RE = re.compile(r"\b(\w+)\.([A-Z]\w*)")
 
 
@@ -70,7 +70,18 @@ class GoEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
+        indices = self._build_indices(go_frags, repo_root)
 
+        for gf in go_frags:
+            self._link_fragment(gf, indices, edges)
+
+        return edges
+
+    def _build_indices(
+        self, go_frags: list[Fragment], repo_root: Path | None
+    ) -> tuple[
+        dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]
+    ]:
         pkg_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         path_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         type_defs: dict[str, list[FragmentId]] = defaultdict(list)
@@ -83,8 +94,7 @@ class GoEdgeBuilder(EdgeBuilder):
             if repo_root:
                 try:
                     rel = f.path.relative_to(repo_root)
-                    pkg_path = str(rel.parent)
-                    path_to_frags[pkg_path].append(f.id)
+                    path_to_frags[str(rel.parent)].append(f.id)
                 except ValueError:
                     pass
 
@@ -94,45 +104,93 @@ class GoEdgeBuilder(EdgeBuilder):
             for fn in funcs:
                 func_defs[fn.lower()].append(f.id)
 
-        for gf in go_frags:
-            imports = _extract_imports(gf.content)
-            func_calls, type_refs, pkg_calls = _extract_references(gf.content)
+        return pkg_to_frags, path_to_frags, type_defs, func_defs
 
-            for imp in imports:
-                imp_pkg = imp.split("/")[-1]
-                for pkg, frag_ids in pkg_to_frags.items():
-                    if pkg == imp_pkg:
-                        for fid in frag_ids:
-                            if fid != gf.id:
-                                self.add_edge(edges, gf.id, fid, self.import_weight)
+    def _link_fragment(
+        self,
+        gf: Fragment,
+        indices: tuple[
+            dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]
+        ],
+        edges: EdgeDict,
+    ) -> None:
+        pkg_to_frags, path_to_frags, type_defs, func_defs = indices
+        imports = _extract_imports(gf.content)
+        func_calls, type_refs, pkg_calls = _extract_references(gf.content)
 
-                for path_str, frag_ids in path_to_frags.items():
-                    if imp in path_str or imp.endswith(path_str):
-                        for fid in frag_ids:
-                            if fid != gf.id:
-                                self.add_edge(edges, gf.id, fid, self.import_weight)
+        self._link_imports(gf, imports, pkg_to_frags, path_to_frags, edges)
+        self._link_refs(gf, type_refs, type_defs, self.type_weight, edges)
+        self._link_refs(gf, func_calls, func_defs, self.func_weight, edges)
+        self._link_pkg_calls(gf, pkg_calls, pkg_to_frags, edges)
+        self._link_same_package(gf, pkg_to_frags, edges)
 
-            for type_ref in type_refs:
-                if type_ref.lower() in type_defs:
-                    for fid in type_defs[type_ref.lower()]:
-                        if fid != gf.id:
-                            self.add_edge(edges, gf.id, fid, self.type_weight)
+    def _link_imports(
+        self,
+        gf: Fragment,
+        imports: set[str],
+        pkg_to_frags: dict[str, list[FragmentId]],
+        path_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for imp in imports:
+            self._link_import_by_package(gf.id, imp, pkg_to_frags, edges)
+            self._link_import_by_path(gf.id, imp, path_to_frags, edges)
 
-            for func_call in func_calls:
-                if func_call.lower() in func_defs:
-                    for fid in func_defs[func_call.lower()]:
-                        if fid != gf.id:
-                            self.add_edge(edges, gf.id, fid, self.func_weight)
+    def _link_import_by_package(
+        self,
+        gf_id: FragmentId,
+        imp: str,
+        pkg_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        imp_pkg = imp.split("/")[-1]
+        for pkg, frag_ids in pkg_to_frags.items():
+            if pkg == imp_pkg:
+                self.add_edges_from_ids(gf_id, frag_ids, self.import_weight, edges)
 
-            for pkg_name, symbol in pkg_calls:
-                if pkg_name.lower() in pkg_to_frags:
-                    for fid in pkg_to_frags[pkg_name.lower()]:
-                        if fid != gf.id:
-                            self.add_edge(edges, gf.id, fid, self.func_weight)
+    def _link_import_by_path(
+        self,
+        gf_id: FragmentId,
+        imp: str,
+        path_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for path_str, frag_ids in path_to_frags.items():
+            if imp in path_str or imp.endswith(path_str):
+                self.add_edges_from_ids(gf_id, frag_ids, self.import_weight, edges)
 
-            current_pkg = _get_package_name(gf.path)
-            for fid in pkg_to_frags[current_pkg]:
+    def _link_refs(
+        self,
+        gf: Fragment,
+        refs: set[str],
+        defs: dict[str, list[FragmentId]],
+        weight: float,
+        edges: EdgeDict,
+    ) -> None:
+        for ref in refs:
+            for fid in defs.get(ref.lower(), []):
                 if fid != gf.id:
-                    self.add_edge(edges, gf.id, fid, self.same_package_weight)
+                    self.add_edge(edges, gf.id, fid, weight)
 
-        return edges
+    def _link_pkg_calls(
+        self,
+        gf: Fragment,
+        pkg_calls: set[tuple[str, str]],
+        pkg_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for pkg_name, _symbol in pkg_calls:
+            for fid in pkg_to_frags.get(pkg_name.lower(), []):
+                if fid != gf.id:
+                    self.add_edge(edges, gf.id, fid, self.func_weight)
+
+    def _link_same_package(
+        self,
+        gf: Fragment,
+        pkg_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        current_pkg = _get_package_name(gf.path)
+        for fid in pkg_to_frags.get(current_pkg, []):
+            if fid != gf.id:
+                self.add_edge(edges, gf.id, fid, self.same_package_weight)

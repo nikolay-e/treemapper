@@ -4,34 +4,11 @@ from pathlib import Path
 
 from tree_sitter import Language, Node, Parser
 
+from ..languages import TREE_SITTER_LANGUAGES
 from ..types import Fragment, FragmentId, extract_identifiers
 from .base import MIN_FRAGMENT_LINES, create_code_gap_fragments
 
-_TREE_SITTER_LANGS: dict[str, str] = {
-    ".py": "python",
-    ".pyw": "python",
-    ".pyi": "python",
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    ".ts": "typescript",
-    ".tsx": "typescript",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-    ".c": "c",
-    ".h": "c",
-    ".cpp": "cpp",
-    ".hpp": "cpp",
-    ".cc": "cpp",
-    ".cxx": "cpp",
-    ".rb": "ruby",
-    ".rake": "ruby",
-    ".cs": "c_sharp",
-}
+_TREE_SITTER_LANGS = TREE_SITTER_LANGUAGES
 
 _DEFINITION_NODE_TYPES = {
     "python": {"function_definition", "class_definition", "decorated_definition"},
@@ -49,8 +26,17 @@ _DEFINITION_NODE_TYPES = {
     "go": {"function_declaration", "method_declaration", "type_declaration"},
     "rust": {"function_item", "impl_item", "struct_item", "enum_item", "trait_item"},
     "java": {"method_declaration", "class_declaration", "interface_declaration", "enum_declaration"},
-    "c": {"function_definition", "struct_specifier", "enum_specifier"},
-    "cpp": {"function_definition", "class_specifier", "struct_specifier", "enum_specifier"},
+    "c": {"function_definition", "struct_specifier", "enum_specifier", "declaration", "type_definition"},
+    "cpp": {
+        "function_definition",
+        "class_specifier",
+        "struct_specifier",
+        "enum_specifier",
+        "declaration",
+        "type_definition",
+        "using_declaration",
+        "alias_declaration",
+    },
     "ruby": {"method", "class", "module"},
     "c_sharp": {
         "method_declaration",
@@ -71,10 +57,11 @@ _NODE_TYPE_KEYWORDS = [
     (("trait", "interface"), "interface"),
     (("enum",), "enum"),
     (("module",), "module"),
-    (("type_alias",), "type"),
+    (("type_alias", "alias_declaration", "type_definition"), "type"),
     (("variable_declarator",), "variable"),
     (("record",), "record"),
     (("property",), "property"),
+    (("declaration", "using_declaration"), "declaration"),
 ]
 
 _MAX_RECURSION_DEPTH = 500

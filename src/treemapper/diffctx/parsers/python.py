@@ -3,8 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from ..types import Fragment, FragmentId, extract_identifiers
-from .base import MIN_FRAGMENT_LINES, create_code_gap_fragments
+from ..types import Fragment
+from .base import create_code_gap_fragments, create_fragment_from_lines
 
 
 class PythonAstStrategy:
@@ -40,56 +40,29 @@ class PythonAstStrategy:
         fragments.extend(create_code_gap_fragments(path, lines, covered))
         return fragments
 
+    def _get_node_range(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> tuple[int, int] | None:
+        if not hasattr(node, "lineno") or not hasattr(node, "end_lineno") or node.end_lineno is None:
+            return None
+
+        start = max(1, node.lineno)
+        for dec in getattr(node, "decorator_list", []) or []:
+            dec_line = getattr(dec, "lineno", None)
+            if isinstance(dec_line, int):
+                start = min(start, dec_line)
+
+        end = max(start, node.end_lineno)
+        return start, end
+
     def _create_function_fragment(
         self, path: Path, lines: list[str], node: ast.FunctionDef | ast.AsyncFunctionDef
     ) -> Fragment | None:
-        if not hasattr(node, "lineno") or not hasattr(node, "end_lineno") or node.end_lineno is None:
+        range_ = self._get_node_range(node)
+        if not range_:
             return None
-
-        start = max(1, node.lineno)
-        for dec in getattr(node, "decorator_list", []) or []:
-            dec_line = getattr(dec, "lineno", None)
-            if isinstance(dec_line, int):
-                start = min(start, dec_line)
-
-        end = max(start, node.end_lineno)
-
-        if end - start + 1 < MIN_FRAGMENT_LINES:
-            return None
-
-        snippet = "\n".join(lines[start - 1 : end])
-        if not snippet.endswith("\n"):
-            snippet += "\n"
-
-        return Fragment(
-            id=FragmentId(path=path, start_line=start, end_line=end),
-            kind="function",
-            content=snippet,
-            identifiers=extract_identifiers(snippet, profile="code"),
-        )
+        return create_fragment_from_lines(path, lines, range_[0], range_[1], "function")
 
     def _create_class_fragment(self, path: Path, lines: list[str], node: ast.ClassDef) -> Fragment | None:
-        if not hasattr(node, "lineno") or not hasattr(node, "end_lineno") or node.end_lineno is None:
+        range_ = self._get_node_range(node)
+        if not range_:
             return None
-
-        start = max(1, node.lineno)
-        for dec in getattr(node, "decorator_list", []) or []:
-            dec_line = getattr(dec, "lineno", None)
-            if isinstance(dec_line, int):
-                start = min(start, dec_line)
-
-        end = max(start, node.end_lineno)
-
-        if end - start + 1 < MIN_FRAGMENT_LINES:
-            return None
-
-        snippet = "\n".join(lines[start - 1 : end])
-        if not snippet.endswith("\n"):
-            snippet += "\n"
-
-        return Fragment(
-            id=FragmentId(path=path, start_line=start, end_line=end),
-            kind="class",
-            content=snippet,
-            identifiers=extract_identifiers(snippet, profile="code"),
-        )
+        return create_fragment_from_lines(path, lines, range_[0], range_[1], "class")

@@ -284,7 +284,39 @@ def _log_ppr_mode(
 
 _MAX_FILE_SIZE = 100_000  # 100KB
 
-_CODE_EXTS = {".py", ".js", ".ts", ".tsx", ".jsx", ".rs", ".java", ".kt", ".go", ".rb", ".php", ".cs"}
+_CODE_EXTS = {
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".rs",
+    ".java",
+    ".kt",
+    ".go",
+    ".rb",
+    ".php",
+    ".cs",
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cc",
+    ".cxx",
+    ".hxx",
+    ".hh",
+    ".swift",
+    ".m",
+    ".mm",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".scala",
+    ".sc",
+    ".lua",
+    ".r",
+    ".R",
+}
 _CFG_EXTS = {".yaml", ".yml", ".json", ".toml", ".ini", ".env"}
 _ALLOWED_EXTS = _CODE_EXTS | _CFG_EXTS
 

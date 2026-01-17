@@ -3,19 +3,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from ...types import Fragment
+from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict, FragmentIndex, discover_files_by_refs
 
-_GHA_RUN_RE = re.compile(r"^\s*-?\s*run:\s*[|>]?\s*(.+?)(?:\n\s{4,}|\n[^\s]|$)", re.MULTILINE | re.DOTALL)
-_GHA_USES_RE = re.compile(r"^\s*uses:\s*([^\s@]+)", re.MULTILINE)
-_GHA_WITH_RE = re.compile(r"^\s*with:\s*\n((?:\s+\w+:.+\n)+)", re.MULTILINE)
+_GHA_RUN_RE = re.compile(r"^\s{0,20}-?\s{0,5}run:\s{0,5}[|>]?\s{0,5}([^\n]{1,500})", re.MULTILINE)
 
-_GITLAB_SCRIPT_RE = re.compile(r"^\s*(?:script|before_script|after_script):\s*\n((?:\s+-\s*.+\n)+)", re.MULTILINE)
-_GITLAB_INCLUDE_RE = re.compile(r"^\s*-?\s*(?:local|project|remote|template):\s*['\"]?([^'\"#\n]+)", re.MULTILINE)
-_GITLAB_EXTENDS_RE = re.compile(r"^\s*extends:\s*['\"]?([^'\"#\n]+)", re.MULTILINE)
+_GITLAB_SCRIPT_RE = re.compile(
+    r"^\s{0,20}(?:script|before_script|after_script):\s?\n((?:\s{1,20}-\s{0,5}[^\n]{1,500}\n){1,100})", re.MULTILINE
+)
+_GITLAB_INCLUDE_RE = re.compile(
+    r"^\s{0,20}-?\s{0,5}(?:local|project|remote|template):\s{0,5}['\"]?([^'\"#\n]{1,300})", re.MULTILINE
+)
 
-_JENKINS_STAGE_RE = re.compile(r"stage\s*\(\s*['\"]([^'\"]+)['\"]", re.MULTILINE)
-_JENKINS_SH_RE = re.compile(r"sh\s*(?:\(['\"]|['\"])(.+?)(?:['\"](?:\))?)", re.MULTILINE | re.DOTALL)
+_JENKINS_SH_RE = re.compile(r"sh\s*(?:\(['\"]|['\"])(.+?)['\"]\)?", re.MULTILINE | re.DOTALL)
 _JENKINS_SCRIPT_RE = re.compile(r"script\s*\{([^}]+)\}", re.MULTILINE | re.DOTALL)
 
 _SCRIPT_CALL_RE = re.compile(r"(?:bash|sh|python|python3|node|npm|yarn|pnpm|make|go|cargo|dotnet|mvn|gradle)\s+([^\s;&|]+)")
@@ -158,36 +158,37 @@ class CICDEdgeBuilder(EdgeBuilder):
         idx = FragmentIndex(fragments, repo_root)
 
         for ci in ci_frags:
-            refs: set[str] = set()
-
-            if _is_github_actions(ci.path):
-                refs = _extract_gha_refs(ci.content)
-            elif _is_gitlab_ci(ci.path):
-                refs = _extract_gitlab_refs(ci.content)
-            elif _is_jenkinsfile(ci.path):
-                refs = _extract_jenkins_refs(ci.content)
-            else:
-                refs = _extract_script_refs(ci.content)
-
-            for ref in refs:
-                ref_lower = ref.lower()
-                ref_name = ref.split("/")[-1].lower()
-
-                for name, frag_ids in idx.by_name.items():
-                    if name == ref_name or name.startswith(ref_name.split(".")[0]):
-                        for fid in frag_ids:
-                            if fid != ci.id:
-                                self.add_edge(edges, ci.id, fid, self.script_weight)
-
-                for path_str, frag_ids in idx.by_path.items():
-                    if ref in path_str or ref_lower in path_str.lower():
-                        for fid in frag_ids:
-                            if fid != ci.id:
-                                self.add_edge(edges, ci.id, fid, self.script_weight)
-
+            refs = self._extract_refs(ci)
+            self._link_refs(ci.id, refs, idx, edges)
             self._link_to_package_json(ci, fragments, edges)
 
         return edges
+
+    def _extract_refs(self, ci: Fragment) -> set[str]:
+        if _is_github_actions(ci.path):
+            return _extract_gha_refs(ci.content)
+        if _is_gitlab_ci(ci.path):
+            return _extract_gitlab_refs(ci.content)
+        if _is_jenkinsfile(ci.path):
+            return _extract_jenkins_refs(ci.content)
+        return _extract_script_refs(ci.content)
+
+    def _link_refs(self, ci_id: FragmentId, refs: set[str], idx: FragmentIndex, edges: EdgeDict) -> None:
+        for ref in refs:
+            self._link_by_name(ci_id, ref, idx, edges)
+            self._link_by_path(ci_id, ref, idx, edges)
+
+    def _link_by_name(self, ci_id: FragmentId, ref: str, idx: FragmentIndex, edges: EdgeDict) -> None:
+        ref_name = ref.split("/")[-1].lower()
+        ref_base = ref_name.split(".")[0]
+        for name, frag_ids in idx.by_name.items():
+            if name == ref_name or name.startswith(ref_base):
+                for fid in frag_ids:
+                    if fid != ci_id:
+                        self.add_edge(edges, ci_id, fid, self.script_weight)
+
+    def _link_by_path(self, ci_id: FragmentId, ref: str, idx: FragmentIndex, edges: EdgeDict) -> None:
+        self.link_by_path_match(ci_id, ref, idx, edges, self.script_weight)
 
     def _link_to_package_json(self, ci_frag: Fragment, all_frags: list[Fragment], edges: EdgeDict) -> None:
         npm_commands = {"npm", "yarn", "pnpm", "npx"}

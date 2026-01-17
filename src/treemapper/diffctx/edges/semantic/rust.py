@@ -12,15 +12,15 @@ _RUST_MOD_RE = re.compile(r"^\s*(?:pub\s+)?mod\s+([a-z_][a-z0-9_]*)\s*[;{]", re.
 _RUST_EXTERN_CRATE_RE = re.compile(r"^\s*extern\s+crate\s+([a-z_][a-z0-9_]*)", re.MULTILINE)
 
 _RUST_FN_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([a-z_][a-z0-9_]*)", re.MULTILINE)
-_RUST_STRUCT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+([A-Z][a-zA-Z0-9_]*)", re.MULTILINE)
-_RUST_ENUM_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?enum\s+([A-Z][a-zA-Z0-9_]*)", re.MULTILINE)
-_RUST_TRAIT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?trait\s+([A-Z][a-zA-Z0-9_]*)", re.MULTILINE)
-_RUST_IMPL_RE = re.compile(r"^\s*impl(?:<[^>]+>)?\s+(?:([A-Z][a-zA-Z0-9_]*)|(?:\w+\s+for\s+)?([A-Z][a-zA-Z0-9_]*))", re.MULTILINE)
-_RUST_TYPE_ALIAS_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?type\s+([A-Z][a-zA-Z0-9_]*)", re.MULTILINE)
+_RUST_STRUCT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+([A-Z]\w*)", re.MULTILINE)
+_RUST_ENUM_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?enum\s+([A-Z]\w*)", re.MULTILINE)
+_RUST_TRAIT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?trait\s+([A-Z]\w*)", re.MULTILINE)
+_RUST_IMPL_RE = re.compile(r"^\s*impl(?:<[^>]+>)?\s+(?:\w+\s+for\s+)?([A-Z]\w*)", re.MULTILINE)
+_RUST_TYPE_ALIAS_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?type\s+([A-Z]\w*)", re.MULTILINE)
 
-_RUST_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z][a-zA-Z0-9_]*)\b")
-_RUST_FN_CALL_RE = re.compile(r"(?<![A-Za-z_])([a-z_][a-z0-9_]*)\s*[!]?\s*\(")
-_RUST_PATH_CALL_RE = re.compile(r"([a-z_][a-z0-9_]*)::([a-z_][a-z0-9_]*|[A-Z][a-zA-Z0-9_]*)")
+_RUST_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
+_RUST_FN_CALL_RE = re.compile(r"(?<!\w)([a-z_][a-z0-9_]*)\s?!?\s?\(")
+_RUST_PATH_CALL_RE = re.compile(r"([a-z_][a-z0-9_]*)::([a-z_][a-z0-9_]*|[A-Z]\w*)")
 
 
 def _is_rust_file(path: Path) -> bool:
@@ -53,8 +53,6 @@ def _extract_definitions(content: str) -> tuple[set[str], set[str], set[str]]:
     for m in _RUST_IMPL_RE.finditer(content):
         if m.group(1):
             types.add(m.group(1))
-        if m.group(2):
-            types.add(m.group(2))
 
     traits = {m.group(1) for m in _RUST_TRAIT_RE.finditer(content)}
     return funcs, types, traits
@@ -82,7 +80,18 @@ class RustEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
+        indices = self._build_indices(rust_frags)
 
+        for rf in rust_frags:
+            self._link_fragment(rf, rust_frags, indices, edges)
+
+        return edges
+
+    def _build_indices(
+        self, rust_frags: list[Fragment]
+    ) -> tuple[
+        dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]
+    ]:
         name_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         mod_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         type_defs: dict[str, list[FragmentId]] = defaultdict(list)
@@ -92,9 +101,8 @@ class RustEdgeBuilder(EdgeBuilder):
             stem = f.path.stem.lower()
             name_to_frags[stem].append(f.id)
 
-            if stem == "mod" or stem == "lib":
-                parent = f.path.parent.name.lower()
-                mod_to_frags[parent].append(f.id)
+            if stem in {"mod", "lib"}:
+                mod_to_frags[f.path.parent.name.lower()].append(f.id)
             else:
                 mod_to_frags[stem].append(f.id)
 
@@ -104,60 +112,102 @@ class RustEdgeBuilder(EdgeBuilder):
             for fn in funcs:
                 fn_defs[fn.lower()].append(f.id)
 
-            declared_mods = _extract_mods(f.content)
-            for mod_name in declared_mods:
+            for mod_name in _extract_mods(f.content):
                 mod_to_frags[mod_name.lower()].append(f.id)
 
-        for rf in rust_frags:
-            uses = _extract_uses(rf.content)
-            type_refs, fn_calls, path_calls = _extract_references(rf.content)
+        return name_to_frags, mod_to_frags, type_defs, fn_defs
 
-            for use_path in uses:
-                parts = use_path.split("::")
-                for part in parts:
-                    part_lower = part.lower()
-                    if part_lower in mod_to_frags:
-                        for fid in mod_to_frags[part_lower]:
-                            if fid != rf.id:
-                                self.add_edge(edges, rf.id, fid, self.use_weight)
-                    if part_lower in name_to_frags:
-                        for fid in name_to_frags[part_lower]:
-                            if fid != rf.id:
-                                self.add_edge(edges, rf.id, fid, self.use_weight)
+    def _link_fragment(
+        self,
+        rf: Fragment,
+        rust_frags: list[Fragment],
+        indices: tuple[
+            dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]
+        ],
+        edges: EdgeDict,
+    ) -> None:
+        name_to_frags, mod_to_frags, type_defs, fn_defs = indices
 
-            declared_mods = _extract_mods(rf.content)
-            for mod_name in declared_mods:
-                mod_lower = mod_name.lower()
-                if mod_lower in name_to_frags:
-                    for fid in name_to_frags[mod_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.mod_weight)
+        self._link_uses(rf, mod_to_frags, name_to_frags, edges)
+        self._link_declared_mods(rf, name_to_frags, edges)
+        self._link_refs(rf, type_defs, fn_defs, edges)
+        self._link_path_calls(rf, mod_to_frags, edges)
+        self._link_same_crate(rf, rust_frags, edges)
 
-            for type_ref in type_refs:
-                ref_lower = type_ref.lower()
-                if ref_lower in type_defs:
-                    for fid in type_defs[ref_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.type_weight)
+    def _link_uses(
+        self,
+        rf: Fragment,
+        mod_to_frags: dict[str, list[FragmentId]],
+        name_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for use_path in _extract_uses(rf.content):
+            self._link_use_path_parts(rf.id, use_path, mod_to_frags, name_to_frags, edges)
 
-            for fn_call in fn_calls:
-                call_lower = fn_call.lower()
-                if call_lower in fn_defs:
-                    for fid in fn_defs[call_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.fn_weight)
+    def _link_use_path_parts(
+        self,
+        rf_id: FragmentId,
+        use_path: str,
+        mod_to_frags: dict[str, list[FragmentId]],
+        name_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for part in use_path.split("::"):
+            part_lower = part.lower()
+            self.add_edges_from_ids(rf_id, mod_to_frags.get(part_lower, []), self.use_weight, edges)
+            self.add_edges_from_ids(rf_id, name_to_frags.get(part_lower, []), self.use_weight, edges)
 
-            for mod_name, symbol in path_calls:
-                mod_lower = mod_name.lower()
-                if mod_lower in mod_to_frags:
-                    for fid in mod_to_frags[mod_lower]:
-                        if fid != rf.id:
-                            self.add_edge(edges, rf.id, fid, self.use_weight)
+    def _link_declared_mods(
+        self,
+        rf: Fragment,
+        name_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for mod_name in _extract_mods(rf.content):
+            for fid in name_to_frags.get(mod_name.lower(), []):
+                if fid != rf.id:
+                    self.add_edge(edges, rf.id, fid, self.mod_weight)
 
-            if rf.path.stem.lower() in {"lib", "main", "mod"}:
-                parent_dir = rf.path.parent
-                for f in rust_frags:
-                    if f.path.parent == parent_dir and f.id != rf.id:
-                        self.add_edge(edges, rf.id, f.id, self.same_crate_weight)
+    def _link_refs(
+        self,
+        rf: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        fn_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        type_refs, fn_calls, _ = _extract_references(rf.content)
 
-        return edges
+        for type_ref in type_refs:
+            for fid in type_defs.get(type_ref.lower(), []):
+                if fid != rf.id:
+                    self.add_edge(edges, rf.id, fid, self.type_weight)
+
+        for fn_call in fn_calls:
+            for fid in fn_defs.get(fn_call.lower(), []):
+                if fid != rf.id:
+                    self.add_edge(edges, rf.id, fid, self.fn_weight)
+
+    def _link_path_calls(
+        self,
+        rf: Fragment,
+        mod_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        _, _, path_calls = _extract_references(rf.content)
+        for mod_name, _symbol in path_calls:
+            for fid in mod_to_frags.get(mod_name.lower(), []):
+                if fid != rf.id:
+                    self.add_edge(edges, rf.id, fid, self.use_weight)
+
+    def _link_same_crate(
+        self,
+        rf: Fragment,
+        rust_frags: list[Fragment],
+        edges: EdgeDict,
+    ) -> None:
+        if rf.path.stem.lower() not in {"lib", "main", "mod"}:
+            return
+        parent_dir = rf.path.parent
+        for f in rust_frags:
+            if f.path.parent == parent_dir and f.id != rf.id:
+                self.add_edge(edges, rf.id, f.id, self.same_crate_weight)

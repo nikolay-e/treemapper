@@ -139,9 +139,9 @@ def build_tree(dir_path: Path, ctx: TreeBuildContext, current_depth: int = 0) ->
             if node:
                 tree.append(node)
     except PermissionError:
-        logging.warning(f"Permission denied accessing directory {dir_path}")
+        logging.warning("Permission denied accessing directory %s", dir_path)
     except OSError as e:
-        logging.warning(f"Error accessing directory {dir_path}: {e}")
+        logging.warning("Error accessing directory %s: %s", dir_path, e)
 
     return tree
 
@@ -151,11 +151,11 @@ def _process_entry(entry: Path, ctx: TreeBuildContext, current_depth: int) -> di
         relative_path = entry.relative_to(ctx.base_dir).as_posix()
         is_dir = entry.is_dir()
     except (OSError, ValueError) as e:
-        logging.warning(f"Could not process path for entry {entry}: {e}")
+        logging.warning("Could not process path for entry %s: %s", entry, e)
         return None
 
     if ctx.is_output_file(entry):
-        logging.debug(f"Skipping output file: {entry}")
+        logging.debug("Skipping output file: %s", entry)
         return None
 
     path_to_check = relative_path + "/" if is_dir else relative_path
@@ -163,7 +163,7 @@ def _process_entry(entry: Path, ctx: TreeBuildContext, current_depth: int) -> di
         return None
 
     if entry.is_symlink() or not entry.exists():
-        logging.debug(f"Skipping '{path_to_check}': symlink or not exists")
+        logging.debug("Skipping '%s': symlink or not exists", path_to_check)
         return None
 
     return _create_node(entry, ctx, current_depth, is_dir)
@@ -182,7 +182,7 @@ def _create_node(entry: Path, ctx: TreeBuildContext, current_depth: int, is_dir:
 
         return node
     except OSError as e:
-        logging.error(f"Failed to create node for {entry.name}: {e}")
+        logging.error("Failed to create node for %s: %s", entry.name, e)
         return None
 
 

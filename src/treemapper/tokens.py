@@ -24,7 +24,7 @@ def _get_encoder(encoding: str) -> Any | None:
         import tiktoken
 
         return tiktoken.get_encoding(encoding)
-    except Exception:
+    except (ImportError, KeyError, ValueError):
         return None
 
 
@@ -74,10 +74,9 @@ def _count_tokens_sampled(text: str, text_len: int, encoder: Any, encoding: str)
 def _format_size(byte_size: int) -> str:
     if byte_size < 1024:
         return f"{byte_size} B"
-    elif byte_size < 1024 * 1024:
+    if byte_size < 1024 * 1024:
         return f"{byte_size / 1024:.1f} KB"
-    else:
-        return f"{byte_size / (1024 * 1024):.1f} MB"
+    return f"{byte_size / (1024 * 1024):.1f} MB"
 
 
 def print_token_summary(text: str, encoding: str = "o200k_base") -> None:

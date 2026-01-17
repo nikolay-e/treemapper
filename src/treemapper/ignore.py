@@ -21,14 +21,14 @@ def read_ignore_file(file_path: Path) -> list[str]:
                 if stripped.startswith("#"):
                     continue
                 ignore_patterns.append(stripped.rstrip())
-        logging.info(f"Using ignore patterns from {file_path}")
-        logging.debug(f"Read ignore patterns from {file_path}: {ignore_patterns}")
+        logging.info("Using ignore patterns from %s", file_path)
+        logging.debug("Read ignore patterns from %s: %s", file_path, ignore_patterns)
     except PermissionError:
-        logging.warning(f"Could not read ignore file {file_path}: Permission denied")
+        logging.warning("Could not read ignore file %s: Permission denied", file_path)
     except OSError as e:
-        logging.warning(f"Could not read ignore file {file_path}: {e}")
+        logging.warning("Could not read ignore file %s: %s", file_path, e)
     except UnicodeDecodeError as e:
-        logging.warning(f"Could not decode ignore file {file_path} as UTF-8: {e}")
+        logging.warning("Could not decode ignore file %s as UTF-8: %s", file_path, e)
 
     return ignore_patterns
 
@@ -42,13 +42,13 @@ def _get_output_file_pattern(output_file: Path | None, root_dir: Path) -> str | 
         resolved_root = root_dir.resolve()
 
         if not resolved_output.is_relative_to(resolved_root):
-            logging.debug(f"Output file {output_file} is outside root directory {root_dir}")
+            logging.debug("Output file %s is outside root directory %s", output_file, root_dir)
             return None
 
         relative_path = resolved_output.relative_to(resolved_root).as_posix()
         return f"/{relative_path}"
     except (ValueError, OSError) as e:
-        logging.debug(f"Could not determine relative path for output file {output_file}: {e}")
+        logging.debug("Could not determine relative path for output file %s: %s", output_file, e)
         return None
 
 
@@ -115,35 +115,61 @@ def _aggregate_all_ignore_patterns(root: Path, ignore_filenames: list[str]) -> l
             for line in read_ignore_file(ignore_dir / ignore_filename):
                 out.append(_process_ignore_line(line, rel))
 
-    logging.debug(f"Aggregated {len(out)} ignore patterns from {root}")
+    logging.debug("Aggregated %d ignore patterns from %s", len(out), root)
     return out
+
+
+def _transform_anchored_pattern(anchored: str, rel_to_root: str) -> str | None:
+    prefix = rel_to_root + "/"
+    if anchored.startswith(prefix):
+        return "/" + anchored[len(prefix) :]
+    if anchored in {rel_to_root, prefix}:
+        return None
+    return None
+
+
+def _transform_relative_pattern(pat: str, rel_to_root: str) -> str | None:
+    prefix = rel_to_root + "/"
+    if pat.startswith(prefix):
+        return "/" + pat[len(prefix) :]
+    if pat in {rel_to_root, prefix}:
+        return None
+    return None
 
 
 def _transform_parent_pattern(line: str, rel_to_root: str) -> str | None:
     neg = line.startswith("!")
     pat = line[1:] if neg else line
 
-    if "**" in pat:
-        result = pat
-    elif "/" not in pat:
+    result: str
+    if "**" in pat or "/" not in pat:
         result = pat
     elif pat.startswith("/"):
-        anchored = pat[1:]
-        if anchored.startswith(rel_to_root + "/"):
-            result = "/" + anchored[len(rel_to_root) + 1 :]
-        elif anchored == rel_to_root or anchored == rel_to_root + "/":
+        transformed = _transform_anchored_pattern(pat[1:], rel_to_root)
+        if transformed is None:
             return None
-        else:
-            return None
+        result = transformed
     else:
-        if pat.startswith(rel_to_root + "/"):
-            result = "/" + pat[len(rel_to_root) + 1 :]
-        elif pat == rel_to_root or pat == rel_to_root + "/":
+        transformed = _transform_relative_pattern(pat, rel_to_root)
+        if transformed is None:
             return None
-        else:
-            return None
+        result = transformed
 
     return ("!" + result) if neg else result
+
+
+def _process_parent_ignore_file(ignore_file: Path, resolved_root: Path, parent_dir: Path, out: list[str]) -> None:
+    if not ignore_file.is_file():
+        return
+    try:
+        rel_to_root = resolved_root.relative_to(parent_dir).as_posix()
+    except ValueError:
+        return
+
+    for line in read_ignore_file(ignore_file):
+        pattern = _transform_parent_pattern(line, rel_to_root)
+        if pattern:
+            out.append(pattern)
 
 
 def _collect_parent_ignore_patterns(root: Path, ignore_filenames: list[str]) -> list[str]:
@@ -155,17 +181,7 @@ def _collect_parent_ignore_patterns(root: Path, ignore_filenames: list[str]) -> 
         is_git_root = (current / ".git").exists()
 
         for filename in ignore_filenames:
-            ignore_file = current / filename
-            if ignore_file.is_file():
-                try:
-                    rel_to_root = resolved_root.relative_to(current).as_posix()
-                except ValueError:
-                    continue
-
-                for line in read_ignore_file(ignore_file):
-                    pattern = _transform_parent_pattern(line, rel_to_root)
-                    if pattern:
-                        out.append(pattern)
+            _process_parent_ignore_file(current / filename, resolved_root, current, out)
 
         if is_git_root:
             break
@@ -173,7 +189,7 @@ def _collect_parent_ignore_patterns(root: Path, ignore_filenames: list[str]) -> 
         current = current.parent
 
     if out:
-        logging.debug(f"Collected {len(out)} patterns from parent directories")
+        logging.debug("Collected %d patterns from parent directories", len(out))
     return out
 
 
@@ -243,9 +259,9 @@ def get_ignore_specs(
     output_pattern = _get_output_file_pattern(output_file, root_dir)
     if output_pattern and output_pattern not in patterns:
         patterns.append(output_pattern)
-        logging.debug(f"Adding output file to ignores: {output_pattern}")
+        logging.debug("Adding output file to ignores: %s", output_pattern)
 
-    logging.debug(f"Combined ignore patterns: {patterns}")
+    logging.debug("Combined ignore patterns: %s", patterns)
     spec: pathspec.PathSpec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
     return spec
 
@@ -253,5 +269,5 @@ def get_ignore_specs(
 def should_ignore(relative_path_str: str, combined_spec: pathspec.PathSpec) -> bool:
     is_ignored = combined_spec.match_file(relative_path_str)
     if logging.getLogger().isEnabledFor(logging.DEBUG):
-        logging.debug(f"Checking ignore for '{relative_path_str}': {is_ignored}")
+        logging.debug("Checking ignore for '%s': %s", relative_path_str, is_ignored)
     return is_ignored

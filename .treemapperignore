@@ -1,5 +1,4 @@
 # Tests and test artifacts
-tests
 .hypothesis
 .pytest_cache
 .coverage

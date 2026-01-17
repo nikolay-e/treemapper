@@ -6,12 +6,14 @@ from typing import Protocol, runtime_checkable
 
 from ..types import Fragment, FragmentId, extract_identifiers
 
-_MIN_FRAGMENT_LINES = 2
+_MIN_FRAGMENT_LINES = 1
+MIN_FRAGMENT_LINES = _MIN_FRAGMENT_LINES
 _GENERIC_MAX_LINES = 200
 _GENERIC_MAX_EXTENSION = 100
 _MIN_FRAGMENT_WORDS = 10
 
 _BRACKET_PAIRS = {"{": "}", "[": "]", "(": ")"}
+
 _CLOSE_BRACKETS = set(_BRACKET_PAIRS.values())
 
 
@@ -20,6 +22,7 @@ class FragmentationStrategy(Protocol):
     priority: int
 
     def can_handle(self, path: Path, content: str) -> bool: ...
+
     def fragment(self, path: Path, content: str) -> list[Fragment]: ...
 
 
@@ -57,6 +60,27 @@ def compute_bracket_balance(text: str) -> int:
     return len(stack)
 
 
+def _is_comment_or_blank(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return True
+    return stripped.startswith("//") or stripped.startswith("#") or stripped.startswith("/*") or stripped.startswith("*")
+
+
+def _is_top_level_close(line: str) -> bool:
+    stripped = line.strip()
+    return stripped == "}" or stripped == "};" or stripped.startswith("}")
+
+
+def _find_first_balanced_point(lines: list[str], start_idx: int, target_end_idx: int) -> int | None:
+    for end_idx in range(start_idx, target_end_idx + 1):
+        text = "\n".join(lines[start_idx : end_idx + 1])
+        if compute_bracket_balance(text) == 0 and _is_top_level_close(lines[end_idx]):
+            if end_idx + 1 > target_end_idx or _is_comment_or_blank(lines[end_idx + 1]):
+                return end_idx
+    return None
+
+
 def find_balanced_end_line(
     lines: list[str], start_idx: int, target_end_idx: int, max_extension: int = _GENERIC_MAX_EXTENSION
 ) -> int:
@@ -65,6 +89,9 @@ def find_balanced_end_line(
 
     text_to_target = "\n".join(lines[start_idx : target_end_idx + 1])
     if compute_bracket_balance(text_to_target) == 0:
+        first_balanced = _find_first_balanced_point(lines, start_idx, target_end_idx)
+        if first_balanced is not None and first_balanced < target_end_idx:
+            return first_balanced
         return target_end_idx
 
     max_end = min(len(lines) - 1, target_end_idx + max_extension)

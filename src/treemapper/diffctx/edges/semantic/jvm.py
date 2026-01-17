@@ -15,26 +15,26 @@ _JVM_EXTS = _JAVA_EXTS | _KOTLIN_EXTS | _SCALA_EXTS
 _JAVA_IMPORT_RE = re.compile(r"^\s*import\s+(?:static\s+)?([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*(?:\.[A-Z]\w*)?)", re.MULTILINE)
 _JAVA_PACKAGE_RE = re.compile(r"^\s*package\s+([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)", re.MULTILINE)
 _JAVA_CLASS_RE = re.compile(
-    r"^\s*(?:public|private|protected)?\s*(?:abstract|final)?\s*(?:class|interface|enum|record)\s+([A-Z]\w*)", re.MULTILINE
+    r"^\s*(?:public |private |protected )?(?:abstract |final )?(?:class|interface|enum|record)\s+([A-Z]\w*)", re.MULTILINE
 )
 _JAVA_EXTENDS_RE = re.compile(r"\bextends\s+([A-Z]\w*)")
 _JAVA_IMPLEMENTS_RE = re.compile(r"\bimplements\s+([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)")
 
 _KOTLIN_IMPORT_RE = re.compile(r"^\s*import\s+([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*(?:\.[A-Z]\w*)?)", re.MULTILINE)
 _KOTLIN_CLASS_RE = re.compile(
-    r"^\s*(?:public|private|internal|protected)?\s*(?:abstract|open|sealed|data|inline|value)?\s*(?:class|interface|object|enum)\s+([A-Z]\w*)",
+    r"^\s*(?:\w+\s+)*(?:class|interface|object|enum)\s+([A-Z]\w*)",
     re.MULTILINE,
 )
 _KOTLIN_FUN_RE = re.compile(
-    r"^\s*(?:public|private|internal|protected)?\s*(?:suspend\s+)?fun\s+(?:<[^>]+>\s+)?([a-z][a-zA-Z0-9_]*)", re.MULTILINE
+    r"^\s*(?:public |private |internal |protected )?(?:suspend )?fun\s+(?:<[^>]+> )?([a-z]\w*)", re.MULTILINE
 )
 
 _SCALA_IMPORT_RE = re.compile(r"^\s*import\s+([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*(?:\.[A-Z_]\w*)?)", re.MULTILINE)
 _SCALA_CLASS_RE = re.compile(r"^\s*(?:abstract\s+)?(?:sealed\s+)?(?:case\s+)?(?:class|trait|object)\s+([A-Z]\w*)", re.MULTILINE)
-_SCALA_DEF_RE = re.compile(r"^\s*(?:private|protected)?\s*def\s+([a-z][a-zA-Z0-9_]*)", re.MULTILINE)
+_SCALA_DEF_RE = re.compile(r"^\s*(?:private |protected )?def\s+([a-z]\w*)", re.MULTILINE)
 
-_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z][a-zA-Z0-9_]*)\b")
-_ANNOTATION_RE = re.compile(r"@([A-Z][a-zA-Z0-9_]*)")
+_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
+_ANNOTATION_RE = re.compile(r"@([A-Z]\w*)")
 
 
 def _is_jvm_file(path: Path) -> bool:
@@ -112,7 +112,16 @@ class JVMEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
+        indices = self._build_indices(jvm_frags)
 
+        for jf in jvm_frags:
+            self._link_fragment(jf, indices, edges)
+
+        return edges
+
+    def _build_indices(
+        self, jvm_frags: list[Fragment]
+    ) -> tuple[dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]]:
         package_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         class_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         fqn_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
@@ -122,59 +131,71 @@ class JVMEdgeBuilder(EdgeBuilder):
             if pkg:
                 package_to_frags[pkg].append(f.id)
 
-            classes = _extract_classes(f.content, f.path)
-            for cls in classes:
+            for cls in _extract_classes(f.content, f.path):
                 class_to_frags[cls.lower()].append(f.id)
                 if pkg:
-                    fqn = f"{pkg}.{cls}"
-                    fqn_to_frags[fqn.lower()].append(f.id)
+                    fqn_to_frags[f"{pkg}.{cls}".lower()].append(f.id)
 
-        for jf in jvm_frags:
-            imports = _extract_imports(jf.content, jf.path)
-            inheritance = _extract_inheritance(jf.content)
-            type_refs = _extract_type_refs(jf.content)
-            annotations = _extract_annotations(jf.content)
-            current_pkg = _extract_package(jf.content)
+        return package_to_frags, class_to_frags, fqn_to_frags
 
-            for imp in imports:
-                imp_lower = imp.lower()
-                if imp_lower in fqn_to_frags:
-                    for fid in fqn_to_frags[imp_lower]:
-                        if fid != jf.id:
-                            self.add_edge(edges, jf.id, fid, self.import_weight)
+    def _link_fragment(
+        self,
+        jf: Fragment,
+        indices: tuple[dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]],
+        edges: EdgeDict,
+    ) -> None:
+        package_to_frags, class_to_frags, fqn_to_frags = indices
 
-                parts = imp.split(".")
-                if parts:
-                    class_name = parts[-1].lower()
-                    if class_name in class_to_frags:
-                        for fid in class_to_frags[class_name]:
-                            if fid != jf.id:
-                                self.add_edge(edges, jf.id, fid, self.import_weight)
+        self._link_imports(jf, fqn_to_frags, class_to_frags, edges)
+        self._link_refs(jf, class_to_frags, edges)
+        self._link_same_package(jf, package_to_frags, edges)
 
-            for parent in inheritance:
-                parent_lower = parent.lower()
-                if parent_lower in class_to_frags:
-                    for fid in class_to_frags[parent_lower]:
-                        if fid != jf.id:
-                            self.add_edge(edges, jf.id, fid, self.inheritance_weight)
+    def _link_imports(
+        self,
+        jf: Fragment,
+        fqn_to_frags: dict[str, list[FragmentId]],
+        class_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for imp in _extract_imports(jf.content, jf.path):
+            imp_lower = imp.lower()
+            for fid in fqn_to_frags.get(imp_lower, []):
+                if fid != jf.id:
+                    self.add_edge(edges, jf.id, fid, self.import_weight)
 
-            for type_ref in type_refs:
-                ref_lower = type_ref.lower()
-                if ref_lower in class_to_frags:
-                    for fid in class_to_frags[ref_lower]:
-                        if fid != jf.id:
-                            self.add_edge(edges, jf.id, fid, self.type_weight)
-
-            for annot in annotations:
-                annot_lower = annot.lower()
-                if annot_lower in class_to_frags:
-                    for fid in class_to_frags[annot_lower]:
-                        if fid != jf.id:
-                            self.add_edge(edges, jf.id, fid, self.annotation_weight)
-
-            if current_pkg and current_pkg in package_to_frags:
-                for fid in package_to_frags[current_pkg]:
+            parts = imp.split(".")
+            if parts:
+                for fid in class_to_frags.get(parts[-1].lower(), []):
                     if fid != jf.id:
-                        self.add_edge(edges, jf.id, fid, self.same_package_weight)
+                        self.add_edge(edges, jf.id, fid, self.import_weight)
 
-        return edges
+    def _link_refs(
+        self,
+        jf: Fragment,
+        class_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        ref_weights = [
+            (_extract_inheritance(jf.content), self.inheritance_weight),
+            (_extract_type_refs(jf.content), self.type_weight),
+            (_extract_annotations(jf.content), self.annotation_weight),
+        ]
+
+        for refs, weight in ref_weights:
+            for ref in refs:
+                for fid in class_to_frags.get(ref.lower(), []):
+                    if fid != jf.id:
+                        self.add_edge(edges, jf.id, fid, weight)
+
+    def _link_same_package(
+        self,
+        jf: Fragment,
+        package_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        current_pkg = _extract_package(jf.content)
+        if not current_pkg:
+            return
+        for fid in package_to_frags.get(current_pkg, []):
+            if fid != jf.id:
+                self.add_edge(edges, jf.id, fid, self.same_package_weight)

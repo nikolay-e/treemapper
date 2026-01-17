@@ -147,3 +147,61 @@ class EdgeBuilder(ABC):
     ) -> None:
         w = weight if weight is not None else self.weight
         edges[(src, dst)] = max(edges.get((src, dst), 0.0), w)
+
+    def add_edges_from_ids(
+        self,
+        source_id: FragmentId,
+        target_ids: list[FragmentId],
+        weight: float,
+        edges: EdgeDict,
+    ) -> None:
+        for fid in target_ids:
+            if fid != source_id:
+                self.add_edge(edges, source_id, fid, weight)
+
+    def link_by_path_match(
+        self,
+        src_id: FragmentId,
+        ref: str,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+        weight: float | None = None,
+    ) -> None:
+        w = weight if weight is not None else self.weight
+        ref_lower = ref.lower()
+        for path_str, frag_ids in idx.by_path.items():
+            if ref in path_str or ref_lower in path_str.lower():
+                for fid in frag_ids:
+                    if fid != src_id:
+                        self.add_edge(edges, src_id, fid, w)
+
+    def link_by_name_match(
+        self,
+        src_id: FragmentId,
+        ref_name: str,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+        weight: float | None = None,
+    ) -> None:
+        w = weight if weight is not None else self.weight
+        ref_lower = ref_name.lower()
+        for name, frag_ids in idx.by_name.items():
+            if name == ref_lower:
+                for fid in frag_ids:
+                    if fid != src_id:
+                        self.add_edge(edges, src_id, fid, w)
+
+    @staticmethod
+    def index_paths_for_fragment(
+        f: Fragment,
+        path_index: dict[str, list[FragmentId]],
+        repo_root: Path | None,
+    ) -> None:
+        if not repo_root:
+            return
+        try:
+            rel = f.path.relative_to(repo_root)
+            path_index[str(rel)].append(f.id)
+            path_index[rel.as_posix()].append(f.id)
+        except ValueError:
+            pass

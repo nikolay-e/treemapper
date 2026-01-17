@@ -60,7 +60,7 @@ class HTMLStrategy:
             if source_line is None:
                 continue
 
-            elem_html = html.tostring(elem, encoding="unicode")
+            elem_html: str = html.tostring(elem, encoding="unicode")  # pyright: ignore[reportAssignmentType]
             elem_lines = elem_html.count("\n") + 1
             end_line = min(source_line + elem_lines - 1, len(lines))
 

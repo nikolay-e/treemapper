@@ -17,7 +17,7 @@ _PHP_CLASS_RE = re.compile(r"^\s*(?:abstract\s+)?(?:final\s+)?class\s+([A-Z]\w*)
 _PHP_INTERFACE_RE = re.compile(r"^\s*interface\s+([A-Z]\w*)", re.MULTILINE)
 _PHP_TRAIT_RE = re.compile(r"^\s*trait\s+([A-Z]\w*)", re.MULTILINE)
 _PHP_ENUM_RE = re.compile(r"^\s*enum\s+([A-Z]\w*)", re.MULTILINE)
-_PHP_FUNCTION_RE = re.compile(r"^\s*(?:public|private|protected)?\s*(?:static\s+)?function\s+([a-z_]\w*)", re.MULTILINE)
+_PHP_FUNCTION_RE = re.compile(r"^\s*(?:public |private |protected )?(?:static )?function\s+([a-z_]\w*)", re.MULTILINE)
 
 _PHP_EXTENDS_RE = re.compile(r"class\s+\w+\s+extends\s+([A-Z]\w*)")
 _PHP_IMPLEMENTS_RE = re.compile(r"implements\s+([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)")
@@ -85,6 +85,21 @@ def _extract_type_refs(content: str) -> set[str]:
     return refs
 
 
+class _PHPIndex:
+    name_to_frags: dict[str, list[FragmentId]]
+    path_to_frags: dict[str, list[FragmentId]]
+    namespace_to_frags: dict[str, list[FragmentId]]
+    class_to_frags: dict[str, list[FragmentId]]
+    fqn_to_frags: dict[str, list[FragmentId]]
+
+    def __init__(self) -> None:
+        self.name_to_frags = defaultdict(list)
+        self.path_to_frags = defaultdict(list)
+        self.namespace_to_frags = defaultdict(list)
+        self.class_to_frags = defaultdict(list)
+        self.fqn_to_frags = defaultdict(list)
+
+
 class PHPEdgeBuilder(EdgeBuilder):
     weight = 0.70
     use_weight = 0.75
@@ -100,91 +115,104 @@ class PHPEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
-
-        name_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-        path_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-        namespace_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-        class_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-        fqn_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
-
-        for f in php_frags:
-            stem = f.path.stem.lower()
-            name_to_frags[stem].append(f.id)
-
-            if repo_root:
-                try:
-                    rel = f.path.relative_to(repo_root)
-                    path_to_frags[str(rel)].append(f.id)
-                    path_to_frags[rel.as_posix()].append(f.id)
-                except ValueError:
-                    pass
-
-            ns = _extract_namespace(f.content)
-            if ns:
-                namespace_to_frags[ns.lower()].append(f.id)
-                ns_parts = ns.split("\\")
-                for i in range(len(ns_parts)):
-                    partial_ns = "\\".join(ns_parts[: i + 1])
-                    namespace_to_frags[partial_ns.lower()].append(f.id)
-
-            classes, interfaces, traits, enums = _extract_definitions(f.content)
-            all_types = classes | interfaces | traits | enums
-            for t in all_types:
-                class_to_frags[t.lower()].append(f.id)
-                if ns:
-                    fqn = f"{ns}\\{t}"
-                    fqn_to_frags[fqn.lower()].append(f.id)
+        idx = self._build_index(php_frags, repo_root)
 
         for pf in php_frags:
-            uses = _extract_uses(pf.content)
-            requires = _extract_requires(pf.content)
-            inheritance = _extract_inheritance(pf.content)
-            type_refs = _extract_type_refs(pf.content)
-            current_ns = _extract_namespace(pf.content)
-
-            for use in uses:
-                use_lower = use.lower().replace("\\", "\\\\")
-                if use_lower in fqn_to_frags:
-                    for fid in fqn_to_frags[use_lower]:
-                        if fid != pf.id:
-                            self.add_edge(edges, pf.id, fid, self.use_weight)
-
-                class_name = use.split("\\")[-1].lower()
-                if class_name in class_to_frags:
-                    for fid in class_to_frags[class_name]:
-                        if fid != pf.id:
-                            self.add_edge(edges, pf.id, fid, self.use_weight)
-
-            for req in requires:
-                req_name = req.split("/")[-1].replace(".php", "").lower()
-                if req_name in name_to_frags:
-                    for fid in name_to_frags[req_name]:
-                        if fid != pf.id:
-                            self.add_edge(edges, pf.id, fid, self.require_weight)
-
-                for path_str, frag_ids in path_to_frags.items():
-                    if req in path_str:
-                        for fid in frag_ids:
-                            if fid != pf.id:
-                                self.add_edge(edges, pf.id, fid, self.require_weight)
-
-            for parent in inheritance:
-                parent_lower = parent.lower()
-                if parent_lower in class_to_frags:
-                    for fid in class_to_frags[parent_lower]:
-                        if fid != pf.id:
-                            self.add_edge(edges, pf.id, fid, self.inheritance_weight)
-
-            for type_ref in type_refs:
-                ref_lower = type_ref.lower()
-                if ref_lower in class_to_frags:
-                    for fid in class_to_frags[ref_lower]:
-                        if fid != pf.id:
-                            self.add_edge(edges, pf.id, fid, self.type_weight)
-
-            if current_ns and current_ns.lower() in namespace_to_frags:
-                for fid in namespace_to_frags[current_ns.lower()]:
-                    if fid != pf.id:
-                        self.add_edge(edges, pf.id, fid, self.same_namespace_weight)
+            self._add_fragment_edges(pf, idx, edges)
 
         return edges
+
+    def _build_index(self, php_frags: list[Fragment], repo_root: Path | None) -> _PHPIndex:
+        idx = _PHPIndex()
+        for f in php_frags:
+            self._index_fragment(f, idx, repo_root)
+        return idx
+
+    def _index_fragment(self, f: Fragment, idx: _PHPIndex, repo_root: Path | None) -> None:
+        stem = f.path.stem.lower()
+        idx.name_to_frags[stem].append(f.id)
+
+        self._index_paths(f, idx, repo_root)
+        self._index_namespace(f, idx)
+        self._index_types(f, idx)
+
+    def _index_paths(self, f: Fragment, idx: _PHPIndex, repo_root: Path | None) -> None:
+        self.index_paths_for_fragment(f, idx.path_to_frags, repo_root)
+
+    def _index_namespace(self, f: Fragment, idx: _PHPIndex) -> None:
+        ns = _extract_namespace(f.content)
+        if not ns:
+            return
+        idx.namespace_to_frags[ns.lower()].append(f.id)
+        ns_parts = ns.split("\\")
+        for i in range(len(ns_parts)):
+            partial_ns = "\\".join(ns_parts[: i + 1])
+            idx.namespace_to_frags[partial_ns.lower()].append(f.id)
+
+    def _index_types(self, f: Fragment, idx: _PHPIndex) -> None:
+        ns = _extract_namespace(f.content)
+        classes, interfaces, traits, enums = _extract_definitions(f.content)
+        all_types = classes | interfaces | traits | enums
+        for t in all_types:
+            idx.class_to_frags[t.lower()].append(f.id)
+            if ns:
+                fqn = f"{ns}\\{t}"
+                idx.fqn_to_frags[fqn.lower()].append(f.id)
+
+    def _add_fragment_edges(self, pf: Fragment, idx: _PHPIndex, edges: EdgeDict) -> None:
+        uses = _extract_uses(pf.content)
+        requires = _extract_requires(pf.content)
+        inheritance = _extract_inheritance(pf.content)
+        type_refs = _extract_type_refs(pf.content)
+        current_ns = _extract_namespace(pf.content)
+
+        self._add_use_edges(pf.id, uses, idx, edges)
+        self._add_require_edges(pf.id, requires, idx, edges)
+        self._add_inheritance_edges(pf.id, inheritance, idx, edges)
+        self._add_type_edges(pf.id, type_refs, idx, edges)
+        self._add_namespace_edges(pf.id, current_ns, idx, edges)
+
+    def _add_use_edges(self, pf_id: FragmentId, uses: set[str], idx: _PHPIndex, edges: EdgeDict) -> None:
+        for use in uses:
+            use_lower = use.lower().replace("\\", "\\\\")
+            for fid in idx.fqn_to_frags.get(use_lower, []):
+                if fid != pf_id:
+                    self.add_edge(edges, pf_id, fid, self.use_weight)
+
+            class_name = use.split("\\")[-1].lower()
+            for fid in idx.class_to_frags.get(class_name, []):
+                if fid != pf_id:
+                    self.add_edge(edges, pf_id, fid, self.use_weight)
+
+    def _add_require_edges(self, pf_id: FragmentId, requires: set[str], idx: _PHPIndex, edges: EdgeDict) -> None:
+        for req in requires:
+            self._link_require_by_name(pf_id, req, idx, edges)
+            self._link_require_by_path(pf_id, req, idx, edges)
+
+    def _link_require_by_name(self, pf_id: FragmentId, req: str, idx: _PHPIndex, edges: EdgeDict) -> None:
+        req_name = req.split("/")[-1].replace(".php", "").lower()
+        self.add_edges_from_ids(pf_id, idx.name_to_frags.get(req_name, []), self.require_weight, edges)
+
+    def _link_require_by_path(self, pf_id: FragmentId, req: str, idx: _PHPIndex, edges: EdgeDict) -> None:
+        for path_str, frag_ids in idx.path_to_frags.items():
+            if req in path_str:
+                self.add_edges_from_ids(pf_id, frag_ids, self.require_weight, edges)
+
+    def _add_inheritance_edges(self, pf_id: FragmentId, inheritance: set[str], idx: _PHPIndex, edges: EdgeDict) -> None:
+        for parent in inheritance:
+            for fid in idx.class_to_frags.get(parent.lower(), []):
+                if fid != pf_id:
+                    self.add_edge(edges, pf_id, fid, self.inheritance_weight)
+
+    def _add_type_edges(self, pf_id: FragmentId, type_refs: set[str], idx: _PHPIndex, edges: EdgeDict) -> None:
+        for type_ref in type_refs:
+            for fid in idx.class_to_frags.get(type_ref.lower(), []):
+                if fid != pf_id:
+                    self.add_edge(edges, pf_id, fid, self.type_weight)
+
+    def _add_namespace_edges(self, pf_id: FragmentId, current_ns: str | None, idx: _PHPIndex, edges: EdgeDict) -> None:
+        if not current_ns:
+            return
+        for fid in idx.namespace_to_frags.get(current_ns.lower(), []):
+            if fid != pf_id:
+                self.add_edge(edges, pf_id, fid, self.same_namespace_weight)
