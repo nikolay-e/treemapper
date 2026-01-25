@@ -177,5 +177,5 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-norecursedirs = ["mutants", ".git", ".mypy_cache", ".pytest_cache", "__pycache__"]
+norecursedirs = ["mutants", ".git", ".mypy_cache", ".pytest_cache", "__pycache__", ".hypothesis"]
 addopts = "-n 14 --dist loadfile"

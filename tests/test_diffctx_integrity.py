@@ -4,15 +4,15 @@ import math
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from treemapper.diffctx import build_diff_context
-from treemapper.diffctx.graph import Graph, build_graph
+from treemapper.diffctx.graph import Graph
 from treemapper.diffctx.ppr import personalized_pagerank
-from treemapper.diffctx.types import Fragment, FragmentId
+from treemapper.diffctx.types import FragmentId
 
 
 class TestPPRMathematicalInvariants:
@@ -30,37 +30,43 @@ class TestPPRMathematicalInvariants:
         return graph
 
     def test_ppr_normalization_sum_to_one(self) -> None:
-        graph = self._create_graph_with_edges([
-            ("a", "b", 0.5),
-            ("b", "c", 0.5),
-            ("c", "a", 0.5),
-            ("a", "d", 0.3),
-        ])
+        graph = self._create_graph_with_edges(
+            [
+                ("a", "b", 0.5),
+                ("b", "c", 0.5),
+                ("c", "a", 0.5),
+                ("a", "d", 0.3),
+            ]
+        )
         seeds = {"a"}
         scores = personalized_pagerank(graph, seeds, alpha=0.6)
         total = sum(scores.values())
         assert abs(total - 1.0) < 1e-6, f"PPR scores sum to {total}, expected 1.0"
 
     def test_ppr_all_scores_non_negative(self) -> None:
-        graph = self._create_graph_with_edges([
-            ("a", "b", 0.9),
-            ("b", "c", 0.8),
-            ("c", "d", 0.7),
-            ("d", "a", 0.6),
-        ])
+        graph = self._create_graph_with_edges(
+            [
+                ("a", "b", 0.9),
+                ("b", "c", 0.8),
+                ("c", "d", 0.7),
+                ("d", "a", 0.6),
+            ]
+        )
         seeds = {"a", "c"}
         scores = personalized_pagerank(graph, seeds, alpha=0.5)
         for node, score in scores.items():
             assert score >= 0, f"Node {node} has negative score: {score}"
 
     def test_ppr_seeds_have_higher_scores_than_average(self) -> None:
-        graph = self._create_graph_with_edges([
-            ("seed1", "other1", 0.5),
-            ("seed1", "other2", 0.5),
-            ("seed2", "other3", 0.5),
-            ("other1", "other4", 0.3),
-            ("other2", "other5", 0.3),
-        ])
+        graph = self._create_graph_with_edges(
+            [
+                ("seed1", "other1", 0.5),
+                ("seed1", "other2", 0.5),
+                ("seed2", "other3", 0.5),
+                ("other1", "other4", 0.3),
+                ("other2", "other5", 0.3),
+            ]
+        )
         seeds = {"seed1", "seed2"}
         scores = personalized_pagerank(graph, seeds, alpha=0.6)
         seed_scores = [scores[s] for s in seeds if s in scores]
@@ -68,23 +74,23 @@ class TestPPRMathematicalInvariants:
         if seed_scores and non_seed_scores:
             avg_seed = sum(seed_scores) / len(seed_scores)
             avg_non_seed = sum(non_seed_scores) / len(non_seed_scores)
-            assert avg_seed > avg_non_seed, (
-                f"Seeds avg ({avg_seed:.4f}) should be > non-seeds avg ({avg_non_seed:.4f})"
-            )
+            assert avg_seed > avg_non_seed, f"Seeds avg ({avg_seed:.4f}) should be > non-seeds avg ({avg_non_seed:.4f})"
 
     def test_ppr_deterministic_output(self) -> None:
-        graph = self._create_graph_with_edges([
-            ("a", "b", 0.5),
-            ("b", "c", 0.5),
-            ("c", "a", 0.5),
-        ])
+        graph = self._create_graph_with_edges(
+            [
+                ("a", "b", 0.5),
+                ("b", "c", 0.5),
+                ("c", "a", 0.5),
+            ]
+        )
         seeds = {"a"}
         scores1 = personalized_pagerank(graph, seeds, alpha=0.6)
         scores2 = personalized_pagerank(graph, seeds, alpha=0.6)
         for node in scores1:
-            assert abs(scores1[node] - scores2[node]) < 1e-10, (
-                f"Non-deterministic PPR: {node} has {scores1[node]} vs {scores2[node]}"
-            )
+            assert (
+                abs(scores1[node] - scores2[node]) < 1e-10
+            ), f"Non-deterministic PPR: {node} has {scores1[node]} vs {scores2[node]}"
 
     def test_ppr_empty_graph_returns_empty(self) -> None:
         graph = Graph()
@@ -106,12 +112,14 @@ class TestPPRMathematicalInvariants:
         assert abs(scores["solo"] - 1.0) < 1e-6
 
     def test_ppr_disconnected_components(self) -> None:
-        graph = self._create_graph_with_edges([
-            ("a1", "a2", 0.5),
-            ("a2", "a1", 0.5),
-            ("b1", "b2", 0.5),
-            ("b2", "b1", 0.5),
-        ])
+        graph = self._create_graph_with_edges(
+            [
+                ("a1", "a2", 0.5),
+                ("a2", "a1", 0.5),
+                ("b1", "b2", 0.5),
+                ("b2", "b1", 0.5),
+            ]
+        )
         seeds = {"a1"}
         scores = personalized_pagerank(graph, seeds, alpha=0.6)
         assert abs(sum(scores.values()) - 1.0) < 1e-6
@@ -215,16 +223,20 @@ class TestRealisticGarbageFiltering:
         subprocess.run(["git", "config", "user.name", "T"], cwd=repo, capture_output=True, check=True)
         main_module = repo / "src" / "main_feature.py"
         main_module.parent.mkdir(parents=True, exist_ok=True)
-        main_module.write_text("""
+        main_module.write_text(
+            """
 def process_user_data(user_id: int) -> dict:
     return {"id": user_id, "status": "active"}
 
 def validate_input(data: dict) -> bool:
     return "id" in data
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         unrelated1 = repo / "utils" / "math_helpers.py"
         unrelated1.parent.mkdir(parents=True, exist_ok=True)
-        unrelated1.write_text("""
+        unrelated1.write_text(
+            """
 def calculate_fibonacci(n: int) -> int:
     FIBONACCI_MARKER_UNIQUE_12345 = True
     if n <= 1:
@@ -251,10 +263,13 @@ class MathUtilities:
         if n <= 1:
             return 1
         return n * self.factorial(n - 1)
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         unrelated2 = repo / "services" / "email_service.py"
         unrelated2.parent.mkdir(parents=True, exist_ok=True)
-        unrelated2.write_text("""
+        unrelated2.write_text(
+            """
 class EmailSender:
     EMAIL_SENDER_MARKER_FGHIJ = "email"
 
@@ -268,10 +283,13 @@ class EmailSender:
 def format_email_body(template: str, params: dict) -> str:
     EMAIL_FORMAT_MARKER_PQRST = True
     return template.format(**params)
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         unrelated3 = repo / "config" / "settings_loader.py"
         unrelated3.parent.mkdir(parents=True, exist_ok=True)
-        unrelated3.write_text("""
+        unrelated3.write_text(
+            """
 import os
 
 CONFIG_LOADER_MARKER_UVWXY = "config"
@@ -291,13 +309,16 @@ class ConfigurationManager:
 
     def get(self, key: str, default=None):
         return self.settings.get(key, default)
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, capture_output=True, check=True)
         base_sha = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
         ).stdout.strip()
-        main_module.write_text("""
+        main_module.write_text(
+            """
 def process_user_data(user_id: int) -> dict:
     validated = validate_input({"id": user_id})
     if not validated:
@@ -306,14 +327,14 @@ def process_user_data(user_id: int) -> dict:
 
 def validate_input(data: dict) -> bool:
     return "id" in data and isinstance(data["id"], int)
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
         subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "improve user processing"], cwd=repo, capture_output=True, check=True)
         return repo, base_sha
 
-    def test_unrelated_code_excluded_without_garbage_keyword(
-        self, repo_with_realistic_unrelated_code: tuple[Path, str]
-    ) -> None:
+    def test_unrelated_code_excluded_without_garbage_keyword(self, repo_with_realistic_unrelated_code: tuple[Path, str]) -> None:
         repo, base_sha = repo_with_realistic_unrelated_code
         context = build_diff_context(
             root_dir=repo,
@@ -422,9 +443,7 @@ class TestBudgetEdgeCases:
             )
         subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "init"], cwd=repo, capture_output=True, check=True)
-        base = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
-        ).stdout.strip()
+        base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True).stdout.strip()
         (repo / "module_0.py").write_text("def function_0():\n    return 999\n", encoding="utf-8")
         subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "change"], cwd=repo, capture_output=True, check=True)
@@ -474,25 +493,19 @@ class TestRandomizedGarbageFiltering:
         subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=repo, capture_output=True, check=True)
         subprocess.run(["git", "config", "user.name", "T"], cwd=repo, capture_output=True, check=True)
         main_file = repo / "main_feature.py"
-        main_file.write_text(
-            "def main_function():\n    return 'initial'\n", encoding="utf-8"
-        )
+        main_file.write_text("def main_function():\n    return 'initial'\n", encoding="utf-8")
         markers = []
         for i in range(num_unrelated_files):
             marker = f"UNIQUE_MARKER_{identifier_seed}_{i}_XYZ"
             markers.append(marker)
             unrelated = repo / f"unrelated_{identifier_seed}_{i}.py"
             unrelated.write_text(
-                f"{marker} = True\n"
-                f"def helper_{identifier_seed}_{i}():\n"
-                f"    return '{marker}'\n",
+                f"{marker} = True\n" f"def helper_{identifier_seed}_{i}():\n" f"    return '{marker}'\n",
                 encoding="utf-8",
             )
         subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "init"], cwd=repo, capture_output=True, check=True)
-        main_file.write_text(
-            "def main_function():\n    return 'modified'\n", encoding="utf-8"
-        )
+        main_file.write_text("def main_function():\n    return 'modified'\n", encoding="utf-8")
         subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "change"], cwd=repo, capture_output=True, check=True)
         context = build_diff_context(
@@ -504,8 +517,7 @@ class TestRandomizedGarbageFiltering:
         assert "main_function" in all_content, "Changed function must be included"
         for marker in markers:
             assert marker not in all_content, (
-                f"Randomized marker '{marker}' should NOT be in context. "
-                f"Algorithm is including unrelated code."
+                f"Randomized marker '{marker}' should NOT be in context. " f"Algorithm is including unrelated code."
             )
 
     def _extract_content(self, context: dict) -> str:
@@ -536,9 +548,9 @@ class TestGraphBuildingIntegrity:
         graph.add_node("b")
         graph.add_edge("a", "b", float("inf"))
         neighbors_after_inf = graph.neighbors("a")
-        assert "b" not in neighbors_after_inf or math.isfinite(neighbors_after_inf.get("b", 0)), (
-            "Infinite weight edge should be filtered"
-        )
+        assert "b" not in neighbors_after_inf or math.isfinite(
+            neighbors_after_inf.get("b", 0)
+        ), "Infinite weight edge should be filtered"
         graph.add_edge("a", "b", float("nan"))
         neighbors_after_nan = graph.neighbors("a")
         for weight in neighbors_after_nan.values():
