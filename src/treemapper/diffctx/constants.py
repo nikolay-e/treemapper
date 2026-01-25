@@ -14,16 +14,6 @@ __all__ = [
 
 
 def expand_config_key(key: str) -> set[str]:
-    expanded: set[str] = {key}
-    parts = key.split("_")
-    for part in parts:
-        if len(part) >= 3:
-            expanded.add(part)
-    for prefix in CONFIG_KEY_COMMON_PREFIXES:
-        if key.startswith(prefix + "_") and len(key) > len(prefix) + 1:
-            stripped = key[len(prefix) + 1 :]
-            expanded.add(stripped)
-            for sub in stripped.split("_"):
-                if len(sub) >= 3:
-                    expanded.add(sub)
-    return expanded
+    if len(key) < 6:
+        return set()
+    return {key}

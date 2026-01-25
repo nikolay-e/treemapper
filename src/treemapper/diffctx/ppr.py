@@ -69,9 +69,9 @@ def personalized_pagerank(
     p, scores = _initialize_ppr_scores(nodes, valid_seeds)
     out_sum = {}
     for n in nodes:
-        weights = graph.neighbors(n).values()
-        finite_weights = [w for w in weights if math.isfinite(w)]
-        if len(finite_weights) < len(list(weights)):
+        nbr_values = list(graph.neighbors(n).values())
+        finite_weights = [w for w in nbr_values if math.isfinite(w)]
+        if len(finite_weights) < len(nbr_values):
             logging.debug("Node %s has non-finite edge weights, filtering", n)
         total = sum(finite_weights)
         out_sum[n] = total if math.isfinite(total) else 0.0

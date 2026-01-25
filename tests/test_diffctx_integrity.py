@@ -16,7 +16,6 @@ from treemapper.diffctx.types import FragmentId
 
 
 class TestPPRMathematicalInvariants:
-
     def _create_graph_with_edges(self, edges: list[tuple[FragmentId, FragmentId, float]]) -> Graph:
         graph = Graph()
         nodes = set()
@@ -152,7 +151,6 @@ class TestPPRMathematicalInvariants:
 
 
 class TestDiffContextNegativeCases:
-
     @pytest.fixture
     def git_repo(self, tmp_path: Path) -> Path:
         repo = tmp_path / "test_repo"
@@ -213,7 +211,6 @@ class TestDiffContextNegativeCases:
 
 
 class TestRealisticGarbageFiltering:
-
     @pytest.fixture
     def repo_with_realistic_unrelated_code(self, tmp_path: Path) -> tuple[Path, str]:
         repo = tmp_path / "realistic_repo"
@@ -372,7 +369,6 @@ def validate_input(data: dict) -> bool:
 
 
 class TestAssertionPrecision:
-
     def test_word_boundary_matching(self) -> None:
         content = "def main_helper():\n    pass\ndef domain():\n    pass"
         pattern_main = r"\bmain\b"
@@ -428,7 +424,6 @@ def third_function():
 
 
 class TestBudgetEdgeCases:
-
     @pytest.fixture
     def large_repo(self, tmp_path: Path) -> tuple[Path, str]:
         repo = tmp_path / "large_repo"
@@ -477,7 +472,6 @@ class TestBudgetEdgeCases:
 
 
 class TestRandomizedGarbageFiltering:
-
     @given(
         num_unrelated_files=st.integers(min_value=2, max_value=5),
         identifier_seed=st.integers(min_value=1000, max_value=9999),
@@ -500,7 +494,7 @@ class TestRandomizedGarbageFiltering:
             markers.append(marker)
             unrelated = repo / f"unrelated_{identifier_seed}_{i}.py"
             unrelated.write_text(
-                f"{marker} = True\n" f"def helper_{identifier_seed}_{i}():\n" f"    return '{marker}'\n",
+                f"{marker} = True\ndef helper_{identifier_seed}_{i}():\n    return '{marker}'\n",
                 encoding="utf-8",
             )
         subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
@@ -516,9 +510,9 @@ class TestRandomizedGarbageFiltering:
         all_content = self._extract_content(context)
         assert "main_function" in all_content, "Changed function must be included"
         for marker in markers:
-            assert marker not in all_content, (
-                f"Randomized marker '{marker}' should NOT be in context. " f"Algorithm is including unrelated code."
-            )
+            assert (
+                marker not in all_content
+            ), f"Randomized marker '{marker}' should NOT be in context. Algorithm is including unrelated code."
 
     def _extract_content(self, context: dict) -> str:
         parts = []
@@ -531,7 +525,6 @@ class TestRandomizedGarbageFiltering:
 
 
 class TestGraphBuildingIntegrity:
-
     def test_graph_self_loops_dont_break_ppr(self) -> None:
         graph = Graph()
         graph.add_node("a")

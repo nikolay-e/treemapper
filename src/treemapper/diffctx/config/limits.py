@@ -22,15 +22,15 @@ class PPRConfig:
 
 @dataclass(frozen=True)
 class LexicalConfig:
-    min_similarity: float = 0.1
+    min_similarity: float = 0.30
     hub_percentile: float = 0.95
-    top_k_neighbors: int = 10
-    max_df_ratio: float = 0.20
-    min_idf: float = 1.6
-    max_postings: int = 200
-    weight_min: float = 0.1
-    weight_max: float = 0.2
-    backward_factor: float = 0.7
+    top_k_neighbors: int = 5
+    max_df_ratio: float = 0.15
+    min_idf: float = 2.0
+    max_postings: int = 100
+    weight_min: float = 0.05
+    weight_max: float = 0.15
+    backward_factor: float = 0.5
 
 
 @dataclass(frozen=True)

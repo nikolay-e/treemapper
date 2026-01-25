@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -340,6 +341,19 @@ def _is_candidate_file(file_path: Path, root_dir: Path, included_set: set[Path],
 
 
 def _collect_candidate_files(root_dir: Path, included_set: set[Path], combined_spec: pathspec.PathSpec) -> list[Path]:
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=root_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and result.stdout:
+            files = [root_dir / f for f in result.stdout.split("\0") if f]
+            return [f for f in files if _is_candidate_file(f, root_dir, included_set, combined_spec)]
+    except (subprocess.SubprocessError, OSError):
+        pass
     return [f for f in root_dir.rglob("*") if _is_candidate_file(f, root_dir, included_set, combined_spec)]
 
 
