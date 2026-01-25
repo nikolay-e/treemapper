@@ -357,10 +357,15 @@ def _build_ident_index(files: list[Path], concepts: frozenset[str]) -> dict[str,
     return inverted_index
 
 
+_MIN_CONCEPT_LENGTH = 4
+
+
 def _collect_expansion_files(
     inverted_index: dict[str, list[Path]], concepts: frozenset[str], included_set: set[Path]
 ) -> list[Path]:
-    rare_concepts = [c for c in concepts if 0 < len(inverted_index.get(c, [])) <= _RARE_THRESHOLD]
+    rare_concepts = [
+        c for c in concepts if len(c) >= _MIN_CONCEPT_LENGTH and 0 < len(inverted_index.get(c, [])) <= _RARE_THRESHOLD
+    ]
     expansion_files: set[Path] = set()
 
     for concept in rare_concepts:

@@ -5,6 +5,7 @@
 htmlcov
 .treemapperignore
 
+tests
 # Build and cache
 build
 dist
