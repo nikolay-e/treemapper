@@ -58,8 +58,8 @@ def _is_test_file(path: Path) -> bool:
     return "/tests/" in path_str or "/test/" in path_str
 
 
-def _has_direct_import(test_frag: Fragment, src_frag: Fragment) -> bool:
-    src_module = path_to_module(src_frag.path)
+def _has_direct_import(test_frag: Fragment, src_frag: Fragment, repo_root: Path | None) -> bool:
+    src_module = path_to_module(src_frag.path, repo_root=repo_root)
     if not src_module:
         return False
     for match in _IMPORT_RE.finditer(test_frag.content):
@@ -104,12 +104,12 @@ class TestEdgeBuilder(EdgeBuilder):
                 continue
 
             for src_frag in by_base.get(target_name, []):
-                self._add_test_source_edge(edges, test_frag, src_frag)
+                self._add_test_source_edge(edges, test_frag, src_frag, repo_root)
 
         return edges
 
-    def _add_test_source_edge(self, edges: EdgeDict, test_frag: Fragment, src_frag: Fragment) -> None:
-        weight = self.weight_direct if _has_direct_import(test_frag, src_frag) else self.weight_naming
+    def _add_test_source_edge(self, edges: EdgeDict, test_frag: Fragment, src_frag: Fragment, repo_root: Path | None) -> None:
+        weight = self.weight_direct if _has_direct_import(test_frag, src_frag, repo_root) else self.weight_naming
         edges[(test_frag.id, src_frag.id)] = weight
         edges[(src_frag.id, test_frag.id)] = EDGE_WEIGHTS["test_reverse"].forward
 

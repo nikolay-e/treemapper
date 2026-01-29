@@ -10,7 +10,6 @@ class AlgorithmLimits:
     rare_identifier_threshold: int = 3
     max_expansion_files: int = 20
     overhead_per_fragment: int = 18
-    default_budget_tokens: int = 50_000
 
 
 @dataclass(frozen=True)

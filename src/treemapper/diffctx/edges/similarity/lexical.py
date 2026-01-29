@@ -7,11 +7,11 @@ from pathlib import Path
 
 from ...config import (
     DEFAULT_LANG_WEIGHTS,
-    EXTENSION_TO_LANGUAGE,
     LANG_WEIGHTS,
     LEXICAL,
     LangWeights,
 )
+from ...languages import EXTENSION_TO_LANGUAGE
 from ...stopwords import TokenProfile, filter_idents
 from ...types import Fragment, FragmentId, extract_identifier_list
 from ..base import EdgeBuilder, EdgeDict

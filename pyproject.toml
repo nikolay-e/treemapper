@@ -51,6 +51,7 @@ module = [
     "tree_sitter_c",
     "tree_sitter_cpp",
     "tree_sitter_ruby",
+    "tree_sitter_c_sharp",
     "mistune",
     "pysbd",
     "ruamel.yaml",
@@ -178,4 +179,4 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 norecursedirs = ["mutants", ".git", ".mypy_cache", ".pytest_cache", "__pycache__", ".hypothesis"]
-addopts = "-n 14 --dist loadfile"
+addopts = "-n auto --dist loadfile"

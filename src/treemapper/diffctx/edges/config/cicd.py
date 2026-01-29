@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import configparser
 import logging
 import re
 from pathlib import Path
@@ -127,35 +128,37 @@ def _extract_jenkins_refs(content: str) -> set[str]:
 
 def _extract_tox_refs(content: str) -> set[str]:
     refs: set[str] = set()
-    # Extract deps
-    for match in re.finditer(r"^\s*deps\s*=\s*(.+)$", content, re.MULTILINE):
-        deps = match.group(1).split()
-        refs.update(d.strip() for d in deps if d.strip())
+    parser = configparser.ConfigParser()
+    try:
+        parser.read_string(content)
+    except configparser.Error:
+        return refs
 
-    # Extract commands
-    for match in re.finditer(r"^\s*commands\s*=\s*(.+)$", content, re.MULTILINE):
-        cmd = match.group(1)
-        # Split by whitespace to find potential paths
-        # Examples:
-        #   commands = pytest {posargs}
-        #   commands = ruff check src/
-        #   commands = python -m pytest tests/
-        parts = cmd.split()
-        for p in parts:
-            # Strip quoting
-            p = p.strip("'\"")
-            # Remove tox specific vars like {posargs}
-            p = re.sub(r"\{[^}]+\}", "", p)
+    for section in parser.sections():
+        if not section.lower().startswith("testenv"):
+            continue
 
-            if not p or p.startswith("-"):
+        deps = parser.get(section, "deps", fallback="")
+        commands = parser.get(section, "commands", fallback="")
+
+        for line in deps.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("-r"):
                 continue
+            refs.add(line.split()[0] if line.split() else line)
 
-            # Heuristic: if it looks like a path (contains / or .py/.ini etc)
-            # or if we are permissive and just add everything that looks like an ident
-            # Given discover_files_by_refs filters candidates, being permissive is safer.
-            refs.add(p)
-
-        refs.update(_extract_script_refs(cmd))
+        for line in commands.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            for p in parts:
+                p = p.strip("'\"")
+                p = re.sub(r"\{[^}]+\}", "", p)
+                if not p or p.startswith("-"):
+                    continue
+                refs.add(p)
+            refs.update(_extract_script_refs(line))
 
     return refs
 

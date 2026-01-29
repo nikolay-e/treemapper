@@ -105,29 +105,3 @@ DOC_EXTENSIONS = frozenset(
         ".adoc",
     }
 )
-
-EXTENSION_TO_LANGUAGE: dict[str, str] = {}
-
-for ext in PYTHON_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "python"
-
-for ext in JAVASCRIPT_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "javascript"
-
-for ext in TYPESCRIPT_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "typescript"
-
-for ext in GO_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "go"
-
-for ext in RUST_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "rust"
-
-for ext in JAVA_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "java"
-
-for ext in KOTLIN_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "kotlin"
-
-for ext in SCALA_EXTENSIONS:
-    EXTENSION_TO_LANGUAGE[ext] = "scala"
