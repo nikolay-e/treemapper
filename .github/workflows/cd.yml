@@ -32,12 +32,12 @@ jobs:
       commit_sha: ${{ steps.commit_version.outputs.commit_sha }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Need full history for git bundle
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -135,7 +135,7 @@ jobs:
           git bundle create repo.bundle --all
 
       - name: Upload bundle as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: git-repo-bundle
           path: repo.bundle
@@ -166,7 +166,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Download git bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: git-repo-bundle
 
@@ -187,7 +187,7 @@ jobs:
           ls -la src/treemapper/ || echo "ERROR: src/treemapper not found!"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -251,7 +251,7 @@ jobs:
           fi
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.asset_name }}-binary
           path: ./repo/dist/treemapper-*
@@ -269,7 +269,7 @@ jobs:
       id-token: write
     steps:
       - name: Download git bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: git-repo-bundle
 
@@ -290,7 +290,7 @@ jobs:
           ls -la src/treemapper/ || echo "ERROR: src/treemapper not found!"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -336,7 +336,7 @@ jobs:
       contents: write
     steps:
       - name: Download git bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: git-repo-bundle
 
@@ -385,7 +385,7 @@ jobs:
           echo "Successfully pushed version commit and tag"
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: ./artifacts
 
