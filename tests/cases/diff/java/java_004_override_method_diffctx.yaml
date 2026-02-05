@@ -1,0 +1,20 @@
+must_include:
+- Dog
+- breed
+- '@Override'
+- eat
+- sleep
+- getAgeInYears
+- learnTrick
+- performTrick
+- serviceAnimal
+- chocolate
+must_not_include:
+- GARBAGE_JAVA_TICKET_301
+- GARBAGE_JAVA_PRICE_302
+- GARBAGE_JAVA_MAINT_303
+- GARBAGE_JAVA_TASK_304
+- TicketPricing
+- MaintenanceScheduler
+- calculatePrice
+- scheduleTask

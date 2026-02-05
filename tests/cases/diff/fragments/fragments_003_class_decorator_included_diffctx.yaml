@@ -1,0 +1,20 @@
+must_include:
+- '@dataclass'
+- MyClass
+- decorated_class.py
+must_not_include:
+- GARBAGE_FRAG_standaloneB003
+- GARBAGE_FRAG_unrelatedB003
+- GARBAGE_FRAG_methodB003
+- GARBAGE_FRAG_standaloneA003
+- GARBAGE_FRAG_unrelatedA003
+- GARBAGE_FRAG_methodA003
+- GARBAGE_FRAG_static003
+- GARBAGE_FRAG_model003
+- GARBAGE_FRAG_anotherclass003
+- models_garbage_003.py
+- standalone_function_before
+- standalone_function_after
+- UnrelatedClassBefore
+- UnrelatedClassAfter
+- GarbageModel

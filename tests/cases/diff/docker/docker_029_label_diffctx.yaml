@@ -1,0 +1,19 @@
+must_include:
+- org.opencontainers.image.title
+- org.opencontainers.image.version
+- org.opencontainers.image.revision
+- org.opencontainers.image.created
+- org.opencontainers.image.source
+- com.myorg.app.component
+- com.myorg.app.team
+must_not_include:
+- GARBAGE_DOCKER_514_BUILD_MARKER_001
+- GARBAGE_DOCKER_514_BUILD_VAR_002
+- GARBAGE_DOCKER_514_TEST_MARKER_003
+- GARBAGE_DOCKER_514_TEST_VER_004
+- GARBAGE_DOCKER_514_VER_DOC_005
+- GARBAGE_DOCKER_514_SEMVER_006
+- GARBAGE_DOCKER_514_RELEASE_MARKER_007
+- GARBAGE_DOCKER_514_WORKFLOW_008
+- GARBAGE_DOCKER_514_CHANGELOG_MARKER_009
+- GARBAGE_DOCKER_514_ENTRY_010

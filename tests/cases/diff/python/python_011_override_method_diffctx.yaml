@@ -1,0 +1,21 @@
+must_include:
+- def process
+- class BaseProcessor
+- ProcessingStatus
+- ValidationError
+- super().process
+must_not_include:
+- GARBAGE_MARKER_LOG_001
+- UNRELATED_LOG_LEVEL_002
+- GARBAGE_LOG_CLASS_003
+- GARBAGE_ROTATE_MARKER_004
+- GARBAGE_MARKER_SCHED_005
+- UNRELATED_INTERVAL_006
+- GARBAGE_SCHED_CLASS_007
+- GARBAGE_FORMAT_CRON_008
+- LogFormatter
+- LogRotator
+- TaskScheduler
+- format_cron_expression
+- garbage_logging.py
+- garbage_scheduler.py

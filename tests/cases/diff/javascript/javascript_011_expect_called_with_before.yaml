@@ -1,0 +1,11 @@
+notifier.ts: |
+  export interface Notification {
+      title: string;
+      body: string;
+  }
+
+  export function sendNotification(notify: (n: Notification) => void, title: string, body: string) {
+      notify({ title, body });
+  }
+notifier.test.ts: |
+  console.log('initial');

@@ -1,0 +1,27 @@
+must_include:
+- '@KafkaListener'
+- OrderEventConsumer
+- handleOrderEvent
+- handlePaymentEvent
+- handleInventoryEventsBatch
+- handlePriorityOrderEvent
+- Acknowledgment
+- acknowledge
+- '@Payload'
+- '@Header'
+- KafkaHeaders.RECEIVED_PARTITION
+- KafkaHeaders.OFFSET
+- '@TopicPartition'
+- '@PartitionOffset'
+- batch
+- ConsumerRecordMetadata
+- MDC
+must_not_include:
+- GARBAGE_JAVA_WEBSOCKET_901
+- GARBAGE_JAVA_SESSION_902
+- GARBAGE_JAVA_CACHE_903
+- GARBAGE_JAVA_TTL_904
+- WebSocketHandler
+- CacheManager
+- addSession
+- put

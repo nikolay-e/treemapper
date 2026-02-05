@@ -1,0 +1,13 @@
+login.ts: |
+  export function getLoginUrl(): string {
+      return '/login';
+  }
+
+  export function getCredentials() {
+      return { username: 'test', password: 'test123' };  // pragma: allowlist secret
+  }
+
+  // playwright_garbage_marker_001
+  const GARBAGE_LOGIN_CONFIG = { timeout: 5000 };
+login.spec.ts: |
+  console.log('initial');

@@ -1,0 +1,24 @@
+must_include:
+- orderSchema
+- orderStatusSchema
+- orderLineItemSchema
+- validateOrder
+- calculateOrderTotals
+- moneySchema
+- addressSchema
+- src/schemas/order.ts
+must_not_include:
+- GARBAGE_TS_008_BILLING_001
+- GARBAGE_TS_008_TAX_RATES_002
+- GARBAGE_TS_008_billingPeriodSchema_003
+- GARBAGE_TS_008_BillingCalculator_004
+- GARBAGE_TS_008_PRECISION_005
+- GARBAGE_TS_008_billingCalculator_006
+- GARBAGE_TS_008_REPORTS_007
+- GARBAGE_TS_008_reportTypeSchema_008
+- GARBAGE_TS_008_ReportResult_009
+- GARBAGE_TS_008_ReportGenerator_010
+- GARBAGE_TS_008_MAX_ROWS_011
+- GARBAGE_TS_008_reportGenerator_012
+- billing.ts
+- reports.ts

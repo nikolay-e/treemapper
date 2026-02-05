@@ -1,0 +1,8 @@
+defaults.ts: |
+  export const defaultConfig = {
+      timeout: 5000,
+      retries: 3,
+      baseUrl: 'https://api.example.com',
+  };
+config.ts: |
+  console.log('initial');

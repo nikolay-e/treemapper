@@ -1,0 +1,12 @@
+must_include_files:
+  - query.py
+must_include_content:
+  - |
+    QueryBuilder
+must_not_include:
+  - GARBAGE_DEP_003_COLOR_A
+  - GARBAGE_DEP_003_FITNESS_B
+  - ColorScheme
+  - WorkoutLog
+  - generate_palette
+  - calculate_bmi

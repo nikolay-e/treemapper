@@ -1,0 +1,120 @@
+k8s/base/deployment.yaml: |
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: backend-service
+    namespace: production
+    labels:
+      app: backend-service
+      tier: backend
+  spec:
+    replicas: 3
+    selector:
+      matchLabels:
+        app: backend-service
+    template:
+      metadata:
+        labels:
+          app: backend-service
+          tier: backend
+      spec:
+        containers:
+        - name: backend
+          image: registry.example.com/backend-service:v1.2.0
+          ports:
+          - containerPort: 8080
+            name: http
+          env:
+          - name: DATABASE_URL
+            value: "postgresql://db.internal.svc.cluster.local:5432/mydb"
+          - name: REDIS_URL
+            value: "redis://cache.internal.svc.cluster.local:6379"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+k8s/base/service.yaml: |
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: backend-service
+    namespace: production
+  spec:
+    selector:
+      app: backend-service
+    ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+k8s/base/service-db.yaml: |
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: external-db
+    namespace: production
+    labels:
+      app: external-db
+      type: external
+  spec:
+    type: ClusterIP
+    ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+k8s/base/configmap.yaml: |
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: backend-config
+    namespace: production
+  data:
+    LOG_LEVEL: info
+    POOL_SIZE: "10"
+    TIMEOUT: "30"
+k8s/unrelated/crossplane/aws-rds.yaml: |
+  # GARBAGE_K8S_434_CROSSPLANE_RDS
+  apiVersion: database.aws.crossplane.io/v1beta1
+  kind: RDSInstance
+  metadata:
+    name: GARBAGE_K8S_434_RDS_INSTANCE
+  spec:
+    forProvider:
+      engine: GARBAGE_K8S_434_RDS_ENGINE
+      engineVersion: GARBAGE_K8S_434_ENGINE_VERSION
+      instanceClass: GARBAGE_K8S_434_INSTANCE_CLASS
+      allocatedStorage: GARBAGE_K8S_434_STORAGE_SIZE
+k8s/unrelated/crossplane/gcp-cloudsql.yaml: |
+  # GARBAGE_K8S_434_CROSSPLANE_SQL
+  apiVersion: database.gcp.crossplane.io/v1beta1
+  kind: CloudSQLInstance
+  metadata:
+    name: GARBAGE_K8S_434_CLOUDSQL
+  spec:
+    forProvider:
+      databaseVersion: GARBAGE_K8S_434_SQL_VERSION
+      tier: GARBAGE_K8S_434_SQL_TIER
+      region: GARBAGE_K8S_434_SQL_REGION
+k8s/unrelated/operators/postgres-operator.yaml: |
+  # GARBAGE_K8S_434_PG_OPERATOR
+  apiVersion: acid.zalan.do/v1
+  kind: postgresql
+  metadata:
+    name: GARBAGE_K8S_434_PG_CLUSTER
+    namespace: postgres-operator
+  spec:
+    teamId: GARBAGE_K8S_434_TEAM_ID
+    numberOfInstances: GARBAGE_K8S_434_PG_INSTANCES
+    users:
+      GARBAGE_K8S_434_PG_USER: []
+    databases:
+      GARBAGE_K8S_434_PG_DB: GARBAGE_K8S_434_PG_OWNER
+kustomize/base/kustomization.yaml: |
+  # GARBAGE_K8S_434_KUSTOMIZE
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  resources:
+  - GARBAGE_K8S_434_RESOURCE_PATH
+  namespace: GARBAGE_K8S_434_KUSTOMIZE_NS

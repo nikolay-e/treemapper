@@ -1,0 +1,12 @@
+must_include:
+- main
+- CONFIG_VALUE
+must_not_include:
+- GARBAGE_GRAPH_ghi001
+- GARBAGE_GRAPH_ghi002
+- GARBAGE_GRAPH_ghi003
+- PRIMARY_COLOR
+- GOLDEN_RATIO
+- HTTP_OK
+- ColorPalette
+- calculate_golden_spiral

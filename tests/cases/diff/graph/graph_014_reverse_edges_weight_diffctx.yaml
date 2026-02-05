@@ -1,0 +1,18 @@
+must_include:
+- main
+- helper
+- compute
+- validate
+- process_result
+- DataSource
+- ResultProcessor
+must_not_include:
+- GARBAGE_GRAPH_nop001
+- GARBAGE_GRAPH_nop002
+- GARBAGE_GRAPH_nop003
+- reverse_main
+- reverse_helper
+- chain_a_GARBAGE
+- chain_b_GARBAGE
+- bidi_func_a
+- bidi_func_b

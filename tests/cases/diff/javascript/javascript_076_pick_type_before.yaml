@@ -1,0 +1,10 @@
+user.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+      password: string;
+      createdAt: Date;
+  }
+dto.ts: |
+  console.log('initial');

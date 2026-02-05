@@ -1,0 +1,22 @@
+must_include:
+- WidgetContainer
+- FormHandler
+- static_cast
+- Widget
+- Button
+- TextInput
+- getWidgetAs
+must_not_include:
+- GARBAGE_CPP_PARTICLE_252_001
+- GARBAGE_CPP_PARTICLE_MAX_252_002
+- GARBAGE_CPP_PARTICLE_STRUCT_252_003
+- GARBAGE_CPP_PARTICLE_EMITTER_252_005
+- GARBAGE_CPP_PARTICLE_EMIT_252_006
+- GARBAGE_CPP_AUDIO_252_012
+- GARBAGE_CPP_AUDIO_CHANNEL_252_013
+- GARBAGE_CPP_AUDIO_MIXER_252_014
+- GARBAGE_CPP_AUDIO_MIX_252_015
+- ParticleEmitter
+- AudioMixer
+- Particle
+- AudioChannel

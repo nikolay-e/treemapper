@@ -1,0 +1,11 @@
+must_include:
+- database.tf
+- aws_db_instance
+- aws_db_subnet_group
+- aws_security_group
+- performance_insights_enabled
+must_not_include:
+- GARBAGE_TF_rds447a
+- GARBAGE_TF_rds447b
+- legacy_dashboard
+- legacy-metrics

@@ -1,0 +1,47 @@
+chart/Chart.yaml: |
+  apiVersion: v2
+  name: env-app
+  description: Application with environment variable configuration
+  type: application
+  version: 1.0.0
+chart/values.yaml: |
+  replicaCount: 1
+  image:
+    repository: env-app
+    tag: "1.0.0"
+  env: []
+chart/templates/deployment.yaml: |
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: {{ .Release.Name }}-{{ .Chart.Name }}
+  spec:
+    replicas: {{ .Values.replicaCount }}
+    template:
+      spec:
+        containers:
+          - name: {{ .Chart.Name }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            {{- if .Values.env }}
+            env:
+              {{- toYaml .Values.env | nindent 14 }}
+            {{- end }}
+src/app.py: |
+  import os
+  log_level = os.environ.get('LOG_LEVEL', 'info')
+chart/templates/backup-pvc.yaml: |
+  apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: GARBAGE_HELM_019_BACKUP_PVC_A
+  spec:
+    accessModes:
+      - GARBAGE_HELM_019_ACCESS_MODE_B
+    resources:
+      requests:
+        storage: GARBAGE_HELM_019_STORAGE_SIZE_C
+chart/docs/env-vars.md: |
+  # Environment Variables
+  GARBAGE_HELM_019_ENV_DOC_D
+  ## Secret Management
+  GARBAGE_HELM_019_SECRET_MGMT_E

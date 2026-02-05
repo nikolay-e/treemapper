@@ -1,0 +1,32 @@
+must_include:
+- GenericRepository
+- BaseEntity
+- InMemoryRepository
+- saveAll
+- findAllById
+- findAll(Predicate
+- findByCategory
+- findByNameContaining
+- findByPriceRange
+- findInStock
+- findLowStock
+- findTopByPrice
+- generateId
+- ConcurrentHashMap
+must_not_include:
+- GARBAGE_JAVA_PRICING_R032A
+- GARBAGE_JAVA_MARGIN_R032B
+- GARBAGE_JAVA_DISCOUNT_R032C
+- GARBAGE_JAVA_ALERT_R032D
+- GARBAGE_JAVA_THRESHOLD_R032E
+- GARBAGE_JAVA_LOW_R032F
+- GARBAGE_JAVA_SUPPLIER_R032G
+- GARBAGE_JAVA_REGISTER_R032H
+- SoundWaveAnalyzer
+- RgbConverter
+- UnitConverter
+- calculateFrequency
+- calculateAmplitude
+- rgbToHex
+- hexToRgb
+- milesToKilometers

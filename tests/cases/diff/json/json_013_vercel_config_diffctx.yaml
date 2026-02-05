@@ -1,0 +1,14 @@
+must_include:
+- api/hello.js
+- api/users.js
+- lib/userService.js
+- getUsers
+must_not_include:
+- GARBAGE_JSON_013_DEPLOY_REGION_A
+- GARBAGE_JSON_013_APP_DEPLOYER_B
+- GARBAGE_JSON_013_DEPLOY_APP_C
+- GARBAGE_JSON_013_UPLOAD_CHUNK_D
+- GARBAGE_JSON_013_FILE_UPLOADER_E
+- GARBAGE_JSON_013_UPLOAD_FILE_F
+- deployer.js
+- uploader.js

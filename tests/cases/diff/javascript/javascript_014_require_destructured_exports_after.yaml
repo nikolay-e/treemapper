@@ -1,0 +1,13 @@
+module.js: |
+  const a = 1;
+  const b = 2;
+
+  module.exports = { a, b };
+main.js: |
+  const { a, b } = require('./module');
+
+  function main() {
+      console.log(a + b);
+  }
+
+  main();

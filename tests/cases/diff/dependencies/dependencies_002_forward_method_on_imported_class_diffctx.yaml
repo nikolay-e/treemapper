@@ -1,0 +1,12 @@
+must_include_files:
+  - handler.py
+must_include_content:
+  - |
+    UserService
+must_not_include:
+  - GARBAGE_DEP_002_RECIPE_A
+  - GARBAGE_DEP_002_MUSIC_B
+  - RecipeBook
+  - MusicPlayer
+  - shuffle_playlist
+  - load_recipes

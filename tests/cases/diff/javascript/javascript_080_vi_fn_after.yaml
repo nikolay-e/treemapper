@@ -1,0 +1,20 @@
+callback.ts: |
+  export type Callback = (value: number) => void;
+
+  export function processNumbers(numbers: number[], callback: Callback) {
+      numbers.forEach(n => callback(n));
+  }
+callback.test.ts: |
+  import { describe, it, expect, vi } from 'vitest';
+  import { processNumbers } from './callback';
+
+  describe('processNumbers', () => {
+      it('should call callback for each number', () => {
+          const callback = vi.fn();
+          processNumbers([1, 2, 3], callback);
+          expect(callback).toHaveBeenCalledTimes(3);
+          expect(callback).toHaveBeenCalledWith(1);
+          expect(callback).toHaveBeenCalledWith(2);
+          expect(callback).toHaveBeenCalledWith(3);
+      });
+  });

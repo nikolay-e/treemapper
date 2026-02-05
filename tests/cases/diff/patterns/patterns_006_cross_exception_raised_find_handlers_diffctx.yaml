@@ -1,0 +1,17 @@
+must_include_files:
+  - service.py
+must_include_content:
+  - |
+    def transfer(from_account, to_account, amount):
+        balance = get_balance(from_account)
+        if balance < amount:
+            raise InsufficientFundsError(from_account)
+must_not_include:
+  - GARBAGE_PAT_006_AUDIT_LOGGER_A
+  - GARBAGE_PAT_006_AUDIT_TABLE_B
+  - GARBAGE_PAT_006_NOTIFICATION_A
+  - GARBAGE_PAT_006_CHANNEL_B
+  - GarbageAuditLogger
+  - GarbageNotificationSender
+  - garbage_audit_logger.py
+  - garbage_notification_sender.py

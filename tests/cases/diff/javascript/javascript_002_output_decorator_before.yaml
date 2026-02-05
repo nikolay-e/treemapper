@@ -1,0 +1,7 @@
+item.model.ts: |
+  export interface Item {
+      id: string;
+      name: string;
+  }
+item-row.component.ts: |
+  console.log('initial');

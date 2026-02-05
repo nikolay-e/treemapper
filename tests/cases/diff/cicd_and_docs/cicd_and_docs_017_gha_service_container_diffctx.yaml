@@ -1,0 +1,22 @@
+must_include_files:
+  - .github/workflows/test.yml
+must_include_content:
+  - |
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+must_not_include:
+  - GARBAGE_CICD_DOCS_017_DOCKER_MARKER_A
+  - GARBAGE_CICD_DOCS_017_NETWORK_MARKER_B
+  - GARBAGE_CICD_DOCS_017_VOLUME_MARKER_C
+  - GARBAGE_CICD_DOCS_017_CONTAINER_MARKER_D
+  - GARBAGE_CICD_DOCS_017_ENTRYPOINT_MARKER_E
+  - GARBAGE_CICD_DOCS_017_MEMORY_MARKER_F
+  - GarbageDockerService
+  - GarbageContainerManager
+  - garbage_docker.ts
+  - garbage_container.ts

@@ -1,0 +1,17 @@
+Button.tsx: |
+  export interface ButtonProps {
+      label: string;
+      variant?: 'primary' | 'secondary';
+      size?: 'small' | 'medium' | 'large';
+      onClick?: () => void;
+  }
+
+  export function Button({ label, variant = 'primary', size = 'medium', onClick }: ButtonProps) {
+      return (
+          <button className={`btn btn-${variant} btn-${size}`} onClick={onClick}>
+              {label}
+          </button>
+      );
+  }
+Button.stories.tsx: |
+  console.log('initial');

@@ -1,0 +1,3 @@
+must_include:
+- _serialize
+- _deserialize

@@ -1,0 +1,6 @@
+must_include:
+- BaseClass
+- DerivedClass
+- derived.ts
+must_not_include:
+- js_garbage_marker_001

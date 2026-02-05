@@ -1,0 +1,21 @@
+user.ts: |
+  export class MyClass {
+      private value: number;
+
+      constructor(value: number) {
+          this.value = value;
+      }
+
+      getValue(): number {
+          return this.value;
+      }
+  }
+main.ts: |
+  import { MyClass } from './user';
+
+  function createInstance() {
+      const instance = new MyClass(42);
+      return instance.getValue();
+  }
+
+  console.log(createInstance());

@@ -1,0 +1,20 @@
+api.ts: |
+  export async function fetchUserData(userId: string) {
+      return { id: userId, name: 'User' };
+  }
+UserDetails.vue: |
+  <script setup lang="ts">
+  import { ref, watch } from 'vue';
+  import { fetchUserData } from './api';
+
+  const props = defineProps<{ userId: string }>();
+  const userData = ref<{ id: string; name: string } | null>(null);
+
+  watch(() => props.userId, async (newId) => {
+      userData.value = await fetchUserData(newId);
+  }, { immediate: true });
+  </script>
+
+  <template>
+      <div v-if="userData">{{ userData.name }}</div>
+  </template>

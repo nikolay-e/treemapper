@@ -1,0 +1,16 @@
+types.ts: |
+  export interface ButtonProps {
+      label: string;
+      onClick: () => void;
+      disabled?: boolean;
+      variant?: 'primary' | 'secondary';
+  }
+
+  // js_garbage_marker_006
+  const GARBAGE_BUTTON_CONFIG = { maxWidth: 200 };
+Button.tsx: |
+  import { ButtonProps } from './types';
+
+  export function Button({ label, onClick }: ButtonProps) {
+      return <button onClick={onClick}>{label}</button>;
+  }

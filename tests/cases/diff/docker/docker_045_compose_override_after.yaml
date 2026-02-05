@@ -1,0 +1,73 @@
+src/api.py: |
+  from flask import Flask, jsonify
+  import os
+
+  app = Flask(__name__)
+
+  NODE_ENV = os.getenv("NODE_ENV", "production")
+  DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+  @app.route('/health')
+  def health():
+      return jsonify(status='ok', env=NODE_ENV)
+
+  @app.route('/api/info')
+  def info():
+      return jsonify(
+          environment=NODE_ENV,
+          debug=DEBUG
+      )
+
+  if __name__ == "__main__":
+      app.run(host="0.0.0.0", port=3000, debug=DEBUG)
+requirements.txt: |
+  flask==2.3.0
+  gunicorn==21.2.0
+Dockerfile: |
+  FROM python:3.12-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install --no-cache-dir -r requirements.txt
+  COPY src/ ./src/
+  EXPOSE 3000
+  CMD ["gunicorn", "-b", "0.0.0.0:3000", "src.api:app"]
+docker-compose.yml: |
+  version: '3.8'
+  services:
+    api:
+      build: .
+      environment:
+        - NODE_ENV=production
+docker-compose.override.yml: |
+  version: '3.8'
+  services:
+    api:
+      environment:
+        - NODE_ENV=development
+        - DEBUG=true
+      volumes:
+        - .:/app
+      ports:
+        - "3000:3000"
+scripts/dev.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCK_045_DEV_SCRIPT_A
+  GARBAGE_DOCK_045_DEV_PORT_B=3000
+  docker-compose up --build
+tests/test_override.py: |
+  # GARBAGE_DOCK_045_OVERRIDE_TEST_A
+  GARBAGE_DOCK_045_TEST_ENV_B = "test-env"
+  def test_override_merging():
+      pass
+docs/local-development.md: |
+  # Local Development
+  GARBAGE_DOCK_045_LOCAL_DOC_A
+  GARBAGE_DOCK_045_HOT_RELOAD_B="true"
+k8s/dev-overlay.yaml: |
+  # GARBAGE_DOCK_045_K8S_OVERLAY_A
+  apiVersion: apps/v1
+  GARBAGE_DOCK_045_PATCH_TYPE_B: strategic
+skaffold.yaml: |
+  # GARBAGE_DOCK_045_SKAFFOLD_A
+  apiVersion: skaffold/v4beta1
+  GARBAGE_DOCK_045_SYNC_MODE_B: infer

@@ -1,0 +1,29 @@
+must_include_files:
+  - .travis.yml
+  - tests/test_math.py
+must_include_content:
+  - |
+    python:
+      - "3.11"
+      - "3.12"
+  - |
+    install:
+      - pip install -e .[dev]
+
+    script:
+      - pytest --cov
+      - mypy src/
+  - |
+    def test_multiply():
+        assert 2 * 3 == 6
+must_not_include:
+  - GARBAGE_CICD_009_PRIME_MARKER_A
+  - GARBAGE_CICD_009_LIMIT_MARKER_B
+  - GARBAGE_CICD_009_CACHE_MARKER_C
+  - GARBAGE_CICD_009_FIB_MARKER_D
+  - GARBAGE_CICD_009_MEMO_MARKER_E
+  - GARBAGE_CICD_009_MAX_MARKER_F
+  - GarbagePrimeGenerator
+  - GarbageFibonacci
+  - garbage_prime.py
+  - garbage_fibonacci.py

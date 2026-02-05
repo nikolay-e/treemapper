@@ -1,0 +1,19 @@
+item-selector.component.ts: |
+  import { Component } from '@angular/core';
+
+  @Component({
+      selector: 'app-item-selector',
+      template: '<div>Initial</div>',
+  })
+  export class ItemSelectorComponent {}
+
+  // angular_garbage_marker_002
+  const GARBAGE_SELECTOR_CONFIG = { multiSelect: false };
+parent.component.ts: |
+  import { Component } from '@angular/core';
+
+  @Component({
+      selector: 'app-parent',
+      template: '<div>Initial</div>',
+  })
+  export class ParentComponent {}

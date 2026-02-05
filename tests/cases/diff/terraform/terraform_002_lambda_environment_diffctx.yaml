@@ -1,0 +1,15 @@
+must_include:
+- aws_lambda_function
+- environment
+- custom_env_vars
+- base_env_vars
+- tracing_mode
+must_not_include:
+- GARBAGE_TF_PIPELINE_442_001
+- GARBAGE_PIPELINE_442_002
+- GARBAGE_ROLE_442_003
+- GARBAGE_BUCKET_442_004
+- GARBAGE_SOURCE_442_005
+- GARBAGE_TF_CACHE_442_006
+- GARBAGE-CACHE-442-007
+- GARBAGE_CACHE_VAR_442_008

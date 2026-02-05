@@ -1,0 +1,43 @@
+chart/Chart.yaml: |
+  apiVersion: v2
+  name: resource-app
+  description: Application with resource management
+  type: application
+  version: 1.2.0
+chart/values.yaml: |
+  replicaCount: 1
+  image:
+    repository: resource-app
+    tag: "1.2.0"
+  resources: {}
+chart/templates/deployment.yaml: |
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: {{ .Release.Name }}-{{ .Chart.Name }}
+  spec:
+    replicas: {{ .Values.replicaCount }}
+    template:
+      spec:
+        containers:
+          - name: {{ .Chart.Name }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            {{- with .Values.resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+chart/templates/external-secret.yaml: |
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: GARBAGE_HELM_018_EXT_SECRET_A
+  spec:
+    secretStoreRef:
+      name: GARBAGE_HELM_018_SECRET_STORE_B
+    target:
+      name: GARBAGE_HELM_018_SECRET_TARGET_C
+chart/docs/resource-quotas.md: |
+  # Resource Quotas
+  GARBAGE_HELM_018_QUOTA_DOC_D
+  ## Namespace Limits
+  GARBAGE_HELM_018_NS_LIMITS_E

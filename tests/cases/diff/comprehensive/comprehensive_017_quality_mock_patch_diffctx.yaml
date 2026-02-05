@@ -1,0 +1,18 @@
+must_include_files:
+  - tests/test_api.py
+must_include_content:
+  - |
+    @mock.patch('src.api_client.requests.get')
+    def test_fetch_user(mock_get):
+        mock_get.return_value.json.return_value = {"id": 1, "name": "Alice"}
+must_not_include:
+  - GARBAGE_COMP_017_PROXY_MODE_A
+  - GARBAGE_COMP_017_HEADER_INJECT_B
+  - GARBAGE_COMP_017_RETRY_POLICY_C
+  - GARBAGE_COMP_017_FIXTURE_PATH_D
+  - GARBAGE_COMP_017_RECORD_MODE_E
+  - GARBAGE_COMP_017_PORT_RANGE_F
+  - GarbageHttpInterceptor
+  - GarbageMockServer
+  - garbage_http_interceptor.py
+  - garbage_mock_server.py

@@ -1,0 +1,16 @@
+must_include:
+- tomllib
+- PathLike
+must_not_include:
+- GARBAGE_PY_043_PROFILE_A
+- GARBAGE_PY_043_TIMER_B
+- GARBAGE_PY_043_PROFILER_C
+- GARBAGE_PY_043_STOP_D
+- GARBAGE_PY_043_CIRCUIT_E
+- GARBAGE_PY_043_STATE_F
+- GARBAGE_PY_043_BREAKER_G
+- GARBAGE_PY_043_OPEN_H
+- Profiler
+- CircuitBreaker
+- garbage_profiling.py
+- garbage_circuit_breaker.py

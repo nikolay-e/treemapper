@@ -1,0 +1,16 @@
+must_include_files:
+  - UserService.cs
+must_include_content:
+  - |
+    Where(
+  - |
+    Select(
+must_not_include:
+  - GARBAGE_JVM_019_SORT_MARKER_A
+  - GARBAGE_JVM_019_PAGE_MARKER_B
+  - GARBAGE_JVM_019_BATCH_MARKER_C
+  - GARBAGE_JVM_019_CHUNK_MARKER_D
+  - GarbageSorter
+  - GarbageBatcher
+  - GarbageSorter.cs
+  - GarbageBatcher.cs

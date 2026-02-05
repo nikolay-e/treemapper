@@ -1,0 +1,3 @@
+must_include:
+- original_function
+- new_function

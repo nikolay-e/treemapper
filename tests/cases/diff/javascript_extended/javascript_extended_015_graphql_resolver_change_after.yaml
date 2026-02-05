@@ -1,0 +1,28 @@
+resolvers.ts: |
+  export const resolvers = {
+      Query: {
+          user: (_: any, { id }: { id: string }) => ({ id, name: 'Test' }),
+          users: () => [{ id: '1', name: 'User 1' }, { id: '2', name: 'User 2' }],
+      },
+      Mutation: {
+          createUser: (_: any, { name }: { name: string }) => ({ id: Date.now().toString(), name }),
+      },
+  };
+
+  // js_garbage_marker_010
+  const GARBAGE_RESOLVER = { garbage: () => null };
+schema.ts: |
+  import { resolvers } from './resolvers';
+
+  export const typeDefs = `
+      type User {
+          id: ID!
+          name: String!
+      }
+
+      type Query {
+          user(id: ID!): User
+      }
+  `;
+
+  export { resolvers };

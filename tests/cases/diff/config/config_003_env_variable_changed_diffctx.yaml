@@ -1,0 +1,11 @@
+must_include:
+- .env.example
+- API_TIMEOUT
+must_not_include:
+- GARBAGE_CFG_003_MARKER_A
+- GARBAGE_CFG_003_REPORT_B
+- GARBAGE_CFG_003_FORMAT_C
+- GARBAGE_CFG_003_MARKER_D
+- GARBAGE_CFG_003_CACHE_E
+- report_generator.py
+- cache_manager.py

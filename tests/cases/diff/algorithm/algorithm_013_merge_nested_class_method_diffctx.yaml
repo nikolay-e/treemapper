@@ -1,0 +1,34 @@
+must_include_files:
+  - src/services/user_service.py
+must_include_content:
+  - |
+    def get_users_by_email_domain(self, domain: str) -> List[User]:
+        return self.db.query(User).filter(
+            User.email.endswith(f"@{domain}")
+        ).all()
+
+    def create_user(self, username: str, email: str) -> User:
+        if self.get_user_by_email(email):
+            raise ValueError(f"User with email {email} already exists")
+        user = User(
+            id=self._generate_id(),
+            username=username,
+            email=email.lower(),
+            created_at=datetime.now()
+        )
+        self.db.add(user)
+        return user
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        return self.db.query(User).filter_by(email=email.lower()).first()
+must_not_include:
+  - GARBAGE_ALGO_013_PERM_MARKER_A
+  - GARBAGE_ALGO_013_ROLE_MARKER_B
+  - GARBAGE_ALGO_013_ACCESS_MARKER_C
+  - GARBAGE_ALGO_013_NOTIFY_MARKER_D
+  - GARBAGE_ALGO_013_CHANNEL_MARKER_E
+  - GARBAGE_ALGO_013_QUEUE_MARKER_F
+  - PermissionChecker
+  - NotificationService
+  - garbage_permissions.py
+  - garbage_notifications.py

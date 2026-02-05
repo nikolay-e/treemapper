@@ -1,0 +1,20 @@
+must_include_files:
+  - chart/values.yaml
+  - chart/templates/service.yaml
+must_include_content:
+  - |
+    service:
+      type: LoadBalancer
+      port: 443
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  - |
+    type: {{ .Values.service.type }}
+must_not_include:
+  - GARBAGE_HELM_002_BACKUP_JOB_A
+  - GARBAGE_HELM_002_BACKUP_CONTAINER_B
+  - GARBAGE_HELM_002_BACKUP_CMD_C
+  - GARBAGE_HELM_002_API_DOCS_D
+  - GARBAGE_HELM_002_API_ENDPOINT_E
+  - chart/templates/backup-cronjob.yaml
+  - chart/docs/api-spec.md

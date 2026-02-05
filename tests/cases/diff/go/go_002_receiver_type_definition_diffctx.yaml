@@ -1,0 +1,18 @@
+must_include:
+- FindAll
+- FindByEmail
+- Update
+- Delete
+- UserRepository
+- QueryOptions
+must_not_include:
+- GARBAGE_GO_REDIS_CACHE_001
+- GARBAGE_GO_TYPE_REDIS_002
+- GARBAGE_GO_FUNC_CACHE_003
+- GARBAGE_GO_CACHE_UNUSED_004
+- GARBAGE_GO_QUEUE_MESSAGE_005
+- GARBAGE_GO_TYPE_QUEUE_006
+- GARBAGE_GO_FUNC_QUEUE_007
+- GARBAGE_GO_QUEUE_OUTPUT_008
+- redis_cache
+- message_queue

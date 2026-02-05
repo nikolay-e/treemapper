@@ -1,0 +1,29 @@
+interfaces.ts: |
+  export interface Serializable {
+      serialize(): string;
+      deserialize(data: string): void;
+  }
+
+  export interface Comparable<T> {
+      compareTo(other: T): number;
+  }
+impl.ts: |
+  import { Serializable, Comparable } from './interfaces';
+
+  export class DataRecord implements Serializable, Comparable<DataRecord> {
+      constructor(public id: number, public value: string) {}
+
+      serialize(): string {
+          return JSON.stringify({ id: this.id, value: this.value });
+      }
+
+      deserialize(data: string): void {
+          const parsed = JSON.parse(data);
+          this.id = parsed.id;
+          this.value = parsed.value;
+      }
+
+      compareTo(other: DataRecord): number {
+          return this.id - other.id;
+      }
+  }

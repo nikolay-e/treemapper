@@ -1,0 +1,10 @@
+config/queue.yaml: |
+  queue:
+    broker: amqp://rabbitmq:5672
+    backend: redis://redis:6379
+    prefetch_count: 4
+src/tasks.py: |
+  from celery import Celery
+
+  def create_celery_app(broker: str, backend: str):
+      return Celery(__name__, broker=broker, backend=backend)

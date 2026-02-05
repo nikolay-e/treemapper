@@ -1,0 +1,28 @@
+must_include_files:
+  - asyncapi.yaml
+must_include_content:
+  - |
+    orders/shipped:
+      subscribe:
+        message:
+          payload:
+            $ref: '#/components/schemas/OrderShippedEvent'
+  - |
+    OrderShippedEvent:
+      type: object
+      properties:
+        orderId:
+          type: string
+        trackingNumber:
+          type: string
+must_not_include:
+  - GARBAGE_CICD_DOCS_060_ROUTER_MARKER_A
+  - GARBAGE_CICD_DOCS_060_PARTITION_MARKER_B
+  - GARBAGE_CICD_DOCS_060_BALANCE_MARKER_C
+  - GARBAGE_CICD_DOCS_060_SERIALIZE_MARKER_D
+  - GARBAGE_CICD_DOCS_060_SCHEMA_MARKER_E
+  - GARBAGE_CICD_DOCS_060_COMPRESS_MARKER_F
+  - GarbageEventRouter
+  - GarbageEventSerializer
+  - garbage_event_router.ts
+  - garbage_event_serializer.ts

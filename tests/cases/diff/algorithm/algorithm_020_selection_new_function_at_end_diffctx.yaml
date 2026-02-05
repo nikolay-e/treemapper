@@ -1,0 +1,38 @@
+must_include_files:
+  - src/math/calculator.py
+must_include_content:
+  - |
+    def div(a: Number, b: Number, precision: int = 10) -> Decimal:
+        if b == 0:
+            raise ValueError("division by zero")
+        result = Decimal(str(a)) / Decimal(str(b))
+        return _round_value(result, precision)
+
+    def modulo(a: Number, b: Number, precision: int = 10) -> Decimal:
+        if b == 0:
+            raise ValueError("modulo by zero")
+        result = Decimal(str(a)) % Decimal(str(b))
+        return _round_value(result, precision)
+must_not_include:
+  - GARBAGE_ALGO_STATS_END001
+  - GARBAGE_ALGO_STATS_VERSION_END002
+  - GARBAGE_ALGO_STATS_CACHE_END003
+  - GARBAGE_ALGO_ADD_END004
+  - GARBAGE_ALGO_SUB_END005
+  - GARBAGE_ALGO_MUL_END006
+  - GARBAGE_ALGO_DIV_END007
+  - GarbageStatisticsCalculator
+  - add_garbage
+  - sub_garbage
+  - div_garbage
+  - GARBAGE_ALGO_CONVERTER_END010
+  - GARBAGE_ALGO_CONVERTER_UNITS_END011
+  - GARBAGE_ALGO_CONVERTER_RATES_END012
+  - GarbageUnitConverter
+  - GARBAGE_ALGO_FINANCIAL_END018
+  - GARBAGE_ALGO_FINANCIAL_CURRENCY_END019
+  - GARBAGE_ALGO_FINANCIAL_RATES_END020
+  - GarbageFinancialCalculator
+  - garbage_statistics.py
+  - garbage_converter.py
+  - garbage_financial.py

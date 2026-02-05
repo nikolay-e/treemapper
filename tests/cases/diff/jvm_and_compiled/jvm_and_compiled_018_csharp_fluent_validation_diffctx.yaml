@@ -1,0 +1,16 @@
+must_include_files:
+  - UserValidator.cs
+must_include_content:
+  - |
+    AbstractValidator
+  - |
+    RuleFor
+must_not_include:
+  - GARBAGE_JVM_018_SANITIZE_MARKER_A
+  - GARBAGE_JVM_018_CLEAN_MARKER_B
+  - GARBAGE_JVM_018_FORMAT_MARKER_C
+  - GARBAGE_JVM_018_NORM_MARKER_D
+  - GarbageSanitizer
+  - GarbageFormatter
+  - GarbageSanitizer.cs
+  - GarbageFormatter.cs

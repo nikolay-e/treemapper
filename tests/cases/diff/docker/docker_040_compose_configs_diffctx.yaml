@@ -1,0 +1,19 @@
+must_include:
+- 'configs:'
+- 'source: nginx_main'
+- 'target: /etc/nginx/nginx.conf'
+- 'mode: 0440'
+- 'external: true'
+- 'name: nginx_mime_types_v1'
+- 'file: ./nginx/nginx.conf'
+must_not_include:
+- GARBAGE_DOCKER_525_CONFIG_MARKER_001
+- GARBAGE_DOCKER_525_CONFIG_VAR_002
+- GARBAGE_DOCKER_525_TEST_MARKER_003
+- GARBAGE_DOCKER_525_TEST_CFG_004
+- GARBAGE_DOCKER_525_CFG_DOC_005
+- GARBAGE_DOCKER_525_RELOAD_006
+- GARBAGE_DOCKER_525_ANSIBLE_MARKER_007
+- GARBAGE_DOCKER_525_TEMPLATE_008
+- GARBAGE_DOCKER_525_K8S_MARKER_009
+- GARBAGE_DOCKER_525_CM_010

@@ -1,0 +1,31 @@
+must_include_files:
+  - src/calculator/operations.py
+  - tests/test_operations.py
+must_include_content:
+  - |
+    def add(a: Number, b: Number) -> float:
+        return float(a) + float(b)
+  - |
+    def safe_divide(a: Number, b: Number, default: float = 0.0) -> float:
+        try:
+            return divide(a, b)
+        except ValueError:
+            return default
+  - |
+    class TestSafeDivide:
+        def test_safe_divide_normal(self):
+            assert safe_divide(10, 2) == 5.0
+
+        def test_safe_divide_by_zero(self):
+            assert safe_divide(10, 0) == 0.0
+must_not_include:
+  - GARBAGE_ALGO_010_FIXTURE_MARKER_A
+  - GARBAGE_ALGO_010_SETUP_MARKER_B
+  - GARBAGE_ALGO_010_DATA_MARKER_C
+  - GARBAGE_ALGO_010_MOCK_MARKER_D
+  - GARBAGE_ALGO_010_PATCH_MARKER_E
+  - GARBAGE_ALGO_010_FAKE_MARKER_F
+  - TestFixtures
+  - MockCalculator
+  - garbage_fixtures.py
+  - garbage_mocks.py

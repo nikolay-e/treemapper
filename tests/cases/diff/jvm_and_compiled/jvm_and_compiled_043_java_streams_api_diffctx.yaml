@@ -1,0 +1,17 @@
+must_include_files:
+  - src/main/java/com/example/DataProcessor.java
+  - src/main/java/com/example/User.java
+must_include_content:
+  - |
+    stream()
+  - |
+    groupByDepartment
+must_not_include:
+  - GARBAGE_JVM_043_ITER_MARKER_A
+  - GARBAGE_JVM_043_CURSOR_MARKER_B
+  - GARBAGE_JVM_043_REDUCE_MARKER_C
+  - GARBAGE_JVM_043_FOLD_MARKER_D
+  - GarbageIterator
+  - GarbageReducer
+  - GarbageIterator.java
+  - GarbageReducer.java

@@ -1,0 +1,21 @@
+original.ts: |
+  export interface User {
+      id: string;
+      name: string;
+  }
+
+  export function createUser(name: string): User {
+      return { id: Date.now().toString(), name };
+  }
+augmentation.ts: |
+  import { User } from './original';
+
+  declare module './original' {
+      interface User {
+          email?: string;
+      }
+  }
+
+  export function createUserWithEmail(name: string, email: string): User {
+      return { id: Date.now().toString(), name, email };
+  }

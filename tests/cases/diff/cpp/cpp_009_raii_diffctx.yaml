@@ -1,0 +1,22 @@
+must_include:
+- LockGuard
+- UniqueLock
+- ScopeGuard
+- ResourceGuard
+- SpinMutex
+- criticalSection
+- deferredLock
+must_not_include:
+- GARBAGE_CPP_REGEX_249_001
+- GARBAGE_CPP_REGEX_MAX_249_002
+- GARBAGE_CPP_REGEX_FLAGS_249_003
+- GARBAGE_CPP_REGEX_ENGINE_249_006
+- GARBAGE_CPP_REGEX_COMPILE_249_007
+- GARBAGE_CPP_CONFIG_249_013
+- GARBAGE_CPP_CONFIG_VALUE_249_014
+- GARBAGE_CPP_CONFIG_PARSER_249_015
+- GARBAGE_CPP_CONFIG_LOAD_249_016
+- RegexEngine
+- ConfigParser
+- RegexMatch
+- ConfigValue

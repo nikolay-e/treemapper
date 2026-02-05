@@ -1,0 +1,14 @@
+must_include:
+- public.ts
+- FullRecord
+- PublicRecord
+must_not_include:
+- GARBAGE_JSX_046_GEO_CONFIG_A
+- GARBAGE_JSX_046_CALCULATE_DISTANCE_B
+- GARBAGE_JSX_046_DEFAULT_COORDS_C
+- GARBAGE_JSX_046_TZ_CONFIG_D
+- GARBAGE_JSX_046_TIMEZONE_SERVICE_E
+- GARBAGE_JSX_046_GET_OFFSET_F
+- GarbageGeoService
+- geolocation.ts
+- timezone.ts

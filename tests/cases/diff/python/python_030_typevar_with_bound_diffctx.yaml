@@ -1,0 +1,17 @@
+must_include:
+- class BaseModel
+- "bound=BaseModel"
+- "def save(self, model: T)"
+must_not_include:
+- GARBAGE_PY_030_QUEUE_A
+- GARBAGE_PY_030_BROKER_B
+- GARBAGE_PY_030_MQ_C
+- GARBAGE_PY_030_CONSUME_D
+- GARBAGE_PY_030_TEMPLATE_E
+- GARBAGE_PY_030_RENDER_F
+- GARBAGE_PY_030_ENGINE_G
+- GARBAGE_PY_030_OUTPUT_H
+- MessageQueue
+- TemplateEngine
+- garbage_queue.py
+- garbage_templating.py

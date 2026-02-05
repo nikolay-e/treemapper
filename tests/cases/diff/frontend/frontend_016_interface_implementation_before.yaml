@@ -1,0 +1,16 @@
+interfaces.ts: |
+  export interface IService {
+      start(): void;
+      stop(): void;
+      getStatus(): string;
+  }
+
+  export interface ILogger {
+      log(message: string): void;
+      error(message: string): void;
+  }
+
+  // ts_garbage_marker_001
+  const GARBAGE_INTERFACE_CONFIG = { version: 1 };
+service.ts: |
+  console.log('initial');

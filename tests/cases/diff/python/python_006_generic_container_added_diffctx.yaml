@@ -1,0 +1,21 @@
+must_include:
+- TypeVar
+- Generic
+- class Container
+- class Result
+- Generic[T]
+must_not_include:
+- GARBAGE_MARKER_SERIAL_001
+- UNRELATED_SERIAL_VERSION_002
+- GARBAGE_JSON_CLASS_003
+- GARBAGE_PICKLE_MARKER_004
+- GARBAGE_MARKER_VALID_005
+- UNRELATED_MAX_LENGTH_006
+- GARBAGE_VALID_CLASS_007
+- GARBAGE_FORMAT_VALID_008
+- JsonSerializer
+- PickleSerializer
+- Validator
+- format_validation_error
+- garbage_serialization.py
+- garbage_validation.py

@@ -1,0 +1,20 @@
+must_include_files:
+  - docs/api.rst
+must_include_content:
+  - |
+    .. autofunction:: mylib.transform
+    .. autofunction:: mylib.validate
+  - |
+    Use :func:`mylib.transform` to convert data formats.
+    Call :func:`mylib.validate` before processing.
+must_not_include:
+  - GARBAGE_CICD_DOCS_043_BUILDER_MARKER_A
+  - GARBAGE_CICD_DOCS_043_FORMAT_MARKER_B
+  - GARBAGE_CICD_DOCS_043_PARALLEL_MARKER_C
+  - GARBAGE_CICD_DOCS_043_INDEXER_MARKER_D
+  - GARBAGE_CICD_DOCS_043_SEARCH_MARKER_E
+  - GARBAGE_CICD_DOCS_043_STEMMER_MARKER_F
+  - GarbageSphinxBuilder
+  - GarbageSphinxIndexer
+  - garbage_sphinx_builder.ts
+  - garbage_sphinx_indexer.ts

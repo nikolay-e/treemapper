@@ -1,0 +1,14 @@
+must_include:
+- wrapper.ts
+- fetchData
+- Parameters
+must_not_include:
+- GARBAGE_JSX_048_LOG_CONFIG_A
+- GARBAGE_JSX_048_ROTATE_LOGS_B
+- GARBAGE_JSX_048_ROTATE_OUTPUT_C
+- GARBAGE_JSX_048_TELEMETRY_CONFIG_D
+- GARBAGE_JSX_048_TELEMETRY_CLIENT_E
+- GARBAGE_JSX_048_BATCH_SEND_F
+- GarbageLogTransport
+- logging.ts
+- telemetry.ts

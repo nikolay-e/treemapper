@@ -1,0 +1,14 @@
+must_include:
+- release_notes.txt
+- v2.4.1
+- CSV export encoding
+- data migration script
+must_not_include:
+- GARBAGE_MERGE_006_MARKER_A
+- GARBAGE_MERGE_006_MARKER_B
+- GARBAGE_MERGE_006_A_CLEAN
+- GARBAGE_MERGE_006_A_VERSION
+- GARBAGE_MERGE_006_B_SUMMARY
+- GARBAGE_MERGE_006_B_VERSION
+- text_sanitizer.py
+- health_monitor.py

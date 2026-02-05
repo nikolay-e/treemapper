@@ -1,0 +1,19 @@
+must_include_files:
+  - chart/values.yaml
+  - chart/templates/deployment.yaml
+must_include_content:
+  - |
+    image:
+      repository: myapp
+      tag: latest
+      pullPolicy: IfNotPresent
+  - |
+    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+must_not_include:
+  - GARBAGE_HELM_016_AMBASSADOR_MAPPING_A
+  - GARBAGE_HELM_016_AMBASSADOR_HOST_B
+  - GARBAGE_HELM_016_AMBASSADOR_PREFIX_C
+  - GARBAGE_HELM_016_REGISTRY_DOC_D
+  - GARBAGE_HELM_016_PULL_SECRET_DOC_E
+  - chart/templates/ambassador-mapping.yaml
+  - chart/docs/container-registry.md

@@ -1,0 +1,14 @@
+must_include_files:
+  - src/services/UserService.scala
+must_include_content:
+  - |
+    def createUser(name: String, age: Int, email: String): User
+  - |
+    def updateEmail(id: Long, newEmail: String): Option[User]
+must_not_include:
+  - GARBAGE_SCALA_001_MARKER_A
+  - GARBAGE_SCALA_001_MARKER_B
+  - GARBAGE_SCALA_001_MARKER_D
+  - GARBAGE_SCALA_001_MARKER_E
+  - unrelated/EventPublisher.scala
+  - unrelated/MetricsCollector.scala

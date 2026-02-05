@@ -1,0 +1,17 @@
+config/webhooks.yaml: |
+  webhooks:
+    timeout: 10
+    retry_count: 5
+    endpoints:
+      - url: https://example.com/hook
+      - url: https://backup.example.com/hook
+src/webhooks.py: |
+  import requests
+
+  class WebhookDispatcher:
+      def __init__(self, timeout: int = 30, retry_count: int = 3):
+          self.timeout = timeout
+          self.retry_count = retry_count
+
+      def dispatch(self, url: str, payload: dict):
+          return requests.post(url, json=payload, timeout=self.timeout)

@@ -1,0 +1,13 @@
+config/auth.yaml: |
+  jwt:
+    secret_key: prod-secret-key
+    algorithm: RS256
+    expiration_hours: 1
+src/auth.py: |
+  import jwt
+
+  def create_token(payload: dict, secret: str, algorithm: str = "HS256") -> str:
+      return jwt.encode(payload, secret, algorithm=algorithm)
+
+  def verify_token(token: str, secret: str, algorithm: str = "HS256") -> dict:
+      return jwt.decode(token, secret, algorithms=[algorithm])

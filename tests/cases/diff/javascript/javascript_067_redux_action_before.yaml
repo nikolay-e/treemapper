@@ -1,0 +1,31 @@
+userSlice.ts: |
+  import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+
+  interface User {
+      id: string;
+      name: string;
+  }
+
+  interface UserState {
+      users: User[];
+      loading: boolean;
+  }
+
+  const initialState: UserState = { users: [], loading: false };
+
+  export const userSlice = createSlice({
+      name: 'users',
+      initialState,
+      reducers: {
+          addUser: (state, action: PayloadAction<User>) => {
+              state.users.push(action.payload);
+          },
+          removeUser: (state, action: PayloadAction<string>) => {
+              state.users = state.users.filter(u => u.id !== action.payload);
+          },
+      },
+  });
+
+  export const { addUser, removeUser } = userSlice.actions;
+UserForm.tsx: |
+  console.log('initial');

@@ -1,0 +1,15 @@
+must_include_files:
+  - processor.py
+must_include_content:
+  - |
+    katakana_var = "カタカナ"
+    hiragana_func = "ひらがな"
+must_not_include:
+  - GARBAGE_INT_010_INDEX_MARKER_A
+  - GARBAGE_INT_010_NGRAM_MARKER_B
+  - GarbageTextIndex
+  - garbage_text_index.py
+  - GARBAGE_INT_010_DETECT_MARKER_C
+  - GARBAGE_INT_010_FALLBACK_MARKER_D
+  - GarbageEncodingDetector
+  - garbage_encoding_detector.py

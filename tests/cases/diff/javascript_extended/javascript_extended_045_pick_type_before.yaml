@@ -1,0 +1,13 @@
+user.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+      password: string;
+      createdAt: Date;
+  }
+
+  // ts_ext_garbage_marker_007
+  const GARBAGE_USER = { id: 'garbage' };
+dto.ts: |
+  console.log('initial');

@@ -1,0 +1,14 @@
+must_include_files:
+  - templates.py
+must_include_content:
+  - |
+    "zh": "你好世界!"
+must_not_include:
+  - GARBAGE_INT_004_CACHE_MARKER_A
+  - GARBAGE_INT_004_EVICT_MARKER_B
+  - GarbageTemplateCache
+  - garbage_template_cache.py
+  - GARBAGE_INT_004_LOG_MARKER_C
+  - GARBAGE_INT_004_AUDIT_MARKER_D
+  - GarbageGreetingLog
+  - garbage_greeting_log.py

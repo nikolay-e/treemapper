@@ -1,0 +1,20 @@
+login.ts: |
+  export function getLoginUrl(): string {
+      return '/login';
+  }
+
+  export function getCredentials() {
+      return { username: 'test', password: 'test123' };  // pragma: allowlist secret
+  }
+login.spec.ts: |
+  import { test, expect } from '@playwright/test';
+  import { getLoginUrl, getCredentials } from './login';
+
+  test('user can log in', async ({ page }) => {
+      await page.goto(getLoginUrl());
+      const { username, password } = getCredentials();
+      await page.fill('[name=username]', username);
+      await page.fill('[name=password]', password);
+      await page.click('button[type=submit]');
+      await expect(page).toHaveURL('/dashboard');
+  });

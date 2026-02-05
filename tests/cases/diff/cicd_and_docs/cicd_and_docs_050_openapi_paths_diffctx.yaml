@@ -1,0 +1,23 @@
+must_include_files:
+  - openapi.yaml
+must_include_content:
+  - |
+    post:
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUser'
+must_not_include:
+  - GARBAGE_CICD_DOCS_050_PARSER_MARKER_A
+  - GARBAGE_CICD_DOCS_050_VALIDATE_MARKER_B
+  - GARBAGE_CICD_DOCS_050_DEREFERENCE_MARKER_C
+  - GARBAGE_CICD_DOCS_050_GENERATOR_MARKER_D
+  - GARBAGE_CICD_DOCS_050_LANG_MARKER_E
+  - GARBAGE_CICD_DOCS_050_TEMPLATE_MARKER_F
+  - GarbageOpenapiParser
+  - GarbageOpenapiGenerator
+  - garbage_openapi_parser.ts
+  - garbage_openapi_generator.ts

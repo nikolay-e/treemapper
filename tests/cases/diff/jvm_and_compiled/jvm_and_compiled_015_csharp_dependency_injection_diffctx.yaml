@@ -1,0 +1,16 @@
+must_include_files:
+  - Startup.cs
+must_include_content:
+  - |
+    GARBAGE_JVM_015_ENCODE_MARKER_A
+  - |
+    GARBAGE_JVM_015_DECODE_MARKER_B
+must_not_include:
+  - GARBAGE_JVM_015_LOGGER_MARKER_A
+  - GARBAGE_JVM_015_SINK_MARKER_B
+  - GARBAGE_JVM_015_METRIC_MARKER_C
+  - GARBAGE_JVM_015_COUNTER_MARKER_D
+  - GarbageLogSink
+  - GarbageMetricCounter
+  - GarbageLogSink.cs
+  - GarbageMetricCounter.cs

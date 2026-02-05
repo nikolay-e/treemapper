@@ -1,0 +1,8 @@
+result.ts: 'export type Success<T> = { success: true; data: T };
+
+  export type Failure = { success: false; error: string };
+
+  '
+handler.ts: 'console.log(''initial'');
+
+  '

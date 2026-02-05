@@ -1,0 +1,8 @@
+types.ts: |
+  export interface CardProps {
+      title: string;
+      subtitle?: string;
+      variant: 'primary' | 'secondary';
+  }
+Card.vue: |
+  <template><div>initial</div></template>

@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/RequestHandler.cs
+  - Models/Request.cs
+must_include_content:
+  - |
+    { Method: "GET", Path: "/" } => "Home",
+must_not_include:
+  - GARBAGE_CS_023_CORS_HANDLER_A
+  - GARBAGE_CS_023_COMPRESSION_MW_B
+  - CorsHandler
+  - CompressionMiddleware
+  - Unrelated/CorsHandler.cs
+  - Unrelated/CompressionMiddleware.cs

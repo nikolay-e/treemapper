@@ -1,0 +1,12 @@
+must_include:
+- add
+- calculator.py
+must_not_include:
+- GARBAGE_GRAPH_stu001
+- GARBAGE_GRAPH_stu002
+- GARBAGE_GRAPH_stu003
+- test_circle_area
+- test_rectangle_perimeter
+- TestTriangle
+- parse_json_GARBAGE
+- JsonProcessor

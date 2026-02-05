@@ -1,0 +1,14 @@
+must_include:
+- method
+- MyClass
+- _internal_process
+- clear_cache
+must_not_include:
+- GARBAGE_GRAPH_pqr001
+- GARBAGE_GRAPH_pqr002
+- GARBAGE_GRAPH_pqr003
+- Calculator_GARBAGE
+- StateMachine_GARBAGE
+- Visitor_GARBAGE
+- NodeA_GARBAGE
+- NodeB_GARBAGE

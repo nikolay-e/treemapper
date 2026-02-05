@@ -1,0 +1,16 @@
+must_include:
+- Arc
+- RwLock
+- clone_handle
+- set
+must_not_include:
+- GARBAGE_RUST_037_EMAIL_VALIDATOR_A
+- GARBAGE_RUST_037_EMAIL_REGEX_B
+- GarbageEmailValidator037
+- garbage_validate_037
+- garbage_is_allowed_domain_037
+- GARBAGE_RUST_037_SLUG_GENERATOR_C
+- GARBAGE_RUST_037_SEPARATOR_D
+- GarbageSlugGenerator037
+- garbage_slugify_037
+- garbage_deslugify_037

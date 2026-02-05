@@ -1,0 +1,22 @@
+must_include:
+- PacketSerializer
+- serializeDataPacket
+- deserializeDataPacket
+- reinterpret_cast
+- PacketHeader
+- DataPacket
+- validatePacket
+must_not_include:
+- GARBAGE_CPP_MATRIX_251_001
+- GARBAGE_CPP_MATRIX_SIZE_251_002
+- GARBAGE_CPP_MATRIX_STRUCT_251_003
+- GARBAGE_CPP_MATRIX_CLASS_251_005
+- GARBAGE_CPP_MATRIX_MULT_251_006
+- GARBAGE_CPP_SCENE_251_011
+- GARBAGE_CPP_SCENE_NODE_251_012
+- GARBAGE_CPP_SCENE_GRAPH_251_014
+- GARBAGE_CPP_SCENE_ADD_251_015
+- MatrixMath
+- SceneGraph
+- Matrix4x4
+- SceneNode

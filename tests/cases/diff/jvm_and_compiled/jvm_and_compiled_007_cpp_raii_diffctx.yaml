@@ -1,0 +1,16 @@
+must_include_files:
+  - guard.cpp
+must_include_content:
+  - |
+    GARBAGE_JVM_007_ENQUEUE_MARKER_A
+  - |
+    GARBAGE_JVM_007_DEQUEUE_MARKER_B
+must_not_include:
+  - GARBAGE_JVM_007_SPIN_MARKER_A
+  - GARBAGE_JVM_007_YIELD_MARKER_B
+  - GARBAGE_JVM_007_SEM_MARKER_C
+  - GARBAGE_JVM_007_POST_MARKER_D
+  - GarbageSpinLock
+  - GarbageSemaphore
+  - garbage_spinlock.cpp
+  - garbage_semaphore.cpp

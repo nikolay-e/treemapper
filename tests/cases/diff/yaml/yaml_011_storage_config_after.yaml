@@ -1,0 +1,13 @@
+config/storage.yaml: |
+  storage:
+    backend: s3
+    bucket: my-bucket
+    region: us-east-1
+src/storage.py: |
+  class StorageBackend:
+      def __init__(self, backend: str, path: str):
+          self.backend = backend
+          self.path = path
+
+      def save(self, filename: str, data: bytes):
+          pass

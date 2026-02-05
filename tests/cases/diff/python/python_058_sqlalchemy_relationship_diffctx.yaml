@@ -1,0 +1,17 @@
+must_include:
+- class Order
+- class OrderItem
+- calculate_total
+must_not_include:
+- GARBAGE_PY_058_SHIP_A
+- GARBAGE_PY_058_CARRIER_B
+- GARBAGE_PY_058_RATE_C
+- GARBAGE_PY_058_ETA_D
+- GARBAGE_PY_058_INV_E
+- GARBAGE_PY_058_STOCK_F
+- GARBAGE_PY_058_RESERVE_G
+- GARBAGE_PY_058_DEDUCT_H
+- ShippingCalculator
+- InventoryManager
+- garbage_shipping.py
+- garbage_inventory.py

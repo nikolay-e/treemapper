@@ -1,0 +1,19 @@
+types.ts: |
+  export interface CardProps {
+      title: string;
+      subtitle?: string;
+      variant: 'primary' | 'secondary';
+  }
+Card.vue: |
+  <script setup lang="ts">
+  import type { CardProps } from './types';
+
+  const props = defineProps<CardProps>();
+  </script>
+
+  <template>
+      <div :class="props.variant">
+          <h2>{{ props.title }}</h2>
+          <p v-if="props.subtitle">{{ props.subtitle }}</p>
+      </div>
+  </template>

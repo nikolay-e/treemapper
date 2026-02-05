@@ -1,0 +1,42 @@
+src/main.rs: |
+  fn main() {
+      let version = env!("CARGO_PKG_VERSION");
+      println!("App version: {}", version);
+  }
+Cargo.toml: |
+  [package]
+  name = "myapp"
+  version = "1.0.0"
+  edition = "2021"
+
+  [dependencies]
+  tokio = { version = "1.35", features = ["full"] }
+  axum = "0.7"
+Dockerfile: |
+  FROM rust:1.74-alpine
+  WORKDIR /app
+  COPY . .
+  RUN cargo build --release
+  CMD ["./target/release/myapp"]
+scripts/build.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCKER_507_BUILD_MARKER_001
+  GARBAGE_DOCKER_507_BUILD_VAR_002="release"
+  cargo build --release
+tests/integration_test.rs: |
+  // GARBAGE_DOCKER_507_TEST_MARKER_003
+  // GARBAGE_DOCKER_507_TEST_VAR_004
+  #[test]
+  fn test_main() {}
+docs/building.md: |
+  # Building
+  GARBAGE_DOCKER_507_BUILD_DOC_005
+  GARBAGE_DOCKER_507_INSTRUCTIONS_006="cargo build"
+.github/actions/release/action.yml: |
+  # GARBAGE_DOCKER_507_ACTION_MARKER_007
+  name: Release
+  GARBAGE_DOCKER_507_ACTION_VAR_008: release
+benches/benchmark.rs: |
+  // GARBAGE_DOCKER_507_BENCH_MARKER_009
+  // GARBAGE_DOCKER_507_BENCH_VAR_010
+  fn bench_main() {}

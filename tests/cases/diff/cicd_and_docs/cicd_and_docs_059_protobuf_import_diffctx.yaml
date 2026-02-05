@@ -1,0 +1,25 @@
+must_include_files:
+  - common.proto
+must_include_content:
+  - |
+    enum SortOrder {
+      SORT_ORDER_UNSPECIFIED = 0;
+      SORT_ORDER_ASC = 1;
+      SORT_ORDER_DESC = 2;
+    }
+  - |
+    message DateRange {
+      string start_date = 1;
+      string end_date = 2;
+    }
+must_not_include:
+  - GARBAGE_CICD_DOCS_059_GENERATOR_MARKER_A
+  - GARBAGE_CICD_DOCS_059_OUTPUT_MARKER_B
+  - GARBAGE_CICD_DOCS_059_FLAT_MARKER_C
+  - GARBAGE_CICD_DOCS_059_RESOLVE_MARKER_D
+  - GARBAGE_CICD_DOCS_059_INCLUDE_MARKER_E
+  - GARBAGE_CICD_DOCS_059_CACHED_MARKER_F
+  - GarbageProtoGenerator
+  - GarbageProtoResolver
+  - garbage_proto_generator.ts
+  - garbage_proto_resolver.ts

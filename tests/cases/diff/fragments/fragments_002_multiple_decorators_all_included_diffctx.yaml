@@ -1,0 +1,19 @@
+must_include:
+- '@decorator1'
+- '@decorator2'
+- '@decorator3'
+- decorated_func
+- multi_dec.py
+must_not_include:
+- GARBAGE_FRAG_before002
+- GARBAGE_FRAG_beforeclass002
+- GARBAGE_FRAG_after002
+- GARBAGE_FRAG_afterclass002
+- GARBAGE_FRAG_aftermethod002
+- GARBAGE_FRAG_constant002
+- GARBAGE_FRAG_util002
+- GARBAGE_FRAG_helper002
+- garbage_utils_002.py
+- unrelated_before_function
+- unrelated_after_function
+- GarbageHelper

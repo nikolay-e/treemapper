@@ -1,0 +1,33 @@
+must_include_files:
+  - src/services/order_service.py
+must_include_content:
+  - |
+    @dataclass
+    class Order:
+        id: int
+        customer_id: int
+        total: float
+        status: str = "pending"
+        created_at: datetime = None
+  - |
+    def process_order(self, order_id: int) -> bool:
+        order = self.get_order(order_id)
+        if not order:
+            return False
+        if order.status != "pending":
+            return False
+        success = self.payment_service.charge(order.customer_id, order.total)
+        if success:
+            order.status = "completed"
+        return success
+must_not_include:
+  - GARBAGE_ALGO_016_ANALYTICS_MARKER_A
+  - GARBAGE_ALGO_016_TRACKING_MARKER_B
+  - GARBAGE_ALGO_016_EVENTS_MARKER_C
+  - GARBAGE_ALGO_016_REPORT_MARKER_D
+  - GARBAGE_ALGO_016_EXPORT_MARKER_E
+  - GARBAGE_ALGO_016_FORMAT_MARKER_F
+  - AnalyticsTracker
+  - ReportGenerator
+  - garbage_analytics.py
+  - garbage_reporting.py

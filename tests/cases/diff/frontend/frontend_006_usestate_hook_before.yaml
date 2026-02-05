@@ -1,0 +1,22 @@
+types.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+  }
+
+  export interface Post {
+      id: string;
+      title: string;
+      content: string;
+      authorId: string;
+  }
+
+  // react_garbage_marker_002
+  const GARBAGE_CONSTANT = "should not appear";
+UserList.tsx: |
+  import React from 'react';
+
+  export function UserList() {
+      return <div>Initial</div>;
+  }

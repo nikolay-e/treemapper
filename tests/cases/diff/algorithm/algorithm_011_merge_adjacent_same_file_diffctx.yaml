@@ -1,0 +1,25 @@
+must_include_files:
+  - src/validators/input_validators.py
+must_include_content:
+  - |
+    def validate_email(email: str) -> bool:
+        if not email or '@' not in email:
+            return False
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.match(pattern, email.lower()))
+
+    def validate_phone(phone: str) -> bool:
+        cleaned = re.sub(r'[\s\-\(\)]', '', phone)
+        pattern = r'^\+?[1-9]\d{1,14}$'
+        return bool(re.match(pattern, cleaned))
+must_not_include:
+  - GARBAGE_ALGO_011_TRANSFORM_MARKER_A
+  - GARBAGE_ALGO_011_CONVERT_MARKER_B
+  - GARBAGE_ALGO_011_MAPPER_MARKER_C
+  - GARBAGE_ALGO_011_SERIAL_MARKER_D
+  - GARBAGE_ALGO_011_FORMAT_MARKER_E
+  - GARBAGE_ALGO_011_ENCODE_MARKER_F
+  - DataTransformer
+  - JSONSerializer
+  - garbage_transformers.py
+  - garbage_serializers.py

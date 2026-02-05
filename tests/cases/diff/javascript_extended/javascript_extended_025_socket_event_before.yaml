@@ -1,0 +1,13 @@
+events.ts: |
+  export interface ChatMessage {
+      userId: string;
+      text: string;
+      timestamp: number;
+  }
+
+  export const CHAT_EVENT = 'chat:message';
+
+  // node_garbage_marker_005
+  const GARBAGE_EVENT = 'garbage:event';
+socket.ts: |
+  console.log('initial');

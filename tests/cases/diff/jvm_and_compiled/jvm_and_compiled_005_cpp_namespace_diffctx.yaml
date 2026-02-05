@@ -1,0 +1,16 @@
+must_include_files:
+  - app.cpp
+must_include_content:
+  - |
+    GARBAGE_JVM_005_REGISTRY_MARKER_A
+  - |
+    GARBAGE_JVM_005_LOOKUP_MARKER_B
+must_not_include:
+  - GARBAGE_JVM_005_COLOR_MARKER_A
+  - GARBAGE_JVM_005_HEX_MARKER_B
+  - GARBAGE_JVM_005_HASH_MARKER_C
+  - GARBAGE_JVM_005_ENCRYPT_MARKER_D
+  - GarbageColorConverter
+  - GarbageCryptoUtils
+  - garbage_color.cpp
+  - garbage_crypto.cpp

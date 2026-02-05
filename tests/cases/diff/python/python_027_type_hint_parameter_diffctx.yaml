@@ -1,0 +1,17 @@
+must_include:
+- class UserProfile
+- "def process(self, user: UserProfile)"
+- full_display
+must_not_include:
+- GARBAGE_PY_027_REPORTING_A
+- GARBAGE_PY_027_METRICS_B
+- GARBAGE_PY_027_GENERATOR_C
+- GARBAGE_PY_027_RETENTION_D
+- GARBAGE_PY_027_MIGRATION_E
+- GARBAGE_PY_027_SCHEMA_F
+- GARBAGE_PY_027_MIGRATOR_G
+- GARBAGE_PY_027_VERSION_H
+- ReportGenerator
+- DatabaseMigrator
+- garbage_reporting.py
+- garbage_migration.py

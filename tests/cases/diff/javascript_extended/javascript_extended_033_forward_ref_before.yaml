@@ -1,0 +1,21 @@
+Input.tsx: |
+  import { forwardRef } from 'react';
+
+  interface InputProps {
+      label: string;
+      type?: string;
+  }
+
+  export const Input = forwardRef<HTMLInputElement, InputProps>(
+      ({ label, type = 'text' }, ref) => (
+          <div>
+              <label>{label}</label>
+              <input ref={ref} type={type} />
+          </div>
+      )
+  );
+
+  // react_adv_garbage_marker_007
+  const GARBAGE_INPUT_CONFIG = { maxLength: 100 };
+Form.tsx: |
+  console.log('initial');

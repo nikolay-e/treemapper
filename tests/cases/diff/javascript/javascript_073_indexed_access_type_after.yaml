@@ -1,0 +1,14 @@
+schema.ts: |
+  export interface Schema {
+      users: { id: string; name: string }[];
+      posts: { id: string; title: string; content: string }[];
+  }
+accessor.ts: |
+  import { Schema } from './schema';
+
+  type User = Schema['users'][number];
+  type Post = Schema['posts'][number];
+
+  function getFirstUser(schema: Schema): User {
+      return schema.users[0];
+  }

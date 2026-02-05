@@ -1,0 +1,18 @@
+types.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+  }
+
+  export type UserRole = 'admin' | 'user' | 'guest';
+service.ts: |
+  import type { User, UserRole } from './types';
+
+  function getUser(id: string): User {
+      return { id, name: 'Test', email: 'test@example.com' };
+  }
+
+  function checkRole(role: UserRole): boolean {
+      return role === 'admin';
+  }

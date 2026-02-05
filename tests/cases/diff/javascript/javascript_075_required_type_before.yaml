@@ -1,0 +1,8 @@
+options.ts: |
+  export interface Options {
+      name?: string;
+      value?: number;
+      enabled?: boolean;
+  }
+validator.ts: |
+  console.log('initial');

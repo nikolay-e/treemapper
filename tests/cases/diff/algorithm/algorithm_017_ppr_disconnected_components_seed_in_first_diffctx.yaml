@@ -1,0 +1,39 @@
+must_include_files:
+  - src/auth/authenticator.py
+must_include_content:
+  - |
+    class Authenticator:
+        def __init__(self, session_duration: int = 3600):
+            self.users: Dict[str, str] = {}
+            self.sessions: Dict[str, dict] = {}
+            self.session_duration = session_duration
+  - |
+    def login(self, username: str, password: str) -> Optional[str]:
+        if username not in self.users:
+            return None
+        if self.users[username] != self._hash_password(password):
+            return None
+        session_token = self._generate_token()
+        expires_at = datetime.now() + timedelta(seconds=self.session_duration)
+        self.sessions[session_token] = {"username": username, "expires_at": expires_at}
+        return session_token
+
+    def validate_session(self, token: str) -> Optional[str]:
+        session = self.sessions.get(token)
+        if not session:
+            return None
+        if datetime.now() > session["expires_at"]:
+            del self.sessions[token]
+            return None
+        return session["username"]
+must_not_include:
+  - GARBAGE_ALGO_017_BACKUP_MARKER_A
+  - GARBAGE_ALGO_017_RESTORE_MARKER_B
+  - GARBAGE_ALGO_017_SNAPSHOT_MARKER_C
+  - GARBAGE_ALGO_017_SYNC_MARKER_D
+  - GARBAGE_ALGO_017_REPLICATE_MARKER_E
+  - GARBAGE_ALGO_017_QUEUE_MARKER_F
+  - BackupManager
+  - DataSynchronizer
+  - garbage_backup.py
+  - garbage_sync.py

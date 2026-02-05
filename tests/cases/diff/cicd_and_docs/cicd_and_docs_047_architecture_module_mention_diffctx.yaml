@@ -1,0 +1,24 @@
+must_include_files:
+  - docs/architecture.md
+must_include_content:
+  - |
+    - `cache` - Redis caching layer
+    - `events` - Event publishing and handling
+  - |
+    ## Module Dependencies
+
+    ```
+    api -> auth -> cache
+    api -> events
+    ```
+must_not_include:
+  - GARBAGE_CICD_DOCS_047_ANALYZER_MARKER_A
+  - GARBAGE_CICD_DOCS_047_FORMAT_MARKER_B
+  - GARBAGE_CICD_DOCS_047_CIRCULAR_MARKER_C
+  - GARBAGE_CICD_DOCS_047_VALIDATOR_MARKER_D
+  - GARBAGE_CICD_DOCS_047_RULES_MARKER_E
+  - GARBAGE_CICD_DOCS_047_STRICT_MARKER_F
+  - GarbageArchAnalyzer
+  - GarbageArchValidator
+  - garbage_arch_analyzer.ts
+  - garbage_arch_validator.ts

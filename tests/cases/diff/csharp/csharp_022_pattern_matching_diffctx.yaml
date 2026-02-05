@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/AreaCalculator.cs
+  - Models/Shape.cs
+must_include_content:
+  - |
+    Circle c => Math.PI * c.Radius * c.Radius,
+must_not_include:
+  - GARBAGE_CS_022_TAX_CALCULATOR_A
+  - GARBAGE_CS_022_DISCOUNT_ENGINE_B
+  - TaxCalculator
+  - DiscountEngine
+  - Unrelated/TaxCalculator.cs
+  - Unrelated/DiscountEngine.cs

@@ -1,0 +1,18 @@
+must_include:
+- index.html
+- about.html
+- Title
+- Heading
+- Username
+- Version
+must_not_include:
+- GARBAGE_GO_EMBED_MIGRATE_001
+- GARBAGE_GO_TYPE_MIGRATE_002
+- GARBAGE_GO_FUNC_MIGRATE_003
+- GARBAGE_GO_MIGRATE_UNUSED_004
+- GARBAGE_GO_CONFIG_EMBED_005
+- GARBAGE_GO_TYPE_CONFIG_006
+- GARBAGE_GO_FUNC_CONFIG_007
+- GARBAGE_GO_CONFIG_OUTPUT_008
+- migrations
+- loader.go

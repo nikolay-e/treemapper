@@ -1,0 +1,8 @@
+types.ts: 'export type Named = { name: string };
+
+  export type Aged = { age: number };
+
+  '
+person.ts: 'console.log(''initial'');
+
+  '

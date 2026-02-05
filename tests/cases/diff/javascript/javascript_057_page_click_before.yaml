@@ -1,0 +1,10 @@
+login.ts: |
+  export function getLoginUrl(): string {
+      return '/login';
+  }
+
+  export function getCredentials() {
+      return { username: 'test', password: 'test123' };  // pragma: allowlist secret
+  }
+login.spec.ts: |
+  console.log('initial');

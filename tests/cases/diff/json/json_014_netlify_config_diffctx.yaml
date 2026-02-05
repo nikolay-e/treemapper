@@ -1,0 +1,14 @@
+must_include:
+- functions/hello.js
+- exports.handler
+- functions/users.js
+- getAllUsers
+must_not_include:
+- GARBAGE_JSON_014_BUNDLE_FORMAT_A
+- GARBAGE_JSON_014_ASSET_BUNDLER_B
+- GARBAGE_JSON_014_BUNDLE_ASSETS_C
+- GARBAGE_JSON_014_OPTIMIZE_LEVEL_D
+- GARBAGE_JSON_014_IMAGE_OPTIMIZER_E
+- GARBAGE_JSON_014_OPTIMIZE_IMAGES_F
+- bundler.js
+- optimizer.js

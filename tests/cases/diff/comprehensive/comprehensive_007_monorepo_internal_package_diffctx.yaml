@@ -1,0 +1,21 @@
+must_include_files:
+  - internal/logger/index.ts
+must_include_content:
+  - |
+    export enum LogLevel {
+        DEBUG = 0,
+        INFO = 1,
+        WARN = 2,
+        ERROR = 3,
+    }
+must_not_include:
+  - GARBAGE_COMP_007_SIDECAR_PROXY_A
+  - GARBAGE_COMP_007_LOAD_BALANCE_B
+  - GARBAGE_COMP_007_CIRCUIT_BREAK_C
+  - GARBAGE_COMP_007_ETCD_CLUSTER_D
+  - GARBAGE_COMP_007_WATCH_INTERVAL_E
+  - GARBAGE_COMP_007_RECONCILE_F
+  - GarbageServiceMesh
+  - GarbageConfigSync
+  - garbage_service_mesh.ts
+  - garbage_config_sync.ts

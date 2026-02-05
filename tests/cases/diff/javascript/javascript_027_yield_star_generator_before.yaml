@@ -1,0 +1,8 @@
+sub_generator.ts: |
+  export function* subGenerator() {
+      yield 1;
+      yield 2;
+      yield 3;
+  }
+main_generator.ts: |
+  console.log('initial');

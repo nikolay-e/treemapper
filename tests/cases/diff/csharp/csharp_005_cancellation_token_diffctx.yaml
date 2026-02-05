@@ -1,0 +1,14 @@
+must_include_files:
+  - Program.cs
+  - Services/DownloadService.cs
+must_include_content:
+  - |
+    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    var service = new DownloadService(httpClient);
+must_not_include:
+  - GARBAGE_CS_005_SESSION_STORE_A
+  - GARBAGE_CS_005_TOKEN_BUCKET_B
+  - SessionStore
+  - TokenBucket
+  - Unrelated/SessionStore.cs
+  - Unrelated/TokenBucket.cs

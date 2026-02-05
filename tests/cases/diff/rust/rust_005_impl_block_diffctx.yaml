@@ -1,0 +1,28 @@
+must_include:
+- Circle
+- area
+- circumference
+- diameter
+- contains_point
+- PI
+must_not_include:
+- GARBAGE_RUST_COMPRESS_001
+- GARBAGE_COMPRESSION_LEVEL_002
+- GARBAGE_BUFFER_SIZE_003
+- GarbageCompressor004
+- garbage_compress_005
+- GARBAGE_COMPRESS_IMPL_006
+- garbage_decompress_007
+- GARBAGE_DECOMPRESS_ERROR_008
+- GarbageCompressionAlgorithm009
+- garbage_encode_010
+- garbage_decode_011
+- GARBAGE_RUST_ENCRYPT_012
+- GARBAGE_KEY_SIZE_013
+- GARBAGE_IV_SIZE_014
+- GarbageCipher015
+- garbage_encrypt_016
+- GARBAGE_ENCRYPT_IMPL_017
+- garbage_decrypt_018
+- GARBAGE_DECRYPT_ERROR_019
+- garbage_generate_key_020

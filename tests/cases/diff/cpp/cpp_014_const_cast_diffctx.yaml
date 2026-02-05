@@ -1,0 +1,16 @@
+must_include_files:
+  - src/adapter/const_adapter.cpp
+must_include_content:
+  - |
+    class ConstSafeAdapter
+  - |
+    const_cast<char*>
+must_not_include:
+  - GARBAGE_CPP_014_PALETTE_A
+  - GARBAGE_CPP_014_PALETTE_B
+  - GARBAGE_CPP_014_CSV_D
+  - GARBAGE_CPP_014_CSV_E
+  - ColorPalette
+  - CsvParser
+  - color_palette.hpp
+  - csv_parser.cpp

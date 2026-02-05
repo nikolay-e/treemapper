@@ -1,0 +1,26 @@
+must_include:
+- class User
+- class Post
+- class Profile
+- TimestampMixin
+- SoftDeleteMixin
+- models.CharField
+- models.EmailField
+- find_by_email
+- publish
+must_not_include:
+- GARBAGE_PYTHON_052_001
+- GARBAGE_PYTHON_052_002
+- GARBAGE_PYTHON_052_003
+- GARBAGE_PYTHON_052_004
+- GARBAGE_PYTHON_052_005
+- GARBAGE_PYTHON_052_006
+- GARBAGE_PYTHON_052_007
+- GARBAGE_PYTHON_052_008
+- GARBAGE_PYTHON_052_009
+- SearchIndex
+- NotificationManager
+- TaskQueue
+- search_service.py
+- notification_manager.py
+- background_tasks.py

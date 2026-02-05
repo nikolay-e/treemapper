@@ -1,0 +1,23 @@
+must_include:
+- ObjectPool
+- ArenaAllocator
+- PooledObject
+- placement new
+- allocate
+- deallocate
+- reset
+must_not_include:
+- GARBAGE_CPP_SHADER_250_001
+- GARBAGE_CPP_SHADER_VERSION_250_002
+- GARBAGE_CPP_SHADER_TYPE_250_003
+- GARBAGE_CPP_SHADER_COMPILER_250_006
+- GARBAGE_CPP_SHADER_COMPILE_250_007
+- GARBAGE_CPP_ANIM_250_013
+- GARBAGE_CPP_ANIM_KEYFRAME_250_014
+- GARBAGE_CPP_ANIM_TRACK_250_016
+- GARBAGE_CPP_ANIM_SYSTEM_250_018
+- GARBAGE_CPP_ANIM_UPDATE_250_019
+- ShaderCompiler
+- AnimationSystem
+- Keyframe
+- AnimationTrack

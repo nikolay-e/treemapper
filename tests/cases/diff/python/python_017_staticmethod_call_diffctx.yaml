@@ -1,0 +1,11 @@
+must_include:
+- Validator.is_email
+- Validator.is_phone
+- ContactForm
+must_not_include:
+- GARBAGE_PY_DB_847291
+- UNRELATED_DB_MARKER_392847
+- GARBAGE_PY_CACHE_563829
+- UNRELATED_CACHE_MARKER_847261
+- GarbageDatabaseConnection
+- GarbageCacheManager

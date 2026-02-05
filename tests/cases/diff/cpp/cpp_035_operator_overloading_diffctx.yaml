@@ -1,0 +1,37 @@
+must_include:
+- Vector
+- Particle
+- PhysicsWorld
+- Transform
+- operator+
+- operator-
+- operator*
+- operator+=
+- operator-=
+- operator[]
+- operator==
+- dot
+- cross
+- reflect
+- normalized
+must_not_include:
+- GARBAGE_CPP_JSON_278_001
+- GARBAGE_CPP_JSON_DEPTH_278_002
+- GARBAGE_CPP_JSON_TYPE_278_003
+- GARBAGE_CPP_JSON_VALUE_278_004
+- GARBAGE_CPP_JSON_DATA_278_005
+- GARBAGE_CPP_JSON_BUILDER_278_006
+- GARBAGE_CPP_JSON_OBJ_278_007
+- GARBAGE_CPP_JSON_ARR_278_009
+- GARBAGE_CPP_JSON_KEY_278_011
+- GARBAGE_CPP_JSON_VAL_278_013
+- GARBAGE_CPP_MD_278_015
+- GARBAGE_CPP_MD_NODE_278_016
+- GARBAGE_CPP_MD_ELEMENT_278_017
+- GARBAGE_CPP_MD_PARSER_278_019
+- GARBAGE_CPP_MD_PARSE_278_020
+- GARBAGE_CPP_MD_TO_HTML_278_022
+- JsonBuilder
+- MarkdownParser
+- JsonValue
+- MarkdownNode

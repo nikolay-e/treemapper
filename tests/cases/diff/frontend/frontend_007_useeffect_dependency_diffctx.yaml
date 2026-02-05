@@ -1,0 +1,14 @@
+must_include_files:
+  - src/Dashboard.tsx
+must_include_content:
+  - |
+    useEffect
+  - |
+    fetchDashboard
+must_not_include:
+  - GARBAGE_FE_007_DATE_A
+  - GARBAGE_FE_007_DATE_B
+  - GARBAGE_FE_007_STRING_D
+  - GARBAGE_FE_007_STRING_E
+  - date_formatter.ts
+  - string_utils.ts

@@ -1,0 +1,14 @@
+must_include:
+- tests/math.test.js
+- src/math.js
+- add
+- divide
+must_not_include:
+- GARBAGE_JSON_007_REPORT_FORMAT_A
+- GARBAGE_JSON_007_TEST_REPORTER_B
+- GARBAGE_JSON_007_CREATE_REPORT_C
+- GARBAGE_JSON_007_SAMPLE_RATE_D
+- GARBAGE_JSON_007_DATA_SAMPLER_E
+- GARBAGE_JSON_007_SAMPLE_STREAM_F
+- reporter.js
+- sampler.js

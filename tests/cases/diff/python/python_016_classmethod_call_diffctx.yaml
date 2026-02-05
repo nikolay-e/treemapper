@@ -1,0 +1,22 @@
+must_include:
+- '@classmethod'
+- def from_json
+- def from_file
+- def from_env
+- class Config
+- ConfigSchema
+must_not_include:
+- GARBAGE_MARKER_PARSER_001
+- UNRELATED_PARSE_MODE_002
+- GARBAGE_YAML_CLASS_003
+- GARBAGE_TOML_MARKER_004
+- GARBAGE_MARKER_WATCHER_005
+- UNRELATED_POLL_INTERVAL_006
+- GARBAGE_WATCHER_CLASS_007
+- GARBAGE_FORMAT_WATCH_008
+- YamlParser
+- TomlParser
+- FileWatcher
+- format_watch_event
+- garbage_parser.py
+- garbage_watcher.py

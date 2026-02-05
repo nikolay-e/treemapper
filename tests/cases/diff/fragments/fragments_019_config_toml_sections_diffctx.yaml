@@ -1,0 +1,10 @@
+must_include:
+- config.toml
+- database
+- port
+must_not_include:
+- GARBAGE_FRAG_garbroot_071
+- GARBAGE_FRAG_garbnested_071
+- GARBAGE_FRAG_garbitem1_071
+- GARBAGE_FRAG_garbitem2_071
+- garbage_config_071.toml

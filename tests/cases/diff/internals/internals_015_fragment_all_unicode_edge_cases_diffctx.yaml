@@ -1,0 +1,9 @@
+must_include:
+- handler
+- cyrillic
+- chinese
+- arabic
+- japanese
+- korean
+- emoji
+- status

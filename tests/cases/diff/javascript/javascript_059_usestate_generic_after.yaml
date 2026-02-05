@@ -1,0 +1,19 @@
+types.ts: |
+  export interface TodoItem {
+      id: string;
+      text: string;
+      completed: boolean;
+  }
+TodoList.tsx: |
+  import { useState } from 'react';
+  import { TodoItem } from './types';
+
+  export function TodoList() {
+      const [todos, setTodos] = useState<TodoItem[]>([]);
+
+      const addTodo = (text: string) => {
+          setTodos([...todos, { id: Date.now().toString(), text, completed: false }]);
+      };
+
+      return <div>{todos.map(t => <span key={t.id}>{t.text}</span>)}</div>;
+  }

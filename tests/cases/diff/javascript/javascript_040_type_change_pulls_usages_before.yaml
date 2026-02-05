@@ -1,0 +1,11 @@
+types.ts: |
+  export type Config = {
+      apiUrl: string;
+      timeout: number;
+  };
+app.ts: |
+  import { Config } from './types';
+
+  function init(config: Config) {
+      console.log(`Connecting to ${config.apiUrl}`);
+  }

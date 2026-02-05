@@ -1,0 +1,15 @@
+must_include_files:
+  - src/Counter.tsx
+must_include_content:
+  - |
+    useReducer
+  - |
+    counterReducer
+must_not_include:
+  - GARBAGE_FE_009_COLOR_A
+  - GARBAGE_FE_009_COLOR_B
+  - GARBAGE_FE_009_DEBOUNCE_D
+  - GARBAGE_FE_009_THROTTLE_E
+  - hslToHex
+  - color_utils.ts
+  - debounce_utils.ts

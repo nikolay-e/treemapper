@@ -1,0 +1,15 @@
+must_include_files:
+  - greetings.py
+must_include_content:
+  - |
+    def привет_мир():
+        return "здравствуй"
+must_not_include:
+  - GARBAGE_INT_001_CACHE_MARKER_A
+  - GARBAGE_INT_001_INTL_MARKER_B
+  - GarbageIntlCache
+  - garbage_intl_cache.py
+  - GARBAGE_INT_001_ENCODE_MARKER_C
+  - GARBAGE_INT_001_DECODE_MARKER_D
+  - GarbageEncodingUtils
+  - garbage_encoding_utils.py

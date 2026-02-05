@@ -1,0 +1,26 @@
+must_include_files:
+  - services/data_processor.py
+must_include_content:
+  - |
+    @timing
+    @validate_input
+    @cache_result
+    def process_batch(self, items: List[Dict], filter_fn: Optional[Callable] = None) -> List[Dict]:
+        results = []
+        for item in items:
+            if filter_fn and not filter_fn(item):
+                continue
+            processed = self._transform_item(item)
+            results.append(processed)
+        return results
+must_not_include:
+  - GARBAGE_ALGO_005_LOGGING_MARKER_A
+  - GARBAGE_ALGO_005_HANDLER_MARKER_B
+  - GARBAGE_ALGO_005_LEVEL_MARKER_C
+  - GARBAGE_ALGO_005_EVENT_MARKER_D
+  - GARBAGE_ALGO_005_LISTENER_MARKER_E
+  - GARBAGE_ALGO_005_EMIT_MARKER_F
+  - LogHandler
+  - EventEmitter
+  - garbage_logging.py
+  - garbage_events.py

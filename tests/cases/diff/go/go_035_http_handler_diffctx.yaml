@@ -1,0 +1,19 @@
+must_include_files:
+  - api/handlers.go
+  - api/router.go
+must_include_content:
+  - |
+    func (h *UserHandler) handleGet(w http.ResponseWriter, r *http.Request) {
+  - |
+    func (h *UserHandler) handlePost(w http.ResponseWriter, r *http.Request) {
+  - |
+    func SetupRoutes(mux *http.ServeMux, userHandler *UserHandler) {
+must_not_include:
+  - GARBAGE_GO_035_CRON_SCHEDULER_A
+  - GARBAGE_GO_035_NewCronScheduler
+  - GarbageCronScheduler035
+  - GARBAGE_GO_035_MAILER_SMTP_B
+  - GARBAGE_GO_035_NewSmtpMailer
+  - GarbageSmtpMailer035
+  - cron/scheduler.go
+  - mailer/smtp.go

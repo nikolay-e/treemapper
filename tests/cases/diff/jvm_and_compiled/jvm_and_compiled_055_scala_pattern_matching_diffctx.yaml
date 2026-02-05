@@ -1,0 +1,17 @@
+must_include_files:
+  - User.scala
+  - UserValidator.scala
+must_include_content:
+  - |
+    match
+  - |
+    case User
+must_not_include:
+  - GARBAGE_JVM_055_EXTRACT_MARKER_A
+  - GARBAGE_JVM_055_DECONSTRUCT_MARKER_B
+  - GARBAGE_JVM_055_MATCH_MARKER_C
+  - GARBAGE_JVM_055_CASE_MARKER_D
+  - GarbageExtractOps
+  - GarbageMatchHelper
+  - GarbageExtractOps.scala
+  - GarbageMatchHelper.scala

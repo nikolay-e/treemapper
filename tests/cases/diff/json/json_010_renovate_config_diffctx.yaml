@@ -1,0 +1,13 @@
+must_include:
+- package.json
+- src/app.js
+- startServer
+must_not_include:
+- GARBAGE_JSON_010_PATCH_VERSION_A
+- GARBAGE_JSON_010_JSON_PATCHER_B
+- GARBAGE_JSON_010_APPLY_PATCHES_C
+- GARBAGE_JSON_010_ARCHIVE_FORMAT_D
+- GARBAGE_JSON_010_FILE_ARCHIVER_E
+- GARBAGE_JSON_010_CREATE_ARCHIVE_F
+- patcher.js
+- archiver.js

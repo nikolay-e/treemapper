@@ -1,0 +1,14 @@
+must_include_files:
+  - engine.py
+must_include_content:
+  - |
+    def get_statistics(values: list) -> dict:
+must_not_include:
+  - GARBAGE_INT_003_FORMAT_MARKER_A
+  - GARBAGE_INT_003_DECIMAL_MARKER_B
+  - GarbageMathFormatter
+  - garbage_math_formatter.py
+  - GARBAGE_INT_003_PARSE_MARKER_C
+  - GARBAGE_INT_003_BASE_MARKER_D
+  - GarbageNumberParser
+  - garbage_number_parser.py

@@ -1,0 +1,14 @@
+must_include:
+- service.test.ts
+- getUserDisplayName
+- fetchUser
+must_not_include:
+- GARBAGE_JSX_004_STORAGE_ADAPTER_A
+- GARBAGE_JSX_004_SYNC_STORAGE_B
+- GARBAGE_JSX_004_SYNC_OUTPUT_C
+- GARBAGE_JSX_004_NOTIFICATION_HUB_D
+- GARBAGE_JSX_004_NOTIFIER_E
+- GARBAGE_JSX_004_DISPATCH_NOTIFICATION_F
+- GarbageStorageAdapter
+- storage.ts
+- notifications.ts

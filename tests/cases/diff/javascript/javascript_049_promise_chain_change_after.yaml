@@ -1,0 +1,15 @@
+api.ts: |
+  export function fetchData(): Promise<{ data: string; metadata: { timestamp: number } }> {
+      return fetch('/api/data')
+          .then(res => res.json())
+          .then(data => ({
+              ...data,
+              metadata: { timestamp: Date.now() },
+          }));
+  }
+consumer.ts: |
+  import { fetchData } from './api';
+
+  fetchData().then(result => {
+      console.log(result.data);
+  });

@@ -1,0 +1,23 @@
+must_include_files:
+  - chart/values.yaml
+  - chart/templates/deployment.yaml
+must_include_content:
+  - |
+    tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "app"
+        effect: "NoSchedule"
+  - |
+    {{- with .Values.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 8 }}
+    {{- end }}
+must_not_include:
+  - GARBAGE_HELM_013_OTEL_COLLECTOR_A
+  - GARBAGE_HELM_013_OTEL_CONTAINER_B
+  - GARBAGE_HELM_013_OTEL_IMAGE_C
+  - GARBAGE_HELM_013_GPU_GUIDE_D
+  - GARBAGE_HELM_013_DRIVER_INSTALL_E
+  - chart/templates/otel-collector.yaml
+  - chart/docs/gpu-setup.md

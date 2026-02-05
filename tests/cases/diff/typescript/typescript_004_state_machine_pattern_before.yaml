@@ -1,0 +1,38 @@
+src/types/order.ts: |
+  export type OrderStatus =
+    | 'pending'
+    | 'confirmed'
+    | 'processing'
+    | 'shipped'
+    | 'delivered'
+    | 'cancelled';
+
+  export interface OrderItem {
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+  }
+
+  export interface Order {
+    id: string;
+    customerId: string;
+    items: OrderItem[];
+    status: OrderStatus;
+    total: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }
+src/services/orderService.ts: |
+  console.log('placeholder');
+vendor/notification-sdk/index.ts: |
+  // GARBAGE_TS_004_NOTIFY_001 - third party notification SDK
+  export const GARBAGE_TS_004_VERSION_002 = "1.5.0";
+
+  export function GARBAGE_TS_004_send_003(msg: string): void {
+    console.log('GARBAGE_TS_004_SENDING_004:', msg);
+  }
+docs/audit/README.md: |
+  # Audit Documentation
+  GARBAGE_TS_004_AUDIT_005 - audit system overview
+  Using GARBAGE_TS_004_LOGGER_006 for tracking.

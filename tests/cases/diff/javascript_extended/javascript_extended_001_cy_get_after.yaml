@@ -1,0 +1,21 @@
+form.ts: |
+  export const FORM_SELECTORS = {
+      nameInput: '[data-testid=name-input]',
+      emailInput: '[data-testid=email-input]',
+      submitButton: '[data-testid=submit-btn]',
+  };
+
+  // cypress_garbage_marker_001
+  const GARBAGE_FORM_SELECTORS = { garbage: '[data-testid=garbage]' };
+form.cy.ts: |
+  import { FORM_SELECTORS } from './form';
+
+  describe('Contact Form', () => {
+      it('should submit form', () => {
+          cy.visit('/contact');
+          cy.get(FORM_SELECTORS.nameInput).type('John Doe');
+          cy.get(FORM_SELECTORS.emailInput).type('john@example.com');
+          cy.get(FORM_SELECTORS.submitButton).click();
+          cy.contains('Thank you').should('be.visible');
+      });
+  });

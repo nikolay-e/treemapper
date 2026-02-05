@@ -1,0 +1,12 @@
+must_include:
+- build.gradle
+- jacoco
+- actuator
+- dependency-management
+must_not_include:
+- GARBAGE_JAVA_022_METRICS_A
+- GARBAGE_JAVA_022_METRICS_B
+- GARBAGE_JAVA_022_FLAGS_C
+- GARBAGE_JAVA_022_FLAGS_D
+- MetricsExporter
+- FeatureFlags

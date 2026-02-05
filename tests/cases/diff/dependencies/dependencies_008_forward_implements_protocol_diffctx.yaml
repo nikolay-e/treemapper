@@ -1,0 +1,12 @@
+must_include_files:
+  - impl.py
+must_include_content:
+  - |
+    Repository
+must_not_include:
+  - GARBAGE_DEP_008_WEATHER_A
+  - GARBAGE_DEP_008_INVENTORY_B
+  - ForecastModel
+  - Warehouse
+  - dew_point
+  - reorder_point

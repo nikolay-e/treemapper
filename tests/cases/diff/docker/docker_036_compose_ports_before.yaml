@@ -1,0 +1,58 @@
+api/src/app.py: |
+  from flask import Flask, jsonify
+  from prometheus_client import make_wsgi_app, Counter
+  from werkzeug.middleware.dispatcher import DispatcherMiddleware
+
+  REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests')
+
+  app = Flask(__name__)
+
+  @app.route('/health')
+  def health():
+      REQUEST_COUNT.inc()
+      return jsonify(status='ok')
+
+  @app.route('/api/v1/data')
+  def get_data():
+      REQUEST_COUNT.inc()
+      return jsonify(data=[1, 2, 3])
+
+  app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+      '/metrics': make_wsgi_app()
+  })
+api/Dockerfile: |
+  FROM python:3.12-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install -r requirements.txt
+  COPY src/ ./src/
+  CMD ["gunicorn", "-b", "0.0.0.0:8080", "src.app:app"]
+api/requirements.txt: |
+  flask==2.3.0
+  gunicorn==21.2.0
+  prometheus-client==0.19.0
+docker-compose.yml: |
+  version: '3.8'
+  services:
+    api:
+      build: ./api
+scripts/port_forward.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCKER_521_PORT_MARKER_001
+  GARBAGE_DOCKER_521_PORT_VAR_002="forward"
+  kubectl port-forward svc/api 8080:8080
+tests/test_ports.py: |
+  # GARBAGE_DOCKER_521_TEST_MARKER_003
+  GARBAGE_DOCKER_521_TEST_PORT_004 = {"http": 8080}
+  def test_port_binding():
+      pass
+docs/ports.md: |
+  # Port Configuration
+  GARBAGE_DOCKER_521_PORT_DOC_005
+  GARBAGE_DOCKER_521_MAPPING_006="8080:80"
+firewall/rules.yaml: |
+  # GARBAGE_DOCKER_521_FW_MARKER_007
+  GARBAGE_DOCKER_521_RULE_008: allow-http
+nginx/upstream.conf: |
+  # GARBAGE_DOCKER_521_NGINX_MARKER_009
+  GARBAGE_DOCKER_521_UPSTREAM_010: api_servers

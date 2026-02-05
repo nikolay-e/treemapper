@@ -1,0 +1,24 @@
+calculator.ts: |
+  export function add(a: number, b: number): number {
+      return a + b;
+  }
+
+  export function multiply(a: number, b: number): number {
+      return a * b;
+  }
+calculator.test.ts: |
+  import { add, multiply } from './calculator';
+
+  describe('Calculator', () => {
+      describe('add', () => {
+          it('should add two numbers', () => {
+              expect(add(1, 2)).toBe(3);
+          });
+      });
+
+      describe('multiply', () => {
+          it('should multiply two numbers', () => {
+              expect(multiply(2, 3)).toBe(6);
+          });
+      });
+  });

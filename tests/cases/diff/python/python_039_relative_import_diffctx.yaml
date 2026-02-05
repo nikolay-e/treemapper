@@ -1,0 +1,16 @@
+must_include:
+- class User
+- is_admin
+must_not_include:
+- GARBAGE_PY_039_FLAGS_A
+- GARBAGE_PY_039_TOGGLE_B
+- GARBAGE_PY_039_SERVICE_C
+- GARBAGE_PY_039_SET_D
+- GARBAGE_PY_039_LIMITER_E
+- GARBAGE_PY_039_BUCKET_F
+- GARBAGE_PY_039_RATE_G
+- GARBAGE_PY_039_ALLOW_H
+- FeatureFlagService
+- RateLimiter
+- garbage_feature_flags.py
+- garbage_rate_limiter.py

@@ -1,0 +1,20 @@
+must_include_files:
+  - pkg/io/interfaces.go
+  - pkg/io/file.go
+must_include_content:
+  - |
+    type ReadWriter interface {
+        Reader
+        Writer
+    }
+  - |
+    func ProcessReadWriteCloser(rwc ReadWriteCloser) error {
+must_not_include:
+  - GARBAGE_GO_028_CACHE_STORE_A
+  - GARBAGE_GO_028_NewCacheStore
+  - GarbageCacheStore028
+  - GARBAGE_GO_028_ANALYTICS_TRACKER_B
+  - GARBAGE_GO_028_NewEventTracker
+  - GarbageEventTracker028
+  - cache/store.go
+  - analytics/tracker.go

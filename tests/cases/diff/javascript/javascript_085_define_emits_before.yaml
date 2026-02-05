@@ -1,0 +1,7 @@
+events.ts: |
+  export interface FormEvents {
+      submit: [data: { name: string; email: string }];
+      cancel: [];
+  }
+ContactForm.vue: |
+  <template><div>initial</div></template>

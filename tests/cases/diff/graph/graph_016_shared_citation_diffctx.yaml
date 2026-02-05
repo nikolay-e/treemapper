@@ -1,0 +1,15 @@
+must_include:
+- Methods
+must_not_include:
+- GARBAGE_GRAPH_tuv001
+- GARBAGE_GRAPH_tuv002
+- GARBAGE_GRAPH_tuv003
+- darwin1859
+- mendel1866
+- einstein1905
+- bohr1913
+- pauling1939
+- lewis1916
+- Biology Paper
+- Physics Research
+- Chemistry Study

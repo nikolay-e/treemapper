@@ -1,0 +1,2 @@
+must_include:
+- aws_iam_role

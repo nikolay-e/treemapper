@@ -1,0 +1,11 @@
+must_include:
+- get_user
+must_not_include:
+- GARBAGE_GRAPH_vwx001
+- GARBAGE_GRAPH_vwx002
+- GARBAGE_GRAPH_vwx003
+- process_payment
+- refund_payment
+- PaymentProcessor
+- check_stock
+- reserve_stock

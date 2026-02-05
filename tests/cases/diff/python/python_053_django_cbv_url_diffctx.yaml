@@ -1,0 +1,17 @@
+must_include:
+- class ArticleListView
+- ArticleDetailView
+- as_view
+must_not_include:
+- GARBAGE_PY_053_MIDDLE_A
+- GARBAGE_PY_053_CHAIN_B
+- GARBAGE_PY_053_LIMIT_C
+- GARBAGE_PY_053_TRACK_D
+- GARBAGE_PY_053_TMPL_E
+- GARBAGE_PY_053_FILTER_F
+- GARBAGE_PY_053_RENDER_G
+- GARBAGE_PY_053_CLEAR_H
+- RateLimitMiddleware
+- TemplateRenderer
+- garbage_middleware.py
+- garbage_template.py

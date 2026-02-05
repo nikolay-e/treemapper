@@ -1,0 +1,47 @@
+chart/Chart.yaml: |
+  apiVersion: v2
+  name: image-app
+  description: Application with image configuration
+  type: application
+  version: 1.0.0
+chart/values.yaml: |
+  replicaCount: 1
+  image:
+    repository: myapp
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+chart/templates/deployment.yaml: |
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: {{ .Release.Name }}-{{ .Chart.Name }}
+  spec:
+    replicas: {{ .Values.replicaCount }}
+    template:
+      spec:
+        containers:
+          - name: {{ .Chart.Name }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            ports:
+              - containerPort: 8080
+chart/Dockerfile: |
+  FROM python:3.11-slim
+  COPY . .
+  CMD ["python", "app.py"]
+chart/templates/ambassador-mapping.yaml: |
+  apiVersion: getambassador.io/v3alpha1
+  kind: Mapping
+  metadata:
+    name: GARBAGE_HELM_016_AMBASSADOR_MAPPING_A
+  spec:
+    hostname: GARBAGE_HELM_016_AMBASSADOR_HOST_B
+    prefix: GARBAGE_HELM_016_AMBASSADOR_PREFIX_C
+chart/docs/container-registry.md: |
+  # Container Registry Setup
+  GARBAGE_HELM_016_REGISTRY_DOC_D
+  ## Image Pull Secrets
+  GARBAGE_HELM_016_PULL_SECRET_DOC_E

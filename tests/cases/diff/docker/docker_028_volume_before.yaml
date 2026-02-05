@@ -1,0 +1,53 @@
+src/app.py: |
+  import os
+  import json
+  from pathlib import Path
+
+  DATA_DIR = Path('/data')
+  CACHE_DIR = Path('/cache')
+  LOGS_DIR = Path('/var/log/app')
+
+  def ensure_directories():
+      for directory in [DATA_DIR, CACHE_DIR, LOGS_DIR]:
+          directory.mkdir(parents=True, exist_ok=True)
+
+  def save_data(key: str, value: dict):
+      filepath = DATA_DIR / f"{key}.json"
+      with open(filepath, 'w') as f:
+          json.dump(value, f)
+
+  def load_data(key: str) -> dict:
+      filepath = DATA_DIR / f"{key}.json"
+      with open(filepath, 'r') as f:
+          return json.load(f)
+requirements.txt: |
+  flask==2.3.0
+  gunicorn==21.2.0
+Dockerfile: |
+  FROM python:3.11-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install -r requirements.txt
+  COPY src/ ./src/
+  CMD ["python", "src/app.py"]
+scripts/backup_data.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCKER_513_BACKUP_MARKER_001
+  GARBAGE_DOCKER_513_BACKUP_VAR_002="daily"
+  tar -czf backup.tar.gz /data
+tests/test_storage.py: |
+  # GARBAGE_DOCKER_513_TEST_MARKER_003
+  GARBAGE_DOCKER_513_TEST_STORAGE_004 = {"path": "/data"}
+  def test_storage():
+      pass
+docs/volumes.md: |
+  # Volume Configuration
+  GARBAGE_DOCKER_513_VOL_DOC_005
+  GARBAGE_DOCKER_513_MOUNT_006="/data,/cache"
+k8s/persistent-volume.yaml: |
+  # GARBAGE_DOCKER_513_K8S_MARKER_007
+  apiVersion: v1
+  GARBAGE_DOCKER_513_PV_008: 10Gi
+ops/retention.yaml: |
+  # GARBAGE_DOCKER_513_OPS_MARKER_009
+  GARBAGE_DOCKER_513_RETENTION_010: 30d

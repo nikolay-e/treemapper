@@ -1,0 +1,16 @@
+must_include_files:
+  - src/main/java/com/example/dto/UserDto.java
+must_include_content:
+  - |
+    email
+  - |
+    @Email
+must_not_include:
+  - GARBAGE_JVM_039_GRAPHQL_MARKER_A
+  - GARBAGE_JVM_039_RESOLVER_MARKER_B
+  - GARBAGE_JVM_039_GRPC_MARKER_C
+  - GARBAGE_JVM_039_PROTO_MARKER_D
+  - GarbageGraphqlResolver
+  - GarbageGrpcService
+  - GarbageGraphqlResolver.java
+  - GarbageGrpcService.java

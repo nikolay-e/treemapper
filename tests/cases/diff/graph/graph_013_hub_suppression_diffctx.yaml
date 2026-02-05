@@ -1,0 +1,14 @@
+must_include:
+- func1
+- process_data_1
+- module1.py
+must_not_include:
+- GARBAGE_GRAPH_klm001
+- GARBAGE_GRAPH_klm002
+- GARBAGE_GRAPH_klm003
+- track_event
+- track_page_view
+- record_metric
+- increment_counter
+- audit_log
+- audit_create

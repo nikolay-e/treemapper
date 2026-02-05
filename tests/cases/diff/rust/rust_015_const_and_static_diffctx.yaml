@@ -1,0 +1,25 @@
+must_include:
+- MIN_SIZE
+- DEFAULT_NAME
+- INSTANCE_COUNT
+- Config
+- AtomicUsize
+- get_instance_count
+must_not_include:
+- GARBAGE_RUST_BENCH_001
+- GARBAGE_WARMUP_ITERATIONS_002
+- GARBAGE_BENCH_ITERATIONS_003
+- GarbageBenchmark004
+- garbage_run_005
+- garbage_compare_006
+- GarbageBenchmarkable007
+- garbage_benchmark_008
+- GARBAGE_RUST_PROFILER_009
+- GARBAGE_PROFILE_DEPTH_010
+- GarbageProfiler011
+- garbage_start_012
+- GARBAGE_PROFILE_START_013
+- garbage_stop_014
+- GARBAGE_PROFILE_STOP_015
+- garbage_report_016
+- GARBAGE_PROFILE_REPORT_017

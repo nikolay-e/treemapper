@@ -1,0 +1,10 @@
+events.ts: |
+  export interface ChatMessage {
+      userId: string;
+      text: string;
+      timestamp: number;
+  }
+
+  export const CHAT_EVENT = 'chat:message';
+socket.ts: |
+  console.log('initial');

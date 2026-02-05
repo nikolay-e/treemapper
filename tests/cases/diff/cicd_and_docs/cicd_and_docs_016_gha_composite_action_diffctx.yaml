@@ -1,0 +1,23 @@
+must_include_files:
+  - .github/actions/setup/action.yml
+must_include_content:
+  - |
+    runs:
+      using: composite
+      steps:
+        - uses: actions/setup-node@v4
+          with:
+            node-version: 18
+        - run: npm ci
+          shell: bash
+must_not_include:
+  - GARBAGE_CICD_DOCS_016_ACTION_MARKER_A
+  - GARBAGE_CICD_DOCS_016_RUNTIME_MARKER_B
+  - GARBAGE_CICD_DOCS_016_TIMEOUT_MARKER_C
+  - GARBAGE_CICD_DOCS_016_INPUT_MARKER_D
+  - GARBAGE_CICD_DOCS_016_DEFAULT_MARKER_E
+  - GARBAGE_CICD_DOCS_016_VALIDATE_MARKER_F
+  - GarbageActionRunner
+  - GarbageInputParser
+  - garbage_action.ts
+  - garbage_input.ts

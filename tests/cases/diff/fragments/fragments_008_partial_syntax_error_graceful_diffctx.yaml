@@ -1,0 +1,19 @@
+must_include:
+- valid_function
+must_not_include:
+- GARBAGE_FRAG_beforevalid031
+- GARBAGE_FRAG_classbefore031
+- GARBAGE_FRAG_methodbefore031
+- GARBAGE_FRAG_between031
+- GARBAGE_FRAG_afterbroken031
+- GARBAGE_FRAG_classafter031
+- GARBAGE_FRAG_partialfunc031
+- GARBAGE_FRAG_partialclass031
+- GARBAGE_FRAG_partialconst031
+- garbage_partial_031.py
+- unrelated_before_valid_031
+- unrelated_between_031
+- unrelated_after_broken_031
+- UnrelatedClassBefore031
+- UnrelatedClassAfter031
+- GarbagePartial031

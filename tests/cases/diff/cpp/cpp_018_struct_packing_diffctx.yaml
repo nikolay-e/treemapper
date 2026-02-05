@@ -1,0 +1,16 @@
+must_include_files:
+  - src/net/serializer.cpp
+must_include_content:
+  - |
+    class PacketSerializer
+  - |
+    PacketHeader
+must_not_include:
+  - GARBAGE_CPP_018_IMAGE_A
+  - GARBAGE_CPP_018_IMAGE_B
+  - GARBAGE_CPP_018_HASH_D
+  - GARBAGE_CPP_018_HASH_E
+  - ImageLoader
+  - SimpleHashTable
+  - image_loader.hpp
+  - hash_table.cpp

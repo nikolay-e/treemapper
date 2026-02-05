@@ -1,0 +1,16 @@
+must_include_files:
+  - manager.cpp
+must_include_content:
+  - |
+    GARBAGE_JVM_009_MATRIX_MARKER_A
+  - |
+    GARBAGE_JVM_009_TRANSPOSE_MARKER_B
+must_not_include:
+  - GARBAGE_JVM_009_POOL_MARKER_A
+  - GARBAGE_JVM_009_RECYCLE_MARKER_B
+  - GARBAGE_JVM_009_FACTORY_MARKER_C
+  - GARBAGE_JVM_009_DESTROY_MARKER_D
+  - GarbageObjectPool
+  - GarbageObjectFactory
+  - garbage_pool.cpp
+  - garbage_factory.cpp

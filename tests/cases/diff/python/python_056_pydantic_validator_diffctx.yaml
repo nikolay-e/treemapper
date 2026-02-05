@@ -1,0 +1,17 @@
+must_include:
+- '@validator'
+- class UserCreate
+- UserCreate
+must_not_include:
+- GARBAGE_PY_056_GEO_A
+- GARBAGE_PY_056_COORD_B
+- GARBAGE_PY_056_PROJ_C
+- GARBAGE_PY_056_REVERSE_D
+- GARBAGE_PY_056_PAY_E
+- GARBAGE_PY_056_STRIPE_F
+- GARBAGE_PY_056_CHARGE_G
+- GARBAGE_PY_056_REFUND_H
+- GeoLocator
+- PaymentProcessor
+- garbage_geo.py
+- garbage_payment.py

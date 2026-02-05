@@ -1,0 +1,14 @@
+ThemeContext.tsx: |
+  import { createContext } from 'react';
+
+  export interface Theme {
+      primary: string;
+      secondary: string;
+  }
+
+  export const ThemeContext = createContext<Theme>({ primary: '#000', secondary: '#fff' });
+
+  // react_adv_garbage_marker_003
+  const GARBAGE_THEME = { garbage: '#000' };
+Button.tsx: |
+  console.log('initial');

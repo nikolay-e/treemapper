@@ -1,0 +1,13 @@
+config/validation.yaml: |
+  validation:
+    username:
+      min_length: 3
+      max_length: 20
+    password:
+      min_length: 8
+src/validators.py: |
+  def validate_username(username: str, min_len: int = 3, max_len: int = 20) -> bool:
+      return min_len <= len(username) <= max_len
+
+  def validate_password(password: str, min_len: int = 8) -> bool:
+      return len(password) >= min_len

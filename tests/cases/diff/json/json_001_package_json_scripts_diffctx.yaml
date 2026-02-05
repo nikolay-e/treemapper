@@ -1,0 +1,14 @@
+must_include:
+- webpack.config.js
+- module.exports
+- src/index.js
+- createApp
+must_not_include:
+- GARBAGE_JSON_001_FORMAT_CONFIG_A
+- GARBAGE_JSON_001_CODE_FORMATTER_B
+- GARBAGE_JSON_001_APPLY_FORMATTING_C
+- GARBAGE_JSON_001_MIGRATION_REGISTRY_D
+- GARBAGE_JSON_001_SCHEMA_MIGRATOR_E
+- GARBAGE_JSON_001_RUN_MIGRATIONS_F
+- formatter.js
+- migrator.js

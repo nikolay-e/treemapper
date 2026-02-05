@@ -1,0 +1,40 @@
+must_include_files:
+  - src/services/user_service.py
+must_include_content:
+  - |
+    def new_function(self, username: str, email: str, metadata: Optional[Dict] = None) -> User:
+        x = self._validate_username(username)
+        y = self._validate_email(email)
+        if not x or not y:
+            raise ValueError("Invalid username or email")
+        user = User(username=username, email=email, metadata=metadata or {})
+        return self.func2(user)
+
+    def _validate_username(self, username: str) -> bool:
+        return len(username) >= 3 and username.isalnum()
+
+    def _validate_email(self, email: str) -> bool:
+        return "@" in email and "." in email
+must_not_include:
+  - GARBAGE_ALGO_ACCOUNT_NEWF001
+  - GARBAGE_ALGO_ACCOUNT_VERSION_NEWF002
+  - GARBAGE_ALGO_ACCOUNT_CACHE_NEWF003
+  - GARBAGE_ALGO_FUNC1_NEWF004
+  - GARBAGE_ALGO_FUNC2_NEWF005
+  - GARBAGE_ALGO_X_NEWF006
+  - GARBAGE_ALGO_Y_NEWF007
+  - GARBAGE_ALGO_CREATED_NEWF008
+  - GarbageAccountService
+  - new_function_garbage
+  - GARBAGE_ALGO_PROFILE_NEWF009
+  - GARBAGE_ALGO_PROFILE_ENABLED_NEWF010
+  - GARBAGE_ALGO_PROFILE_STATE_NEWF011
+  - GarbageProfileService
+  - new_function_profile
+  - GARBAGE_ALGO_SESSION_NEWF016
+  - GARBAGE_ALGO_SESSION_TTL_NEWF017
+  - GARBAGE_ALGO_SESSION_STORE_NEWF018
+  - GarbageSessionService
+  - garbage_account_service.py
+  - garbage_profile_service.py
+  - garbage_session_service.py

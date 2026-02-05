@@ -1,0 +1,11 @@
+types.ts: |
+  export interface ButtonProps {
+      label: string;
+      onClick: () => void;
+  }
+Button.tsx: |
+  import { ButtonProps } from './types';
+
+  export function Button({ label, onClick }: ButtonProps) {
+      return <button onClick={onClick}>{label}</button>;
+  }

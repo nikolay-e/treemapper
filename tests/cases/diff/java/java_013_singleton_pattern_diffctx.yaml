@@ -1,0 +1,31 @@
+must_include:
+- getInstance()
+- volatile
+- synchronized
+- ApplicationConfig
+- initialize
+- registerChangeListener
+- getIntProperty
+- getBooleanProperty
+- isProduction
+- refresh
+- loadFromFile
+- resetForTesting
+- ConcurrentHashMap
+must_not_include:
+- GARBAGE_JAVA_LOCALE_S023A
+- GARBAGE_JAVA_BUNDLE_S023B
+- GARBAGE_JAVA_DEFAULT_S023C
+- GARBAGE_JAVA_THEME_S023D
+- GARBAGE_JAVA_COLOR_S023E
+- GARBAGE_JAVA_REGISTER_S023F
+- GARBAGE_JAVA_PERF_S023G
+- GARBAGE_JAVA_TIMER_S023H
+- LocalizationManager
+- ThemeManager
+- PerformanceMonitor
+- getMessage
+- setTheme
+- getCurrentTheme
+- startTimer
+- stopTimer

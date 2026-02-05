@@ -1,0 +1,25 @@
+must_include_files:
+  - .gitlab-ci.yml
+  - src/config.py
+must_include_content:
+  - |
+    variables:
+      DATABASE_URL: postgres://db/prod
+      REDIS_URL: redis://redis:6379
+      CI_DEBUG: "true"
+  - |
+    cache = CacheConfig(
+        url=os.getenv("REDIS_URL"),
+        ttl=int(os.getenv("CACHE_TTL", "3600")),
+    )
+must_not_include:
+  - GARBAGE_CICD_005_LOG_MARKER_A
+  - GARBAGE_CICD_005_FORMAT_MARKER_B
+  - GARBAGE_CICD_005_LEVEL_MARKER_C
+  - GARBAGE_CICD_005_METRIC_MARKER_D
+  - GARBAGE_CICD_005_PORT_MARKER_E
+  - GARBAGE_CICD_005_ENABLED_MARKER_F
+  - GarbageLogHandler
+  - GarbageMetricsCollector
+  - garbage_logging.py
+  - garbage_metrics.py

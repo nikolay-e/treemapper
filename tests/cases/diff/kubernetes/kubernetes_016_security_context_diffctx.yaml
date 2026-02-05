@@ -1,0 +1,16 @@
+must_include:
+- securityContext
+- runAsNonRoot
+- runAsUser
+- allowPrivilegeEscalation
+- readOnlyRootFilesystem
+- capabilities
+must_not_include:
+- GARBAGE_K8S_416_SEALED_SECRETS
+- GARBAGE_K8S_416_SS_CONTROLLER
+- GARBAGE_K8S_416_SS_LABEL
+- GARBAGE_K8S_416_SS_VERSION
+- GARBAGE_K8S_416_TRIVY_OPERATOR
+- GARBAGE_K8S_416_TRIVY_NAME
+- GARBAGE_K8S_416_TRIVY_VERSION
+- GARBAGE_K8S_416_TRIVY_NS

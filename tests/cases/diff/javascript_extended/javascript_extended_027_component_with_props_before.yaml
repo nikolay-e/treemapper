@@ -1,0 +1,19 @@
+Card.tsx: |
+  interface CardProps {
+      title: string;
+      children: React.ReactNode;
+  }
+
+  export function Card({ title, children }: CardProps) {
+      return (
+          <div className="card">
+              <h2>{title}</h2>
+              {children}
+          </div>
+      );
+  }
+
+  // react_adv_garbage_marker_001
+  const GARBAGE_CARD_CONFIG = { maxWidth: 300 };
+App.tsx: |
+  console.log('initial');

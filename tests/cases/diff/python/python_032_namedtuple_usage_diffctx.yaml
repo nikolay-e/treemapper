@@ -1,0 +1,17 @@
+must_include:
+- class Point
+- class Rectangle
+- distance_to
+must_not_include:
+- GARBAGE_PY_032_LOGGING_A
+- GARBAGE_PY_032_HANDLER_B
+- GARBAGE_PY_032_STRUCT_C
+- GARBAGE_PY_032_ERROR_D
+- GARBAGE_PY_032_ENCRYPT_E
+- GARBAGE_PY_032_CIPHER_F
+- GARBAGE_PY_032_ENCRYPTOR_G
+- GARBAGE_PY_032_DECRYPT_H
+- StructuredLogger
+- Encryptor
+- garbage_logging.py
+- garbage_encryption.py

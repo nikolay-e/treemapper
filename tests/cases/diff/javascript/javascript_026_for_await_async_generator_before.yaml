@@ -1,0 +1,9 @@
+generator.ts: |
+  export async function* asyncGenerator() {
+      for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          yield i;
+      }
+  }
+consumer.ts: |
+  console.log('initial');

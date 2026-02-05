@@ -1,0 +1,18 @@
+must_include:
+- PaginatedResponse
+- NewPaginatedResponse
+- RequestID
+- Timestamp
+- ValidateEmail
+- Slugify
+must_not_include:
+- GARBAGE_GO_EXPERIMENTAL_FEAT_001
+- GARBAGE_GO_TYPE_FEATURE_002
+- GARBAGE_GO_FUNC_FEATURE_003
+- GARBAGE_GO_FEATURE_UNUSED_004
+- GARBAGE_GO_DEPRECATED_LEGACY_005
+- GARBAGE_GO_TYPE_LEGACY_006
+- GARBAGE_GO_FUNC_LEGACY_007
+- GARBAGE_GO_LEGACY_OUTPUT_008
+- experimental
+- deprecated

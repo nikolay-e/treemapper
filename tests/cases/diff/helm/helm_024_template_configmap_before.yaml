@@ -1,0 +1,28 @@
+chart/Chart.yaml: |
+  apiVersion: v2
+  name: cfg-app
+  version: 1.0.0
+chart/values.yaml: |
+  config:
+    logLevel: info
+    maxConnections: 100
+chart/templates/configmap.yaml: |
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: app-config
+  data: {}
+chart/templates/falco-rules.yaml: |
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: GARBAGE_HELM_024_FALCO_RULES_A
+  data:
+    rules: |
+      GARBAGE_HELM_024_FALCO_RULE_B
+      GARBAGE_HELM_024_FALCO_MACRO_C
+chart/docs/config-management.md: |
+  # Configuration Management
+  GARBAGE_HELM_024_CONFIG_DOC_D
+  ## Hot Reload
+  GARBAGE_HELM_024_HOT_RELOAD_E

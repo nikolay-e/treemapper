@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/AsyncService.cs
+  - Resources/AsyncResource.cs
+must_include_content:
+  - |
+    await using var resource = new AsyncResource();
+must_not_include:
+  - GARBAGE_CS_026_SNAPSHOT_SERVICE_A
+  - GARBAGE_CS_026_REPLAY_BUFFER_B
+  - SnapshotService
+  - ReplayBuffer
+  - Unrelated/SnapshotService.cs
+  - Unrelated/ReplayBuffer.cs

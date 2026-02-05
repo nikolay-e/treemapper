@@ -1,0 +1,29 @@
+must_include_files:
+  - noxfile.py
+  - src/api.py
+must_include_content:
+  - |
+    @nox.session(python=["3.10", "3.11", "3.12"])
+    def tests(session):
+        session.install("-e", ".[dev]")
+        session.run("pytest", "--cov")
+
+    @nox.session
+    def lint(session):
+        session.install("ruff")
+        session.run("ruff", "check", "src/")
+  - |
+    def get_users() -> List[User]:
+        repo = UserRepository()
+        return repo.get_users()
+must_not_include:
+  - GARBAGE_CICD_014_AUTH_MARKER_A
+  - GARBAGE_CICD_014_EXPIRY_MARKER_B
+  - GARBAGE_CICD_014_SECRET_MARKER_C
+  - GARBAGE_CICD_014_SESSION_MARKER_D
+  - GARBAGE_CICD_014_TTL_MARKER_E
+  - GARBAGE_CICD_014_PREFIX_MARKER_F
+  - GarbageAuthService
+  - GarbageSessionManager
+  - garbage_auth.py
+  - garbage_session.py

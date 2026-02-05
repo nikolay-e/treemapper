@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/PersonService.cs
+  - Models/PersonRecord.cs
+must_include_content:
+  - |
+    return person with { Age = newAge };
+must_not_include:
+  - GARBAGE_CS_021_GEO_SERVICE_A
+  - GARBAGE_CS_021_CURRENCY_CONVERTER_B
+  - GeoService
+  - CurrencyConverter
+  - Unrelated/GeoService.cs
+  - Unrelated/CurrencyConverter.cs

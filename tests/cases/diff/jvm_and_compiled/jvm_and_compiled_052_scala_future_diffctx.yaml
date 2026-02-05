@@ -1,0 +1,16 @@
+must_include_files:
+  - AsyncProcessor.scala
+must_include_content:
+  - |
+    Future
+  - |
+    Future.sequence
+must_not_include:
+  - GARBAGE_JVM_052_PROMISE_MARKER_A
+  - GARBAGE_JVM_052_AWAIT_MARKER_B
+  - GARBAGE_JVM_052_CALLBACK_MARKER_C
+  - GARBAGE_JVM_052_DEFERRED_MARKER_D
+  - GarbagePromise
+  - GarbageDeferred
+  - GarbagePromise.scala
+  - GarbageDeferred.scala

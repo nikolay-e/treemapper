@@ -1,0 +1,8 @@
+config.ts: |
+  export interface AppConfig {
+      apiUrl: string;
+      timeout: number;
+      debug: boolean;
+  }
+getter.ts: |
+  console.log('initial');

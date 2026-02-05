@@ -1,0 +1,21 @@
+must_include:
+- authenticate_user
+- create_session
+- hashlib
+must_not_include:
+- SUBSCRIPTION_MODULE_MARKER_PPP111
+- AUTH_PAYMENT_MARKER_QQQ222
+- CREATE_INVOICE_MARKER_RRR333
+- MANAGER_MARKER_SSS444
+- SESSION_MARKER_TTT555
+- TRACKING_MODULE_MARKER_UUU666
+- AUTH_API_MARKER_VVV777
+- CREATE_EVENT_MARKER_WWW888
+- TRACKER_MARKER_XXX999
+- VISITOR_SESSION_MARKER_YYY000
+- authenticate_payment
+- create_invoice
+- SubscriptionManager
+- authenticate_api_key
+- create_event
+- SessionTracker

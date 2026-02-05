@@ -1,0 +1,14 @@
+api.ts: |
+  export interface Response {
+      data?: {
+          user?: {
+              name?: string;
+          };
+      };
+  }
+
+  export function fetchResponse(): Response {
+      return { data: { user: { name: 'Test' } } };
+  }
+main.ts: |
+  console.log('initial');

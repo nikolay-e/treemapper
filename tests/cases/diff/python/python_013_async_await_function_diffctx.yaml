@@ -1,0 +1,20 @@
+must_include:
+- async def fetch_user_data
+- UserData
+- FetchError
+- AsyncHttpClient
+must_not_include:
+- GARBAGE_MARKER_WS_001
+- UNRELATED_WS_BUFFER_002
+- GARBAGE_WS_CLASS_003
+- GARBAGE_WS_MSG_MARKER_004
+- GARBAGE_MARKER_SSE_005
+- UNRELATED_SSE_RETRY_006
+- GARBAGE_SSE_CLASS_007
+- GARBAGE_FORMAT_SSE_008
+- WebSocketManager
+- WebSocketMessage
+- SSEClient
+- format_sse_event
+- garbage_websocket_handler.py
+- garbage_sse.py

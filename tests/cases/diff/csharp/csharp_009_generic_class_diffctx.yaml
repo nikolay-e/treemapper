@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/CacheService.cs
+  - Collections/Cache.cs
+must_include_content:
+  - |
+    private readonly Cache<string, User> _userCache = new();
+must_not_include:
+  - GARBAGE_CS_009_RETRY_POLICY_A
+  - GARBAGE_CS_009_CORRELATION_ID_B
+  - RetryPolicy
+  - CorrelationIdProvider
+  - Unrelated/RetryPolicy.cs
+  - Unrelated/CorrelationIdProvider.cs

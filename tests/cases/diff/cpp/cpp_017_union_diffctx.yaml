@@ -1,0 +1,16 @@
+must_include_files:
+  - src/data/variant_store.cpp
+must_include_content:
+  - |
+    class Variant
+  - |
+    ValueStorage
+must_not_include:
+  - GARBAGE_CPP_017_TPOOL_A
+  - GARBAGE_CPP_017_TPOOL_B
+  - GARBAGE_CPP_017_RING_D
+  - GARBAGE_CPP_017_RING_E
+  - ThreadPool
+  - RingBuffer
+  - thread_pool.hpp
+  - ring_buffer.cpp

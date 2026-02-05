@@ -1,0 +1,33 @@
+must_include_files:
+  - src/models/product.py
+must_include_content:
+  - |
+    class ProductStatus(Enum):
+        ACTIVE = "active"
+        INACTIVE = "inactive"
+        DISCONTINUED = "discontinued"
+  - |
+    @dataclass
+    class Product:
+        id: int
+        name: str
+        price: Decimal
+        description: Optional[str] = None
+        stock: int = 0
+        created_at: datetime = None
+        status: ProductStatus = ProductStatus.ACTIVE
+        tags: List[str] = field(default_factory=list)
+  - |
+    def is_available(self) -> bool:
+        return self.stock > 0 and self.status == ProductStatus.ACTIVE
+must_not_include:
+  - GARBAGE_ALGO_014_INV_MARKER_A
+  - GARBAGE_ALGO_014_STOCK_MARKER_B
+  - GARBAGE_ALGO_014_WAREHOUSE_MARKER_C
+  - GARBAGE_ALGO_014_SHIP_MARKER_D
+  - GARBAGE_ALGO_014_CARRIER_MARKER_E
+  - GARBAGE_ALGO_014_RATE_MARKER_F
+  - InventoryManager
+  - ShippingCalculator
+  - garbage_inventory.py
+  - garbage_shipping.py

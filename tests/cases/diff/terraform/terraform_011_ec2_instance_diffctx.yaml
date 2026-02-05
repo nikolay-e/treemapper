@@ -1,0 +1,13 @@
+must_include:
+- compute.tf
+- aws_launch_template
+- aws_instance
+- aws_security_group
+- metadata_options
+- http_tokens
+- ECS_CLUSTER
+must_not_include:
+- GARBAGE_TF_ec2451a
+- GARBAGE_TF_ec2451b
+- legacy_web
+- collect_legacy_metrics

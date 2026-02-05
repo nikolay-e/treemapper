@@ -1,0 +1,7 @@
+schema.ts: |
+  export interface Schema {
+      users: { id: string; name: string }[];
+      posts: { id: string; title: string; content: string }[];
+  }
+accessor.ts: |
+  console.log('initial');

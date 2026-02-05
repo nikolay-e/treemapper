@@ -1,0 +1,12 @@
+must_include:
+- config.yaml
+- pool_size
+- database/connection.py
+must_not_include:
+- GARBAGE_CFG_001_MARKER_A
+- GARBAGE_CFG_001_TEMPLATE_B
+- GARBAGE_CFG_001_FOOTER_C
+- GARBAGE_CFG_001_MARKER_D
+- GARBAGE_CFG_001_TRACKER_E
+- email_templates.py
+- analytics.py

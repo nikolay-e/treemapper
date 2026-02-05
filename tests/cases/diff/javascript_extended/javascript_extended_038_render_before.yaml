@@ -1,0 +1,13 @@
+Greeting.tsx: |
+  interface GreetingProps {
+      name: string;
+  }
+
+  export function Greeting({ name }: GreetingProps) {
+      return <h1>Hello, {name}!</h1>;
+  }
+
+  // testing_library_garbage_marker_001
+  const GARBAGE_GREETING_CONFIG = { maxLength: 100 };
+Greeting.test.tsx: |
+  console.log('initial');

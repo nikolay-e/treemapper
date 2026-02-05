@@ -1,0 +1,18 @@
+must_include_files:
+  - src/driver/spi_controller.cpp
+must_include_content:
+  - |
+    class SpiController
+  - |
+    waitReady
+  - |
+    SpiRegisters
+must_not_include:
+  - GARBAGE_CPP_015_JSON_A
+  - GARBAGE_CPP_015_JSON_B
+  - GARBAGE_CPP_015_POOL_D
+  - GARBAGE_CPP_015_POOL_E
+  - JsonFormatter
+  - StringPool
+  - json_formatter.hpp
+  - string_pool.cpp

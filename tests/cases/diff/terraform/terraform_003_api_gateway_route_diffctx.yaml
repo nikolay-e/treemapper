@@ -1,0 +1,16 @@
+must_include:
+- aws_apigatewayv2_route
+- aws_apigatewayv2_api
+- aws_apigatewayv2_integration
+- aws_apigatewayv2_authorizer
+- cors_configuration
+must_not_include:
+- GARBAGE_TF_GLUE_443_001
+- GARBAGE_GLUE_DB_443_002
+- GARBAGE_CRAWLER_443_003
+- GARBAGE_GLUE_ROLE_443_004
+- GARBAGE_BUCKET_443_005
+- GARBAGE_TF_SFN_443_006
+- GARBAGE_STATE_MACHINE_443_007
+- GARBAGE_SFN_ROLE_443_008
+- GARBAGE_STATE_443_009

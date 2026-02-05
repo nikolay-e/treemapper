@@ -1,0 +1,23 @@
+must_include:
+- class TimestampMixin
+- class SoftDeleteMixin
+- to_dict
+- def get_db_session
+- soft_delete
+- restore
+must_not_include:
+- GARBAGE_PYTHON_051_001
+- GARBAGE_PYTHON_051_002
+- GARBAGE_PYTHON_051_003
+- GARBAGE_PYTHON_051_004
+- GARBAGE_PYTHON_051_005
+- GARBAGE_PYTHON_051_006
+- GARBAGE_PYTHON_051_007
+- GARBAGE_PYTHON_051_008
+- GARBAGE_PYTHON_051_009
+- CacheExtension
+- MailExtension
+- SessionManager
+- cache_extension.py
+- mail_extension.py
+- session_extension.py

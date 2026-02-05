@@ -1,0 +1,12 @@
+must_include:
+- main
+- helper
+must_not_include:
+- GARBAGE_GRAPH_mno001
+- GARBAGE_GRAPH_mno002
+- GARBAGE_GRAPH_mno003
+- chain_caller
+- func_a_GARBAGE
+- func_b_GARBAGE
+- use_star
+- exported_func

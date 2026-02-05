@@ -1,0 +1,4 @@
+must_include:
+- useCounter.ts
+must_not_include:
+- js_garbage_marker_011

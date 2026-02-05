@@ -1,0 +1,16 @@
+must_include:
+- class Cache
+- "Cache[str, dict]"
+must_not_include:
+- GARBAGE_PY_029_SCHEDULER_A
+- GARBAGE_PY_029_CRON_B
+- GARBAGE_PY_029_TASK_C
+- GARBAGE_PY_029_CANCEL_D
+- GARBAGE_PY_029_AUDIT_E
+- GARBAGE_PY_029_TRAIL_F
+- GARBAGE_PY_029_LOGGER_G
+- GARBAGE_PY_029_RECENT_H
+- TaskScheduler
+- AuditLogger
+- garbage_scheduler.py
+- garbage_audit.py

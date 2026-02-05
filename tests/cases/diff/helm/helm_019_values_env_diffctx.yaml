@@ -1,0 +1,23 @@
+must_include_files:
+  - chart/values.yaml
+  - chart/templates/deployment.yaml
+must_include_content:
+  - |
+    env:
+      - name: LOG_LEVEL
+        value: debug
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: db-secret
+            key: url
+  - |
+    {{- toYaml .Values.env | nindent 14 }}
+must_not_include:
+  - GARBAGE_HELM_019_BACKUP_PVC_A
+  - GARBAGE_HELM_019_ACCESS_MODE_B
+  - GARBAGE_HELM_019_STORAGE_SIZE_C
+  - GARBAGE_HELM_019_ENV_DOC_D
+  - GARBAGE_HELM_019_SECRET_MGMT_E
+  - chart/templates/backup-pvc.yaml
+  - chart/docs/env-vars.md

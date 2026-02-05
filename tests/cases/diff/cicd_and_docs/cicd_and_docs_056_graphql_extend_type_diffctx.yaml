@@ -1,0 +1,27 @@
+must_include_files:
+  - orders.graphql
+must_include_content:
+  - |
+    extend type Query {
+      orders(status: OrderStatus): [Order!]!
+      order(id: ID!): Order
+    }
+  - |
+    enum OrderStatus {
+      PENDING
+      CONFIRMED
+      SHIPPED
+      DELIVERED
+      CANCELLED
+    }
+must_not_include:
+  - GARBAGE_CICD_DOCS_056_MERGE_MARKER_A
+  - GARBAGE_CICD_DOCS_056_STITCH_MARKER_B
+  - GARBAGE_CICD_DOCS_056_CONFLICT_MARKER_C
+  - GARBAGE_CICD_DOCS_056_VALIDATE_MARKER_D
+  - GARBAGE_CICD_DOCS_056_DEPRECATE_MARKER_E
+  - GARBAGE_CICD_DOCS_056_DIRECTIVE_MARKER_F
+  - GarbageSchemaMerger
+  - GarbageSchemaValidator
+  - garbage_schema_merger.ts
+  - garbage_schema_validator.ts

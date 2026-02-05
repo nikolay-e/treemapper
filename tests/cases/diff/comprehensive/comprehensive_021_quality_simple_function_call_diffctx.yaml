@@ -1,0 +1,19 @@
+must_include_files:
+  - src/main.py
+must_include_content:
+  - |
+    from src.utils import double_value
+
+    def bar():
+        return double_value(42)
+must_not_include:
+  - GARBAGE_COMP_021_THUNK_CACHE_A
+  - GARBAGE_COMP_021_FORCE_EVAL_B
+  - GARBAGE_COMP_021_DEPTH_LIMIT_C
+  - GARBAGE_COMP_021_POOL_STRATEGY_D
+  - GARBAGE_COMP_021_YIELD_POINT_E
+  - GARBAGE_COMP_021_STACK_SIZE_F
+  - GarbageLazyEvaluator
+  - GarbageCoroutinePool
+  - garbage_lazy_evaluator.py
+  - garbage_coroutine_pool.py

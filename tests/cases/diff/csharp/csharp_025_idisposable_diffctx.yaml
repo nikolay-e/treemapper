@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/FileService.cs
+  - Resources/FileResource.cs
+must_include_content:
+  - |
+    using var resource = new FileResource(path);
+must_not_include:
+  - GARBAGE_CS_025_METRICS_FLUSHER_A
+  - GARBAGE_CS_025_INDEX_REBUILDER_B
+  - MetricsFlusher
+  - IndexRebuilder
+  - Unrelated/MetricsFlusher.cs
+  - Unrelated/IndexRebuilder.cs

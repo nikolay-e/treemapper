@@ -1,0 +1,20 @@
+must_include_files:
+  - .gitlab-ci.yml
+must_include_content:
+  - |
+    cache:
+      key: $CI_COMMIT_REF_SLUG
+      paths:
+        - node_modules/
+      policy: pull-push
+must_not_include:
+  - GARBAGE_CICD_DOCS_029_BACKEND_MARKER_A
+  - GARBAGE_CICD_DOCS_029_STORAGE_MARKER_B
+  - GARBAGE_CICD_DOCS_029_TTL_MARKER_C
+  - GARBAGE_CICD_DOCS_029_INVALIDATE_MARKER_D
+  - GARBAGE_CICD_DOCS_029_PURGE_MARKER_E
+  - GARBAGE_CICD_DOCS_029_CASCADE_MARKER_F
+  - GarbageCacheBackend
+  - GarbageCacheInvalidator
+  - garbage_cache_backend.ts
+  - garbage_cache_invalidator.ts

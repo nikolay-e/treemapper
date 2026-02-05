@@ -1,0 +1,24 @@
+must_include:
+- class OrderStatus
+- class Priority
+- class PaymentMethod
+- Enum
+- auto
+- REFUNDED
+- next_status
+must_not_include:
+- GARBAGE_PYTHON_035_001
+- GARBAGE_PYTHON_035_002
+- GARBAGE_PYTHON_035_003
+- GARBAGE_PYTHON_035_004
+- GARBAGE_PYTHON_035_005
+- GARBAGE_PYTHON_035_006
+- GARBAGE_PYTHON_035_007
+- GARBAGE_PYTHON_035_008
+- GARBAGE_PYTHON_035_009
+- ShippingZone
+- TaxCalculator
+- DiscountRule
+- shipping_calculator.py
+- tax_service.py
+- discount_engine.py

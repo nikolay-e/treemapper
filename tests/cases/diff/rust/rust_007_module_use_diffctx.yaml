@@ -1,0 +1,26 @@
+must_include:
+- processor
+- transformer
+- pub use utils
+- word_count
+must_not_include:
+- GARBAGE_RUST_HTTP_001
+- GARBAGE_HTTP_TIMEOUT_002
+- GARBAGE_MAX_REDIRECTS_003
+- GarbageHttpClient004
+- garbage_get_005
+- GARBAGE_HTTP_ERROR_006
+- garbage_post_007
+- GARBAGE_POST_ERROR_008
+- garbage_set_header_009
+- GarbageHttpHandler010
+- garbage_handle_011
+- GARBAGE_RUST_WS_012
+- GARBAGE_WS_PORT_013
+- GARBAGE_PING_INTERVAL_014
+- GarbageWebSocket015
+- garbage_connect_016
+- GARBAGE_WS_CONNECT_ERROR_017
+- garbage_send_018
+- GARBAGE_WS_SEND_ERROR_019
+- garbage_close_020

@@ -1,0 +1,8 @@
+callback.ts: |
+  export type Callback = (value: number) => void;
+
+  export function processNumbers(numbers: number[], callback: Callback) {
+      numbers.forEach(n => callback(n));
+  }
+callback.test.ts: |
+  console.log('initial');

@@ -1,0 +1,14 @@
+must_include:
+- src/app.ts
+- processData
+- src/database.ts
+- DatabaseClient
+must_not_include:
+- GARBAGE_JSON_004_COMPRESS_LEVEL_A
+- GARBAGE_JSON_004_DATA_COMPRESSOR_B
+- GARBAGE_JSON_004_QUICK_COMPRESS_C
+- GARBAGE_JSON_004_INDEX_CONFIG_D
+- GARBAGE_JSON_004_SEARCH_INDEXER_E
+- GARBAGE_JSON_004_BUILD_INDEX_F
+- compressor.js
+- indexer.js

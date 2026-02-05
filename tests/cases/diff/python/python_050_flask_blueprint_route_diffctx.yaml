@@ -1,0 +1,20 @@
+must_include:
+- def update_user
+- def delete_user
+- def rate_limit
+must_not_include:
+- GARBAGE_PYTHON_050_001
+- GARBAGE_PYTHON_050_002
+- GARBAGE_PYTHON_050_003
+- GARBAGE_PYTHON_050_004
+- GARBAGE_PYTHON_050_005
+- GARBAGE_PYTHON_050_006
+- GARBAGE_PYTHON_050_007
+- GARBAGE_PYTHON_050_008
+- GARBAGE_PYTHON_050_009
+- RequestLogger
+- APIError
+- UserSerializer
+- middleware.py
+- error_handlers.py
+- serializers.py

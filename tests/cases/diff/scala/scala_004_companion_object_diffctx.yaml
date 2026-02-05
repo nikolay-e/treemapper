@@ -1,0 +1,14 @@
+must_include_files:
+  - src/services/UserFactory.scala
+must_include_content:
+  - |
+    User.fromJson(json)
+  - |
+    User.anonymous
+must_not_include:
+  - GARBAGE_SCALA_004_MARKER_A
+  - GARBAGE_SCALA_004_MARKER_B
+  - GARBAGE_SCALA_004_MARKER_E
+  - GARBAGE_SCALA_004_MARKER_F
+  - unrelated/NotificationSender.scala
+  - unrelated/AuditLogger.scala

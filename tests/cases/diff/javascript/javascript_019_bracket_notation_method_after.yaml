@@ -1,0 +1,17 @@
+handler.ts: |
+  export const handlers = {
+      onClick: () => console.log('clicked'),
+      onHover: () => console.log('hovered'),
+      onFocus: () => console.log('focused'),
+  };
+main.ts: |
+  import { handlers } from './handler';
+
+  function callHandler(name: string) {
+      const method = handlers[name as keyof typeof handlers];
+      if (method) {
+          method();
+      }
+  }
+
+  callHandler('onClick');

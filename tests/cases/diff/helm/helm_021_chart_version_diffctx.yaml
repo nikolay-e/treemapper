@@ -1,0 +1,18 @@
+must_include_files:
+  - chart/Chart.yaml
+  - chart/CHANGELOG.md
+must_include_content:
+  - |
+    version: 2.0.0
+    appVersion: "2.0.0"
+  - |
+    ## 2.0.0
+    - Breaking: Changed API endpoint format
+must_not_include:
+  - GARBAGE_HELM_021_ROLLOUT_A
+  - GARBAGE_HELM_021_ROLLOUT_WEIGHT_B
+  - GARBAGE_HELM_021_ROLLOUT_LABEL_C
+  - GARBAGE_HELM_021_VERSION_POLICY_D
+  - GARBAGE_HELM_021_RELEASE_PROCESS_E
+  - chart/templates/argo-rollout.yaml
+  - chart/docs/versioning.md

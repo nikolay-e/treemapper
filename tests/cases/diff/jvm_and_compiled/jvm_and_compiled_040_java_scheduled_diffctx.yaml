@@ -1,0 +1,16 @@
+must_include_files:
+  - src/main/java/com/example/ScheduledTasks.java
+must_include_content:
+  - |
+    dailyReport
+  - |
+    cron
+must_not_include:
+  - GARBAGE_JVM_040_CRON_MARKER_A
+  - GARBAGE_JVM_040_QUARTZ_MARKER_B
+  - GARBAGE_JVM_040_TIMER_MARKER_C
+  - GARBAGE_JVM_040_INTERVAL_MARKER_D
+  - GarbageCronScheduler
+  - GarbageTimerTask
+  - GarbageCronScheduler.java
+  - GarbageTimerTask.java

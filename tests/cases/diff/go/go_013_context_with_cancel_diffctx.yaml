@@ -1,0 +1,19 @@
+must_include:
+- Processor
+- ProcessorMetrics
+- ErrProcessingTimeout
+- ErrMaxRetriesExceeded
+- doWorkWithContext
+- isRetryable
+- WithTimeout
+must_not_include:
+- GARBAGE_GO_LIFECYCLE_MGR_001
+- GARBAGE_GO_TYPE_LIFECYCLE_002
+- GARBAGE_GO_FUNC_LIFECYCLE_003
+- GARBAGE_GO_LIFECYCLE_UNUSED_004
+- GARBAGE_GO_LIFECYCLE_HOOKS_005
+- GARBAGE_GO_TYPE_HOOKS_006
+- GARBAGE_GO_FUNC_HOOKS_007
+- GARBAGE_GO_HOOKS_OUTPUT_008
+- lifecycle
+- hooks.go

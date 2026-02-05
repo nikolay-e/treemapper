@@ -1,0 +1,14 @@
+must_include:
+- utils.ts
+- fetchUser
+- FetchOptions
+must_not_include:
+- GARBAGE_JSX_006_THEME_PROVIDER_A
+- GARBAGE_JSX_006_APPLY_THEME_B
+- GARBAGE_JSX_006_THEME_OUTPUT_C
+- GARBAGE_JSX_006_CLIPBOARD_HANDLER_D
+- GARBAGE_JSX_006_CLIPBOARD_SERVICE_E
+- GARBAGE_JSX_006_READ_CLIPBOARD_F
+- GarbageThemeManager
+- theme.ts
+- clipboard.ts

@@ -1,0 +1,8 @@
+user.model.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+  }
+user-card.component.ts: |
+  console.log('initial');

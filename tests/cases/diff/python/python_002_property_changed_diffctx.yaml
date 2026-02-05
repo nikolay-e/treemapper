@@ -1,0 +1,19 @@
+must_include:
+- '@property'
+- full_name
+- title
+must_not_include:
+- GARBAGE_MARKER_PAYMENT_001
+- UNRELATED_PAYMENT_CONST_002
+- GARBAGE_PROCESSOR_MARKER_003
+- GARBAGE_STRIPE_MARKER_004
+- GARBAGE_MARKER_INVENTORY_005
+- UNRELATED_STOCK_CONSTANT_006
+- GARBAGE_INVENTORY_CLASS_007
+- GARBAGE_REORDER_MARKER_008
+- PaymentProcessor
+- StripeGateway
+- InventoryManager
+- calculate_reorder_point
+- garbage_payment.py
+- garbage_inventory.py

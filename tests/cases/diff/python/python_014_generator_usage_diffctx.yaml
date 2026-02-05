@@ -1,0 +1,20 @@
+must_include:
+- yield
+- def data_batches
+- BatchStats
+- BatchProcessor
+must_not_include:
+- GARBAGE_MARKER_STREAM_PROC_001
+- UNRELATED_BUFFER_SIZE_002
+- GARBAGE_STREAM_CLASS_003
+- GARBAGE_CHUNKED_MARKER_004
+- GARBAGE_MARKER_AGG_005
+- UNRELATED_AGG_WINDOW_006
+- GARBAGE_AGG_CLASS_007
+- GARBAGE_FORMAT_AGG_008
+- StreamingProcessor
+- ChunkedReader
+- DataAggregator
+- format_aggregation_result
+- garbage_streaming_processor.py
+- garbage_aggregator.py

@@ -1,0 +1,10 @@
+config/api.yaml: |
+  cors:
+    allowed_origins:
+      - https://example.com
+      - https://api.example.com
+    allow_credentials: true
+src/middleware.py: |
+  def setup_cors(app, origins: list[str], credentials: bool = True):
+      for origin in origins:
+          app.allow_origin(origin, credentials=credentials)

@@ -1,0 +1,19 @@
+must_include:
+- NewCounter
+- NewAdder
+- NewMultiplier
+- NewAccumulator
+- NewRateLimiter
+- NewMemoizer
+- closure
+must_not_include:
+- GARBAGE_GO_POOL_CONN_001
+- GARBAGE_GO_TYPE_CONN_002
+- GARBAGE_GO_FUNC_CONN_003
+- GARBAGE_GO_CONN_UNUSED_004
+- GARBAGE_GO_POOL_WORKER_005
+- GARBAGE_GO_TYPE_WORKER_006
+- GARBAGE_GO_FUNC_WORKER_007
+- GARBAGE_GO_WORKER_OUTPUT_008
+- connection.go
+- worker.go

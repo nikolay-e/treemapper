@@ -1,0 +1,24 @@
+must_include:
+- class UserSchema
+- class UserCreateSchema
+- class UserUpdateSchema
+- BaseModel
+- EmailStr
+- '@validator'
+- is_verified
+must_not_include:
+- GARBAGE_PYTHON_034_001
+- GARBAGE_PYTHON_034_002
+- GARBAGE_PYTHON_034_003
+- GARBAGE_PYTHON_034_004
+- GARBAGE_PYTHON_034_005
+- GARBAGE_PYTHON_034_006
+- GARBAGE_PYTHON_034_007
+- GARBAGE_PYTHON_034_008
+- GARBAGE_PYTHON_034_009
+- CacheBackend
+- MessageQueue
+- RateLimiter
+- cache_layer.py
+- queue_manager.py
+- rate_limiter.py

@@ -1,0 +1,25 @@
+actions.ts: |
+  export const INCREMENT = 'INCREMENT';
+  export const DECREMENT = 'DECREMENT';
+  export const RESET = 'RESET';
+  export const SET = 'SET';
+
+  export const increment = () => ({ type: INCREMENT });
+  export const decrement = () => ({ type: DECREMENT });
+  export const reset = () => ({ type: RESET });
+  export const setValue = (value: number) => ({ type: SET, payload: value });
+reducer.ts: |
+  import { INCREMENT, DECREMENT } from './actions';
+
+  const initialState = { count: 0 };
+
+  export function counterReducer(state = initialState, action: any) {
+      switch (action.type) {
+          case INCREMENT:
+              return { count: state.count + 1 };
+          case DECREMENT:
+              return { count: state.count - 1 };
+          default:
+              return state;
+      }
+  }

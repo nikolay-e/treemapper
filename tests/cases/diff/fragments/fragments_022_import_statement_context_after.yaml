@@ -1,0 +1,42 @@
+utils.py: |
+  from typing import Optional, List
+
+  def helper():
+      return 100
+
+  def unrelated_util_081():
+      return "GARBAGE_FRAG_unrelatedutil081"
+
+  class UnrelatedUtilClass:
+      MARKER = "GARBAGE_FRAG_utilclass081"
+
+      def util_method(self):
+          return "GARBAGE_FRAG_utilmethod081"
+
+  def another_util_081():
+      return "GARBAGE_FRAG_anotherutil081"
+
+  UTIL_CONSTANT = "GARBAGE_FRAG_utilconst081"
+main.py: |
+  from utils import helper
+  import os
+
+  def main():
+      return helper()
+
+  def unrelated_main_081():
+      return "GARBAGE_FRAG_unrelatedmain081"
+
+  class UnrelatedMainClass:
+      VALUE = "GARBAGE_FRAG_mainclass081"
+
+  def trailing_main_081():
+      return "GARBAGE_FRAG_trailingmain081"
+garbage_module_081.py: |
+  def garbage_func_081():
+      return "GARBAGE_FRAG_garbfunc081"
+
+  class GarbageClass081:
+      CONST = "GARBAGE_FRAG_garbclass081"
+
+  GARBAGE_CONST_081 = "GARBAGE_FRAG_garbconst081"

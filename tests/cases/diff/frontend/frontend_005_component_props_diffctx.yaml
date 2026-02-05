@@ -1,0 +1,13 @@
+must_include_files:
+  - src/components/UserCard.tsx
+must_include_content:
+  - |
+    UserCardProps
+must_not_include:
+  - GARBAGE_FE_005_ANALYTICS_A
+  - GARBAGE_FE_005_ANALYTICS_B
+  - GARBAGE_FE_005_LOCALE_D
+  - GARBAGE_FE_005_LOCALE_E
+  - AnalyticsTracker
+  - analytics_tracker.ts
+  - locale_config.ts

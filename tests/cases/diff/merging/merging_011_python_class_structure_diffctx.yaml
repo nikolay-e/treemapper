@@ -1,0 +1,5 @@
+must_include:
+- __init__
+- add
+- clear
+- self.count

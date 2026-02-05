@@ -1,0 +1,12 @@
+must_include_files:
+  - main.py
+must_include_content:
+  - |
+    calculate_tax
+must_not_include:
+  - GARBAGE_DEP_001_WEATHER_A
+  - GARBAGE_DEP_001_ASTRO_B
+  - WeatherStation
+  - CelestialBody
+  - predict_temperature
+  - orbital_period

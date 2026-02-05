@@ -1,0 +1,13 @@
+must_include_files:
+  - src/conditional.ts
+must_include_content:
+  - |
+    Unwrap
+must_not_include:
+  - GARBAGE_FE_019_COLOR_A
+  - GARBAGE_FE_019_COLOR_B
+  - GARBAGE_FE_019_DEBOUNCE_D
+  - GARBAGE_FE_019_THROTTLE_E
+  - hslToHex
+  - color_utils.ts
+  - debounce_utils.ts

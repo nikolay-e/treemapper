@@ -1,0 +1,14 @@
+schemas.ts: |
+  export interface CreateUserBody {
+      name: string;
+      email: string;
+      password: string;
+  }
+controller.ts: |
+  import { Request, Response } from 'express';
+  import { CreateUserBody } from './schemas';
+
+  export function createUser(req: Request, res: Response) {
+      const body = req.body as CreateUserBody;
+      res.status(201).json({ id: '1', name: body.name, email: body.email });
+  }

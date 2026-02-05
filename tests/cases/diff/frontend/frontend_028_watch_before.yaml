@@ -1,0 +1,20 @@
+api.ts: |
+  export async function searchUsers(query: string): Promise<any[]> {
+      const response = await fetch(\`/api/users?search=\${encodeURIComponent(query)}\`);
+      return response.json();
+  }
+
+  export async function fetchUserDetails(userId: string): Promise<any> {
+      const response = await fetch(\`/api/users/\${userId}\`);
+      return response.json();
+  }
+
+  // vue_garbage_marker_003
+  const GARBAGE_API_TIMEOUT = 5000;
+UserSearch.vue: |
+  <template>
+      <div>Initial</div>
+  </template>
+
+  <script setup lang="ts">
+  </script>

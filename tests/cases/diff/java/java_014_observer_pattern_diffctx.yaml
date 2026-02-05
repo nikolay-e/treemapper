@@ -1,0 +1,30 @@
+must_include:
+- PriceSubject
+- PriceObserver
+- PriceChangeEvent
+- PriceAlertObserver
+- attach
+- detach
+- notifyObservers
+- onPriceUpdate
+- interestedIn
+- AlertCallback
+- CopyOnWriteArrayList
+- ExecutorService
+must_not_include:
+- GARBAGE_JAVA_REBAL_O024A
+- GARBAGE_JAVA_ALLOC_O024B
+- GARBAGE_JAVA_CALC_O024C
+- GARBAGE_JAVA_HOURS_O024D
+- GARBAGE_JAVA_MARKET_O024E
+- GARBAGE_JAVA_DURATION_O024F
+- GARBAGE_JAVA_DIV_O024G
+- GARBAGE_JAVA_RECORD_O024H
+- TemperatureConverter
+- CircleCalculator
+- WordCounter
+- celsiusToFahrenheit
+- fahrenheitToCelsius
+- calculateArea
+- countWords
+- countCharacters

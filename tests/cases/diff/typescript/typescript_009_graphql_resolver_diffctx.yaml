@@ -1,0 +1,14 @@
+must_include:
+- postResolvers
+- GraphQLContext
+- CreatePostInput
+- Post
+- User
+- src/graphql/resolvers/postResolvers.ts
+must_not_include:
+- GARBAGE_TS_009_SEARCH_001
+- GARBAGE_TS_009_VERSION_002
+- GARBAGE_TS_009_search_003
+- GARBAGE_TS_009_SEARCHING_004
+- GARBAGE_TS_009_MEDIA_005
+- GARBAGE_TS_009_PROCESSOR_006

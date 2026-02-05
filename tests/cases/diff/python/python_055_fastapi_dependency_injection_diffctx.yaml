@@ -1,0 +1,17 @@
+must_include:
+- async def get_current_user
+- Depends
+- get_db
+must_not_include:
+- GARBAGE_PY_055_STORE_A
+- GARBAGE_PY_055_BUCKET_B
+- GARBAGE_PY_055_UPLOAD_C
+- GARBAGE_PY_055_DOWNLOAD_D
+- GARBAGE_PY_055_SMTP_E
+- GARBAGE_PY_055_TEMPLATE_F
+- GARBAGE_PY_055_ATTACH_G
+- GARBAGE_PY_055_BULK_H
+- ObjectStorage
+- EmailSender
+- garbage_storage.py
+- garbage_email.py

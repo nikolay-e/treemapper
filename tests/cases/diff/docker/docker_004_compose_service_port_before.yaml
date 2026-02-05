@@ -1,0 +1,83 @@
+src/server.js: |
+  const http = require('http');
+  const url = require('url');
+
+  const PORT = parseInt(process.env.PORT || '3000', 10);
+  const HOST = process.env.HOST || '0.0.0.0';
+
+  const routes = {
+      '/health': (req, res) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'ok', port: PORT }));
+      },
+      '/api/status': (req, res) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ running: true, uptime: process.uptime() }));
+      }
+  };
+
+  const server = http.createServer((req, res) => {
+      const pathname = url.parse(req.url).pathname;
+      const handler = routes[pathname] || ((req, res) => {
+          res.writeHead(404);
+          res.end('Not Found');
+      });
+      handler(req, res);
+  });
+
+  server.listen(PORT, HOST, () => {
+      console.log(`Server running at http://${HOST}:${PORT}/`);
+  });
+src/config.js: |
+  module.exports = {
+      port: parseInt(process.env.PORT || '3000', 10),
+      host: process.env.HOST || '0.0.0.0',
+      nodeEnv: process.env.NODE_ENV || 'development'
+  };
+package.json: |
+  {
+    "name": "http-server",
+    "version": "1.0.0",
+    "main": "src/server.js",
+    "scripts": {
+      "start": "node src/server.js"
+    }
+  }
+Dockerfile: |
+  FROM node:20-alpine
+  WORKDIR /app
+  COPY package*.json ./
+  RUN npm ci --only=production
+  COPY src/ ./src/
+  CMD ["node", "src/server.js"]
+docker-compose.yml: |
+  version: '3.8'
+  services:
+    web:
+      build: .
+      ports:
+        - "3000:3000"
+scripts/start_dev.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCKER_074_START_MARKER_m1n2b3
+  GARBAGE_DOCKER_074_DEV_PORT_v4c5x6="3000"
+  docker-compose up -d
+tests/integration.test.js: |
+  // GARBAGE_DOCKER_074_TEST_MARKER_z7a8s9
+  const GARBAGE_DOCKER_074_TEST_PORT_d0f1g2 = 3000;
+  describe('Server', () => {
+      it('should respond on port', () => {});
+  });
+docs/networking.md: |
+  # Network Configuration
+  GARBAGE_DOCKER_074_NET_DOC_h3j4k5
+  GARBAGE_DOCKER_074_PORT_LIST_l6q7w8="3000,8080"
+nginx/nginx.conf: |
+  # GARBAGE_DOCKER_074_NGINX_MARKER_e9r0t1
+  upstream backend {
+    GARBAGE_DOCKER_074_UPSTREAM_y2u3i4: server;
+  }
+k8s/service.yaml: |
+  # GARBAGE_DOCKER_074_K8S_MARKER_o5p6a7
+  apiVersion: v1
+  GARBAGE_DOCKER_074_SVC_TYPE_s8d9f0: ClusterIP

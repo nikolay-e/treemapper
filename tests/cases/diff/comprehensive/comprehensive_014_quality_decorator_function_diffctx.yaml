@@ -1,0 +1,18 @@
+must_include_files:
+  - src/main.py
+must_include_content:
+  - |
+    @log_calls
+    def greet(name):
+        return f"Hello, {name}!"
+must_not_include:
+  - GARBAGE_COMP_014_PRIORITY_ORDER_A
+  - GARBAGE_COMP_014_ERROR_HANDLER_B
+  - GARBAGE_COMP_014_SHORT_CIRCUIT_C
+  - GARBAGE_COMP_014_DISCOVERY_PATH_D
+  - GARBAGE_COMP_014_LAZY_IMPORT_E
+  - GARBAGE_COMP_014_SANDBOX_MODE_F
+  - GarbageMiddlewareChain
+  - GarbagePluginLoader
+  - garbage_middleware_chain.py
+  - garbage_plugin_loader.py

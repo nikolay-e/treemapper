@@ -1,0 +1,18 @@
+must_include_files:
+  - tests/conftest.py
+must_include_content:
+  - |
+    @pytest.fixture
+    def db_with_data(db):
+  - |
+    @pytest.fixture
+    def transaction_db(db):
+must_not_include:
+  - GARBAGE_PAT_001_METRICS_COLLECTOR_A
+  - GARBAGE_PAT_001_COLLECTION_INTERVAL_B
+  - GARBAGE_PAT_001_LOG_ROTATOR_A
+  - GARBAGE_PAT_001_ROTATION_SIZE_B
+  - GarbageMetricsCollector
+  - GarbageLogRotator
+  - garbage_metrics_collector.py
+  - garbage_log_rotator.py

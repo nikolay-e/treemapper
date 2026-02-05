@@ -1,0 +1,15 @@
+must_include_files:
+  - src/ThemedButton.tsx
+must_include_content:
+  - |
+    useContext
+  - |
+    ThemeContext
+must_not_include:
+  - GARBAGE_FE_008_STORAGE_A
+  - GARBAGE_FE_008_STORAGE_B
+  - GARBAGE_FE_008_VALIDATION_D
+  - GARBAGE_FE_008_VALIDATION_E
+  - StorageService
+  - storage_service.ts
+  - validation_rules.ts

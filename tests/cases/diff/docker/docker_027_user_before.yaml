@@ -1,0 +1,52 @@
+src/app.py: |
+  import os
+  import pwd
+  from flask import Flask, jsonify
+
+  app = Flask(__name__)
+
+  @app.route('/whoami')
+  def whoami():
+      return jsonify(
+          uid=os.getuid(),
+          gid=os.getgid(),
+          user=pwd.getpwuid(os.getuid()).pw_name
+      )
+
+  @app.route('/health')
+  def health():
+      return jsonify(status='ok')
+
+  if __name__ == '__main__':
+      app.run(host='0.0.0.0', port=8080)
+requirements.txt: |
+  flask==2.3.0
+  gunicorn==21.2.0
+Dockerfile: |
+  FROM python:3.11-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install -r requirements.txt
+  COPY src/ ./src/
+  CMD ["python", "src/app.py"]
+scripts/setup_user.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCKER_512_SETUP_MARKER_001
+  GARBAGE_DOCKER_512_SETUP_VAR_002="user_setup"
+  useradd -m appuser
+tests/test_security.py: |
+  # GARBAGE_DOCKER_512_TEST_MARKER_003
+  GARBAGE_DOCKER_512_TEST_SEC_004 = {"uid": 1000}
+  def test_non_root():
+      pass
+docs/security.md: |
+  # Security
+  GARBAGE_DOCKER_512_SEC_DOC_005
+  GARBAGE_DOCKER_512_USER_006="appuser"
+k8s/pod-security.yaml: |
+  # GARBAGE_DOCKER_512_K8S_MARKER_007
+  apiVersion: v1
+  GARBAGE_DOCKER_512_PSP_008: restricted
+compliance/checks.yaml: |
+  # GARBAGE_DOCKER_512_COMPLIANCE_MARKER_009
+  GARBAGE_DOCKER_512_CHECK_010: non-root

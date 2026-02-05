@@ -1,0 +1,15 @@
+must_include:
+- field_count
+- Fields
+- Data::Struct
+must_not_include:
+- GARBAGE_RUST_029_RENDERER_A
+- GARBAGE_RUST_029_RENDER_FMT_B
+- GarbageTemplateRenderer029
+- garbage_render_029
+- garbage_render_partial_029
+- GARBAGE_RUST_029_ENCODER_C
+- GARBAGE_RUST_029_ENCODING_D
+- GarbageBase64Encoder029
+- garbage_encode_029
+- garbage_decode_029

@@ -1,0 +1,9 @@
+userHandler.ts: |
+  import { Request, Response } from 'express';
+
+  export async function getUserHandler(req: Request, res: Response) {
+      const { id } = req.params;
+      res.json({ id, name: 'User' });
+  }
+routes.ts: |
+  console.log('initial');

@@ -1,0 +1,6 @@
+functions.ts: |
+  export function targetFunction() {
+      return 'called';
+  }
+main.ts: |
+  console.log('initial');

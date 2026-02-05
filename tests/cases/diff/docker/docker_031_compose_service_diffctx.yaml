@@ -1,0 +1,18 @@
+must_include:
+- 'build:'
+- 'context: ./api'
+- 'dockerfile: Dockerfile'
+- 'container_name: api-service'
+- 'hostname: api'
+- 'restart: unless-stopped'
+- 'logging:'
+- json-file
+must_not_include:
+- GARBAGE_DOCKER_516_START_MARKER_001
+- GARBAGE_DOCKER_516_START_VAR_002
+- GARBAGE_DOCKER_516_TEST_MARKER_003
+- GARBAGE_DOCKER_516_TEST_SVC_004
+- GARBAGE_DOCKER_516_SVC_DOC_005
+- GARBAGE_DOCKER_516_TOPOLOGY_006
+- GARBAGE_DOCKER_516_K8S_MARKER_007
+- GARBAGE_DOCKER_516_K8S_SVC_008

@@ -1,0 +1,19 @@
+must_include_files:
+  - src/main.py
+must_include_content:
+  - |
+    def hello():
+        greeting = create_greeting("world", DEFAULT_LANGUAGE)
+        print(greeting)
+        return greeting
+must_not_include:
+  - GARBAGE_COMP_001_METRIC_TRACKER_A
+  - GARBAGE_COMP_001_SESSION_COUNTER_B
+  - GARBAGE_COMP_001_FLUSH_INTERVAL_C
+  - GARBAGE_COMP_001_WARMUP_BATCH_D
+  - GARBAGE_COMP_001_EVICTION_POLICY_E
+  - GARBAGE_COMP_001_TTL_SECONDS_F
+  - GarbageTelemetryCollector
+  - GarbageCacheWarmer
+  - garbage_telemetry.py
+  - garbage_cache_warmer.py

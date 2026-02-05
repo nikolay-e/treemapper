@@ -1,0 +1,22 @@
+must_include_files:
+  - src/services/auth.py
+must_include_content:
+  - |
+    def authenticate(username, password):
+        user = User(username, f"{username}@example.com")
+        if not user.validate():
+            raise ValueError("Invalid username")
+        if not check_password(password):
+            raise ValueError("Invalid password")
+        return True
+must_not_include:
+  - GARBAGE_COMP_004_CHANNEL_TYPE_A
+  - GARBAGE_COMP_004_DELIVERY_MODE_B
+  - GARBAGE_COMP_004_MAX_RETRIES_C
+  - GARBAGE_COMP_004_LOG_RETENTION_D
+  - GARBAGE_COMP_004_COMPLIANCE_LEVEL_E
+  - GARBAGE_COMP_004_ROTATION_POLICY_F
+  - GarbageNotificationHub
+  - GarbageAuditLogger
+  - garbage_notification_hub.py
+  - garbage_audit_logger.py

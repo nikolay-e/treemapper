@@ -1,0 +1,58 @@
+chart/Chart.yaml: |
+  apiVersion: v2
+  name: notification-svc
+  version: 1.3.0
+chart/values.yaml: |
+  replicaCount: 1
+  image:
+    repository: notification-service
+    tag: "1.3.0"
+  config:
+    logLevel: debug
+    debugMode: true
+    maxConnections: 100
+chart/templates/configmap.yaml: |
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: {{ .Release.Name }}-config
+    labels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+  data:
+    LOG_LEVEL: {{ .Values.config.logLevel }}
+    DEBUG_MODE: {{ .Values.config.debugMode | quote }}
+chart/templates/deployment.yaml: |
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: {{ .Release.Name }}-{{ .Chart.Name }}
+  spec:
+    replicas: {{ .Values.replicaCount }}
+    template:
+      spec:
+        containers:
+          - name: {{ .Chart.Name }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            envFrom:
+              - configMapRef:
+                  name: {{ .Release.Name }}-config
+chart/templates/networkpolicy.yaml: |
+  apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    name: GARBAGE_HELM_004_NETPOL_NAME_A
+  spec:
+    podSelector:
+      matchLabels:
+        app: GARBAGE_HELM_004_NETPOL_SELECTOR_B
+    policyTypes:
+      - Ingress
+    ingress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                name: GARBAGE_HELM_004_NETPOL_NS_C
+chart/tools/load-test.py: |
+  # GARBAGE_HELM_004_LOADTEST_HEADER_D
+  import requests
+  GARBAGE_HELM_004_LOADTEST_CONFIG_E = {"concurrency": 10}

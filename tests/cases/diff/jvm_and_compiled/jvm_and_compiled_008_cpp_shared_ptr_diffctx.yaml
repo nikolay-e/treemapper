@@ -1,0 +1,16 @@
+must_include_files:
+  - cache.cpp
+must_include_content:
+  - |
+    GARBAGE_JVM_008_PUSH_MARKER_A
+  - |
+    GARBAGE_JVM_008_POP_MARKER_B
+must_not_include:
+  - GARBAGE_JVM_008_GC_MARKER_A
+  - GARBAGE_JVM_008_SWEEP_MARKER_B
+  - GARBAGE_JVM_008_REF_MARKER_C
+  - GARBAGE_JVM_008_DEC_MARKER_D
+  - GarbageCollector
+  - GarbageRefCounter
+  - garbage_gc.cpp
+  - garbage_refcount.cpp

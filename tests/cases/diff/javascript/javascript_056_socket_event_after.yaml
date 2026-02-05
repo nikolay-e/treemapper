@@ -1,0 +1,19 @@
+events.ts: |
+  export interface ChatMessage {
+      userId: string;
+      text: string;
+      timestamp: number;
+  }
+
+  export const CHAT_EVENT = 'chat:message';
+socket.ts: |
+  import { Server } from 'socket.io';
+  import { CHAT_EVENT, ChatMessage } from './events';
+
+  export function setupSocket(io: Server) {
+      io.on('connection', (socket) => {
+          socket.on(CHAT_EVENT, (message: ChatMessage) => {
+              io.emit(CHAT_EVENT, message);
+          });
+      });
+  }

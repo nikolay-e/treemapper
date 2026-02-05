@@ -1,0 +1,13 @@
+must_include_files:
+  - src/InputField.tsx
+must_include_content:
+  - |
+    forwardRef
+must_not_include:
+  - GARBAGE_FE_011_COLOR_A
+  - GARBAGE_FE_011_COLOR_B
+  - GARBAGE_FE_011_DEBOUNCE_D
+  - GARBAGE_FE_011_THROTTLE_E
+  - hslToHex
+  - color_utils.ts
+  - debounce_utils.ts

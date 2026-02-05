@@ -1,0 +1,20 @@
+must_include:
+- Storage
+- Delete
+- Exists
+- ListableStorage
+- List
+- ListWithMeta
+- StorageItem
+- Checksum
+must_not_include:
+- GARBAGE_GO_AUTH_IMPL_001
+- GARBAGE_GO_TYPE_AUTH_002
+- GARBAGE_GO_FUNC_AUTH_003
+- GARBAGE_GO_AUTH_UNUSED_004
+- GARBAGE_GO_LOGGER_IMPL_005
+- GARBAGE_GO_TYPE_LOGGER_006
+- GARBAGE_GO_FUNC_LOGGER_007
+- GARBAGE_GO_LOGGER_OUTPUT_008
+- authenticator
+- structured_logger

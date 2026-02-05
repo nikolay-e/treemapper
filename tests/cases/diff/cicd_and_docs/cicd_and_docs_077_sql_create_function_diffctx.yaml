@@ -1,0 +1,26 @@
+must_include_files:
+  - format_currency.sql
+must_include_content:
+  - |
+    CREATE OR REPLACE FUNCTION format_currency(
+        amount DECIMAL,
+        currency_code TEXT DEFAULT 'USD',
+        show_decimals BOOLEAN DEFAULT TRUE
+    )
+  - |
+    symbol := CASE currency_code
+        WHEN 'USD' THEN '$'
+        WHEN 'EUR' THEN '€'
+        WHEN 'GBP' THEN '£'
+        WHEN 'JPY' THEN '¥'
+must_not_include:
+  - GARBAGE_CICD_DOCS_077_FUNC_MARKER_A
+  - GARBAGE_CICD_DOCS_077_IMMUTABLE_MARKER_B
+  - GARBAGE_CICD_DOCS_077_RETURN_MARKER_C
+  - GARBAGE_CICD_DOCS_077_PARSE_MARKER_D
+  - GARBAGE_CICD_DOCS_077_TOKEN_MARKER_E
+  - GARBAGE_CICD_DOCS_077_COMPILE_MARKER_F
+  - GarbageFunctionValidator
+  - GarbageSQLParser
+  - garbage_function_validator.ts
+  - garbage_sql_parser.ts

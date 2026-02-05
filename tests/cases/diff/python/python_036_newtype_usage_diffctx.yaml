@@ -1,0 +1,23 @@
+must_include:
+- UserId = NewType
+- Email = NewType
+- SessionToken = NewType
+- class UserProfile
+- class OrderSummary
+- create_session_token
+must_not_include:
+- GARBAGE_PYTHON_036_001
+- GARBAGE_PYTHON_036_002
+- GARBAGE_PYTHON_036_003
+- GARBAGE_PYTHON_036_004
+- GARBAGE_PYTHON_036_005
+- GARBAGE_PYTHON_036_006
+- GARBAGE_PYTHON_036_007
+- GARBAGE_PYTHON_036_008
+- GARBAGE_PYTHON_036_009
+- NotificationChannel
+- AuditEntry
+- FeatureFlag
+- notification_service.py
+- audit_logger.py
+- feature_flags.py

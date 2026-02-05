@@ -1,0 +1,16 @@
+must_include_files:
+  - UserService.swift
+must_include_content:
+  - |
+    throw AppError
+  - |
+    handleError
+must_not_include:
+  - GARBAGE_JVM_063_RECOVER_MARKER_A
+  - GARBAGE_JVM_063_RETRY_MARKER_B
+  - GARBAGE_JVM_063_CIRCUIT_MARKER_C
+  - GARBAGE_JVM_063_BREAKER_MARKER_D
+  - GarbageRecoveryHandler
+  - GarbageCircuitBreaker
+  - GarbageRecoveryHandler.swift
+  - GarbageCircuitBreaker.swift

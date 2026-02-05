@@ -1,0 +1,16 @@
+must_include_files:
+  - Program.scala
+must_include_content:
+  - |
+    IOApp
+  - |
+    for {
+must_not_include:
+  - GARBAGE_JVM_050_ZIO_MARKER_A
+  - GARBAGE_JVM_050_FIBER_MARKER_B
+  - GARBAGE_JVM_050_LAYER_MARKER_C
+  - GARBAGE_JVM_050_RUNTIME_MARKER_D
+  - GarbageZioFiber
+  - GarbageLayerBuilder
+  - GarbageZioFiber.scala
+  - GarbageLayerBuilder.scala

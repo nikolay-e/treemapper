@@ -1,0 +1,13 @@
+must_include_files:
+  - src/template_types.ts
+must_include_content:
+  - |
+    EventName
+must_not_include:
+  - GARBAGE_FE_021_COLOR_A
+  - GARBAGE_FE_021_COLOR_B
+  - GARBAGE_FE_021_DEBOUNCE_D
+  - GARBAGE_FE_021_THROTTLE_E
+  - hslToHex
+  - color_utils.ts
+  - debounce_utils.ts

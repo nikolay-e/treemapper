@@ -1,0 +1,8 @@
+handler.ts: |
+  export const handlers = {
+      onClick: () => console.log('clicked'),
+      onHover: () => console.log('hovered'),
+      onFocus: () => console.log('focused'),
+  };
+main.ts: |
+  console.log('initial');

@@ -1,0 +1,12 @@
+must_include:
+- suspend fun
+- getUserWithRetry
+- delay
+- deleteUser
+must_not_include:
+- GARBAGE_JAVA_024_TOKEN_A
+- GARBAGE_JAVA_024_TOKEN_B
+- GARBAGE_JAVA_024_EMAIL_C
+- GARBAGE_JAVA_024_EMAIL_D
+- TokenGenerator
+- EmailValidator

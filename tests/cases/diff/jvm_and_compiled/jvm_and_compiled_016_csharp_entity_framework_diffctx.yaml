@@ -1,0 +1,16 @@
+must_include_files:
+  - AppDbContext.cs
+must_include_content:
+  - |
+    GARBAGE_JVM_016_TOHEX_MARKER_A
+  - |
+    GARBAGE_JVM_016_FROMHEX_MARKER_B
+must_not_include:
+  - GARBAGE_JVM_016_MIGRATE_MARKER_A
+  - GARBAGE_JVM_016_SEED_MARKER_B
+  - GARBAGE_JVM_016_SCHEMA_MARKER_C
+  - GARBAGE_JVM_016_INDEX_MARKER_D
+  - GarbageMigrator
+  - GarbageSchemaBuilder
+  - GarbageMigrator.cs
+  - GarbageSchemaBuilder.cs

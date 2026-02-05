@@ -1,0 +1,9 @@
+Counter.vue: |
+  <template>
+      <div>Initial</div>
+  </template>
+
+  <script setup lang="ts">
+  // vue_garbage_marker_001
+  const GARBAGE_CONFIG = { unused: true };
+  </script>

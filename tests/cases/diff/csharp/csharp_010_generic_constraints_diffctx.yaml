@@ -1,0 +1,13 @@
+must_include_files:
+  - Program.cs
+  - Services/Factory.cs
+must_include_content:
+  - |
+    var user = Factory.Create<User>();
+must_not_include:
+  - GARBAGE_CS_010_ENCRYPTION_A
+  - GARBAGE_CS_010_COMPRESSION_B
+  - EncryptionHelper
+  - CompressionHelper
+  - Unrelated/EncryptionHelper.cs
+  - Unrelated/CompressionHelper.cs

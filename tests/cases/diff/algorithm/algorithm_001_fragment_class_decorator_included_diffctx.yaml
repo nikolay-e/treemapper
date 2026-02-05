@@ -1,0 +1,33 @@
+must_include_files:
+  - models/user.py
+must_include_content:
+  - |
+    @dataclass
+    class User:
+        id: int
+        username: str
+        email: str
+        display_name: Optional[str] = None
+        created_at: datetime = field(default_factory=datetime.now)
+        address: Optional[Address] = None
+        roles: List[str] = field(default_factory=list)
+
+        def is_admin(self) -> bool:
+            return "admin" in self.roles
+
+        def has_address(self) -> bool:
+            return self.address is not None
+
+        def get_display_name(self) -> str:
+            return self.display_name or self.username
+must_not_include:
+  - GARBAGE_ALGO_001_ANALYTICS_MARKER_A
+  - GARBAGE_ALGO_001_TRACKER_MARKER_B
+  - GARBAGE_ALGO_001_CLASS_MARKER_C
+  - GARBAGE_ALGO_001_NOTIFY_MARKER_D
+  - GARBAGE_ALGO_001_PUSH_MARKER_E
+  - GARBAGE_ALGO_001_PUSH_CLASS_F
+  - AnalyticsTracker
+  - PushService
+  - garbage_analytics.py
+  - garbage_notifications.py

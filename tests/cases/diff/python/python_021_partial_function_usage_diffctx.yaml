@@ -1,0 +1,11 @@
+must_include:
+- FinancialReport
+- format_currency
+- FormatterRegistry
+must_not_include:
+- GARBAGE_PY_PDF_827364
+- UNRELATED_PDF_MARKER_918273
+- GARBAGE_PY_EXCEL_918273
+- UNRELATED_EXCEL_MARKER_827163
+- GarbagePDFGenerator
+- GarbageExcelExporter

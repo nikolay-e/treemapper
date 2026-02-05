@@ -1,0 +1,20 @@
+Button.tsx: |
+  export interface ButtonProps {
+      label: string;
+      variant?: 'primary' | 'secondary';
+      size?: 'small' | 'medium' | 'large';
+      onClick?: () => void;
+  }
+
+  export function Button({ label, variant = 'primary', size = 'medium', onClick }: ButtonProps) {
+      return (
+          <button className={`btn btn-${variant} btn-${size}`} onClick={onClick}>
+              {label}
+          </button>
+      );
+  }
+
+  // storybook_garbage_marker_001
+  const GARBAGE_BUTTON_CONFIG = { maxWidth: 200 };
+Button.stories.tsx: |
+  console.log('initial');

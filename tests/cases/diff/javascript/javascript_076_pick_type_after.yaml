@@ -1,0 +1,16 @@
+user.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+      password: string;
+      createdAt: Date;
+  }
+dto.ts: |
+  import { User } from './user';
+
+  type UserPublic = Pick<User, 'id' | 'name' | 'email'>;
+
+  function toPublic(user: User): UserPublic {
+      return { id: user.id, name: user.name, email: user.email };
+  }

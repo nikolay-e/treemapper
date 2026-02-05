@@ -1,0 +1,13 @@
+must_include_files:
+  - src/repository.ts
+must_include_content:
+  - |
+    extends BaseEntity
+must_not_include:
+  - GARBAGE_FE_018_COLOR_A
+  - GARBAGE_FE_018_COLOR_B
+  - GARBAGE_FE_018_DEBOUNCE_D
+  - GARBAGE_FE_018_THROTTLE_E
+  - hslToHex
+  - color_utils.ts
+  - debounce_utils.ts

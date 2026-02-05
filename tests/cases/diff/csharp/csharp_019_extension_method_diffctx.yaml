@@ -1,0 +1,13 @@
+must_include_files:
+  - Program.cs
+  - Extensions/StringExtensions.cs
+must_include_content:
+  - |
+    var slug = title.ToSlug();
+must_not_include:
+  - GARBAGE_CS_019_API_GATEWAY_A
+  - GARBAGE_CS_019_LOAD_BALANCER_B
+  - ApiGateway
+  - LoadBalancer
+  - Unrelated/ApiGateway.cs
+  - Unrelated/LoadBalancer.cs

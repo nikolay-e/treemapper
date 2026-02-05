@@ -1,0 +1,21 @@
+must_include:
+- __add__
+- __sub__
+- __mul__
+- class Money
+- CurrencyMismatchError
+must_not_include:
+- GARBAGE_MARKER_SHIPPING_001
+- UNRELATED_SHIPPING_RATE_002
+- GARBAGE_SHIPPING_CLASS_003
+- GARBAGE_CARRIER_MARKER_004
+- GARBAGE_MARKER_AUDIT_005
+- UNRELATED_AUDIT_CONST_006
+- GARBAGE_AUDIT_CLASS_007
+- GARBAGE_FORMAT_MARKER_008
+- ShippingCalculator
+- CarrierIntegration
+- AuditLogger
+- format_audit_entry
+- garbage_shipping.py
+- garbage_audit.py

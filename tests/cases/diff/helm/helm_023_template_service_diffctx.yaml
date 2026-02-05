@@ -1,0 +1,16 @@
+must_include_files:
+  - chart/values.yaml
+  - chart/templates/service.yaml
+must_include_content:
+  - |
+    type: {{ .Values.service.type }}
+  - |
+    port: {{ .Values.service.port }}
+must_not_include:
+  - GARBAGE_HELM_023_CONSTRAINT_KIND_A
+  - GARBAGE_HELM_023_CONSTRAINT_NAME_B
+  - GARBAGE_HELM_023_API_GROUP_C
+  - GARBAGE_HELM_023_MESH_DOC_D
+  - GARBAGE_HELM_023_ROUTING_DOC_E
+  - chart/templates/gatekeeper-constraint.yaml
+  - chart/docs/service-mesh.md

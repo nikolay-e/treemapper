@@ -1,0 +1,17 @@
+must_include:
+- def validate_email
+- validate_phone
+- parametrize
+must_not_include:
+- GARBAGE_PY_061_FORMAT_A
+- GARBAGE_PY_061_LOCALE_B
+- GARBAGE_PY_061_DECIMAL_C
+- GARBAGE_PY_061_PERCENT_D
+- GARBAGE_PY_061_SANITIZE_E
+- GARBAGE_PY_061_XSS_F
+- GARBAGE_PY_061_TAG_G
+- GARBAGE_PY_061_STRIP_H
+- NumberFormatter
+- HtmlSanitizer
+- garbage_formatter.py
+- garbage_sanitizer.py

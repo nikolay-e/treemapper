@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/DataProcessor.cs
+  - Interfaces/IProcessor.cs
+must_include_content:
+  - |
+    public class DataProcessor : IProcessor
+must_not_include:
+  - GARBAGE_CS_008_TELEMETRY_A
+  - GARBAGE_CS_008_CIRCUIT_BREAKER_B
+  - TelemetryCollector
+  - CircuitBreaker
+  - Unrelated/TelemetryCollector.cs
+  - Unrelated/CircuitBreaker.cs

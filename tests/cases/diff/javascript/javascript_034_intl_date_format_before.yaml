@@ -1,0 +1,11 @@
+locale.ts: |
+  export const localeConfig = {
+      locale: 'en-US',
+      options: {
+          year: 'numeric' as const,
+          month: 'long' as const,
+          day: 'numeric' as const,
+      },
+  };
+formatter.ts: |
+  console.log('initial');

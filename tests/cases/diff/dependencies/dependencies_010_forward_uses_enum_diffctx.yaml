@@ -1,0 +1,12 @@
+must_include_files:
+  - order.py
+must_include_content:
+  - |
+    OrderStatus
+must_not_include:
+  - GARBAGE_DEP_010_ZODIAC_A
+  - GARBAGE_DEP_010_ORIGAMI_B
+  - HoroscopeChart
+  - OrigamiModel
+  - zodiac_sign
+  - fold_count

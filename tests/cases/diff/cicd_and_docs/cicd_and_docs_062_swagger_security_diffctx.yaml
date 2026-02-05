@@ -1,0 +1,28 @@
+must_include_files:
+  - swagger.yaml
+must_include_content:
+  - |
+    oauth2:
+      type: oauth2
+      flow: accessCode
+      authorizationUrl: https://auth.example.com/authorize
+      tokenUrl: https://auth.example.com/token
+      scopes:
+        read:users: Read user data
+        write:users: Modify user data
+  - |
+    bearerAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+must_not_include:
+  - GARBAGE_CICD_DOCS_062_AUTH_MARKER_A
+  - GARBAGE_CICD_DOCS_062_EXPIRE_MARKER_B
+  - GARBAGE_CICD_DOCS_062_REFRESH_MARKER_C
+  - GARBAGE_CICD_DOCS_062_VALIDATE_MARKER_D
+  - GARBAGE_CICD_DOCS_062_SCOPE_MARKER_E
+  - GARBAGE_CICD_DOCS_062_AUDIT_MARKER_F
+  - GarbageAuthHandler
+  - GarbageSecurityValidator
+  - garbage_auth_handler.ts
+  - garbage_security_validator.ts

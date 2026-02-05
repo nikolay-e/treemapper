@@ -1,0 +1,14 @@
+must_include:
+- Stats.tsx
+- expensiveComputation
+- averageValue
+must_not_include:
+- GARBAGE_JSX_031_AVATAR_CONFIG_A
+- GARBAGE_JSX_031_GENERATE_INITIALS_B
+- GARBAGE_JSX_031_INITIALS_OUTPUT_C
+- GARBAGE_JSX_031_SPINNER_CONFIG_D
+- GARBAGE_JSX_031_SPINNER_MANAGER_E
+- GARBAGE_JSX_031_RENDER_SPINNER_F
+- GarbageAvatar
+- avatar.tsx
+- spinner.tsx

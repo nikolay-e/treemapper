@@ -1,0 +1,20 @@
+must_include:
+- Producer
+- Message
+- ProducerStats
+- createMessage
+- send
+- Priority
+- Headers
+- chan<-
+must_not_include:
+- GARBAGE_GO_PUBSUB_KAFKA_001
+- GARBAGE_GO_TYPE_KAFKA_002
+- GARBAGE_GO_FUNC_KAFKA_003
+- GARBAGE_GO_KAFKA_UNUSED_004
+- GARBAGE_GO_PUBSUB_NATS_005
+- GARBAGE_GO_TYPE_NATS_006
+- GARBAGE_GO_FUNC_NATS_007
+- GARBAGE_GO_NATS_OUTPUT_008
+- kafka
+- nats

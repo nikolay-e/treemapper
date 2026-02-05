@@ -1,0 +1,64 @@
+must_include_files:
+  - src/core/main.py
+  - src/utils/rare_module.py
+must_include_content:
+  - |
+    def main(self, data: Dict[str, Any]) -> MainResult:
+        try:
+            validated = self._validate_input(data)
+            processed = unique_helper(validated, self.config.rare_config)
+            enhanced = self._enhance_result(processed)
+            result = self._format_output(enhanced)
+            self._results.append(result)
+            return result
+        except Exception as e:
+            error_result = MainResult(success=False, error=str(e))
+            self._results.append(error_result)
+            return error_result
+
+    def _enhance_result(self, result: RareResult) -> RareResult:
+        if result.success and result.data:
+            result.data["enhanced"] = True
+            result.data["enhancement_version"] = self.config.version
+        return result
+  - |
+    def unique_helper(data: Dict[str, Any], config: Optional[RareConfig] = None) -> RareResult:
+        config = config or RareConfig()
+        start_time = datetime.now()
+
+        processed_data = _process_with_algorithm(data, config)
+        validated = _validate_result(processed_data, config)
+
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds() * 1000
+
+        return RareResult(
+            success=validated,
+            data=processed_data,
+            metadata={"algorithm": config.algorithm},
+            processing_time_ms=duration,
+        )
+must_not_include:
+  - GARBAGE_ALGO_COMMON_RARE001
+  - GARBAGE_ALGO_COMMON_VERSION_RARE002
+  - GARBAGE_ALGO_COMMON_CACHE_RARE003
+  - GARBAGE_ALGO_UNIQUE_RARE004
+  - GARBAGE_ALGO_MAIN_RARE005
+  - GarbageCommonHelper
+  - unique_helper_garbage
+  - main_garbage
+  - GARBAGE_ALGO_SPECIAL_RARE007
+  - GARBAGE_ALGO_SPECIAL_CONFIG_RARE008
+  - GARBAGE_ALGO_SPECIAL_STATE_RARE009
+  - GarbageSpecialProcessor
+  - unique_helper_special
+  - main_special
+  - GARBAGE_ALGO_UTILITY_RARE013
+  - GARBAGE_ALGO_UTILITY_ENABLED_RARE014
+  - GARBAGE_ALGO_UTILITY_BUFFER_RARE015
+  - GarbageUtilityHelper
+  - unique_helper_utility
+  - main_utility
+  - garbage_common_module.py
+  - garbage_special_module.py
+  - garbage_utility_module.py

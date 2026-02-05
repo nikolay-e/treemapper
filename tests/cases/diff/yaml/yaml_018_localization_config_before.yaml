@@ -1,0 +1,15 @@
+config/i18n.yaml: |
+  localization:
+    default_locale: en
+    supported_locales:
+      - en
+      - es
+src/i18n.py: |
+  class Translator:
+      def __init__(self, default_locale: str = "en"):
+          self.default_locale = default_locale
+          self.translations = {}
+
+      def translate(self, key: str, locale: str = None) -> str:
+          locale = locale or self.default_locale
+          return self.translations.get(locale, {}).get(key, key)

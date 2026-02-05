@@ -1,0 +1,18 @@
+must_include:
+- main.tf
+- modules/vpc/main.tf
+- modules/rds/main.tf
+- module "vpc"
+- module "rds"
+- aws_security_group
+- aws_kms_key
+- backend "s3"
+- module.vpc.vpc_id
+- module.vpc.private_subnet_ids
+must_not_include:
+- GARBAGE_TF_mod468a
+- GARBAGE_TF_mod468b
+- legacy_vpc
+- legacy_rds
+- old-org/terraform-modules
+- migrate_legacy_modules

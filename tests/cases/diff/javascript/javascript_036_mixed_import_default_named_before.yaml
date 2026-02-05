@@ -1,0 +1,12 @@
+module.ts: |
+  export default function defaultExport() {
+      return 'default';
+  }
+
+  export function namedExport() {
+      return 'named';
+  }
+
+  export const VALUE = 42;
+main.ts: |
+  console.log('initial');

@@ -1,0 +1,21 @@
+resolvers.ts: |
+  export const resolvers = {
+      Query: {
+          user: (_: any, { id }: { id: string }) => ({ id, name: 'Test' }),
+      },
+  };
+schema.ts: |
+  import { resolvers } from './resolvers';
+
+  export const typeDefs = \`
+      type User {
+          id: ID!
+          name: String!
+      }
+
+      type Query {
+          user(id: ID!): User
+      }
+  \`;
+
+  export { resolvers };

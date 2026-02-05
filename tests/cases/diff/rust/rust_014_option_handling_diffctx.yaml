@@ -1,0 +1,28 @@
+must_include:
+- Option<i32>
+- Option<usize>
+- find_index
+- find_or_default
+- find_last
+- find_all
+- find_by
+- find_map
+must_not_include:
+- GARBAGE_RUST_CSV_001
+- GARBAGE_CSV_DELIMITER_002
+- GARBAGE_CSV_QUOTE_003
+- GarbageCsvReader004
+- garbage_read_005
+- GARBAGE_CSV_READ_ERROR_006
+- garbage_parse_row_007
+- GarbageCsvWriter008
+- garbage_write_009
+- GARBAGE_CSV_WRITE_ERROR_010
+- GARBAGE_RUST_XML_011
+- GARBAGE_XML_VERSION_012
+- GarbageXmlNode013
+- garbage_parse_014
+- GARBAGE_XML_PARSE_ERROR_015
+- garbage_to_string_016
+- GARBAGE_XML_CONTENT_017
+- garbage_find_child_018

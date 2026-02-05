@@ -1,0 +1,11 @@
+types.ts: |
+  export type Named = { name: string };
+  export type Aged = { age: number };
+person.ts: |
+  import { Named, Aged } from './types';
+
+  type Person = Named & Aged;
+
+  function createPerson(name: string, age: number): Person {
+      return { name, age };
+  }

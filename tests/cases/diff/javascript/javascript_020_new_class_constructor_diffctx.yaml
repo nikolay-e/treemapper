@@ -1,0 +1,5 @@
+must_include:
+- MyClass
+- main.ts
+must_not_include:
+- js_garbage_marker_001

@@ -1,0 +1,6 @@
+utils.ts: |
+  export function formatName(first: string, last: string): string {
+      return `${first} ${last}`;
+  }
+Profile.vue: |
+  <template><div>initial</div></template>

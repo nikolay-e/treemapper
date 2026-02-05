@@ -1,0 +1,102 @@
+src/api.py: |
+  from flask import Flask, jsonify
+  import psycopg2
+  import os
+
+  app = Flask(__name__)
+
+  def get_db_connection():
+      return psycopg2.connect(
+          host=os.getenv("DB_HOST", "db"),
+          database=os.getenv("DB_NAME", "apidb"),
+          user=os.getenv("DB_USER", "postgres"),
+          password=os.getenv("DB_PASSWORD", "secret")
+      )
+
+  @app.route('/health')
+  def health():
+      return jsonify(status='ok')
+
+  @app.route('/api/users')
+  def list_users():
+      conn = get_db_connection()
+      cursor = conn.cursor()
+      cursor.execute("SELECT id, name FROM users")
+      users = cursor.fetchall()
+      conn.close()
+      return jsonify(users=users)
+src/migrations.py: |
+  import psycopg2
+  import os
+
+  def run_migrations():
+      conn = psycopg2.connect(
+          host=os.getenv("DB_HOST", "db"),
+          database=os.getenv("DB_NAME", "apidb"),
+          user=os.getenv("DB_USER", "postgres"),
+          password=os.getenv("DB_PASSWORD", "secret")
+      )
+      cursor = conn.cursor()
+      cursor.execute("""
+          CREATE TABLE IF NOT EXISTS users (
+              id SERIAL PRIMARY KEY,
+              name VARCHAR(255) NOT NULL
+          )
+      """)
+      conn.commit()
+      conn.close()
+
+  if __name__ == "__main__":
+      run_migrations()
+requirements.txt: |
+  flask==2.3.0
+  psycopg2-binary==2.9.9
+  gunicorn==21.2.0
+Dockerfile: |
+  FROM python:3.12-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install --no-cache-dir -r requirements.txt
+  COPY src/ ./src/
+  EXPOSE 8080
+  CMD ["gunicorn", "-b", "0.0.0.0:8080", "src.api:app"]
+docker-compose.yml: |
+  version: '3.8'
+  services:
+    api:
+      build: .
+      ports:
+        - "8080:8080"
+      environment:
+        - DB_HOST=db
+        - DB_PASSWORD=secret
+    db:
+      image: postgres:16-alpine
+      environment:
+        POSTGRES_PASSWORD: secret
+        POSTGRES_DB: apidb
+      volumes:
+        - pgdata:/var/lib/postgresql/data
+  volumes:
+    pgdata:
+scripts/wait_for_db.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCK_034_WAIT_SCRIPT_A
+  GARBAGE_DOCK_034_WAIT_TIMEOUT_B=60
+  until pg_isready -h db; do sleep 1; done
+tests/test_api.py: |
+  # GARBAGE_DOCK_034_API_TEST_A
+  GARBAGE_DOCK_034_TEST_DB_URL_B = "sqlite:///test.db"
+  def test_health():
+      pass
+docs/services.md: |
+  # Service Dependencies
+  GARBAGE_DOCK_034_SVC_DOC_A
+  GARBAGE_DOCK_034_DEP_GRAPH_B="db->migrations->api"
+k8s/init-container.yaml: |
+  # GARBAGE_DOCK_034_K8S_INIT_A
+  apiVersion: v1
+  GARBAGE_DOCK_034_INIT_IMAGE_B: busybox
+monitoring/healthcheck.yml: |
+  # GARBAGE_DOCK_034_HC_MONITOR_A
+  GARBAGE_DOCK_034_HC_INTERVAL_B: 10

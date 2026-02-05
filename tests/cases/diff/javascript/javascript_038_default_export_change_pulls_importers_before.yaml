@@ -1,0 +1,10 @@
+api.ts: |
+  export default function apiClient() {
+      return { get: (url: string) => fetch(url) };
+  }
+service.ts: |
+  import client from './api';
+
+  export function getData(url: string) {
+      return client().get(url);
+  }

@@ -1,0 +1,9 @@
+full.ts: |
+  export interface FullRecord {
+      id: string;
+      name: string;
+      secret: string;
+      internal: boolean;
+  }
+public.ts: |
+  console.log('initial');

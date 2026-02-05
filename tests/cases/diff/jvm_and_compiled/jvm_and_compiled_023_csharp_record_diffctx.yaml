@@ -1,0 +1,14 @@
+must_include_files:
+  - Program.cs
+must_include_content:
+  - |
+    with { Age = 31 }
+must_not_include:
+  - GARBAGE_JVM_023_TUPLE_MARKER_A
+  - GARBAGE_JVM_023_PAIR_MARKER_B
+  - GARBAGE_JVM_023_STRUCT_MARKER_C
+  - GARBAGE_JVM_023_VALUE_MARKER_D
+  - GarbageTupleHelper
+  - GarbageStructBuilder
+  - GarbageTupleHelper.cs
+  - GarbageStructBuilder.cs

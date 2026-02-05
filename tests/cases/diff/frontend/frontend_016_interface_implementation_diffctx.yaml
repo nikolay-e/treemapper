@@ -1,0 +1,5 @@
+must_include:
+- service.ts
+- implements IService
+must_not_include:
+- ts_garbage_marker_001

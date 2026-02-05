@@ -1,0 +1,12 @@
+must_include:
+- pom.xml
+- spring-boot-starter-data-jpa
+- postgresql
+- flyway-core
+must_not_include:
+- GARBAGE_JAVA_021_AUDIT_A
+- GARBAGE_JAVA_021_AUDIT_B
+- GARBAGE_JAVA_021_CACHE_C
+- GARBAGE_JAVA_021_CACHE_D
+- AuditLogger
+- CacheWarmer

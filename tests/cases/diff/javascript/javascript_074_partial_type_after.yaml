@@ -1,0 +1,13 @@
+config.ts: |
+  export interface FullConfig {
+      host: string;
+      port: number;
+      ssl: boolean;
+      timeout: number;
+  }
+updater.ts: |
+  import { FullConfig } from './config';
+
+  function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {
+      return { ...current, ...updates };
+  }

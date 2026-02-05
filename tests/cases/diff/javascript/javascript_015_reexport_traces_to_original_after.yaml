@@ -1,0 +1,10 @@
+core.ts: |
+  export function coreFunction(): void {
+      console.log('core');
+  }
+other.ts: |
+  export { coreFunction } from './core';
+main.ts: |
+  import { coreFunction } from './other';
+
+  coreFunction();

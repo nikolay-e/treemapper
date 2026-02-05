@@ -1,0 +1,33 @@
+must_include:
+- ApiException
+- ValidationException
+- ResourceNotFoundException
+- DuplicateResourceException
+- AuthenticationException
+- RateLimitException
+- ErrorResponse
+- errorCode
+- httpStatus
+- errorId
+- toErrorResponse
+- GlobalExceptionHandler
+- FieldError
+- invalidCredentials
+- accountLocked
+must_not_include:
+- GARBAGE_JAVA_SESSION_E031A
+- GARBAGE_JAVA_TOKEN_E031B
+- GARBAGE_JAVA_EXPIRED_E031C
+- GARBAGE_JAVA_AUDIT_E031D
+- GARBAGE_JAVA_LOG_E031E
+- GARBAGE_JAVA_FAILED_E031F
+- GARBAGE_JAVA_HASH_E031G
+- GARBAGE_JAVA_SALT_E031H
+- SessionManager
+- AuditLogger
+- PasswordHasher
+- createSession
+- invalidateSession
+- logAction
+- generateSalt
+- hashPassword

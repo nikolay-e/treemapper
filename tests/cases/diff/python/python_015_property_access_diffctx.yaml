@@ -1,0 +1,21 @@
+must_include:
+- '@property'
+- def full_name
+- def age
+- def is_adult
+- class Person
+must_not_include:
+- GARBAGE_MARKER_TEMPLATE_001
+- UNRELATED_TEMPLATE_EXT_002
+- GARBAGE_TEMPLATE_CLASS_003
+- GARBAGE_CACHE_MARKER_004
+- GARBAGE_MARKER_LOCALE_005
+- UNRELATED_DEFAULT_LANG_006
+- GARBAGE_LOCALE_CLASS_007
+- GARBAGE_FORMAT_LOCALE_008
+- TemplateEngine
+- TemplateCache
+- Localizer
+- format_locale_key
+- garbage_templates.py
+- garbage_localization.py

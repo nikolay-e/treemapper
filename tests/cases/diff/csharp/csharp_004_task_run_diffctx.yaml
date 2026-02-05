@@ -1,0 +1,13 @@
+must_include_files:
+  - Program.cs
+  - Services/ComputeService.cs
+must_include_content:
+  - |
+    var result = await Task.Run(() => service.HeavyComputation(1000000));
+must_not_include:
+  - GARBAGE_CS_004_NOTIFICATION_A
+  - GARBAGE_CS_004_RATE_LIMITER_B
+  - NotificationSender
+  - RateLimiter
+  - Unrelated/NotificationSender.cs
+  - Unrelated/RateLimiter.cs

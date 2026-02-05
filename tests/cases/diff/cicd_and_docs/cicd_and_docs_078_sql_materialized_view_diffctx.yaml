@@ -1,0 +1,21 @@
+must_include_files:
+  - sales_summary_mv.sql
+must_include_content:
+  - |
+    AVG(o.total) AS avg_order_value,
+    COUNT(DISTINCT o.user_id) AS unique_customers,
+    SUM(CASE WHEN o.status = 'refunded' THEN o.total ELSE 0 END) AS refunded_amount,
+  - |
+    CREATE INDEX idx_sales_summary_revenue ON sales_summary(revenue DESC);
+    CREATE INDEX idx_sales_summary_order_count ON sales_summary(order_count DESC);
+must_not_include:
+  - GARBAGE_CICD_DOCS_078_VIEW_MARKER_A
+  - GARBAGE_CICD_DOCS_078_REFRESH_MARKER_B
+  - GARBAGE_CICD_DOCS_078_INDEX_MARKER_C
+  - GARBAGE_CICD_DOCS_078_CACHE_MARKER_D
+  - GARBAGE_CICD_DOCS_078_TTL_MARKER_E
+  - GARBAGE_CICD_DOCS_078_PRECOMPUTE_MARKER_F
+  - GarbageViewManager
+  - GarbageAnalyticsCache
+  - garbage_view_manager.ts
+  - garbage_analytics_cache.ts

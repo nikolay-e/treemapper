@@ -1,0 +1,15 @@
+must_include:
+- aws_security_group
+- ingress_rules
+- egress_rules
+- security_groups
+- from_port
+- to_port
+must_not_include:
+- GARBAGE_TF_WAF_448_001
+- GARBAGE_WAF_ACL_448_002
+- GARBAGE_WAF_METRIC_448_003
+- GARBAGE_TF_SHIELD_448_004
+- GARBAGE_SHIELD_448_005
+- GARBAGE_ALB_448_006
+- GARBAGE_SHIELD_VAR_448_007

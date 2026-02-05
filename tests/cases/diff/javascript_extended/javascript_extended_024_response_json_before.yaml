@@ -1,0 +1,15 @@
+service.ts: |
+  export interface ApiResponse<T> {
+      data: T;
+      success: boolean;
+      timestamp: number;
+  }
+
+  export function createResponse<T>(data: T): ApiResponse<T> {
+      return { data, success: true, timestamp: Date.now() };
+  }
+
+  // node_garbage_marker_004
+  const GARBAGE_RESPONSE = { garbage: true };
+handler.ts: |
+  console.log('initial');

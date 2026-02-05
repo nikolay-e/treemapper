@@ -1,0 +1,14 @@
+must_include:
+- src/index.js
+- bootstrap
+- src/routes.js
+- setupRoutes
+must_not_include:
+- GARBAGE_JSON_011_DEBUG_LEVEL_A
+- GARBAGE_JSON_011_STEP_DEBUGGER_B
+- GARBAGE_JSON_011_START_DEBUG_C
+- GARBAGE_JSON_011_PROFILE_INTERVAL_D
+- GARBAGE_JSON_011_PERF_PROFILER_E
+- GARBAGE_JSON_011_PROFILE_SECTION_F
+- debugger.js
+- profiler.js

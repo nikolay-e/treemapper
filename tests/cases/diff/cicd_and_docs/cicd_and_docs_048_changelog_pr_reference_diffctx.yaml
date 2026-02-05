@@ -1,0 +1,23 @@
+must_include_files:
+  - CHANGELOG.md
+must_include_content:
+  - |
+    ## [1.1.0] - 2024-02-01
+
+    ### Added
+    - User authentication (#123)
+    - OAuth2 support (#125)
+
+    ### Fixed
+    - Login timeout issue (#124)
+must_not_include:
+  - GARBAGE_CICD_DOCS_048_PARSER_MARKER_A
+  - GARBAGE_CICD_DOCS_048_FORMAT_MARKER_B
+  - GARBAGE_CICD_DOCS_048_STRICT_MARKER_C
+  - GARBAGE_CICD_DOCS_048_GENERATOR_MARKER_D
+  - GARBAGE_CICD_DOCS_048_PRESET_MARKER_E
+  - GARBAGE_CICD_DOCS_048_APPEND_MARKER_F
+  - GarbageChangelogParser
+  - GarbageChangelogGenerator
+  - garbage_changelog_parser.ts
+  - garbage_changelog_generator.ts

@@ -1,0 +1,16 @@
+must_include:
+- multiply
+- subtract
+- divide
+- Calculator
+- MathContext
+- Division by zero
+must_not_include:
+- GARBAGE_JAVA_REPORT_001
+- GARBAGE_JAVA_INTERNAL_002
+- GARBAGE_JAVA_LOCAL_003
+- GARBAGE_JAVA_STATS_004
+- ReportGenerator
+- StatisticsCollector
+- generateSummary
+- calculateMean

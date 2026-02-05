@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/ConfigService.cs
+  - Models/Configuration.cs
+must_include_content:
+  - |
+    return _config.ConnectionString
+must_not_include:
+  - GARBAGE_CS_024_FILE_WATCHER_A
+  - GARBAGE_CS_024_CLEANUP_SERVICE_B
+  - FileWatcher
+  - CleanupService
+  - Unrelated/FileWatcher.cs
+  - Unrelated/CleanupService.cs

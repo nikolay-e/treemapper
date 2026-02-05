@@ -1,0 +1,10 @@
+types.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+  }
+
+  export type UserRole = 'admin' | 'user' | 'guest';
+service.ts: |
+  console.log('initial');

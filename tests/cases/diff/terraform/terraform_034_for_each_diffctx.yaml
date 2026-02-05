@@ -1,0 +1,18 @@
+must_include:
+- main.tf
+- for_each
+- local.subnet_config
+- local.environments
+- aws_subnet
+- aws_autoscaling_group
+- aws_launch_template
+- aws_security_group_rule
+- web_ingress
+- each.value
+- each.key
+must_not_include:
+- GARBAGE_TF_fe474a
+- GARBAGE_TF_fe474b
+- legacy_subnet_1
+- legacy_subnet_2
+- generate_legacy_subnets

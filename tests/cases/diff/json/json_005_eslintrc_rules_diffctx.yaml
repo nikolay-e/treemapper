@@ -1,0 +1,13 @@
+must_include:
+- src/main.js
+- calculateTotal
+- formatCurrency
+must_not_include:
+- GARBAGE_JSON_005_SORT_CONFIG_A
+- GARBAGE_JSON_005_ARRAY_SORTER_B
+- GARBAGE_JSON_005_SORT_ITEMS_C
+- GARBAGE_JSON_005_COUNTER_INITIAL_D
+- GARBAGE_JSON_005_EVENT_COUNTER_E
+- GARBAGE_JSON_005_COUNT_EVENTS_F
+- sorter.js
+- counter.js

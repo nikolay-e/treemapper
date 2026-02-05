@@ -1,0 +1,11 @@
+interfaces.ts: |
+  export interface Serializable {
+      serialize(): string;
+      deserialize(data: string): void;
+  }
+
+  export interface Comparable<T> {
+      compareTo(other: T): number;
+  }
+impl.ts: |
+  console.log('initial');

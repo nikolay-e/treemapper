@@ -1,0 +1,14 @@
+must_include:
+- ActionButton.tsx
+- createClickHandler
+- createDeleteHandler
+must_not_include:
+- GARBAGE_JSX_035_BADGE_CONFIG_A
+- GARBAGE_JSX_035_ANIMATE_BADGE_B
+- GARBAGE_JSX_035_BADGE_OUTPUT_C
+- GARBAGE_JSX_035_DIVIDER_CONFIG_D
+- GARBAGE_JSX_035_DIVIDER_FACTORY_E
+- GARBAGE_JSX_035_RENDER_DIVIDER_F
+- GarbageBadge
+- badge.tsx
+- divider.tsx

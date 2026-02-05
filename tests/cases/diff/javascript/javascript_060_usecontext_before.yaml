@@ -1,0 +1,11 @@
+ThemeContext.tsx: |
+  import { createContext } from 'react';
+
+  export interface Theme {
+      primary: string;
+      secondary: string;
+  }
+
+  export const ThemeContext = createContext<Theme>({ primary: '#000', secondary: '#fff' });
+Button.tsx: |
+  console.log('initial');

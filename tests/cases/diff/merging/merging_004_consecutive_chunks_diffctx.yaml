@@ -1,0 +1,15 @@
+must_include:
+- Helm 3.14
+- kubectl configured
+- database migrations completed
+- Slack webhook
+- deployment_guide.txt
+must_not_include:
+- GARBAGE_MERGE_004_MARKER_A
+- GARBAGE_MERGE_004_MARKER_B
+- GARBAGE_MERGE_004_A_CLEAN
+- GARBAGE_MERGE_004_A_VERSION
+- GARBAGE_MERGE_004_B_SUMMARY
+- GARBAGE_MERGE_004_B_VERSION
+- text_sanitizer.py
+- health_monitor.py

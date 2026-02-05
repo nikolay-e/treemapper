@@ -1,0 +1,22 @@
+must_include:
+- '@Service'
+- UserService
+- findAll
+- save
+- update
+- delete
+- deactivate
+- '@Cacheable'
+- '@CacheEvict'
+- '@Transactional'
+- CreateUserRequest
+- UpdateUserRequest
+must_not_include:
+- GARBAGE_JAVA_AUDIT_401
+- GARBAGE_JAVA_LOG_402
+- GARBAGE_JAVA_METRICS_403
+- GARBAGE_JAVA_COUNTER_404
+- AuditLogService
+- MetricsCollector
+- logAction
+- incrementCounter

@@ -1,0 +1,14 @@
+api.ts: |
+  export async function fetchUser(id: string) {
+      const response = await fetch(`/api/users/${id}`);
+      return response.json();
+  }
+service.ts: |
+  import { fetchUser } from './api';
+
+  export async function getUserName(id: string): Promise<string> {
+      const user = await fetchUser(id);
+      return user.name;
+  }
+service.test.ts: |
+  console.log('initial');

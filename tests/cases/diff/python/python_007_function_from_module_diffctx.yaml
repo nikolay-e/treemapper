@@ -1,0 +1,20 @@
+must_include:
+- def calculate_tax
+- TaxBracket
+- TaxRate
+- DEFAULT_TAX_RATES
+must_not_include:
+- GARBAGE_MARKER_REPORT_001
+- UNRELATED_REPORT_FORMAT_002
+- GARBAGE_REPORT_CLASS_003
+- GARBAGE_CHART_MARKER_004
+- GARBAGE_MARKER_EMAIL_005
+- UNRELATED_SMTP_PORT_006
+- GARBAGE_EMAIL_CLASS_007
+- GARBAGE_FORMAT_EMAIL_008
+- ReportGenerator
+- ChartBuilder
+- EmailSender
+- format_email_address
+- garbage_reporting.py
+- garbage_email.py

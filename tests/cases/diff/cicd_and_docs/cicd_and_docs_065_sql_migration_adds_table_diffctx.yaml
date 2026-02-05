@@ -1,0 +1,21 @@
+must_include_files:
+  - 002_create_order_items.sql
+must_include_content:
+  - |
+    CREATE TABLE order_items (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL,
+  - |
+    CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+must_not_include:
+  - GARBAGE_CICD_DOCS_065_BUILDER_MARKER_A
+  - GARBAGE_CICD_DOCS_065_CHARSET_MARKER_B
+  - GARBAGE_CICD_DOCS_065_ENGINE_MARKER_C
+  - GARBAGE_CICD_DOCS_065_MIGRATOR_MARKER_D
+  - GARBAGE_CICD_DOCS_065_CHANGELOG_MARKER_E
+  - GARBAGE_CICD_DOCS_065_CONTEXT_MARKER_F
+  - GarbageTableBuilder
+  - GarbageTableMigrator
+  - garbage_table_builder.ts
+  - garbage_table_migrator.ts

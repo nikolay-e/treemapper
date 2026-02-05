@@ -1,0 +1,17 @@
+must_include:
+- class User
+- class Post
+- db.query
+must_not_include:
+- GARBAGE_PY_057_ANALYTICS_A
+- GARBAGE_PY_057_EVENT_B
+- GARBAGE_PY_057_PIPELINE_C
+- GARBAGE_PY_057_SEGMENT_D
+- GARBAGE_PY_057_SEARCH_E
+- GARBAGE_PY_057_INDEX_F
+- GARBAGE_PY_057_RANK_G
+- GARBAGE_PY_057_FUZZY_H
+- AnalyticsEngine
+- SearchIndex
+- garbage_analytics.py
+- garbage_search.py

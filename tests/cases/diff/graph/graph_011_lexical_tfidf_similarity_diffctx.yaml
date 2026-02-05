@@ -1,0 +1,13 @@
+must_include:
+- process_user_data
+- user_data
+must_not_include:
+- GARBAGE_GRAPH_efg001
+- GARBAGE_GRAPH_efg002
+- GARBAGE_GRAPH_efg003
+- process_product_data
+- process_order_data
+- process_payment_data
+- product_data
+- order_data
+- payment_data

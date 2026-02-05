@@ -1,0 +1,17 @@
+must_include_files:
+  - src/main/java/com/example/Config.java
+  - src/main/java/com/example/AppContext.java
+must_include_content:
+  - |
+    getInstance
+  - |
+    volatile
+must_not_include:
+  - GARBAGE_JVM_041_FLYWEIGHT_MARKER_A
+  - GARBAGE_JVM_041_POOL_MARKER_B
+  - GARBAGE_JVM_041_LAZY_MARKER_C
+  - GARBAGE_JVM_041_EAGER_MARKER_D
+  - GarbageFlyweight
+  - GarbageLazyInit
+  - GarbageFlyweight.java
+  - GarbageLazyInit.java

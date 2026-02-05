@@ -1,0 +1,17 @@
+must_include_files:
+  - Event.scala
+  - EventHandler.scala
+must_include_content:
+  - |
+    PartialFunction
+  - |
+    orElse
+must_not_include:
+  - GARBAGE_JVM_054_LIFT_MARKER_A
+  - GARBAGE_JVM_054_COLLECT_MARKER_B
+  - GARBAGE_JVM_054_GUARD_MARKER_C
+  - GARBAGE_JVM_054_FILTER_MARKER_D
+  - GarbageLiftOps
+  - GarbageGuardHelper
+  - GarbageLiftOps.scala
+  - GarbageGuardHelper.scala

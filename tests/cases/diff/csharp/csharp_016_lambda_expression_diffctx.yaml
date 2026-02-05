@@ -1,0 +1,13 @@
+must_include_files:
+  - Program.cs
+  - Services/Validator.cs
+must_include_content:
+  - |
+    var validator = new Validator<User>()
+must_not_include:
+  - GARBAGE_CS_016_RETRY_HANDLER_A
+  - GARBAGE_CS_016_DEAD_LETTER_B
+  - RetryHandler
+  - DeadLetterQueue
+  - Unrelated/RetryHandler.cs
+  - Unrelated/DeadLetterQueue.cs

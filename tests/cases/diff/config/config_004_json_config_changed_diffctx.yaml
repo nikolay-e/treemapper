@@ -1,0 +1,11 @@
+must_include:
+- settings.json
+- maxConnections
+must_not_include:
+- GARBAGE_CFG_004_MARKER_A
+- GARBAGE_CFG_004_UPLOAD_B
+- GARBAGE_CFG_004_STORAGE_C
+- GARBAGE_CFG_004_MARKER_D
+- GARBAGE_CFG_004_SCHEDULE_E
+- file_uploader.py
+- scheduler.py

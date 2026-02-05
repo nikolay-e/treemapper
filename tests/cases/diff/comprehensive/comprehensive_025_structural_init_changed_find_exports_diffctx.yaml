@@ -1,0 +1,3 @@
+must_include:
+- __init__.py
+- new_module.py

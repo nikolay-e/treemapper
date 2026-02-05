@@ -1,0 +1,13 @@
+must_include_files:
+  - custom_handler.py
+  - handlers/base.py
+must_include_content:
+  - |
+    BaseHandler
+must_not_include:
+  - GARBAGE_DEP_007_RECIPE_A
+  - GARBAGE_DEP_007_BIRD_B
+  - CookBook
+  - BirdLog
+  - parse_ingredient
+  - identify_bird

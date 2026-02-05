@@ -1,0 +1,22 @@
+must_include:
+- def format_iso
+- def parse_iso
+- def truncate
+- ISO_FORMAT
+- overlaps
+must_not_include:
+- GARBAGE_PYTHON_037_001
+- GARBAGE_PYTHON_037_002
+- GARBAGE_PYTHON_037_003
+- GARBAGE_PYTHON_037_004
+- GARBAGE_PYTHON_037_005
+- GARBAGE_PYTHON_037_006
+- GARBAGE_PYTHON_037_007
+- GARBAGE_PYTHON_037_008
+- GARBAGE_PYTHON_037_009
+- ImageDimensions
+- PDFDocument
+- CSVExporter
+- image_processor.py
+- pdf_generator.py
+- csv_exporter.py

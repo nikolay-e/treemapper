@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/ConsoleLogger.cs
+  - Interfaces/ILogger.cs
+must_include_content:
+  - |
+    public class ConsoleLogger : ILogger, IDetailedLogger
+must_not_include:
+  - GARBAGE_CS_007_EMAIL_SENDER_A
+  - GARBAGE_CS_007_QUEUE_MANAGER_B
+  - EmailSender
+  - QueueManager
+  - Unrelated/EmailSender.cs
+  - Unrelated/QueueManager.cs

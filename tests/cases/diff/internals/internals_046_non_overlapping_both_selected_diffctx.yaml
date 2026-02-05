@@ -1,0 +1,3 @@
+must_include:
+- concept_a_handler
+- concept_b_handler

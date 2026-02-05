@@ -1,0 +1,11 @@
+must_include:
+- .env
+must_not_include:
+- GARBAGE_FRAG_garbvar080
+- GARBAGE_FRAG_garbfunc080
+- GARBAGE_FRAG_garbclass080
+- GARBAGE_FRAG_garbonlykey080
+- GARBAGE_FRAG_anothergarbenv080
+- garbage_080.py
+- garbage_080.env
+- Garbage080

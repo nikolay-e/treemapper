@@ -1,0 +1,11 @@
+form.ts: |
+  export const FORM_SELECTORS = {
+      nameInput: '[data-testid=name-input]',
+      emailInput: '[data-testid=email-input]',
+      submitButton: '[data-testid=submit-btn]',
+  };
+
+  // cypress_garbage_marker_001
+  const GARBAGE_FORM_SELECTORS = { garbage: '[data-testid=garbage]' };
+form.cy.ts: |
+  console.log('initial');

@@ -1,0 +1,16 @@
+must_include_files:
+  - src/permissions/access_control.cpp
+must_include_content:
+  - |
+    class AccessControl
+  - |
+    makeMask
+must_not_include:
+  - GARBAGE_CPP_016_MATRIX_A
+  - GARBAGE_CPP_016_MATRIX_B
+  - GARBAGE_CPP_016_TIMER_D
+  - GARBAGE_CPP_016_TIMER_E
+  - Matrix3x3
+  - TimerQueue
+  - matrix_utils.hpp
+  - timer_queue.cpp

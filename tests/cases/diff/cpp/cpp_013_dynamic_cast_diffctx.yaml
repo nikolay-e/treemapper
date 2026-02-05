@@ -1,0 +1,23 @@
+must_include:
+- ShapeRenderer
+- ShapeVisitor
+- dynamic_cast
+- Circle
+- Rectangle
+- Triangle
+- getCircles
+- scaleCircles
+must_not_include:
+- GARBAGE_CPP_TERRAIN_253_001
+- GARBAGE_CPP_TERRAIN_SIZE_253_002
+- GARBAGE_CPP_TERRAIN_TYPE_253_003
+- GARBAGE_CPP_TERRAIN_GEN_253_006
+- GARBAGE_CPP_TERRAIN_GENERATE_253_007
+- GARBAGE_CPP_PATH_253_011
+- GARBAGE_CPP_PATH_NODE_253_012
+- GARBAGE_CPP_PATH_FINDER_253_014
+- GARBAGE_CPP_PATH_FIND_253_015
+- TerrainGenerator
+- PathFinder
+- TerrainChunk
+- PathNode

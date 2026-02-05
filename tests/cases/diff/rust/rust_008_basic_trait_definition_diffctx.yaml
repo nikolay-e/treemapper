@@ -1,0 +1,28 @@
+must_include:
+- Describable
+- describe
+- short_description
+- detailed_description
+- Displayable
+must_not_include:
+- GARBAGE_RUST_PARSING_001
+- GARBAGE_MAX_TOKENS_002
+- GARBAGE_DELIMITER_003
+- GarbageParser004
+- garbage_parse_int_005
+- GARBAGE_PARSE_INT_ERROR_006
+- garbage_parse_float_007
+- GARBAGE_PARSE_FLOAT_ERROR_008
+- garbage_skip_whitespace_009
+- GARBAGE_SKIP_IMPL_010
+- garbage_peek_011
+- GarbageParseable012
+- garbage_from_str_013
+- GARBAGE_RUST_RENDER_014
+- GARBAGE_CANVAS_WIDTH_015
+- GARBAGE_CANVAS_HEIGHT_016
+- GarbageRenderer017
+- garbage_clear_018
+- garbage_draw_rect_019
+- GARBAGE_DRAW_IMPL_020
+- garbage_render_021

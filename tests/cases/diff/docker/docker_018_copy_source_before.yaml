@@ -1,0 +1,43 @@
+requirements.txt: |
+  flask==2.3.0
+  flask-cors==4.0.0
+  requests==2.31.0
+  pydantic==2.5.0
+  sqlalchemy==2.0.23
+src/app.py: |
+  from flask import Flask
+  from flask_cors import CORS
+  app = Flask(__name__)
+  CORS(app)
+src/models.py: |
+  from sqlalchemy import Column, Integer, String
+  from sqlalchemy.ext.declarative import declarative_base
+  Base = declarative_base()
+  class User(Base):
+      __tablename__ = 'users'
+      id = Column(Integer, primary_key=True)
+      name = Column(String(100))
+Dockerfile: |
+  FROM python:3.11-slim
+  RUN pip install flask flask-cors
+  COPY src/app.py /app/
+  WORKDIR /app
+  CMD ["python", "app.py"]
+scripts/seed_data.sh: |
+  #!/bin/bash
+  # GARBAGE_DOCKER_503_SEED_MARKER_001
+  GARBAGE_DOCKER_503_SEED_VAR_002="seed_config"
+  python manage.py seed
+tests/test_models.py: |
+  # GARBAGE_DOCKER_503_TEST_MARKER_003
+  GARBAGE_DOCKER_503_TEST_CONFIG_004 = {"db": "test"}
+  def test_user_model():
+      pass
+docs/api.md: |
+  # API Documentation
+  GARBAGE_DOCKER_503_API_DOC_005
+  GARBAGE_DOCKER_503_ENDPOINT_006="/api/v1"
+config/logging.yaml: |
+  # GARBAGE_DOCKER_503_LOG_MARKER_007
+  version: 1
+  GARBAGE_DOCKER_503_LOG_CONFIG_008: debug

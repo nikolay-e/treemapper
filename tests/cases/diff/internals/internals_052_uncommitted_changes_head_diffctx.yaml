@@ -1,0 +1,3 @@
+must_include:
+- base_func
+- new_func

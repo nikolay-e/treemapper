@@ -1,0 +1,25 @@
+ExpensiveList.tsx: |
+  import { memo } from 'react';
+
+  interface Item {
+      id: string;
+      name: string;
+  }
+
+  interface ExpensiveListProps {
+      items: Item[];
+  }
+
+  function ExpensiveListComponent({ items }: ExpensiveListProps) {
+      return (
+          <ul>
+              {items.map(item => (
+                  <li key={item.id}>{item.name}</li>
+              ))}
+          </ul>
+      );
+  }
+
+  export const ExpensiveList = memo(ExpensiveListComponent);
+Dashboard.tsx: |
+  console.log('initial');

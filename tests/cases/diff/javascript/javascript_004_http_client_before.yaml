@@ -1,0 +1,9 @@
+api.config.ts: |
+  export const API_BASE = '/api';
+
+  export interface ApiResponse<T> {
+      data: T;
+      status: number;
+  }
+data.service.ts: |
+  console.log('initial');

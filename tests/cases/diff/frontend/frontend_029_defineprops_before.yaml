@@ -1,0 +1,22 @@
+types.ts: |
+  export interface CardProps {
+      title: string;
+      description?: string;
+      imageUrl?: string;
+      tags?: string[];
+  }
+
+  export interface CardAction {
+      label: string;
+      handler: () => void;
+  }
+
+  // vue_garbage_marker_004
+  const GARBAGE_CARD_CONFIG = { maxTags: 10 };
+Card.vue: |
+  <template>
+      <div>Initial</div>
+  </template>
+
+  <script setup lang="ts">
+  </script>

@@ -1,0 +1,20 @@
+must_include:
+- authSlice
+- AuthState
+- createAsyncThunk
+- LoginCredentials
+- loginApi
+- logoutApi
+- src/store/authSlice.ts
+must_not_include:
+- GARBAGE_TS_006_STORAGE_001
+- GARBAGE_TS_006_STORAGE_KEY_002
+- GARBAGE_TS_006_StorageManager_003
+- GARBAGE_TS_006_VERSION_004
+- GARBAGE_TS_006_storageManager_005
+- GARBAGE_TS_006_I18N_006
+- GARBAGE_TS_006_Locale_007
+- GARBAGE_TS_006_I18n_008
+- GARBAGE_TS_006_i18n_009
+- storage.ts
+- i18n.ts

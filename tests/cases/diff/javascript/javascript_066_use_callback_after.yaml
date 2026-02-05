@@ -1,0 +1,15 @@
+handlers.ts: |
+  export function createClickHandler(id: string) {
+      return () => console.log('Clicked:', id);
+  }
+ActionButton.tsx: |
+  import { useCallback } from 'react';
+  import { createClickHandler } from './handlers';
+
+  export function ActionButton({ id }: { id: string }) {
+      const handleClick = useCallback(() => {
+          createClickHandler(id)();
+      }, [id]);
+
+      return <button onClick={handleClick}>Action</button>;
+  }

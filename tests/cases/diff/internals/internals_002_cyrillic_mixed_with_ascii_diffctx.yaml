@@ -1,0 +1,16 @@
+must_include_files:
+  - messages.py
+must_include_content:
+  - |
+    def привет_мир():
+        result = "здравствуй"
+        return result
+must_not_include:
+  - GARBAGE_INT_002_PARSER_MARKER_A
+  - GARBAGE_INT_002_TOKEN_MARKER_B
+  - GarbageLocaleParser
+  - garbage_locale_parser.py
+  - GARBAGE_INT_002_STORE_MARKER_C
+  - GARBAGE_INT_002_PERSIST_MARKER_D
+  - GarbageTranslationStore
+  - garbage_translation_store.py

@@ -1,0 +1,16 @@
+must_include_files:
+  - widget.cpp
+must_include_content:
+  - |
+    GARBAGE_JVM_011_SCHED_MARKER_A
+  - |
+    GARBAGE_JVM_011_CANCEL_MARKER_B
+must_not_include:
+  - GARBAGE_JVM_011_RENDER_MARKER_A
+  - GARBAGE_JVM_011_SHADER_MARKER_B
+  - GARBAGE_JVM_011_CANVAS_MARKER_C
+  - GARBAGE_JVM_011_PIXEL_MARKER_D
+  - GarbageRenderer
+  - GarbageCanvas
+  - garbage_renderer.cpp
+  - garbage_canvas.cpp

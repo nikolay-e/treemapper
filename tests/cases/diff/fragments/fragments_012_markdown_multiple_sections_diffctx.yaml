@@ -1,0 +1,11 @@
+must_include:
+- multi_section.md
+- '# Section One'
+must_not_include:
+- GARBAGE_FRAG_garbdoc1_051
+- GARBAGE_FRAG_garbcontent1_051
+- GARBAGE_FRAG_garbdoc2_051
+- GARBAGE_FRAG_garbcontent2_051
+- GARBAGE_FRAG_garbsub051
+- GARBAGE_FRAG_garbsubcontent051
+- garbage_multi_051.md

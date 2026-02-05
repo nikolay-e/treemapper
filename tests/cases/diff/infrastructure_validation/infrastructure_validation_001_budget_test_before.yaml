@@ -1,0 +1,47 @@
+src/models.py: |
+  from dataclasses import dataclass
+  from typing import Optional
+
+  @dataclass
+  class Config:
+      x: int = 1
+      name: str = "default"
+      enabled: bool = True
+
+  @dataclass
+  class Settings:
+      config: Config
+      debug: bool = False
+
+  def create_default_config():
+      return Config()
+
+  def create_settings(config: Optional[Config] = None):
+      if config is None:
+          config = create_default_config()
+      return Settings(config=config)
+src/processor.py: |
+  from models import Config, create_settings
+
+  def process_config(cfg: Config):
+      if cfg.enabled:
+          return f"Processing {cfg.name} with x={cfg.x}"
+      return "Disabled"
+
+  def run():
+      settings = create_settings()
+      return process_config(settings.config)
+scripts/benchmark.sh: |
+  #!/bin/bash
+  # GARBAGE_INFRA_001_BENCH_SCRIPT_A
+  GARBAGE_INFRA_001_BENCH_ITERATIONS_B=1000
+  python -m timeit "import processor; processor.run()"
+tests/test_perf.py: |
+  # GARBAGE_INFRA_001_PERF_TEST_A
+  GARBAGE_INFRA_001_PERF_THRESHOLD_B = 0.5
+  def test_performance():
+      pass
+docs/budget.md: |
+  # Budget Guide
+  GARBAGE_INFRA_001_BUDGET_DOC_A
+  GARBAGE_INFRA_001_TOKEN_LIMIT_B=50000

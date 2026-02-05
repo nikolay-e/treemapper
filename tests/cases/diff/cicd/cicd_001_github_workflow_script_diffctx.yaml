@@ -1,0 +1,45 @@
+must_include_files:
+  - .github/workflows/ci.yml
+  - src/build.ts
+must_include_content:
+  - |
+    name: CI
+    on: [push, pull_request]
+    jobs:
+      build:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Setup Node.js
+            uses: actions/setup-node@v4
+            with:
+              node-version: '20'
+              cache: 'npm'
+          - run: npm ci
+          - run: npm run build
+          - run: npm test
+  - |
+    export function build(options?: Partial<BuildOptions>): void {
+      const config = getConfig();
+      const opts: BuildOptions = {
+        minify: config.production,
+        sourceMaps: !config.production,
+        outDir: './dist',
+        ...options,
+      };
+
+      logger.info('Starting build process');
+      logger.debug(`Build options: ${JSON.stringify(opts)}`);
+
+      compileSources(opts);
+      copyAssets(opts.outDir);
+
+      logger.info('Build completed successfully');
+    }
+must_not_include:
+  - GARBAGE_CICD_001_DOCS_MARKER_A
+  - GARBAGE_CICD_001_README_SECTION_B
+  - GARBAGE_CICD_001_DEPLOY_SCRIPT_C
+  - GARBAGE_CICD_001_DEPLOY_VAR_D
+  - docs/README.md
+  - scripts/deploy.sh

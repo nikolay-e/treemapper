@@ -1,0 +1,25 @@
+routes.ts: |
+  import { Router } from 'express';
+
+  export const userRouter = Router();
+
+  userRouter.get('/:id', (req, res) => {
+      res.json({ id: req.params.id });
+  });
+
+  userRouter.post('/', (req, res) => {
+      res.status(201).json(req.body);
+  });
+
+  userRouter.delete('/:id', (req, res) => {
+      res.status(204).send();
+  });
+
+  // js_garbage_marker_009
+  const GARBAGE_ROUTE = '/garbage';
+middleware.ts: |
+  import { userRouter } from './routes';
+
+  export function setupRoutes(app: any) {
+      app.use('/users', userRouter);
+  }

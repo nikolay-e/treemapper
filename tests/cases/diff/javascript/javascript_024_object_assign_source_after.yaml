@@ -1,0 +1,12 @@
+defaults.ts: |
+  export const defaultConfig = {
+      timeout: 5000,
+      retries: 3,
+      baseUrl: 'https://api.example.com',
+  };
+config.ts: |
+  import { defaultConfig } from './defaults';
+
+  export function createConfig(overrides: Partial<typeof defaultConfig>) {
+      return Object.assign({}, defaultConfig, overrides);
+  }

@@ -1,0 +1,27 @@
+api.ts: |
+  export async function fetchUser(id: string) {
+      const response = await fetch(`/api/users/${id}`);
+      return response.json();
+  }
+service.ts: |
+  import { fetchUser } from './api';
+
+  export async function getUserName(id: string): Promise<string> {
+      const user = await fetchUser(id);
+      return user.name;
+  }
+service.test.ts: |
+  import { getUserName } from './service';
+  import { fetchUser } from './api';
+
+  jest.mock('./api');
+
+  const mockedFetchUser = fetchUser as jest.MockedFunction<typeof fetchUser>;
+
+  describe('Service', () => {
+      it('should return user name', async () => {
+          mockedFetchUser.mockResolvedValue({ id: '1', name: 'Test User' });
+          const name = await getUserName('1');
+          expect(name).toBe('Test User');
+      });
+  });

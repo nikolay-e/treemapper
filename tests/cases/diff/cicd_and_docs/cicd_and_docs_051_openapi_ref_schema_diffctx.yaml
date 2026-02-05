@@ -1,0 +1,25 @@
+must_include_files:
+  - openapi.yaml
+must_include_content:
+  - |
+    address:
+      $ref: '#/components/schemas/Address'
+  - |
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+must_not_include:
+  - GARBAGE_CICD_DOCS_051_VALIDATOR_MARKER_A
+  - GARBAGE_CICD_DOCS_051_FORMAT_MARKER_B
+  - GARBAGE_CICD_DOCS_051_COERCE_MARKER_C
+  - GARBAGE_CICD_DOCS_051_RESOLVER_MARKER_D
+  - GARBAGE_CICD_DOCS_051_CIRCULAR_MARKER_E
+  - GARBAGE_CICD_DOCS_051_CACHE_MARKER_F
+  - GarbageSchemaValidator
+  - GarbageSchemaResolver
+  - garbage_schema_validator.ts
+  - garbage_schema_resolver.ts

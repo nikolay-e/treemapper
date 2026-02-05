@@ -1,0 +1,21 @@
+must_include:
+- __enter__
+- __exit__
+- class DatabaseConnection
+- QueryResult
+- ConnectionStats
+must_not_include:
+- GARBAGE_MARKER_POOL_001
+- UNRELATED_POOL_SIZE_002
+- GARBAGE_POOL_CLASS_003
+- GARBAGE_POOLED_MARKER_004
+- GARBAGE_MARKER_MIGRATE_005
+- UNRELATED_VERSION_006
+- GARBAGE_MIGRATE_CLASS_007
+- GARBAGE_FORMAT_MIGRATE_008
+- ConnectionPool
+- PooledConnection
+- MigrationManager
+- format_migration_version
+- garbage_pooling.py
+- garbage_migration.py

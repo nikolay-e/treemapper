@@ -1,0 +1,17 @@
+must_include:
+- '@shared_task'
+- send_email.delay
+- generate_report
+must_not_include:
+- GARBAGE_PY_059_QUEUE_A
+- GARBAGE_PY_059_BROKER_B
+- GARBAGE_PY_059_ROUTING_C
+- GARBAGE_PY_059_ACK_D
+- GARBAGE_PY_059_HOOK_E
+- GARBAGE_PY_059_RETRY_F
+- GARBAGE_PY_059_SIGN_G
+- GARBAGE_PY_059_LOG_H
+- MessageQueue
+- WebhookDispatcher
+- garbage_queue.py
+- garbage_webhook.py

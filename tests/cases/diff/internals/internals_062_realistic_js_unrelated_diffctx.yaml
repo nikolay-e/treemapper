@@ -1,0 +1,21 @@
+must_include:
+- fetchUserProfile
+- updateUserPreferences
+- Invalid userId
+must_not_include:
+- STRING_HELPER_MARKER_QWE123
+- CAPITALIZE_MARKER_RTY456
+- TRUNCATE_MARKER_UIO789
+- FORMATTER_MARKER_ASD012
+- DATE_HELPER_MARKER_FGH345
+- FORMAT_ISO_MARKER_JKL678
+- ADD_DAYS_MARKER_ZXC901
+- CALC_DAYS_MARKER_VBN234
+- VALIDATOR_MARKER_MNB567
+- capitalizeFirstLetter
+- truncateWithEllipsis
+- StringFormatter
+- formatDateISO
+- addDaysToDate
+- calculateDaysBetween
+- DateRangeValidator

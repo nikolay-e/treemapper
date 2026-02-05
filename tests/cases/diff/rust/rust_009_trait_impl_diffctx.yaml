@@ -1,0 +1,31 @@
+must_include:
+- impl Animal for Dog
+- impl Animal for Cat
+- Cat
+- meow
+- woof
+- Domesticated
+must_not_include:
+- GARBAGE_RUST_FS_001
+- GARBAGE_MAX_PATH_LEN_002
+- GARBAGE_BUFFER_SIZE_003
+- GarbageFileHandle004
+- garbage_read_005
+- GARBAGE_READ_ERROR_006
+- garbage_write_007
+- GARBAGE_WRITE_ERROR_008
+- garbage_seek_009
+- GARBAGE_SEEK_ERROR_010
+- GarbageFileSystem011
+- garbage_open_012
+- garbage_delete_013
+- GARBAGE_RUST_SCHED_014
+- GARBAGE_MAX_TASKS_015
+- GARBAGE_DEFAULT_PRIORITY_016
+- GarbageTask017
+- garbage_run_018
+- GARBAGE_TASK_ERROR_019
+- garbage_cancel_020
+- GARBAGE_CANCEL_IMPL_021
+- GarbageScheduler022
+- garbage_schedule_023

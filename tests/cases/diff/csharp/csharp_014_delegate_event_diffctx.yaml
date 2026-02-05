@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/OrderProcessor.cs
+  - Events/OrderEventArgs.cs
+must_include_content:
+  - |
+    public event EventHandler<OrderEventArgs>? OrderProcessed;
+must_not_include:
+  - GARBAGE_CS_014_CACHE_INVALIDATOR_A
+  - GARBAGE_CS_014_BG_SCHEDULER_B
+  - CacheInvalidator
+  - BackgroundScheduler
+  - Unrelated/CacheInvalidator.cs
+  - Unrelated/BackgroundScheduler.cs

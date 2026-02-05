@@ -1,0 +1,14 @@
+must_include_files:
+  - src/services/UserProcessor.scala
+must_include_content:
+  - |
+    import Implicits._
+  - |
+    def processString(): String
+must_not_include:
+  - GARBAGE_SCALA_005_MARKER_A
+  - GARBAGE_SCALA_005_MARKER_B
+  - GARBAGE_SCALA_005_MARKER_D
+  - GARBAGE_SCALA_005_MARKER_E
+  - unrelated/EmailSender.scala
+  - unrelated/RateLimiter.scala

@@ -1,0 +1,19 @@
+must_include:
+- Multiplexer
+- MultiplexerStats
+- handleInput
+- forward
+- select
+- done
+- Timeouts
+must_not_include:
+- GARBAGE_GO_ROUTER_FANOUT_001
+- GARBAGE_GO_TYPE_FANOUT_002
+- GARBAGE_GO_FUNC_FANOUT_003
+- GARBAGE_GO_FANOUT_UNUSED_004
+- GARBAGE_GO_ROUTER_LB_005
+- GARBAGE_GO_TYPE_LB_006
+- GARBAGE_GO_FUNC_LB_007
+- GARBAGE_GO_LB_OUTPUT_008
+- fanout
+- loadbalancer

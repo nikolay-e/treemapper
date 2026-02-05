@@ -1,0 +1,25 @@
+must_include_files:
+  - docs/api/users.md
+must_include_content:
+  - |
+    ### Parameters
+
+    | Name | Type | Description |
+    |------|------|-------------|
+    | limit | integer | Max results (default: 10) |
+    | offset | integer | Pagination offset |
+  - |
+    ## POST /api/users
+
+    Create a new user.
+must_not_include:
+  - GARBAGE_CICD_DOCS_046_GENERATOR_MARKER_A
+  - GARBAGE_CICD_DOCS_046_FORMAT_MARKER_B
+  - GARBAGE_CICD_DOCS_046_VERSION_MARKER_C
+  - GARBAGE_CICD_DOCS_046_EXTRACTOR_MARKER_D
+  - GARBAGE_CICD_DOCS_046_OUTPUT_MARKER_E
+  - GARBAGE_CICD_DOCS_046_RECURSIVE_MARKER_F
+  - GarbageApiDocsGenerator
+  - GarbageApiSchemaExtractor
+  - garbage_api_docs_generator.ts
+  - garbage_api_schema_extractor.ts

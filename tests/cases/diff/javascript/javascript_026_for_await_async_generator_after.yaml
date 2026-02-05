@@ -1,0 +1,17 @@
+generator.ts: |
+  export async function* asyncGenerator() {
+      for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          yield i;
+      }
+  }
+consumer.ts: |
+  import { asyncGenerator } from './generator';
+
+  async function consume() {
+      for await (const value of asyncGenerator()) {
+          console.log(value);
+      }
+  }
+
+  consume();

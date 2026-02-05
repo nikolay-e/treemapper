@@ -1,0 +1,6 @@
+validator.ts: |
+  export function isValidEmail(email: string): boolean {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+validator.test.ts: |
+  console.log('initial');

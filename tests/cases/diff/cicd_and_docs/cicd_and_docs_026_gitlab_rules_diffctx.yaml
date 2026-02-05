@@ -1,0 +1,20 @@
+must_include_files:
+  - .gitlab-ci.yml
+must_include_content:
+  - |
+    rules:
+      - if: $CI_COMMIT_BRANCH == "main"
+      - if: $CI_COMMIT_TAG
+        when: always
+      - when: never
+must_not_include:
+  - GARBAGE_CICD_DOCS_026_CONDITION_MARKER_A
+  - GARBAGE_CICD_DOCS_026_PATTERN_MARKER_B
+  - GARBAGE_CICD_DOCS_026_STRICT_MARKER_C
+  - GARBAGE_CICD_DOCS_026_TRIGGER_MARKER_D
+  - GARBAGE_CICD_DOCS_026_WHEN_MARKER_E
+  - GARBAGE_CICD_DOCS_026_ALLOW_MARKER_F
+  - GarbageConditionEvaluator
+  - GarbageTriggerHandler
+  - garbage_condition.ts
+  - garbage_trigger.ts

@@ -1,0 +1,16 @@
+config/scheduler.yaml: |
+  scheduler:
+    timezone: America/New_York
+    jobs:
+      - name: cleanup
+        cron: "0 2 * * *"
+      - name: report
+        cron: "0 8 * * 1"
+src/scheduler.py: |
+  from apscheduler.schedulers.background import BackgroundScheduler
+
+  def create_scheduler(timezone: str = "UTC"):
+      return BackgroundScheduler(timezone=timezone)
+
+  def cleanup_job():
+      pass

@@ -1,0 +1,10 @@
+utils.ts: |
+  export function fetchUser(id: string): Promise<User> {
+      return fetch(`/api/users/${id}`).then(res => res.json());
+  }
+
+  export function fetchPosts(userId: string): Promise<Post[]> {
+      return fetch(`/api/users/${userId}/posts`).then(res => res.json());
+  }
+main.ts: |
+  console.log('initial');

@@ -1,0 +1,16 @@
+api.ts: |
+  export default function apiClient(baseUrl = '') {
+      return {
+          get: (url: string) => fetch(baseUrl + url),
+          post: (url: string, data: any) => fetch(baseUrl + url, {
+              method: 'POST',
+              body: JSON.stringify(data),
+          }),
+      };
+  }
+service.ts: |
+  import client from './api';
+
+  export function getData(url: string) {
+      return client().get(url);
+  }

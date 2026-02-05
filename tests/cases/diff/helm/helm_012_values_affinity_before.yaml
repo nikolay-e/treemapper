@@ -1,0 +1,50 @@
+chart/Chart.yaml: |
+  apiVersion: v2
+  name: compute-svc
+  description: Compute service with scheduling constraints
+  type: application
+  version: 3.1.0
+chart/values.yaml: |
+  replicaCount: 3
+  image:
+    repository: compute-svc
+    tag: "3.1.0"
+  affinity: {}
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+chart/templates/deployment.yaml: |
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: {{ .Release.Name }}-{{ .Chart.Name }}
+  spec:
+    replicas: {{ .Values.replicaCount }}
+    template:
+      spec:
+        containers:
+          - name: {{ .Chart.Name }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            resources:
+              {{- toYaml .Values.resources | nindent 14 }}
+        {{- with .Values.affinity }}
+        affinity:
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+chart/templates/vault-injector.yaml: |
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: GARBAGE_HELM_012_VAULT_INJECTOR_A
+  spec:
+    template:
+      spec:
+        containers:
+          - name: GARBAGE_HELM_012_VAULT_CONTAINER_B
+            image: GARBAGE_HELM_012_VAULT_IMAGE_C
+chart/docs/scheduling.md: |
+  # Scheduling Guide
+  GARBAGE_HELM_012_SCHEDULING_DOC_D
+  ## Node Selection
+  GARBAGE_HELM_012_NODE_SELECTION_E

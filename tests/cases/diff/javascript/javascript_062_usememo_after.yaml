@@ -1,0 +1,12 @@
+compute.ts: |
+  export function expensiveComputation(items: number[]): number {
+      return items.reduce((sum, n) => sum + n * n, 0);
+  }
+Stats.tsx: |
+  import { useMemo } from 'react';
+  import { expensiveComputation } from './compute';
+
+  export function Stats({ items }: { items: number[] }) {
+      const result = useMemo(() => expensiveComputation(items), [items]);
+      return <div>Result: {result}</div>;
+  }

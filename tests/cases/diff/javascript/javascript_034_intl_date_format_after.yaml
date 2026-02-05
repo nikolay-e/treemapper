@@ -1,0 +1,16 @@
+locale.ts: |
+  export const localeConfig = {
+      locale: 'en-US',
+      options: {
+          year: 'numeric' as const,
+          month: 'long' as const,
+          day: 'numeric' as const,
+      },
+  };
+formatter.ts: |
+  import { localeConfig } from './locale';
+
+  export function formatDate(date: Date): string {
+      const formatter = new Intl.DateTimeFormat(localeConfig.locale, localeConfig.options);
+      return formatter.format(date);
+  }

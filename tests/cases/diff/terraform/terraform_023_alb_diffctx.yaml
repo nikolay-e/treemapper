@@ -1,0 +1,16 @@
+must_include:
+- lb.tf
+- security.tf
+- aws_lb
+- aws_lb_listener
+- aws_lb_target_group
+- aws_lb_listener_rule
+- aws_security_group
+- ELBSecurityPolicy-TLS13
+- drop_invalid_header_fields
+- aws_wafv2_web_acl_association
+must_not_include:
+- GARBAGE_TF_alb463a
+- GARBAGE_TF_alb463b
+- CostReportGenerator
+- trackVisitor

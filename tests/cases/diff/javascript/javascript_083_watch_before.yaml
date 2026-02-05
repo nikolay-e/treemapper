@@ -1,0 +1,6 @@
+api.ts: |
+  export async function fetchUserData(userId: string) {
+      return { id: userId, name: 'User' };
+  }
+UserDetails.vue: |
+  <template><div>initial</div></template>

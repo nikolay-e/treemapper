@@ -1,0 +1,16 @@
+must_include_files:
+  - ProfileView.swift
+must_include_content:
+  - |
+    @EnvironmentObject
+  - |
+    appState.isLoggedIn
+must_not_include:
+  - GARBAGE_JVM_062_BINDING_MARKER_A
+  - GARBAGE_JVM_062_WRAPPER_MARKER_B
+  - GARBAGE_JVM_062_STORE_MARKER_C
+  - GARBAGE_JVM_062_REDUCER_MARKER_D
+  - GarbageBindingWrapper
+  - GarbageStateReducer
+  - GarbageBindingWrapper.swift
+  - GarbageStateReducer.swift

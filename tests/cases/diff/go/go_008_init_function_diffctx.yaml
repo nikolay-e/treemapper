@@ -1,0 +1,21 @@
+must_include:
+- Config
+- init
+- DatabaseURL
+- RedisURL
+- JWTSecret
+- CORSOrigins
+- RateLimitRPS
+- validateConfig
+- getEnvRequired
+must_not_include:
+- GARBAGE_GO_BOOTSTRAP_INIT_001
+- GARBAGE_GO_TYPE_BOOTSTRAP_002
+- GARBAGE_GO_FUNC_BOOTSTRAP_003
+- GARBAGE_GO_BOOTSTRAP_UNUSED_004
+- GARBAGE_GO_SETUP_DATABASE_005
+- GARBAGE_GO_TYPE_SETUP_006
+- GARBAGE_GO_FUNC_SETUP_007
+- GARBAGE_GO_SETUP_OUTPUT_008
+- bootstrap
+- setup

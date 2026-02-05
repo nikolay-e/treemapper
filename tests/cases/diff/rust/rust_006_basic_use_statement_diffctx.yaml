@@ -1,0 +1,26 @@
+must_include:
+- HashMap
+- HashSet
+- BTreeMap
+- use std::collections
+must_not_include:
+- GARBAGE_RUST_VALIDATION_001
+- GARBAGE_MAX_LENGTH_002
+- GARBAGE_MIN_LENGTH_003
+- GarbageValidator004
+- garbage_validate_string_005
+- GARBAGE_TOO_LONG_ERROR_006
+- garbage_validate_email_007
+- garbage_add_rule_008
+- GarbageValidatable009
+- garbage_is_valid_010
+- garbage_validate_011
+- GARBAGE_RUST_FORMAT_012
+- GARBAGE_DATE_FORMAT_013
+- GARBAGE_TIME_FORMAT_014
+- GarbageFormatter015
+- garbage_format_date_016
+- garbage_format_currency_017
+- garbage_format_number_018
+- garbage_pad_string_019
+- garbage_truncate_020

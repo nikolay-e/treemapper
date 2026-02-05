@@ -1,0 +1,15 @@
+must_include:
+- NetworkError
+- ValidationError
+- validate_and_parse
+must_not_include:
+- GARBAGE_RUST_025_NOTIFIER_A
+- GARBAGE_RUST_025_NOTIFY_CHANNEL_B
+- GarbageNotificationService025
+- garbage_send_025
+- garbage_broadcast_025
+- GARBAGE_RUST_025_ARCHIVER_C
+- GARBAGE_RUST_025_ARCHIVE_FMT_D
+- GarbageFileArchiver025
+- garbage_compress_025
+- garbage_extract_025

@@ -1,0 +1,8 @@
+form.ts: |
+  export const FORM_SELECTORS = {
+      nameInput: '[data-testid=name-input]',
+      emailInput: '[data-testid=email-input]',
+      submitButton: '[data-testid=submit-btn]',
+  };
+form.cy.ts: |
+  console.log('initial');

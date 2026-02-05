@@ -1,0 +1,12 @@
+must_include_files:
+  - app.py
+must_include_content:
+  - |
+    helper as h
+must_not_include:
+  - GARBAGE_DEP_004_CHESS_A
+  - GARBAGE_DEP_004_CURRENCY_B
+  - ChessBoard
+  - ExchangeService
+  - evaluate_position
+  - convert_GARBAGE

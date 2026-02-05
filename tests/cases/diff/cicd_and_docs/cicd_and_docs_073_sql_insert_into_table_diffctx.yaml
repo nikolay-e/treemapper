@@ -1,0 +1,22 @@
+must_include_files:
+  - initial_data.sql
+must_include_content:
+  - |
+    INSERT INTO categories (name, description, active) VALUES
+        ('Electronics', 'Electronic devices and accessories', TRUE),
+        ('Clothing', 'Apparel and fashion items', TRUE),
+        ('Books', 'Physical and digital books', TRUE),
+  - |
+    ('Home & Garden', 'Home improvement and garden supplies', TRUE),
+    ('Sports', 'Sports equipment and gear', TRUE),
+must_not_include:
+  - GARBAGE_CICD_DOCS_073_SEED_MARKER_A
+  - GARBAGE_CICD_DOCS_073_BULK_MARKER_B
+  - GARBAGE_CICD_DOCS_073_IMPORT_MARKER_C
+  - GARBAGE_CICD_DOCS_073_LOADER_MARKER_D
+  - GARBAGE_CICD_DOCS_073_PARSE_MARKER_E
+  - GARBAGE_CICD_DOCS_073_CHUNK_MARKER_F
+  - GarbageSeedValidator
+  - GarbageDataLoader
+  - garbage_seed_validator.ts
+  - garbage_data_loader.ts

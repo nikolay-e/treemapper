@@ -1,0 +1,13 @@
+worker.ts: |
+  self.onmessage = function(e: MessageEvent) {
+      const result = e.data * 2;
+      self.postMessage(result);
+  };
+main.ts: |
+  const worker = new Worker('./worker.ts');
+
+  worker.onmessage = function(e: MessageEvent) {
+      console.log('Result:', e.data);
+  };
+
+  worker.postMessage(21);

@@ -1,0 +1,19 @@
+schemas.ts: |
+  import { z } from 'zod';
+
+  export const UserSchema = z.object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string().email(),
+  });
+
+  export type User = z.infer<typeof UserSchema>;
+
+  // js_garbage_marker_008
+  const GARBAGE_SCHEMA = z.object({ garbage: z.boolean() });
+validator.ts: |
+  import { UserSchema, User } from './schemas';
+
+  export function validateUser(data: unknown): User {
+      return UserSchema.parse(data);
+  }

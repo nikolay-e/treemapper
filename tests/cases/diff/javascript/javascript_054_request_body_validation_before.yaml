@@ -1,0 +1,8 @@
+schemas.ts: |
+  export interface CreateUserBody {
+      name: string;
+      email: string;
+      password: string;
+  }
+controller.ts: |
+  console.log('initial');

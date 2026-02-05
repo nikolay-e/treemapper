@@ -1,0 +1,4 @@
+must_include:
+- defineProps
+must_not_include:
+- vue_garbage_marker_004

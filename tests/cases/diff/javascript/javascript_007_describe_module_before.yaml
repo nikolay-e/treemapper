@@ -1,0 +1,10 @@
+calculator.ts: |
+  export function add(a: number, b: number): number {
+      return a + b;
+  }
+
+  export function multiply(a: number, b: number): number {
+      return a * b;
+  }
+calculator.test.ts: |
+  console.log('initial');

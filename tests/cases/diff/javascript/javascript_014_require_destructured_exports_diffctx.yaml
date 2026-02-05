@@ -1,0 +1,5 @@
+must_include:
+- require('./module')
+- main.js
+must_not_include:
+- js_garbage_marker_001

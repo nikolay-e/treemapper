@@ -1,0 +1,20 @@
+must_include_files:
+  - src/core.py
+must_include_content:
+  - |
+    def core_function(values: List[int]) -> int:
+        if not values:
+            return 0
+        total = sum(values)
+        return total // len(values)
+must_not_include:
+  - GARBAGE_COMP_002_BUCKET_SIZE_A
+  - GARBAGE_COMP_002_REFILL_RATE_B
+  - GARBAGE_COMP_002_WINDOW_DURATION_C
+  - GARBAGE_COMP_002_FAILURE_THRESHOLD_D
+  - GARBAGE_COMP_002_RECOVERY_TIMEOUT_E
+  - GARBAGE_COMP_002_HALF_OPEN_STATE_F
+  - GarbageRateLimiter
+  - GarbageCircuitBreaker
+  - garbage_rate_limiter.py
+  - garbage_circuit_breaker.py

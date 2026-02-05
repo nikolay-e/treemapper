@@ -1,0 +1,25 @@
+must_include_files:
+  - chart/values.yaml
+  - chart/templates/deployment.yaml
+must_include_content:
+  - |
+    env:
+      - name: APP_ENV
+        value: production
+      - name: LOG_LEVEL
+        value: warn
+      - name: DB_HOST
+        valueFrom:
+          secretKeyRef:
+            name: db-secret
+            key: host
+  - |
+    {{- toYaml .Values.env | nindent 14 }}
+must_not_include:
+  - GARBAGE_HELM_010_ISTIO_VS_A
+  - GARBAGE_HELM_010_ISTIO_HOST_B
+  - GARBAGE_HELM_010_ISTIO_DEST_C
+  - GARBAGE_HELM_010_MIGRATION_SCRIPT_D
+  - GARBAGE_HELM_010_MIGRATION_DB_E
+  - chart/templates/istio-virtualservice.yaml
+  - chart/scripts/migrate.sh

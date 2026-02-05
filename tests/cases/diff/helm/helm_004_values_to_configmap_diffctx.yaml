@@ -1,0 +1,20 @@
+must_include_files:
+  - chart/values.yaml
+  - chart/templates/configmap.yaml
+must_include_content:
+  - |
+    config:
+      logLevel: debug
+      debugMode: true
+      maxConnections: 100
+  - |
+    LOG_LEVEL: {{ .Values.config.logLevel }}
+    DEBUG_MODE: {{ .Values.config.debugMode | quote }}
+must_not_include:
+  - GARBAGE_HELM_004_NETPOL_NAME_A
+  - GARBAGE_HELM_004_NETPOL_SELECTOR_B
+  - GARBAGE_HELM_004_NETPOL_NS_C
+  - GARBAGE_HELM_004_LOADTEST_HEADER_D
+  - GARBAGE_HELM_004_LOADTEST_CONFIG_E
+  - chart/templates/networkpolicy.yaml
+  - chart/tools/load-test.py

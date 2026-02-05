@@ -1,0 +1,14 @@
+routes.ts: |
+  import { Router } from 'express';
+
+  export const userRouter = Router();
+
+  userRouter.get('/:id', (req, res) => {
+      res.json({ id: req.params.id });
+  });
+middleware.ts: |
+  import { userRouter } from './routes';
+
+  export function setupRoutes(app: any) {
+      app.use('/users', userRouter);
+  }

@@ -1,0 +1,34 @@
+must_include_files:
+  - src/services/report_generator.py
+must_include_content:
+  - |
+    class ReportGenerator:
+        def __init__(self, title: str, currency: str = "USD"):
+            self.title = title
+            self.currency = currency
+            self.created_at = datetime.now()
+
+        def generate_summary(self, data: Dict[str, Any]) -> str:
+            revenue = data.get("revenue", 0)
+            growth = data.get("growth", 0)
+            previous = data.get("previous_revenue", 0)
+
+            lines = [
+                f"Report: {self.title}",
+                f"Date: {format_date(self.created_at)}",
+                f"Revenue: {format_currency(revenue, self.currency)}",
+                f"Previous: {format_currency(previous, self.currency)}",
+                f"Growth: {format_percentage(growth)}",
+            ]
+            return "\n".join(lines)
+must_not_include:
+  - GARBAGE_ALGO_008_VALIDATE_MARKER_A
+  - GARBAGE_ALGO_008_SCHEMA_MARKER_B
+  - GARBAGE_ALGO_008_RULES_MARKER_C
+  - GARBAGE_ALGO_008_PARSER_MARKER_D
+  - GARBAGE_ALGO_008_FORMAT_MARKER_E
+  - GARBAGE_ALGO_008_DECODE_MARKER_F
+  - DataValidator
+  - JSONParser
+  - garbage_validators.py
+  - garbage_parsers.py

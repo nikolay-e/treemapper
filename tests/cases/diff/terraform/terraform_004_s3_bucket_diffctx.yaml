@@ -1,0 +1,16 @@
+must_include:
+- aws_s3_bucket
+- aws_s3_bucket_versioning
+- aws_s3_bucket_lifecycle_configuration
+- lifecycle_rules
+- kms_key_id
+must_not_include:
+- GARBAGE_TF_EMR_444_001
+- GARBAGE_EMR_CLUSTER_444_002
+- GARBAGE_444_003
+- GARBAGE_EMR_PROFILE_444_004
+- GARBAGE_EMR_ROLE_444_005
+- GARBAGE_TF_ATHENA_444_006
+- GARBAGE_ATHENA_WG_444_007
+- GARBAGE_ATHENA_BUCKET_444_008
+- GARBAGE_ATHENA_DB_444_009

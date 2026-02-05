@@ -1,0 +1,22 @@
+user.model.ts: |
+  export interface User {
+      id: string;
+      name: string;
+      email: string;
+  }
+user-card.component.ts: |
+  import { Component, Input } from '@angular/core';
+  import { User } from './user.model';
+
+  @Component({
+      selector: 'app-user-card',
+      template: `
+          <div class="card">
+              <h3>{{ user.name }}</h3>
+              <p>{{ user.email }}</p>
+          </div>
+      `
+  })
+  export class UserCardComponent {
+      @Input() user!: User;
+  }

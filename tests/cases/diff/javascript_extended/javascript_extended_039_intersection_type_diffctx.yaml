@@ -1,0 +1,14 @@
+must_include:
+- person.ts
+- Named
+- Aged
+must_not_include:
+- GARBAGE_JSX_039_CURRENCY_FMT_A
+- GARBAGE_JSX_039_CONVERT_RATE_B
+- GARBAGE_JSX_039_DEFAULT_CURRENCY_C
+- GARBAGE_JSX_039_DATE_CONFIG_D
+- GARBAGE_JSX_039_DATE_FORMATTER_E
+- GARBAGE_JSX_039_PARSE_DATE_F
+- GarbageCurrencyFormatter
+- currency.ts
+- dateUtils.ts

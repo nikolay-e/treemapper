@@ -1,0 +1,34 @@
+must_include_files:
+  - Makefile
+  - src/app.py
+must_include_content:
+  - |
+    build:
+    	python -m build
+
+    test:
+    	pytest tests/ --cov=src
+
+    lint:
+    	ruff check src/
+
+    deploy:
+    	./scripts/deploy.sh
+  - |
+    def run() -> None:
+        app = create_application()
+        try:
+            app.run()
+        except KeyboardInterrupt:
+            app.shutdown()
+must_not_include:
+  - GARBAGE_CICD_007_DOC_MARKER_A
+  - GARBAGE_CICD_007_FORMAT_MARKER_B
+  - GARBAGE_CICD_007_TEMPLATE_MARKER_C
+  - GARBAGE_CICD_007_RELEASE_MARKER_D
+  - GARBAGE_CICD_007_BRANCH_MARKER_E
+  - GARBAGE_CICD_007_TAG_MARKER_F
+  - GarbageDocGenerator
+  - GarbageReleaseManager
+  - garbage_docs.py
+  - garbage_release.py

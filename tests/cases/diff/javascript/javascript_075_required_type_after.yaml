@@ -1,0 +1,14 @@
+options.ts: |
+  export interface Options {
+      name?: string;
+      value?: number;
+      enabled?: boolean;
+  }
+validator.ts: |
+  import { Options } from './options';
+
+  type StrictOptions = Required<Options>;
+
+  function validate(options: StrictOptions): boolean {
+      return options.name.length > 0 && options.value >= 0 && typeof options.enabled === 'boolean';
+  }

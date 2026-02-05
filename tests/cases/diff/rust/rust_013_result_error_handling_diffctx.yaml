@@ -1,0 +1,30 @@
+must_include:
+- Result
+- ParseIntError
+- ParseError
+- parse_or_default
+- try_parse_all
+- InvalidRadix
+must_not_include:
+- GARBAGE_RUST_IMAGE_001
+- GARBAGE_MAX_WIDTH_002
+- GARBAGE_MAX_HEIGHT_003
+- GarbageImage004
+- garbage_load_005
+- GARBAGE_LOAD_ERROR_006
+- garbage_resize_007
+- GARBAGE_RESIZE_IMPL_008
+- garbage_save_009
+- GARBAGE_SAVE_ERROR_010
+- GarbageImageFilter011
+- garbage_apply_012
+- GARBAGE_RUST_AUDIO_013
+- GARBAGE_SAMPLE_RATE_014
+- GARBAGE_BIT_DEPTH_015
+- GarbageAudioBuffer016
+- garbage_load_017
+- GARBAGE_AUDIO_LOAD_ERROR_018
+- garbage_mix_019
+- GARBAGE_MIX_IMPL_020
+- garbage_normalize_021
+- GARBAGE_NORMALIZE_IMPL_022

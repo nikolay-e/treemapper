@@ -1,0 +1,60 @@
+user.py: |
+  from typing import Optional
+
+  class User:
+      def __init__(self, first: str, last: str):
+          self.first = first
+          self.last = last
+
+      @property
+      def full_name(self) -> str:
+          return f"{self.first} {self.last}"
+
+      @property
+      def initials(self) -> str:
+          return f"{self.first[0]}{self.last[0]}".upper()
+
+      def greet(self) -> str:
+          return f"Hello, {self.full_name}!"
+views.py: |
+  from user import User
+
+  def render_user(user: User) -> str:
+      return f"Name: {user.full_name}"
+
+  def render_user_card(user: User) -> str:
+      return f"[{user.initials}] {user.full_name}"
+
+  def render_greeting(user: User) -> str:
+      return user.greet()
+serializers.py: |
+  from user import User
+
+  def user_to_dict(user: User) -> dict:
+      return {
+          "first": user.first,
+          "last": user.last,
+          "full_name": user.full_name,
+          "initials": user.initials,
+      }
+
+  def user_to_display(user: User) -> str:
+      return f"{user.full_name} ({user.initials})"
+scripts/create_users.sh: |
+  #!/bin/bash
+  # GARBAGE_INFRA_004_CREATE_SCRIPT_A
+  GARBAGE_INFRA_004_DEFAULT_ROLE_B="viewer"
+  python create_users.py
+tests/test_user.py: |
+  # GARBAGE_INFRA_004_USER_TEST_A
+  GARBAGE_INFRA_004_TEST_EMAIL_B = "test@example.com"
+  def test_user_creation():
+      pass
+docs/user-model.md: |
+  # User Model
+  GARBAGE_INFRA_004_USER_DOC_A
+  GARBAGE_INFRA_004_FIELDS_LIST_B="first,last,email"
+migrations/002_add_title.sql: |
+  -- GARBAGE_INFRA_004_MIGRATION_A
+  -- GARBAGE_INFRA_004_COLUMN_TYPE_B: VARCHAR(50)
+  ALTER TABLE users ADD COLUMN title VARCHAR(50);

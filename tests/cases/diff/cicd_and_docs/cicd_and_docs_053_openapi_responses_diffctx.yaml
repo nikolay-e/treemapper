@@ -1,0 +1,27 @@
+must_include_files:
+  - openapi.yaml
+must_include_content:
+  - |
+    '404':
+      description: Product not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  - |
+    Error:
+      type: object
+      required:
+        - code
+        - message
+must_not_include:
+  - GARBAGE_CICD_DOCS_053_FORMAT_MARKER_A
+  - GARBAGE_CICD_DOCS_053_MIME_MARKER_B
+  - GARBAGE_CICD_DOCS_053_PRETTY_MARKER_C
+  - GARBAGE_CICD_DOCS_053_SCHEMA_MARKER_D
+  - GARBAGE_CICD_DOCS_053_STRICT_MARKER_E
+  - GARBAGE_CICD_DOCS_053_COERCE_MARKER_F
+  - GarbageResponseFormatter
+  - GarbageResponseValidator
+  - garbage_response_formatter.ts
+  - garbage_response_validator.ts

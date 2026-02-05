@@ -1,0 +1,15 @@
+ExpensiveComponent.tsx: |
+  import React from 'react';
+
+  export function ExpensiveComponent() {
+      return <div>Initial</div>;
+  }
+
+  // react_garbage_marker_008
+  const GARBAGE_MEMO_DATA = ["unused", "data"];
+ParentComponent.tsx: |
+  import React from 'react';
+
+  export function ParentComponent() {
+      return <div>Initial</div>;
+  }

@@ -1,0 +1,6 @@
+must_include:
+- Counter.vue
+- ref
+- computed
+must_not_include:
+- vue_garbage_marker_001

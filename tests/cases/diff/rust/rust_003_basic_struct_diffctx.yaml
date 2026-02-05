@@ -1,0 +1,22 @@
+must_include:
+- Point
+- z
+- Rectangle
+- area
+- perimeter
+must_not_include:
+- GARBAGE_RUST_NETWORK_001
+- GARBAGE_DEFAULT_PORT_002
+- GARBAGE_TIMEOUT_MS_003
+- GarbageNetworkConfig004
+- garbage_connect_005
+- GARBAGE_CONNECTION_ERROR_006
+- garbage_disconnect_007
+- GarbageNetworkHandler008
+- garbage_handle_request_009
+- GARBAGE_RUST_SERIAL_010
+- GARBAGE_FORMAT_VERSION_011
+- GarbageSerializer012
+- garbage_serialize_013
+- GARBAGE_SERIALIZE_IMPL_014
+- garbage_deserialize_015

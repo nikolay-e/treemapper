@@ -1,0 +1,57 @@
+utils.py: |
+  from typing import Any, Optional
+
+  def helper() -> str:
+      return "helper result"
+
+  def format_output(data: Any) -> str:
+      return f"Output: {data}"
+
+  def validate_input(value: Optional[str]) -> bool:
+      if value is None:
+          return False
+      return len(value.strip()) > 0
+
+  def parse_config(raw: str) -> dict:
+      lines = raw.strip().split('\n')
+      result = {}
+      for line in lines:
+          if '=' in line:
+              key, val = line.split('=', 1)
+              result[key.strip()] = val.strip()
+      return result
+services.py: |
+  from utils import helper, format_output
+
+  def run_pipeline() -> str:
+      result = helper()
+      return format_output(result)
+
+  def process_batch(items: list) -> list:
+      return [format_output(item) for item in items]
+main.py: |
+  from utils import helper
+
+  def main():
+      result = helper()
+      print(result)
+
+  if __name__ == "__main__":
+      main()
+scripts/run_pipeline.sh: |
+  #!/bin/bash
+  # GARBAGE_INFRA_005_PIPELINE_SCRIPT_A
+  GARBAGE_INFRA_005_BATCH_SIZE_B=50
+  python main.py
+tests/test_utils.py: |
+  # GARBAGE_INFRA_005_UTIL_TEST_A
+  GARBAGE_INFRA_005_TEST_DATA_B = "sample-data"
+  def test_helper():
+      pass
+docs/architecture.md: |
+  # Architecture
+  GARBAGE_INFRA_005_ARCH_DOC_A
+  GARBAGE_INFRA_005_LAYER_DIAGRAM_B="utils->services->main"
+config/settings.ini: |
+  # GARBAGE_INFRA_005_SETTINGS_A
+  GARBAGE_INFRA_005_LOG_LEVEL_B = DEBUG

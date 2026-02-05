@@ -1,0 +1,15 @@
+must_include:
+- functions/index.js
+- firebase-functions
+- getFirestore
+- functions/utils/validation.js
+- validateItem
+must_not_include:
+- GARBAGE_JSON_015_EMU_PORT_A
+- GARBAGE_JSON_015_SERVICE_EMULATOR_B
+- GARBAGE_JSON_015_START_EMULATOR_C
+- GARBAGE_JSON_015_SEED_BATCH_D
+- GARBAGE_JSON_015_DATA_SEEDER_E
+- GARBAGE_JSON_015_SEED_DATABASE_F
+- emulator.js
+- seeder.js

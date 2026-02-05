@@ -1,0 +1,16 @@
+must_include:
+- add
+- i64
+- subtract
+- divide
+must_not_include:
+- GARBAGE_RUST_LOGGING_001
+- GARBAGE_LOG_LEVEL_002
+- garbage_logger_init_003
+- garbage_log_method_004
+- garbage_format_log_005
+- GARBAGE_RUST_CACHE_006
+- GARBAGE_CACHE_SIZE_007
+- GarbageCacheManager008
+- garbage_cache_get_009
+- LoggerConfig

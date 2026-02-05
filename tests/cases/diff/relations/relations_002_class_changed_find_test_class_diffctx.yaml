@@ -1,0 +1,3 @@
+must_include:
+- user_service.py
+- test_user_service.py

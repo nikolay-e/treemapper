@@ -1,0 +1,6 @@
+handlers.ts: |
+  export function createClickHandler(id: string) {
+      return () => console.log('Clicked:', id);
+  }
+ActionButton.tsx: |
+  console.log('initial');

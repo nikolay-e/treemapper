@@ -1,0 +1,16 @@
+must_include_files:
+  - CacheService.swift
+must_include_content:
+  - |
+    T: Comparable & Hashable
+  - |
+    where C.Element: Comparable
+must_not_include:
+  - GARBAGE_JVM_065_ASSOC_MARKER_A
+  - GARBAGE_JVM_065_TYPE_MARKER_B
+  - GARBAGE_JVM_065_OPAQUE_MARKER_C
+  - GARBAGE_JVM_065_SOME_MARKER_D
+  - GarbageAssocType
+  - GarbageOpaqueWrapper
+  - GarbageAssocType.swift
+  - GarbageOpaqueWrapper.swift

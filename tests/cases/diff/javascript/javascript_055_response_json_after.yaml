@@ -1,0 +1,18 @@
+service.ts: |
+  export interface ApiResponse<T> {
+      data: T;
+      success: boolean;
+      timestamp: number;
+  }
+
+  export function createResponse<T>(data: T): ApiResponse<T> {
+      return { data, success: true, timestamp: Date.now() };
+  }
+handler.ts: |
+  import { Request, Response } from 'express';
+  import { createResponse } from './service';
+
+  export function getDataHandler(req: Request, res: Response) {
+      const data = { message: 'Hello' };
+      res.json(createResponse(data));
+  }

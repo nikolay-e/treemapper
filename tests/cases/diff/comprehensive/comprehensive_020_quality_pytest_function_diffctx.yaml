@@ -1,0 +1,19 @@
+must_include_files:
+  - tests/test_calculator.py
+must_include_content:
+  - |
+    from src.calculator import add, subtract, divide
+
+    def test_add_positive():
+        assert add(2, 3) == 5
+must_not_include:
+  - GARBAGE_COMP_020_WARMUP_ROUNDS_A
+  - GARBAGE_COMP_020_STATS_METHOD_B
+  - GARBAGE_COMP_020_TIMER_PRECISION_C
+  - GARBAGE_COMP_020_BRANCH_COVERAGE_D
+  - GARBAGE_COMP_020_REPORT_FORMAT_E
+  - GARBAGE_COMP_020_MERGE_RESULTS_F
+  - GarbageBenchmarkRunner
+  - GarbageCoverageReporter
+  - garbage_benchmark_runner.py
+  - garbage_coverage_reporter.py

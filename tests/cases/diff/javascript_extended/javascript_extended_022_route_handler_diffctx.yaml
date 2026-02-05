@@ -1,0 +1,14 @@
+must_include:
+- routes.ts
+- getUserHandler
+- listUsersHandler
+must_not_include:
+- GARBAGE_JSX_022_CORS_CONFIG_A
+- GARBAGE_JSX_022_APPLY_CORS_B
+- GARBAGE_JSX_022_CORS_OUTPUT_C
+- GARBAGE_JSX_022_SESSION_STORE_D
+- GARBAGE_JSX_022_SESSION_MANAGER_E
+- GARBAGE_JSX_022_CLEANUP_SESSIONS_F
+- GarbageCorsHandler
+- cors.ts
+- session.ts

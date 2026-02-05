@@ -1,0 +1,21 @@
+must_include_files:
+  - .gitlab-ci.yml
+must_include_content:
+  - |
+    .node-job:
+      image: node:18
+      before_script:
+        - npm ci
+  - |
+    extends: .node-job
+must_not_include:
+  - GARBAGE_CICD_DOCS_033_ENGINE_MARKER_A
+  - GARBAGE_CICD_DOCS_033_SYNTAX_MARKER_B
+  - GARBAGE_CICD_DOCS_033_CACHE_MARKER_C
+  - GARBAGE_CICD_DOCS_033_RESOLVER_MARKER_D
+  - GARBAGE_CICD_DOCS_033_MERGE_MARKER_E
+  - GARBAGE_CICD_DOCS_033_OVERRIDE_MARKER_F
+  - GarbageTemplateEngine
+  - GarbageTemplateResolver
+  - garbage_template_engine.ts
+  - garbage_template_resolver.ts

@@ -1,0 +1,7 @@
+worker.ts: |
+  self.onmessage = function(e: MessageEvent) {
+      const result = e.data * 2;
+      self.postMessage(result);
+  };
+main.ts: |
+  console.log('initial');

@@ -1,0 +1,58 @@
+auth.service.ts: |
+  import { Injectable } from '@angular/core';
+  import { BehaviorSubject, Observable } from 'rxjs';
+
+  export interface AuthUser {
+      id: string;
+      email: string;
+      token: string;
+  }
+
+  @Injectable({ providedIn: 'root' })
+  export class AuthService {
+      private currentUserSubject = new BehaviorSubject<AuthUser | null>(null);
+
+      get currentUser$(): Observable<AuthUser | null> {
+          return this.currentUserSubject.asObservable();
+      }
+
+      get isAuthenticated(): boolean {
+          return this.currentUserSubject.value !== null;
+      }
+
+      login(email: string, password: string): Promise<AuthUser> {
+          return fetch('/api/login', {
+              method: 'POST',
+              body: JSON.stringify({ email, password }),
+          })
+              .then(res => res.json())
+              .then(user => {
+                  this.currentUserSubject.next(user);
+                  return user;
+              });
+      }
+
+      logout(): void {
+          this.currentUserSubject.next(null);
+      }
+  }
+
+  // angular_garbage_marker_003
+  const GARBAGE_AUTH_CONFIG = { tokenExpiry: 3600 };
+user.service.ts: |
+  import { Injectable } from '@angular/core';
+
+  @Injectable({ providedIn: 'root' })
+  export class UserService {
+      getUsers(): Promise<any[]> {
+          return fetch('/api/users').then(res => res.json());
+      }
+  }
+dashboard.component.ts: |
+  import { Component } from '@angular/core';
+
+  @Component({
+      selector: 'app-dashboard',
+      template: '<div>Initial</div>',
+  })
+  export class DashboardComponent {}

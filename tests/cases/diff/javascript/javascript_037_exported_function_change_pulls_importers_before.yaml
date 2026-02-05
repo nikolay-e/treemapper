@@ -1,0 +1,11 @@
+utils.ts: |
+  export function fetchUser(id: string) {
+      return fetch(`/api/users/${id}`);
+  }
+consumer.ts: |
+  import { fetchUser } from './utils';
+
+  async function loadUser(id: string) {
+      const response = await fetchUser(id);
+      return response.json();
+  }

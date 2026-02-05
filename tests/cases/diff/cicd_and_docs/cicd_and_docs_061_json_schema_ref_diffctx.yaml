@@ -1,0 +1,19 @@
+must_include_files:
+  - user.json
+must_include_content:
+  - |
+    "required": ["id", "name", "email"],
+  - |
+    "email": {"type": "string", "format": "email"},
+    "address": {"$ref": "address.json"},
+must_not_include:
+  - GARBAGE_CICD_DOCS_061_LOADER_MARKER_A
+  - GARBAGE_CICD_DOCS_061_CACHE_MARKER_B
+  - GARBAGE_CICD_DOCS_061_BUNDLE_MARKER_C
+  - GARBAGE_CICD_DOCS_061_RESOLVER_MARKER_D
+  - GARBAGE_CICD_DOCS_061_CIRCULAR_MARKER_E
+  - GARBAGE_CICD_DOCS_061_DEREFERENCE_MARKER_F
+  - GarbageSchemaLoader
+  - GarbageSchemaResolver
+  - garbage_schema_loader.ts
+  - garbage_schema_resolver.ts

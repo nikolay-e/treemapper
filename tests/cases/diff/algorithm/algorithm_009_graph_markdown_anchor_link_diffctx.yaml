@@ -1,0 +1,38 @@
+must_include_files:
+  - docs/user-guide.md
+must_include_content:
+  - |
+    ## Installation
+
+    ### System Requirements
+
+    - Python 3.10+ (upgraded from 3.9)
+    - pip 22.0+
+    - 8GB RAM minimum (increased for better performance)
+    - Docker (optional, for containerized deployment)
+
+    ### Package Installation
+
+    Run the following command:
+
+    ```bash
+    pip install our-package>=2.0.0
+    ```
+  - |
+    ### Docker Installation
+
+    Alternatively, use Docker:
+
+    ```bash
+    docker pull ourorg/our-package:latest
+    docker run -p 8080:8080 ourorg/our-package:latest
+    ```
+must_not_include:
+  - GARBAGE_ALGO_009_FAQ_MARKER_A
+  - GARBAGE_ALGO_009_QUESTIONS_MARKER_B
+  - GARBAGE_ALGO_009_ANSWERS_MARKER_C
+  - GARBAGE_ALGO_009_VERSION_MARKER_D
+  - GARBAGE_ALGO_009_RELEASE_MARKER_E
+  - GARBAGE_ALGO_009_NOTES_MARKER_F
+  - garbage_faq.md
+  - garbage_changelog.md

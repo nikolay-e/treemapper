@@ -1,0 +1,13 @@
+must_include_files:
+  - Services/OrderService.cs
+  - Models/Order.cs
+must_include_content:
+  - |
+    public IEnumerable<Order> GetRecentOrders(int days)
+must_not_include:
+  - GARBAGE_CS_013_SMS_GATEWAY_A
+  - GARBAGE_CS_013_WEBHOOK_DISPATCHER_B
+  - SmsGateway
+  - WebhookDispatcher
+  - Unrelated/SmsGateway.cs
+  - Unrelated/WebhookDispatcher.cs

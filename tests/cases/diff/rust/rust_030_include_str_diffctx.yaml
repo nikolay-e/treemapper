@@ -1,0 +1,16 @@
+must_include:
+- features
+- auth
+- api
+- get_features
+must_not_include:
+- GARBAGE_RUST_030_PRINTER_A
+- GARBAGE_RUST_030_PRINT_MODE_B
+- GarbagePrettyPrinter030
+- garbage_print_header_030
+- garbage_print_footer_030
+- GARBAGE_RUST_030_COUNTER_C
+- GARBAGE_RUST_030_MAX_COUNT_D
+- GarbageAtomicCounter030
+- garbage_increment_030
+- garbage_reset_030

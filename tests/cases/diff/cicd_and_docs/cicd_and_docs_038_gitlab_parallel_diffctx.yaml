@@ -1,0 +1,18 @@
+must_include_files:
+  - .gitlab-ci.yml
+must_include_content:
+  - |
+    parallel:
+      matrix:
+        - BROWSER: [chrome, firefox, safari]
+must_not_include:
+  - GARBAGE_CICD_DOCS_038_EXECUTOR_MARKER_A
+  - GARBAGE_CICD_DOCS_038_POOL_MARKER_B
+  - GARBAGE_CICD_DOCS_038_BATCH_MARKER_C
+  - GARBAGE_CICD_DOCS_038_COORDINATOR_MARKER_D
+  - GARBAGE_CICD_DOCS_038_SYNC_MARKER_E
+  - GARBAGE_CICD_DOCS_038_TIMEOUT_MARKER_F
+  - GarbageParallelExecutor
+  - GarbageParallelCoordinator
+  - garbage_parallel_executor.ts
+  - garbage_parallel_coordinator.ts

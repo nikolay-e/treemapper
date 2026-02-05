@@ -1,0 +1,11 @@
+must_include:
+- pyproject.toml
+- timeout
+must_not_include:
+- GARBAGE_CFG_005_MARKER_A
+- GARBAGE_CFG_005_BENCH_B
+- GARBAGE_CFG_005_RESULT_C
+- GARBAGE_CFG_005_MARKER_D
+- GARBAGE_CFG_005_SEED_E
+- benchmarks.py
+- seed_data.py

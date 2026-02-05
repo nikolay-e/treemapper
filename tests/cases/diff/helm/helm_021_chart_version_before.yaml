@@ -1,0 +1,35 @@
+chart/Chart.yaml: |
+  apiVersion: v2
+  name: myapp
+  description: Web application
+  type: application
+  version: 1.0.0
+chart/CHANGELOG.md: |
+  # Changelog
+
+  ## 2.0.0
+  - Breaking: Changed API endpoint format
+  - Added new authentication method
+chart/values.yaml: |
+  replicaCount: 1
+  image:
+    repository: myapp
+    tag: "1.0.0"
+chart/templates/argo-rollout.yaml: |
+  apiVersion: argoproj.io/v1alpha1
+  kind: Rollout
+  metadata:
+    name: GARBAGE_HELM_021_ROLLOUT_A
+  spec:
+    strategy:
+      canary:
+        steps:
+          - setWeight: GARBAGE_HELM_021_ROLLOUT_WEIGHT_B
+    selector:
+      matchLabels:
+        app: GARBAGE_HELM_021_ROLLOUT_LABEL_C
+chart/docs/versioning.md: |
+  # Versioning Policy
+  GARBAGE_HELM_021_VERSION_POLICY_D
+  ## Release Process
+  GARBAGE_HELM_021_RELEASE_PROCESS_E

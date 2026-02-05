@@ -1,0 +1,25 @@
+must_include_files:
+  - .env
+  - config/settings.py
+must_include_content:
+  - |
+    DEBUG=true
+    DATABASE_URL=postgresql://localhost/myapp_dev
+    SECRET_KEY=dev-secret-key-for-testing
+    LOG_LEVEL=DEBUG
+    MAX_CONNECTIONS=5
+  - |
+    class Settings:
+        DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+        DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///app.db")
+must_not_include:
+  - GARBAGE_ALGO_003_MIGRATION_MARKER_A
+  - GARBAGE_ALGO_003_SCHEMA_MARKER_B
+  - GARBAGE_ALGO_003_RUNNER_C
+  - GARBAGE_ALGO_003_SEED_MARKER_D
+  - GARBAGE_ALGO_003_FIXTURE_MARKER_E
+  - GARBAGE_ALGO_003_SEEDER_F
+  - MigrationRunner
+  - DataSeeder
+  - garbage_migrations.py
+  - garbage_seeds.py

@@ -1,0 +1,19 @@
+must_include:
+- serde
+- serde_json
+- features
+- serialization
+- Serialize
+- Deserialize
+- to_json
+- from_json
+must_not_include:
+- GARBAGE_RUST_METRICS_FEAT_001
+- GARBAGE_METRICS_INTERVAL_002
+- GarbageMetricsCollector003
+- garbage_increment_004
+- garbage_set_gauge_005
+- garbage_export_006
+- GARBAGE_METRICS_EXPORT_007
+- GarbageMetricsReporter008
+- garbage_report_009

@@ -1,0 +1,12 @@
+must_include:
+- sealed class NetworkResult
+- Loading
+- Empty
+- isSuccess
+must_not_include:
+- GARBAGE_JAVA_026_RETRY_A
+- GARBAGE_JAVA_026_RETRY_B
+- GARBAGE_JAVA_026_POOL_C
+- GARBAGE_JAVA_026_POOL_D
+- RetryPolicy
+- ConnectionPool

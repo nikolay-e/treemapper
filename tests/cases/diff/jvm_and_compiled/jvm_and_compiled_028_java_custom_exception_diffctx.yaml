@@ -1,0 +1,16 @@
+must_include_files:
+  - src/main/java/com/example/Service.java
+  - src/main/java/com/example/ServiceException.java
+  - src/main/java/com/example/ValidationException.java
+must_include_content:
+  - |
+    errorCode
+must_not_include:
+  - GARBAGE_JVM_028_HANDLER_MARKER_A
+  - GARBAGE_JVM_028_RECOVER_MARKER_B
+  - GARBAGE_JVM_028_FALLBACK_MARKER_C
+  - GARBAGE_JVM_028_RETRY_MARKER_D
+  - GarbageErrorHandler
+  - GarbageFallbackService
+  - GarbageErrorHandler.java
+  - GarbageFallbackService.java

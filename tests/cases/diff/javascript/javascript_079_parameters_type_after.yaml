@@ -1,0 +1,13 @@
+api.ts: |
+  export function fetchData(url: string, options: { method: string; headers: Record<string, string> }) {
+      return fetch(url, options);
+  }
+wrapper.ts: |
+  import { fetchData } from './api';
+
+  type FetchParams = Parameters<typeof fetchData>;
+
+  function wrappedFetch(...args: FetchParams) {
+      console.log('Fetching:', args[0]);
+      return fetchData(...args);
+  }

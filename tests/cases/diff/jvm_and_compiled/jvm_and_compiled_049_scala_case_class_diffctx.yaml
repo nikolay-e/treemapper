@@ -1,0 +1,16 @@
+must_include_files:
+  - UserService.scala
+must_include_content:
+  - |
+    createUser
+  - |
+    copyWithNewAge
+must_not_include:
+  - GARBAGE_JVM_049_TUPLE_MARKER_A
+  - GARBAGE_JVM_049_PAIR_MARKER_B
+  - GARBAGE_JVM_049_TRIPLE_MARKER_C
+  - GARBAGE_JVM_049_QUAD_MARKER_D
+  - GarbageTupleOps
+  - GarbageTripleOps
+  - GarbageTupleOps.scala
+  - GarbageTripleOps.scala

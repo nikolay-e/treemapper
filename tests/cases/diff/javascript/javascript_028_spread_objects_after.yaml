@@ -1,0 +1,17 @@
+defaults.ts: |
+  export const defaults = {
+      theme: 'light',
+      language: 'en',
+  };
+
+  export const overrides = {
+      theme: 'dark',
+  };
+config.ts: |
+  import { defaults, overrides } from './defaults';
+
+  export const config = {
+      ...defaults,
+      ...overrides,
+      version: '1.0',
+  };

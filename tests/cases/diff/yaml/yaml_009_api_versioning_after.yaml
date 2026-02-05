@@ -1,0 +1,10 @@
+config/api.yaml: |
+  api:
+    version: v2
+    prefix: /api
+    deprecated_versions:
+      - v1
+src/routes.py: |
+  def register_routes(app, version: str = "v1", prefix: str = "/api"):
+      base_path = f"{prefix}/{version}"
+      app.add_route(f"{base_path}/users", users_handler)

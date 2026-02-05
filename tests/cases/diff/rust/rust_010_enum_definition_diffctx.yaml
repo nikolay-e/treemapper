@@ -1,0 +1,27 @@
+must_include:
+- Pending
+- Error
+- Processing
+- is_active
+- is_terminal
+- error_message
+- progress
+must_not_include:
+- GARBAGE_RUST_NOTIF_001
+- GARBAGE_MAX_NOTIFICATIONS_002
+- GARBAGE_RETENTION_DAYS_003
+- GarbageNotificationType004
+- GarbageNotification005
+- garbage_send_006
+- GARBAGE_SEND_ERROR_007
+- garbage_schedule_008
+- GARBAGE_SCHEDULE_ERROR_009
+- GarbageNotificationService010
+- garbage_enqueue_011
+- GARBAGE_RUST_QUEUE_012
+- GARBAGE_QUEUE_CAPACITY_013
+- GarbageMessageQueue014
+- garbage_push_015
+- GARBAGE_QUEUE_FULL_016
+- garbage_pop_017
+- garbage_peek_018

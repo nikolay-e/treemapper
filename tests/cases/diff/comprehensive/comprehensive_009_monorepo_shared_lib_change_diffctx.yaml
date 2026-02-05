@@ -1,0 +1,19 @@
+must_include_files:
+  - packages/shared/src/utils.ts
+must_include_content:
+  - |
+    export function formatDate(date: Date, format: string = 'iso'): string {
+        if (format === 'iso') {
+            return date.toISOString();
+        }
+must_not_include:
+  - GARBAGE_COMP_009_LAYOUT_ENGINE_A
+  - GARBAGE_COMP_009_EDGE_ROUTING_B
+  - GARBAGE_COMP_009_ZOOM_LEVEL_C
+  - GARBAGE_COMP_009_EXPORT_FORMAT_D
+  - GARBAGE_COMP_009_RESOLUTION_DPI_E
+  - GARBAGE_COMP_009_WATERMARK_F
+  - GarbageGraphRenderer
+  - GarbageChartExporter
+  - garbage_graph_renderer.ts
+  - garbage_chart_exporter.ts

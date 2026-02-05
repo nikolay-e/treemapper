@@ -1,0 +1,16 @@
+must_include:
+- UserRepository
+- Repository
+- DatabaseConnection
+- User
+- BaseEntity
+- findById
+- findAll
+- src/repositories/userRepository.ts
+must_not_include:
+- GARBAGE_TS_003_CACHE_001
+- GARBAGE_TS_003_VERSION_002
+- GARBAGE_TS_003_createCache_003
+- GARBAGE_TS_003_CREATING_004
+- GARBAGE_TS_003_METRICS_005
+- GARBAGE_TS_003_COLLECTOR_006

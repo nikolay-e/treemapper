@@ -1,0 +1,11 @@
+must_include:
+- DataHandler
+- TextProcessor
+- ProcessingResult
+must_not_include:
+- GARBAGE_PY_QUEUE_827364
+- UNRELATED_QUEUE_MARKER_918273
+- GARBAGE_PY_SCHED_918273
+- UNRELATED_SCHED_MARKER_827163
+- GarbageQueueManager
+- GarbageScheduler
