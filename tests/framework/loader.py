@@ -95,28 +95,33 @@ def load_test_cases(yaml_path: Path) -> list[YamlTestCase]:
     return []
 
 
+def _is_triplet_part(yaml_file: Path, seen: set[Path]) -> bool:
+    if yaml_file in seen:
+        return True
+    return yaml_file.stem.endswith(("_after", "_diffctx"))
+
+
 def load_test_cases_from_dir(cases_dir: Path, pattern: str = "**/*.yaml") -> list[YamlTestCase]:
-    cases = []
+    cases: list[YamlTestCase] = []
     seen_triplet_bases: set[Path] = set()
 
     for yaml_file in sorted(cases_dir.glob(pattern)):
-        if yaml_file.stem.endswith("_before"):
-            triplet_case = _load_triplet(yaml_file)
-            if triplet_case:
-                seen_triplet_bases.add(yaml_file)
-                base_name = re.sub(r"_before$", "", yaml_file.stem)
-                seen_triplet_bases.add(yaml_file.parent / f"{base_name}_after.yaml")
-                seen_triplet_bases.add(yaml_file.parent / f"{base_name}_diffctx.yaml")
-                cases.append(triplet_case)
+        if not yaml_file.stem.endswith("_before"):
+            continue
+        triplet_case = _load_triplet(yaml_file)
+        if triplet_case:
+            seen_triplet_bases.add(yaml_file)
+            base_name = re.sub(r"_before$", "", yaml_file.stem)
+            seen_triplet_bases.add(yaml_file.parent / f"{base_name}_after.yaml")
+            seen_triplet_bases.add(yaml_file.parent / f"{base_name}_diffctx.yaml")
+            cases.append(triplet_case)
 
     for yaml_file in sorted(cases_dir.glob(pattern)):
-        if yaml_file in seen_triplet_bases:
-            continue
-        if yaml_file.stem.endswith(("_after", "_diffctx")):
-            continue
-        cases.extend(load_test_cases(yaml_file))
+        if not _is_triplet_part(yaml_file, seen_triplet_bases):
+            cases.extend(load_test_cases(yaml_file))
 
-    for yaml_file in sorted(cases_dir.glob(pattern.replace(".yaml", ".yml"))):
+    yml_pattern = pattern.replace(".yaml", ".yml")
+    for yaml_file in sorted(cases_dir.glob(yml_pattern)):
         if yaml_file in seen_triplet_bases:
             continue
         if yaml_file.stem.endswith(("_before", "_after", "_diffctx")):

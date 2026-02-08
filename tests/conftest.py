@@ -114,7 +114,9 @@ def run_mapper(monkeypatch, temp_project):
                 main()
                 return True
             except SystemExit as e:
-                return e.code == 0
+                if e.code == 0:
+                    return True
+                raise
 
     return _run
 

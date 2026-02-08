@@ -66,12 +66,12 @@ class YamlTestRunner:
 
         for pattern in case.must_include:
             assert pattern in all_content, (
-                f"[{case.name}] Expected '{pattern}' in context, but not found.\n" f"Fragment paths: {fragment_paths}"
+                f"[{case.name}] Expected '{pattern}' in context, but not found.\n" + f"Fragment paths: {fragment_paths}"
             )
 
         for file_path in case.must_include_files:
             assert any(file_path in p for p in fragment_paths), (
-                f"[{case.name}] Expected file '{file_path}' in fragments, but not found.\n" f"Fragment paths: {fragment_paths}"
+                f"[{case.name}] Expected file '{file_path}' in fragments, but not found.\n" + f"Fragment paths: {fragment_paths}"
             )
 
         for content_block in case.must_include_content:
