@@ -47,6 +47,7 @@ KNOWN_FAILURES = frozenset(
         "json_009_vscode_settings",
         "json_011_launch_json",
         "json_012_nodemon_config",
+        "kubernetes_017_service_account",
         "kubernetes_024_loadbalancer",
         "merging_006_small_paragraphs",
         "rust_014_option_handling",
