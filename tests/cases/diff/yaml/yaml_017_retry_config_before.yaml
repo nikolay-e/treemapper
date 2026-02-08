@@ -16,3 +16,21 @@ src/retry.py: |
                   else:
                       raise
       return wrapper
+garbage_config_loader.py: |
+  GARBAGE_YAML_017_CONFIG_MARKER_A = "config"
+  GARBAGE_YAML_017_LOADER_MARKER_B = True
+
+  class ConfigLoader:
+      GARBAGE_YAML_017_LOADER_CLASS_C = "loader"
+
+      def load(self, path: str) -> dict:
+          return {}
+garbage_dependency_injector.py: |
+  GARBAGE_YAML_017_INJECT_MARKER_D = "inject"
+  GARBAGE_YAML_017_CONTAINER_MARKER_E = 42
+
+  class DependencyInjector:
+      GARBAGE_YAML_017_INJECTOR_CLASS_F = True
+
+      def register(self, name: str, factory: object) -> None:
+          pass

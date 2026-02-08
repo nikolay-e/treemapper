@@ -1,5 +1,19 @@
-must_include:
-- MyClass
-- main.ts
+must_include_files:
+  - main.ts
+must_include_content:
+  - |
+    function createInstance() {
+        const instance = new MyClass(42);
+        return instance.getValue();
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_020_NOTIFY_MARKER_A
+  - GARBAGE_JS_020_PUSH_MARKER_B
+  - GARBAGE_JS_020_PUSH_CLASS_C
+  - GARBAGE_JS_020_ANALYTICS_MARKER_D
+  - GARBAGE_JS_020_TRACKER_MARKER_E
+  - GARBAGE_JS_020_TRACKER_CLASS_F
+  - PushNotifier
+  - AnalyticsTracker
+  - garbage_notifications.ts
+  - garbage_analytics.ts

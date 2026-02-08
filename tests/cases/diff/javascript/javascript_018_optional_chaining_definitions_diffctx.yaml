@@ -1,5 +1,19 @@
-must_include:
-- fetchResponse
-- main.ts
+must_include_files:
+  - main.ts
+must_include_content:
+  - |
+    function getName() {
+        const response = fetchResponse();
+        return response?.data?.user?.name ?? 'Unknown';
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_018_SERIAL_MARKER_A
+  - GARBAGE_JS_018_CODEC_MARKER_B
+  - GARBAGE_JS_018_CODEC_CLASS_C
+  - GARBAGE_JS_018_BACKUP_MARKER_D
+  - GARBAGE_JS_018_SNAPSHOT_MARKER_E
+  - GARBAGE_JS_018_SNAPSHOT_CLASS_F
+  - CodecSerializer
+  - SnapshotBackup
+  - garbage_serialization.ts
+  - garbage_backup.ts

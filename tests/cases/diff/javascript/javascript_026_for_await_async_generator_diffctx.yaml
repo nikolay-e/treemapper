@@ -1,5 +1,20 @@
-must_include:
-- asyncGenerator
-- consumer.ts
+must_include_files:
+  - consumer.ts
+must_include_content:
+  - |
+    async function consume() {
+        for await (const value of asyncGenerator()) {
+            console.log(value);
+        }
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_026_AUTH_MARKER_A
+  - GARBAGE_JS_026_TOKEN_MARKER_B
+  - GARBAGE_JS_026_VALIDATOR_CLASS_C
+  - GARBAGE_JS_026_ENCRYPT_MARKER_D
+  - GARBAGE_JS_026_CIPHER_MARKER_E
+  - GARBAGE_JS_026_ENGINE_CLASS_F
+  - TokenValidator
+  - CipherEngine
+  - garbage_auth.ts
+  - garbage_encryption.ts

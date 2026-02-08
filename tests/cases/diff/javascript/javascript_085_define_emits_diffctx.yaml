@@ -1,5 +1,20 @@
-must_include:
-- FormEvents
-- ContactForm.vue
+must_include_files:
+  - ContactForm.vue
+must_include_content:
+  - |
+    const emit = defineEmits<FormEvents>();
+
+    function handleSubmit() {
+        emit('submit', { name: name.value, email: email.value });
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_085_WEBHOOK_MARKER_A
+  - GARBAGE_JS_085_ENDPOINT_MARKER_B
+  - GARBAGE_JS_085_DISPATCHER_CLASS_C
+  - GARBAGE_JS_085_RETRY_MARKER_D
+  - GARBAGE_JS_085_ATTEMPTS_MARKER_E
+  - GARBAGE_JS_085_HANDLER_CLASS_F
+  - WebhookDispatcher
+  - RetryHandler
+  - garbage_webhook.ts
+  - garbage_retry.ts

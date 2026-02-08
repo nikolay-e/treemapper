@@ -1,5 +1,19 @@
-must_include:
-- fetchData
-- wrapper.ts
+must_include_files:
+  - wrapper.ts
+must_include_content:
+  - |
+    function wrappedFetch(...args: FetchParams) {
+        console.log('Fetching:', args[0]);
+        return fetchData(...args);
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_079_AUDIT_MARKER_A
+  - GARBAGE_JS_079_TRAIL_MARKER_B
+  - GARBAGE_JS_079_LOGGER_CLASS_C
+  - GARBAGE_JS_079_COMPRESS_MARKER_D
+  - GARBAGE_JS_079_RATIO_MARKER_E
+  - GARBAGE_JS_079_COMPRESSOR_CLASS_F
+  - AuditLogger
+  - DataCompressor
+  - garbage_auditing.ts
+  - garbage_compression.ts

@@ -1,5 +1,16 @@
-must_include:
-- BaseService
-- base.ts
+must_include_files:
+  - base.ts
+must_include_content:
+  - |
+    process(data: string, options?: { prefix?: string }): string {
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_050_PAYMENT_MARKER_A
+  - GARBAGE_JS_050_INVOICE_MARKER_B
+  - GARBAGE_JS_050_PAYMENT_CLASS_C
+  - GARBAGE_JS_050_ENCRYPT_MARKER_D
+  - GARBAGE_JS_050_CIPHER_MARKER_E
+  - GARBAGE_JS_050_ENCRYPT_CLASS_F
+  - PaymentGateway
+  - CipherService
+  - garbage_payments.ts
+  - garbage_encryption.ts

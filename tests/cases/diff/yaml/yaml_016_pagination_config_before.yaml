@@ -12,3 +12,21 @@ src/pagination.py: |
           limit = min(limit or self.default_limit, self.max_limit)
           offset = (page - 1) * limit
           return query.offset(offset).limit(limit)
+garbage_csv_exporter.py: |
+  GARBAGE_YAML_016_CSV_MARKER_A = "csv"
+  GARBAGE_YAML_016_EXPORT_MARKER_B = True
+
+  class CsvExporter:
+      GARBAGE_YAML_016_EXPORTER_CLASS_C = "exporter"
+
+      def export(self, rows: list, filename: str) -> None:
+          pass
+garbage_markdown_parser.py: |
+  GARBAGE_YAML_016_MARKDOWN_MARKER_D = "markdown"
+  GARBAGE_YAML_016_PARSE_MARKER_E = 42
+
+  class MarkdownParser:
+      GARBAGE_YAML_016_PARSER_CLASS_F = True
+
+      def parse(self, text: str) -> dict:
+          return {}

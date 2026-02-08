@@ -1,5 +1,15 @@
-must_include:
-- Config
+must_include_files:
 - types.ts
+must_include_content:
+- "    retries: number;\n    debug?: boolean;\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_040_RATELIMIT_MARKER_A
+- GARBAGE_JS_040_WINDOW_MARKER_B
+- GARBAGE_JS_040_LIMITER_CLASS_C
+- GARBAGE_JS_040_FEATURE_MARKER_D
+- GARBAGE_JS_040_TOGGLE_MARKER_E
+- GARBAGE_JS_040_FLAG_CLASS_F
+- RateLimiter
+- FeatureFlagService
+- garbage_ratelimit.ts
+- garbage_featureflags.ts

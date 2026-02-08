@@ -1,5 +1,24 @@
-must_include:
-- loggingHandler
+must_include_files:
 - proxy.ts
+must_include_content:
+- '
+
+  }
+
+  '
+- 'import { loggingHandler } from ''./handlers'';
+
+
+  '
+- "\n    return new Proxy(target, loggingHandler);\n}\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_029_FLAG_MARKER_A
+- GARBAGE_JS_029_TOGGLE_MARKER_B
+- GARBAGE_JS_029_TOGGLE_CLASS_C
+- GARBAGE_JS_029_AUDIT_MARKER_D
+- GARBAGE_JS_029_TRAIL_MARKER_E
+- GARBAGE_JS_029_TRAIL_CLASS_F
+- FeatureToggle
+- AuditTrail
+- garbage_feature_flags.ts
+- garbage_auditing.ts

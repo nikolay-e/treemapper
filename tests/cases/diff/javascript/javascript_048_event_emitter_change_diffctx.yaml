@@ -1,5 +1,21 @@
-must_include:
-- emitUserDeleted
+must_include_files:
 - emitter.ts
+must_include_content:
+- '
+
+  }
+
+
+  '
+- "\n    appEmitter.emit('userDeleted', userId);\n}\n\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_048_STORAGE_MARKER_A
+- GARBAGE_JS_048_BUCKET_MARKER_B
+- GARBAGE_JS_048_STORAGE_CLASS_C
+- GARBAGE_JS_048_INDEX_MARKER_D
+- GARBAGE_JS_048_SHARD_MARKER_E
+- GARBAGE_JS_048_INDEXER_CLASS_F
+- ObjectStorage
+- SearchIndexer
+- garbage_storage.ts
+- garbage_indexing.ts

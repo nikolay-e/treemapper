@@ -1,5 +1,17 @@
-must_include:
-- Repository
+must_include_files:
 - interfaces.ts
+must_include_content:
+- '    findAll(): Promise<T[]>;
+
+  '
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_039_EMAIL_MARKER_A
+- GARBAGE_JS_039_SMTP_MARKER_B
+- GARBAGE_JS_039_DISPATCHER_CLASS_C
+- GARBAGE_JS_039_SCHEDULE_MARKER_D
+- GARBAGE_JS_039_CRON_MARKER_E
+- GARBAGE_JS_039_SCHEDULER_CLASS_F
+- EmailDispatcher
+- TaskScheduler
+- garbage_email.ts
+- garbage_scheduling.ts

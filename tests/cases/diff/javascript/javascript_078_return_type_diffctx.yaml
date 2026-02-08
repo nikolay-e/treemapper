@@ -1,5 +1,18 @@
-must_include:
-- createUser
-- types.ts
+must_include_files:
+  - types.ts
+must_include_content:
+  - |
+    function processUser(user: User) {
+        console.log(`User ${user.name} created at ${user.createdAt}`);
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_078_RATELIMIT_MARKER_A
+  - GARBAGE_JS_078_WINDOW_MARKER_B
+  - GARBAGE_JS_078_LIMITER_CLASS_C
+  - GARBAGE_JS_078_FLAG_MARKER_D
+  - GARBAGE_JS_078_TOGGLE_MARKER_E
+  - GARBAGE_JS_078_TOGGLE_CLASS_F
+  - RateLimiter
+  - FeatureToggle
+  - garbage_rate_limiting.ts
+  - garbage_feature_flags.ts

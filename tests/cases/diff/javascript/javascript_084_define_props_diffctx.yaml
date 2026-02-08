@@ -1,5 +1,16 @@
-must_include:
-- CardProps
-- Card.vue
+must_include_files:
+  - Card.vue
+must_include_content:
+  - |
+    const props = defineProps<CardProps>();
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_084_SESSION_MARKER_A
+  - GARBAGE_JS_084_EXPIRY_MARKER_B
+  - GARBAGE_JS_084_STORE_CLASS_C
+  - GARBAGE_JS_084_MIDDLEWARE_MARKER_D
+  - GARBAGE_JS_084_PIPELINE_MARKER_E
+  - GARBAGE_JS_084_PIPELINE_CLASS_F
+  - SessionStore
+  - MiddlewarePipeline
+  - garbage_session.ts
+  - garbage_middleware.ts

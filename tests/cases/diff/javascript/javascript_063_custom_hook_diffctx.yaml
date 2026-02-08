@@ -1,5 +1,16 @@
-must_include:
-- useApi
+must_include_files:
 - UserList.tsx
+must_include_content:
+- "\n    const { data, loading, error } = useApi<User[]>('/api/users');\n    if (loading) return <div>Loading...</div>;\n    if (error) return <div>Error: {error.message}</div>;\n    return <ul>{data?.map(u\
+  \ => <li key={u.id}>{u.name}</li>)}</ul>;\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_063_EMAIL_MARKER_A
+- GARBAGE_JS_063_SMTP_MARKER_B
+- GARBAGE_JS_063_DISPATCHER_CLASS_C
+- GARBAGE_JS_063_LOG_MARKER_D
+- GARBAGE_JS_063_LEVEL_MARKER_E
+- GARBAGE_JS_063_AGGREGATOR_CLASS_F
+- EmailDispatcher
+- LogAggregator
+- garbage_email.ts
+- garbage_logging.ts

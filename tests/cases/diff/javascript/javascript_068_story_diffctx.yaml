@@ -1,5 +1,30 @@
-must_include:
-- Button
+must_include_files:
 - Button.stories.tsx
+must_include_content:
+- 'import type { Meta, StoryObj } from ''@storybook/react'';
+
+  import { Button, ButtonProps } from ''./Button'';
+
+
+
+  '
+- "\n    title: 'Components/Button',\n    component: Button,\n    argTypes: {\n        variant: { control: 'select', options: ['primary', 'secondary'] },\n"
+- '
+
+  export default meta;
+
+
+
+  '
+- "\n    args: {\n        label: 'Secondary Button',\n        variant: 'secondary',\n    },\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_068_COMPRESS_MARKER_A
+- GARBAGE_JS_068_RATIO_MARKER_B
+- GARBAGE_JS_068_ENGINE_CLASS_C
+- GARBAGE_JS_068_SERIAL_MARKER_D
+- GARBAGE_JS_068_FORMAT_MARKER_E
+- GARBAGE_JS_068_SERIALIZER_CLASS_F
+- CompressionEngine
+- Serializer
+- garbage_compression.ts
+- garbage_serialization.ts

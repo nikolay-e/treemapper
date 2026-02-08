@@ -37,3 +37,25 @@ user-list.component.ts: |
           this.userService.getUsers().subscribe(users => this.users = users);
       }
   }
+garbage_payments.ts: |
+  const GARBAGE_JS_003_PAYMENT_MARKER_A = "payments";
+  const GARBAGE_JS_003_INVOICE_MARKER_B = true;
+
+  class InvoiceProcessor {
+      static GARBAGE_JS_003_PROCESSOR_CLASS_C = "processor";
+
+      charge(amount: number): void {
+          // noop
+      }
+  }
+garbage_email.ts: |
+  const GARBAGE_JS_003_EMAIL_MARKER_D = "email";
+  const GARBAGE_JS_003_SMTP_MARKER_E = 42;
+
+  class SmtpRelay {
+      static GARBAGE_JS_003_RELAY_CLASS_F = true;
+
+      deliver(to: string, subject: string): void {
+          // noop
+      }
+  }

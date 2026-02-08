@@ -1,5 +1,20 @@
-must_include:
-- isValidEmail
+must_include_files:
 - validator.test.ts
+must_include_content:
+- 'import { isValidEmail } from ''./validator'';
+
+
+
+  '
+- "\n    it('should validate correct email', () => {\n        expect(isValidEmail('test@example.com')).toBe(true);\n    });\n\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_008_SCHEMA_MARKER_A
+- GARBAGE_JS_008_VERSION_MARKER_B
+- GARBAGE_JS_008_MIGRATOR_CLASS_C
+- GARBAGE_JS_008_SNAPSHOT_MARKER_D
+- GARBAGE_JS_008_RESTORE_MARKER_E
+- GARBAGE_JS_008_MANAGER_CLASS_F
+- SchemaMigrator
+- SnapshotManager
+- garbage_migration.ts
+- garbage_backup.ts

@@ -1,6 +1,18 @@
-must_include:
-- utils.add
-- utils.multiply
-- main.ts
+must_include_files:
+  - main.ts
+must_include_content:
+  - |
+    function calculate() {
+        const sum = utils.add(1, 2);
+        const product = utils.multiply(3, 4);
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_013_CACHE_MARKER_A
+  - GARBAGE_JS_013_EVICT_MARKER_B
+  - GARBAGE_JS_013_EVICT_CLASS_C
+  - GARBAGE_JS_013_RATELIMIT_MARKER_D
+  - GARBAGE_JS_013_THROTTLE_MARKER_E
+  - GARBAGE_JS_013_THROTTLE_CLASS_F
+  - CacheEviction
+  - RateLimiter
+  - garbage_caching.ts
+  - garbage_rate_limiting.ts

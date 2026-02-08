@@ -18,3 +18,25 @@ main.ts: |
   }
 
   calculate();
+garbage_caching.ts: |
+  const GARBAGE_JS_013_CACHE_MARKER_A = "caching";
+  const GARBAGE_JS_013_EVICT_MARKER_B = true;
+
+  class CacheEviction {
+      static GARBAGE_JS_013_EVICT_CLASS_C = "eviction";
+
+      evict(key: string): void {
+          // noop
+      }
+  }
+garbage_rate_limiting.ts: |
+  const GARBAGE_JS_013_RATELIMIT_MARKER_D = "ratelimit";
+  const GARBAGE_JS_013_THROTTLE_MARKER_E = 42;
+
+  class RateLimiter {
+      static GARBAGE_JS_013_THROTTLE_CLASS_F = true;
+
+      check(clientId: string): boolean {
+          return true;
+      }
+  }

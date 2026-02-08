@@ -1,6 +1,25 @@
-must_include:
-- Logger
-- ApiService
+must_include_files:
 - service.ts
+must_include_content:
+- "\n    }\n"
+- '
+
+  }
+
+  '
+- 'import { Logger } from ''./decorators'';
+
+
+  '
+- "\n        return fetch(url).then(res => res.json());\n    }\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_023_QUEUE_MARKER_A
+- GARBAGE_JS_023_BROKER_MARKER_B
+- GARBAGE_JS_023_BROKER_CLASS_C
+- GARBAGE_JS_023_THROTTLE_MARKER_D
+- GARBAGE_JS_023_LIMITER_MARKER_E
+- GARBAGE_JS_023_LIMITER_CLASS_F
+- MessageBroker
+- RequestLimiter
+- garbage_queue.ts
+- garbage_throttling.ts

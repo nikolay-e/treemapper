@@ -1,5 +1,33 @@
-must_include:
-- filterActive
+must_include_files:
 - list.component.ts
+must_include_content:
+- 'import { Component } from ''@angular/core'';
+
+  import { Observable, of } from ''rxjs'';
+
+  import { map } from ''rxjs/operators'';
+
+  import { filterActive } from ''./transformers'';
+
+
+  '
+- "\ninterface Item {\n    id: string;\n    name: string;\n    active: boolean;\n"
+- "\n@Component({\n    selector: 'app-list',\n    template: `<div *ngFor=\"let item of items$ | async\">{{ item.name }}</div>`\n})\n"
+- "\n    items$: Observable<Item[]> = of([\n        { id: '1', name: 'Item 1', active: true },\n        { id: '2', name: 'Item 2', active: false },\n    ]).pipe(map(filterActive));\n"
+- '
+
+  }
+
+
+  '
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_005_RATE_MARKER_A
+- GARBAGE_JS_005_WINDOW_MARKER_B
+- GARBAGE_JS_005_LIMITER_CLASS_C
+- GARBAGE_JS_005_FLAG_MARKER_D
+- GARBAGE_JS_005_TOGGLE_MARKER_E
+- GARBAGE_JS_005_TOGGLE_CLASS_F
+- SlidingWindowLimiter
+- FeatureToggle
+- garbage_ratelimit.ts
+- garbage_featureflags.ts

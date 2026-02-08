@@ -1,6 +1,19 @@
-must_include:
-- defaults
-- overrides
+must_include_files:
 - config.ts
+must_include_content:
+- 'import { defaults, overrides } from ''./defaults'';
+
+
+  '
+- "\n    ...defaults,\n    ...overrides,\n    version: '1.0',\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_028_SCHEDULE_MARKER_A
+- GARBAGE_JS_028_CRON_MARKER_B
+- GARBAGE_JS_028_SCHEDULER_CLASS_C
+- GARBAGE_JS_028_HEALTH_MARKER_D
+- GARBAGE_JS_028_PING_MARKER_E
+- GARBAGE_JS_028_PROBE_CLASS_F
+- CronScheduler
+- HealthProbe
+- garbage_scheduling.ts
+- garbage_health_check.ts

@@ -25,3 +25,25 @@ service.test.ts: |
           expect(name).toBe('Test User');
       });
   });
+garbage_monitoring.ts: |
+  const GARBAGE_JS_009_ALERT_MARKER_A = "monitoring";
+  const GARBAGE_JS_009_DISPATCH_MARKER_B = true;
+
+  class AlertDispatcher {
+      static GARBAGE_JS_009_DISPATCHER_CLASS_C = "dispatcher";
+
+      fire(alert: string): void {
+          // noop
+      }
+  }
+garbage_profiling.ts: |
+  const GARBAGE_JS_009_TRACE_MARKER_D = "profiling";
+  const GARBAGE_JS_009_SPAN_MARKER_E = 42;
+
+  class TraceProfiler {
+      static GARBAGE_JS_009_PROFILER_CLASS_F = true;
+
+      begin(name: string): void {
+          // noop
+      }
+  }

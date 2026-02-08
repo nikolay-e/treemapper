@@ -1,5 +1,19 @@
-must_include:
-- Counter
-- App.vue
+must_include_files:
+  - App.vue
+must_include_content:
+  - |
+    import Counter from './Counter.vue';
+    </script>
+
+    <template>
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_081_BACKUP_MARKER_A
+  - GARBAGE_JS_081_SNAPSHOT_MARKER_B
+  - GARBAGE_JS_081_MANAGER_CLASS_C
+  - GARBAGE_JS_081_MONITOR_MARKER_D
+  - GARBAGE_JS_081_UPTIME_MARKER_E
+  - GARBAGE_JS_081_MONITOR_CLASS_F
+  - BackupManager
+  - UptimeMonitor
+  - garbage_backup.ts
+  - garbage_monitoring.ts

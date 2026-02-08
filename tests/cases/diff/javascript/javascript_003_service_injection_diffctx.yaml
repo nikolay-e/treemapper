@@ -1,5 +1,16 @@
-must_include:
-- UserService
+must_include_files:
 - user-list.component.ts
+must_include_content:
+- "import { Component, OnInit } from '@angular/core';\nimport { UserService } from './user.service';\n\n@Component({\n    selector: 'app-user-list',\n"
+- "\n    users: any[] = [];\n\n    constructor(private userService: UserService) {}\n\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_003_PAYMENT_MARKER_A
+- GARBAGE_JS_003_INVOICE_MARKER_B
+- GARBAGE_JS_003_PROCESSOR_CLASS_C
+- GARBAGE_JS_003_EMAIL_MARKER_D
+- GARBAGE_JS_003_SMTP_MARKER_E
+- GARBAGE_JS_003_RELAY_CLASS_F
+- InvoiceProcessor
+- SmtpRelay
+- garbage_payments.ts
+- garbage_email.ts

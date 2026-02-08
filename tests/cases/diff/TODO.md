@@ -51,51 +51,48 @@ must_not_include:
 |-----------|-------|------------|--------|
 | algorithm | 63 | 21 | ✅ Done |
 | cicd | 45 | 15 | ✅ Done |
+| cicd_and_docs | 234 | 78 | ✅ Done |
+| comprehensive | 81 | 27 | ✅ Done |
+| config | 15 | 5 | ✅ Done |
+| cpp | 108 | 36 | ✅ Done |
+| csharp | 78 | 26 | ✅ Done |
+| dependencies | 123 | 41 | ✅ Done |
+| docker | 135 | 45 | ✅ Done |
+| fragments | 72 | 24 | ✅ Done |
+| frontend | 90 | 30 | ✅ Done |
+| go | 105 | 35 | ✅ Done |
+| graph | 51 | 17 | ✅ Done |
+| helm | 135 | 45 | ✅ Done |
+| infrastructure_validation | 15 | 5 | ✅ Done |
+| internals | 195 | 65 | ✅ Done |
+| java | 78 | 26 | ✅ Done |
+| javascript | 255 | 85 | ✅ Done |
+| javascript_extended | 147 | 49 | ✅ Done |
+| json | 45 | 15 | ✅ Done |
+| jvm_and_compiled | 216 | 72 | ✅ Done |
+| kubernetes | 120 | 40 | ✅ Done |
+| merging | 36 | 12 | ✅ Done |
+| operations | 18 | 6 | ✅ Done |
+| output | 36 | 12 | ✅ Done |
+| patterns | 135 | 45 | ✅ Done |
+| php | 60 | 20 | ✅ Done |
+| ppr | 105 | 35 | ✅ Done |
+| python | 186 | 62 | ✅ Done |
+| relations | 21 | 7 | ✅ Done |
+| ruby | 60 | 20 | ✅ Done |
+| rust | 120 | 40 | ✅ Done |
+| scala | 78 | 26 | ✅ Done |
+| scripting | 90 | 30 | ✅ Done |
+| selection | 24 | 8 | ✅ Done |
+| shell | 75 | 25 | ✅ Done |
+| swift | 60 | 20 | ✅ Done |
+| terraform | 240 | 80 | ✅ Done |
+| typescript | 27 | 9 | ✅ Done |
+| yaml | 60 | 20 | ✅ Done |
 
 ### 🔄 Remaining
 
-| Directory | Files | Est. Cases | Priority |
-|-----------|-------|------------|----------|
-| cicd_and_docs | 234 | ~78 | High |
-| comprehensive | 81 | ~27 | High |
-| config | 15 | ~5 | Medium |
-| cpp | 108 | ~36 | Medium |
-| csharp | 78 | ~26 | Medium |
-| dependencies | 123 | ~41 | High |
-| docker | 135 | ~45 | High |
-| fragments | 72 | ~24 | Medium |
-| frontend | 90 | ~30 | High |
-| go | 105 | ~35 | Medium |
-| graph | 51 | ~17 | Medium |
-| helm | 135 | ~45 | High |
-| infrastructure_validation | 15 | ~5 | Low |
-| internals | 195 | ~65 | Medium |
-| java | 78 | ~26 | Medium |
-| javascript | 255 | ~85 | High |
-| javascript_extended | 147 | ~49 | Medium |
-| json | 45 | ~15 | Low |
-| jvm_and_compiled | 216 | ~72 | Medium |
-| kubernetes | 120 | ~40 | High |
-| merging | 36 | ~12 | Low |
-| operations | 18 | ~6 | Low |
-| output | 36 | ~12 | Low |
-| patterns | 135 | ~45 | Medium |
-| php | 60 | ~20 | Low |
-| ppr | 105 | ~35 | Medium |
-| python | 186 | ~62 | High |
-| relations | 21 | ~7 | Low |
-| ruby | 60 | ~20 | Low |
-| rust | 120 | ~40 | Medium |
-| scala | 78 | ~26 | Low |
-| scripting | 90 | ~30 | Medium |
-| selection | 24 | ~8 | Medium |
-| shell | 75 | ~25 | Medium |
-| swift | 60 | ~20 | Low |
-| terraform | 240 | ~80 | High |
-| typescript | 27 | ~9 | Medium |
-| yaml | 60 | ~20 | Medium |
-
-**Total remaining:** ~38 directories, ~1100+ test cases
+None - all directories enriched.
 
 ---
 

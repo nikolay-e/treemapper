@@ -1,5 +1,27 @@
-must_include:
-- Input
+must_include_files:
 - Form.tsx
+must_include_content:
+- 'import { useRef } from ''react'';
+
+  import { Input } from ''./Input'';
+
+
+
+  '
+- "\n    const emailRef = useRef<HTMLInputElement>(null);\n\n    const handleSubmit = () => {\n        emailRef.current?.focus();\n"
+- '
+
+  }
+
+  '
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_064_METRIC_MARKER_A
+- GARBAGE_JS_064_COUNTER_MARKER_B
+- GARBAGE_JS_064_COLLECTOR_CLASS_C
+- GARBAGE_JS_064_NOTIFY_MARKER_D
+- GARBAGE_JS_064_PUSH_MARKER_E
+- GARBAGE_JS_064_BROADCASTER_CLASS_F
+- MetricsCollector
+- NotificationBroadcaster
+- garbage_metrics.ts
+- garbage_notifications.ts

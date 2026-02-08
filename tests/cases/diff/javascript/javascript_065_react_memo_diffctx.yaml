@@ -1,5 +1,22 @@
-must_include:
-- ExpensiveList
+must_include_files:
 - Dashboard.tsx
+must_include_content:
+- 'import { useState } from ''react'';
+
+  import { ExpensiveList } from ''./ExpensiveList'';
+
+
+
+  '
+- "\n    const [items] = useState([{ id: '1', name: 'Item 1' }]);\n    const [count, setCount] = useState(0);\n\n    return (\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_065_HEALTH_MARKER_A
+- GARBAGE_JS_065_HEARTBEAT_MARKER_B
+- GARBAGE_JS_065_CHECKER_CLASS_C
+- GARBAGE_JS_065_SCHEDULE_MARKER_D
+- GARBAGE_JS_065_INTERVAL_MARKER_E
+- GARBAGE_JS_065_SCHEDULER_CLASS_F
+- HealthChecker
+- TaskScheduler
+- garbage_health_checks.ts
+- garbage_scheduling.ts

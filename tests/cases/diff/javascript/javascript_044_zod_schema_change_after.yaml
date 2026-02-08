@@ -16,3 +16,25 @@ validator.ts: |
   export function validateUser(data: unknown): User {
       return UserSchema.parse(data);
   }
+garbage_monitoring.ts: |
+  const GARBAGE_JS_044_MONITOR_MARKER_A = "monitoring";
+  const GARBAGE_JS_044_HEALTH_MARKER_B = true;
+
+  class HealthMonitor {
+      static GARBAGE_JS_044_MONITOR_CLASS_C = "monitor";
+
+      check(endpoint: string): boolean {
+          return true;
+      }
+  }
+garbage_profiling.ts: |
+  const GARBAGE_JS_044_PROFILE_MARKER_D = "profiling";
+  const GARBAGE_JS_044_SAMPLE_MARKER_E = 100;
+
+  class PerformanceProfiler {
+      static GARBAGE_JS_044_PROFILER_CLASS_F = true;
+
+      startTrace(name: string): number {
+          return Date.now();
+      }
+  }

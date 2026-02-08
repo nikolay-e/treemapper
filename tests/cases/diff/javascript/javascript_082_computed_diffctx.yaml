@@ -1,5 +1,16 @@
-must_include:
-- formatName
-- Profile.vue
+must_include_files:
+  - Profile.vue
+must_include_content:
+  - |
+    const fullName = computed(() => formatName(firstName.value, lastName.value));
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_082_PROFILE_MARKER_A
+  - GARBAGE_JS_082_DURATION_MARKER_B
+  - GARBAGE_JS_082_PROFILER_CLASS_C
+  - GARBAGE_JS_082_HEALTH_MARKER_D
+  - GARBAGE_JS_082_STATUS_MARKER_E
+  - GARBAGE_JS_082_CHECKER_CLASS_F
+  - PerformanceProfiler
+  - HealthChecker
+  - garbage_profiling.ts
+  - garbage_health_checks.ts

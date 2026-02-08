@@ -1,5 +1,16 @@
-must_include:
-- sendNotification
+must_include_files:
 - notifier.test.ts
+must_include_content:
+- "\n    it('should call notify with correct args', () => {\n        const notify = jest.fn<void, [Notification]>();\n        sendNotification(notify, 'Hello', 'World');\n        expect(notify).toHaveBeenCalledWith({\
+  \ title: 'Hello', body: 'World' });\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_011_BUCKET_MARKER_A
+- GARBAGE_JS_011_REFILL_MARKER_B
+- GARBAGE_JS_011_BUCKET_CLASS_C
+- GARBAGE_JS_011_CIRCUIT_MARKER_D
+- GARBAGE_JS_011_TRIP_MARKER_E
+- GARBAGE_JS_011_BREAKER_CLASS_F
+- TokenBucket
+- CircuitBreaker
+- garbage_throttling.ts
+- garbage_circuitbreaker.ts

@@ -13,3 +13,25 @@ decorators.ts: |
   }
 service.ts: |
   console.log('initial');
+garbage_queue.ts: |
+  const GARBAGE_JS_023_QUEUE_MARKER_A = "queue";
+  const GARBAGE_JS_023_BROKER_MARKER_B = true;
+
+  class MessageBroker {
+      static GARBAGE_JS_023_BROKER_CLASS_C = "broker";
+
+      publish(topic: string, payload: string): void {
+          // noop
+      }
+  }
+garbage_throttling.ts: |
+  const GARBAGE_JS_023_THROTTLE_MARKER_D = "throttle";
+  const GARBAGE_JS_023_LIMITER_MARKER_E = 42;
+
+  class RequestLimiter {
+      static GARBAGE_JS_023_LIMITER_CLASS_F = true;
+
+      allow(clientId: string): boolean {
+          return true;
+      }
+  }

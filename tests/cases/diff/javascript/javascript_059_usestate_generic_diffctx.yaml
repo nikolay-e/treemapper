@@ -1,5 +1,15 @@
-must_include:
-- TodoItem
+must_include_files:
 - TodoList.tsx
+must_include_content:
+- "\n    const [todos, setTodos] = useState<TodoItem[]>([]);\n\n    const addTodo = (text: string) => {\n        setTodos([...todos, { id: Date.now().toString(), text, completed: false }]);\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_059_NOTIFY_MARKER_A
+- GARBAGE_JS_059_PUSH_MARKER_B
+- GARBAGE_JS_059_NOTIFY_CLASS_C
+- GARBAGE_JS_059_THROTTLE_MARKER_D
+- GARBAGE_JS_059_LIMITER_MARKER_E
+- GARBAGE_JS_059_THROTTLE_CLASS_F
+- PushNotificationService
+- RequestThrottler
+- garbage_notifications.ts
+- garbage_throttle.ts

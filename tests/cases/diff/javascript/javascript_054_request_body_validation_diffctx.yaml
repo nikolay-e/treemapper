@@ -1,5 +1,21 @@
-must_include:
-- CreateUserBody
+must_include_files:
 - controller.ts
+must_include_content:
+- 'import { Request, Response } from ''express'';
+
+  import { CreateUserBody } from ''./schemas'';
+
+
+  '
+- "\n    const body = req.body as CreateUserBody;\n    res.status(201).json({ id: '1', name: body.name, email: body.email });\n}\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_054_COMPRESS_MARKER_A
+- GARBAGE_JS_054_GZIP_MARKER_B
+- GARBAGE_JS_054_COMPRESS_CLASS_C
+- GARBAGE_JS_054_SERIAL_MARKER_D
+- GARBAGE_JS_054_CODEC_MARKER_E
+- GARBAGE_JS_054_SERIAL_CLASS_F
+- GzipCompressor
+- BinaryCodec
+- garbage_compression.ts
+- garbage_serialization.ts

@@ -1,5 +1,19 @@
-must_include:
-- sql
-- query.ts
+must_include_files:
+  - query.ts
+must_include_content:
+  - |
+    function buildQuery(userId: string) {
+        const query = sql`SELECT * FROM users WHERE id = ${userId}`;
+        return query;
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_033_NOTIFY_MARKER_A
+  - GARBAGE_JS_033_PUSH_MARKER_B
+  - GARBAGE_JS_033_NOTIFIER_CLASS_C
+  - GARBAGE_JS_033_ANALYTICS_MARKER_D
+  - GARBAGE_JS_033_TRACKER_MARKER_E
+  - GARBAGE_JS_033_TRACKER_CLASS_F
+  - PushNotifier
+  - EventTracker
+  - garbage_notifications.ts
+  - garbage_analytics.ts

@@ -1,5 +1,15 @@
-must_include:
-- fetchUser
+must_include_files:
 - main.ts
+must_include_content:
+- "async function main() {\n    const user = await fetchUser('123');\n    console.log(user);\n}\n\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_012_SPAN_MARKER_A
+- GARBAGE_JS_012_EXPORT_MARKER_B
+- GARBAGE_JS_012_EXPORTER_CLASS_C
+- GARBAGE_JS_012_BACKOFF_MARKER_D
+- GARBAGE_JS_012_DELAY_MARKER_E
+- GARBAGE_JS_012_BACKOFF_CLASS_F
+- SpanExporter
+- ExponentialBackoff
+- garbage_telemetry.ts
+- garbage_retry.ts

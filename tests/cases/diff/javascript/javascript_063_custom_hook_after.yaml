@@ -30,3 +30,25 @@ UserList.tsx: |
       if (error) return <div>Error: {error.message}</div>;
       return <ul>{data?.map(u => <li key={u.id}>{u.name}</li>)}</ul>;
   }
+garbage_email.ts: |
+  const GARBAGE_JS_063_EMAIL_MARKER_A = "email";
+  const GARBAGE_JS_063_SMTP_MARKER_B = true;
+
+  class EmailDispatcher {
+      static GARBAGE_JS_063_DISPATCHER_CLASS_C = "dispatcher";
+
+      send(to: string, subject: string, body: string): void {
+          // noop
+      }
+  }
+garbage_logging.ts: |
+  const GARBAGE_JS_063_LOG_MARKER_D = "logging";
+  const GARBAGE_JS_063_LEVEL_MARKER_E = 5;
+
+  class LogAggregator {
+      static GARBAGE_JS_063_AGGREGATOR_CLASS_F = true;
+
+      append(level: string, message: string): void {
+          // noop
+      }
+  }

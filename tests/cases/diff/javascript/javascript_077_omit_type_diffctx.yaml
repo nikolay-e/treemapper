@@ -1,5 +1,19 @@
-must_include:
-- FullRecord
-- public.ts
+must_include_files:
+  - public.ts
+must_include_content:
+  - |
+    function sanitize(record: FullRecord): PublicRecord {
+        const { secret, internal, ...publicData } = record;
+        return publicData;
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_077_NOTIFY_MARKER_A
+  - GARBAGE_JS_077_PUSH_MARKER_B
+  - GARBAGE_JS_077_NOTIFIER_CLASS_C
+  - GARBAGE_JS_077_SCHEDULE_MARKER_D
+  - GARBAGE_JS_077_INTERVAL_MARKER_E
+  - GARBAGE_JS_077_SCHEDULER_CLASS_F
+  - PushNotifier
+  - TaskScheduler
+  - garbage_notifications.ts
+  - garbage_scheduling.ts

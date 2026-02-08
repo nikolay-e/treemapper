@@ -1,5 +1,24 @@
-must_include:
-- defaultConfig
+must_include_files:
 - config.ts
+must_include_content:
+- 'import { defaultConfig } from ''./defaults'';
+
+
+  '
+- "\n    return Object.assign({}, defaultConfig, overrides);\n}\n"
+- '
+
+  }
+
+  '
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_024_TELEMETRY_MARKER_A
+- GARBAGE_JS_024_SPAN_MARKER_B
+- GARBAGE_JS_024_SPAN_CLASS_C
+- GARBAGE_JS_024_POOL_MARKER_D
+- GARBAGE_JS_024_CONN_MARKER_E
+- GARBAGE_JS_024_CONN_CLASS_F
+- SpanCollector
+- ConnectionPool
+- garbage_telemetry.ts
+- garbage_pooling.ts

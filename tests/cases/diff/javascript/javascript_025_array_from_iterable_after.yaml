@@ -17,3 +17,25 @@ main.ts: |
   }
 
   console.log(getNumbers());
+garbage_caching.ts: |
+  const GARBAGE_JS_025_CACHE_MARKER_A = "caching";
+  const GARBAGE_JS_025_TTL_MARKER_B = true;
+
+  class CacheStore {
+      static GARBAGE_JS_025_STORE_CLASS_C = "store";
+
+      get(key: string): unknown {
+          return undefined;
+      }
+  }
+garbage_rate_limiter.ts: |
+  const GARBAGE_JS_025_RATE_MARKER_D = "rate_limit";
+  const GARBAGE_JS_025_WINDOW_MARKER_E = 42;
+
+  class SlidingWindowLimiter {
+      static GARBAGE_JS_025_LIMITER_CLASS_F = true;
+
+      isAllowed(clientId: string): boolean {
+          return true;
+      }
+  }

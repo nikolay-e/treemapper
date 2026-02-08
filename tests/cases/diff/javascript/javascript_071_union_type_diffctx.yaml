@@ -1,6 +1,31 @@
-must_include:
-- Success
-- Failure
+must_include_files:
 - handler.ts
+must_include_content:
+- 'import { Success, Failure } from ''./result'';
+
+
+
+  '
+- '
+
+  type Result<T> = Success<T> | Failure;
+
+
+  '
+- "\nfunction handleResult<T>(result: Result<T>) {\n    if (result.success) {\n        return result.data;\n    }\n"
+- '
+
+  }
+
+  '
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_071_THROTTLE_MARKER_A
+- GARBAGE_JS_071_DELAY_MARKER_B
+- GARBAGE_JS_071_THROTTLER_CLASS_C
+- GARBAGE_JS_071_QUEUE_MARKER_D
+- GARBAGE_JS_071_PRIORITY_MARKER_E
+- GARBAGE_JS_071_MSGQUEUE_CLASS_F
+- RequestThrottler
+- MessageQueue
+- garbage_throttling.ts
+- garbage_queueing.ts

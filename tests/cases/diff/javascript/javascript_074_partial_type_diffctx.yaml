@@ -1,5 +1,18 @@
-must_include:
-- FullConfig
-- updater.ts
+must_include_files:
+  - updater.ts
+must_include_content:
+  - |
+    function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {
+        return { ...current, ...updates };
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_074_AUTH_MARKER_A
+  - GARBAGE_JS_074_TOKEN_MARKER_B
+  - GARBAGE_JS_074_PROVIDER_CLASS_C
+  - GARBAGE_JS_074_ENCRYPT_MARKER_D
+  - GARBAGE_JS_074_KEY_SIZE_MARKER_E
+  - GARBAGE_JS_074_SERVICE_CLASS_F
+  - AuthProvider
+  - EncryptionService
+  - garbage_auth.ts
+  - garbage_encryption.ts

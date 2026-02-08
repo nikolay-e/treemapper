@@ -1,5 +1,22 @@
-must_include:
-- createClickHandler
+must_include_files:
 - ActionButton.tsx
+must_include_content:
+- 'import { useCallback } from ''react'';
+
+  import { createClickHandler } from ''./handlers'';
+
+
+
+  '
+- "\n    const handleClick = useCallback(() => {\n        createClickHandler(id)();\n    }, [id]);\n\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_066_RATELIMIT_MARKER_A
+- GARBAGE_JS_066_WINDOW_MARKER_B
+- GARBAGE_JS_066_LIMITER_CLASS_C
+- GARBAGE_JS_066_FLAG_MARKER_D
+- GARBAGE_JS_066_TOGGLE_MARKER_E
+- GARBAGE_JS_066_FLAGSERVICE_CLASS_F
+- RateLimiter
+- FeatureFlagService
+- garbage_rate_limiting.ts
+- garbage_feature_flags.ts

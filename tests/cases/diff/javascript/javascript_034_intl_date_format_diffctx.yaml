@@ -1,5 +1,15 @@
-must_include:
-- localeConfig
+must_include_files:
 - formatter.ts
+must_include_content:
+- "\n    const formatter = new Intl.DateTimeFormat(localeConfig.locale, localeConfig.options);\n    return formatter.format(date);\n}\n"
 must_not_include:
-- js_garbage_marker_001
+- GARBAGE_JS_034_LOG_MARKER_A
+- GARBAGE_JS_034_LEVEL_MARKER_B
+- GARBAGE_JS_034_AGGREGATOR_CLASS_C
+- GARBAGE_JS_034_METRIC_MARKER_D
+- GARBAGE_JS_034_COUNTER_MARKER_E
+- GARBAGE_JS_034_COLLECTOR_CLASS_F
+- LogAggregator
+- MetricsCollector
+- garbage_logging.ts
+- garbage_metrics.ts

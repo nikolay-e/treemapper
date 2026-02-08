@@ -16,3 +16,25 @@ user_repo.ts: |
           return entity;
       }
   }
+garbage_email.ts: |
+  const GARBAGE_JS_039_EMAIL_MARKER_A = "email";
+  const GARBAGE_JS_039_SMTP_MARKER_B = true;
+
+  class EmailDispatcher {
+      static GARBAGE_JS_039_DISPATCHER_CLASS_C = "dispatcher";
+
+      send(to: string, subject: string, body: string): void {
+          // noop
+      }
+  }
+garbage_scheduling.ts: |
+  const GARBAGE_JS_039_SCHEDULE_MARKER_D = "scheduling";
+  const GARBAGE_JS_039_CRON_MARKER_E = 60;
+
+  class TaskScheduler {
+      static GARBAGE_JS_039_SCHEDULER_CLASS_F = true;
+
+      schedule(cronExpr: string, callback: () => void): void {
+          // noop
+      }
+  }

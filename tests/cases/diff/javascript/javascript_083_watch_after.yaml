@@ -18,3 +18,25 @@ UserDetails.vue: |
   <template>
       <div v-if="userData">{{ userData.name }}</div>
   </template>
+garbage_queue.ts: |
+  const GARBAGE_JS_083_QUEUE_MARKER_A = "queue";
+  const GARBAGE_JS_083_FIFO_MARKER_B = true;
+
+  class MessageQueue {
+      static GARBAGE_JS_083_QUEUE_CLASS_C = "queue";
+
+      enqueue(item: string): void {
+          // noop
+      }
+  }
+garbage_throttling.ts: |
+  const GARBAGE_JS_083_THROTTLE_MARKER_D = "throttling";
+  const GARBAGE_JS_083_LIMIT_MARKER_E = 1000;
+
+  class RequestThrottler {
+      static GARBAGE_JS_083_THROTTLER_CLASS_F = true;
+
+      throttle(requestId: string): boolean {
+          return true;
+      }
+  }

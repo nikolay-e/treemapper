@@ -1,5 +1,19 @@
-must_include:
-- targetFunction
-- main.ts
+must_include_files:
+  - main.ts
+must_include_content:
+  - |
+    function dynamicCall() {
+        const result = eval('targetFunction()');
+        return result;
+    }
 must_not_include:
-- js_garbage_marker_001
+  - GARBAGE_JS_031_MIGRATE_MARKER_A
+  - GARBAGE_JS_031_SCHEMA_MARKER_B
+  - GARBAGE_JS_031_MIGRATOR_CLASS_C
+  - GARBAGE_JS_031_BACKUP_MARKER_D
+  - GARBAGE_JS_031_SNAPSHOT_MARKER_E
+  - GARBAGE_JS_031_MANAGER_CLASS_F
+  - SchemaMigrator
+  - SnapshotManager
+  - garbage_migration.ts
+  - garbage_backup.ts

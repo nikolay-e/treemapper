@@ -12,3 +12,25 @@ app.ts: |
   }
 app.test.ts: |
   console.log('initial');
+garbage_queue.ts: |
+  const GARBAGE_JS_010_FIFO_MARKER_A = "queue";
+  const GARBAGE_JS_010_DEQUEUE_MARKER_B = true;
+
+  class FifoQueue {
+      static GARBAGE_JS_010_QUEUE_CLASS_C = "queue";
+
+      enqueue(item: string): void {
+          // noop
+      }
+  }
+garbage_websocket.ts: |
+  const GARBAGE_JS_010_CHANNEL_MARKER_D = "websocket";
+  const GARBAGE_JS_010_BROADCAST_MARKER_E = 42;
+
+  class ChannelBroadcaster {
+      static GARBAGE_JS_010_BROADCASTER_CLASS_F = true;
+
+      broadcast(channel: string, message: string): void {
+          // noop
+      }
+  }
