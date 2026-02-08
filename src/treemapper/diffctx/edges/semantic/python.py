@@ -14,7 +14,7 @@ _CALL_WEIGHT = 0.85
 _SYMBOL_REF_WEIGHT = 0.95
 _TYPE_REF_WEIGHT = 0.60
 
-_PY_IMPORT_RE = re.compile(r"(?:from\s+(\.{0,3}[\w.]{0,200})\s+import|import\s+([\w.]{1,200}))")
+_PY_IMPORT_RE = re.compile(r"(?:from\s{1,20}(\.{0,3}[\w.]{0,200})\s{1,20}import|import\s{1,20}([\w.]{1,200}))")
 
 
 def _is_python_file(path: Path) -> bool:
