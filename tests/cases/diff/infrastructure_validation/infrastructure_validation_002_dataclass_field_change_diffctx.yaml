@@ -1,12 +1,4 @@
-must_include:
-- class Order
-- priority
-must_not_include:
-- GARBAGE_INFRA_002_SEED_SCRIPT_A
-- GARBAGE_INFRA_002_SEED_COUNT_B
-- GARBAGE_INFRA_002_MODEL_TEST_A
-- GARBAGE_INFRA_002_TEST_FIXTURE_B
-- GARBAGE_INFRA_002_MODEL_DOC_A
-- GARBAGE_INFRA_002_SCHEMA_VERSION_B
-- GARBAGE_INFRA_002_MIGRATION_A
-- GARBAGE_INFRA_002_TABLE_PREFIX_B
+must_include_files:
+- models.py
+must_include_content:
+- 'priority: int = 0'

@@ -1,15 +1,15 @@
-must_include:
-- Copy
-- midpoint
-- calculate_area
+must_include_files:
+- src/geometry.rs
+- src/lib.rs
+- src/point.rs
+must_include_content:
+- use crate::point::Point;
+- 'pub fn calculate_area(p1: Point, p2: Point, p3: Point) -> f64 {'
 must_not_include:
 - GARBAGE_RUST_034_COLOR_PALETTE_A
 - GARBAGE_RUST_034_DEFAULT_COLOR_B
-- GarbageColorPalette034
-- garbage_add_color_034
-- garbage_get_primary_034
-- GARBAGE_RUST_034_FONT_REGISTRY_C
 - GARBAGE_RUST_034_DEFAULT_FONT_D
-- GarbageFontRegistry034
-- garbage_register_font_034
-- garbage_lookup_font_034
+- GARBAGE_RUST_034_FONT_REGISTRY_C
+- color_palette.rs
+- font_registry.rs
+- mod.rs

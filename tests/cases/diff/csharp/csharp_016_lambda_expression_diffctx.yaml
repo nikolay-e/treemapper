@@ -1,13 +1,10 @@
 must_include_files:
-  - Program.cs
-  - Services/Validator.cs
+- Program.cs
 must_include_content:
-  - |
-    var validator = new Validator<User>()
+- using MyApp.Services;
+- static void Main()
 must_not_include:
-  - GARBAGE_CS_016_RETRY_HANDLER_A
-  - GARBAGE_CS_016_DEAD_LETTER_B
-  - RetryHandler
-  - DeadLetterQueue
-  - Unrelated/RetryHandler.cs
-  - Unrelated/DeadLetterQueue.cs
+- GARBAGE_CS_016_DEAD_LETTER_B
+- GARBAGE_CS_016_RETRY_HANDLER_A
+- DeadLetterQueue.cs
+- RetryHandler.cs

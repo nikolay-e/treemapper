@@ -1,18 +1,12 @@
 must_include_files:
-  - pkg/httpclient/client.go
+- pkg/httpclient/client.go
 must_include_content:
-  - |
-    type Option func(*Client)
-  - |
-    func WithTimeout(d time.Duration) Option {
-  - |
-    func NewClient(baseURL string, opts ...Option) *Client {
+- retries    int
+- type Option func(*Client)
 must_not_include:
-  - GARBAGE_GO_031_POOL_WORKER_A
-  - GARBAGE_GO_031_NewWorkerPool
-  - GarbageWorkerPool031
-  - GARBAGE_GO_031_QUEUE_BROKER_B
-  - GARBAGE_GO_031_NewBroker
-  - GarbageBroker031
-  - pool/worker.go
-  - queue/broker.go
+- GARBAGE_GO_031_NewBroker(topic
+- GARBAGE_GO_031_NewWorkerPool(size
+- GARBAGE_GO_031_POOL_WORKER_A
+- GARBAGE_GO_031_QUEUE_BROKER_B
+- broker.go
+- worker.go

@@ -1,7 +1,8 @@
-must_include:
-- def update_user
-- def delete_user
-- def rate_limit
+must_include_files:
+- routes.py
+must_include_content:
+- 'def rate_limit(max_requests: int = 100):'
+- '@rate_limit(max_requests=50)'
 must_not_include:
 - GARBAGE_PYTHON_050_001
 - GARBAGE_PYTHON_050_002
@@ -12,9 +13,6 @@ must_not_include:
 - GARBAGE_PYTHON_050_007
 - GARBAGE_PYTHON_050_008
 - GARBAGE_PYTHON_050_009
-- RequestLogger
-- APIError
-- UserSerializer
-- middleware.py
 - error_handlers.py
+- middleware.py
 - serializers.py

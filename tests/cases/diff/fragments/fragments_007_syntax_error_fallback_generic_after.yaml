@@ -1,28 +1,3 @@
-broken.py: |
-  import os
-  from pathlib import Path
-
-  GARBAGE_CONST_BEFORE_030 = "GARBAGE_FRAG_constbefore030"
-
-  def valid_before_broken():
-      return "GARBAGE_FRAG_validbefore030"
-
-  def broken(:
-      x = [1, 2, 3
-      return x
-
-  def valid_after_broken():
-      return "GARBAGE_FRAG_validafter030"
-
-  class GarbageAfterClass:
-      MARKER = "GARBAGE_FRAG_afterclass030"
-
-  GARBAGE_CONST_AFTER_030 = "GARBAGE_FRAG_constafter030"
-garbage_broken_030.py: |
-  def garbage_function_030():
-      return "GARBAGE_FRAG_garbagefunc030"
-
-  class GarbageBroken030:
-      VALUE = "GARBAGE_FRAG_garbagevalue030"
-
-  GARBAGE_MODULE_CONST = "GARBAGE_FRAG_moduleconst030"
+broken.py: "import os\nfrom pathlib import Path\n\ndef valid_before_broken():\n\ndef broken(:\n    x = [1, 2, 3\n    return x\n\ndef valid_after_broken():\n\nclass GarbageAfterClass:\n\n"
+garbage_broken_030.py: "def garbage_function_030():\n    return \"GARBAGE_FRAG_garbagefunc030\"\n\nclass GarbageBroken030:\n    VALUE = \"GARBAGE_FRAG_garbagevalue030\"\n\nGARBAGE_MODULE_CONST = \"GARBAGE_FRAG_moduleconst030\"\
+  \n"

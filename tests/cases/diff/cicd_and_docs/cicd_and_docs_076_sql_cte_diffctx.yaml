@@ -1,34 +1,15 @@
 must_include_files:
-  - monthly_sales.sql
+- sql/queries/monthly_sales.sql
+- src/models/monthly_report.py
 must_include_content:
-  - |
-    monthly_growth AS (
-        SELECT
-            month,
-            revenue,
-            order_count,
-            unique_customers,
-            avg_order_value,
-            LAG(revenue) OVER (ORDER BY month) AS prev_revenue,
-  - |
-    running_totals AS (
-        SELECT
-            month,
-            revenue,
-            order_count,
-            unique_customers,
-            avg_order_value,
-            revenue_growth_percent,
-            order_growth_percent,
-            SUM(revenue) OVER (ORDER BY month) AS ytd_revenue,
+- -- Monthly sales report with growth calculation using multiple CTEs
+- from typing import Optional
 must_not_include:
-  - GARBAGE_CICD_DOCS_076_CTE_MARKER_A
-  - GARBAGE_CICD_DOCS_076_MATERIALIZE_MARKER_B
-  - GARBAGE_CICD_DOCS_076_FOLD_MARKER_C
-  - GARBAGE_CICD_DOCS_076_WINDOW_MARKER_D
-  - GARBAGE_CICD_DOCS_076_FRAME_MARKER_E
-  - GARBAGE_CICD_DOCS_076_AGGREGATE_MARKER_F
-  - GarbageCTEOptimizer
-  - GarbageWindowAnalyzer
-  - garbage_cte_optimizer.ts
-  - garbage_window_analyzer.ts
+- GARBAGE_CICD_DOCS_076_AGGREGATE_MARKER_F
+- GARBAGE_CICD_DOCS_076_CTE_MARKER_A
+- GARBAGE_CICD_DOCS_076_FOLD_MARKER_C
+- GARBAGE_CICD_DOCS_076_FRAME_MARKER_E
+- GARBAGE_CICD_DOCS_076_MATERIALIZE_MARKER_B
+- GARBAGE_CICD_DOCS_076_WINDOW_MARKER_D
+- garbage_cte_optimizer.ts
+- garbage_window_analyzer.ts

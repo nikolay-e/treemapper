@@ -1,14 +1,14 @@
-must_include:
-- Step 2
+must_include_files:
+- guide.md
+must_include_content:
+- '4. Choose installation directory (recommended: /opt/app)'
 must_not_include:
 - GARBAGE_GRAPH_wxy001
+- GARBAGE_GRAPH_wxy001.
 - GARBAGE_GRAPH_wxy002
+- GARBAGE_GRAPH_wxy002.
 - GARBAGE_GRAPH_wxy003
-- Step A GARBAGE
-- Step B GARBAGE
-- Phase 1 GARBAGE
-- Phase 2 GARBAGE
-- Day 1 GARBAGE
-- Cooking Guide
-- Workout Guide
-- Travel Planning
+- GARBAGE_GRAPH_wxy003.
+- fitness_guide_GARBAGE_GRAPH_wxy002.md
+- travel_guide_GARBAGE_GRAPH_wxy003.md
+- unrelated_guide_GARBAGE_GRAPH_wxy001.md

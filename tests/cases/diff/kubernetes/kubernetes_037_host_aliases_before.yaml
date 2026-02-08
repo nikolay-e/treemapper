@@ -1,107 +1,29 @@
-k8s/base/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: legacy-integration
-    namespace: production
-    labels:
-      app: legacy-integration
-      tier: integration
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
-        app: legacy-integration
-    template:
-      metadata:
-        labels:
-          app: legacy-integration
-          tier: integration
-      spec:
-        containers:
-        - name: app
-          image: registry.example.com/legacy-integration:v2.0.0
-          ports:
-          - containerPort: 8080
-            name: http
-          env:
-          - name: LEGACY_HOST
-            value: legacy-service
-          - name: LEGACY_PORT
-            value: "8443"
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "500m"
-            limits:
-              memory: "1Gi"
-              cpu: "1000m"
-k8s/base/service.yaml: |
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: legacy-integration
-    namespace: production
-  spec:
-    selector:
-      app: legacy-integration
-    ports:
-    - name: http
-      port: 80
-      targetPort: 8080
-k8s/base/configmap.yaml: |
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: legacy-config
-    namespace: production
-  data:
-    CONNECTION_TIMEOUT: "30000"
-    MAX_RETRIES: "5"
-    ENABLE_SSL: "true"
-app.py: |
-  import socket
+k8s/base/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: legacy-integration\n  namespace: production\n  labels:\n    app: legacy-integration\n    tier: integration\nspec:\n \
+  \ replicas: 2\n  selector:\n    matchLabels:\n      app: legacy-integration\n  template:\n    metadata:\n      labels:\n        app: legacy-integration\n        tier: integration\n    spec:\n      containers:\n\
+  \      - name: app\n        image: registry.example.com/legacy-integration:v2.0.0\n        ports:\n        - containerPort: 8080\n          name: http\n        env:\n        - name: LEGACY_HOST\n    \
+  \      value: legacy-service\n        - name: LEGACY_PORT\n          value: \"8443\"\n        resources:\n          requests:\n            memory: \"512Mi\"\n            cpu: \"500m\"\n          limits:\n\
+  \            memory: \"1Gi\"\n            cpu: \"1000m\"\n"
+k8s/base/service.yaml: "apiVersion: v1\nkind: Service\nmetadata:\n  name: legacy-integration\n  namespace: production\nspec:\n  selector:\n    app: legacy-integration\n  ports:\n  - name: http\n    port:\
+  \ 80\n    targetPort: 8080\n"
+k8s/base/configmap.yaml: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: legacy-config\n  namespace: production\ndata:\n  CONNECTION_TIMEOUT: \"30000\"\n  MAX_RETRIES: \"5\"\n  ENABLE_SSL: \"true\"\
+  \n"
+app.py: 'import socket
+
   import os
-  legacy_host = os.environ.get('LEGACY_HOST', 'legacy-service')
+
+  legacy_host = os.environ.get(''LEGACY_HOST'', ''legacy-service'')
+
   host = socket.gethostbyname(legacy_host)
-  print(f'Connecting to {host}')
-k8s/unrelated/hosts/configmap.yaml: |
-  # GARBAGE_K8S_437_HOSTS_CM
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: GARBAGE_K8S_437_HOSTS_CONFIG
-    namespace: hosts
-  data:
-    hosts: GARBAGE_K8S_437_HOSTS_DATA
-    resolve.conf: GARBAGE_K8S_437_RESOLVE_CONF
-k8s/unrelated/coredns/customzone.yaml: |
-  # GARBAGE_K8S_437_COREDNS_ZONE
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: GARBAGE_K8S_437_ZONE_CM
-    namespace: kube-system
-  data:
-    zone.db: GARBAGE_K8S_437_ZONE_DATA
-    custom.hosts: GARBAGE_K8S_437_CUSTOM_HOSTS
-k8s/unrelated/sidecar/init-container.yaml: |
-  # GARBAGE_K8S_437_INIT_SIDECAR
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: GARBAGE_K8S_437_SIDECAR_DEPLOY
-    namespace: sidecar
-  spec:
-    template:
-      spec:
-        initContainers:
-        - name: GARBAGE_K8S_437_INIT_NAME
-          image: GARBAGE_K8S_437_INIT_IMAGE
-          command: [GARBAGE_K8S_437_INIT_CMD]
-tests/integration/conftest.py: |
-  # GARBAGE_K8S_437_PYTEST
-  import pytest
-  GARBAGE_K8S_437_FIXTURE = "fixture_value"
-  def GARBAGE_K8S_437_CONFTEST_FUNC():
-      return GARBAGE_K8S_437_FIXTURE
+
+  print(f''Connecting to {host}'')
+
+  '
+k8s/unrelated/hosts/configmap.yaml: "# GARBAGE_K8S_437_HOSTS_CM\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: GARBAGE_K8S_437_HOSTS_CONFIG\n  namespace: hosts\ndata:\n  hosts: GARBAGE_K8S_437_HOSTS_DATA\n\
+  \  resolve.conf: GARBAGE_K8S_437_RESOLVE_CONF\n"
+k8s/unrelated/coredns/customzone.yaml: "# GARBAGE_K8S_437_COREDNS_ZONE\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: GARBAGE_K8S_437_ZONE_CM\n  namespace: kube-system\ndata:\n  zone.db: GARBAGE_K8S_437_ZONE_DATA\n\
+  \  custom.hosts: GARBAGE_K8S_437_CUSTOM_HOSTS\n"
+k8s/unrelated/sidecar/init-container.yaml: "# GARBAGE_K8S_437_INIT_SIDECAR\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: GARBAGE_K8S_437_SIDECAR_DEPLOY\n  namespace: sidecar\nspec:\n  template:\n\
+  \    spec:\n      initContainers:\n      - name: GARBAGE_K8S_437_INIT_NAME\n        image: GARBAGE_K8S_437_INIT_IMAGE\n        command: [GARBAGE_K8S_437_INIT_CMD]\n"
+tests/integration/conftest.py: 'import pytest
+
+  '

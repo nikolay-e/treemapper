@@ -1,12 +1,8 @@
 must_include_files:
-  - validator.py
+- validator.py
 must_include_content:
-  - |
-    MIN_PASSWORD_LENGTH
+- from constants import MIN_PASSWORD_LENGTH, MAX_PASSWORD_LENGTH, PASSWORD_SPECIAL_CHARS
+- 'def validate(password: str) -> dict:'
 must_not_include:
-  - GARBAGE_DEP_009_GEOLOGY_A
-  - GARBAGE_DEP_009_KNITTING_B
-  - MineralSample
-  - KnittingPattern
-  - mohs_hardness
-  - yarn_needed
+- geology_GARBAGE_DEP_009_GEOLOGY_A.py
+- knitting_GARBAGE_DEP_009_KNITTING_B.py

@@ -1,120 +1,21 @@
-k8s/base/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: cache-service
-    namespace: production
-    labels:
-      app: cache-service
-      tier: cache
-  spec:
-    replicas: 6
-    selector:
-      matchLabels:
-        app: cache-service
-    template:
-      metadata:
-        labels:
-          app: cache-service
-          tier: cache
-      spec:
-        topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: DoNotSchedule
-          labelSelector:
-            matchLabels:
-              app: cache-service
-        containers:
-        - name: cache
-          image: registry.example.com/cache-service:v1.5.0
-          ports:
-          - containerPort: 6379
-            name: redis
-          - containerPort: 9121
-            name: metrics
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "500m"
-            limits:
-              memory: "2Gi"
-              cpu: "1000m"
-k8s/base/service.yaml: |
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: cache-service
-    namespace: production
-    labels:
-      app: cache-service
-  spec:
-    selector:
-      app: cache-service
-    ports:
-    - name: redis
-      port: 6379
-      targetPort: 6379
-    - name: metrics
-      port: 9121
-      targetPort: 9121
-k8s/base/pdb.yaml: |
-  apiVersion: policy/v1
-  kind: PodDisruptionBudget
-  metadata:
-    name: cache-service-pdb
-    namespace: production
-  spec:
-    minAvailable: 4
-    selector:
-      matchLabels:
-        app: cache-service
-k8s/base/servicemonitor.yaml: |
-  apiVersion: monitoring.coreos.com/v1
-  kind: ServiceMonitor
-  metadata:
-    name: cache-service
-    namespace: production
-  spec:
-    selector:
-      matchLabels:
-        app: cache-service
-    endpoints:
-    - port: metrics
-      interval: 15s
-k8s/unrelated/topology/node-labels.yaml: |
-  # GARBAGE_K8S_438_NODE_LABELS
-  apiVersion: v1
-  kind: Node
-  metadata:
-    name: GARBAGE_K8S_438_NODE_NAME
-    labels:
-      topology.kubernetes.io/zone: GARBAGE_K8S_438_ZONE
-      topology.kubernetes.io/region: GARBAGE_K8S_438_REGION
-      node.kubernetes.io/instance-type: GARBAGE_K8S_438_INSTANCE
-k8s/unrelated/scheduling/priority-class.yaml: |
-  # GARBAGE_K8S_438_PRIORITY
-  apiVersion: scheduling.k8s.io/v1
-  kind: PriorityClass
-  metadata:
-    name: GARBAGE_K8S_438_PRIORITY_NAME
-  value: GARBAGE_K8S_438_PRIORITY_VALUE
-  globalDefault: GARBAGE_K8S_438_GLOBAL_DEFAULT
-  preemptionPolicy: GARBAGE_K8S_438_PREEMPTION
-k8s/unrelated/quota/resourcequota.yaml: |
-  # GARBAGE_K8S_438_QUOTA
-  apiVersion: v1
-  kind: ResourceQuota
-  metadata:
-    name: GARBAGE_K8S_438_QUOTA_NAME
-    namespace: quota
-  spec:
-    hard:
-      requests.cpu: GARBAGE_K8S_438_CPU_REQUEST
-      requests.memory: GARBAGE_K8S_438_MEM_REQUEST
-      limits.cpu: GARBAGE_K8S_438_CPU_LIMIT
-cdk8s/main.ts: |
-  // GARBAGE_K8S_438_CDK8S
-  import { App } from 'cdk8s';
+k8s/base/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: cache-service\n  namespace: production\n  labels:\n    app: cache-service\n    tier: cache\nspec:\n  replicas: 6\n  selector:\n\
+  \    matchLabels:\n      app: cache-service\n  template:\n    metadata:\n      labels:\n        app: cache-service\n        tier: cache\n    spec:\n      topologySpreadConstraints:\n      - maxSkew: 1\n\
+  \        topologyKey: topology.kubernetes.io/zone\n        whenUnsatisfiable: DoNotSchedule\n        labelSelector:\n          matchLabels:\n            app: cache-service\n      containers:\n      -\
+  \ name: cache\n        image: registry.example.com/cache-service:v1.5.0\n        ports:\n        - containerPort: 6379\n          name: redis\n        - containerPort: 9121\n          name: metrics\n\
+  \        resources:\n          requests:\n            memory: \"1Gi\"\n            cpu: \"500m\"\n          limits:\n            memory: \"2Gi\"\n            cpu: \"1000m\"\n"
+k8s/base/service.yaml: "apiVersion: v1\nkind: Service\nmetadata:\n  name: cache-service\n  namespace: production\n  labels:\n    app: cache-service\nspec:\n  selector:\n    app: cache-service\n  ports:\n\
+  \  - name: redis\n    port: 6379\n    targetPort: 6379\n  - name: metrics\n    port: 9121\n    targetPort: 9121\n"
+k8s/base/pdb.yaml: "apiVersion: policy/v1\nkind: PodDisruptionBudget\nmetadata:\n  name: cache-service-pdb\n  namespace: production\nspec:\n  minAvailable: 4\n  selector:\n    matchLabels:\n      app: cache-service\n"
+k8s/base/servicemonitor.yaml: "apiVersion: monitoring.coreos.com/v1\nkind: ServiceMonitor\nmetadata:\n  name: cache-service\n  namespace: production\nspec:\n  selector:\n    matchLabels:\n      app: cache-service\n\
+  \  endpoints:\n  - port: metrics\n    interval: 15s\n"
+k8s/unrelated/topology/node-labels.yaml: "# GARBAGE_K8S_438_NODE_LABELS\napiVersion: v1\nkind: Node\nmetadata:\n  name: GARBAGE_K8S_438_NODE_NAME\n  labels:\n    topology.kubernetes.io/zone: GARBAGE_K8S_438_ZONE\n\
+  \    topology.kubernetes.io/region: GARBAGE_K8S_438_REGION\n    node.kubernetes.io/instance-type: GARBAGE_K8S_438_INSTANCE\n"
+k8s/unrelated/scheduling/priority-class.yaml: "# GARBAGE_K8S_438_PRIORITY\napiVersion: scheduling.k8s.io/v1\nkind: PriorityClass\nmetadata:\n  name: GARBAGE_K8S_438_PRIORITY_NAME\nvalue: GARBAGE_K8S_438_PRIORITY_VALUE\n\
+  globalDefault: GARBAGE_K8S_438_GLOBAL_DEFAULT\npreemptionPolicy: GARBAGE_K8S_438_PREEMPTION\n"
+k8s/unrelated/quota/resourcequota.yaml: "# GARBAGE_K8S_438_QUOTA\napiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: GARBAGE_K8S_438_QUOTA_NAME\n  namespace: quota\nspec:\n  hard:\n    requests.cpu:\
+  \ GARBAGE_K8S_438_CPU_REQUEST\n    requests.memory: GARBAGE_K8S_438_MEM_REQUEST\n    limits.cpu: GARBAGE_K8S_438_CPU_LIMIT\n"
+cdk8s/main.ts: 'import { App } from ''cdk8s'';
+
   const app = new App();
-  const GARBAGE_K8S_438_CDK_VAR = "GARBAGE_K8S_438_CDK_VALUE";
+
+  '

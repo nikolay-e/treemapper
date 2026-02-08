@@ -1,12 +1,7 @@
 must_include_files:
-  - handler.py
+- handler.py
 must_include_content:
-  - |
-    UserService
+- svc = UserService("postgres://localhost/mydb")
 must_not_include:
-  - GARBAGE_DEP_002_RECIPE_A
-  - GARBAGE_DEP_002_MUSIC_B
-  - RecipeBook
-  - MusicPlayer
-  - shuffle_playlist
-  - load_recipes
+- music_playlist_GARBAGE_DEP_002_MUSIC_B.py
+- recipe_manager_GARBAGE_DEP_002_RECIPE_A.py

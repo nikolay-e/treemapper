@@ -1,16 +1,15 @@
-must_include:
-- Clone
-- duplicate
-- clone_entities
-- process_with_backup
+must_include_files:
+- src/entity.rs
+- src/lib.rs
+- src/service.rs
+must_include_content:
+- pub fn duplicate(&self) -> Self {
+- pub mod service;
 must_not_include:
-- GARBAGE_RUST_033_RATE_LIMITER_A
-- GARBAGE_RUST_033_MAX_REQUESTS_B
-- GarbageTokenBucket033
-- garbage_consume_033
-- garbage_refill_033
 - GARBAGE_RUST_033_CIRCUIT_BREAKER_C
 - GARBAGE_RUST_033_FAILURE_THRESHOLD_D
-- GarbageCircuitBreaker033
-- garbage_record_failure_033
-- garbage_is_open_033
+- GARBAGE_RUST_033_MAX_REQUESTS_B
+- GARBAGE_RUST_033_RATE_LIMITER_A
+- circuit_breaker.rs
+- mod.rs
+- rate_limiter.rs

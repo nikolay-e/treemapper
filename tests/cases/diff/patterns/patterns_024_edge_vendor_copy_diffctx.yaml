@@ -1,2 +1,4 @@
-must_include:
-- chunk.js
+must_include_files:
+- third_party/lodash/chunk.js
+must_include_content:
+- if (!Array.isArray(array)) {

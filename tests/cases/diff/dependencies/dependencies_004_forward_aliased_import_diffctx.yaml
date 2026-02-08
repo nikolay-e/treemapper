@@ -1,12 +1,8 @@
 must_include_files:
-  - app.py
+- app.py
 must_include_content:
-  - |
-    helper as h
+- from utils import helper as h
+- data = [1, 2, 3, 4, 5]
 must_not_include:
-  - GARBAGE_DEP_004_CHESS_A
-  - GARBAGE_DEP_004_CURRENCY_B
-  - ChessBoard
-  - ExchangeService
-  - evaluate_position
-  - convert_GARBAGE
+- chess_engine_GARBAGE_DEP_004_CHESS_A.py
+- currency_converter_GARBAGE_DEP_004_CURRENCY_B.py

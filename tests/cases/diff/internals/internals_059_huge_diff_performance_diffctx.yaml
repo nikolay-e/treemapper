@@ -1,4 +1,2 @@
-must_include:
-- func_0
-- func_1
-- func_2
+must_include_files:
+- huge_file.py

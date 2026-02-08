@@ -1,20 +1,14 @@
 must_include_files:
 - impl.ts
 must_include_content:
-- 'import { Serializable, Comparable } from ''./interfaces'';
-
-
-
-  '
-- "\n    constructor(public id: number, public value: string) {}\n\n    serialize(): string {\n        return JSON.stringify({ id: this.id, value: this.value });\n"
+- import { Serializable, Comparable } from './interfaces';
+- 'serialize(): string {'
 must_not_include:
-- GARBAGE_JS_022_LOG_MARKER_A
-- GARBAGE_JS_022_TRANSPORT_MARKER_B
-- GARBAGE_JS_022_TRANSPORT_CLASS_C
-- GARBAGE_JS_022_METRIC_MARKER_D
-- GARBAGE_JS_022_COUNTER_MARKER_E
 - GARBAGE_JS_022_COUNTER_CLASS_F
-- LogTransport
-- MetricsCounter
+- GARBAGE_JS_022_COUNTER_MARKER_E
+- GARBAGE_JS_022_LOG_MARKER_A
+- GARBAGE_JS_022_METRIC_MARKER_D
+- GARBAGE_JS_022_TRANSPORT_CLASS_C
+- GARBAGE_JS_022_TRANSPORT_MARKER_B
 - garbage_logging.ts
 - garbage_metrics.ts

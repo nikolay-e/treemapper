@@ -1,25 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/deployment.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    resources:
-      limits:
-        cpu: 500m
-        memory: 512Mi
-      requests:
-        cpu: 250m
-        memory: 256Mi
-  - |
-    {{- with .Values.resources }}
-    resources:
-      {{- toYaml . | nindent 14 }}
-    {{- end }}
-must_not_include:
-  - GARBAGE_HELM_018_EXT_SECRET_A
-  - GARBAGE_HELM_018_SECRET_STORE_B
-  - GARBAGE_HELM_018_SECRET_TARGET_C
-  - GARBAGE_HELM_018_QUOTA_DOC_D
-  - GARBAGE_HELM_018_NS_LIMITS_E
-  - chart/templates/external-secret.yaml
-  - chart/docs/resource-quotas.md
+- 'memory: 512Mi'

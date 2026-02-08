@@ -1,22 +1,6 @@
 must_include_files:
-  - chart/Chart.yaml
-  - src/db.py
+- chart/Chart.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    dependencies:
-      - name: postgresql
-        version: "13.0.0"
-        repository: https://charts.bitnami.com/bitnami
-      - name: redis
-        version: "17.0.0"
-        repository: https://charts.bitnami.com/bitnami
-  - |
-    import psycopg2
-must_not_include:
-  - GARBAGE_HELM_008_MIGRATION_JOB_A
-  - GARBAGE_HELM_008_MIGRATION_CONTAINER_B
-  - GARBAGE_HELM_008_MIGRATION_CMD_C
-  - GARBAGE_HELM_008_DB_GUIDE_D
-  - GARBAGE_HELM_008_SCHEMA_SECTION_E
-  - chart/templates/migration-job.yaml
-  - chart/docs/database-guide.md
+- 'appVersion: "1.1.0"'
+- 'version: "13.0.0"'

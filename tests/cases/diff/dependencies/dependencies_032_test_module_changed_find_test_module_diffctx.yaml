@@ -1,5 +1,4 @@
-must_include:
-- formatting.py
-- test_formatting.py
-must_not_include:
-- garbage_marker_12345
+must_include_files:
+- utils/formatting.py
+must_include_content:
+- 'def format_currency(amount, symbol="$"):'

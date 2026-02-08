@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - types.ts
-must_not_include:
-- js_garbage_marker_006
+must_include_content:
+- interface ButtonProps {

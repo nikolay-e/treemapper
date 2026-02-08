@@ -1,19 +1,13 @@
 must_include_files:
-  - .gitlab-ci.yml
+- .gitlab-ci.yml
 must_include_content:
-  - |
-    trigger:
-      project: team/deploy
-      branch: main
-      strategy: depend
+- 'project: team/deploy'
 must_not_include:
-  - GARBAGE_CICD_DOCS_034_ORCHESTRATOR_MARKER_A
-  - GARBAGE_CICD_DOCS_034_QUEUE_MARKER_B
-  - GARBAGE_CICD_DOCS_034_ASYNC_MARKER_C
-  - GARBAGE_CICD_DOCS_034_MONITOR_MARKER_D
-  - GARBAGE_CICD_DOCS_034_ALERT_MARKER_E
-  - GARBAGE_CICD_DOCS_034_INTERVAL_MARKER_F
-  - GarbagePipelineOrchestrator
-  - GarbagePipelineMonitor
-  - garbage_pipeline_orchestrator.ts
-  - garbage_pipeline_monitor.ts
+- GARBAGE_CICD_DOCS_034_ALERT_MARKER_E
+- GARBAGE_CICD_DOCS_034_ASYNC_MARKER_C
+- GARBAGE_CICD_DOCS_034_INTERVAL_MARKER_F
+- GARBAGE_CICD_DOCS_034_MONITOR_MARKER_D
+- GARBAGE_CICD_DOCS_034_ORCHESTRATOR_MARKER_A
+- GARBAGE_CICD_DOCS_034_QUEUE_MARKER_B
+- garbage_pipeline_monitor.ts
+- garbage_pipeline_orchestrator.ts

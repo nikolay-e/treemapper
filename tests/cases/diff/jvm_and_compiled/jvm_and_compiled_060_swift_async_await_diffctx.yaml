@@ -1,16 +1,11 @@
 must_include_files:
-  - UserAPI.swift
+- UserAPI.swift
 must_include_content:
-  - |
-    async throws
-  - |
-    await
+- import Foundation
 must_not_include:
-  - GARBAGE_JVM_060_COMBINE_MARKER_A
-  - GARBAGE_JVM_060_PUBLISHER_MARKER_B
-  - GARBAGE_JVM_060_SUBSCRIBER_MARKER_C
-  - GARBAGE_JVM_060_SINK_MARKER_D
-  - GarbageCombinePublisher
-  - GarbageSubscriberSink
-  - GarbageCombinePublisher.swift
-  - GarbageSubscriberSink.swift
+- GARBAGE_JVM_060_COMBINE_MARKER_A
+- GARBAGE_JVM_060_PUBLISHER_MARKER_B
+- GARBAGE_JVM_060_SINK_MARKER_D
+- GARBAGE_JVM_060_SUBSCRIBER_MARKER_C
+- GarbageCombinePublisher.swift
+- GarbageSubscriberSink.swift

@@ -1,27 +1,14 @@
-must_include:
-- format_lower
-- to_lowercase
-- format_title
-- slugify
-- pub use utils::format_lower
-- pub use utils::sanitize
+must_include_files:
+- src/lib/mod.rs
+- src/lib/utils.rs
+must_include_content:
+- pub use utils::format_lower;
+- pub fn info() -> String {
 must_not_include:
-- GARBAGE_RUST_RPC_001
+- GARBAGE_GRPC_PORT_012
 - GARBAGE_RPC_PORT_002
 - GARBAGE_RPC_TIMEOUT_003
-- GarbageRpcClient004
-- garbage_call_005
-- GARBAGE_RPC_ERROR_006
-- garbage_notify_007
-- GARBAGE_NOTIFY_ERROR_008
-- GarbageRpcHandler009
-- garbage_handle_010
 - GARBAGE_RUST_GRPC_011
-- GARBAGE_GRPC_PORT_012
-- GarbageGrpcChannel013
-- garbage_connect_014
-- GARBAGE_GRPC_CONNECT_ERROR_015
-- garbage_call_016
-- GARBAGE_GRPC_CALL_ERROR_017
-- garbage_stream_018
-- GARBAGE_GRPC_STREAM_ERROR_019
+- GARBAGE_RUST_RPC_001
+- grpc.rs
+- rpc.rs

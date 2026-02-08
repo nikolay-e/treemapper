@@ -1,23 +1,6 @@
-useApi.ts: |
-  import { useState, useEffect } from 'react';
+useApi.ts: "import { useState, useEffect } from 'react';\n\nexport function useApi<T>(url: string) {\n    const [data, setData] = useState<T | null>(null);\n    const [loading, setLoading] = useState(true);\n\
+  \    const [error, setError] = useState<Error | null>(null);\n\n    useEffect(() => {\n        fetch(url)\n            .then(res => res.json())\n            .then(setData)\n            .catch(setError)\n\
+  \            .finally(() => setLoading(false));\n    }, [url]);\n\n    return { data, loading, error };\n}\n\n// react_adv_garbage_marker_006\n"
+UserList.tsx: 'console.log(''initial'');
 
-  export function useApi<T>(url: string) {
-      const [data, setData] = useState<T | null>(null);
-      const [loading, setLoading] = useState(true);
-      const [error, setError] = useState<Error | null>(null);
-
-      useEffect(() => {
-          fetch(url)
-              .then(res => res.json())
-              .then(setData)
-              .catch(setError)
-              .finally(() => setLoading(false));
-      }, [url]);
-
-      return { data, loading, error };
-  }
-
-  // react_adv_garbage_marker_006
-  const GARBAGE_API_CONFIG = { timeout: 9999 };
-UserList.tsx: |
-  console.log('initial');
+  '

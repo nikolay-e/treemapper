@@ -1,16 +1,12 @@
-must_include:
-- build_client
-- build_server
-- types.proto
-- configure
+must_include_files:
+- build.rs
+must_include_content:
+- tonic_build::configure()
 must_not_include:
 - GARBAGE_RUST_028_HEALTH_A
 - GARBAGE_RUST_028_HEALTH_PATH_B
-- GarbageHealthChecker028
-- garbage_check_028
-- garbage_set_unhealthy_028
 - GARBAGE_RUST_028_METRICS_C
 - GARBAGE_RUST_028_METRICS_PORT_D
-- GarbagePrometheusExporter028
-- garbage_export_028
-- garbage_reset_028
+- health.rs
+- metrics.rs
+- mod.rs

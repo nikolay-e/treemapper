@@ -1,4 +1,6 @@
-must_include:
+must_include_files:
 - updater.ts
-must_not_include:
-- ts_ext_garbage_marker_005
+must_include_content:
+- import { FullConfig } from './config';
+- 'function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig
+  {'

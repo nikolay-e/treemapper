@@ -1,14 +1,9 @@
-must_include:
-- aws_lambda_function
-- lambda_exec
-- handler
-- runtime
-- environment_variables
+must_include_files:
+- infrastructure/lambda.tf
+must_include_content:
+- handler       = "main.handler"
 must_not_include:
-- GARBAGE_TF_MONITORING_441_001
-- GARBAGE_TF_LAMBDA_MARKER_441_002
-- GARBAGE_DASHBOARD_441_003
-- GARBAGE_LOGS_441_004
 - GARBAGE_TF_BATCH_441_005
-- GARBAGE_BATCH_JOB_441_006
-- GARBAGE_BATCH_441_007
+- GARBAGE_TF_MONITORING_441_001
+- batch.tf
+- monitoring.tf

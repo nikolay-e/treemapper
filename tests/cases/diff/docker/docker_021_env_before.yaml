@@ -1,50 +1,34 @@
-src/config.ts: |
-  export const config = {
-      nodeEnv: process.env.NODE_ENV || 'development',
-      port: parseInt(process.env.PORT || '3000'),
-      dbUrl: process.env.DATABASE_URL,
-      redisUrl: process.env.REDIS_URL,
-      logLevel: process.env.LOG_LEVEL || 'info'
-  };
-src/index.ts: |
-  import { config } from './config';
+src/config.ts: "export const config = {\n    nodeEnv: process.env.NODE_ENV || 'development',\n    port: parseInt(process.env.PORT || '3000'),\n    dbUrl: process.env.DATABASE_URL,\n    redisUrl: process.env.REDIS_URL,\n\
+  \    logLevel: process.env.LOG_LEVEL || 'info'\n};\n"
+src/index.ts: 'import { config } from ''./config'';
+
   console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
-package.json: |
-  {
-    "name": "api-service",
-    "version": "1.0.0",
-    "main": "dist/index.js",
-    "scripts": {
-      "build": "tsc",
-      "start": "node dist/index.js"
-    }
-  }
-Dockerfile: |
-  FROM node:20-alpine
+
+  '
+package.json: "{\n  \"name\": \"api-service\",\n  \"version\": \"1.0.0\",\n  \"main\": \"dist/index.js\",\n  \"scripts\": {\n    \"build\": \"tsc\",\n    \"start\": \"node dist/index.js\"\n  }\n}\n"
+Dockerfile: 'FROM node:20-alpine
+
   WORKDIR /app
+
   COPY . .
+
   RUN npm ci && npm run build
+
   CMD ["node", "dist/index.js"]
-scripts/local_dev.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_506_DEV_MARKER_001
-  GARBAGE_DOCKER_506_DEV_VAR_002="local"
+
+  '
+scripts/local_dev.sh: '#!/bin/bash
+
   export NODE_ENV=development
+
   npm run dev
-tests/config.test.ts: |
-  // GARBAGE_DOCKER_506_TEST_MARKER_003
-  const GARBAGE_DOCKER_506_TEST_CONFIG_004 = { env: 'test' };
-  describe('Config', () => {
-      it('should load env vars', () => {});
-  });
-docs/environment.md: |
-  # Environment Variables
-  GARBAGE_DOCKER_506_ENV_DOC_005
-  GARBAGE_DOCKER_506_VAR_LIST_006="NODE_ENV,PORT,DATABASE_URL"
-terraform/variables.tf: |
-  # GARBAGE_DOCKER_506_TF_MARKER_007
-  # GARBAGE_DOCKER_506_TF_VAR_008
-  variable "environment" { default = "production" }
-.env.example: |
-  # GARBAGE_DOCKER_506_ENV_EXAMPLE_009
-  GARBAGE_DOCKER_506_SECRET_010="example_secret"
+
+  '
+tests/config.test.ts: "describe('Config', () => {\n    it('should load env vars', () => {});\n});\n"
+docs/environment.md: '# Environment Variables
+
+  '
+terraform/variables.tf: 'variable "environment" { default = "production" }
+
+  '
+.env.example: ''

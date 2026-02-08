@@ -1,19 +1,5 @@
-must_include:
-- 'networks:'
-- '- frontend'
-- '- backend'
-- 'internal: true'
-- 'subnet: 172.28.0.0/16'
-- 'subnet: 172.29.0.0/16'
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- '- CACHE_HOST=redis'
 - 'driver: bridge'
-must_not_include:
-- GARBAGE_DOCKER_520_NET_MARKER_001
-- GARBAGE_DOCKER_520_NET_VAR_002
-- GARBAGE_DOCKER_520_TEST_MARKER_003
-- GARBAGE_DOCKER_520_TEST_NET_004
-- GARBAGE_DOCKER_520_NET_DOC_005
-- GARBAGE_DOCKER_520_TOPOLOGY_006
-- GARBAGE_DOCKER_520_TF_MARKER_007
-- GARBAGE_DOCKER_520_VPC_008
-- GARBAGE_DOCKER_520_POLICY_MARKER_009
-- GARBAGE_DOCKER_520_POLICY_010

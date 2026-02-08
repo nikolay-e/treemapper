@@ -1,83 +1,41 @@
-chart/Chart.yaml: |
-  apiVersion: v2
+chart/Chart.yaml: 'apiVersion: v2
+
   name: payment-svc
+
   version: 2.1.0
+
   appVersion: "3.0.0"
-chart/values.yaml: |
-  replicaCount: 2
-  image:
-    repository: payment-service
-    tag: "3.0.0"
-  service:
-    type: ClusterIP
-    port: 80
-  ingress:
-    enabled: false
-chart/templates/_helpers.tpl: |
-  {{- define "payment-svc.fullname" -}}
+
+  '
+chart/values.yaml: "replicaCount: 2\nimage:\n  repository: payment-service\n  tag: \"3.0.0\"\nservice:\n  type: ClusterIP\n  port: 80\ningress:\n  enabled: false\n"
+chart/templates/_helpers.tpl: '{{- define "payment-svc.fullname" -}}
+
   {{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" }}
+
   {{- end }}
 
+
   {{- define "payment-svc.labels" -}}
+
   app.kubernetes.io/name: {{ .Chart.Name }}
+
   app.kubernetes.io/instance: {{ .Release.Name }}
+
   {{- end }}
-chart/templates/service.yaml: |
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: {{ include "payment-svc.fullname" . }}
-    labels:
-      {{- include "payment-svc.labels" . | nindent 4 }}
-  spec:
-    type: {{ .Values.service.type }}
-    ports:
-      - port: {{ .Values.service.port }}
-        targetPort: http
-        protocol: TCP
-        name: http
-    selector:
-      {{- include "payment-svc.labels" . | nindent 4 }}
-chart/templates/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: {{ include "payment-svc.fullname" . }}
-  spec:
-    replicas: {{ .Values.replicaCount }}
-    selector:
-      matchLabels:
-        {{- include "payment-svc.labels" . | nindent 6 }}
-    template:
-      metadata:
-        labels:
-          {{- include "payment-svc.labels" . | nindent 8 }}
-      spec:
-        containers:
-          - name: {{ .Chart.Name }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            ports:
-              - name: http
-                containerPort: 8080
-chart/templates/backup-cronjob.yaml: |
-  apiVersion: batch/v1
-  kind: CronJob
-  metadata:
-    name: GARBAGE_HELM_002_BACKUP_JOB_A
-  spec:
-    schedule: "0 2 * * *"
-    jobTemplate:
-      spec:
-        template:
-          spec:
-            containers:
-              - name: GARBAGE_HELM_002_BACKUP_CONTAINER_B
-                image: backup-tool:latest
-                command: ["GARBAGE_HELM_002_BACKUP_CMD_C"]
-            restartPolicy: OnFailure
-chart/docs/api-spec.md: |
-  # Payment API Specification
-  GARBAGE_HELM_002_API_DOCS_D
+
+  '
+chart/templates/service.yaml: "apiVersion: v1\nkind: Service\nmetadata:\n  name: {{ include \"payment-svc.fullname\" . }}\n  labels:\n    {{- include \"payment-svc.labels\" . | nindent 4 }}\nspec:\n  type:\
+  \ {{ .Values.service.type }}\n  ports:\n    - port: {{ .Values.service.port }}\n      targetPort: http\n      protocol: TCP\n      name: http\n  selector:\n    {{- include \"payment-svc.labels\" . | nindent\
+  \ 4 }}\n"
+chart/templates/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ include \"payment-svc.fullname\" . }}\nspec:\n  replicas: {{ .Values.replicaCount }}\n  selector:\n    matchLabels:\n\
+  \      {{- include \"payment-svc.labels\" . | nindent 6 }}\n  template:\n    metadata:\n      labels:\n        {{- include \"payment-svc.labels\" . | nindent 8 }}\n    spec:\n      containers:\n     \
+  \   - name: {{ .Chart.Name }}\n          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n          ports:\n            - name: http\n              containerPort: 8080\n"
+chart/templates/backup-cronjob.yaml: "apiVersion: batch/v1\nkind: CronJob\nmetadata:\nspec:\n  schedule: \"0 2 * * *\"\n  jobTemplate:\n    spec:\n      template:\n        spec:\n          containers:\n\
+  \              image: backup-tool:latest\n          restartPolicy: OnFailure\n"
+chart/docs/api-spec.md: '# Payment API Specification
+
   ## Endpoints
+
   POST /api/v1/payments
-  GARBAGE_HELM_002_API_ENDPOINT_E
+
+  '

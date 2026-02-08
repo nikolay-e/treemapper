@@ -1,5 +1,5 @@
-must_include:
+must_include_files:
 - service.ts
-- implements IService
-must_not_include:
-- ts_garbage_marker_001
+must_include_content:
+- import { IService, ILogger } from './interfaces';
+- 'constructor(logger: ILogger) {'

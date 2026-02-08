@@ -10,17 +10,6 @@ no_headings.md: 'This is a document without any headings.
   This is the last paragraph.
 
 
-  GARBAGE_FRAG_para1_052 unrelated paragraph content.
-
-
-  GARBAGE_FRAG_para2_052 more unrelated content here.
-
-
-  GARBAGE_FRAG_para3_052 trailing garbage paragraph.
-
-
-  Some final GARBAGE_FRAG_final052 content.
-
   '
 garbage_no_headings_052.md: 'GARBAGE_FRAG_garbpara1_052 garbage document paragraph one.
 

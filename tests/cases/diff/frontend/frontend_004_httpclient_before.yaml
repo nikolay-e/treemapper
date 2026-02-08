@@ -1,38 +1,11 @@
-api.types.ts: |
-  export interface ApiResponse<T> {
-      data: T;
-      message: string;
-      status: number;
-  }
+api.types.ts: "export interface ApiResponse<T> {\n    data: T;\n    message: string;\n    status: number;\n}\n\nexport interface PaginatedResponse<T> {\n    items: T[];\n    total: number;\n    page: number;\n\
+  \    pageSize: number;\n}\n\nexport interface User {\n    id: string;\n    name: string;\n    email: string;\n}\n\nexport interface CreateUserRequest {\n    name: string;\n    email: string;\n    password:\
+  \ string;\n}\n\nexport interface UpdateUserRequest {\n    name?: string;\n    email?: string;\n}\n\n// angular_garbage_marker_004\n"
+api.service.ts: 'import { Injectable } from ''@angular/core'';
 
-  export interface PaginatedResponse<T> {
-      items: T[];
-      total: number;
-      page: number;
-      pageSize: number;
-  }
 
-  export interface User {
-      id: string;
-      name: string;
-      email: string;
-  }
+  @Injectable({ providedIn: ''root'' })
 
-  export interface CreateUserRequest {
-      name: string;
-      email: string;
-      password: string;
-  }
-
-  export interface UpdateUserRequest {
-      name?: string;
-      email?: string;
-  }
-
-  // angular_garbage_marker_004
-  const GARBAGE_API_CONFIG = { baseUrl: '/api' };
-api.service.ts: |
-  import { Injectable } from '@angular/core';
-
-  @Injectable({ providedIn: 'root' })
   export class ApiService {}
+
+  '

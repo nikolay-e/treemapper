@@ -1,66 +1,18 @@
-src/types/user.ts: |
-  export interface UserDTO {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: 'admin' | 'user' | 'guest';
+src/types/user.ts: "export interface UserDTO {\n  id: string;\n  email: string;\n  firstName: string;\n  lastName: string;\n  role: 'admin' | 'user' | 'guest';\n}\n\nexport interface User {\n  id: string;\n\
+  \  email: string;\n  fullName: string;\n  role: 'admin' | 'user' | 'guest';\n}\n\nexport type CreateUserInput = Omit<UserDTO, 'id'>;\nexport type UpdateUserInput = Partial<Omit<UserDTO, 'id'>>;\n"
+src/api/client.ts: "export interface ApiResponse<T> {\n  data: T;\n  status: number;\n  message?: string;\n}\n\nexport class ApiClient {\n  private baseUrl: string;\n  private headers: Record<string, string>;\n\
+  \n  constructor(baseUrl: string, authToken?: string) {\n    this.baseUrl = baseUrl;\n    this.headers = {\n      'Content-Type': 'application/json',\n      ...(authToken && { Authorization: `Bearer ${authToken}`\
+  \ }),\n    };\n  }\n\n  async get<T>(endpoint: string): Promise<T> {\n    const response = await fetch(`${this.baseUrl}${endpoint}`, {\n      headers: this.headers,\n    });\n    return response.json();\n\
+  \  }\n\n  async post<T, U>(endpoint: string, body: U): Promise<T> {\n    const response = await fetch(`${this.baseUrl}${endpoint}`, {\n      method: 'POST',\n      headers: this.headers,\n      body:\
+  \ JSON.stringify(body),\n    });\n    return response.json();\n  }\n}\n"
+src/services/userService.ts: 'console.log(''placeholder'');
+
+  '
+vendor/analytics-sdk/index.ts: '
+
   }
 
-  export interface User {
-    id: string;
-    email: string;
-    fullName: string;
-    role: 'admin' | 'user' | 'guest';
-  }
+  '
+docs/architecture/overview.md: '# Architecture Overview
 
-  export type CreateUserInput = Omit<UserDTO, 'id'>;
-  export type UpdateUserInput = Partial<Omit<UserDTO, 'id'>>;
-src/api/client.ts: |
-  export interface ApiResponse<T> {
-    data: T;
-    status: number;
-    message?: string;
-  }
-
-  export class ApiClient {
-    private baseUrl: string;
-    private headers: Record<string, string>;
-
-    constructor(baseUrl: string, authToken?: string) {
-      this.baseUrl = baseUrl;
-      this.headers = {
-        'Content-Type': 'application/json',
-        ...(authToken && { Authorization: `Bearer ${authToken}` }),
-      };
-    }
-
-    async get<T>(endpoint: string): Promise<T> {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        headers: this.headers,
-      });
-      return response.json();
-    }
-
-    async post<T, U>(endpoint: string, body: U): Promise<T> {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: this.headers,
-        body: JSON.stringify(body),
-      });
-      return response.json();
-    }
-  }
-src/services/userService.ts: |
-  console.log('placeholder');
-vendor/analytics-sdk/index.ts: |
-  // GARBAGE_TS_001_ANALYTICS_001 - third party analytics SDK
-  export const GARBAGE_TS_001_SDK_VERSION_002 = "3.0.0";
-
-  export function GARBAGE_TS_001_init_003(apiKey: string): void {
-    console.log('GARBAGE_TS_001_INIT_004:', apiKey);
-  }
-docs/architecture/overview.md: |
-  # Architecture Overview
-  GARBAGE_TS_001_DOCS_005 - this is documentation
-  The system uses GARBAGE_TS_001_PATTERN_006 architecture.
+  '

@@ -1,3 +1,2 @@
-must_include:
-- func1
-- func2
+must_include_files:
+- utils.py

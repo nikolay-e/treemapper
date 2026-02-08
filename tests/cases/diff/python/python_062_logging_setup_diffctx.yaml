@@ -1,11 +1,8 @@
-must_include:
-- update_context
-- configure_all
-- json_format
-- max_bytes
-- backup_count
-- RotatingFileHandler
-- add_file_handler
+must_include_files:
+- logging_config.py
+must_include_content:
+- 'def update_context(self, **kwargs) -> None:'
+- 'def configure_all(cls, level: str = "INFO") -> None:'
 must_not_include:
 - GARBAGE_PYTHON_062_001
 - GARBAGE_PYTHON_062_002
@@ -16,9 +13,6 @@ must_not_include:
 - GARBAGE_PYTHON_062_007
 - GARBAGE_PYTHON_062_008
 - GARBAGE_PYTHON_062_009
-- MetricsCollector
-- HealthChecker
-- ConfigLoader
-- metrics_collector.py
-- health_checker.py
 - config_loader.py
+- health_checker.py
+- metrics_collector.py

@@ -1,20 +1,14 @@
-must_include:
-- def update_profile
-- class User
-- UserPreferences
-- AccountStatus
+must_include_files:
+- handlers/profile.py
+must_include_content:
+- from typing import Dict, Any, Optional, List
+- 'def handle_update(self, user: User, data: Dict[str, Any]) -> User:'
 must_not_include:
-- GARBAGE_MARKER_AUTH_001
-- UNRELATED_TOKEN_EXPIRY_002
 - GARBAGE_AUTH_CLASS_003
-- GARBAGE_OAUTH_MARKER_004
-- GARBAGE_MARKER_PERM_005
-- UNRELATED_ADMIN_ROLE_006
-- GARBAGE_PERM_CLASS_007
 - GARBAGE_FORMAT_PERM_008
-- AuthManager
-- OAuthProvider
-- PermissionChecker
-- format_permission_error
+- GARBAGE_MARKER_AUTH_001
+- GARBAGE_MARKER_PERM_005
+- GARBAGE_OAUTH_MARKER_004
+- GARBAGE_PERM_CLASS_007
 - garbage_auth.py
 - garbage_permissions.py

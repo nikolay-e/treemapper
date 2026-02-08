@@ -1,22 +1,14 @@
 must_include_files:
-  - src/db.py
+- src/db.py
 must_include_content:
-  - |
-    def save(data):
-        with transaction():
-            try:
-                validate(data)
-                db_insert(data)
-            except Exception:
-                rollback_changes()
+- validate(data)
+- 'def validate(data):'
 must_not_include:
-  - GARBAGE_COMP_022_LOCK_TYPE_A
-  - GARBAGE_COMP_022_LEASE_DURATION_B
-  - GARBAGE_COMP_022_REENTRANT_C
-  - GARBAGE_COMP_022_COMPENSATION_D
-  - GARBAGE_COMP_022_STEP_TIMEOUT_E
-  - GARBAGE_COMP_022_IDEMPOTENT_F
-  - GarbageLockManager
-  - GarbageSagaCoordinator
-  - garbage_lock_manager.py
-  - garbage_saga_coordinator.py
+- GARBAGE_COMP_022_COMPENSATION_D
+- GARBAGE_COMP_022_IDEMPOTENT_F
+- GARBAGE_COMP_022_LEASE_DURATION_B
+- GARBAGE_COMP_022_LOCK_TYPE_A
+- GARBAGE_COMP_022_REENTRANT_C
+- GARBAGE_COMP_022_STEP_TIMEOUT_E
+- garbage_lock_manager.py
+- garbage_saga_coordinator.py

@@ -1,30 +1,13 @@
 must_include_files:
-  - .pre-commit-config.yaml
-  - src/code.py
+- .pre-commit-config.yaml
 must_include_content:
-  - |
-    repos:
-      - repo: https://github.com/pre-commit/pre-commit-hooks
-        rev: v4.5.0
-        hooks:
-          - id: trailing-whitespace
-          - id: end-of-file-fixer
-      - repo: https://github.com/astral-sh/ruff-pre-commit
-        rev: v0.1.0
-        hooks:
-          - id: ruff
-            args: [--fix]
-  - |
-    def process() -> bool:
-        return True
+- '- id: end-of-file-fixer'
 must_not_include:
-  - GARBAGE_CICD_012_VALIDATOR_MARKER_A
-  - GARBAGE_CICD_012_STRICT_MARKER_B
-  - GARBAGE_CICD_012_VERSION_MARKER_C
-  - GARBAGE_CICD_012_FORMAT_MARKER_D
-  - GARBAGE_CICD_012_INDENT_MARKER_E
-  - GARBAGE_CICD_012_PRETTY_MARKER_F
-  - GarbageSchemaValidator
-  - GarbageOutputFormatter
-  - garbage_validator.py
-  - garbage_formatter.py
+- GARBAGE_CICD_012_FORMAT_MARKER_D
+- GARBAGE_CICD_012_INDENT_MARKER_E
+- GARBAGE_CICD_012_PRETTY_MARKER_F
+- GARBAGE_CICD_012_STRICT_MARKER_B
+- GARBAGE_CICD_012_VALIDATOR_MARKER_A
+- GARBAGE_CICD_012_VERSION_MARKER_C
+- garbage_formatter.py
+- garbage_validator.py

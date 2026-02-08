@@ -1,21 +1,2 @@
-enums.ts: |
-  export enum Status {
-      Pending = 'PENDING',
-      Active = 'ACTIVE',
-      Completed = 'COMPLETED',
-      Cancelled = 'CANCELLED',
-      OnHold = 'ON_HOLD',
-  }
-
-  // js_garbage_marker_005
-  const GARBAGE_ENUM_CONFIG = { unused: true };
-task.ts: |
-  import { Status } from './enums';
-
-  export class Task {
-      status: Status = Status.Pending;
-
-      complete() {
-          this.status = Status.Completed;
-      }
-  }
+enums.ts: "export enum Status {\n    Pending = 'PENDING',\n    Active = 'ACTIVE',\n    Completed = 'COMPLETED',\n    Cancelled = 'CANCELLED',\n    OnHold = 'ON_HOLD',\n}\n\n// js_garbage_marker_005\n"
+task.ts: "import { Status } from './enums';\n\nexport class Task {\n    status: Status = Status.Pending;\n\n    complete() {\n        this.status = Status.Completed;\n    }\n}\n"

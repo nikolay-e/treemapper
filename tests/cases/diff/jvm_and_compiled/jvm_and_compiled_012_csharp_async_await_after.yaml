@@ -53,8 +53,8 @@ GarbageRetryPolicy.cs: |
       public GarbageRetryPolicy(int maxRetries) { _maxRetries = maxRetries; }
       public bool ShouldRetry(int attempt) => attempt < _maxRetries;
   }
-GarbageRetryPolicy.cs: |
-  public class GarbageRetryPolicy
+GarbageLoadBalancer.cs: |
+  public class GarbageLoadBalancer
   {
       public const string GARBAGE_JVM_012_RETRY_MARKER_A = "marker";
       public const string GARBAGE_JVM_012_TIMEOUT_MARKER_B = "marker";

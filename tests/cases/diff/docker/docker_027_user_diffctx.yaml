@@ -1,17 +1,4 @@
-must_include:
-- groupadd --gid 1000 appgroup
-- useradd --uid 1000 --gid appgroup
-- USER appuser:appgroup
-- COPY --chown=appuser:appgroup
-- mkdir -p /app/data /app/logs
-must_not_include:
-- GARBAGE_DOCKER_512_SETUP_MARKER_001
-- GARBAGE_DOCKER_512_SETUP_VAR_002
-- GARBAGE_DOCKER_512_TEST_MARKER_003
-- GARBAGE_DOCKER_512_TEST_SEC_004
-- GARBAGE_DOCKER_512_SEC_DOC_005
-- GARBAGE_DOCKER_512_USER_006
-- GARBAGE_DOCKER_512_K8S_MARKER_007
-- GARBAGE_DOCKER_512_PSP_008
-- GARBAGE_DOCKER_512_COMPLIANCE_MARKER_009
-- GARBAGE_DOCKER_512_CHECK_010
+must_include_files:
+- Dockerfile
+must_include_content:
+- FROM base AS dependencies

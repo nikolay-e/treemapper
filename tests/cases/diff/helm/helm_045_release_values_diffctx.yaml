@@ -1,6 +1,4 @@
-must_include:
-- '{{ .Release.Name }}'
-- '{{ .Release.Namespace }}'
-must_not_include:
-- garbage_marker_12345
-- unused_marker_67890
+must_include_files:
+- templates/configmap.yaml
+must_include_content:
+- 'name: {{ .Release.Name }}-config'

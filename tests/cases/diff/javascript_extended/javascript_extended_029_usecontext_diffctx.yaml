@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - Button.tsx
-must_not_include:
-- react_adv_garbage_marker_003
+must_include_content:
+- 'function Button({ children }: { children: React.ReactNode }) {'

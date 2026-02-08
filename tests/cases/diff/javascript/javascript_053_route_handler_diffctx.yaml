@@ -1,25 +1,14 @@
 must_include_files:
 - routes.ts
 must_include_content:
-- 'import { Router } from ''express'';
-
-  import { getUserHandler } from ''./userHandler'';
-
-
-  '
-- '
-
-  router.get(''/users/:id'', getUserHandler);
-
-  '
+- import { Router } from 'express';
+- router = Router()
 must_not_include:
-- GARBAGE_JS_053_RATELIMIT_MARKER_A
 - GARBAGE_JS_053_BUCKET_MARKER_B
-- GARBAGE_JS_053_RATELIMIT_CLASS_C
-- GARBAGE_JS_053_FLAG_MARKER_D
-- GARBAGE_JS_053_TOGGLE_MARKER_E
 - GARBAGE_JS_053_FLAG_CLASS_F
-- TokenBucketLimiter
-- FeatureFlagManager
-- garbage_ratelimit.ts
+- GARBAGE_JS_053_FLAG_MARKER_D
+- GARBAGE_JS_053_RATELIMIT_CLASS_C
+- GARBAGE_JS_053_RATELIMIT_MARKER_A
+- GARBAGE_JS_053_TOGGLE_MARKER_E
 - garbage_featureflags.ts
+- garbage_ratelimit.ts

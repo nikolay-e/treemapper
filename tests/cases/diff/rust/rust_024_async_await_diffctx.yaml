@@ -1,51 +1,20 @@
-must_include:
-- fetch_with_retry
-- fetch_with_timeout
-- MaxRetriesExceeded
-- RateLimited
-- AsyncFetcher
-- fetch_all
-- with_header
-- get_with_retry
+must_include_files:
+- src/async_service.rs
+must_include_content:
+- 'pub fn with_header(mut self, key: &str, value: &str) -> Self {'
+- 'pub fn with_timeout(mut self, timeout: Duration) -> Self {'
 must_not_include:
-- GARBAGE_RUST_COMPRESS_async001
-- GARBAGE_COMPRESSION_LEVEL_async002
 - GARBAGE_BUFFER_SIZE_async003
+- GARBAGE_COMPRESSION_LEVEL_async002
 - GARBAGE_MAGIC_HEADER_async004
-- GarbageCompressor_async005
-- garbage_compress_async006
-- garbage_decompress_async007
-- garbage_compression_ratio_async008
-- GarbageGzipCompressor_async009
-- garbage_new_async010
-- garbage_set_level_async011
-- garbage_internal_compress_async012
-- GarbageLz4Compressor_async013
-- garbage_new_fast_async014
-- garbage_new_high_async015
-- GARBAGE_RUST_SERIAL_async016
 - GARBAGE_MAX_DEPTH_async017
-- GARBAGE_MAX_STRING_LEN_async018
-- GarbageValue_async019
-- GarbageSerializer_async020
-- garbage_serialize_async021
-- garbage_deserialize_async022
-- GarbageJsonSerializer_async023
-- garbage_new_async024
-- garbage_set_indent_async025
-- garbage_escape_string_async026
-- GARBAGE_NOT_IMPLEMENTED_async027
-- GARBAGE_NOT_IMPLEMENTED_async028
-- GARBAGE_RUST_VALID_async029
-- GARBAGE_MIN_LENGTH_async030
 - GARBAGE_MAX_LENGTH_async031
-- GarbageValidator_async032
-- garbage_validate_async033
-- garbage_is_valid_async034
-- GarbageEmailValidator_async035
-- garbage_new_async036
-- garbage_allow_domain_async037
-- GARBAGE_MISSING_AT_async038
-- GARBAGE_TOO_SHORT_async039
-- GarbagePasswordValidator_async040
-- garbage_new_async041
+- GARBAGE_MAX_STRING_LEN_async018
+- GARBAGE_MIN_LENGTH_async030
+- GARBAGE_RUST_COMPRESS_async001
+- GARBAGE_RUST_SERIAL_async016
+- GARBAGE_RUST_VALID_async029
+- compression.rs
+- mod.rs
+- serialization.rs
+- validation.rs

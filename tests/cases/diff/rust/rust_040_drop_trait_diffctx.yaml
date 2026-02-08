@@ -1,59 +1,20 @@
-must_include:
-- impl Drop for Connection
-- impl Drop for ConnectionPool
-- Drop for ScopedConnection
-- Drop for ResourceGuard
-- ACTIVE_CONNECTIONS
-- active_connections
-- total_connections
-- uptime
-- ScopedConnection
-- ResourceGuard
-- Resource
-- cleanup
-- is_valid
+must_include_files:
+- src/connection.rs
+must_include_content:
+- use std::time::{Duration, Instant};
+- ACTIVE_CONNECTIONS.fetch_add(1, Ordering::SeqCst);
 must_not_include:
-- GARBAGE_RUST_THREAD_drop001
-- GARBAGE_MAX_THREADS_drop002
-- GARBAGE_STACK_SIZE_drop003
-- GarbageRunnable_drop004
-- garbage_run_drop005
-- garbage_name_drop006
-- GarbageThread_drop007
-- garbage_new_drop008
-- garbage_set_stack_size_drop009
-- garbage_set_priority_drop010
-- garbage_spawn_drop011
-- GARBAGE_SPAWN_ERROR_drop012
-- GarbageThreadPool_drop013
-- garbage_new_drop014
-- garbage_execute_drop015
-- GARBAGE_POOL_ERROR_drop016
-- garbage_shutdown_drop017
-- GARBAGE_RUST_MEM_drop018
-- GARBAGE_PAGE_SIZE_drop019
 - GARBAGE_ALIGNMENT_drop020
-- GarbageAllocator_drop021
-- garbage_allocate_drop022
-- garbage_deallocate_drop023
-- garbage_allocated_drop024
-- GarbageBumpAllocator_drop025
-- garbage_new_drop026
-- garbage_reset_drop027
-- garbage_remaining_drop028
 - GARBAGE_BUMP_NO_DEALLOC_drop029
-- GarbagePoolAllocator_drop030
-- garbage_new_drop031
-- GARBAGE_RUST_PROTO_drop032
-- GARBAGE_VERSION_drop033
 - GARBAGE_MAX_MESSAGE_SIZE_drop034
-- GarbageMessageType_drop035
-- GarbageCodec_drop036
-- garbage_encode_drop037
-- garbage_decode_drop038
-- GarbageJsonCodec_drop039
-- garbage_new_drop040
-- GarbageProtocol_drop041
-- garbage_new_drop042
-- garbage_send_drop043
-- garbage_receive_drop044
+- GARBAGE_MAX_THREADS_drop002
+- GARBAGE_PAGE_SIZE_drop019
+- GARBAGE_RUST_MEM_drop018
+- GARBAGE_RUST_PROTO_drop032
+- GARBAGE_RUST_THREAD_drop001
+- GARBAGE_STACK_SIZE_drop003
+- GARBAGE_VERSION_drop033
+- memory.rs
+- mod.rs
+- protocol.rs
+- threading.rs

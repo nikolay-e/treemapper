@@ -1,14 +1,5 @@
-must_include:
-- RateLimiter
-- createRateLimitMiddleware
-- RateLimitConfig
-- AuthenticatedRequest
-- MiddlewareFunction
+must_include_files:
 - src/middleware/rateLimit.ts
-must_not_include:
-- GARBAGE_TS_007_UPLOAD_001
-- GARBAGE_TS_007_MAX_SIZE_002
-- GARBAGE_TS_007_upload_003
-- GARBAGE_TS_007_UPLOADING_004
-- GARBAGE_TS_007_COMPRESS_005
-- GARBAGE_TS_007_HANDLER_006
+must_include_content:
+- import { Response, NextFunction } from 'express';
+- interface RateLimitEntry {

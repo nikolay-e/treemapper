@@ -23,6 +23,42 @@ _JENKINS_SCRIPT_RE = re.compile(r"script\s*\{([^}]+)\}", re.MULTILINE | re.DOTAL
 _SCRIPT_CALL_RE = re.compile(
     r"(?:bash|sh|python|python3|node|npm|yarn|pnpm|make|go|cargo|dotnet|mvn|gradle|pytest|ruff|mypy|black|isort|flake8)\s+([^\s;&|]+)"
 )
+_PKG_MANAGER_SUBCOMMANDS = frozenset(
+    {
+        "run",
+        "test",
+        "start",
+        "build",
+        "install",
+        "ci",
+        "init",
+        "publish",
+        "pack",
+        "link",
+        "unlink",
+        "exec",
+        "add",
+        "remove",
+        "upgrade",
+        "info",
+        "list",
+        "outdated",
+        "audit",
+        "fix",
+        "cache",
+        "config",
+        "help",
+        "version",
+        "create",
+        "set",
+        "get",
+        "why",
+        "dedupe",
+        "prune",
+        "dlx",
+        "store",
+    }
+)
 _FILE_REF_RE = re.compile(r"(?:\.\/|scripts\/|bin\/|tools\/|src\/|tests\/)([a-zA-Z0-9_.-]+(?:\.(?:sh|py|js|ts|rb))?)")
 
 
@@ -81,7 +117,7 @@ def _extract_script_refs(content: str) -> set[str]:
 
     for match in _SCRIPT_CALL_RE.finditer(content):
         script = match.group(1).strip().strip("'\"")
-        if script and not script.startswith("-"):
+        if script and not script.startswith("-") and script.lower() not in _PKG_MANAGER_SUBCOMMANDS:
             refs.add(script)
 
     for match in _FILE_REF_RE.finditer(content):
@@ -228,7 +264,7 @@ class CICDEdgeBuilder(EdgeBuilder):
             logging.debug("CICD refs for %s: %s", ci.name, local_refs)
             refs.update(local_refs)
 
-        discovered = discover_files_by_refs(refs, changed_files, all_candidate_files)
+        discovered = discover_files_by_refs(refs, changed_files, all_candidate_files, repo_root)
         logging.debug("CICD discovered for %s: %s", [c.name for c in ci_files], [d.name for d in discovered])
         return discovered
 

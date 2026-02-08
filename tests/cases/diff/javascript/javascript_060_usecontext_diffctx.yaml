@@ -1,26 +1,13 @@
 must_include_files:
 - Button.tsx
 must_include_content:
-- 'import { useContext } from ''react'';
-
-  import { ThemeContext } from ''./ThemeContext'';
-
-
-  '
-- "\n    const theme = useContext(ThemeContext);\n    return <button style={{ backgroundColor: theme.primary }}>{children}</button>;\n}\n"
-- '
-
-  }
-
-  '
+- 'function Button({ children }: { children: React.ReactNode }) {'
 must_not_include:
-- GARBAGE_JS_060_CIRCUIT_MARKER_A
+- GARBAGE_JS_060_BACKOFF_MARKER_E
 - GARBAGE_JS_060_BREAKER_MARKER_B
 - GARBAGE_JS_060_CIRCUIT_CLASS_C
-- GARBAGE_JS_060_RETRY_MARKER_D
-- GARBAGE_JS_060_BACKOFF_MARKER_E
+- GARBAGE_JS_060_CIRCUIT_MARKER_A
 - GARBAGE_JS_060_RETRY_CLASS_F
-- CircuitBreakerGuard
-- ExponentialBackoffRetrier
+- GARBAGE_JS_060_RETRY_MARKER_D
 - garbage_circuit.ts
 - garbage_retry.ts

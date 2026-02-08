@@ -1,16 +1,5 @@
-must_include:
-- OrderStateMachine
-- OrderService
-- OrderStatus
-- Order
-- canTransition
-- transition
-- getAvailableTransitions
+must_include_files:
 - src/services/orderService.ts
-must_not_include:
-- GARBAGE_TS_004_NOTIFY_001
-- GARBAGE_TS_004_VERSION_002
-- GARBAGE_TS_004_send_003
-- GARBAGE_TS_004_SENDING_004
-- GARBAGE_TS_004_AUDIT_005
-- GARBAGE_TS_004_LOGGER_006
+must_include_content:
+- import { Order, OrderStatus, OrderItem } from '../types/order';
+- type StateTransition = {

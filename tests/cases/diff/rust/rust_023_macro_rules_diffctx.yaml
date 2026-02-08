@@ -1,15 +1,14 @@
-must_include:
-- hashmap
-- HashMap
-- ensure
+must_include_files:
+- src/macros.rs
+- src/main.rs
+must_include_content:
+- macro_rules! hashmap {
+- let config = hashmap! {
 must_not_include:
-- GARBAGE_RUST_023_FORMATTER_A
 - GARBAGE_RUST_023_FMT_PREFIX_B
-- GarbageTextFormatter023
-- garbage_format_line_023
-- garbage_format_block_023
-- GARBAGE_RUST_023_VALIDATOR_C
+- GARBAGE_RUST_023_FORMATTER_A
 - GARBAGE_RUST_023_MAX_LEN_D
-- GarbageInputValidator023
-- garbage_validate_023
-- garbage_sanitize_023
+- GARBAGE_RUST_023_VALIDATOR_C
+- formatter.rs
+- mod.rs
+- validator.rs

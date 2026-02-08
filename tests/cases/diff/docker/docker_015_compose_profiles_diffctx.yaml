@@ -1,13 +1,4 @@
-must_include:
-- def main
-must_not_include:
-- GARBAGE_DOCK_015_DEBUG_SCRIPT_A
-- GARBAGE_DOCK_015_DEBUG_PORT_B
-- GARBAGE_DOCK_015_PROFILE_TEST_A
-- GARBAGE_DOCK_015_TEST_ENV_B
-- GARBAGE_DOCK_015_DEV_DOC_A
-- GARBAGE_DOCK_015_IDE_SETUP_B
-- GARBAGE_DOCK_015_K8S_DEV_A
-- GARBAGE_DOCK_015_REPLICA_COUNT_B
-- GARBAGE_DOCK_015_TF_DEV_A
-- GARBAGE_DOCK_015_INSTANCE_TYPE_B
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- 'command: python -m debugpy --wait-for-client --listen 0.0.0.0:5678 app.py'

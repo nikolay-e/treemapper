@@ -1,16 +1,13 @@
-must_include:
-- priority
-- execute_all
-- find_plugin
-- Send + Sync
+must_include_files:
+- src/plugin.rs
+must_include_content:
+- 'pub trait Plugin: Send + Sync {'
+- self.plugins.sort_by_key(|p| std::cmp::Reverse(p.priority()));
 must_not_include:
-- GARBAGE_RUST_026_MIGRATOR_A
 - GARBAGE_RUST_026_MIGRATION_VER_B
-- GarbageSchemaMigrator026
-- garbage_migrate_up_026
-- garbage_migrate_down_026
+- GARBAGE_RUST_026_MIGRATOR_A
 - GARBAGE_RUST_026_SEEDER_C
 - GARBAGE_RUST_026_SEED_COUNT_D
-- GarbageDataSeeder026
-- garbage_seed_users_026
-- garbage_seed_products_026
+- migrator.rs
+- mod.rs
+- seeder.rs

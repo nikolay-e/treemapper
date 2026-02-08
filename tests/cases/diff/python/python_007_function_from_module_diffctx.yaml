@@ -1,20 +1,14 @@
-must_include:
-- def calculate_tax
-- TaxBracket
-- TaxRate
-- DEFAULT_TAX_RATES
+must_include_files:
+- services/billing.py
+must_include_content:
+- from utils.tax import calculate_tax, get_effective_rate, format_tax_summary
+- 'def __init__(self, apply_tax: bool = True):'
 must_not_include:
-- GARBAGE_MARKER_REPORT_001
-- UNRELATED_REPORT_FORMAT_002
-- GARBAGE_REPORT_CLASS_003
 - GARBAGE_CHART_MARKER_004
-- GARBAGE_MARKER_EMAIL_005
-- UNRELATED_SMTP_PORT_006
 - GARBAGE_EMAIL_CLASS_007
 - GARBAGE_FORMAT_EMAIL_008
-- ReportGenerator
-- ChartBuilder
-- EmailSender
-- format_email_address
-- garbage_reporting.py
+- GARBAGE_MARKER_EMAIL_005
+- GARBAGE_MARKER_REPORT_001
+- GARBAGE_REPORT_CLASS_003
 - garbage_email.py
+- garbage_reporting.py

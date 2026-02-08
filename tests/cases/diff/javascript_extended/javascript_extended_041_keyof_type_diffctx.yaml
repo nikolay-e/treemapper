@@ -1,14 +1,13 @@
-must_include:
-- getter.ts
-- AppConfig
-- ConfigKey
+must_include_files:
+- src/getter.ts
+must_include_content:
+- import { AppConfig, defaultConfig } from './config';
+- type ConfigKey = keyof AppConfig;
 must_not_include:
 - GARBAGE_JSX_041_FONT_CONFIG_A
+- GARBAGE_JSX_041_IS_MOBILE_F
 - GARBAGE_JSX_041_PRELOAD_FONTS_B
-- GARBAGE_JSX_041_FONT_OUTPUT_C
 - GARBAGE_JSX_041_VIEWPORT_CONFIG_D
 - GARBAGE_JSX_041_VIEWPORT_OBSERVER_E
-- GARBAGE_JSX_041_IS_MOBILE_F
-- GarbageFontLoader
 - fontLoader.ts
 - viewport.ts

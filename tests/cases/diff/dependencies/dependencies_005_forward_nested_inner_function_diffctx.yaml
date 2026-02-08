@@ -1,12 +1,7 @@
 must_include_files:
-  - outer.py
+- outer.py
 must_include_content:
-  - |
-    def inner
+- avg = inner(data)
 must_not_include:
-  - GARBAGE_DEP_005_AQUARIUM_A
-  - GARBAGE_DEP_005_TICKET_B
-  - Aquarium
-  - TicketQueue
-  - fish_population
-  - create_ticket
+- aquarium_sim_GARBAGE_DEP_005_AQUARIUM_A.py
+- ticket_system_GARBAGE_DEP_005_TICKET_B.py

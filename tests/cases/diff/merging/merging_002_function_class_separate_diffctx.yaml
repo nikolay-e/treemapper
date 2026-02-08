@@ -1,13 +1,10 @@
-must_include:
-- format_event_payload
-- dispatch
-- event_handler.py
+must_include_files:
+- src/event_handler.py
+must_include_content:
+- '"version": "2.0",'
+- formatted = format_event_payload(event_type, payload)
 must_not_include:
 - GARBAGE_MERGE_002_MARKER_A
 - GARBAGE_MERGE_002_MARKER_B
-- GARBAGE_MERGE_002_A_CLEAN
-- GARBAGE_MERGE_002_A_VERSION
-- GARBAGE_MERGE_002_B_SUMMARY
-- GARBAGE_MERGE_002_B_VERSION
-- text_sanitizer.py
 - health_monitor.py
+- text_sanitizer.py

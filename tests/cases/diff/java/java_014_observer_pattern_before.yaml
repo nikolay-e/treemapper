@@ -1,109 +1,18 @@
-src/main/java/com/stocktrading/model/StockPrice.java: |
-  package com.stocktrading.model;
-
-  import java.math.BigDecimal;
-  import java.time.Instant;
-
-  public class StockPrice {
-      private final String symbol;
-      private final BigDecimal price;
-      private final BigDecimal previousClose;
-      private final long volume;
-      private final Instant timestamp;
-
-      public StockPrice(String symbol, BigDecimal price, BigDecimal previousClose, long volume) {
-          this.symbol = symbol;
-          this.price = price;
-          this.previousClose = previousClose;
-          this.volume = volume;
-          this.timestamp = Instant.now();
-      }
-
-      public String getSymbol() { return symbol; }
-      public BigDecimal getPrice() { return price; }
-      public BigDecimal getPreviousClose() { return previousClose; }
-      public long getVolume() { return volume; }
-      public Instant getTimestamp() { return timestamp; }
-
-      public BigDecimal getChange() {
-          return price.subtract(previousClose);
-      }
-
-      public BigDecimal getChangePercent() {
-          if (previousClose.compareTo(BigDecimal.ZERO) == 0) {
-              return BigDecimal.ZERO;
-          }
-          return getChange().divide(previousClose, 4, java.math.RoundingMode.HALF_UP)
-              .multiply(new BigDecimal("100"));
-      }
-  }
-src/main/java/com/stocktrading/service/PriceUpdateService.java: |
-  package com.stocktrading.service;
-
-  import com.stocktrading.model.StockPrice;
-  import org.springframework.stereotype.Service;
-  import java.math.BigDecimal;
-  import java.util.HashMap;
-  import java.util.Map;
-
-  @Service
-  public class PriceUpdateService {
-      private final Map<String, StockPrice> currentPrices = new HashMap<>();
-
-      public void updatePrice(String symbol, BigDecimal price, BigDecimal previousClose, long volume) {
-          StockPrice stockPrice = new StockPrice(symbol, price, previousClose, volume);
-          currentPrices.put(symbol, stockPrice);
-          System.out.println("Price updated for " + symbol + ": " + price);
-      }
-
-      public StockPrice getPrice(String symbol) {
-          return currentPrices.get(symbol);
-      }
-
-      public Map<String, StockPrice> getAllPrices() {
-          return new HashMap<>(currentPrices);
-      }
-  }
-src/test/java/com/demo/math/TemperatureConverter.java: |
-  package com.demo.math;
-
-  public class TemperatureConverter {
-      public static final String GARBAGE_JAVA_REBAL_O024A = "temp_marker";
-      private static final String GARBAGE_JAVA_ALLOC_O024B = "celsius_marker";
-
-      public double celsiusToFahrenheit(double c) {
-          String GARBAGE_JAVA_CALC_O024C = "kelvin_marker";
-          return c * 1.8 + 32;
-      }
-
-      public double fahrenheitToCelsius(double f) {
-          return (f - 32) / 1.8;
-      }
-  }
-src/test/java/com/demo/shapes/CircleCalculator.java: |
-  package com.demo.shapes;
-
-  public class CircleCalculator {
-      public static final String GARBAGE_JAVA_HOURS_O024D = "circle_marker";
-      private static final String GARBAGE_JAVA_MARKET_O024E = "radius_marker";
-
-      public double calculateArea(double r) {
-          String GARBAGE_JAVA_DURATION_O024F = "area_marker";
-          return 3.14159 * r * r;
-      }
-  }
-src/test/java/com/demo/text/WordCounter.java: |
-  package com.demo.text;
-
-  public class WordCounter {
-      public static final String GARBAGE_JAVA_DIV_O024G = "word_marker";
-
-      public int countWords(String t) {
-          String GARBAGE_JAVA_RECORD_O024H = "count_marker";
-          return t == null ? 0 : t.split(" ").length;
-      }
-
-      public int countCharacters(String t) {
-          return t == null ? 0 : t.length();
-      }
-  }
+src/main/java/com/stocktrading/model/StockPrice.java: "package com.stocktrading.model;\n\nimport java.math.BigDecimal;\nimport java.time.Instant;\n\npublic class StockPrice {\n    private final String symbol;\n\
+  \    private final BigDecimal price;\n    private final BigDecimal previousClose;\n    private final long volume;\n    private final Instant timestamp;\n\n    public StockPrice(String symbol, BigDecimal\
+  \ price, BigDecimal previousClose, long volume) {\n        this.symbol = symbol;\n        this.price = price;\n        this.previousClose = previousClose;\n        this.volume = volume;\n        this.timestamp\
+  \ = Instant.now();\n    }\n\n    public String getSymbol() { return symbol; }\n    public BigDecimal getPrice() { return price; }\n    public BigDecimal getPreviousClose() { return previousClose; }\n\
+  \    public long getVolume() { return volume; }\n    public Instant getTimestamp() { return timestamp; }\n\n    public BigDecimal getChange() {\n        return price.subtract(previousClose);\n    }\n\n\
+  \    public BigDecimal getChangePercent() {\n        if (previousClose.compareTo(BigDecimal.ZERO) == 0) {\n            return BigDecimal.ZERO;\n        }\n        return getChange().divide(previousClose,\
+  \ 4, java.math.RoundingMode.HALF_UP)\n            .multiply(new BigDecimal(\"100\"));\n    }\n}\n"
+src/main/java/com/stocktrading/service/PriceUpdateService.java: "package com.stocktrading.service;\n\nimport com.stocktrading.model.StockPrice;\nimport org.springframework.stereotype.Service;\nimport java.math.BigDecimal;\n\
+  import java.util.HashMap;\nimport java.util.Map;\n\n@Service\npublic class PriceUpdateService {\n    private final Map<String, StockPrice> currentPrices = new HashMap<>();\n\n    public void updatePrice(String\
+  \ symbol, BigDecimal price, BigDecimal previousClose, long volume) {\n        StockPrice stockPrice = new StockPrice(symbol, price, previousClose, volume);\n        currentPrices.put(symbol, stockPrice);\n\
+  \        System.out.println(\"Price updated for \" + symbol + \": \" + price);\n    }\n\n    public StockPrice getPrice(String symbol) {\n        return currentPrices.get(symbol);\n    }\n\n    public\
+  \ Map<String, StockPrice> getAllPrices() {\n        return new HashMap<>(currentPrices);\n    }\n}\n"
+src/test/java/com/demo/math/TemperatureConverter.java: "package com.demo.math;\n\npublic class TemperatureConverter {\n\n    public double celsiusToFahrenheit(double c) {\n        return c * 1.8 + 32;\n\
+  \    }\n\n    public double fahrenheitToCelsius(double f) {\n        return (f - 32) / 1.8;\n    }\n}\n"
+src/test/java/com/demo/shapes/CircleCalculator.java: "package com.demo.shapes;\n\npublic class CircleCalculator {\n\n    public double calculateArea(double r) {\n        return 3.14159 * r * r;\n    }\n\
+  }\n"
+src/test/java/com/demo/text/WordCounter.java: "package com.demo.text;\n\npublic class WordCounter {\n\n    public int countWords(String t) {\n        return t == null ? 0 : t.split(\" \").length;\n    }\n\
+  \n    public int countCharacters(String t) {\n        return t == null ? 0 : t.length();\n    }\n}\n"

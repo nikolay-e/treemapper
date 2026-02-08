@@ -1,100 +1,20 @@
-src/middleware/types.ts: |
-  import { Request, Response, NextFunction } from 'express';
+src/middleware/types.ts: "import { Request, Response, NextFunction } from 'express';\n\nexport interface AuthenticatedRequest extends Request {\n  user?: AuthUser;\n  requestId: string;\n}\n\nexport interface\
+  \ AuthUser {\n  id: string;\n  email: string;\n  role: 'admin' | 'user';\n}\n\nexport type MiddlewareFunction = (\n  req: AuthenticatedRequest,\n  res: Response,\n  next: NextFunction\n) => void | Promise<void>;\n\
+  \nexport interface RateLimitConfig {\n  windowMs: number;\n  maxRequests: number;\n  message?: string;\n}\n"
+src/middleware/rateLimit.ts: "import { Response, NextFunction } from 'express';\nimport { AuthenticatedRequest, MiddlewareFunction, RateLimitConfig } from './types';\n\ninterface RateLimitEntry {\n  count:\
+  \ number;\n  resetAt: number;\n}\n\nexport class RateLimiter {\n  private store = new Map<string, RateLimitEntry>();\n\n  constructor(private config: RateLimitConfig) {\n    setInterval(() => this.cleanup(),\
+  \ config.windowMs);\n  }\n\n  private getKey(req: AuthenticatedRequest): string {\n    return req.user ? `user:${req.user.id}` : `ip:${req.ip}`;\n  }\n\n  check(req: AuthenticatedRequest): { allowed:\
+  \ boolean; remaining: number } {\n    const key = this.getKey(req);\n    const now = Date.now();\n\n    let entry = this.store.get(key);\n    if (!entry || now > entry.resetAt) {\n      entry = { count:\
+  \ 0, resetAt: now + this.config.windowMs };\n    }\n\n    entry.count++;\n    this.store.set(key, entry);\n\n    const remaining = Math.max(0, this.config.maxRequests - entry.count);\n    return { allowed:\
+  \ entry.count <= this.config.maxRequests, remaining };\n  }\n\n  private cleanup(): void {\n    const now = Date.now();\n    for (const [key, entry] of this.store.entries()) {\n      if (now > entry.resetAt)\
+  \ {\n        this.store.delete(key);\n      }\n    }\n  }\n}\n\nexport function createRateLimitMiddleware(config: RateLimitConfig): MiddlewareFunction {\n  const limiter = new RateLimiter(config);\n\n\
+  \  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {\n    const result = limiter.check(req);\n\n    res.setHeader('X-RateLimit-Limit', config.maxRequests.toString());\n    res.setHeader('X-RateLimit-Remaining',\
+  \ result.remaining.toString());\n\n    if (!result.allowed) {\n      return res.status(429).json({\n        error: config.message || 'Too many requests',\n      });\n    }\n\n    next();\n  };\n}\n"
+vendor/upload-handler/index.ts: '
 
-  export interface AuthenticatedRequest extends Request {
-    user?: AuthUser;
-    requestId: string;
   }
 
-  export interface AuthUser {
-    id: string;
-    email: string;
-    role: 'admin' | 'user';
-  }
+  '
+docs/compression/overview.md: '# Compression Guide
 
-  export type MiddlewareFunction = (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => void | Promise<void>;
-
-  export interface RateLimitConfig {
-    windowMs: number;
-    maxRequests: number;
-    message?: string;
-  }
-src/middleware/rateLimit.ts: |
-  import { Response, NextFunction } from 'express';
-  import { AuthenticatedRequest, MiddlewareFunction, RateLimitConfig } from './types';
-
-  interface RateLimitEntry {
-    count: number;
-    resetAt: number;
-  }
-
-  export class RateLimiter {
-    private store = new Map<string, RateLimitEntry>();
-
-    constructor(private config: RateLimitConfig) {
-      setInterval(() => this.cleanup(), config.windowMs);
-    }
-
-    private getKey(req: AuthenticatedRequest): string {
-      return req.user ? `user:${req.user.id}` : `ip:${req.ip}`;
-    }
-
-    check(req: AuthenticatedRequest): { allowed: boolean; remaining: number } {
-      const key = this.getKey(req);
-      const now = Date.now();
-
-      let entry = this.store.get(key);
-      if (!entry || now > entry.resetAt) {
-        entry = { count: 0, resetAt: now + this.config.windowMs };
-      }
-
-      entry.count++;
-      this.store.set(key, entry);
-
-      const remaining = Math.max(0, this.config.maxRequests - entry.count);
-      return { allowed: entry.count <= this.config.maxRequests, remaining };
-    }
-
-    private cleanup(): void {
-      const now = Date.now();
-      for (const [key, entry] of this.store.entries()) {
-        if (now > entry.resetAt) {
-          this.store.delete(key);
-        }
-      }
-    }
-  }
-
-  export function createRateLimitMiddleware(config: RateLimitConfig): MiddlewareFunction {
-    const limiter = new RateLimiter(config);
-
-    return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-      const result = limiter.check(req);
-
-      res.setHeader('X-RateLimit-Limit', config.maxRequests.toString());
-      res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
-
-      if (!result.allowed) {
-        return res.status(429).json({
-          error: config.message || 'Too many requests',
-        });
-      }
-
-      next();
-    };
-  }
-vendor/upload-handler/index.ts: |
-  // GARBAGE_TS_007_UPLOAD_001 - third party upload handler
-  export const GARBAGE_TS_007_MAX_SIZE_002 = 10485760;
-
-  export function GARBAGE_TS_007_upload_003(file: unknown): void {
-    console.log('GARBAGE_TS_007_UPLOADING_004:', file);
-  }
-docs/compression/overview.md: |
-  # Compression Guide
-  GARBAGE_TS_007_COMPRESS_005 documentation
-  Configure GARBAGE_TS_007_HANDLER_006 for responses.
+  '

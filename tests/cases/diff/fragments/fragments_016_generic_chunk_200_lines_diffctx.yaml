@@ -1,7 +1,9 @@
-must_include:
+must_include_files:
 - large.tex
-- MODIFIED
+must_include_content:
+- MODIFIED line 25
 must_not_include:
+- GARBAGE_FRAG_texline10_060
 - GARBAGE_FRAG_texline1_060
 - GARBAGE_FRAG_texline2_060
 - GARBAGE_FRAG_texline3_060
@@ -11,11 +13,10 @@ must_not_include:
 - GARBAGE_FRAG_texline7_060
 - GARBAGE_FRAG_texline8_060
 - GARBAGE_FRAG_texline9_060
-- GARBAGE_FRAG_texline10_060
 - GARBAGE_FRAG_txtline1_060
 - GARBAGE_FRAG_txtline2_060
 - GARBAGE_FRAG_txtline3_060
 - GARBAGE_FRAG_txtline4_060
 - GARBAGE_FRAG_txtline5_060
-- garbage_large_060.tex
 - garbage_060.txt
+- garbage_large_060.tex

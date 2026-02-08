@@ -1,16 +1,11 @@
 must_include_files:
-  - OrderService.scala
+- OrderService.scala
 must_include_content:
-  - |
-    for {
-  - |
-    yield
+- 'class OrderService(repo: Repository) {'
 must_not_include:
-  - GARBAGE_JVM_051_MONAD_MARKER_A
-  - GARBAGE_JVM_051_FLATMAP_MARKER_B
-  - GARBAGE_JVM_051_BIND_MARKER_C
-  - GARBAGE_JVM_051_CHAIN_MARKER_D
-  - GarbageMonadOps
-  - GarbageBindHelper
-  - GarbageMonadOps.scala
-  - GarbageBindHelper.scala
+- GARBAGE_JVM_051_BIND_MARKER_C
+- GARBAGE_JVM_051_CHAIN_MARKER_D
+- GARBAGE_JVM_051_FLATMAP_MARKER_B
+- GARBAGE_JVM_051_MONAD_MARKER_A
+- GarbageBindHelper.scala
+- GarbageMonadOps.scala

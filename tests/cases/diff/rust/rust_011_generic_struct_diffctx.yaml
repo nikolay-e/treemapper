@@ -1,27 +1,14 @@
-must_include:
-- Container<T>
-- into_inner
-- get
-- get_mut
-- map
-- replace
-- TypedContainer
-- PhantomData
+must_include_files:
+- src/container.rs
+must_include_content:
+- use std::marker::PhantomData;
+- pub fn get_mut(&mut self) -> &mut T {
 must_not_include:
+- GARBAGE_BLOCK_SIZE_003
+- GARBAGE_INDEX_FACTOR_013
+- GARBAGE_RUST_INDEX_012
 - GARBAGE_RUST_STORAGE_001
 - GARBAGE_STORAGE_LIMIT_002
-- GARBAGE_BLOCK_SIZE_003
-- GarbageStorageEngine004
-- garbage_store_005
-- GARBAGE_STORAGE_FULL_006
-- garbage_retrieve_007
-- garbage_remove_008
-- GarbageStorable009
-- garbage_serialize_010
-- garbage_deserialize_011
-- GARBAGE_RUST_INDEX_012
-- GARBAGE_INDEX_FACTOR_013
-- GarbageIndex014
-- garbage_insert_015
-- garbage_search_016
-- garbage_range_017
+- indexing.rs
+- mod.rs
+- storage.rs

@@ -1,10 +1,8 @@
-must_include:
-- '@dataclass'
-- class User
-- class Address
-- class Preferences
-- AccountStatus
-- PENDING_VERIFICATION
+must_include_files:
+- models.py
+must_include_content:
+- PENDING_VERIFICATION = "pending_verification"
+- 'def format_multi_line(self) -> str:'
 must_not_include:
 - GARBAGE_PYTHON_033_001
 - GARBAGE_PYTHON_033_002
@@ -15,9 +13,6 @@ must_not_include:
 - GARBAGE_PYTHON_033_007
 - GARBAGE_PYTHON_033_008
 - GARBAGE_PYTHON_033_009
-- PaymentGateway
-- EmailSender
-- FileStorage
-- payment_gateway.py
 - email_service.py
 - file_storage.py
+- payment_gateway.py

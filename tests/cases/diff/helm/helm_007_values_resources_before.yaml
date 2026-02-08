@@ -1,64 +1,20 @@
-chart/Chart.yaml: |
-  apiVersion: v2
+chart/Chart.yaml: 'apiVersion: v2
+
   name: cache-proxy
+
   version: 1.0.0
-chart/values.yaml: |
-  replicaCount: 1
-  image:
-    repository: cache-proxy
-    tag: "1.0.0"
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-chart/templates/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: {{ .Release.Name }}-{{ .Chart.Name }}
-  spec:
-    replicas: {{ .Values.replicaCount }}
-    selector:
-      matchLabels:
-        app.kubernetes.io/name: {{ .Chart.Name }}
-    template:
-      metadata:
-        labels:
-          app.kubernetes.io/name: {{ .Chart.Name }}
-      spec:
-        containers:
-          - name: {{ .Chart.Name }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            resources:
-              {{- toYaml .Values.resources | nindent 14 }}
-            ports:
-              - name: http
-                containerPort: 6379
-chart/templates/service.yaml: |
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: {{ .Release.Name }}-{{ .Chart.Name }}
-  spec:
-    type: ClusterIP
-    ports:
-      - port: 6379
-        targetPort: 6379
-    selector:
-      app.kubernetes.io/name: {{ .Chart.Name }}
-chart/templates/metrics-exporter.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: GARBAGE_HELM_007_EXPORTER_NAME_A
-  spec:
-    template:
-      spec:
-        containers:
-          - name: GARBAGE_HELM_007_EXPORTER_CONTAINER_B
-            image: GARBAGE_HELM_007_EXPORTER_IMAGE_C
-chart/docs/capacity-plan.md: |
-  # Capacity Planning
-  GARBAGE_HELM_007_CAPACITY_DOC_D
+
+  '
+chart/values.yaml: "replicaCount: 1\nimage:\n  repository: cache-proxy\n  tag: \"1.0.0\"\nresources:\n  limits:\n    cpu: 100m\n    memory: 128Mi\n"
+chart/templates/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}-{{ .Chart.Name }}\nspec:\n  replicas: {{ .Values.replicaCount }}\n  selector:\n    matchLabels:\n\
+  \      app.kubernetes.io/name: {{ .Chart.Name }}\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: {{ .Chart.Name }}\n    spec:\n      containers:\n        - name: {{ .Chart.Name\
+  \ }}\n          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n          resources:\n            {{- toYaml .Values.resources | nindent 14 }}\n          ports:\n            - name:\
+  \ http\n              containerPort: 6379\n"
+chart/templates/service.yaml: "apiVersion: v1\nkind: Service\nmetadata:\n  name: {{ .Release.Name }}-{{ .Chart.Name }}\nspec:\n  type: ClusterIP\n  ports:\n    - port: 6379\n      targetPort: 6379\n  selector:\n\
+  \    app.kubernetes.io/name: {{ .Chart.Name }}\n"
+chart/templates/metrics-exporter.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\nspec:\n  template:\n    spec:\n      containers:\n"
+chart/docs/capacity-plan.md: '# Capacity Planning
+
   ## Resource Estimates
-  GARBAGE_HELM_007_RESOURCE_ESTIMATE_E
+
+  '

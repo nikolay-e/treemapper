@@ -1,3 +1,4 @@
-must_include:
-- compute_arabic
-- arabic_greeting
+must_include_files:
+- mixed_unicode.py
+must_include_content:
+- 'def compute_arabic():'

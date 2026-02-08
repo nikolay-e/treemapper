@@ -1,24 +1,5 @@
-must_include:
-- func
-- return
+must_include_files:
+- small.py
 must_not_include:
-- GARBAGE_FRAG_unrelatedbefore091
-- GARBAGE_FRAG_classa091
-- GARBAGE_FRAG_methoda091
-- GARBAGE_FRAG_unrelatedmiddle091
-- GARBAGE_FRAG_classb091
-- GARBAGE_FRAG_methodb1_091
-- GARBAGE_FRAG_methodb2_091
-- GARBAGE_FRAG_unrelatedafter091
-- GARBAGE_FRAG_trailingconst091
-- GARBAGE_FRAG_garbfunc091
-- GARBAGE_FRAG_garbsmall091
-- GARBAGE_FRAG_garbmethod091
-- GARBAGE_FRAG_garbconst091
+- GARBAGE_CONST
 - garbage_small_091.py
-- unrelated_before_091
-- unrelated_middle_091
-- unrelated_after_091
-- UnrelatedClassA
-- UnrelatedClassB
-- GarbageSmall091

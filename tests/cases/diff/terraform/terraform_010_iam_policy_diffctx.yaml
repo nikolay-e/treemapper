@@ -1,15 +1,9 @@
-must_include:
-- aws_iam_role
-- aws_iam_policy
-- aws_iam_role_policy_attachment
-- aws_iam_policy_document
-- inline_policy
-- managed_policy_arns
+must_include_files:
+- infrastructure/iam.tf
+must_include_content:
+- '"arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",'
 must_not_include:
 - GARBAGE_TF_COGNITO_450_001
-- GARBAGE_USER_POOL_450_002
-- GARBAGE_ATTR_450_003
-- GARBAGE_CLIENT_450_004
 - GARBAGE_TF_ORG_450_005
-- GARBAGE_SCP_450_006
-- GARBAGE_ACTION_450_007
+- cognito.tf
+- organizations.tf

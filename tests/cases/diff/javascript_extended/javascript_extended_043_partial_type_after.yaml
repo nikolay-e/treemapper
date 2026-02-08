@@ -1,16 +1,2 @@
-config.ts: |
-  export interface FullConfig {
-      host: string;
-      port: number;
-      ssl: boolean;
-      timeout: number;
-  }
-
-  // ts_ext_garbage_marker_005
-  const GARBAGE_CONFIG = { garbage: true };
-updater.ts: |
-  import { FullConfig } from './config';
-
-  function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {
-      return { ...current, ...updates };
-  }
+config.ts: "export interface FullConfig {\n    host: string;\n    port: number;\n    ssl: boolean;\n    timeout: number;\n}\n\n// ts_ext_garbage_marker_005\n"
+updater.ts: "import { FullConfig } from './config';\n\nfunction updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {\n    return { ...current, ...updates };\n}\n"

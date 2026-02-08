@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - schemas.ts
-must_not_include:
-- js_garbage_marker_008
+must_include_content:
+- UserSchema = z.object({
+- type User = z.infer<typeof UserSchema>;

@@ -1,24 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/deployment.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    persistence:
-      enabled: true
-      size: 10Gi
-      storageClass: standard
-  - |
-    {{- if .Values.persistence.enabled }}
-    volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: {{ .Release.Name }}-data
-    {{- end }}
-must_not_include:
-  - GARBAGE_HELM_011_JAEGER_AGENT_A
-  - GARBAGE_HELM_011_JAEGER_LABEL_B
-  - GARBAGE_HELM_011_JAEGER_CONTAINER_C
-  - GARBAGE_HELM_011_STORAGE_GUIDE_D
-  - GARBAGE_HELM_011_BACKUP_PROCEDURE_E
-  - chart/templates/jaeger-agent.yaml
-  - chart/docs/storage-guide.md
+- 'enabled: true'

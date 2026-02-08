@@ -1,2 +1,4 @@
-must_include:
-- aws_instance
+must_include_files:
+- variables.tf
+must_include_content:
+- default = "prod"

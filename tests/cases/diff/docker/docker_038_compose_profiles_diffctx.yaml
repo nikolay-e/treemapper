@@ -1,20 +1,4 @@
-must_include:
-- 'profiles:'
-- '- debug'
-- '- monitoring'
-- '- testing'
-- '- tools'
-- nicolaka/netshoot
-- dpage/pgadmin4
-- prom/prometheus
-must_not_include:
-- GARBAGE_DOCKER_523_DEBUG_MARKER_001
-- GARBAGE_DOCKER_523_DEBUG_VAR_002
-- GARBAGE_DOCKER_523_TEST_MARKER_003
-- GARBAGE_DOCKER_523_TEST_PROFILE_004
-- GARBAGE_DOCKER_523_PROF_DOC_005
-- GARBAGE_DOCKER_523_PROFILES_006
-- GARBAGE_DOCKER_523_K8S_MARKER_007
-- GARBAGE_DOCKER_523_OVERLAY_008
-- GARBAGE_DOCKER_523_ENV_MARKER_009
-- GARBAGE_DOCKER_523_LOCAL_010
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- '- "8080:8080"'

@@ -1,5 +1,4 @@
-must_include:
+must_include_files:
 - UserProfile.tsx
-- useApi
-must_not_include:
-- react_garbage_marker_006
+must_include_content:
+- 'function UserProfile({ userId }: { userId: string }) {'

@@ -1,68 +1,11 @@
-user.model.ts: |
-  export interface User {
-      id: string;
-      name: string;
-      email: string;
-      avatar?: string;
-      role: 'admin' | 'user' | 'guest';
-  }
-
-  export interface UserDisplayOptions {
-      showAvatar: boolean;
-      showRole: boolean;
-      compact: boolean;
-  }
-
-  // angular_garbage_marker_001
-  const GARBAGE_USER_CONFIG = { maxUsers: 100 };
-user-card.component.ts: |
-  import { Component, Input } from '@angular/core';
-  import { User, UserDisplayOptions } from './user.model';
-
-  @Component({
-      selector: 'app-user-card',
-      template: \`
-          <div class="user-card" [class.compact]="options?.compact">
-              <img *ngIf="options?.showAvatar && user?.avatar"
-                   [src]="user.avatar"
-                   [alt]="user.name" />
-              <div class="info">
-                  <h3>{{ user?.name }}</h3>
-                  <p>{{ user?.email }}</p>
-                  <span *ngIf="options?.showRole" class="role">{{ user?.role }}</span>
-              </div>
-          </div>
-      \`,
-  })
-  export class UserCardComponent {
-      @Input() user: User | null = null;
-      @Input() options: UserDisplayOptions = {
-          showAvatar: true,
-          showRole: true,
-          compact: false,
-      };
-  }
-user-list.component.ts: |
-  import { Component } from '@angular/core';
-  import { User, UserDisplayOptions } from './user.model';
-
-  @Component({
-      selector: 'app-user-list',
-      template: \`
-          <div class="user-list">
-              <app-user-card
-                  *ngFor="let user of users"
-                  [user]="user"
-                  [options]="displayOptions">
-              </app-user-card>
-          </div>
-      \`,
-  })
-  export class UserListComponent {
-      users: User[] = [];
-      displayOptions: UserDisplayOptions = {
-          showAvatar: true,
-          showRole: false,
-          compact: true,
-      };
-  }
+user.model.ts: "export interface User {\n    id: string;\n    name: string;\n    email: string;\n    avatar?: string;\n    role: 'admin' | 'user' | 'guest';\n}\n\nexport interface UserDisplayOptions {\n\
+  \    showAvatar: boolean;\n    showRole: boolean;\n    compact: boolean;\n}\n\n// angular_garbage_marker_001\n"
+user-card.component.ts: "import { Component, Input } from '@angular/core';\nimport { User, UserDisplayOptions } from './user.model';\n\n@Component({\n    selector: 'app-user-card',\n    template: \\`\n\
+  \        <div class=\"user-card\" [class.compact]=\"options?.compact\">\n            <img *ngIf=\"options?.showAvatar && user?.avatar\"\n                 [src]=\"user.avatar\"\n                 [alt]=\"\
+  user.name\" />\n            <div class=\"info\">\n                <h3>{{ user?.name }}</h3>\n                <p>{{ user?.email }}</p>\n                <span *ngIf=\"options?.showRole\" class=\"role\"\
+  >{{ user?.role }}</span>\n            </div>\n        </div>\n    \\`,\n})\nexport class UserCardComponent {\n    @Input() user: User | null = null;\n    @Input() options: UserDisplayOptions = {\n   \
+  \     showAvatar: true,\n        showRole: true,\n        compact: false,\n    };\n}\n"
+user-list.component.ts: "import { Component } from '@angular/core';\nimport { User, UserDisplayOptions } from './user.model';\n\n@Component({\n    selector: 'app-user-list',\n    template: \\`\n       \
+  \ <div class=\"user-list\">\n            <app-user-card\n                *ngFor=\"let user of users\"\n                [user]=\"user\"\n                [options]=\"displayOptions\">\n            </app-user-card>\n\
+  \        </div>\n    \\`,\n})\nexport class UserListComponent {\n    users: User[] = [];\n    displayOptions: UserDisplayOptions = {\n        showAvatar: true,\n        showRole: false,\n        compact:\
+  \ true,\n    };\n}\n"

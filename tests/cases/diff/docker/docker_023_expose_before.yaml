@@ -1,53 +1,36 @@
-src/app.py: |
-  from flask import Flask, jsonify
-  from prometheus_client import make_wsgi_app
-  from werkzeug.middleware.dispatcher import DispatcherMiddleware
+src/app.py: "from flask import Flask, jsonify\nfrom prometheus_client import make_wsgi_app\nfrom werkzeug.middleware.dispatcher import DispatcherMiddleware\n\napp = Flask(__name__)\n\n@app.route('/health')\n\
+  def health():\n    return jsonify(status='ok')\n\n@app.route('/ready')\ndef ready():\n    return jsonify(status='ready')\n\napp.wsgi_app = DispatcherMiddleware(app.wsgi_app, {\n    '/metrics': make_wsgi_app()\n\
+  })\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=8080)\n"
+requirements.txt: 'flask==2.3.0
 
-  app = Flask(__name__)
-
-  @app.route('/health')
-  def health():
-      return jsonify(status='ok')
-
-  @app.route('/ready')
-  def ready():
-      return jsonify(status='ready')
-
-  app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
-      '/metrics': make_wsgi_app()
-  })
-
-  if __name__ == '__main__':
-      app.run(host='0.0.0.0', port=8080)
-requirements.txt: |
-  flask==2.3.0
   gunicorn==21.2.0
+
   prometheus-client==0.19.0
-Dockerfile: |
-  FROM python:3.11-slim
+
+  '
+Dockerfile: 'FROM python:3.11-slim
+
   WORKDIR /app
+
   COPY requirements.txt .
+
   RUN pip install -r requirements.txt
+
   COPY src/ ./src/
+
   CMD ["python", "src/app.py"]
-scripts/health_check.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_508_HEALTH_MARKER_001
-  GARBAGE_DOCKER_508_HEALTH_VAR_002="check"
+
+  '
+scripts/health_check.sh: '#!/bin/bash
+
   curl http://localhost:8080/health
-tests/test_endpoints.py: |
-  # GARBAGE_DOCKER_508_TEST_MARKER_003
-  GARBAGE_DOCKER_508_TEST_CONFIG_004 = {"port": 8080}
-  def test_health():
-      pass
-docs/networking.md: |
-  # Networking
-  GARBAGE_DOCKER_508_NET_DOC_005
-  GARBAGE_DOCKER_508_PORTS_006="8080,9090"
-k8s/service.yaml: |
-  # GARBAGE_DOCKER_508_K8S_MARKER_007
-  apiVersion: v1
-  GARBAGE_DOCKER_508_K8S_SVC_008: Service
-monitoring/alerts.yaml: |
-  # GARBAGE_DOCKER_508_ALERT_MARKER_009
-  GARBAGE_DOCKER_508_ALERT_CONFIG_010: critical
+
+  '
+tests/test_endpoints.py: "def test_health():\n    pass\n"
+docs/networking.md: '# Networking
+
+  '
+k8s/service.yaml: 'apiVersion: v1
+
+  '
+monitoring/alerts.yaml: ''

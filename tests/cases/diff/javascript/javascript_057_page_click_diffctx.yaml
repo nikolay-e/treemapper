@@ -1,21 +1,14 @@
 must_include_files:
 - login.spec.ts
 must_include_content:
-- 'import { test, expect } from ''@playwright/test'';
-
-  import { getLoginUrl, getCredentials } from ''./login'';
-
-
-  '
-- "\n    await page.goto(getLoginUrl());\n    const { username, password } = getCredentials();\n    await page.fill('[name=username]', username);\n    await page.fill('[name=password]', password);\n"
+- import { test, expect } from '@playwright/test';
+- async ({ page }) => {
 must_not_include:
-- GARBAGE_JS_057_PROFILE_MARKER_A
-- GARBAGE_JS_057_TRACE_MARKER_B
 - GARBAGE_JS_057_PROFILE_CLASS_C
-- GARBAGE_JS_057_QUEUE_MARKER_D
-- GARBAGE_JS_057_WORKER_MARKER_E
+- GARBAGE_JS_057_PROFILE_MARKER_A
 - GARBAGE_JS_057_QUEUE_CLASS_F
-- PerformanceProfiler
-- WorkerQueueManager
+- GARBAGE_JS_057_QUEUE_MARKER_D
+- GARBAGE_JS_057_TRACE_MARKER_B
+- GARBAGE_JS_057_WORKER_MARKER_E
 - garbage_profiling.ts
 - garbage_queue.ts

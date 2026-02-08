@@ -1,145 +1,21 @@
-k8s/base/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: secure-api
-    namespace: production
-    labels:
-      app: secure-api
-      tier: backend
-  spec:
-    replicas: 3
-    selector:
-      matchLabels:
-        app: secure-api
-    template:
-      metadata:
-        labels:
-          app: secure-api
-          tier: backend
-      spec:
-        containers:
-        - name: api
-          image: registry.example.com/secure-api:v2.1.0
-          ports:
-          - containerPort: 8080
-            name: http
-          env:
-          - name: TLS_ENABLED
-            value: "true"
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "500m"
-            limits:
-              memory: "1Gi"
-              cpu: "1000m"
-k8s/base/service.yaml: |
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: secure-api
-    namespace: production
-  spec:
-    selector:
-      app: secure-api
-    ports:
-    - name: http
-      port: 80
-      targetPort: 8080
-k8s/base/certificate.yaml: |
-  apiVersion: cert-manager.io/v1
-  kind: Certificate
-  metadata:
-    name: api-tls
-    namespace: production
-  spec:
-    secretName: tls-cert
-    issuerRef:
-      name: letsencrypt-prod
-      kind: ClusterIssuer
-    dnsNames:
-    - api.example.com
-    - api-backup.example.com
-k8s/base/ingress.yaml: |
-  apiVersion: networking.k8s.io/v1
-  kind: Ingress
-  metadata:
-    name: api-ingress
-    namespace: production
-    annotations:
-      kubernetes.io/ingress.class: nginx
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/ssl-redirect: "true"
-      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-  spec:
-    tls:
-    - hosts:
-      - api.example.com
-      - api-backup.example.com
-      secretName: tls-cert
-    rules:
-    - host: api.example.com
-      http:
-        paths:
-        - path: /
-          pathType: Prefix
-          backend:
-            service:
-              name: secure-api
-              port:
-                number: 80
-    - host: api-backup.example.com
-      http:
-        paths:
-        - path: /
-          pathType: Prefix
-          backend:
-            service:
-              name: secure-api
-              port:
-                number: 80
-k8s/unrelated/vault/vault-injector.yaml: |
-  # GARBAGE_K8S_427_VAULT_INJECTOR
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: GARBAGE_K8S_427_VAULT_AGENT
-    namespace: vault
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
-        app: GARBAGE_K8S_427_VAULT_LABEL
-    template:
-      spec:
-        containers:
-        - name: vault-agent
-          image: hashicorp/vault:GARBAGE_K8S_427_VAULT_VERSION
-          env:
-          - name: VAULT_ADDR
-            value: GARBAGE_K8S_427_VAULT_ADDR
-k8s/unrelated/backup/velero-schedule.yaml: |
-  # GARBAGE_K8S_427_VELERO_BACKUP
-  apiVersion: velero.io/v1
-  kind: Schedule
-  metadata:
-    name: GARBAGE_K8S_427_BACKUP_SCHEDULE
-    namespace: velero
-  spec:
-    schedule: GARBAGE_K8S_427_CRON_EXPR
-    template:
-      includedNamespaces:
-      - GARBAGE_K8S_427_BACKUP_NS
-      storageLocation: GARBAGE_K8S_427_STORAGE_LOC
-k8s/unrelated/cost/kubecost.yaml: |
-  # GARBAGE_K8S_427_KUBECOST_CONFIG
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: GARBAGE_K8S_427_KUBECOST_CM
-    namespace: kubecost
-  data:
-    prometheus-url: GARBAGE_K8S_427_PROM_URL
-    cluster-id: GARBAGE_K8S_427_CLUSTER_ID
-Makefile: "# GARBAGE_K8S_427_MAKEFILE\ndeploy:\n\tkubectl apply -f k8s/base/\n\techo \"GARBAGE_K8S_427_MAKE_DEPLOY\"\n"
+k8s/base/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: secure-api\n  namespace: production\n  labels:\n    app: secure-api\n    tier: backend\nspec:\n  replicas: 3\n  selector:\n\
+  \    matchLabels:\n      app: secure-api\n  template:\n    metadata:\n      labels:\n        app: secure-api\n        tier: backend\n    spec:\n      containers:\n      - name: api\n        image: registry.example.com/secure-api:v2.1.0\n\
+  \        ports:\n        - containerPort: 8080\n          name: http\n        env:\n        - name: TLS_ENABLED\n          value: \"true\"\n        resources:\n          requests:\n            memory:\
+  \ \"512Mi\"\n            cpu: \"500m\"\n          limits:\n            memory: \"1Gi\"\n            cpu: \"1000m\"\n"
+k8s/base/service.yaml: "apiVersion: v1\nkind: Service\nmetadata:\n  name: secure-api\n  namespace: production\nspec:\n  selector:\n    app: secure-api\n  ports:\n  - name: http\n    port: 80\n    targetPort:\
+  \ 8080\n"
+k8s/base/certificate.yaml: "apiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: api-tls\n  namespace: production\nspec:\n  secretName: tls-cert\n  issuerRef:\n    name: letsencrypt-prod\n\
+  \    kind: ClusterIssuer\n  dnsNames:\n  - api.example.com\n  - api-backup.example.com\n"
+k8s/base/ingress.yaml: "apiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: api-ingress\n  namespace: production\n  annotations:\n    kubernetes.io/ingress.class: nginx\n    cert-manager.io/cluster-issuer:\
+  \ letsencrypt-prod\n    nginx.ingress.kubernetes.io/ssl-redirect: \"true\"\n    nginx.ingress.kubernetes.io/force-ssl-redirect: \"true\"\nspec:\n  tls:\n  - hosts:\n    - api.example.com\n    - api-backup.example.com\n\
+  \    secretName: tls-cert\n  rules:\n  - host: api.example.com\n    http:\n      paths:\n      - path: /\n        pathType: Prefix\n        backend:\n          service:\n            name: secure-api\n\
+  \            port:\n              number: 80\n  - host: api-backup.example.com\n    http:\n      paths:\n      - path: /\n        pathType: Prefix\n        backend:\n          service:\n            name:\
+  \ secure-api\n            port:\n              number: 80\n"
+k8s/unrelated/vault/vault-injector.yaml: "# GARBAGE_K8S_427_VAULT_INJECTOR\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: GARBAGE_K8S_427_VAULT_AGENT\n  namespace: vault\nspec:\n  replicas:\
+  \ 2\n  selector:\n    matchLabels:\n      app: GARBAGE_K8S_427_VAULT_LABEL\n  template:\n    spec:\n      containers:\n      - name: vault-agent\n        image: hashicorp/vault:GARBAGE_K8S_427_VAULT_VERSION\n\
+  \        env:\n        - name: VAULT_ADDR\n          value: GARBAGE_K8S_427_VAULT_ADDR\n"
+k8s/unrelated/backup/velero-schedule.yaml: "# GARBAGE_K8S_427_VELERO_BACKUP\napiVersion: velero.io/v1\nkind: Schedule\nmetadata:\n  name: GARBAGE_K8S_427_BACKUP_SCHEDULE\n  namespace: velero\nspec:\n  schedule:\
+  \ GARBAGE_K8S_427_CRON_EXPR\n  template:\n    includedNamespaces:\n    - GARBAGE_K8S_427_BACKUP_NS\n    storageLocation: GARBAGE_K8S_427_STORAGE_LOC\n"
+k8s/unrelated/cost/kubecost.yaml: "# GARBAGE_K8S_427_KUBECOST_CONFIG\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: GARBAGE_K8S_427_KUBECOST_CM\n  namespace: kubecost\ndata:\n  prometheus-url: GARBAGE_K8S_427_PROM_URL\n\
+  \  cluster-id: GARBAGE_K8S_427_CLUSTER_ID\n"
+Makefile: "deploy:\n\tkubectl apply -f k8s/base/\n"

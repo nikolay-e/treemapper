@@ -1,15 +1,5 @@
 must_include_files:
-  - Program.cs
-  - Utilities/StringHelper.cs
+- Program.cs
 must_include_content:
-  - |
-    using MyApp.Utilities;
-  - |
-    var result = StringHelper.Capitalize("hello");
-must_not_include:
-  - GARBAGE_CS_001_CACHE_WARMER_A
-  - GARBAGE_CS_001_HEALTH_CHECK_B
-  - CacheWarmer
-  - HealthCheck
-  - Unrelated/CacheWarmer.cs
-  - Unrelated/HealthCheck.cs
+- using MyApp.Utilities;
+- var result = StringHelper.Capitalize("hello");

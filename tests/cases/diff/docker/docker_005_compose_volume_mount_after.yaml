@@ -1,131 +1,47 @@
-src/storage.py: |
-  import os
-  import json
-  from pathlib import Path
-  from typing import Any, Optional
+src/storage.py: "import os\nimport json\nfrom pathlib import Path\nfrom typing import Any, Optional\n\nDATA_PATH = Path(os.getenv(\"DATA_PATH\", \"/app/data\"))\nCONFIG_PATH = Path(os.getenv(\"CONFIG_PATH\"\
+  , \"/app/config\"))\nLOGS_PATH = Path(os.getenv(\"LOGS_PATH\", \"/app/logs\"))\n\ndef ensure_directories():\n    DATA_PATH.mkdir(parents=True, exist_ok=True)\n    LOGS_PATH.mkdir(parents=True, exist_ok=True)\n\
+  \ndef save_data(filename: str, content: dict) -> None:\n    filepath = DATA_PATH / filename\n    with open(filepath, \"w\") as f:\n        json.dump(content, f, indent=2)\n\ndef load_config(config_name:\
+  \ str) -> Optional[dict]:\n    config_file = CONFIG_PATH / f\"{config_name}.json\"\n    if not config_file.exists():\n        return None\n    with open(config_file) as f:\n        return json.load(f)\n\
+  \ndef write_log(message: str) -> None:\n    log_file = LOGS_PATH / \"app.log\"\n    with open(log_file, \"a\") as f:\n        f.write(f\"{message}\\n\")\n"
+src/app.py: "from storage import ensure_directories, load_config, write_log\n\ndef main():\n    ensure_directories()\n    config = load_config(\"app\")\n    write_log(\"Application started\")\n\nif __name__\
+  \ == \"__main__\":\n    main()\n"
+requirements.txt: 'pyyaml==6.0.0
 
-  DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
-  CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/app/config"))
-  LOGS_PATH = Path(os.getenv("LOGS_PATH", "/app/logs"))
+  '
+Dockerfile: 'FROM python:3.12-slim
 
-  def ensure_directories():
-      DATA_PATH.mkdir(parents=True, exist_ok=True)
-      LOGS_PATH.mkdir(parents=True, exist_ok=True)
-
-  def save_data(filename: str, content: dict) -> None:
-      filepath = DATA_PATH / filename
-      with open(filepath, "w") as f:
-          json.dump(content, f, indent=2)
-
-  def load_config(config_name: str) -> Optional[dict]:
-      config_file = CONFIG_PATH / f"{config_name}.json"
-      if not config_file.exists():
-          return None
-      with open(config_file) as f:
-          return json.load(f)
-
-  def write_log(message: str) -> None:
-      log_file = LOGS_PATH / "app.log"
-      with open(log_file, "a") as f:
-          f.write(f"{message}\n")
-src/app.py: |
-  from storage import ensure_directories, load_config, write_log
-
-  def main():
-      ensure_directories()
-      config = load_config("app")
-      write_log("Application started")
-
-  if __name__ == "__main__":
-      main()
-requirements.txt: |
-  pyyaml==6.0.0
-Dockerfile: |
-  FROM python:3.12-slim
   WORKDIR /app
+
   COPY requirements.txt .
+
   RUN pip install -r requirements.txt
+
   COPY src/ ./src/
+
   CMD ["python", "src/app.py"]
-docker-compose.yml: |
-  version: '3.8'
 
-  services:
-    app:
-      build:
-        context: .
-        dockerfile: Dockerfile
-      volumes:
-        # Persistent data - survives container recreation
-        - app_data:/app/data
+  '
+docker-compose.yml: "version: '3.8'\n\nservices:\n  app:\n    build:\n      context: .\n      dockerfile: Dockerfile\n    volumes:\n      # Persistent data - survives container recreation\n      - app_data:/app/data\n\
+  \n      # Read-only config from host\n      - ./config:/app/config:ro\n\n      # Named volume for logs with custom driver\n      - app_logs:/app/logs\n\n      # Temporary storage - cleared on restart\n\
+  \      - type: tmpfs\n        target: /app/tmp\n        tmpfs:\n          size: 100M\n          mode: 1777\n\n      # Bind mount for development hot-reload\n      - type: bind\n        source: ./src\n\
+  \        target: /app/src\n        read_only: false\n\n    environment:\n      - DATA_PATH=/app/data\n      - CONFIG_PATH=/app/config\n      - LOGS_PATH=/app/logs\n    restart: unless-stopped\n\n  backup:\n\
+  \    image: alpine:latest\n    volumes:\n      - app_data:/data:ro\n      - ./backups:/backups\n    command: sh -c \"tar -czf /backups/backup-$$(date +%Y%m%d).tar.gz /data\"\n    profiles:\n      - backup\n\
+  \nvolumes:\n  app_data:\n    driver: local\n    driver_opts:\n      type: none\n      o: bind\n      device: ${PWD}/persistent_data\n\n  app_logs:\n    driver: local\n    labels:\n      com.example.description:\
+  \ \"Application logs\"\n      com.example.retention: \"7d\"\n"
+scripts/backup.sh: '#!/bin/bash
 
-        # Read-only config from host
-        - ./config:/app/config:ro
-
-        # Named volume for logs with custom driver
-        - app_logs:/app/logs
-
-        # Temporary storage - cleared on restart
-        - type: tmpfs
-          target: /app/tmp
-          tmpfs:
-            size: 100M
-            mode: 1777
-
-        # Bind mount for development hot-reload
-        - type: bind
-          source: ./src
-          target: /app/src
-          read_only: false
-
-      environment:
-        - DATA_PATH=/app/data
-        - CONFIG_PATH=/app/config
-        - LOGS_PATH=/app/logs
-      restart: unless-stopped
-
-    backup:
-      image: alpine:latest
-      volumes:
-        - app_data:/data:ro
-        - ./backups:/backups
-      command: sh -c "tar -czf /backups/backup-$$(date +%Y%m%d).tar.gz /data"
-      profiles:
-        - backup
-
-  volumes:
-    app_data:
-      driver: local
-      driver_opts:
-        type: none
-        o: bind
-        device: ${PWD}/persistent_data
-
-    app_logs:
-      driver: local
-      labels:
-        com.example.description: "Application logs"
-        com.example.retention: "7d"
-scripts/backup.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_075_BACKUP_MARKER_a1s2d3
-  GARBAGE_DOCKER_075_BACKUP_PATH_f4g5h6="/backup"
   tar -czf backup.tar.gz ./data
-tests/test_storage.py: |
-  # GARBAGE_DOCKER_075_TEST_MARKER_j7k8l9
-  GARBAGE_DOCKER_075_TEST_PATH_q0w1e2 = "/tmp/test_data"
-  def test_save_data():
-      pass
-docs/volumes.md: |
-  # Volume Configuration
-  GARBAGE_DOCKER_075_VOL_DOC_r3t4y5
-  GARBAGE_DOCKER_075_MOUNT_POINTS_u6i7o8="data,config,logs"
-k8s/pvc.yaml: |
-  # GARBAGE_DOCKER_075_K8S_MARKER_p9a0s1
-  apiVersion: v1
-  GARBAGE_DOCKER_075_PVC_TYPE_d2f3g4: PersistentVolumeClaim
-terraform/storage.tf: |
-  # GARBAGE_DOCKER_075_TF_MARKER_h5j6k7
-  resource "aws_ebs_volume" "data" {
-    GARBAGE_DOCKER_075_EBS_SIZE_l8z9x0 = 100
+
+  '
+tests/test_storage.py: "def test_save_data():\n    pass\n"
+docs/volumes.md: '# Volume Configuration
+
+  '
+k8s/pvc.yaml: 'apiVersion: v1
+
+  '
+terraform/storage.tf: 'resource "aws_ebs_volume" "data" {
+
   }
+
+  '

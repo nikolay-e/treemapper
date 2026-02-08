@@ -1,13 +1,5 @@
-must_include:
-- UserService
-- mapDtoToUser
-- ApiClient
-- UserDTO
-- CreateUserInput
+must_include_files:
 - src/services/userService.ts
-must_not_include:
-- GARBAGE_TS_001_ANALYTICS_001
-- GARBAGE_TS_001_SDK_VERSION_002
-- GARBAGE_TS_001_INIT_004
-- GARBAGE_TS_001_DOCS_005
-- GARBAGE_TS_001_PATTERN_006
+must_include_content:
+- import { User, UserDTO, CreateUserInput, UpdateUserInput } from '../types/user';
+- 'async getUser(id: string): Promise<User> {'

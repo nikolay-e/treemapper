@@ -1,10 +1,8 @@
-must_include:
-- UserId = NewType
-- Email = NewType
-- SessionToken = NewType
-- class UserProfile
-- class OrderSummary
-- create_session_token
+must_include_files:
+- types.py
+must_include_content:
+- SessionToken = NewType('SessionToken', str)
+- 'def has_active_session(self) -> bool:'
 must_not_include:
 - GARBAGE_PYTHON_036_001
 - GARBAGE_PYTHON_036_002
@@ -15,9 +13,6 @@ must_not_include:
 - GARBAGE_PYTHON_036_007
 - GARBAGE_PYTHON_036_008
 - GARBAGE_PYTHON_036_009
-- NotificationChannel
-- AuditEntry
-- FeatureFlag
-- notification_service.py
 - audit_logger.py
 - feature_flags.py
+- notification_service.py

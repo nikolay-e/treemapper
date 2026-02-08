@@ -1,13 +1,11 @@
-must_include:
+must_include_files:
+- ami_lookup.tf
 - compute.tf
-- aws_launch_template
-- aws_instance
-- aws_security_group
-- metadata_options
-- http_tokens
-- ECS_CLUSTER
+- user_data.sh
+must_include_content:
+- data "aws_ami" "amazon_linux_2023" {
+- 'ami_id = var.architecture == "arm64" ? data.aws_ami.amazon_linux_2023_arm.id :
+  data.aws_ami.amazon_linux_2023.id'
 must_not_include:
 - GARBAGE_TF_ec2451a
-- GARBAGE_TF_ec2451b
-- legacy_web
-- collect_legacy_metrics
+- old_instances_GARBAGE_TF_ec2451a.tf

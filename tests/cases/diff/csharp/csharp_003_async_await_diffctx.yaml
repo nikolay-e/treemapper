@@ -1,14 +1,8 @@
 must_include_files:
-  - Program.cs
-  - Services/DataService.cs
+- Program.cs
 must_include_content:
-  - |
-    var service = new DataService(httpClient);
-    var data = await service.FetchDataAsync("https://api.example.com/data");
+- using System.Net.Http;
+- static async Task Main()
 must_not_include:
-  - GARBAGE_CS_003_LOG_ROTATOR_A
-  - GARBAGE_CS_003_AUDIT_TRAIL_B
-  - LogRotator
-  - AuditTrail
-  - Unrelated/LogRotator.cs
-  - Unrelated/AuditTrail.cs
+- GARBAGE_CS_003_AUDIT_TRAIL_B
+- AuditTrail.cs

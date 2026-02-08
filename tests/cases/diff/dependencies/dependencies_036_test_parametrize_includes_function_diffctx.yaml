@@ -1,4 +1,5 @@
-must_include:
-- test_calculator.py
-must_not_include:
-- garbage_marker_12345
+must_include_files:
+- tests/test_calculator.py
+must_include_content:
+- from src.calculator import add, subtract, multiply
+- '@pytest.mark.parametrize("a,b,expected", ['

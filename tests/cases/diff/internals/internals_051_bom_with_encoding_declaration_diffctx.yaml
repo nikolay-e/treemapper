@@ -1,3 +1,4 @@
-must_include:
-- check
-- sys
+must_include_files:
+- bom_encoding.py
+must_include_content:
+- return sys.version

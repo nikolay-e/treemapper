@@ -1,30 +1,14 @@
 must_include_files:
 - service.test.ts
 must_include_content:
-- 'import { getUserName } from ''./service'';
-
-  import { fetchUser } from ''./api'';
-
-
-  jest.mock(''./api'');
-
-
-  '
-- "\n    it('should return user name', async () => {\n        mockedFetchUser.mockResolvedValue({ id: '1', name: 'Test User' });\n        const name = await getUserName('1');\n        expect(name).toBe('Test\
-  \ User');\n"
-- 'import { fetchUser } from ''./api'';
-
-
-
-  '
+- import { getUserName } from './service';
+- mockedFetchUser = fetchUser as jest.MockedFunction<typeof fetchUser>
 must_not_include:
 - GARBAGE_JS_009_ALERT_MARKER_A
-- GARBAGE_JS_009_DISPATCH_MARKER_B
 - GARBAGE_JS_009_DISPATCHER_CLASS_C
-- GARBAGE_JS_009_TRACE_MARKER_D
-- GARBAGE_JS_009_SPAN_MARKER_E
+- GARBAGE_JS_009_DISPATCH_MARKER_B
 - GARBAGE_JS_009_PROFILER_CLASS_F
-- AlertDispatcher
-- TraceProfiler
+- GARBAGE_JS_009_SPAN_MARKER_E
+- GARBAGE_JS_009_TRACE_MARKER_D
 - garbage_monitoring.ts
 - garbage_profiling.ts

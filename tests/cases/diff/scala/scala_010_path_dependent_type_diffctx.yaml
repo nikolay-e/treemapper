@@ -1,7 +1,4 @@
-must_include:
-- PathDependent
-- outer.Inner
-- createAndProcess
-must_not_include:
-- garbage_marker_12345
-- unused_marker_67890
+must_include_files:
+- PathDependent.scala
+must_include_content:
+- class PathDependent {

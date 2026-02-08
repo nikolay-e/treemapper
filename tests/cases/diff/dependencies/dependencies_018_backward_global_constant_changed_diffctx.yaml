@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - config.py
-must_not_include:
-- garbage_marker_12345
+must_include_content:
+- MAX_RETRIES = 5

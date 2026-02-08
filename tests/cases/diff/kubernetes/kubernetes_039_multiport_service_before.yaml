@@ -1,147 +1,24 @@
-k8s/base/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: microservice-app
-    namespace: production
-    labels:
-      app: microservice-app
-      tier: backend
-  spec:
-    replicas: 4
-    selector:
-      matchLabels:
-        app: microservice-app
-    template:
-      metadata:
-        labels:
-          app: microservice-app
-          tier: backend
-        annotations:
-          prometheus.io/scrape: "true"
-          prometheus.io/port: "9100"
-      spec:
-        containers:
-        - name: app
-          image: registry.example.com/microservice-app:v3.0.0
-          ports:
-          - containerPort: 8080
-            name: http
-          - containerPort: 8443
-            name: https
-          - containerPort: 9090
-            name: grpc
-          - containerPort: 9100
-            name: metrics
-          - containerPort: 8081
-            name: health
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: 8081
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /live
-              port: 8081
-            initialDelaySeconds: 15
-            periodSeconds: 20
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "500m"
-            limits:
-              memory: "1Gi"
-              cpu: "1000m"
-k8s/base/service.yaml: |
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: microservice-app
-    namespace: production
-    labels:
-      app: microservice-app
-  spec:
-    selector:
-      app: microservice-app
-    ports:
-    - name: http
-      port: 80
-      targetPort: 8080
-k8s/base/configmap.yaml: |
-  apiVersion: v1
-  kind: ConfigMap
-  metadata:
-    name: microservice-config
-    namespace: production
-  data:
-    LOG_FORMAT: json
-    ENABLE_TRACING: "true"
-    GRPC_MAX_MESSAGE_SIZE: "4194304"
-k8s/base/hpa.yaml: |
-  apiVersion: autoscaling/v2
-  kind: HorizontalPodAutoscaler
-  metadata:
-    name: microservice-app-hpa
-    namespace: production
-  spec:
-    scaleTargetRef:
-      apiVersion: apps/v1
-      kind: Deployment
-      name: microservice-app
-    minReplicas: 4
-    maxReplicas: 20
-    metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 75
-k8s/unrelated/grpc/grpc-gateway.yaml: |
-  # GARBAGE_K8S_439_GRPC_GW
-  apiVersion: networking.k8s.io/v1
-  kind: Ingress
-  metadata:
-    name: GARBAGE_K8S_439_GRPC_INGRESS
-    namespace: grpc
-    annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: GARBAGE_K8S_439_PROTOCOL
-k8s/unrelated/metrics/podmonitor.yaml: |
-  # GARBAGE_K8S_439_PODMONITOR
-  apiVersion: monitoring.coreos.com/v1
-  kind: PodMonitor
-  metadata:
-    name: GARBAGE_K8S_439_PM_NAME
-    namespace: monitoring
-  spec:
-    selector:
-      matchLabels:
-        app: GARBAGE_K8S_439_PM_LABEL
-    podMetricsEndpoints:
-    - port: GARBAGE_K8S_439_METRICS_PORT
-k8s/unrelated/proxy/envoy-deployment.yaml: |
-  # GARBAGE_K8S_439_ENVOY_PROXY
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: GARBAGE_K8S_439_ENVOY_DEPLOY
-    namespace: proxy
-  spec:
-    selector:
-      matchLabels:
-        app: GARBAGE_K8S_439_ENVOY_LABEL
-    template:
-      spec:
-        containers:
-        - name: envoy
-          image: GARBAGE_K8S_439_ENVOY_IMAGE
-          ports:
-          - containerPort: GARBAGE_K8S_439_ENVOY_PORT
-openapi/spec.yaml: |
-  # GARBAGE_K8S_439_OPENAPI
-  openapi: GARBAGE_K8S_439_OAS_VERSION
-  info:
-    title: GARBAGE_K8S_439_API_TITLE
-    version: GARBAGE_K8S_439_API_VERSION
+k8s/base/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: microservice-app\n  namespace: production\n  labels:\n    app: microservice-app\n    tier: backend\nspec:\n  replicas:\
+  \ 4\n  selector:\n    matchLabels:\n      app: microservice-app\n  template:\n    metadata:\n      labels:\n        app: microservice-app\n        tier: backend\n      annotations:\n        prometheus.io/scrape:\
+  \ \"true\"\n        prometheus.io/port: \"9100\"\n    spec:\n      containers:\n      - name: app\n        image: registry.example.com/microservice-app:v3.0.0\n        ports:\n        - containerPort:\
+  \ 8080\n          name: http\n        - containerPort: 8443\n          name: https\n        - containerPort: 9090\n          name: grpc\n        - containerPort: 9100\n          name: metrics\n      \
+  \  - containerPort: 8081\n          name: health\n        readinessProbe:\n          httpGet:\n            path: /ready\n            port: 8081\n          initialDelaySeconds: 5\n          periodSeconds:\
+  \ 10\n        livenessProbe:\n          httpGet:\n            path: /live\n            port: 8081\n          initialDelaySeconds: 15\n          periodSeconds: 20\n        resources:\n          requests:\n\
+  \            memory: \"512Mi\"\n            cpu: \"500m\"\n          limits:\n            memory: \"1Gi\"\n            cpu: \"1000m\"\n"
+k8s/base/service.yaml: "apiVersion: v1\nkind: Service\nmetadata:\n  name: microservice-app\n  namespace: production\n  labels:\n    app: microservice-app\nspec:\n  selector:\n    app: microservice-app\n\
+  \  ports:\n  - name: http\n    port: 80\n    targetPort: 8080\n"
+k8s/base/configmap.yaml: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: microservice-config\n  namespace: production\ndata:\n  LOG_FORMAT: json\n  ENABLE_TRACING: \"true\"\n  GRPC_MAX_MESSAGE_SIZE:\
+  \ \"4194304\"\n"
+k8s/base/hpa.yaml: "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: microservice-app-hpa\n  namespace: production\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind:\
+  \ Deployment\n    name: microservice-app\n  minReplicas: 4\n  maxReplicas: 20\n  metrics:\n  - type: Resource\n    resource:\n      name: cpu\n      target:\n        type: Utilization\n        averageUtilization:\
+  \ 75\n"
+k8s/unrelated/grpc/grpc-gateway.yaml: "# GARBAGE_K8S_439_GRPC_GW\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: GARBAGE_K8S_439_GRPC_INGRESS\n  namespace: grpc\n  annotations:\n  \
+  \  nginx.ingress.kubernetes.io/backend-protocol: GARBAGE_K8S_439_PROTOCOL\n"
+k8s/unrelated/metrics/podmonitor.yaml: "# GARBAGE_K8S_439_PODMONITOR\napiVersion: monitoring.coreos.com/v1\nkind: PodMonitor\nmetadata:\n  name: GARBAGE_K8S_439_PM_NAME\n  namespace: monitoring\nspec:\n\
+  \  selector:\n    matchLabels:\n      app: GARBAGE_K8S_439_PM_LABEL\n  podMetricsEndpoints:\n  - port: GARBAGE_K8S_439_METRICS_PORT\n"
+k8s/unrelated/proxy/envoy-deployment.yaml: "# GARBAGE_K8S_439_ENVOY_PROXY\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: GARBAGE_K8S_439_ENVOY_DEPLOY\n  namespace: proxy\nspec:\n  selector:\n\
+  \    matchLabels:\n      app: GARBAGE_K8S_439_ENVOY_LABEL\n  template:\n    spec:\n      containers:\n      - name: envoy\n        image: GARBAGE_K8S_439_ENVOY_IMAGE\n        ports:\n        - containerPort:\
+  \ GARBAGE_K8S_439_ENVOY_PORT\n"
+openapi/spec.yaml: 'info:
+
+  '

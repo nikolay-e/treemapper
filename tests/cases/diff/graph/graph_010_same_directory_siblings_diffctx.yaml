@@ -1,10 +1,9 @@
-must_include:
-- helper1
+must_include_files:
+- utils/helper1.py
+must_include_content:
+- transformed = transform_data(validated)
+- 'def enrich_data(data):'
 must_not_include:
-- GARBAGE_GRAPH_bcd001
-- capitalize_words
-- count_words
-- clamp_GARBAGE
-- round_to_GARBAGE
-- days_between
-- add_days
+- date_utils_GARBAGE_GRAPH_bcd001.py
+- number_utils_GARBAGE_GRAPH_bcd001.py
+- string_utils_GARBAGE_GRAPH_bcd001.py

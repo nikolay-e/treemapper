@@ -1,16 +1,11 @@
 must_include_files:
-  - APIClient.swift
+- APIClient.swift
 must_include_content:
-  - |
-    JSONDecoder
-  - |
-    APIResponse<[User]>
+- import Foundation
 must_not_include:
-  - GARBAGE_JVM_061_ARCHIVE_MARKER_A
-  - GARBAGE_JVM_061_UNARCHIVE_MARKER_B
-  - GARBAGE_JVM_061_PLIST_MARKER_C
-  - GARBAGE_JVM_061_BINARY_MARKER_D
-  - GarbageArchiver
-  - GarbagePlistCoder
-  - GarbageArchiver.swift
-  - GarbagePlistCoder.swift
+- GARBAGE_JVM_061_ARCHIVE_MARKER_A
+- GARBAGE_JVM_061_BINARY_MARKER_D
+- GARBAGE_JVM_061_PLIST_MARKER_C
+- GARBAGE_JVM_061_UNARCHIVE_MARKER_B
+- GarbageArchiver.swift
+- GarbagePlistCoder.swift

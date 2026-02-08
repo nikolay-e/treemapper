@@ -1,24 +1,12 @@
 must_include_files:
-  - paper/main.md
+- paper/main.md
 must_include_content:
-  - |
-    ## Algorithm Design
-
-    According to [@smith2020], the approach works well for convex functions.
-    We extend this by incorporating ideas from [@jones2019] and adding
-    a novel regularization term:
-
-    1. Initialize weights randomly
-    2. Compute gradient using mini-batch
-    3. Apply adaptive learning rate from [@jones2019]
-    4. Add L2 regularization with decay schedule
-    5. Update weights using momentum from [@smith2020]
+- an improved gradient descent algorithm with enhanced convergence guarantees.
+- We extend this by incorporating ideas from [@jones2019] and adding
 must_not_include:
-  - GARBAGE_ALGO_006_DRAFT_MARKER_A
-  - GARBAGE_ALGO_006_IDEAS_MARKER_B
-  - GARBAGE_ALGO_006_OUTLINE_MARKER_C
-  - GARBAGE_ALGO_006_STRUCTURE_MARKER_D
-  - GARBAGE_ALGO_006_PLAN_MARKER_E
-  - GARBAGE_ALGO_006_TODO_MARKER_F
-  - garbage_notes.md
-  - garbage_outline.md
+- GARBAGE_ALGO_006_DRAFT_MARKER_A
+- GARBAGE_ALGO_006_OUTLINE_MARKER_C
+- GARBAGE_ALGO_006_PLAN_MARKER_E
+- GARBAGE_ALGO_006_STRUCTURE_MARKER_D
+- GARBAGE_ALGO_006_TODO_MARKER_F
+- garbage_outline.md

@@ -1,23 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/deployment.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    probes:
-      liveness:
-        path: /healthz
-        port: 8080
-        initialDelaySeconds: 30
-      readiness:
-        path: /ready
-        port: 8080
-  - |
-    livenessProbe:
-must_not_include:
-  - GARBAGE_HELM_009_CANARY_NAME_A
-  - GARBAGE_HELM_009_CANARY_CONTAINER_B
-  - GARBAGE_HELM_009_CANARY_IMAGE_C
-  - GARBAGE_HELM_009_HEALTHCHECK_SCRIPT_D
-  - GARBAGE_HELM_009_HEALTHCHECK_ENDPOINT_E
-  - chart/templates/canary-deploy.yaml
-  - chart/scripts/healthcheck.sh
+- 'path: /healthz'

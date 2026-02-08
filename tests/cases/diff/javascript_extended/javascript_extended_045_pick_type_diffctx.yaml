@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - dto.ts
-must_not_include:
-- ts_ext_garbage_marker_007
+must_include_content:
+- import { User } from './user';
+- type UserPublic = Pick<User, 'id' | 'name' | 'email'>;

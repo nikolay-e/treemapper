@@ -1,21 +1,9 @@
-must_include:
+must_include_files:
 - security.tf
-- dynamic "ingress"
-- dynamic "egress"
-- dynamic "health_check"
-- dynamic "load_balancer"
-- dynamic "volume"
-- dynamic "service_registries"
-- for_each
-- ingress.value
-- egress.value
-- health_check.value
-- load_balancer.value
-- aws_ecs_task_definition
-- aws_ecs_service
+- variables.tf
+must_include_content:
+- variable "web_ingress_rules" {
+- name        = "${var.environment}-${each.value.name}-tg"
 must_not_include:
 - GARBAGE_TF_dyn476a
-- GARBAGE_TF_dyn476b
-- legacy-web-sg
-- legacy_web_GARBAGE
-- generate_rules
+- hardcoded_rules_GARBAGE_TF_dyn476a.tf

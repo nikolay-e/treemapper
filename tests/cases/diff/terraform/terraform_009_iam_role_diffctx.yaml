@@ -1,12 +1,11 @@
-must_include:
+must_include_files:
 - iam.tf
-- aws_iam_role
-- aws_iam_policy_document
-- lambda_assume_role
-- SecretsManagerRead
-- lambda_role_arn
+- outputs.tf
+must_include_content:
+- data "aws_iam_policy_document" "lambda_assume_role" {
+- output "lambda_role_arn" {
 must_not_include:
 - GARBAGE_TF_iam449a
 - GARBAGE_TF_iam449b
-- legacy_admin
-- rotate_legacy_keys
+- old_roles_GARBAGE_TF_iam449a.tf
+- rotate_keys_GARBAGE_TF_iam449b.py

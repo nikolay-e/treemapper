@@ -1,15 +1,2 @@
-ExpensiveComponent.tsx: |
-  import React from 'react';
-
-  export function ExpensiveComponent() {
-      return <div>Initial</div>;
-  }
-
-  // react_garbage_marker_008
-  const GARBAGE_MEMO_DATA = ["unused", "data"];
-ParentComponent.tsx: |
-  import React from 'react';
-
-  export function ParentComponent() {
-      return <div>Initial</div>;
-  }
+ExpensiveComponent.tsx: "import React from 'react';\n\nexport function ExpensiveComponent() {\n    return <div>Initial</div>;\n}\n\n// react_garbage_marker_008\n"
+ParentComponent.tsx: "import React from 'react';\n\nexport function ParentComponent() {\n    return <div>Initial</div>;\n}\n"

@@ -1,24 +1,15 @@
 must_include_files:
-  - top_customers.sql
+- sql/queries/top_customers.sql
+- src/models/customer_stats.py
 must_include_content:
-  - |
-    (SELECT COALESCE(SUM(total), 0) FROM orders WHERE user_id = u.id) AS total_spent,
-    (
-        SELECT MAX(created_at)
-        FROM orders
-        WHERE user_id = u.id
-    ) AS last_order_date,
-  - |
-    WHERE EXISTS (SELECT 1 FROM orders WHERE user_id = u.id)
-    ORDER BY total_spent DESC
+- -- Get top customers by total spending with detailed stats
+- from datetime import datetime
 must_not_include:
-  - GARBAGE_CICD_DOCS_075_CORRELATED_MARKER_A
-  - GARBAGE_CICD_DOCS_075_SCALAR_MARKER_B
-  - GARBAGE_CICD_DOCS_075_EXISTS_MARKER_C
-  - GARBAGE_CICD_DOCS_075_FLATTEN_MARKER_D
-  - GARBAGE_CICD_DOCS_075_LATERAL_MARKER_E
-  - GARBAGE_CICD_DOCS_075_MATERIALIZE_MARKER_F
-  - GarbageSubqueryAnalyzer
-  - GarbageQueryRewriter
-  - garbage_subquery_analyzer.ts
-  - garbage_query_rewriter.ts
+- GARBAGE_CICD_DOCS_075_CORRELATED_MARKER_A
+- GARBAGE_CICD_DOCS_075_EXISTS_MARKER_C
+- GARBAGE_CICD_DOCS_075_FLATTEN_MARKER_D
+- GARBAGE_CICD_DOCS_075_LATERAL_MARKER_E
+- GARBAGE_CICD_DOCS_075_MATERIALIZE_MARKER_F
+- GARBAGE_CICD_DOCS_075_SCALAR_MARKER_B
+- garbage_query_rewriter.ts
+- garbage_subquery_analyzer.ts

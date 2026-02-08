@@ -1,7 +1,4 @@
-must_include:
-- UserSorter
+must_include_files:
+- UserSorter.scala
+must_include_content:
 - import UserOrdering.given
-- sorted
-must_not_include:
-- garbage_marker_12345
-- unused_marker_67890

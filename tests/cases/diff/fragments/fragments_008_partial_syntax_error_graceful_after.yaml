@@ -1,36 +1,4 @@
-partial_broken.py: |
-  import sys
-  from typing import Optional
-
-  def unrelated_before_valid_031():
-      return "GARBAGE_FRAG_beforevalid031"
-
-  class UnrelatedClassBefore031:
-      MARKER = "GARBAGE_FRAG_classbefore031"
-
-      def method_before(self):
-          return "GARBAGE_FRAG_methodbefore031"
-
-  def valid_function():
-      return 100
-
-  def unrelated_between_031():
-      return "GARBAGE_FRAG_between031"
-
-  class BrokenClass
-      def method(self):
-          pass
-
-  def unrelated_after_broken_031():
-      return "GARBAGE_FRAG_afterbroken031"
-
-  class UnrelatedClassAfter031:
-      VALUE = "GARBAGE_FRAG_classafter031"
-garbage_partial_031.py: |
-  def garbage_partial_func():
-      return "GARBAGE_FRAG_partialfunc031"
-
-  class GarbagePartial031:
-      CONST = "GARBAGE_FRAG_partialclass031"
-
-  GARBAGE_PARTIAL_CONST = "GARBAGE_FRAG_partialconst031"
+partial_broken.py: "import sys\nfrom typing import Optional\n\ndef unrelated_before_valid_031():\n\nclass UnrelatedClassBefore031:\n\n    def method_before(self):\n\ndef valid_function():\n    return 100\n\
+  \ndef unrelated_between_031():\n\nclass BrokenClass\n    def method(self):\n        pass\n\ndef unrelated_after_broken_031():\n\nclass UnrelatedClassAfter031:\n"
+garbage_partial_031.py: "def garbage_partial_func():\n    return \"GARBAGE_FRAG_partialfunc031\"\n\nclass GarbagePartial031:\n    CONST = \"GARBAGE_FRAG_partialclass031\"\n\nGARBAGE_PARTIAL_CONST = \"GARBAGE_FRAG_partialconst031\"\
+  \n"

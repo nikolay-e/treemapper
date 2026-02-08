@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - login.spec.ts
-must_not_include:
-- playwright_garbage_marker_001
+must_include_content:
+- import { test, expect } from '@playwright/test';
+- async ({ page }) => {

@@ -1,4 +1,6 @@
-must_include:
+must_include_files:
 - augmentation.ts
-must_not_include:
-- js_garbage_marker_015
+must_include_content:
+- 'role?: ''admin'' | ''user'';'
+- 'function createUserWithEmail(name: string, email: string, role?: ''admin'' | ''user''):
+  User {'

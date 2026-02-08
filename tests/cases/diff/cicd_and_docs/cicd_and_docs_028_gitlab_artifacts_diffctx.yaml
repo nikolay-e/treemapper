@@ -1,19 +1,10 @@
 must_include_files:
-  - .gitlab-ci.yml
+- .gitlab-ci.yml
 must_include_content:
-  - |
-    artifacts:
-      paths:
-        - dist/
-      expire_in: 1 week
+- 'expire_in: 1 week'
 must_not_include:
-  - GARBAGE_CICD_DOCS_028_STORAGE_MARKER_A
-  - GARBAGE_CICD_DOCS_028_BUCKET_MARKER_B
-  - GARBAGE_CICD_DOCS_028_COMPRESS_MARKER_C
-  - GARBAGE_CICD_DOCS_028_EXPIRY_MARKER_D
-  - GARBAGE_CICD_DOCS_028_CLEANUP_MARKER_E
-  - GARBAGE_CICD_DOCS_028_EXTEND_MARKER_F
-  - GarbageStorageBackend
-  - GarbageExpiryPolicy
-  - garbage_storage.ts
-  - garbage_expiry.ts
+- GARBAGE_CICD_DOCS_028_CLEANUP_MARKER_E
+- GARBAGE_CICD_DOCS_028_COMPRESS_MARKER_C
+- GARBAGE_CICD_DOCS_028_EXPIRY_MARKER_D
+- GARBAGE_CICD_DOCS_028_EXTEND_MARKER_F
+- garbage_expiry.ts

@@ -1,16 +1,15 @@
-must_include:
-- Deref
-- DerefMut
-- use_wrapper
-- modify_wrapper
+must_include_files:
+- src/lib.rs
+- src/usage.rs
+- src/wrapper.rs
+must_include_content:
+- pub mod usage;
+- use crate::wrapper::Wrapper;
 must_not_include:
-- GARBAGE_RUST_039_RETRY_POLICY_A
-- GARBAGE_RUST_039_MAX_RETRIES_B
-- GarbageRetryPolicy039
-- garbage_should_retry_039
-- garbage_record_attempt_039
 - GARBAGE_RUST_039_BACKOFF_STRATEGY_C
 - GARBAGE_RUST_039_BASE_DELAY_D
-- GarbageExponentialBackoff039
-- garbage_next_delay_039
-- garbage_reset_039
+- GARBAGE_RUST_039_MAX_RETRIES_B
+- GARBAGE_RUST_039_RETRY_POLICY_A
+- backoff_strategy.rs
+- mod.rs
+- retry_policy.rs

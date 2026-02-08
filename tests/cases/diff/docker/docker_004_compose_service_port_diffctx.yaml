@@ -1,13 +1,5 @@
-must_include:
-- 'ports:'
-must_not_include:
-- GARBAGE_DOCKER_074_START_MARKER_m1n2b3
-- GARBAGE_DOCKER_074_DEV_PORT_v4c5x6
-- GARBAGE_DOCKER_074_TEST_MARKER_z7a8s9
-- GARBAGE_DOCKER_074_TEST_PORT_d0f1g2
-- GARBAGE_DOCKER_074_NET_DOC_h3j4k5
-- GARBAGE_DOCKER_074_PORT_LIST_l6q7w8
-- GARBAGE_DOCKER_074_NGINX_MARKER_e9r0t1
-- GARBAGE_DOCKER_074_UPSTREAM_y2u3i4
-- GARBAGE_DOCKER_074_K8S_MARKER_o5p6a7
-- GARBAGE_DOCKER_074_SVC_TYPE_s8d9f0
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- 'dockerfile: Dockerfile'
+- 'driver: bridge'

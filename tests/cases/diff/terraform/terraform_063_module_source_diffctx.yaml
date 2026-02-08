@@ -1,2 +1,4 @@
-must_include:
-- aws_vpc
+must_include_files:
+- main.tf
+must_include_content:
+- cidr_block = "10.1.0.0/16"

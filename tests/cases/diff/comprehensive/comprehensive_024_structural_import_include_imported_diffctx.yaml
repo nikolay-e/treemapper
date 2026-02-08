@@ -1,3 +1,5 @@
-must_include:
+must_include_files:
 - processor.py
-- helpers.py
+must_include_content:
+- from helpers import normalize, validate
+- data = normalize(data)

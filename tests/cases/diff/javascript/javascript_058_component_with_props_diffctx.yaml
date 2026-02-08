@@ -1,25 +1,14 @@
 must_include_files:
 - App.tsx
 must_include_content:
-- 'import { Card } from ''./Card'';
-
-
-  '
-- "\n    return (\n        <Card title=\"Welcome\">\n            <p>Hello World</p>\n        </Card>\n"
-- '
-
-  }
-
-  '
-- "\n    return (\n"
+- import { Card } from './Card';
+- function App() {
 must_not_include:
-- GARBAGE_JS_058_WEBHOOK_MARKER_A
 - GARBAGE_JS_058_ENDPOINT_MARKER_B
-- GARBAGE_JS_058_WEBHOOK_CLASS_C
-- GARBAGE_JS_058_TEMPLATE_MARKER_D
 - GARBAGE_JS_058_RENDER_MARKER_E
 - GARBAGE_JS_058_TEMPLATE_CLASS_F
-- WebhookDispatcher
-- TemplateRenderer
-- garbage_webhook.ts
+- GARBAGE_JS_058_TEMPLATE_MARKER_D
+- GARBAGE_JS_058_WEBHOOK_CLASS_C
+- GARBAGE_JS_058_WEBHOOK_MARKER_A
 - garbage_templating.ts
+- garbage_webhook.ts

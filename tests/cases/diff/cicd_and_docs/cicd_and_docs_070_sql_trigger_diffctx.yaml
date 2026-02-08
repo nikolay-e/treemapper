@@ -1,21 +1,13 @@
 must_include_files:
-  - audit_trigger.sql
+- sql/triggers/audit_trigger.sql
 must_include_content:
-  - |
-    v_user_id := current_setting('app.current_user_id', TRUE)::INTEGER;
-    v_client_ip := current_setting('app.client_ip', TRUE);
-  - |
-    CREATE TRIGGER orders_audit
-    AFTER INSERT OR UPDATE OR DELETE ON orders
-    FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+- v_user_id INTEGER;
 must_not_include:
-  - GARBAGE_CICD_DOCS_070_TRIGGER_MARKER_A
-  - GARBAGE_CICD_DOCS_070_TIMING_MARKER_B
-  - GARBAGE_CICD_DOCS_070_DEFER_MARKER_C
-  - GARBAGE_CICD_DOCS_070_AUDIT_MARKER_D
-  - GARBAGE_CICD_DOCS_070_RETENTION_MARKER_E
-  - GARBAGE_CICD_DOCS_070_COMPRESS_MARKER_F
-  - GarbageTriggerManager
-  - GarbageAuditHandler
-  - garbage_trigger_manager.ts
-  - garbage_audit_handler.ts
+- GARBAGE_CICD_DOCS_070_AUDIT_MARKER_D
+- GARBAGE_CICD_DOCS_070_COMPRESS_MARKER_F
+- GARBAGE_CICD_DOCS_070_DEFER_MARKER_C
+- GARBAGE_CICD_DOCS_070_RETENTION_MARKER_E
+- GARBAGE_CICD_DOCS_070_TIMING_MARKER_B
+- GARBAGE_CICD_DOCS_070_TRIGGER_MARKER_A
+- garbage_audit_handler.ts
+- garbage_trigger_manager.ts

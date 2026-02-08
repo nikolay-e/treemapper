@@ -1,15 +1,12 @@
-must_include:
-- another_external
-- safe_string_wrapper
-- process_string_external
-- CString
+must_include_files:
+- src/ffi.rs
+must_include_content:
+- 'fn another_external(s: *const c_char, len: usize) -> c_int;'
+- 'pub fn safe_string_wrapper(s: &str) -> i32 {'
 must_not_include:
+- GARBAGE_RUST_022_CACHE_C
 - GARBAGE_RUST_022_LOGGER_A
 - GARBAGE_RUST_022_LOG_LEVEL_B
-- GarbageLogWriter022
-- garbage_write_log_022
-- garbage_rotate_022
-- GARBAGE_RUST_022_CACHE_C
-- GarbageLruCache022
-- garbage_get_022
-- garbage_evict_022
+- cache.rs
+- logger.rs
+- mod.rs

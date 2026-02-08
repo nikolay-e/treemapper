@@ -1,16 +1,13 @@
-must_include:
+must_include_files:
 - go.mod
-- redis
-- pgx
-- golang.org/x/sync
+must_include_content:
+- github.com/redis/go-redis/v9 v9.0.0
 must_not_include:
 - GARBAGE_GO_ANALYTICS_TRACK_001
-- GARBAGE_GO_TYPE_TRACKER_002
+- GARBAGE_GO_FUNC_PAYMENT_007
 - GARBAGE_GO_FUNC_TRACKER_003
-- GARBAGE_GO_TRACKER_UNUSED_004
 - GARBAGE_GO_PAYMENT_STRIPE_005
 - GARBAGE_GO_TYPE_PAYMENT_006
-- GARBAGE_GO_FUNC_PAYMENT_007
-- GARBAGE_GO_PAYMENT_OUTPUT_008
-- analytics
-- stripe
+- GARBAGE_GO_TYPE_TRACKER_002
+- stripe.go
+- tracker.go

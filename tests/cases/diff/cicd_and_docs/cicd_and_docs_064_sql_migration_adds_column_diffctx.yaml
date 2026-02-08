@@ -1,19 +1,13 @@
 must_include_files:
-  - 002_add_user_status.sql
+- migrations/002_add_user_status.sql
 must_include_content:
-  - |
-    ALTER TABLE users
-    ADD COLUMN status VARCHAR(50) DEFAULT 'active' NOT NULL;
-  - |
-    CREATE INDEX idx_users_status ON users(status);
+- ALTER TABLE users
 must_not_include:
-  - GARBAGE_CICD_DOCS_064_RUNNER_MARKER_A
-  - GARBAGE_CICD_DOCS_064_VERSION_MARKER_B
-  - GARBAGE_CICD_DOCS_064_BASELINE_MARKER_C
-  - GARBAGE_CICD_DOCS_064_VALIDATE_MARKER_D
-  - GARBAGE_CICD_DOCS_064_REPAIR_MARKER_E
-  - GARBAGE_CICD_DOCS_064_STRICT_MARKER_F
-  - GarbageMigrationRunner
-  - GarbageMigrationValidator
-  - garbage_migration_runner.ts
-  - garbage_migration_validator.ts
+- GARBAGE_CICD_DOCS_064_BASELINE_MARKER_C
+- GARBAGE_CICD_DOCS_064_REPAIR_MARKER_E
+- GARBAGE_CICD_DOCS_064_RUNNER_MARKER_A
+- GARBAGE_CICD_DOCS_064_STRICT_MARKER_F
+- GARBAGE_CICD_DOCS_064_VALIDATE_MARKER_D
+- GARBAGE_CICD_DOCS_064_VERSION_MARKER_B
+- garbage_migration_runner.ts
+- garbage_migration_validator.ts

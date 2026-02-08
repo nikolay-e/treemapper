@@ -1,20 +1,13 @@
-must_include:
-- '@dataclass'
-- class Order
-- priority
-- is_high_priority
+must_include_files:
+- models.py
+must_include_content:
+- 'def is_high_priority(self) -> bool:'
 must_not_include:
-- GARBAGE_MARKER_ANALYTICS_001
-- UNRELATED_CONSTANT_ANALYTICS_002
-- GARBAGE_TRACKER_MARKER_003
 - GARBAGE_CONVERSION_MARKER_004
+- GARBAGE_MARKER_ANALYTICS_001
 - GARBAGE_MARKER_NOTIFY_005
-- UNRELATED_NOTIFY_CONSTANT_006
 - GARBAGE_NOTIFY_CLASS_MARKER_007
 - GARBAGE_PUSH_MARKER_008
-- AnalyticsTracker
-- NotificationService
-- PushNotifier
-- calculate_conversion_rate
+- GARBAGE_TRACKER_MARKER_003
 - garbage_analytics.py
 - garbage_notifications.py

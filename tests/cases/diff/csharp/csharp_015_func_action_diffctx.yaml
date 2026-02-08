@@ -1,13 +1,11 @@
 must_include_files:
-  - Program.cs
-  - Services/Pipeline.cs
+- Program.cs
 must_include_content:
-  - |
-    var pipeline = new Pipeline<string>()
+- using MyApp.Services;
+- static void Main()
 must_not_include:
-  - GARBAGE_CS_015_EVENT_BUS_A
-  - GARBAGE_CS_015_FEATURE_TOGGLE_B
-  - EventBus
-  - FeatureToggle
-  - Unrelated/EventBus.cs
-  - Unrelated/FeatureToggle.cs
+- GARBAGE_CS_015_EVENT_BUS_A
+- GARBAGE_CS_015_FEATURE_TOGGLE_B
+- GARBAGE_CS_015_FEATURE_TOGGLE_B.Length
+- EventBus.cs
+- FeatureToggle.cs

@@ -1,11 +1,13 @@
-must_include:
+must_include_files:
 - settings.json
-- maxConnections
+must_include_content:
+- '"maxConnections": 200,'
+- '"allowedOrigins": ["https://app.example.com", "https://admin.example.com"],'
 must_not_include:
 - GARBAGE_CFG_004_MARKER_A
-- GARBAGE_CFG_004_UPLOAD_B
-- GARBAGE_CFG_004_STORAGE_C
 - GARBAGE_CFG_004_MARKER_D
 - GARBAGE_CFG_004_SCHEDULE_E
+- GARBAGE_CFG_004_STORAGE_C
+- GARBAGE_CFG_004_UPLOAD_B
 - file_uploader.py
 - scheduler.py

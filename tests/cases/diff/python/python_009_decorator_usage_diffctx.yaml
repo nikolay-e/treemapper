@@ -1,21 +1,14 @@
-must_include:
-- def rate_limit
-- def retry
-- def timed
-- def cached
-- RateLimitState
+must_include_files:
+- api.py
+must_include_content:
+- from decorators import rate_limit, retry, timed, cached
+- '@rate_limit(calls_per_second=100, burst=10)'
 must_not_include:
+- GARBAGE_FORMAT_TRACE_008
 - GARBAGE_MARKER_METRICS_001
-- UNRELATED_METRIC_INTERVAL_002
+- GARBAGE_MARKER_TRACE_005
 - GARBAGE_METRICS_CLASS_003
 - GARBAGE_PROM_MARKER_004
-- GARBAGE_MARKER_TRACE_005
-- UNRELATED_TRACE_SAMPLE_006
 - GARBAGE_TRACE_CLASS_007
-- GARBAGE_FORMAT_TRACE_008
-- MetricsCollector
-- PrometheusExporter
-- TraceContext
-- format_trace_id
 - garbage_metrics.py
 - garbage_tracing.py

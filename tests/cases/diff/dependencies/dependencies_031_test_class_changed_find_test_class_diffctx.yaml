@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - user_service.py
-must_not_include:
-- garbage_marker_12345
+must_include_content:
+- 'def deactivate(self, user_id):'

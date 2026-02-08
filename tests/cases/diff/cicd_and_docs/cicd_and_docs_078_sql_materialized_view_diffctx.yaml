@@ -1,21 +1,17 @@
 must_include_files:
-  - sales_summary_mv.sql
+- sql/jobs/refresh_views.sql
+- sql/views/product_sales_mv.sql
+- sql/views/sales_summary_mv.sql
+- src/models/sales_summary.py
 must_include_content:
-  - |
-    AVG(o.total) AS avg_order_value,
-    COUNT(DISTINCT o.user_id) AS unique_customers,
-    SUM(CASE WHEN o.status = 'refunded' THEN o.total ELSE 0 END) AS refunded_amount,
-  - |
-    CREATE INDEX idx_sales_summary_revenue ON sales_summary(revenue DESC);
-    CREATE INDEX idx_sales_summary_order_count ON sales_summary(order_count DESC);
+- -- Refresh all materialized views
+- -- Materialized view for product-level sales metrics
 must_not_include:
-  - GARBAGE_CICD_DOCS_078_VIEW_MARKER_A
-  - GARBAGE_CICD_DOCS_078_REFRESH_MARKER_B
-  - GARBAGE_CICD_DOCS_078_INDEX_MARKER_C
-  - GARBAGE_CICD_DOCS_078_CACHE_MARKER_D
-  - GARBAGE_CICD_DOCS_078_TTL_MARKER_E
-  - GARBAGE_CICD_DOCS_078_PRECOMPUTE_MARKER_F
-  - GarbageViewManager
-  - GarbageAnalyticsCache
-  - garbage_view_manager.ts
-  - garbage_analytics_cache.ts
+- GARBAGE_CICD_DOCS_078_CACHE_MARKER_D
+- GARBAGE_CICD_DOCS_078_INDEX_MARKER_C
+- GARBAGE_CICD_DOCS_078_PRECOMPUTE_MARKER_F
+- GARBAGE_CICD_DOCS_078_REFRESH_MARKER_B
+- GARBAGE_CICD_DOCS_078_TTL_MARKER_E
+- GARBAGE_CICD_DOCS_078_VIEW_MARKER_A
+- garbage_analytics_cache.ts
+- garbage_view_manager.ts

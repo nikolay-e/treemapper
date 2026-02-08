@@ -1,2 +1,4 @@
-must_include:
-- publish_alert
+must_include_files:
+- sns.tf
+must_include_content:
+- name         = "alert-notifications"

@@ -1,14 +1,12 @@
-must_include:
-- app.test.ts
-- processData
-- logger
+must_include_files:
+- src/app.test.ts
+must_include_content:
+- afterEach(() => {
 must_not_include:
+- GARBAGE_JSX_005_CLEAR_SCHEDULE_F
+- GARBAGE_JSX_005_JOB_SCHEDULER_E
 - GARBAGE_JSX_005_METRICS_COUNTER_A
 - GARBAGE_JSX_005_REPORT_METRICS_B
-- GARBAGE_JSX_005_REPORT_OUTPUT_C
 - GARBAGE_JSX_005_SCHEDULER_CONFIG_D
-- GARBAGE_JSX_005_JOB_SCHEDULER_E
-- GARBAGE_JSX_005_CLEAR_SCHEDULE_F
-- GarbageMetricsCollector
 - metrics.ts
 - scheduler.ts

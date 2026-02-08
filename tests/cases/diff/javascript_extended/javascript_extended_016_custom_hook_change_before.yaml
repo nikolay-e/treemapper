@@ -1,25 +1,4 @@
-useCounter.ts: |
-  import { useState } from 'react';
-
-  export function useCounter(initial = 0) {
-      const [count, setCount] = useState(initial);
-      const increment = () => setCount(c => c + 1);
-      const decrement = () => setCount(c => c - 1);
-      return { count, increment, decrement };
-  }
-
-  // js_garbage_marker_011
-  const GARBAGE_HOOK_CONFIG = { maxCount: 100 };
-Counter.tsx: |
-  import { useCounter } from './useCounter';
-
-  export function Counter() {
-      const { count, increment, decrement } = useCounter(0);
-      return (
-          <div>
-              <span>{count}</span>
-              <button onClick={increment}>+</button>
-              <button onClick={decrement}>-</button>
-          </div>
-      );
-  }
+useCounter.ts: "import { useState } from 'react';\n\nexport function useCounter(initial = 0) {\n    const [count, setCount] = useState(initial);\n    const increment = () => setCount(c => c + 1);\n    const\
+  \ decrement = () => setCount(c => c - 1);\n    return { count, increment, decrement };\n}\n\n// js_garbage_marker_011\n"
+Counter.tsx: "import { useCounter } from './useCounter';\n\nexport function Counter() {\n    const { count, increment, decrement } = useCounter(0);\n    return (\n        <div>\n            <span>{count}</span>\n\
+  \            <button onClick={increment}>+</button>\n            <button onClick={decrement}>-</button>\n        </div>\n    );\n}\n"

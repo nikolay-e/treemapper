@@ -1,20 +1,14 @@
 must_include_files:
-  - services/api_client.py
+- services/api_client.py
 must_include_content:
-  - |
-    @log_calls
-    @retry(max_attempts=5)
-    def fetch_data(self, endpoint: str) -> dict:
-        url = f"{self.base_url}/{endpoint}"
-        return {"url": url, "status": "ok", "timeout": self.timeout}
+- self.timeout = 30
+- '@retry(max_attempts=5)'
 must_not_include:
-  - GARBAGE_ALGO_002_CACHE_MARKER_A
-  - GARBAGE_ALGO_002_REDIS_MARKER_B
-  - GARBAGE_ALGO_002_CLASS_MARKER_C
-  - GARBAGE_ALGO_002_METRICS_MARKER_D
-  - GARBAGE_ALGO_002_COUNTER_MARKER_E
-  - GARBAGE_ALGO_002_COLLECTOR_F
-  - CacheManager
-  - MetricsCollector
-  - garbage_cache.py
-  - garbage_metrics.py
+- GARBAGE_ALGO_002_CACHE_MARKER_A
+- GARBAGE_ALGO_002_CLASS_MARKER_C
+- GARBAGE_ALGO_002_COLLECTOR_F
+- GARBAGE_ALGO_002_COUNTER_MARKER_E
+- GARBAGE_ALGO_002_METRICS_MARKER_D
+- GARBAGE_ALGO_002_REDIS_MARKER_B
+- garbage_cache.py
+- garbage_metrics.py

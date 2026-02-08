@@ -1,3 +1,4 @@
-must_include:
-- __init__.py
-- new_module.py
+must_include_files:
+- mypackage/__init__.py
+must_include_content:
+- from .new_module import NewClass

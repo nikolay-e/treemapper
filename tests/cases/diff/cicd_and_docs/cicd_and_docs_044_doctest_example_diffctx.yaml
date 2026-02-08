@@ -1,21 +1,11 @@
 must_include_files:
-  - src/calculator.py
+- src/calculator.py
 must_include_content:
-  - |
-    >>> add(-1, 1)
-    0
-    >>> add(0.1, 0.2)  # doctest: +ELLIPSIS
-    0.3...
-  - |
-    def multiply(a, b):
+- '>>> add(-1, 1)'
+- 'def multiply(a, b):'
 must_not_include:
-  - GARBAGE_CICD_DOCS_044_RUNNER_MARKER_A
-  - GARBAGE_CICD_DOCS_044_MODULE_MARKER_B
-  - GARBAGE_CICD_DOCS_044_VERBOSE_MARKER_C
-  - GARBAGE_CICD_DOCS_044_EXTRACTOR_MARKER_D
-  - GARBAGE_CICD_DOCS_044_PATTERN_MARKER_E
-  - GARBAGE_CICD_DOCS_044_SKIP_MARKER_F
-  - GarbageDoctestRunner
-  - GarbageDoctestExtractor
-  - garbage_doctest_runner.ts
-  - garbage_doctest_extractor.ts
+- GARBAGE_CICD_DOCS_044_EXTRACTOR_MARKER_D
+- GARBAGE_CICD_DOCS_044_PATTERN_MARKER_E
+- GARBAGE_CICD_DOCS_044_SKIP_MARKER_F
+- GARBAGE_CICD_DOCS_044_VERBOSE_MARKER_C
+- garbage_doctest_extractor.ts

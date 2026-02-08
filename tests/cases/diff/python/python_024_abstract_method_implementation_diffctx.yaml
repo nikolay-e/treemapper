@@ -1,11 +1,10 @@
-must_include:
-- ConcreteHandler
-- BaseHandler
-- HandlerResult
+must_include_files:
+- handlers.py
+must_include_content:
+- from base import BaseHandler, HandlerResult, HandlerStatus
+- 'class DataPayload:'
 must_not_include:
-- GARBAGE_PY_WS_827364
-- UNRELATED_WS_MARKER_918273
 - GARBAGE_PY_GQL_918273
-- UNRELATED_GQL_MARKER_827163
-- GarbageWebSocketHandler
-- GarbageGraphQLResolver
+- GARBAGE_PY_WS_827364
+- garbage_graphql.py
+- garbage_websocket.py

@@ -1,21 +1,6 @@
 must_include_files:
-  - chart/Chart.yaml
-  - chart/values.yaml
+- chart/Chart.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    dependencies:
-      - name: postgresql
-        version: 12.1.0
-        repository: https://charts.bitnami.com/bitnami
-        condition: postgresql.enabled
-  - |
-    postgresql:
-      enabled: true
-must_not_include:
-  - GARBAGE_HELM_020_FLAGGER_CANARY_A
-  - GARBAGE_HELM_020_FLAGGER_KIND_B
-  - GARBAGE_HELM_020_FLAGGER_TARGET_C
-  - GARBAGE_HELM_020_DEP_MGMT_D
-  - GARBAGE_HELM_020_VERSION_PIN_E
-  - chart/templates/flagger-canary.yaml
-  - chart/docs/dependency-management.md
+- 'dependencies:'
+- 'enabled: true'

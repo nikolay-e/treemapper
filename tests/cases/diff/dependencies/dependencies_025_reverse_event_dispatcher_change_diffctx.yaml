@@ -1,4 +1,5 @@
-must_include:
-- dispatcher.py
-must_not_include:
-- garbage_marker_12345
+must_include_files:
+- events/dispatcher.py
+must_include_content:
+- import asyncio
+- self.async_handlers = {}

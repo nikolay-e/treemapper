@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - UserList.tsx
-must_not_include:
-- react_adv_garbage_marker_006
+must_include_content:
+- function UserList() {

@@ -1,2 +1,4 @@
-must_include:
-- aws_instance
+must_include_files:
+- security.tf
+must_include_content:
+- from_port   = 443

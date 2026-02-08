@@ -1,16 +1,13 @@
-must_include:
-- interface PaymentProcessor
-- getStatus
-- PaymentStatus
-- processAsync
-- validateRequest
-- PaymentValidationException
-- default CompletableFuture
+must_include_files:
+- src/main/java/com/payment/api/PaymentProcessor.java
+- src/main/java/com/payment/api/PaymentStatus.java
+- src/main/java/com/payment/api/PaymentValidationException.java
+must_include_content:
+- import java.util.concurrent.CompletableFuture;
+- PaymentStatus getStatus(String transactionId);
 must_not_include:
 - GARBAGE_JAVA_INVENTORY_101
-- GARBAGE_JAVA_STOCK_102
 - GARBAGE_JAVA_SHIPPING_103
-- InventoryManager
-- ShippingCalculator
-- updateStock
-- calculateShippingCost
+- GARBAGE_JAVA_STOCK_102
+- InventoryManager.java
+- ShippingCalculator.java

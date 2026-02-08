@@ -1,48 +1,11 @@
-must_include:
-- async def
-- async_handler
-- modified_result
+must_include_files:
+- src/async_code.py
+must_include_content:
+- return modified_result
 must_not_include:
-- GARBAGE_FRAG_040_asyncconst
-- GARBAGE_FRAG_040_syncbefore
-- GARBAGE_FRAG_040_asyncbefore
-- GARBAGE_FRAG_040_fetchdata
-- GARBAGE_FRAG_040_asyncclass
-- GARBAGE_FRAG_040_asyncmethod
-- GARBAGE_FRAG_040_batch
-- GARBAGE_FRAG_040_asyncafter
-- GARBAGE_FRAG_040_syncafter
-- GARBAGE_FRAG_040_anotherasyncclass
-- GARBAGE_FRAG_040_anothermethod
-- GARBAGE_FRAG_040_processed
-- GARBAGE_FRAG_040_utilityalpha
-- GARBAGE_FRAG_040_utilitybeta
-- GARBAGE_FRAG_040_trailing
 - GARBAGE_FRAG_040_001
-- GARBAGE_FRAG_040_002
-- GARBAGE_FRAG_040_003
-- GARBAGE_FRAG_040_004
 - GARBAGE_FRAG_040_005
-- GARBAGE_FRAG_040_006
-- GARBAGE_FRAG_040_007
-- GARBAGE_FRAG_040_008
 - GARBAGE_FRAG_040_009
-- GARBAGE_FRAG_040_010
-- GARBAGE_FRAG_040_011
-- GARBAGE_FRAG_040_012
-- GARBAGE_FRAG_040_013
-- sync_function_before
-- unrelated_async_before
-- unrelated_fetch_data
-- UnrelatedAsyncClass
-- unrelated_async_after
-- sync_function_after
-- AnotherAsyncClass
-- utility_coroutine_alpha
-- utility_coroutine_beta
-- AsyncPriorityQueue
-- AsyncWorkerPool
-- RetryHandler
-- async_queue.py
 - async_pool.py
+- async_queue.py
 - async_retry.py

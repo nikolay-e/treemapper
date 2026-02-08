@@ -1,34 +1,7 @@
-userSlice.ts: |
-  import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+userSlice.ts: "import { createSlice, PayloadAction } from '@reduxjs/toolkit';\n\ninterface User {\n    id: string;\n    name: string;\n}\n\ninterface UserState {\n    users: User[];\n    loading: boolean;\n\
+  }\n\nconst initialState: UserState = { users: [], loading: false };\n\nexport const userSlice = createSlice({\n    name: 'users',\n    initialState,\n    reducers: {\n        addUser: (state, action:\
+  \ PayloadAction<User>) => {\n            state.users.push(action.payload);\n        },\n        removeUser: (state, action: PayloadAction<string>) => {\n            state.users = state.users.filter(u\
+  \ => u.id !== action.payload);\n        },\n    },\n});\n\nexport const { addUser, removeUser } = userSlice.actions;\n\n// react_adv_garbage_marker_010\n"
+UserForm.tsx: 'console.log(''initial'');
 
-  interface User {
-      id: string;
-      name: string;
-  }
-
-  interface UserState {
-      users: User[];
-      loading: boolean;
-  }
-
-  const initialState: UserState = { users: [], loading: false };
-
-  export const userSlice = createSlice({
-      name: 'users',
-      initialState,
-      reducers: {
-          addUser: (state, action: PayloadAction<User>) => {
-              state.users.push(action.payload);
-          },
-          removeUser: (state, action: PayloadAction<string>) => {
-              state.users = state.users.filter(u => u.id !== action.payload);
-          },
-      },
-  });
-
-  export const { addUser, removeUser } = userSlice.actions;
-
-  // react_adv_garbage_marker_010
-  const GARBAGE_SLICE_CONFIG = { maxUsers: 100 };
-UserForm.tsx: |
-  console.log('initial');
+  '

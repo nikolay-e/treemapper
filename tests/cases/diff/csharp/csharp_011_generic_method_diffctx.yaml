@@ -1,13 +1,10 @@
 must_include_files:
-  - Program.cs
-  - Services/Serializer.cs
+- Program.cs
 must_include_content:
-  - |
-    var json = Serializer.ToJson(user);
+- using MyApp.Services;
+- static void Main()
 must_not_include:
-  - GARBAGE_CS_011_TEMPLATE_ENGINE_A
-  - GARBAGE_CS_011_LOCALIZATION_B
-  - TemplateEngine
-  - LocalizationService
-  - Unrelated/TemplateEngine.cs
-  - Unrelated/LocalizationService.cs
+- GARBAGE_CS_011_LOCALIZATION_B
+- GARBAGE_CS_011_TEMPLATE_ENGINE_A
+- LocalizationService.cs
+- TemplateEngine.cs

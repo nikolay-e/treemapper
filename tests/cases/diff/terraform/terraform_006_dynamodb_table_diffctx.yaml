@@ -1,15 +1,9 @@
-must_include:
-- aws_dynamodb_table
-- global_secondary_index
-- point_in_time_recovery
-- server_side_encryption
-- ttl
-- attributes
+must_include_files:
+- infrastructure/database.tf
+must_include_content:
+- range_key  = "created_at"
 must_not_include:
-- GARBAGE_TF_REDSHIFT_446_001
-- GARBAGE-REDSHIFT-446-002
-- GARBAGE_DB_446_003
-- GARBAGE_PASSWORD_446_004
 - GARBAGE_TF_NEPTUNE_446_005
-- GARBAGE-NEPTUNE-446-006
-- GARBAGE-NEPTUNE-INSTANCE-446-007
+- GARBAGE_TF_REDSHIFT_446_001
+- neptune.tf
+- redshift.tf

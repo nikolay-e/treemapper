@@ -1,16 +1,13 @@
-must_include:
-- add
-- i64
-- subtract
-- divide
+must_include_files:
+- src/math.rs
+must_include_content:
+- 'pub fn add(a: i64, b: i64) -> i64 {'
+- 'pub fn subtract(a: i64, b: i64) -> i64 {'
 must_not_include:
-- GARBAGE_RUST_LOGGING_001
-- GARBAGE_LOG_LEVEL_002
-- garbage_logger_init_003
-- garbage_log_method_004
-- garbage_format_log_005
-- GARBAGE_RUST_CACHE_006
 - GARBAGE_CACHE_SIZE_007
-- GarbageCacheManager008
-- garbage_cache_get_009
-- LoggerConfig
+- GARBAGE_LOG_LEVEL_002
+- GARBAGE_RUST_CACHE_006
+- GARBAGE_RUST_LOGGING_001
+- cache.rs
+- logging.rs
+- mod.rs

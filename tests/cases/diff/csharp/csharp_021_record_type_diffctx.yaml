@@ -1,13 +1,10 @@
 must_include_files:
-  - Services/PersonService.cs
-  - Models/PersonRecord.cs
+- Services/PersonService.cs
 must_include_content:
-  - |
-    return person with { Age = newAge };
+- public Person CreatePerson(string first, string last, int age)
+- public Person UpdateAge(Person person, int newAge)
 must_not_include:
-  - GARBAGE_CS_021_GEO_SERVICE_A
-  - GARBAGE_CS_021_CURRENCY_CONVERTER_B
-  - GeoService
-  - CurrencyConverter
-  - Unrelated/GeoService.cs
-  - Unrelated/CurrencyConverter.cs
+- GARBAGE_CS_021_CURRENCY_CONVERTER_B
+- GARBAGE_CS_021_GEO_SERVICE_A
+- CurrencyConverter.cs
+- GeoService.cs

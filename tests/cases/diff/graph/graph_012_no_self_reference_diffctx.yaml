@@ -1,11 +1,8 @@
-must_include:
-- func
+must_include_files:
+- module.py
+must_include_content:
+- 'def memoized_func(n, cache=None):'
 must_not_include:
-- GARBAGE_GRAPH_hij001
-- GARBAGE_GRAPH_hij002
-- GARBAGE_GRAPH_hij003
-- ackermann
-- tower_of_hanoi
-- is_even_GARBAGE
-- is_odd_GARBAGE
-- nested_recurse
+- mutual_recursion_GARBAGE_GRAPH_hij002.py
+- nested_recursion_GARBAGE_GRAPH_hij003.py
+- recursive_garbage_GARBAGE_GRAPH_hij001.py

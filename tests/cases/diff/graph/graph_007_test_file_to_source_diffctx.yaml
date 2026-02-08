@@ -1,12 +1,8 @@
-must_include:
-- add
+must_include_files:
 - calculator.py
+must_include_content:
+- return float(a) + float(b)
 must_not_include:
-- GARBAGE_GRAPH_stu001
-- GARBAGE_GRAPH_stu002
-- GARBAGE_GRAPH_stu003
-- test_circle_area
-- test_rectangle_perimeter
-- TestTriangle
-- parse_json_GARBAGE
-- JsonProcessor
+- test_geometry_GARBAGE_GRAPH_stu001.py
+- test_json_GARBAGE_GRAPH_stu003.py
+- unrelated_source_GARBAGE_GRAPH_stu002.py

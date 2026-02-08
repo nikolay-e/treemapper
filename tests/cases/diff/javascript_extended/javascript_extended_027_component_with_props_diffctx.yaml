@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - App.tsx
-must_not_include:
-- react_adv_garbage_marker_001
+must_include_content:
+- import { Card } from './Card';
+- function App() {

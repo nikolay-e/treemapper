@@ -1,70 +1,24 @@
-src/app.py: |
-  import os
-  import tarfile
-  from pathlib import Path
+src/app.py: "import os\nimport tarfile\nfrom pathlib import Path\n\nASSETS_DIR = Path('/app/assets')\nCONFIG_DIR = Path('/app/config')\n\ndef extract_assets():\n    if ASSETS_DIR.exists():\n        print(f\"\
+  Assets loaded: {list(ASSETS_DIR.iterdir())}\")\n\ndef load_config():\n    config_file = CONFIG_DIR / 'app.json'\n    if config_file.exists():\n        return config_file.read_text()\n    return '{}'\n"
+assets.tar.gz: '(binary tarball placeholder)
 
-  ASSETS_DIR = Path('/app/assets')
-  CONFIG_DIR = Path('/app/config')
+  '
+requirements.txt: 'flask==2.3.0
 
-  def extract_assets():
-      if ASSETS_DIR.exists():
-          print(f"Assets loaded: {list(ASSETS_DIR.iterdir())}")
+  '
+Dockerfile: "FROM python:3.12-slim-bookworm AS base\nENV PYTHONDONTWRITEBYTECODE=1\nENV PYTHONUNBUFFERED=1\n\nFROM base AS dependencies\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir\
+  \ -r requirements.txt\n\nFROM base AS production\nWORKDIR /app\n\n# ADD automatically extracts tar archives\nADD assets.tar.gz /app/assets/\n\n# ADD can fetch remote URLs (use with caution - prefer COPY\
+  \ for local files)\nADD --checksum=sha256:abc123def456 https://releases.example.com/config/v1.0/defaults.json /app/config/defaults.json\n\n# COPY for regular files (preferred over ADD for non-archives)\n\
+  COPY --from=dependencies /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages\nCOPY --from=dependencies /usr/local/bin /usr/local/bin\nCOPY src/ ./src/\n\nRUN useradd --create-home\
+  \ appuser && \\\n    chown -R appuser:appuser /app\nUSER appuser\n\nCMD [\"python\", \"src/app.py\"]\n"
+scripts/prepare_assets.sh: '#!/bin/bash
 
-  def load_config():
-      config_file = CONFIG_DIR / 'app.json'
-      if config_file.exists():
-          return config_file.read_text()
-      return '{}'
-assets.tar.gz: |
-  (binary tarball placeholder)
-requirements.txt: |
-  flask==2.3.0
-Dockerfile: |
-  FROM python:3.12-slim-bookworm AS base
-  ENV PYTHONDONTWRITEBYTECODE=1
-  ENV PYTHONUNBUFFERED=1
-
-  FROM base AS dependencies
-  WORKDIR /app
-  COPY requirements.txt .
-  RUN pip install --no-cache-dir -r requirements.txt
-
-  FROM base AS production
-  WORKDIR /app
-
-  # ADD automatically extracts tar archives
-  ADD assets.tar.gz /app/assets/
-
-  # ADD can fetch remote URLs (use with caution - prefer COPY for local files)
-  ADD --checksum=sha256:abc123def456 https://releases.example.com/config/v1.0/defaults.json /app/config/defaults.json
-
-  # COPY for regular files (preferred over ADD for non-archives)
-  COPY --from=dependencies /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-  COPY --from=dependencies /usr/local/bin /usr/local/bin
-  COPY src/ ./src/
-
-  RUN useradd --create-home appuser && \
-      chown -R appuser:appuser /app
-  USER appuser
-
-  CMD ["python", "src/app.py"]
-scripts/prepare_assets.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_515_ASSETS_MARKER_001
-  GARBAGE_DOCKER_515_ASSETS_VAR_002="prepare"
   tar -czf assets.tar.gz assets/
-tests/test_assets.py: |
-  # GARBAGE_DOCKER_515_TEST_MARKER_003
-  GARBAGE_DOCKER_515_TEST_ASSETS_004 = {"path": "/app/assets"}
-  def test_assets_loaded():
-      pass
-docs/assets.md: |
-  # Asset Management
-  GARBAGE_DOCKER_515_ASSET_DOC_005
-  GARBAGE_DOCKER_515_BUNDLE_006="assets.tar.gz"
-cdn/config.yaml: |
-  # GARBAGE_DOCKER_515_CDN_MARKER_007
-  GARBAGE_DOCKER_515_CDN_VAR_008: cloudfront
-build/checksums.txt: |
-  # GARBAGE_DOCKER_515_CHECKSUM_MARKER_009
-  GARBAGE_DOCKER_515_SHA256_010="abc123"
+
+  '
+tests/test_assets.py: "def test_assets_loaded():\n    pass\n"
+docs/assets.md: '# Asset Management
+
+  '
+cdn/config.yaml: ''
+build/checksums.txt: ''

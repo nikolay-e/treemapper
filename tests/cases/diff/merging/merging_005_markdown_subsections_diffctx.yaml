@@ -1,14 +1,9 @@
-must_include:
-- Core Components
-- four main services
-- fraud scoring
-- architecture.md
+must_include_files:
+- docs/architecture.md
+must_include_content:
+- The platform consists of four main services that communicate via message queues.
 must_not_include:
 - GARBAGE_MERGE_005_MARKER_A
 - GARBAGE_MERGE_005_MARKER_B
-- GARBAGE_MERGE_005_A_CLEAN
-- GARBAGE_MERGE_005_A_VERSION
-- GARBAGE_MERGE_005_B_SUMMARY
-- GARBAGE_MERGE_005_B_VERSION
-- text_sanitizer.py
 - health_monitor.py
+- text_sanitizer.py

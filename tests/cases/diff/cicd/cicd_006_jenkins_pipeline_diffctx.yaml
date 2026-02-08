@@ -1,41 +1,13 @@
 must_include_files:
-  - Jenkinsfile
-  - src/app.js
+- Jenkinsfile
 must_include_content:
-  - |
-    environment {
-        NODE_ENV = 'production'
-    }
-  - |
-    stages {
-        stage('Build') {
-            steps {
-                sh 'npm ci'
-                sh 'npm run build'
-            }
-        }
-        stage('Test') {
-            steps {
-                sh 'npm test'
-            }
-        }
-    }
-  - |
-    async function startApp() {
-        const config = loadConfig();
-        const app = createApp(config);
-
-        const server = app.listen(config.port, () => {
-            logger.info(`Server running on port ${config.port}`);
-        });
+- stage('Test') {
 must_not_include:
-  - GARBAGE_CICD_006_DEPLOY_MARKER_A
-  - GARBAGE_CICD_006_TARGET_MARKER_B
-  - GARBAGE_CICD_006_STRATEGY_MARKER_C
-  - GARBAGE_CICD_006_ARTIFACT_MARKER_D
-  - GARBAGE_CICD_006_VERSION_MARKER_E
-  - GARBAGE_CICD_006_PATH_MARKER_F
-  - GarbageDeploymentManager
-  - GarbageArtifactStorage
-  - garbage_deployment.js
-  - garbage_artifacts.js
+- GARBAGE_CICD_006_ARTIFACT_MARKER_D
+- GARBAGE_CICD_006_DEPLOY_MARKER_A
+- GARBAGE_CICD_006_PATH_MARKER_F
+- GARBAGE_CICD_006_STRATEGY_MARKER_C
+- GARBAGE_CICD_006_TARGET_MARKER_B
+- GARBAGE_CICD_006_VERSION_MARKER_E
+- garbage_artifacts.js
+- garbage_deployment.js

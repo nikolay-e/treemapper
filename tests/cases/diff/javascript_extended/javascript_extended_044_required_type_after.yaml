@@ -1,17 +1,3 @@
-options.ts: |
-  export interface Options {
-      name?: string;
-      value?: number;
-      enabled?: boolean;
-  }
-
-  // ts_ext_garbage_marker_006
-  const GARBAGE_OPTIONS = { garbage: undefined };
-validator.ts: |
-  import { Options } from './options';
-
-  type StrictOptions = Required<Options>;
-
-  function validate(options: StrictOptions): boolean {
-      return options.name.length > 0 && options.value >= 0 && typeof options.enabled === 'boolean';
-  }
+options.ts: "export interface Options {\n    name?: string;\n    value?: number;\n    enabled?: boolean;\n}\n\n// ts_ext_garbage_marker_006\n"
+validator.ts: "import { Options } from './options';\n\ntype StrictOptions = Required<Options>;\n\nfunction validate(options: StrictOptions): boolean {\n    return options.name.length > 0 && options.value\
+  \ >= 0 && typeof options.enabled === 'boolean';\n}\n"

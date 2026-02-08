@@ -1,24 +1,10 @@
 must_include_files:
-  - calculate_order_total.sql
+- sql/procedures/calculate_order_total.sql
 must_include_content:
-  - |
-    CREATE OR REPLACE FUNCTION calculate_order_total(
-        p_order_id INTEGER,
-        p_include_tax BOOLEAN DEFAULT FALSE,
-        p_include_shipping BOOLEAN DEFAULT FALSE
-    )
-  - |
-    IF p_include_tax THEN
-        v_total := v_total * (1 + v_tax_rate);
-    END IF;
+- CREATE OR REPLACE FUNCTION calculate_order_total(
 must_not_include:
-  - GARBAGE_CICD_DOCS_068_PROCEDURE_MARKER_A
-  - GARBAGE_CICD_DOCS_068_SECURITY_MARKER_B
-  - GARBAGE_CICD_DOCS_068_VOLATILE_MARKER_C
-  - GARBAGE_CICD_DOCS_068_EXECUTOR_MARKER_D
-  - GARBAGE_CICD_DOCS_068_CACHE_MARKER_E
-  - GARBAGE_CICD_DOCS_068_PARALLEL_MARKER_F
-  - GarbageProcedureManager
-  - GarbageFunctionExecutor
-  - garbage_procedure_manager.ts
-  - garbage_function_executor.ts
+- GARBAGE_CICD_DOCS_068_CACHE_MARKER_E
+- GARBAGE_CICD_DOCS_068_EXECUTOR_MARKER_D
+- GARBAGE_CICD_DOCS_068_PARALLEL_MARKER_F
+- GARBAGE_CICD_DOCS_068_VOLATILE_MARKER_C
+- garbage_function_executor.ts

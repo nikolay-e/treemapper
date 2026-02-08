@@ -1,89 +1,30 @@
-package.json: |
-  {
-    "name": "api-server",
-    "version": "1.0.0",
-    "scripts": {
-      "build": "tsc",
-      "start": "node dist/index.js",
-      "dev": "ts-node src/index.ts"
-    },
-    "dependencies": {
-      "express": "^4.18.2",
-      "pg": "^8.11.3"
-    },
-    "devDependencies": {
-      "typescript": "^5.3.3",
-      "@types/node": "^20.10.0",
-      "@types/express": "^4.17.21"
-    }
-  }
-src/index.ts: |
-  import express from 'express';
+package.json: "{\n  \"name\": \"api-server\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"build\": \"tsc\",\n    \"start\": \"node dist/index.js\",\n    \"dev\": \"ts-node src/index.ts\"\n  },\n\
+  \  \"dependencies\": {\n    \"express\": \"^4.18.2\",\n    \"pg\": \"^8.11.3\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"^5.3.3\",\n    \"@types/node\": \"^20.10.0\",\n    \"@types/express\"\
+  : \"^4.17.21\"\n  }\n}\n"
+src/index.ts: 'import express from ''express'';
+
   const app = express();
-  app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+  app.get(''/health'', (req, res) => res.json({ status: ''ok'' }));
+
   app.listen(3000);
-tsconfig.json: |
-  {
-    "compilerOptions": {
-      "target": "ES2022",
-      "module": "commonjs",
-      "outDir": "./dist",
-      "strict": true
-    }
-  }
-Dockerfile: |
-  # Build stage
-  FROM node:20-alpine AS builder
-  WORKDIR /app
 
-  # Install dependencies first (better caching)
-  COPY package*.json ./
-  RUN npm ci --only=production && \
-      cp -R node_modules /prod_modules && \
-      npm ci
+  '
+tsconfig.json: "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"commonjs\",\n    \"outDir\": \"./dist\",\n    \"strict\": true\n  }\n}\n"
+Dockerfile: "# Build stage\nFROM node:20-alpine AS builder\nWORKDIR /app\n\n# Install dependencies first (better caching)\nCOPY package*.json ./\nRUN npm ci --only=production && \\\n    cp -R node_modules\
+  \ /prod_modules && \\\n    npm ci\n\n# Build application\nCOPY tsconfig.json ./\nCOPY src ./src\nRUN npm run build\n\n# Production stage\nFROM node:20-alpine AS production\nWORKDIR /app\n\n# Security:\
+  \ run as non-root\nRUN addgroup -g 1001 -S nodejs && \\\n    adduser -S nodejs -u 1001\n\n# Copy production dependencies and built code\nCOPY --from=builder --chown=nodejs:nodejs /prod_modules ./node_modules\n\
+  COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist\nCOPY --from=builder --chown=nodejs:nodejs /app/package.json ./\n\nUSER nodejs\nEXPOSE 3000\nENV NODE_ENV=production\n\nHEALTHCHECK --interval=30s\
+  \ --timeout=3s --start-period=5s \\\n    CMD node -e \"require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))\"\n\nCMD [\"node\", \"dist/index.js\"]\n"
+scripts/deploy.sh: '#!/bin/bash
 
-  # Build application
-  COPY tsconfig.json ./
-  COPY src ./src
-  RUN npm run build
-
-  # Production stage
-  FROM node:20-alpine AS production
-  WORKDIR /app
-
-  # Security: run as non-root
-  RUN addgroup -g 1001 -S nodejs && \
-      adduser -S nodejs -u 1001
-
-  # Copy production dependencies and built code
-  COPY --from=builder --chown=nodejs:nodejs /prod_modules ./node_modules
-  COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-  COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
-
-  USER nodejs
-  EXPOSE 3000
-  ENV NODE_ENV=production
-
-  HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-      CMD node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
-
-  CMD ["node", "dist/index.js"]
-scripts/deploy.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_502_DEPLOY_MARKER_001
-  GARBAGE_DOCKER_502_DEPLOY_VAR_002="production"
   docker push myregistry/api:latest
-tests/api.test.ts: |
-  // GARBAGE_DOCKER_502_TEST_MARKER_003
-  const GARBAGE_DOCKER_502_TEST_VAR_004 = "test";
-  describe('API', () => {
-    it('should return health', () => {});
-  });
-docs/architecture.md: |
-  # Architecture
-  GARBAGE_DOCKER_502_ARCH_MARKER_005
-  GARBAGE_DOCKER_502_DESIGN_006="microservices"
-migrations/001_init.sql: |
-  -- GARBAGE_DOCKER_502_MIGRATION_MARKER_007
-  -- GARBAGE_DOCKER_502_SQL_008
-  CREATE TABLE users (id SERIAL PRIMARY KEY);
+
+  '
+tests/api.test.ts: "describe('API', () => {\n  it('should return health', () => {});\n});\n"
+docs/architecture.md: '# Architecture
+
+  '
+migrations/001_init.sql: 'CREATE TABLE users (id SERIAL PRIMARY KEY);
+
+  '

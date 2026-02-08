@@ -1,24 +1,13 @@
 must_include_files:
-  - user_orders_view.sql
+- sql/views/user_orders_view.sql
 must_include_content:
-  - |
-    COALESCE(AVG(o.total), 0) AS avg_order_value,
-    MIN(o.created_at) AS first_order_date,
-    MAX(o.created_at) AS last_order_date,
-  - |
-    CASE
-        WHEN COUNT(o.id) >= 10 THEN 'gold'
-        WHEN COUNT(o.id) >= 5 THEN 'silver'
-        ELSE 'bronze'
-    END AS customer_tier
+- u.email AS user_email,
 must_not_include:
-  - GARBAGE_CICD_DOCS_069_VIEW_MARKER_A
-  - GARBAGE_CICD_DOCS_069_REFRESH_MARKER_B
-  - GARBAGE_CICD_DOCS_069_CACHE_MARKER_C
-  - GARBAGE_CICD_DOCS_069_OPTIMIZE_MARKER_D
-  - GARBAGE_CICD_DOCS_069_INDEX_MARKER_E
-  - GARBAGE_CICD_DOCS_069_VACUUM_MARKER_F
-  - GarbageViewManager
-  - GarbageViewOptimizer
-  - garbage_view_manager.ts
-  - garbage_view_optimizer.ts
+- GARBAGE_CICD_DOCS_069_CACHE_MARKER_C
+- GARBAGE_CICD_DOCS_069_INDEX_MARKER_E
+- GARBAGE_CICD_DOCS_069_OPTIMIZE_MARKER_D
+- GARBAGE_CICD_DOCS_069_REFRESH_MARKER_B
+- GARBAGE_CICD_DOCS_069_VACUUM_MARKER_F
+- GARBAGE_CICD_DOCS_069_VIEW_MARKER_A
+- garbage_view_manager.ts
+- garbage_view_optimizer.ts

@@ -1,16 +1,15 @@
-must_include:
-- GLOBAL_CONFIG
-- lazy_static
-- get_greeting
-- format_version
+must_include_files:
+- src/constants.rs
+- src/lib.rs
+- src/messages.rs
+must_include_content:
+- 'pub const APP_NAME: &''static str = "MyApp";'
+- pub mod messages;
 must_not_include:
-- GARBAGE_RUST_036_MIME_DETECTOR_A
 - GARBAGE_RUST_036_DEFAULT_MIME_B
-- GarbageMimeDetector036
-- garbage_detect_036
-- garbage_register_mime_036
-- GARBAGE_RUST_036_URL_PARSER_C
 - GARBAGE_RUST_036_DEFAULT_SCHEME_D
-- GarbageUrlParser036
-- garbage_parse_036
-- garbage_join_path_036
+- GARBAGE_RUST_036_MIME_DETECTOR_A
+- GARBAGE_RUST_036_URL_PARSER_C
+- mime_detector.rs
+- mod.rs
+- url_parser.rs

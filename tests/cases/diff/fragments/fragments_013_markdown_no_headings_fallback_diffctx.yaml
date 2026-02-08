@@ -1,9 +1,4 @@
-must_include:
+must_include_files:
 - no_headings.md
-- paragraph
-must_not_include:
-- GARBAGE_FRAG_garbpara1_052
-- GARBAGE_FRAG_garbpara2_052
-- GARBAGE_FRAG_garbpara3_052
-- GARBAGE_FRAG_garbfinal052
-- garbage_no_headings_052.md
+must_include_content:
+- Each paragraph should be handled properly.

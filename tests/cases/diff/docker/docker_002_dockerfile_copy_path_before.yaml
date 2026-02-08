@@ -1,79 +1,34 @@
-src/index.js: |
-  const express = require('express');
-  const cors = require('cors');
-  const helmet = require('helmet');
+src/index.js: "const express = require('express');\nconst cors = require('cors');\nconst helmet = require('helmet');\n\nconst app = express();\napp.use(cors());\napp.use(helmet());\napp.use(express.json());\n\
+  \napp.get('/api/health', (req, res) => {\n    res.json({ status: 'healthy', timestamp: Date.now() });\n});\n\napp.get('/api/users', (req, res) => {\n    res.json({ users: [] });\n});\n\nconst PORT = process.env.PORT\
+  \ || 3000;\napp.listen(PORT, () => console.log(`Server running on port ${PORT}`));\n"
+src/middleware/auth.js: "const jwt = require('jsonwebtoken');\n\nfunction authenticateToken(req, res, next) {\n    const token = req.headers['authorization']?.split(' ')[1];\n    if (!token) return res.sendStatus(401);\n\
+  \    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {\n        if (err) return res.sendStatus(403);\n        req.user = user;\n        next();\n    });\n}\n\nmodule.exports = { authenticateToken\
+  \ };\n"
+package.json: "{\n  \"name\": \"api-server\",\n  \"version\": \"1.0.0\",\n  \"main\": \"src/index.js\",\n  \"scripts\": {\n    \"start\": \"node src/index.js\",\n    \"dev\": \"nodemon src/index.js\"\n\
+  \  },\n  \"dependencies\": {\n    \"express\": \"^4.18.2\",\n    \"cors\": \"^2.8.5\",\n    \"helmet\": \"^7.1.0\",\n    \"jsonwebtoken\": \"^9.0.0\"\n  }\n}\n"
+Dockerfile: 'FROM node:18
 
-  const app = express();
-  app.use(cors());
-  app.use(helmet());
-  app.use(express.json());
-
-  app.get('/api/health', (req, res) => {
-      res.json({ status: 'healthy', timestamp: Date.now() });
-  });
-
-  app.get('/api/users', (req, res) => {
-      res.json({ users: [] });
-  });
-
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-src/middleware/auth.js: |
-  const jwt = require('jsonwebtoken');
-
-  function authenticateToken(req, res, next) {
-      const token = req.headers['authorization']?.split(' ')[1];
-      if (!token) return res.sendStatus(401);
-      jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-          if (err) return res.sendStatus(403);
-          req.user = user;
-          next();
-      });
-  }
-
-  module.exports = { authenticateToken };
-package.json: |
-  {
-    "name": "api-server",
-    "version": "1.0.0",
-    "main": "src/index.js",
-    "scripts": {
-      "start": "node src/index.js",
-      "dev": "nodemon src/index.js"
-    },
-    "dependencies": {
-      "express": "^4.18.2",
-      "cors": "^2.8.5",
-      "helmet": "^7.1.0",
-      "jsonwebtoken": "^9.0.0"
-    }
-  }
-Dockerfile: |
-  FROM node:18
   WORKDIR /app
+
   COPY src/ /app/src/
+
   CMD ["node", "src/index.js"]
-scripts/deploy.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_072_DEPLOY_MARKER_x1y2z3
-  GARBAGE_DOCKER_072_DEPLOY_ENV_a4b5c6="staging"
+
+  '
+scripts/deploy.sh: '#!/bin/bash
+
   docker build -t api:latest .
-tests/api.test.js: |
-  // GARBAGE_DOCKER_072_TEST_MARKER_d7e8f9
-  const GARBAGE_DOCKER_072_TEST_SUITE_g0h1i2 = "integration";
-  describe('API', () => {
-      it('should return health', () => {});
-  });
-docs/api.md: |
-  # API Documentation
-  GARBAGE_DOCKER_072_DOC_MARKER_j3k4l5
-  GARBAGE_DOCKER_072_SWAGGER_m6n7o8="v3"
-terraform/main.tf: |
-  # GARBAGE_DOCKER_072_TF_MARKER_p9q0r1
-  provider "aws" {
-    GARBAGE_DOCKER_072_TF_REGION_s2t3u4 = "us-east-1"
+
+  '
+tests/api.test.js: "describe('API', () => {\n    it('should return health', () => {});\n});\n"
+docs/api.md: '# API Documentation
+
+  '
+terraform/main.tf: 'provider "aws" {
+
   }
-.github/workflows/build.yml: |
-  # GARBAGE_DOCKER_072_GH_MARKER_v5w6x7
-  name: Build
-  GARBAGE_DOCKER_072_TRIGGER_y8z9a0: push
+
+  '
+.github/workflows/build.yml: 'name: Build
+
+  '

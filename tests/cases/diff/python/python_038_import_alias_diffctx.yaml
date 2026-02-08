@@ -1,7 +1,8 @@
-must_include:
-- def filter_by_date_range
-- step_count
-- clear
+must_include_files:
+- data_utils.py
+must_include_content:
+- 'def clear(self) -> None:'
+- def filter_by_date_range(
 must_not_include:
 - GARBAGE_PYTHON_038_001
 - GARBAGE_PYTHON_038_002
@@ -12,9 +13,6 @@ must_not_include:
 - GARBAGE_PYTHON_038_007
 - GARBAGE_PYTHON_038_008
 - GARBAGE_PYTHON_038_009
-- ModelTrainer
-- ReportSection
-- DataExporter
+- data_export.py
 - ml_pipeline.py
 - report_builder.py
-- data_export.py

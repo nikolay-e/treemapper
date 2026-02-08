@@ -18,7 +18,7 @@ Each test case consists of 3 files:
 
 ## Garbage Marker Pattern
 
-```
+```text
 GARBAGE_{CATEGORY}_{NUM}_{DESCRIPTION}_{LETTER}
 ```
 

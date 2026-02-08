@@ -1,6 +1,5 @@
-must_include:
+must_include_files:
 - Counter.vue
-- ref
-- computed
-must_not_include:
-- vue_garbage_marker_001
+must_include_content:
+- <div class="counter">
+- function decrement() {

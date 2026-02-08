@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - Counter.tsx
-must_not_include:
-- react_adv_garbage_marker_004
+must_include_content:
+- import { useReducer } from 'react';
+- 'initialState: State = { count: 0 }'

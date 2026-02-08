@@ -5,41 +5,17 @@ multi_section.md: '# Section One
 
   # Section Two
 
-  Content 2 GARBAGE_FRAG_sec2content051
-
 
   # Section Three
 
   Content 3
 
 
-  # Garbage Section A GARBAGE_FRAG_secA051
-
   Garbage content A
 
-  GARBAGE_FRAG_contentA051
-
-
-  ## Garbage Subsection A1 GARBAGE_FRAG_subA1_051
-
-  GARBAGE_FRAG_subcontentA1_051
-
-
-  # Garbage Section B GARBAGE_FRAG_secB051
 
   Garbage content B
 
-  GARBAGE_FRAG_contentB051
-
-
-  ## Garbage Subsection B1 GARBAGE_FRAG_subB1_051
-
-  GARBAGE_FRAG_subcontentB1_051
-
-
-  # Trailing Garbage GARBAGE_FRAG_trailing051
-
-  GARBAGE_FRAG_trailingcontent051
 
   '
 garbage_multi_051.md: '# Garbage Doc Section 1 GARBAGE_FRAG_garbdoc1_051

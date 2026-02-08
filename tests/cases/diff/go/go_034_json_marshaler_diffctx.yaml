@@ -1,40 +1,20 @@
-must_include:
-- Timestamp
-- Duration
-- Event
-- User
-- Response
-- SensitiveString
-- NullableInt
-- ResponseMeta
-- ErrorDetail
-- func (t Timestamp) MarshalJSON()
-- func (t *Timestamp) UnmarshalJSON(data []byte)
-- func (d Duration) MarshalJSON()
-- func (d *Duration) UnmarshalJSON(data []byte)
-- func (e Event) MarshalJSON()
-- func (u User) MarshalJSON()
-- func (s SensitiveString) MarshalJSON()
-- func (n NullableInt) MarshalJSON()
-- NewSuccessResponse
-- NewErrorResponse
-- NewPaginatedResponse
+must_include_files:
+- internal/api/types.go
+must_include_content:
+- '"encoding/json"'
+- func (t *Timestamp) UnmarshalJSON(data []byte) error {
 must_not_include:
-- GARBAGE_GO_OAUTH_CLIENT_A1B2C3
-- GARBAGE_GO_TYPE_TOKEN_D4E5F6
-- GARBAGE_GO_FUNC_OAUTH_G7H8I9
-- GARBAGE_GO_OAUTH_UNUSED_J0K1L2
-- GARBAGE_GO_FUNC_EXCHANGE_TOKEN_M3N4O5
-- GARBAGE_GO_OAUTH_OUTPUT_P6Q7R8
-- GARBAGE_GO_JWT_SERVICE_S9T0U1
-- GARBAGE_GO_TYPE_JWT_V2W3X4
+- GARBAGE_GO_FUNC_EXCHANGE_TOKEN_M3N4O5(ctx
+- GARBAGE_GO_FUNC_JWT_VERIFY_E1F2G3(token
 - GARBAGE_GO_FUNC_JWT_Y5Z6A7
-- GARBAGE_GO_JWT_OUTPUT_B8C9D0
-- GARBAGE_GO_FUNC_JWT_VERIFY_E1F2G3
-- GARBAGE_GO_SAML_SERVICE_H4I5J6
-- GARBAGE_GO_TYPE_SAML_K7L8M9
+- GARBAGE_GO_FUNC_OAUTH_G7H8I9
 - GARBAGE_GO_FUNC_SAML_N0O1P2
-- GARBAGE_GO_SAML_OUTPUT_Q3R4S5
-- oauth
-- jwt
-- saml
+- GARBAGE_GO_JWT_SERVICE_S9T0U1
+- GARBAGE_GO_OAUTH_CLIENT_A1B2C3
+- GARBAGE_GO_SAML_SERVICE_H4I5J6
+- GARBAGE_GO_TYPE_JWT_V2W3X4
+- GARBAGE_GO_TYPE_SAML_K7L8M9
+- GARBAGE_GO_TYPE_TOKEN_D4E5F6
+- jwt.go
+- oauth.go
+- saml.go

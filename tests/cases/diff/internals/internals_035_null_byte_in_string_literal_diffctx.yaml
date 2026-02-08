@@ -1,3 +1,4 @@
-must_include:
-- result
-- process
+must_include_files:
+- null_byte.py
+must_include_content:
+- s = "hello\x00world"

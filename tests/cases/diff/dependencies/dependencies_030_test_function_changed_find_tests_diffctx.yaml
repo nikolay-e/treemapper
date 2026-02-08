@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - calculator.py
-must_not_include:
-- garbage_marker_12345
+must_include_content:
+- return float(a) + float(b)

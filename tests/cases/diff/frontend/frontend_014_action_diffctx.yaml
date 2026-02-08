@@ -1,6 +1,5 @@
-must_include:
+must_include_files:
 - UserEditor.tsx
-- dispatch
-- useSelector
-must_not_include:
-- redux_garbage_marker_001
+must_include_content:
+- import React, { useState } from 'react';
+- 'currentUser = useSelector((state: RootState) => state.user.currentUser)'

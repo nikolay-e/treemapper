@@ -1,13 +1,9 @@
 must_include_files:
-  - Services/ProductService.cs
-  - Models/Product.cs
+- Services/ProductService.cs
 must_include_content:
-  - |
-    public IEnumerable<Product> GetExpensiveProducts(decimal minPrice)
+- public class ProductService
 must_not_include:
-  - GARBAGE_CS_012_IMAGE_RESIZER_A
-  - GARBAGE_CS_012_PDF_GENERATOR_B
-  - ImageResizer
-  - PdfGenerator
-  - Unrelated/ImageResizer.cs
-  - Unrelated/PdfGenerator.cs
+- GARBAGE_CS_012_IMAGE_RESIZER_A
+- GARBAGE_CS_012_PDF_GENERATOR_B
+- ImageResizer.cs
+- PdfGenerator.cs

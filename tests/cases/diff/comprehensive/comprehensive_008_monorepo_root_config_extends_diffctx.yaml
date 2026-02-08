@@ -1,16 +1,13 @@
 must_include_files:
-  - tsconfig.base.json
+- tsconfig.base.json
 must_include_content:
-  - |
-    "moduleResolution": "bundler",
+- '"target": "ES2022",'
 must_not_include:
-  - GARBAGE_COMP_008_BUNDLE_STAT_A
-  - GARBAGE_COMP_008_CHUNK_SPLIT_B
-  - GARBAGE_COMP_008_SOURCE_MAP_C
-  - GARBAGE_COMP_008_PLUGIN_ORDER_D
-  - GARBAGE_COMP_008_EXTERNAL_DEP_E
-  - GARBAGE_COMP_008_MINIFY_FLAG_F
-  - GarbageWebpackAnalyzer
-  - GarbageRollupPlugin
-  - garbage_webpack_analyzer.ts
-  - garbage_rollup_plugin.ts
+- GARBAGE_COMP_008_BUNDLE_STAT_A
+- GARBAGE_COMP_008_CHUNK_SPLIT_B
+- GARBAGE_COMP_008_EXTERNAL_DEP_E
+- GARBAGE_COMP_008_MINIFY_FLAG_F
+- GARBAGE_COMP_008_PLUGIN_ORDER_D
+- GARBAGE_COMP_008_SOURCE_MAP_C
+- garbage_rollup_plugin.ts
+- garbage_webpack_analyzer.ts

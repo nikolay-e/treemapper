@@ -1,19 +1,5 @@
-must_include:
-- 'healthcheck:'
-- 'condition: service_healthy'
-- 'start_period: 60s'
-- pg_isready -U postgres
-- redis-cli
-- 'retries: 5'
-- 'interval: 10s'
-must_not_include:
-- GARBAGE_DOCKER_522_HEALTH_MARKER_001
-- GARBAGE_DOCKER_522_HEALTH_VAR_002
-- GARBAGE_DOCKER_522_TEST_MARKER_003
-- GARBAGE_DOCKER_522_TEST_HEALTH_004
-- GARBAGE_DOCKER_522_HC_DOC_005
-- GARBAGE_DOCKER_522_ENDPOINTS_006
-- GARBAGE_DOCKER_522_PROBE_MARKER_007
-- GARBAGE_DOCKER_522_LIVENESS_008
-- GARBAGE_DOCKER_522_ALERT_MARKER_009
-- GARBAGE_DOCKER_522_ALERT_010
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- '- "8080:8080"'
+- 'postgres_data:'

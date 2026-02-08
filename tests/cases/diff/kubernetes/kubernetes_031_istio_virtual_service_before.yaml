@@ -1,165 +1,22 @@
-k8s/base/deployment-v1.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: product-service-v1
-    namespace: production
-    labels:
-      app: product-service
-      version: v1
-  spec:
-    replicas: 3
-    selector:
-      matchLabels:
-        app: product-service
-        version: v1
-    template:
-      metadata:
-        labels:
-          app: product-service
-          version: v1
-        annotations:
-          sidecar.istio.io/inject: "true"
-      spec:
-        containers:
-        - name: product
-          image: registry.example.com/product-service:v1.0.0
-          ports:
-          - containerPort: 8080
-            name: http
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-k8s/base/deployment-v2.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: product-service-v2
-    namespace: production
-    labels:
-      app: product-service
-      version: v2
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
-        app: product-service
-        version: v2
-    template:
-      metadata:
-        labels:
-          app: product-service
-          version: v2
-        annotations:
-          sidecar.istio.io/inject: "true"
-      spec:
-        containers:
-        - name: product
-          image: registry.example.com/product-service:v2.0.0
-          ports:
-          - containerPort: 8080
-            name: http
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-k8s/base/service.yaml: |
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: product-service
-    namespace: production
-  spec:
-    selector:
-      app: product-service
-    ports:
-    - name: http
-      port: 80
-      targetPort: 8080
-k8s/base/destination-rule.yaml: |
-  apiVersion: networking.istio.io/v1beta1
-  kind: DestinationRule
-  metadata:
-    name: product-service
-    namespace: production
-  spec:
-    host: product-service
-    trafficPolicy:
-      connectionPool:
-        tcp:
-          maxConnections: 100
-        http:
-          h2UpgradePolicy: UPGRADE
-    subsets:
-    - name: v1
-      labels:
-        version: v1
-    - name: v2
-      labels:
-        version: v2
-k8s/base/virtual-service.yaml: |
-  apiVersion: networking.istio.io/v1beta1
-  kind: VirtualService
-  metadata:
-    name: product-service
-    namespace: production
-  spec:
-    hosts:
-    - product-service
-    - product.example.com
-    gateways:
-    - product-gateway
-    - mesh
-k8s/unrelated/linkerd/service-profile.yaml: |
-  # GARBAGE_K8S_431_LINKERD_PROFILE
-  apiVersion: linkerd.io/v1alpha2
-  kind: ServiceProfile
-  metadata:
-    name: GARBAGE_K8S_431_PROFILE_NAME
-    namespace: linkerd
-  spec:
-    routes:
-    - name: GARBAGE_K8S_431_ROUTE_NAME
-      condition:
-        method: GARBAGE_K8S_431_METHOD
-        pathRegex: GARBAGE_K8S_431_PATH_REGEX
-k8s/unrelated/contour/httpproxy.yaml: |
-  # GARBAGE_K8S_431_CONTOUR_PROXY
-  apiVersion: projectcontour.io/v1
-  kind: HTTPProxy
-  metadata:
-    name: GARBAGE_K8S_431_HTTPPROXY_NAME
-    namespace: contour
-  spec:
-    virtualhost:
-      fqdn: GARBAGE_K8S_431_FQDN
-    routes:
-    - services:
-      - name: GARBAGE_K8S_431_PROXY_SVC
-        port: GARBAGE_K8S_431_PROXY_PORT
-k8s/unrelated/traefik/ingressroute.yaml: |
-  # GARBAGE_K8S_431_TRAEFIK_ROUTE
-  apiVersion: traefik.containo.us/v1alpha1
-  kind: IngressRoute
-  metadata:
-    name: GARBAGE_K8S_431_INGRESSROUTE
-    namespace: traefik
-  spec:
-    entryPoints:
-    - GARBAGE_K8S_431_ENTRYPOINT
-    routes:
-    - match: GARBAGE_K8S_431_MATCH_RULE
-      services:
-      - name: GARBAGE_K8S_431_TRAEFIK_SVC
-skaffold.yaml: |
-  # GARBAGE_K8S_431_SKAFFOLD
-  apiVersion: skaffold/v4beta5
-  kind: Config
-  metadata:
-    name: GARBAGE_K8S_431_SKAFFOLD_NAME
-  build:
-    artifacts:
-    - image: GARBAGE_K8S_431_SKAFFOLD_IMAGE
-      docker:
-        dockerfile: GARBAGE_K8S_431_DOCKERFILE
+k8s/base/deployment-v1.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: product-service-v1\n  namespace: production\n  labels:\n    app: product-service\n    version: v1\nspec:\n  replicas:\
+  \ 3\n  selector:\n    matchLabels:\n      app: product-service\n      version: v1\n  template:\n    metadata:\n      labels:\n        app: product-service\n        version: v1\n      annotations:\n  \
+  \      sidecar.istio.io/inject: \"true\"\n    spec:\n      containers:\n      - name: product\n        image: registry.example.com/product-service:v1.0.0\n        ports:\n        - containerPort: 8080\n\
+  \          name: http\n        resources:\n          requests:\n            memory: \"256Mi\"\n            cpu: \"250m\"\n"
+k8s/base/deployment-v2.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: product-service-v2\n  namespace: production\n  labels:\n    app: product-service\n    version: v2\nspec:\n  replicas:\
+  \ 2\n  selector:\n    matchLabels:\n      app: product-service\n      version: v2\n  template:\n    metadata:\n      labels:\n        app: product-service\n        version: v2\n      annotations:\n  \
+  \      sidecar.istio.io/inject: \"true\"\n    spec:\n      containers:\n      - name: product\n        image: registry.example.com/product-service:v2.0.0\n        ports:\n        - containerPort: 8080\n\
+  \          name: http\n        resources:\n          requests:\n            memory: \"256Mi\"\n            cpu: \"250m\"\n"
+k8s/base/service.yaml: "apiVersion: v1\nkind: Service\nmetadata:\n  name: product-service\n  namespace: production\nspec:\n  selector:\n    app: product-service\n  ports:\n  - name: http\n    port: 80\n\
+  \    targetPort: 8080\n"
+k8s/base/destination-rule.yaml: "apiVersion: networking.istio.io/v1beta1\nkind: DestinationRule\nmetadata:\n  name: product-service\n  namespace: production\nspec:\n  host: product-service\n  trafficPolicy:\n\
+  \    connectionPool:\n      tcp:\n        maxConnections: 100\n      http:\n        h2UpgradePolicy: UPGRADE\n  subsets:\n  - name: v1\n    labels:\n      version: v1\n  - name: v2\n    labels:\n    \
+  \  version: v2\n"
+k8s/base/virtual-service.yaml: "apiVersion: networking.istio.io/v1beta1\nkind: VirtualService\nmetadata:\n  name: product-service\n  namespace: production\nspec:\n  hosts:\n  - product-service\n  - product.example.com\n\
+  \  gateways:\n  - product-gateway\n  - mesh\n"
+k8s/unrelated/linkerd/service-profile.yaml: "# GARBAGE_K8S_431_LINKERD_PROFILE\napiVersion: linkerd.io/v1alpha2\nkind: ServiceProfile\nmetadata:\n  name: GARBAGE_K8S_431_PROFILE_NAME\n  namespace: linkerd\n\
+  spec:\n  routes:\n  - name: GARBAGE_K8S_431_ROUTE_NAME\n    condition:\n      method: GARBAGE_K8S_431_METHOD\n      pathRegex: GARBAGE_K8S_431_PATH_REGEX\n"
+k8s/unrelated/contour/httpproxy.yaml: "# GARBAGE_K8S_431_CONTOUR_PROXY\napiVersion: projectcontour.io/v1\nkind: HTTPProxy\nmetadata:\n  name: GARBAGE_K8S_431_HTTPPROXY_NAME\n  namespace: contour\nspec:\n\
+  \  virtualhost:\n    fqdn: GARBAGE_K8S_431_FQDN\n  routes:\n  - services:\n    - name: GARBAGE_K8S_431_PROXY_SVC\n      port: GARBAGE_K8S_431_PROXY_PORT\n"
+k8s/unrelated/traefik/ingressroute.yaml: "# GARBAGE_K8S_431_TRAEFIK_ROUTE\napiVersion: traefik.containo.us/v1alpha1\nkind: IngressRoute\nmetadata:\n  name: GARBAGE_K8S_431_INGRESSROUTE\n  namespace: traefik\n\
+  spec:\n  entryPoints:\n  - GARBAGE_K8S_431_ENTRYPOINT\n  routes:\n  - match: GARBAGE_K8S_431_MATCH_RULE\n    services:\n    - name: GARBAGE_K8S_431_TRAEFIK_SVC\n"
+skaffold.yaml: "apiVersion: skaffold/v4beta5\nkind: Config\nmetadata:\nbuild:\n  artifacts:\n    docker:\n"

@@ -1,2 +1,4 @@
-must_include:
-- check_domain
+must_include_files:
+- dns.tf
+must_include_content:
+- name                   = aws_lb.main.dns_name

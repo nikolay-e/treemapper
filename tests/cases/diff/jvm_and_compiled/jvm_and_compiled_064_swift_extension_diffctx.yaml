@@ -1,16 +1,11 @@
 must_include_files:
-  - Validator.swift
+- Validator.swift
 must_include_content:
-  - |
-    trimmed
-  - |
-    isValidEmail()
+- struct Validator {
 must_not_include:
-  - GARBAGE_JVM_064_PROTOCOL_MARKER_A
-  - GARBAGE_JVM_064_DEFAULT_MARKER_B
-  - GARBAGE_JVM_064_CONFORM_MARKER_C
-  - GARBAGE_JVM_064_WITNESS_MARKER_D
-  - GarbageProtocolDefault
-  - GarbageConformance
-  - GarbageProtocolDefault.swift
-  - GarbageConformance.swift
+- GARBAGE_JVM_064_CONFORM_MARKER_C
+- GARBAGE_JVM_064_DEFAULT_MARKER_B
+- GARBAGE_JVM_064_PROTOCOL_MARKER_A
+- GARBAGE_JVM_064_WITNESS_MARKER_D
+- GarbageConformance.swift
+- GarbageProtocolDefault.swift

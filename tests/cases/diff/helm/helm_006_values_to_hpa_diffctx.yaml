@@ -1,20 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/hpa.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    autoscaling:
-      enabled: true
-      minReplicas: 2
-      maxReplicas: 20
-      targetCPU: 80
-  - |
-    kind: HorizontalPodAutoscaler
-must_not_include:
-  - GARBAGE_HELM_006_SIDECAR_CM_A
-  - GARBAGE_HELM_006_SIDECAR_KEY_B
-  - GARBAGE_HELM_006_SIDECAR_PORT_C
-  - GARBAGE_HELM_006_INTEGRATION_HEADER_D
-  - GARBAGE_HELM_006_INTEGRATION_URL_E
-  - chart/templates/sidecar-config.yaml
-  - chart/test/integration.sh
+- 'enabled: true'

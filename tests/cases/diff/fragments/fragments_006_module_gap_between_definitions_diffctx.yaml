@@ -1,20 +1,8 @@
-must_include:
-- CONSTANT
+must_include_files:
+- gap_between.py
+must_include_content:
+- CONSTANT = 456
 must_not_include:
-- GARBAGE_FRAG_beforeconst021
-- GARBAGE_FRAG_afterconst021
-- GARBAGE_FRAG_gapclass021
-- GARBAGE_FRAG_gapmethod021
-- GARBAGE_FRAG_anotherconst021
-- GARBAGE_FRAG_trailing021
-- GARBAGE_FRAG_garbagea021
-- GARBAGE_FRAG_betweena021
-- GARBAGE_FRAG_garbageb021
-- GARBAGE_FRAG_betweenb021
-- GARBAGE_FRAG_gapvalue021
+- GARBAGE_CONST_A
+- GARBAGE_CONST_B
 - garbage_gap_021.py
-- unrelated_before_const_021
-- unrelated_after_const_021
-- trailing_function_021
-- UnrelatedGapClass
-- GarbageGapClass

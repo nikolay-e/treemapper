@@ -1,75 +1,39 @@
-src/api.py: |
-  from flask import Flask, jsonify
-  import os
+src/api.py: "from flask import Flask, jsonify\nimport os\n\napp = Flask(__name__)\n\nLOG_LEVEL = os.getenv(\"LOG_LEVEL\", \"info\")\nAPP_ENV = os.getenv(\"APP_ENV\", \"production\")\n\n@app.route('/health')\n\
+  def health():\n    return jsonify(status='ok', env=APP_ENV)\n\n@app.route('/api/version')\ndef version():\n    return jsonify(version=\"1.0.0\")\n\nif __name__ == \"__main__\":\n    app.run(host=\"0.0.0.0\"\
+  , port=8080)\n"
+requirements.txt: 'flask==2.3.0
 
-  app = Flask(__name__)
-
-  LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
-  APP_ENV = os.getenv("APP_ENV", "production")
-
-  @app.route('/health')
-  def health():
-      return jsonify(status='ok', env=APP_ENV)
-
-  @app.route('/api/version')
-  def version():
-      return jsonify(version="1.0.0")
-
-  if __name__ == "__main__":
-      app.run(host="0.0.0.0", port=8080)
-requirements.txt: |
-  flask==2.3.0
   gunicorn==21.2.0
-Dockerfile: |
-  FROM python:3.12-slim
+
+  '
+Dockerfile: 'FROM python:3.12-slim
+
   WORKDIR /app
+
   COPY requirements.txt .
+
   RUN pip install --no-cache-dir -r requirements.txt
+
   COPY src/ ./src/
+
   EXPOSE 8080
+
   CMD ["gunicorn", "-b", "0.0.0.0:8080", "src.api:app"]
-common.yml: |
-  version: '3.8'
-  services:
-    base:
-      environment:
-        - LOG_LEVEL=info
-      logging:
-        driver: json-file
-        options:
-          max-size: "10m"
-          max-file: "3"
-      restart: unless-stopped
-docker-compose.yml: |
-  version: '3.8'
-  services:
-    api:
-      extends:
-        file: common.yml
-        service: base
-      build: .
-      ports:
-        - "8080:8080"
-      environment:
-        - APP_ENV=production
-scripts/deploy.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCK_042_DEPLOY_SCRIPT_A
-  GARBAGE_DOCK_042_DEPLOY_TARGET_B="production"
+
+  '
+common.yml: "version: '3.8'\nservices:\n  base:\n    environment:\n      - LOG_LEVEL=info\n    logging:\n      driver: json-file\n      options:\n        max-size: \"10m\"\n        max-file: \"3\"\n   \
+  \ restart: unless-stopped\n"
+docker-compose.yml: "version: '3.8'\nservices:\n  api:\n    extends:\n      file: common.yml\n      service: base\n    build: .\n    ports:\n      - \"8080:8080\"\n    environment:\n      - APP_ENV=production\n"
+scripts/deploy.sh: '#!/bin/bash
+
   docker-compose up -d
-tests/test_extends.py: |
-  # GARBAGE_DOCK_042_EXTENDS_TEST_A
-  GARBAGE_DOCK_042_BASE_SERVICE_B = "base-svc"
-  def test_extends_config():
-      pass
-docs/compose-patterns.md: |
-  # Compose Patterns
-  GARBAGE_DOCK_042_PATTERN_DOC_A
-  GARBAGE_DOCK_042_REUSE_STRATEGY_B="extends"
-k8s/base-deployment.yaml: |
-  # GARBAGE_DOCK_042_K8S_BASE_A
-  apiVersion: apps/v1
-  GARBAGE_DOCK_042_KUSTOMIZE_B: base
-helm/values-common.yaml: |
-  # GARBAGE_DOCK_042_HELM_COMMON_A
-  GARBAGE_DOCK_042_GLOBAL_IMAGE_B: "python:3.12"
+
+  '
+tests/test_extends.py: "def test_extends_config():\n    pass\n"
+docs/compose-patterns.md: '# Compose Patterns
+
+  '
+k8s/base-deployment.yaml: 'apiVersion: apps/v1
+
+  '
+helm/values-common.yaml: ''

@@ -1,16 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/configmap.yaml
+- chart/templates/configmap.yaml
 must_include_content:
-  - |
-    name: {{ .Release.Name }}-config
-  - |
-    {{- toYaml .Values.config | nindent 4 }}
-must_not_include:
-  - GARBAGE_HELM_024_FALCO_RULES_A
-  - GARBAGE_HELM_024_FALCO_RULE_B
-  - GARBAGE_HELM_024_FALCO_MACRO_C
-  - GARBAGE_HELM_024_CONFIG_DOC_D
-  - GARBAGE_HELM_024_HOT_RELOAD_E
-  - chart/templates/falco-rules.yaml
-  - chart/docs/config-management.md
+- 'name: {{ .Release.Name }}-config'

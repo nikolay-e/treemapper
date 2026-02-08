@@ -1,15 +1,4 @@
-must_include:
-- load_config
-- Config
-- run_application
-must_not_include:
-- GARBAGE_DOCKER_073_ENV_MARKER_q1w2e3
-- GARBAGE_DOCKER_073_SETUP_VAR_r4t5y6
-- GARBAGE_DOCKER_073_TEST_MARKER_u7i8o9
-- GARBAGE_DOCKER_073_TEST_ENV_p0a1s2
-- GARBAGE_DOCKER_073_CONFIG_DOC_d3f4g5
-- GARBAGE_DOCKER_073_ENV_LIST_h6j7k8
-- GARBAGE_DOCKER_073_ANSIBLE_MARKER_l9z0x1
-- GARBAGE_DOCKER_073_VARS_c2v3b4
-- GARBAGE_DOCKER_073_HELM_MARKER_n5m6q7
-- GARBAGE_DOCKER_073_VALUES_w8e9r0
+must_include_files:
+- Dockerfile
+must_include_content:
+- COPY requirements.txt .

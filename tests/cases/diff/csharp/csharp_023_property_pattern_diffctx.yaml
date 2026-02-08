@@ -1,13 +1,11 @@
 must_include_files:
-  - Services/RequestHandler.cs
-  - Models/Request.cs
+- Services/RequestHandler.cs
 must_include_content:
-  - |
-    { Method: "GET", Path: "/" } => "Home",
+- using MyApp.Models;
+- public class RequestHandler
 must_not_include:
-  - GARBAGE_CS_023_CORS_HANDLER_A
-  - GARBAGE_CS_023_COMPRESSION_MW_B
-  - CorsHandler
-  - CompressionMiddleware
-  - Unrelated/CorsHandler.cs
-  - Unrelated/CompressionMiddleware.cs
+- GARBAGE_CS_023_COMPRESSION_MW_B
+- GARBAGE_CS_023_CORS_HANDLER_A
+- GARBAGE_CS_023_CORS_HANDLER_A.Length
+- CompressionMiddleware.cs
+- CorsHandler.cs

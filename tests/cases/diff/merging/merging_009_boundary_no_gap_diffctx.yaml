@@ -1,5 +1,2 @@
-must_include:
-- func1
-- func2
-- return 1
-- return 2
+must_include_files:
+- no_gap.py

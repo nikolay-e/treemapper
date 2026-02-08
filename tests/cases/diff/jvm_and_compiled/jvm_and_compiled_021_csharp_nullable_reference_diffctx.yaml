@@ -1,16 +1,11 @@
 must_include_files:
-  - UserRepository.cs
+- UserRepository.cs
 must_include_content:
-  - |
-    User?
-  - |
-    is null
+- class UserRepository
 must_not_include:
-  - GARBAGE_JVM_021_GUARD_MARKER_A
-  - GARBAGE_JVM_021_CHECK_MARKER_B
-  - GARBAGE_JVM_021_ASSERT_MARKER_C
-  - GARBAGE_JVM_021_VERIFY_MARKER_D
-  - GarbageGuardClause
-  - GarbageAssertHelper
-  - GarbageGuardClause.cs
-  - GarbageAssertHelper.cs
+- GARBAGE_JVM_021_ASSERT_MARKER_C
+- GARBAGE_JVM_021_CHECK_MARKER_B
+- GARBAGE_JVM_021_GUARD_MARKER_A
+- GARBAGE_JVM_021_VERIFY_MARKER_D
+- GarbageAssertHelper.cs
+- GarbageGuardClause.cs

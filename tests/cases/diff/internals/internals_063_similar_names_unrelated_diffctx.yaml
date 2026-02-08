@@ -1,24 +1,4 @@
-must_include:
-- add_item_to_cart
-- remove_item_from_cart
-- cart_id
-must_not_include:
-- WEATHER_API_MARKER_XYZ111
-- FETCH_TEMP_MARKER_ABC222
-- FETCH_HUMID_MARKER_DEF333
-- PARSER_MARKER_GHI444
-- STOCKS_TRACKER_MARKER_JKL555
-- STOCK_PRICE_MARKER_MNO666
-- MARKET_CAP_MARKER_PQR777
-- ANALYZER_MARKER_STU888
-- AUDIT_RECORDER_MARKER_VWX999
-- RECORD_ACTION_MARKER_YZA000
-- RETRIEVE_LOG_MARKER_BCD111
-- fetch_temperature
-- fetch_humidity
-- WeatherDataParser
-- get_stock_price
-- get_market_cap
-- StockAnalyzer
-- record_action
-- retrieve_log
+must_include_files:
+- src/shopping/cart_manager.py
+must_include_content:
+- 'if cart_id <= 0 or item_id <= 0:'

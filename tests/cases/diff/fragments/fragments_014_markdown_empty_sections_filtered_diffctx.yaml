@@ -1,18 +1,11 @@
-must_include:
+must_include_files:
 - sparse.md
-- Modified
+must_include_content:
+- Modified content here.
 must_not_include:
-- GARBAGE_FRAG_empty053
-- GARBAGE_FRAG_withcontent053
-- GARBAGE_FRAG_content053a
-- GARBAGE_FRAG_anotherempty053
-- GARBAGE_FRAG_final053
-- GARBAGE_FRAG_content053b
-- GARBAGE_FRAG_sub053
-- GARBAGE_FRAG_subcontent053
-- GARBAGE_FRAG_garbempty053
-- GARBAGE_FRAG_garbcontent053
-- GARBAGE_FRAG_garbline053a
 - GARBAGE_FRAG_garbanotherempty053
+- GARBAGE_FRAG_garbcontent053
+- GARBAGE_FRAG_garbempty053
+- GARBAGE_FRAG_garbline053a
 - GARBAGE_FRAG_garbline053b
 - garbage_sparse_053.md

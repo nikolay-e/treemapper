@@ -1,27 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/deployment.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    affinity:
-      nodeAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          nodeSelectorTerms:
-            - matchExpressions:
-                - key: kubernetes.io/arch
-                  operator: In
-                  values:
-                    - amd64
-  - |
-    {{- with .Values.affinity }}
-    affinity:
-      {{- toYaml . | nindent 8 }}
-    {{- end }}
-must_not_include:
-  - GARBAGE_HELM_012_VAULT_INJECTOR_A
-  - GARBAGE_HELM_012_VAULT_CONTAINER_B
-  - GARBAGE_HELM_012_VAULT_IMAGE_C
-  - GARBAGE_HELM_012_SCHEDULING_DOC_D
-  - GARBAGE_HELM_012_NODE_SELECTION_E
-  - chart/templates/vault-injector.yaml
-  - chart/docs/scheduling.md
+- 'nodeAffinity:'

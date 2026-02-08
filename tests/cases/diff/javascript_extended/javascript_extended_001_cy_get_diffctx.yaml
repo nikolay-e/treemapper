@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - form.cy.ts
-must_not_include:
-- cypress_garbage_marker_001
+must_include_content:
+- it('should submit form', () => {

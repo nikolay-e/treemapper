@@ -1,60 +1,19 @@
-must_include:
-- Parser<'a>
-- Token<'a>
-- first_word
-- longest
-- first_matching
-- StringInterner
-- Parseable
-- Identifier<'a>
-- Span
-- intern
-- parse_from
+must_include_files:
+- src/parser.rs
+must_include_content:
+- pub fn parse(&self) -> Vec<&'a str> {
+- pub fn first_word(&self) -> Option<&'a str> {
 must_not_include:
-- GARBAGE_RUST_NET_life001
-- GARBAGE_XYZPORT_life002
-- GARBAGE_XYZBUFFER_life003
-- GARBAGE_XYZTIMEOUT_life004
-- GarbageXyzNetData_life005
-- xyzfield_life006
-- xyzflag_life007
-- garbage_xyzinit_life008
-- xyzval_life009
-- garbage_xyzprocess_life010
-- garbage_xyzcheck_life011
-- GarbageXyzServer_life012
-- xyzport_life013
-- xyzactive_life014
-- garbage_xyzcreate_life015
-- xyzp_life016
-- garbage_xyzactivate_life017
-- garbage_xyzdeactivate_life018
-- GARBAGE_RUST_CRYPTO_life019
-- GARBAGE_QWERTY_life020
 - GARBAGE_ASDFGH_life021
-- GarbageQwertyData_life022
-- qwerty_life023
-- asdfgh_life024
-- garbage_qwerty_init_life025
-- qval_life026
-- aval_life027
-- garbage_qwerty_transform_life028
-- xyz_life029
-- GarbageZxcvbnState_life030
-- zxcvbn_life031
-- garbage_zxcvbn_create_life032
-- garbage_zxcvbn_modify_life033
-- qqq_life034
-- GARBAGE_RUST_CONFIG_life035
 - GARBAGE_MNBVCX_life036
-- GarbageMnbvcxEntry_life037
-- mnbvcx_life038
-- poiuyt_life039
-- garbage_mnbvcx_make_life040
-- mval_life041
-- garbage_mnbvcx_toggle_life042
-- garbage_mnbvcx_check_life043
-- GarbageLkjhgfHolder_life044
-- lkjhgf_life045
-- garbage_lkjhgf_build_life046
-- lval_life047
+- GARBAGE_QWERTY_life020
+- GARBAGE_RUST_CONFIG_life035
+- GARBAGE_RUST_CRYPTO_life019
+- GARBAGE_RUST_NET_life001
+- GARBAGE_XYZBUFFER_life003
+- GARBAGE_XYZPORT_life002
+- GARBAGE_XYZTIMEOUT_life004
+- config.rs
+- crypto.rs
+- mod.rs
+- network.rs

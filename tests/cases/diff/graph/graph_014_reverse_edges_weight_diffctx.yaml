@@ -1,18 +1,9 @@
-must_include:
-- main
-- helper
-- compute
-- validate
-- process_result
-- DataSource
-- ResultProcessor
+must_include_files:
+- caller.py
+must_include_content:
+- from callee import helper, compute, validate, DataSource
+- 'def main_with_caching():'
 must_not_include:
-- GARBAGE_GRAPH_nop001
-- GARBAGE_GRAPH_nop002
-- GARBAGE_GRAPH_nop003
-- reverse_main
-- reverse_helper
-- chain_a_GARBAGE
-- chain_b_GARBAGE
-- bidi_func_a
-- bidi_func_b
+- bidirectional_GARBAGE_GRAPH_nop003.py
+- chain_caller_GARBAGE_GRAPH_nop002.py
+- reverse_caller_GARBAGE_GRAPH_nop001.py

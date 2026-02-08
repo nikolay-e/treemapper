@@ -1,17 +1,11 @@
 must_include_files:
-  - decorators/logging.py
+- decorators/logging.py
 must_include_content:
-  - |
-    def log_calls(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            start_time = time.time()
+- start_time = time.time()
 must_not_include:
-  - GARBAGE_PAT_008_BATCH_PROCESSOR_A
-  - GARBAGE_PAT_008_BATCH_SIZE_B
-  - GARBAGE_PAT_008_QUEUE_MANAGER_A
-  - GARBAGE_PAT_008_MAX_QUEUE_B
-  - GarbageBatchProcessor
-  - GarbageQueueManager
-  - garbage_batch_processor.py
-  - garbage_queue_manager.py
+- GARBAGE_PAT_008_BATCH_PROCESSOR_A
+- GARBAGE_PAT_008_BATCH_SIZE_B
+- GARBAGE_PAT_008_MAX_QUEUE_B
+- GARBAGE_PAT_008_QUEUE_MANAGER_A
+- garbage_batch_processor.py
+- garbage_queue_manager.py

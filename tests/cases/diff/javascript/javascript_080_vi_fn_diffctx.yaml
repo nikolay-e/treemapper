@@ -1,19 +1,14 @@
 must_include_files:
-  - callback.test.ts
+- callback.test.ts
 must_include_content:
-  - |
-    it('should call callback for each number', () => {
-            const callback = vi.fn();
-            processNumbers([1, 2, 3], callback);
-            expect(callback).toHaveBeenCalledTimes(3);
+- import { describe, it, expect, vi } from 'vitest';
+- const callback = vi.fn();
 must_not_include:
-  - GARBAGE_JS_080_SERIAL_MARKER_A
-  - GARBAGE_JS_080_FORMAT_MARKER_B
-  - GARBAGE_JS_080_SERIALIZER_CLASS_C
-  - GARBAGE_JS_080_MIGRATE_MARKER_D
-  - GARBAGE_JS_080_VERSION_MARKER_E
-  - GARBAGE_JS_080_MIGRATOR_CLASS_F
-  - JsonSerializer
-  - SchemaMigrator
-  - garbage_serialization.ts
-  - garbage_migration.ts
+- GARBAGE_JS_080_FORMAT_MARKER_B
+- GARBAGE_JS_080_MIGRATE_MARKER_D
+- GARBAGE_JS_080_MIGRATOR_CLASS_F
+- GARBAGE_JS_080_SERIALIZER_CLASS_C
+- GARBAGE_JS_080_SERIAL_MARKER_A
+- GARBAGE_JS_080_VERSION_MARKER_E
+- garbage_migration.ts
+- garbage_serialization.ts

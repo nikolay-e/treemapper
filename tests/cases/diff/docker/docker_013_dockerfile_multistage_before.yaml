@@ -1,113 +1,40 @@
-src/index.ts: |
-  import express from 'express';
-  import cors from 'cors';
-  import helmet from 'helmet';
-  import compression from 'compression';
+src/index.ts: "import express from 'express';\nimport cors from 'cors';\nimport helmet from 'helmet';\nimport compression from 'compression';\n\nconst app = express();\nconst PORT = parseInt(process.env.PORT\
+  \ || '3000', 10);\n\napp.use(cors());\napp.use(helmet());\napp.use(compression());\napp.use(express.json());\n\nexport function init() {\n    console.log(\"App initialized\");\n}\n\napp.get('/health',\
+  \ (req, res) => {\n    res.json({ status: 'healthy', version: process.env.APP_VERSION || 'unknown' });\n});\n\napp.get('/api/users', (req, res) => {\n    res.json({ users: [] });\n});\n\napp.listen(PORT,\
+  \ () => {\n    init();\n    console.log(`Server running on port ${PORT}`);\n});\n"
+src/config.ts: "export interface AppConfig {\n    port: number;\n    nodeEnv: string;\n    logLevel: string;\n}\n\nexport function loadConfig(): AppConfig {\n    return {\n        port: parseInt(process.env.PORT\
+  \ || '3000', 10),\n        nodeEnv: process.env.NODE_ENV || 'development',\n        logLevel: process.env.LOG_LEVEL || 'info'\n    };\n}\n"
+package.json: "{\n  \"name\": \"api-server\",\n  \"version\": \"1.0.0\",\n  \"main\": \"dist/index.js\",\n  \"scripts\": {\n    \"build\": \"tsc\",\n    \"start\": \"node dist/index.js\",\n    \"dev\":\
+  \ \"ts-node src/index.ts\"\n  },\n  \"dependencies\": {\n    \"express\": \"^4.18.2\",\n    \"cors\": \"^2.8.5\",\n    \"helmet\": \"^7.1.0\",\n    \"compression\": \"^1.7.4\"\n  },\n  \"devDependencies\"\
+  : {\n    \"typescript\": \"^5.3.3\",\n    \"@types/node\": \"^20.10.0\",\n    \"@types/express\": \"^4.17.21\",\n    \"@types/compression\": \"^1.7.5\"\n  }\n}\n"
+tsconfig.json: "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"commonjs\",\n    \"outDir\": \"./dist\",\n    \"rootDir\": \"./src\",\n    \"strict\": true,\n    \"esModuleInterop\"\
+  : true,\n    \"skipLibCheck\": true,\n    \"forceConsistentCasingInFileNames\": true\n  },\n  \"include\": [\"src/**/*\"],\n  \"exclude\": [\"node_modules\", \"dist\"]\n}\n"
+Dockerfile: 'FROM node:18 AS builder
 
-  const app = express();
-  const PORT = parseInt(process.env.PORT || '3000', 10);
-
-  app.use(cors());
-  app.use(helmet());
-  app.use(compression());
-  app.use(express.json());
-
-  export function init() {
-      console.log("App initialized");
-  }
-
-  app.get('/health', (req, res) => {
-      res.json({ status: 'healthy', version: process.env.APP_VERSION || 'unknown' });
-  });
-
-  app.get('/api/users', (req, res) => {
-      res.json({ users: [] });
-  });
-
-  app.listen(PORT, () => {
-      init();
-      console.log(`Server running on port ${PORT}`);
-  });
-src/config.ts: |
-  export interface AppConfig {
-      port: number;
-      nodeEnv: string;
-      logLevel: string;
-  }
-
-  export function loadConfig(): AppConfig {
-      return {
-          port: parseInt(process.env.PORT || '3000', 10),
-          nodeEnv: process.env.NODE_ENV || 'development',
-          logLevel: process.env.LOG_LEVEL || 'info'
-      };
-  }
-package.json: |
-  {
-    "name": "api-server",
-    "version": "1.0.0",
-    "main": "dist/index.js",
-    "scripts": {
-      "build": "tsc",
-      "start": "node dist/index.js",
-      "dev": "ts-node src/index.ts"
-    },
-    "dependencies": {
-      "express": "^4.18.2",
-      "cors": "^2.8.5",
-      "helmet": "^7.1.0",
-      "compression": "^1.7.4"
-    },
-    "devDependencies": {
-      "typescript": "^5.3.3",
-      "@types/node": "^20.10.0",
-      "@types/express": "^4.17.21",
-      "@types/compression": "^1.7.5"
-    }
-  }
-tsconfig.json: |
-  {
-    "compilerOptions": {
-      "target": "ES2022",
-      "module": "commonjs",
-      "outDir": "./dist",
-      "rootDir": "./src",
-      "strict": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "forceConsistentCasingInFileNames": true
-    },
-    "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist"]
-  }
-Dockerfile: |
-  FROM node:18 AS builder
   WORKDIR /app
+
   COPY . .
+
   RUN npm run build
 
+
   FROM nginx:alpine
+
   COPY --from=builder /app/dist /usr/share/nginx/html
-scripts/build.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_083_BUILD_MARKER_a1b2c3
-  GARBAGE_DOCKER_083_BUILD_TARGET_d4e5f6="production"
+
+  '
+scripts/build.sh: '#!/bin/bash
+
   docker build -t api:latest .
-tests/api.test.ts: |
-  // GARBAGE_DOCKER_083_TEST_MARKER_g7h8i9
-  const GARBAGE_DOCKER_083_TEST_ENV_j0k1l2 = "test";
-  describe('API', () => {
-      it('should initialize', () => {});
-  });
-docs/build.md: |
-  # Build Process
-  GARBAGE_DOCKER_083_BUILD_DOC_m3n4o5
-  GARBAGE_DOCKER_083_STAGES_p6q7r8="builder,production"
-.github/workflows/docker.yml: |
-  # GARBAGE_DOCKER_083_GH_MARKER_s9t0u1
-  name: Docker Build
-  GARBAGE_DOCKER_083_WORKFLOW_v2w3x4: push
-k8s/deployment.yaml: |
-  # GARBAGE_DOCKER_083_K8S_MARKER_y5z6a7
-  apiVersion: apps/v1
-  GARBAGE_DOCKER_083_IMAGE_TAG_b8c9d0: latest
+
+  '
+tests/api.test.ts: "describe('API', () => {\n    it('should initialize', () => {});\n});\n"
+docs/build.md: '# Build Process
+
+  '
+.github/workflows/docker.yml: 'name: Docker Build
+
+  '
+k8s/deployment.yaml: 'apiVersion: apps/v1
+
+  '

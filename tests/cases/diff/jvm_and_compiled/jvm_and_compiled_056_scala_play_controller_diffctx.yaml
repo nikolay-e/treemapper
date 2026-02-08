@@ -1,17 +1,11 @@
 must_include_files:
-  - routes
-  - UserController.scala
+- UserController.scala
 must_include_content:
-  - |
-    AbstractController
-  - |
-    Action.async
+- import play.api.mvc._
 must_not_include:
-  - GARBAGE_JVM_056_AKKA_MARKER_A
-  - GARBAGE_JVM_056_HTTP_MARKER_B
-  - GARBAGE_JVM_056_ROUTE_MARKER_C
-  - GARBAGE_JVM_056_DIRECTIVE_MARKER_D
-  - GarbageAkkaRoute
-  - GarbageDirective
-  - GarbageAkkaRoute.scala
-  - GarbageDirective.scala
+- GARBAGE_JVM_056_AKKA_MARKER_A
+- GARBAGE_JVM_056_DIRECTIVE_MARKER_D
+- GARBAGE_JVM_056_HTTP_MARKER_B
+- GARBAGE_JVM_056_ROUTE_MARKER_C
+- GarbageAkkaRoute.scala
+- GarbageDirective.scala

@@ -1,11 +1,15 @@
-must_include:
-- Prerequisites
+must_include_files:
+- docs.md
+must_include_content:
+- '- Python 3.9+ (upgraded from 3.8)'
+- Run `pip install package-v2`.
 must_not_include:
 - GARBAGE_GRAPH_qrs001
+- GARBAGE_GRAPH_qrs001.
 - GARBAGE_GRAPH_qrs002
+- GARBAGE_GRAPH_qrs002.
 - GARBAGE_GRAPH_qrs003
-- Section A GARBAGE
-- Section B GARBAGE
-- Overview GARBAGE
-- Tutorial GARBAGE
-- Step 1 GARBAGE
+- GARBAGE_GRAPH_qrs003.
+- another_doc_GARBAGE_GRAPH_qrs002.md
+- tutorial_GARBAGE_GRAPH_qrs003.md
+- unrelated_docs_GARBAGE_GRAPH_qrs001.md

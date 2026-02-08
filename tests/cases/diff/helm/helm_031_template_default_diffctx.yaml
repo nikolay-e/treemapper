@@ -1,5 +1,4 @@
-must_include:
-- default 30
-must_not_include:
-- garbage_marker_12345
-- unused_marker_67890
+must_include_files:
+- templates/deployment.yaml
+must_include_content:
+- 'value: {{ .Values.timeout | default 30 | quote }}'

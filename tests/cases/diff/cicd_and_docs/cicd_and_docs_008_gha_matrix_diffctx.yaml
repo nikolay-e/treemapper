@@ -1,19 +1,13 @@
 must_include_files:
-  - .github/workflows/ci.yml
+- .github/workflows/ci.yml
 must_include_content:
-  - |
-    strategy:
-      matrix:
-        node: [16, 18, 20]
-        os: [ubuntu-latest, macos-latest]
+- 'node: [16, 18, 20]'
 must_not_include:
-  - GARBAGE_CICD_DOCS_008_COMPAT_MARKER_A
-  - GARBAGE_CICD_DOCS_008_SHIM_MARKER_B
-  - GARBAGE_CICD_DOCS_008_TARGET_MARKER_C
-  - GARBAGE_CICD_DOCS_008_PLATFORM_MARKER_D
-  - GARBAGE_CICD_DOCS_008_ARCH_MARKER_E
-  - GARBAGE_CICD_DOCS_008_NATIVE_MARKER_F
-  - GarbageCompatibilityLayer
-  - GarbagePlatformDetector
-  - garbage_compatibility.ts
-  - garbage_platform.ts
+- GARBAGE_CICD_DOCS_008_ARCH_MARKER_E
+- GARBAGE_CICD_DOCS_008_COMPAT_MARKER_A
+- GARBAGE_CICD_DOCS_008_NATIVE_MARKER_F
+- GARBAGE_CICD_DOCS_008_PLATFORM_MARKER_D
+- GARBAGE_CICD_DOCS_008_SHIM_MARKER_B
+- GARBAGE_CICD_DOCS_008_TARGET_MARKER_C
+- garbage_compatibility.ts
+- garbage_platform.ts

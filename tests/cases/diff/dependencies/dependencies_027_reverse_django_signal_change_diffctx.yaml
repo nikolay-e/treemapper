@@ -1,5 +1,4 @@
-must_include:
-- user.py
-- class User
-must_not_include:
-- garbage_marker_12345
+must_include_files:
+- models/user.py
+must_include_content:
+- updated_at = models.DateTimeField(auto_now=True)

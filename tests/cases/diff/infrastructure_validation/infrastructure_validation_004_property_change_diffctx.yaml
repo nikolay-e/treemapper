@@ -1,12 +1,5 @@
-must_include:
-- def __init__
-- full_name
-must_not_include:
-- GARBAGE_INFRA_004_CREATE_SCRIPT_A
-- GARBAGE_INFRA_004_DEFAULT_ROLE_B
-- GARBAGE_INFRA_004_USER_TEST_A
-- GARBAGE_INFRA_004_TEST_EMAIL_B
-- GARBAGE_INFRA_004_USER_DOC_A
-- GARBAGE_INFRA_004_FIELDS_LIST_B
-- GARBAGE_INFRA_004_MIGRATION_A
-- GARBAGE_INFRA_004_COLUMN_TYPE_B
+must_include_files:
+- user.py
+must_include_content:
+- 'def __init__(self, first: str, last: str, title: Optional[str] = None):'
+- 'if self.title:'

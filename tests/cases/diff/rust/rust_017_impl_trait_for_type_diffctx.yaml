@@ -1,25 +1,16 @@
-must_include:
-- Drawable
-- area
-- Resizable
-- Transformable
-- Rectangle
-- scale_to_area
-- translate
-- rotate
+must_include_files:
+- src/shapes.rs
+- src/traits.rs
+must_include_content:
+- use crate::traits::{Drawable, Resizable, Transformable};
+- println!("Drawing circle with radius {} at {:?}", self.radius, self.center);
 must_not_include:
-- GARBAGE_RUST_PHYSICS_001
+- GARBAGE_E_012
 - GARBAGE_GRAVITY_002
 - GARBAGE_LIGHT_SPEED_003
-- GarbageVector3D004
-- garbage_magnitude_005
-- garbage_normalize_006
-- GarbagePhysicsBody007
-- garbage_apply_force_008
-- garbage_update_009
-- GARBAGE_RUST_MATH_010
 - GARBAGE_PI_011
-- GARBAGE_E_012
-- GarbageMatrix4x4_013
-- garbage_identity_014
-- garbage_multiply_015
+- GARBAGE_RUST_MATH_010
+- GARBAGE_RUST_PHYSICS_001
+- math.rs
+- mod.rs
+- physics.rs

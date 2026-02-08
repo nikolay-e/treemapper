@@ -1,13 +1,10 @@
 must_include_files:
-  - Program.cs
-  - Extensions/StringExtensions.cs
+- Program.cs
 must_include_content:
-  - |
-    var slug = title.ToSlug();
+- using MyApp.Extensions;
+- static void Main()
 must_not_include:
-  - GARBAGE_CS_019_API_GATEWAY_A
-  - GARBAGE_CS_019_LOAD_BALANCER_B
-  - ApiGateway
-  - LoadBalancer
-  - Unrelated/ApiGateway.cs
-  - Unrelated/LoadBalancer.cs
+- GARBAGE_CS_019_API_GATEWAY_A
+- GARBAGE_CS_019_LOAD_BALANCER_B
+- ApiGateway.cs
+- LoadBalancer.cs

@@ -1,29 +1,16 @@
-must_include:
-- identity<T>
-- swap
-- compare
-- PartialOrd
-- min_by
-- max_by
-- compose
-- curry
+must_include_files:
+- src/utils.rs
+must_include_content:
+- use std::cmp::Ordering;
+- 'pub fn identity<T>(x: T) -> T {'
 must_not_include:
+- GARBAGE_FILTER_CAPACITY_015
+- GARBAGE_HEAPSORT_IMPL_008
+- GARBAGE_MERGESORT_IMPL_006
+- GARBAGE_QUICKSORT_IMPL_004
+- GARBAGE_RUST_FILTER_014
 - GARBAGE_RUST_SORT_001
 - GARBAGE_SORT_THRESHOLD_002
-- garbage_quicksort_003
-- GARBAGE_QUICKSORT_IMPL_004
-- garbage_mergesort_005
-- GARBAGE_MERGESORT_IMPL_006
-- garbage_heapsort_007
-- GARBAGE_HEAPSORT_IMPL_008
-- GarbageSortable009
-- garbage_sort_010
-- garbage_is_sorted_011
-- GarbageSorter012
-- garbage_sort_ascending_013
-- GARBAGE_RUST_FILTER_014
-- GARBAGE_FILTER_CAPACITY_015
-- garbage_filter_016
-- garbage_partition_017
-- GarbageFilterChain018
-- garbage_apply_019
+- filtering.rs
+- mod.rs
+- sorting.rs

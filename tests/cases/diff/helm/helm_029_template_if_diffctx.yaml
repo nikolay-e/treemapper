@@ -1,5 +1,4 @@
-must_include:
-- if .Values.ingress.enabled
-must_not_include:
-- garbage_marker_12345
-- unused_marker_67890
+must_include_files:
+- templates/ingress.yaml
+must_include_content:
+- '{{- if .Values.ingress.enabled -}}'

@@ -33,28 +33,14 @@ Dockerfile: 'FROM alpine:3.14
   '
 scripts/backup.sh: '#!/bin/bash
 
-  # GARBAGE_DOCKER_501_BACKUP_SCRIPT_001
-
-  GARBAGE_DOCKER_501_MARKER_002="backup_config"
-
-  GARBAGE_DOCKER_501_UNUSED_VAR_003=true
-
   pg_dump $DATABASE_URL > backup.sql
 
   '
 docs/deployment.md: '# Deployment Guide
 
-  GARBAGE_DOCKER_501_DOCS_MARKER_004
-
   This is unrelated documentation.
-
-  GARBAGE_DOCKER_501_NOTES_005="deployment notes"
 
   '
 tests/conftest.py: 'import pytest
-
-  GARBAGE_DOCKER_501_TEST_MARKER_006 = "test_config"
-
-  GARBAGE_DOCKER_501_FIXTURE_007 = {"key": "value"}
 
   '

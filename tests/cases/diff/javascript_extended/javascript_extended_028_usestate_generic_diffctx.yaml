@@ -1,14 +1,13 @@
-must_include:
-- TodoList.tsx
-- TodoItem
-- createTodo
+must_include_files:
+- src/TodoList.tsx
+must_include_content:
+- import { useState } from 'react';
+- '[todos, setTodos] = useState<TodoItem[]>([])'
 must_not_include:
 - GARBAGE_JSX_028_BREADCRUMB_CONFIG_A
+- GARBAGE_JSX_028_DISMISS_TOOLTIP_F
 - GARBAGE_JSX_028_RENDER_CRUMBS_B
-- GARBAGE_JSX_028_CRUMBS_OUTPUT_C
 - GARBAGE_JSX_028_TOOLTIP_CONFIG_D
 - GARBAGE_JSX_028_TOOLTIP_MANAGER_E
-- GARBAGE_JSX_028_DISMISS_TOOLTIP_F
-- GarbageBreadcrumbs
 - breadcrumbs.tsx
 - tooltip.tsx

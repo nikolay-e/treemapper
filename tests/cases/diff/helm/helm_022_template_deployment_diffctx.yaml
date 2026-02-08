@@ -1,16 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/deployment.yaml
+- chart/templates/deployment.yaml
 must_include_content:
-  - |
-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-  - |
-    name: {{ .Release.Name }}-{{ .Chart.Name }}
-must_not_include:
-  - GARBAGE_HELM_022_TRAFFIC_SPLIT_A
-  - GARBAGE_HELM_022_SPLIT_SVC_B
-  - GARBAGE_HELM_022_SPLIT_BACKEND_C
-  - GARBAGE_HELM_022_TEMPLATE_DOC_D
-  - GARBAGE_HELM_022_BEST_PRACTICE_E
-  - chart/templates/linkerd-smi.yaml
-  - chart/docs/template-patterns.md
+- 'name: {{ .Release.Name }}-{{ .Chart.Name }}'

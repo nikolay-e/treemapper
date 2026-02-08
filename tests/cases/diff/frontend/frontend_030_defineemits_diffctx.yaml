@@ -1,4 +1,6 @@
-must_include:
-- defineEmits
-must_not_include:
-- vue_garbage_marker_005
+must_include_files:
+- App.vue
+- Modal.vue
+must_include_content:
+- <button @click="showModal = true">Open Modal</button>
+- function handleCancel() {

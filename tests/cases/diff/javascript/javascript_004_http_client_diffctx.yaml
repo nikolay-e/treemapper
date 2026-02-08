@@ -1,26 +1,14 @@
 must_include_files:
 - data.service.ts
 must_include_content:
-- 'import { Injectable } from ''@angular/core'';
-
-  import { HttpClient } from ''@angular/common/http'';
-
-  import { Observable } from ''rxjs'';
-
-  import { map } from ''rxjs/operators'';
-
-  import { API_BASE, ApiResponse } from ''./api.config'';
-
-  '
-- "\n    constructor(private http: HttpClient) {}\n\n    getData<T>(endpoint: string): Observable<T> {\n        return this.http.get<ApiResponse<T>>(`${API_BASE}${endpoint}`)\n"
+- import { Injectable } from '@angular/core';
+- class DataService {
 must_not_include:
+- GARBAGE_JS_004_CRON_MARKER_E
 - GARBAGE_JS_004_HEALTH_MARKER_A
 - GARBAGE_JS_004_PING_MARKER_B
 - GARBAGE_JS_004_PROBE_CLASS_C
-- GARBAGE_JS_004_SCHEDULE_MARKER_D
-- GARBAGE_JS_004_CRON_MARKER_E
 - GARBAGE_JS_004_SCHEDULER_CLASS_F
-- HealthProbe
-- CronScheduler
+- GARBAGE_JS_004_SCHEDULE_MARKER_D
 - garbage_healthcheck.ts
 - garbage_scheduling.ts

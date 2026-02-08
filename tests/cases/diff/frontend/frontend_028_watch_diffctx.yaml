@@ -1,5 +1,4 @@
-must_include:
+must_include_files:
 - UserSearch.vue
-- watch
-must_not_include:
-- vue_garbage_marker_003
+must_include_content:
+- <div class="user-search">

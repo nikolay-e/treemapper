@@ -1,4 +1,4 @@
-must_include:
+must_include_files:
 - enums.ts
-must_not_include:
-- js_garbage_marker_005
+must_include_content:
+- enum Status {

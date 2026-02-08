@@ -1,18 +1,15 @@
-must_include:
+must_include_files:
 - main.tf
-- modules/vpc/main.tf
 - modules/rds/main.tf
-- module "vpc"
-- module "rds"
-- aws_security_group
-- aws_kms_key
-- backend "s3"
-- module.vpc.vpc_id
-- module.vpc.private_subnet_ids
+- modules/rds/variables.tf
+- modules/vpc/main.tf
+- modules/vpc/outputs.tf
+- modules/vpc/variables.tf
+must_include_content:
+- required_version = ">= 1.5.0"
+- resource "aws_db_subnet_group" "main" {
 must_not_include:
 - GARBAGE_TF_mod468a
 - GARBAGE_TF_mod468b
-- legacy_vpc
-- legacy_rds
-- old-org/terraform-modules
-- migrate_legacy_modules
+- migrate_modules_GARBAGE_TF_mod468b.py
+- old_modules_GARBAGE_TF_mod468a.tf

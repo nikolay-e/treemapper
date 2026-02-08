@@ -1,19 +1,15 @@
-must_include:
-- Worker
-- Start
-- processWithTimeout
-- Result
-- results
-- Duration
-- Priority
+must_include_files:
+- internal/worker/pool.go
+must_include_content:
+- Payload  interface{}
+- func NewWorker(id int, jobs <-chan Job, results chan<- Result, logger *log.Logger)
+  *Worker {
 must_not_include:
-- GARBAGE_GO_SCHEDULER_CRON_001
-- GARBAGE_GO_TYPE_CRON_002
 - GARBAGE_GO_FUNC_CRON_003
-- GARBAGE_GO_CRON_UNUSED_004
-- GARBAGE_GO_TASKQUEUE_RABBIT_005
-- GARBAGE_GO_TYPE_RABBIT_006
 - GARBAGE_GO_FUNC_RABBIT_007
-- GARBAGE_GO_RABBIT_OUTPUT_008
-- scheduler
-- rabbitmq
+- GARBAGE_GO_SCHEDULER_CRON_001
+- GARBAGE_GO_TASKQUEUE_RABBIT_005
+- GARBAGE_GO_TYPE_CRON_002
+- GARBAGE_GO_TYPE_RABBIT_006
+- cron.go
+- rabbitmq.go

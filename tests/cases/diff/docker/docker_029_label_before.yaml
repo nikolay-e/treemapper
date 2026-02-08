@@ -1,40 +1,31 @@
-src/main.py: |
-  import os
-  VERSION = os.environ.get('APP_VERSION', 'unknown')
-  BUILD_DATE = os.environ.get('BUILD_DATE', 'unknown')
+src/main.py: "import os\nVERSION = os.environ.get('APP_VERSION', 'unknown')\nBUILD_DATE = os.environ.get('BUILD_DATE', 'unknown')\n\ndef get_version_info():\n    return {\n        'version': VERSION,\n\
+  \        'build_date': BUILD_DATE\n    }\n"
+requirements.txt: 'flask==2.3.0
 
-  def get_version_info():
-      return {
-          'version': VERSION,
-          'build_date': BUILD_DATE
-      }
-requirements.txt: |
-  flask==2.3.0
-Dockerfile: |
-  FROM python:3.11-slim
+  '
+Dockerfile: 'FROM python:3.11-slim
+
   WORKDIR /app
+
   COPY requirements.txt .
+
   RUN pip install -r requirements.txt
+
   COPY src/ ./src/
+
   CMD ["python", "src/main.py"]
-scripts/build_info.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_514_BUILD_MARKER_001
-  GARBAGE_DOCKER_514_BUILD_VAR_002="info"
+
+  '
+scripts/build_info.sh: '#!/bin/bash
+
   echo "Build date: $(date)"
-tests/test_version.py: |
-  # GARBAGE_DOCKER_514_TEST_MARKER_003
-  GARBAGE_DOCKER_514_TEST_VER_004 = {"version": "1.0.0"}
-  def test_version():
-      pass
-docs/versioning.md: |
-  # Versioning
-  GARBAGE_DOCKER_514_VER_DOC_005
-  GARBAGE_DOCKER_514_SEMVER_006="1.0.0"
-.github/workflows/release.yml: |
-  # GARBAGE_DOCKER_514_RELEASE_MARKER_007
-  name: Release
-  GARBAGE_DOCKER_514_WORKFLOW_008: release
-changelog/CHANGELOG.md: |
-  # GARBAGE_DOCKER_514_CHANGELOG_MARKER_009
-  GARBAGE_DOCKER_514_ENTRY_010="v1.0.0"
+
+  '
+tests/test_version.py: "def test_version():\n    pass\n"
+docs/versioning.md: '# Versioning
+
+  '
+.github/workflows/release.yml: 'name: Release
+
+  '
+changelog/CHANGELOG.md: ''

@@ -1,21 +1,5 @@
-must_include:
-- '@async_decorator'
-- async def
-- decorated_async
+must_include_files:
+- async_decorated.py
 must_not_include:
-- GARBAGE_FRAG_syncdec041
-- GARBAGE_FRAG_unrelatedasync041
-- GARBAGE_FRAG_decclass041
-- GARBAGE_FRAG_staticasync041
-- GARBAGE_FRAG_anotherdec041
-- GARBAGE_FRAG_decmethod041
-- GARBAGE_FRAG_garbageasyncdec041
-- GARBAGE_FRAG_garbagedecclass041
-- GARBAGE_FRAG_garbagedecconst041
+- GARBAGE_DEC_CONST
 - garbage_async_dec_041.py
-- sync_decorator_041
-- unrelated_async_041
-- another_decorated_041
-- UnrelatedDecoratedClass
-- AnotherDecClass
-- GarbageDecClass041

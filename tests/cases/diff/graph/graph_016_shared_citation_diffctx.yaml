@@ -1,15 +1,11 @@
-must_include:
-- Methods
+must_include_files:
+- paper.md
+must_include_content:
+- According to [@smith2020], the MODIFIED approach works well for large datasets.
 must_not_include:
 - GARBAGE_GRAPH_tuv001
 - GARBAGE_GRAPH_tuv002
 - GARBAGE_GRAPH_tuv003
-- darwin1859
-- mendel1866
-- einstein1905
-- bohr1913
-- pauling1939
-- lewis1916
-- Biology Paper
-- Physics Research
-- Chemistry Study
+- chemistry_paper_GARBAGE_GRAPH_tuv003.md
+- physics_paper_GARBAGE_GRAPH_tuv002.md
+- unrelated_paper_GARBAGE_GRAPH_tuv001.md

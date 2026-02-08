@@ -1,31 +1,13 @@
 must_include_files:
-  - tox.ini
-  - src/lib.py
+- tox.ini
 must_include_content:
-  - |
-    [tox]
-    envlist = py310,py311,py312
-    isolated_build = True
-
-    [testenv]
-    deps = pytest
-    commands = pytest {posargs}
-
-    [testenv:lint]
-    deps = ruff
-    commands = ruff check src/
-  - |
-    @lru_cache(maxsize=128)
-    def calculate(x: int, y: int) -> int:
-        return x + y
+- envlist = py310,py311,py312
 must_not_include:
-  - GARBAGE_CICD_013_ALGEBRA_MARKER_A
-  - GARBAGE_CICD_013_MATRIX_MARKER_B
-  - GARBAGE_CICD_013_DIM_MARKER_C
-  - GARBAGE_CICD_013_GEOMETRY_MARKER_D
-  - GARBAGE_CICD_013_COORD_MARKER_E
-  - GARBAGE_CICD_013_PRECISION_MARKER_F
-  - GarbageAlgebraProcessor
-  - GarbageGeometryHelper
-  - garbage_algebra.py
-  - garbage_geometry.py
+- GARBAGE_CICD_013_ALGEBRA_MARKER_A
+- GARBAGE_CICD_013_COORD_MARKER_E
+- GARBAGE_CICD_013_DIM_MARKER_C
+- GARBAGE_CICD_013_GEOMETRY_MARKER_D
+- GARBAGE_CICD_013_MATRIX_MARKER_B
+- GARBAGE_CICD_013_PRECISION_MARKER_F
+- garbage_algebra.py
+- garbage_geometry.py

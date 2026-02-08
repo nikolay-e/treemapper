@@ -1,27 +1,13 @@
-must_include:
-- format_string
-- trim_string
-- capitalize
-- reverse
-- truncate
-- pad_left
-- pad_right
+must_include_files:
+- src/utils.rs
+must_include_content:
+- 'pub fn trim_string(s: &str) -> &str {'
+- 'pub fn capitalize(s: &str) -> String {'
 must_not_include:
-- GARBAGE_RUST_REGEX_001
 - GARBAGE_MAX_CAPTURES_002
-- GarbageRegex003
-- garbage_compile_004
-- GARBAGE_REGEX_ERROR_005
-- garbage_match_006
-- garbage_find_all_007
-- garbage_replace_008
-- GarbagePattern009
-- garbage_matches_010
+- GARBAGE_RUST_REGEX_001
 - GARBAGE_RUST_TEMPLATE_011
 - GARBAGE_TEMPLATE_DELIM_012
-- GarbageTemplate013
-- garbage_render_014
-- GARBAGE_RENDERED_015
-- garbage_set_var_016
-- garbage_parse_017
-- GARBAGE_TEMPLATE_ERROR_018
+- mod.rs
+- regex.rs
+- template.rs

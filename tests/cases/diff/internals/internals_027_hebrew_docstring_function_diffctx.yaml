@@ -1,3 +1,4 @@
-must_include:
-- foo
-- bar
+must_include_files:
+- hebrew_docs.py
+must_include_content:
+- '"""תיעוד בעברית"""'

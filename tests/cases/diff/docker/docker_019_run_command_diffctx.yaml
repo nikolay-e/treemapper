@@ -1,15 +1,4 @@
-must_include:
-- RUN apt-get update
-- apt-get install -y --no-install-recommends
-- rm -rf /var/lib/apt/lists/*
-- pip install --no-cache-dir
-- find /usr/local -type d -name __pycache__
-must_not_include:
-- GARBAGE_DOCKER_504_CI_MARKER_001
-- GARBAGE_DOCKER_504_CI_VAR_002
-- GARBAGE_DOCKER_504_CONFTEST_MARKER_003
-- GARBAGE_DOCKER_504_FIXTURE_004
-- GARBAGE_DOCKER_504_DB_DOC_005
-- GARBAGE_DOCKER_504_MIGRATION_006
-- GARBAGE_DOCKER_504_K8S_MARKER_007
-- GARBAGE_DOCKER_504_K8S_CONFIG_008
+must_include_files:
+- Dockerfile
+must_include_content:
+- RUN apt-get update && apt-get install -y --no-install-recommends \

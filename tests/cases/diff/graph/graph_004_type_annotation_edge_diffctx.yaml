@@ -1,15 +1,8 @@
-must_include:
-- UserService
-- UserModel
-- Repository
-- find_by_email
+must_include_files:
+- service.py
+must_include_content:
+- 'def find_by_email(self, email: str) -> Optional[UserModel]:'
 must_not_include:
-- GARBAGE_GRAPH_jkl001
-- GARBAGE_GRAPH_jkl002
-- GARBAGE_GRAPH_jkl003
-- Point_GARBAGE
-- Rectangle_GARBAGE
-- Event_GARBAGE
-- IPAddress_GARBAGE
-- EventEmitter
-- NetworkConfig
+- event_types_GARBAGE_GRAPH_jkl002.py
+- geometry_types_GARBAGE_GRAPH_jkl001.py
+- network_types_GARBAGE_GRAPH_jkl003.py

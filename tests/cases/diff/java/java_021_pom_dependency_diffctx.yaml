@@ -1,12 +1,11 @@
-must_include:
+must_include_files:
 - pom.xml
-- spring-boot-starter-data-jpa
-- postgresql
-- flyway-core
+must_include_content:
+- <artifactId>spring-boot-starter-data-jpa</artifactId>
 must_not_include:
 - GARBAGE_JAVA_021_AUDIT_A
 - GARBAGE_JAVA_021_AUDIT_B
 - GARBAGE_JAVA_021_CACHE_C
 - GARBAGE_JAVA_021_CACHE_D
-- AuditLogger
-- CacheWarmer
+- AuditLogger.java
+- CacheWarmer.java

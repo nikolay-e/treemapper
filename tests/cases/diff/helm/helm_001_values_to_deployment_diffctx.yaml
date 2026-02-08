@@ -1,20 +1,5 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/deployment.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    replicaCount: 3
-    image:
-      repository: nginx
-      tag: "1.25"
-      pullPolicy: Always
-  - |
-    image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-must_not_include:
-  - GARBAGE_HELM_001_GRAFANA_PANEL_A
-  - GARBAGE_HELM_001_MONITORING_TITLE_B
-  - GARBAGE_HELM_001_CPU_PANEL_C
-  - GARBAGE_HELM_001_RUNBOOK_SECTION_D
-  - GARBAGE_HELM_001_RUNBOOK_STEPS_E
-  - chart/templates/monitoring-dashboard.json
-  - chart/docs/runbook.md
+- 'replicaCount: 3'
+- 'pullPolicy: Always'

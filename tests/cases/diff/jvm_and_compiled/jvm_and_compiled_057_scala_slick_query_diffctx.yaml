@@ -1,16 +1,11 @@
 must_include_files:
-  - UserRepository.scala
+- UserRepository.scala
 must_include_content:
-  - |
-    db.run
-  - |
-    filter
+- import slick.jdbc.PostgresProfile.api._
 must_not_include:
-  - GARBAGE_JVM_057_DOOBIE_MARKER_A
-  - GARBAGE_JVM_057_TRANSACT_MARKER_B
-  - GARBAGE_JVM_057_QUILL_MARKER_C
-  - GARBAGE_JVM_057_QUOTED_MARKER_D
-  - GarbageDoobieQuery
-  - GarbageQuillContext
-  - GarbageDoobieQuery.scala
-  - GarbageQuillContext.scala
+- GARBAGE_JVM_057_DOOBIE_MARKER_A
+- GARBAGE_JVM_057_QUILL_MARKER_C
+- GARBAGE_JVM_057_QUOTED_MARKER_D
+- GARBAGE_JVM_057_TRANSACT_MARKER_B
+- GarbageDoobieQuery.scala
+- GarbageQuillContext.scala

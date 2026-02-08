@@ -62,10 +62,14 @@ class FragmentIndex:
                     pass
 
 
+_MIN_REF_LENGTH_FOR_PATH_MATCH = 3
+
+
 def discover_files_by_refs(
     refs: set[str],
     changed_files: list[Path],
     all_candidate_files: list[Path],
+    repo_root: Path | None = None,
 ) -> list[Path]:
     if not refs:
         return []
@@ -77,12 +81,22 @@ def discover_files_by_refs(
         if candidate in changed_set:
             continue
         candidate_name = candidate.name.lower()
-        candidate_str = str(candidate).lower()
+
+        if repo_root:
+            try:
+                candidate_rel = str(candidate.relative_to(repo_root)).lower()
+            except ValueError:
+                candidate_rel = candidate_name
+        else:
+            candidate_rel = candidate_name
 
         for ref in refs:
             ref_lower = ref.lower()
             ref_name = ref.split("/")[-1].lower()
-            if candidate_name == ref_name or ref_lower in candidate_str:
+            if candidate_name == ref_name:
+                discovered.append(candidate)
+                break
+            if len(ref_lower) >= _MIN_REF_LENGTH_FOR_PATH_MATCH and ref_lower in candidate_rel:
                 discovered.append(candidate)
                 break
 

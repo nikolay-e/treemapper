@@ -1,83 +1,38 @@
-src/server.js: |
-  const http = require('http');
-  const url = require('url');
+src/server.js: "const http = require('http');\nconst url = require('url');\n\nconst PORT = parseInt(process.env.PORT || '3000', 10);\nconst HOST = process.env.HOST || '0.0.0.0';\n\nconst routes = {\n  \
+  \  '/health': (req, res) => {\n        res.writeHead(200, { 'Content-Type': 'application/json' });\n        res.end(JSON.stringify({ status: 'ok', port: PORT }));\n    },\n    '/api/status': (req, res)\
+  \ => {\n        res.writeHead(200, { 'Content-Type': 'application/json' });\n        res.end(JSON.stringify({ running: true, uptime: process.uptime() }));\n    }\n};\n\nconst server = http.createServer((req,\
+  \ res) => {\n    const pathname = url.parse(req.url).pathname;\n    const handler = routes[pathname] || ((req, res) => {\n        res.writeHead(404);\n        res.end('Not Found');\n    });\n    handler(req,\
+  \ res);\n});\n\nserver.listen(PORT, HOST, () => {\n    console.log(`Server running at http://${HOST}:${PORT}/`);\n});\n"
+src/config.js: "module.exports = {\n    port: parseInt(process.env.PORT || '3000', 10),\n    host: process.env.HOST || '0.0.0.0',\n    nodeEnv: process.env.NODE_ENV || 'development'\n};\n"
+package.json: "{\n  \"name\": \"http-server\",\n  \"version\": \"1.0.0\",\n  \"main\": \"src/server.js\",\n  \"scripts\": {\n    \"start\": \"node src/server.js\"\n  }\n}\n"
+Dockerfile: 'FROM node:20-alpine
 
-  const PORT = parseInt(process.env.PORT || '3000', 10);
-  const HOST = process.env.HOST || '0.0.0.0';
-
-  const routes = {
-      '/health': (req, res) => {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: 'ok', port: PORT }));
-      },
-      '/api/status': (req, res) => {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ running: true, uptime: process.uptime() }));
-      }
-  };
-
-  const server = http.createServer((req, res) => {
-      const pathname = url.parse(req.url).pathname;
-      const handler = routes[pathname] || ((req, res) => {
-          res.writeHead(404);
-          res.end('Not Found');
-      });
-      handler(req, res);
-  });
-
-  server.listen(PORT, HOST, () => {
-      console.log(`Server running at http://${HOST}:${PORT}/`);
-  });
-src/config.js: |
-  module.exports = {
-      port: parseInt(process.env.PORT || '3000', 10),
-      host: process.env.HOST || '0.0.0.0',
-      nodeEnv: process.env.NODE_ENV || 'development'
-  };
-package.json: |
-  {
-    "name": "http-server",
-    "version": "1.0.0",
-    "main": "src/server.js",
-    "scripts": {
-      "start": "node src/server.js"
-    }
-  }
-Dockerfile: |
-  FROM node:20-alpine
   WORKDIR /app
+
   COPY package*.json ./
+
   RUN npm ci --only=production
+
   COPY src/ ./src/
+
   CMD ["node", "src/server.js"]
-docker-compose.yml: |
-  version: '3.8'
-  services:
-    web:
-      build: .
-      ports:
-        - "3000:3000"
-scripts/start_dev.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_074_START_MARKER_m1n2b3
-  GARBAGE_DOCKER_074_DEV_PORT_v4c5x6="3000"
+
+  '
+docker-compose.yml: "version: '3.8'\nservices:\n  web:\n    build: .\n    ports:\n      - \"3000:3000\"\n"
+scripts/start_dev.sh: '#!/bin/bash
+
   docker-compose up -d
-tests/integration.test.js: |
-  // GARBAGE_DOCKER_074_TEST_MARKER_z7a8s9
-  const GARBAGE_DOCKER_074_TEST_PORT_d0f1g2 = 3000;
-  describe('Server', () => {
-      it('should respond on port', () => {});
-  });
-docs/networking.md: |
-  # Network Configuration
-  GARBAGE_DOCKER_074_NET_DOC_h3j4k5
-  GARBAGE_DOCKER_074_PORT_LIST_l6q7w8="3000,8080"
-nginx/nginx.conf: |
-  # GARBAGE_DOCKER_074_NGINX_MARKER_e9r0t1
-  upstream backend {
-    GARBAGE_DOCKER_074_UPSTREAM_y2u3i4: server;
+
+  '
+tests/integration.test.js: "describe('Server', () => {\n    it('should respond on port', () => {});\n});\n"
+docs/networking.md: '# Network Configuration
+
+  '
+nginx/nginx.conf: 'upstream backend {
+
   }
-k8s/service.yaml: |
-  # GARBAGE_DOCKER_074_K8S_MARKER_o5p6a7
-  apiVersion: v1
-  GARBAGE_DOCKER_074_SVC_TYPE_s8d9f0: ClusterIP
+
+  '
+k8s/service.yaml: 'apiVersion: v1
+
+  '

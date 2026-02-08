@@ -1,14 +1,12 @@
-must_include:
-- api/hello.js
-- api/users.js
-- lib/userService.js
-- getUsers
+must_include_files:
+- vercel.json
+must_include_content:
+- '{"src": "api/**/*.ts", "use": "@vercel/node"}'
+- '"regions": ["sfo1", "iad1"],'
 must_not_include:
-- GARBAGE_JSON_013_DEPLOY_REGION_A
-- GARBAGE_JSON_013_APP_DEPLOYER_B
-- GARBAGE_JSON_013_DEPLOY_APP_C
-- GARBAGE_JSON_013_UPLOAD_CHUNK_D
+- GARBAGE_JSON_013_DEPLOY_APP_C(appName
 - GARBAGE_JSON_013_FILE_UPLOADER_E
+- GARBAGE_JSON_013_UPLOAD_CHUNK_D
 - GARBAGE_JSON_013_UPLOAD_FILE_F
-- deployer.js
+- GARBAGE_JSON_013_UPLOAD_FILE_F(filename
 - uploader.js

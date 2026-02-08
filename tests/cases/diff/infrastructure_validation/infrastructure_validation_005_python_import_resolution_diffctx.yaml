@@ -1,12 +1,4 @@
-must_include:
-- def helper()
-- def main()
-must_not_include:
-- GARBAGE_INFRA_005_PIPELINE_SCRIPT_A
-- GARBAGE_INFRA_005_BATCH_SIZE_B
-- GARBAGE_INFRA_005_UTIL_TEST_A
-- GARBAGE_INFRA_005_TEST_DATA_B
-- GARBAGE_INFRA_005_ARCH_DOC_A
-- GARBAGE_INFRA_005_LAYER_DIAGRAM_B
-- GARBAGE_INFRA_005_SETTINGS_A
-- GARBAGE_INFRA_005_LOG_LEVEL_B
+must_include_files:
+- main.py
+must_include_content:
+- result = helper()

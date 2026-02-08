@@ -1,13 +1,5 @@
-must_include:
-- 'depends_on:'
-must_not_include:
-- GARBAGE_DOCKER_077_WAIT_MARKER_q1a2z3
-- GARBAGE_DOCKER_077_TIMEOUT_w4s5x6
-- GARBAGE_DOCKER_077_TEST_MARKER_e7d8c9
-- GARBAGE_DOCKER_077_TEST_ORDER_r0f1v2
-- GARBAGE_DOCKER_077_DEP_DOC_t3g4b5
-- GARBAGE_DOCKER_077_DEP_GRAPH_y6h7n8
-- GARBAGE_DOCKER_077_K8S_MARKER_u9j0k1
-- GARBAGE_DOCKER_077_INIT_CONTAINER_i2o3p4
-- GARBAGE_DOCKER_077_HELM_MARKER_m5l6z7
-- GARBAGE_DOCKER_077_PROBE_TYPE_x8c9v0
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- 'dockerfile: Dockerfile'
+- 'postgres_data:'

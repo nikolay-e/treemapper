@@ -1,3 +1,4 @@
-must_include:
-- calculate
-- result
+must_include_files:
+- math_symbols.jl
+must_include_content:
+- result = calculate(α, β)

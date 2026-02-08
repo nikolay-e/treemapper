@@ -1,4 +1,4 @@
-must_include:
-- Level 1
-- Updated content under level 1
-- Updated content under level 2
+must_include_files:
+- hierarchy.md
+must_include_content:
+- Updated content under level 2.

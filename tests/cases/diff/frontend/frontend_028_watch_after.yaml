@@ -1,48 +1,7 @@
-api.ts: |
-  export async function searchUsers(query: string): Promise<any[]> {
-      const response = await fetch(\`/api/users?search=\${encodeURIComponent(query)}\`);
-      return response.json();
-  }
-
-  export async function fetchUserDetails(userId: string): Promise<any> {
-      const response = await fetch(\`/api/users/\${userId}\`);
-      return response.json();
-  }
-
-  // vue_garbage_marker_003
-  const GARBAGE_API_TIMEOUT = 5000;
-UserSearch.vue: |
-  <template>
-      <div class="user-search">
-          <input v-model="searchQuery" placeholder="Search users..." />
-          <p v-if="loading">Searching...</p>
-          <ul v-else>
-              <li v-for="user in results" :key="user.id">
-                  {{ user.name }}
-              </li>
-          </ul>
-      </div>
-  </template>
-
-  <script setup lang="ts">
-  import { ref, watch } from 'vue';
-  import { searchUsers } from './api';
-
-  const searchQuery = ref('');
-  const results = ref<any[]>([]);
-  const loading = ref(false);
-
-  watch(searchQuery, async (newQuery, oldQuery) => {
-      if (newQuery.length < 2) {
-          results.value = [];
-          return;
-      }
-
-      loading.value = true;
-      try {
-          results.value = await searchUsers(newQuery);
-      } finally {
-          loading.value = false;
-      }
-  }, { immediate: false });
-  </script>
+api.ts: "export async function searchUsers(query: string): Promise<any[]> {\n    const response = await fetch(\\`/api/users?search=\\${encodeURIComponent(query)}\\`);\n    return response.json();\n}\n\n\
+  export async function fetchUserDetails(userId: string): Promise<any> {\n    const response = await fetch(\\`/api/users/\\${userId}\\`);\n    return response.json();\n}\n\n// vue_garbage_marker_003\n"
+UserSearch.vue: "<template>\n    <div class=\"user-search\">\n        <input v-model=\"searchQuery\" placeholder=\"Search users...\" />\n        <p v-if=\"loading\">Searching...</p>\n        <ul v-else>\n\
+  \            <li v-for=\"user in results\" :key=\"user.id\">\n                {{ user.name }}\n            </li>\n        </ul>\n    </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { ref, watch\
+  \ } from 'vue';\nimport { searchUsers } from './api';\n\nconst searchQuery = ref('');\nconst results = ref<any[]>([]);\nconst loading = ref(false);\n\nwatch(searchQuery, async (newQuery, oldQuery) =>\
+  \ {\n    if (newQuery.length < 2) {\n        results.value = [];\n        return;\n    }\n\n    loading.value = true;\n    try {\n        results.value = await searchUsers(newQuery);\n    } finally {\n\
+  \        loading.value = false;\n    }\n}, { immediate: false });\n</script>\n"

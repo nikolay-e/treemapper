@@ -1,5 +1,6 @@
-must_include:
-- required
+must_include_files:
+- templates/secret.yaml
+must_include_content:
+- 'api-key: {{ required "apiKey is required" .Values.apiKey | b64enc }}'
 must_not_include:
-- garbage_marker_12345
-- unused_marker_67890
+- unrelated.txt

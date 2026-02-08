@@ -1,2 +1,5 @@
-must_include:
+must_include_files:
 - service.py
+must_include_content:
+- self.validate()
+- 'def validate(self):'

@@ -1,4 +1,6 @@
-must_include:
-- memo
-must_not_include:
-- react_garbage_marker_008
+must_include_files:
+- ExpensiveComponent.tsx
+- ParentComponent.tsx
+must_include_content:
+- function areEqual(
+- () => onItemClick(item)

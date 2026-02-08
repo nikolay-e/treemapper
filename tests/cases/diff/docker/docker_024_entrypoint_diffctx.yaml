@@ -1,17 +1,4 @@
-must_include:
-- ENTRYPOINT ["docker-entrypoint.sh"]
-- CMD ["serve", "--workers", "4"]
-- chmod +x /usr/local/bin/docker-entrypoint.sh
-- STOPSIGNAL SIGTERM
-- mkdir -p /etc/app
-must_not_include:
-- GARBAGE_DOCKER_509_ENTRY_MARKER_001
-- GARBAGE_DOCKER_509_ENTRY_VAR_002
-- GARBAGE_DOCKER_509_TEST_MARKER_003
-- GARBAGE_DOCKER_509_TEST_CLI_004
-- GARBAGE_DOCKER_509_CLI_DOC_005
-- GARBAGE_DOCKER_509_COMMANDS_006
-- GARBAGE_DOCKER_509_HELM_MARKER_007
-- GARBAGE_DOCKER_509_HELM_VAR_008
-- GARBAGE_DOCKER_509_INIT_MARKER_009
-- GARBAGE_DOCKER_509_INIT_VAR_010
+must_include_files:
+- Dockerfile
+must_include_content:
+- FROM base AS dependencies

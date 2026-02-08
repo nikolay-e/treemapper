@@ -1,4 +1,5 @@
-must_include:
-- observable.py
-must_not_include:
-- garbage_marker_12345
+must_include_files:
+- core/observable.py
+must_include_content:
+- from typing import Callable, Optional
+- self._last_value = None

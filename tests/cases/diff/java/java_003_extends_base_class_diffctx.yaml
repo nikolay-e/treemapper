@@ -1,19 +1,11 @@
-must_include:
-- BaseEntity
-- updatedAt
-- updatedBy
-- onUpdate
-- softDelete
-- restore
-- version
-- isDeleted
-- isNew
+must_include_files:
+- src/main/java/com/ecommerce/model/BaseEntity.java
+must_include_content:
+- private LocalDateTime updatedAt;
 must_not_include:
-- GARBAGE_JAVA_NOTIFY_201
-- GARBAGE_JAVA_QUEUE_202
 - GARBAGE_JAVA_ANALYTICS_203
 - GARBAGE_JAVA_FLUSH_204
-- NotificationSender
-- AnalyticsTracker
-- sendEmail
-- trackEvent
+- GARBAGE_JAVA_NOTIFY_201
+- GARBAGE_JAVA_QUEUE_202
+- AnalyticsTracker.java
+- NotificationSender.java

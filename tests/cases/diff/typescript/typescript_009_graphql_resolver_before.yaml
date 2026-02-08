@@ -1,57 +1,16 @@
-src/graphql/types.ts: |
-  export interface GraphQLContext {
-    userId?: string;
-    userRole?: 'admin' | 'user' | 'guest';
-    dataSources: DataSources;
+src/graphql/types.ts: "export interface GraphQLContext {\n  userId?: string;\n  userRole?: 'admin' | 'user' | 'guest';\n  dataSources: DataSources;\n}\n\nexport interface DataSources {\n  postAPI: PostAPI;\n\
+  \  userAPI: UserAPI;\n}\n\nexport interface UserAPI {\n  getById(id: string): Promise<User | null>;\n}\n\nexport interface PostAPI {\n  getById(id: string): Promise<Post | null>;\n  getByAuthorId(authorId:\
+  \ string): Promise<Post[]>;\n  create(input: CreatePostInput): Promise<Post>;\n  delete(id: string): Promise<boolean>;\n}\n\nexport interface User {\n  id: string;\n  username: string;\n  email: string;\n\
+  \  displayName: string;\n}\n\nexport interface Post {\n  id: string;\n  authorId: string;\n  title: string;\n  content: string;\n  publishedAt?: Date;\n  createdAt: Date;\n}\n\nexport interface CreatePostInput\
+  \ {\n  title: string;\n  content: string;\n  publish?: boolean;\n}\n"
+src/graphql/resolvers/postResolvers.ts: 'console.log(''placeholder'');
+
+  '
+vendor/search-client/index.ts: '
+
   }
 
-  export interface DataSources {
-    postAPI: PostAPI;
-    userAPI: UserAPI;
-  }
+  '
+docs/media/processing.md: '# Media Processing
 
-  export interface UserAPI {
-    getById(id: string): Promise<User | null>;
-  }
-
-  export interface PostAPI {
-    getById(id: string): Promise<Post | null>;
-    getByAuthorId(authorId: string): Promise<Post[]>;
-    create(input: CreatePostInput): Promise<Post>;
-    delete(id: string): Promise<boolean>;
-  }
-
-  export interface User {
-    id: string;
-    username: string;
-    email: string;
-    displayName: string;
-  }
-
-  export interface Post {
-    id: string;
-    authorId: string;
-    title: string;
-    content: string;
-    publishedAt?: Date;
-    createdAt: Date;
-  }
-
-  export interface CreatePostInput {
-    title: string;
-    content: string;
-    publish?: boolean;
-  }
-src/graphql/resolvers/postResolvers.ts: |
-  console.log('placeholder');
-vendor/search-client/index.ts: |
-  // GARBAGE_TS_009_SEARCH_001 - third party search client
-  export const GARBAGE_TS_009_VERSION_002 = "4.0.0";
-
-  export function GARBAGE_TS_009_search_003(query: string): void {
-    console.log('GARBAGE_TS_009_SEARCHING_004:', query);
-  }
-docs/media/processing.md: |
-  # Media Processing
-  GARBAGE_TS_009_MEDIA_005 documentation
-  Use GARBAGE_TS_009_PROCESSOR_006 for images.
+  '

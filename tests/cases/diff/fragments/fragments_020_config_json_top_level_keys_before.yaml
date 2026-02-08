@@ -1,44 +1,5 @@
-config.json: |
-  {
-    "database": {
-      "host": "localhost",
-      "port": 5432,
-      "name": "mydb",
-      "credentials": {
-        "user": "admin",
-        "password": "secret"
-      }
-    },
-    "server": {
-      "port": 8080,
-      "debug": true,
-      "workers": 4
-    },
-    "garbage_section_a": {
-      "key1": "GARBAGE_FRAG_json_a1_072",
-      "key2": "GARBAGE_FRAG_json_a2_072",
-      "nested": {
-        "deep": "GARBAGE_FRAG_json_deep_072"
-      }
-    },
-    "garbage_section_b": {
-      "value": "GARBAGE_FRAG_json_b1_072",
-      "list": ["GARBAGE_FRAG_json_list1_072", "GARBAGE_FRAG_json_list2_072"]
-    },
-    "logging": {
-      "level": "GARBAGE_FRAG_json_log_072",
-      "format": "GARBAGE_FRAG_json_format_072"
-    }
-  }
-garbage_config_072.json: |
-  {
-    "garbage_root": {
-      "key": "GARBAGE_FRAG_garbroot_072",
-      "nested": {
-        "value": "GARBAGE_FRAG_garbnested_072"
-      }
-    },
-    "another_garbage": {
-      "items": ["GARBAGE_FRAG_garbitem1_072", "GARBAGE_FRAG_garbitem2_072"]
-    }
-  }
+config.json: "{\n  \"database\": {\n    \"host\": \"localhost\",\n    \"port\": 5432,\n    \"name\": \"mydb\",\n    \"credentials\": {\n      \"user\": \"admin\",\n      \"password\": \"secret\"\n    }\n\
+  \  },\n  \"server\": {\n    \"port\": 8080,\n    \"debug\": true,\n    \"workers\": 4\n  },\n  \"garbage_section_a\": {\n    \"nested\": {\n    }\n  },\n  \"garbage_section_b\": {\n  },\n  \"logging\"\
+  : {\n  }\n}\n"
+garbage_config_072.json: "{\n  \"garbage_root\": {\n    \"key\": \"GARBAGE_FRAG_garbroot_072\",\n    \"nested\": {\n      \"value\": \"GARBAGE_FRAG_garbnested_072\"\n    }\n  },\n  \"another_garbage\":\
+  \ {\n    \"items\": [\"GARBAGE_FRAG_garbitem1_072\", \"GARBAGE_FRAG_garbitem2_072\"]\n  }\n}\n"

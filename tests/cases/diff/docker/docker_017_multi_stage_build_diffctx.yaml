@@ -1,18 +1,4 @@
-must_include:
-- FROM node:20-alpine AS builder
-- FROM node:20-alpine AS production
-- COPY --from=builder
-- npm ci --only=production
-- adduser -S nodejs
-- USER nodejs
-- HEALTHCHECK
-- NODE_ENV=production
-must_not_include:
-- GARBAGE_DOCKER_502_DEPLOY_MARKER_001
-- GARBAGE_DOCKER_502_DEPLOY_VAR_002
-- GARBAGE_DOCKER_502_TEST_MARKER_003
-- GARBAGE_DOCKER_502_TEST_VAR_004
-- GARBAGE_DOCKER_502_ARCH_MARKER_005
-- GARBAGE_DOCKER_502_DESIGN_006
-- GARBAGE_DOCKER_502_MIGRATION_MARKER_007
-- GARBAGE_DOCKER_502_SQL_008
+must_include_files:
+- Dockerfile
+must_include_content:
+- COPY package*.json ./

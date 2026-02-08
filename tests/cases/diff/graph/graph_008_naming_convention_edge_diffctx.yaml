@@ -1,11 +1,9 @@
-must_include:
-- get_user
+must_include_files:
+- user_service.py
+must_include_content:
+- 'return {"id": user_id, "name": "Unknown", "active": True}'
+- 'return {"id": generate_id(), "name": name, "email": email, "active": True}'
 must_not_include:
-- GARBAGE_GRAPH_vwx001
-- GARBAGE_GRAPH_vwx002
-- GARBAGE_GRAPH_vwx003
-- process_payment
-- refund_payment
-- PaymentProcessor
-- check_stock
-- reserve_stock
+- inventory_service_GARBAGE_GRAPH_vwx003.py
+- payment_service_GARBAGE_GRAPH_vwx001.py
+- test_payment_service_GARBAGE_GRAPH_vwx002.py

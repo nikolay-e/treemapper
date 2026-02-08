@@ -1,2 +1,2 @@
-must_include:
-- main
+must_include_files:
+- script.py

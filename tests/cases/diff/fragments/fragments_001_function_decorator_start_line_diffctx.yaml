@@ -1,41 +1,12 @@
-must_include:
-- '@decorator'
-- my_function
-- decorated.py
-- return 42
+must_include_files:
+- src/decorated.py
 must_not_include:
-- GARBAGE_FRAG_001_alpha
-- GARBAGE_FRAG_001_beta
-- GARBAGE_FRAG_001_gamma
-- GARBAGE_FRAG_001_delta
-- GARBAGE_FRAG_001_config
-- GARBAGE_FRAG_001_load
-- GARBAGE_FRAG_001_handler
-- GARBAGE_FRAG_001_response
-- GARBAGE_FRAG_001_output
-- GARBAGE_FRAG_001_trailing
 - GARBAGE_FRAG_001_001
 - GARBAGE_FRAG_001_002
 - GARBAGE_FRAG_001_003
-- GARBAGE_FRAG_001_004
-- GARBAGE_FRAG_001_005
 - GARBAGE_FRAG_001_006
 - GARBAGE_FRAG_001_007
-- GARBAGE_FRAG_001_008
-- GARBAGE_FRAG_001_009
 - GARBAGE_FRAG_001_010
-- GARBAGE_FRAG_001_011
-- GARBAGE_FRAG_001_012
-- GARBAGE_FRAG_001_013
-- unrelated_helper_alpha
-- unrelated_helper_beta
-- unrelated_helper_gamma
-- unrelated_utility_delta
-- UnrelatedConfigManager
-- UnrelatedServiceHandler
-- MetricsCollector
-- CacheManager
-- EventBus
-- metrics_collector.py
 - cache_manager.py
 - event_bus.py
+- metrics_collector.py

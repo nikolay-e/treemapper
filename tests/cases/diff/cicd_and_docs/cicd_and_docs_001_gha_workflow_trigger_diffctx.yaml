@@ -1,20 +1,13 @@
 must_include_files:
-  - .github/workflows/ci.yml
+- .github/workflows/ci.yml
 must_include_content:
-  - |
-    on:
-      push:
-        branches: [main, develop]
-      pull_request:
-        branches: [main]
+- 'branches: [main, develop]'
 must_not_include:
-  - GARBAGE_CICD_DOCS_001_SCHEDULE_MARKER_A
-  - GARBAGE_CICD_DOCS_001_INTERVAL_MARKER_B
-  - GARBAGE_CICD_DOCS_001_QUEUE_MARKER_C
-  - GARBAGE_CICD_DOCS_001_WEBHOOK_MARKER_D
-  - GARBAGE_CICD_DOCS_001_SECRET_MARKER_E
-  - GARBAGE_CICD_DOCS_001_VERIFY_MARKER_F
-  - GarbageTaskScheduler
-  - GarbageWebhookHandler
-  - garbage_scheduler.ts
-  - garbage_webhook.ts
+- GARBAGE_CICD_DOCS_001_INTERVAL_MARKER_B
+- GARBAGE_CICD_DOCS_001_QUEUE_MARKER_C
+- GARBAGE_CICD_DOCS_001_SCHEDULE_MARKER_A
+- GARBAGE_CICD_DOCS_001_SECRET_MARKER_E
+- GARBAGE_CICD_DOCS_001_VERIFY_MARKER_F
+- GARBAGE_CICD_DOCS_001_WEBHOOK_MARKER_D
+- garbage_scheduler.ts
+- garbage_webhook.ts

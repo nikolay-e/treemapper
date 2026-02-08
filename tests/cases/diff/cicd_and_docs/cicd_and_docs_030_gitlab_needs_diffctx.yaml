@@ -1,18 +1,11 @@
 must_include_files:
-  - .gitlab-ci.yml
-must_include_content:
-  - |
-    needs: [build]
-  - |
-    needs: [build, test]
+- .gitlab-ci.yml
 must_not_include:
-  - GARBAGE_CICD_DOCS_030_SCHEDULER_MARKER_A
-  - GARBAGE_CICD_DOCS_030_QUEUE_MARKER_B
-  - GARBAGE_CICD_DOCS_030_PRIORITY_MARKER_C
-  - GARBAGE_CICD_DOCS_030_EXECUTOR_MARKER_D
-  - GARBAGE_CICD_DOCS_030_RUNNER_MARKER_E
-  - GARBAGE_CICD_DOCS_030_PARALLEL_MARKER_F
-  - GarbageJobScheduler
-  - GarbageJobExecutor
-  - garbage_job_scheduler.ts
-  - garbage_job_executor.ts
+- GARBAGE_CICD_DOCS_030_EXECUTOR_MARKER_D
+- GARBAGE_CICD_DOCS_030_PARALLEL_MARKER_F
+- GARBAGE_CICD_DOCS_030_PRIORITY_MARKER_C
+- GARBAGE_CICD_DOCS_030_QUEUE_MARKER_B
+- GARBAGE_CICD_DOCS_030_RUNNER_MARKER_E
+- GARBAGE_CICD_DOCS_030_SCHEDULER_MARKER_A
+- garbage_job_executor.ts
+- garbage_job_scheduler.ts

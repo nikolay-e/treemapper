@@ -1,69 +1,28 @@
-chart/Chart.yaml: |
-  apiVersion: v2
+chart/Chart.yaml: 'apiVersion: v2
+
   name: order-processor
+
   version: 3.1.0
-chart/values.yaml: |
-  replicaCount: 1
-  image:
-    repository: order-processor
-    tag: "3.1.0"
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 20
-    targetCPU: 80
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-chart/templates/hpa.yaml: |
-  {{- if .Values.autoscaling.enabled }}
-  apiVersion: autoscaling/v2
-  kind: HorizontalPodAutoscaler
-  metadata:
-    name: {{ .Release.Name }}-{{ .Chart.Name }}
-    labels:
-      app.kubernetes.io/name: {{ .Chart.Name }}
-  spec:
-    scaleTargetRef:
-      apiVersion: apps/v1
-      kind: Deployment
-      name: {{ .Release.Name }}-{{ .Chart.Name }}
-    minReplicas: {{ .Values.autoscaling.minReplicas }}
-    maxReplicas: {{ .Values.autoscaling.maxReplicas }}
-    metrics:
-      - type: Resource
-        resource:
-          name: cpu
-          target:
-            type: Utilization
-            averageUtilization: {{ .Values.autoscaling.targetCPU | default 80 }}
-  {{- end }}
-chart/templates/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: {{ .Release.Name }}-{{ .Chart.Name }}
-  spec:
-    {{- if not .Values.autoscaling.enabled }}
-    replicas: {{ .Values.replicaCount }}
-    {{- end }}
-    template:
-      spec:
-        containers:
-          - name: {{ .Chart.Name }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            resources:
-              {{- toYaml .Values.resources | nindent 14 }}
-chart/templates/sidecar-config.yaml: |
-  apiVersion: v1
+
+  '
+chart/values.yaml: "replicaCount: 1\nimage:\n  repository: order-processor\n  tag: \"3.1.0\"\nautoscaling:\n  enabled: true\n  minReplicas: 2\n  maxReplicas: 20\n  targetCPU: 80\nresources:\n  limits:\n\
+  \    cpu: 500m\n    memory: 512Mi\n"
+chart/templates/hpa.yaml: "{{- if .Values.autoscaling.enabled }}\napiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: {{ .Release.Name }}-{{ .Chart.Name }}\n  labels:\n    app.kubernetes.io/name:\
+  \ {{ .Chart.Name }}\nspec:\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: {{ .Release.Name }}-{{ .Chart.Name }}\n  minReplicas: {{ .Values.autoscaling.minReplicas }}\n  maxReplicas:\
+  \ {{ .Values.autoscaling.maxReplicas }}\n  metrics:\n    - type: Resource\n      resource:\n        name: cpu\n        target:\n          type: Utilization\n          averageUtilization: {{ .Values.autoscaling.targetCPU\
+  \ | default 80 }}\n{{- end }}\n"
+chart/templates/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}-{{ .Chart.Name }}\nspec:\n  {{- if not .Values.autoscaling.enabled }}\n  replicas: {{ .Values.replicaCount\
+  \ }}\n  {{- end }}\n  template:\n    spec:\n      containers:\n        - name: {{ .Chart.Name }}\n          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n          resources:\n  \
+  \          {{- toYaml .Values.resources | nindent 14 }}\n"
+chart/templates/sidecar-config.yaml: 'apiVersion: v1
+
   kind: ConfigMap
+
   metadata:
-    name: GARBAGE_HELM_006_SIDECAR_CM_A
+
   data:
-    GARBAGE_HELM_006_SIDECAR_KEY_B: "envoy-proxy"
-    GARBAGE_HELM_006_SIDECAR_PORT_C: "15001"
-chart/test/integration.sh: |
-  #!/bin/bash
-  # GARBAGE_HELM_006_INTEGRATION_HEADER_D
-  GARBAGE_HELM_006_INTEGRATION_URL_E="http://localhost:8080/health"
+
+  '
+chart/test/integration.sh: '#!/bin/bash
+
+  '

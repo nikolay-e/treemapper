@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - app.ts
-must_not_include:
-- node_garbage_marker_001
+must_include_content:
+- import express from 'express';
+- app = express()

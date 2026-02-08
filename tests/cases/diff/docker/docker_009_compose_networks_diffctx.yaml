@@ -1,13 +1,5 @@
-must_include:
-- 'networks:'
-must_not_include:
-- GARBAGE_DOCKER_079_NET_MARKER_z1x2c3
-- GARBAGE_DOCKER_079_SUBNET_v4b5n6
-- GARBAGE_DOCKER_079_TEST_MARKER_m7k8j9
-- GARBAGE_DOCKER_079_TEST_CIDR_h0g1f2
-- GARBAGE_DOCKER_079_NET_DOC_d3s4a5
-- GARBAGE_DOCKER_079_TOPOLOGY_q6w7e8
-- GARBAGE_DOCKER_079_TF_MARKER_r9t0y1
-- GARBAGE_DOCKER_079_CIDR_BLOCK_u2i3o4
-- GARBAGE_DOCKER_079_K8S_MARKER_p5a6s7
-- GARBAGE_DOCKER_079_POLICY_TYPE_d8f9g0
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- 'dockerfile: Dockerfile'
+- 'driver: bridge'

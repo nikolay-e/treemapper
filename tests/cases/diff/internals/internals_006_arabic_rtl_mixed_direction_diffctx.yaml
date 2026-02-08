@@ -1,15 +1,12 @@
 must_include_files:
-  - renderer.py
+- src/content/renderer.py
 must_include_content:
-  - |
-    text = "Hello مرحبا World"
-    result = render_page("Mixed", text)
+- from src/content/sanitizer import sanitize_html
+- text = "Hello مرحبا World"
 must_not_include:
-  - GARBAGE_INT_006_INDEX_MARKER_A
-  - GARBAGE_INT_006_SEARCH_MARKER_B
-  - GarbageContentIndexer
-  - garbage_content_indexer.py
-  - GARBAGE_INT_006_RENDER_MARKER_C
-  - GARBAGE_INT_006_PURGE_MARKER_D
-  - GarbageRenderCache
-  - garbage_render_cache.py
+- GARBAGE_INT_006_INDEX_MARKER_A
+- GARBAGE_INT_006_PURGE_MARKER_D
+- GARBAGE_INT_006_RENDER_MARKER_C
+- GARBAGE_INT_006_SEARCH_MARKER_B
+- garbage_content_indexer.py
+- garbage_render_cache.py

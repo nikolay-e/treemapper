@@ -1,123 +1,41 @@
-api/src/app.py: |
-  from flask import Flask, jsonify
-  import os
-  import socket
+api/src/app.py: "from flask import Flask, jsonify\nimport os\nimport socket\n\napp = Flask(__name__)\n\n@app.route('/health')\ndef health():\n    return jsonify(\n        status='ok',\n        hostname=socket.gethostname(),\n\
+  \        instance=os.environ.get('HOSTNAME', 'unknown')\n    )\n\n@app.route('/api/v1/data')\ndef get_data():\n    return jsonify(data=[1, 2, 3])\n"
+api/requirements.txt: 'flask==2.3.0
 
-  app = Flask(__name__)
-
-  @app.route('/health')
-  def health():
-      return jsonify(
-          status='ok',
-          hostname=socket.gethostname(),
-          instance=os.environ.get('HOSTNAME', 'unknown')
-      )
-
-  @app.route('/api/v1/data')
-  def get_data():
-      return jsonify(data=[1, 2, 3])
-api/requirements.txt: |
-  flask==2.3.0
   gunicorn==21.2.0
-api/Dockerfile: |
-  FROM python:3.12-slim
+
+  '
+api/Dockerfile: 'FROM python:3.12-slim
+
   WORKDIR /app
+
   COPY requirements.txt .
+
   RUN pip install -r requirements.txt
+
   COPY src/ ./src/
+
   CMD ["gunicorn", "-b", "0.0.0.0:8080", "src.app:app"]
-docker-compose.yml: |
-  version: '3.8'
 
-  services:
-    api:
-      build: ./api
-      ports:
-        - "8080-8082:8080"
-      deploy:
-        mode: replicated
-        replicas: 3
-        endpoint_mode: vip
-        resources:
-          limits:
-            cpus: '0.50'
-            memory: 512M
-          reservations:
-            cpus: '0.25'
-            memory: 256M
-        restart_policy:
-          condition: on-failure
-          delay: 5s
-          max_attempts: 3
-          window: 120s
-        rollback_config:
-          parallelism: 1
-          delay: 10s
-          failure_action: continue
-          monitor: 60s
-          max_failure_ratio: 0.3
-        update_config:
-          parallelism: 1
-          delay: 10s
-          failure_action: rollback
-          monitor: 60s
-          max_failure_ratio: 0.3
-          order: start-first
-        placement:
-          constraints:
-            - node.role == worker
-          preferences:
-            - spread: node.labels.zone
+  '
+docker-compose.yml: "version: '3.8'\n\nservices:\n  api:\n    build: ./api\n    ports:\n      - \"8080-8082:8080\"\n    deploy:\n      mode: replicated\n      replicas: 3\n      endpoint_mode: vip\n   \
+  \   resources:\n        limits:\n          cpus: '0.50'\n          memory: 512M\n        reservations:\n          cpus: '0.25'\n          memory: 256M\n      restart_policy:\n        condition: on-failure\n\
+  \        delay: 5s\n        max_attempts: 3\n        window: 120s\n      rollback_config:\n        parallelism: 1\n        delay: 10s\n        failure_action: continue\n        monitor: 60s\n        max_failure_ratio:\
+  \ 0.3\n      update_config:\n        parallelism: 1\n        delay: 10s\n        failure_action: rollback\n        monitor: 60s\n        max_failure_ratio: 0.3\n        order: start-first\n      placement:\n\
+  \        constraints:\n          - node.role == worker\n        preferences:\n          - spread: node.labels.zone\n\n  db:\n    image: postgres:16-alpine\n    environment:\n      - POSTGRES_PASSWORD=secret\n\
+  \    volumes:\n      - postgres_data:/var/lib/postgresql/data\n    deploy:\n      mode: replicated\n      replicas: 1\n      resources:\n        limits:\n          cpus: '1.0'\n          memory: 1G\n\
+  \        reservations:\n          cpus: '0.5'\n          memory: 512M\n      placement:\n        constraints:\n          - node.labels.db == true\n\n  redis:\n    image: redis:7-alpine\n    deploy:\n\
+  \      mode: global\n      resources:\n        limits:\n          cpus: '0.25'\n          memory: 128M\n\nvolumes:\n  postgres_data:\n"
+scripts/scale_service.sh: '#!/bin/bash
 
-    db:
-      image: postgres:16-alpine
-      environment:
-        - POSTGRES_PASSWORD=secret
-      volumes:
-        - postgres_data:/var/lib/postgresql/data
-      deploy:
-        mode: replicated
-        replicas: 1
-        resources:
-          limits:
-            cpus: '1.0'
-            memory: 1G
-          reservations:
-            cpus: '0.5'
-            memory: 512M
-        placement:
-          constraints:
-            - node.labels.db == true
-
-    redis:
-      image: redis:7-alpine
-      deploy:
-        mode: global
-        resources:
-          limits:
-            cpus: '0.25'
-            memory: 128M
-
-  volumes:
-    postgres_data:
-scripts/scale_service.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_526_SCALE_MARKER_001
-  GARBAGE_DOCKER_526_SCALE_VAR_002="3"
   docker-compose up -d --scale api=3
-tests/test_scaling.py: |
-  # GARBAGE_DOCKER_526_TEST_MARKER_003
-  GARBAGE_DOCKER_526_TEST_SCALE_004 = {"replicas": 3}
-  def test_scaling():
-      pass
-docs/deployment.md: |
-  # Deployment Guide
-  GARBAGE_DOCKER_526_DEPLOY_DOC_005
-  GARBAGE_DOCKER_526_STRATEGY_006="rolling"
-k8s/deployment.yaml: |
-  # GARBAGE_DOCKER_526_K8S_MARKER_007
-  apiVersion: apps/v1
-  GARBAGE_DOCKER_526_K8S_DEPLOY_008: Deployment
-terraform/ecs.tf: |
-  # GARBAGE_DOCKER_526_TF_MARKER_009
-  GARBAGE_DOCKER_526_ECS_010: fargate
+
+  '
+tests/test_scaling.py: "def test_scaling():\n    pass\n"
+docs/deployment.md: '# Deployment Guide
+
+  '
+k8s/deployment.yaml: 'apiVersion: apps/v1
+
+  '
+terraform/ecs.tf: ''

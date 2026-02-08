@@ -1,16 +1,2 @@
-Modal.vue: |
-  <template>
-      <div>Initial</div>
-  </template>
-
-  <script setup lang="ts">
-  // vue_garbage_marker_005
-  const GARBAGE_MODAL_CONFIG = { closeOnEscape: true };
-  </script>
-App.vue: |
-  <template>
-      <div>Initial</div>
-  </template>
-
-  <script setup lang="ts">
-  </script>
+Modal.vue: "<template>\n    <div>Initial</div>\n</template>\n\n<script setup lang=\"ts\">\n// vue_garbage_marker_005\n</script>\n"
+App.vue: "<template>\n    <div>Initial</div>\n</template>\n\n<script setup lang=\"ts\">\n</script>\n"

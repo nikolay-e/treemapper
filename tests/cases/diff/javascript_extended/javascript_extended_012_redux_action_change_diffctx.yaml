@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - actions.ts
-must_not_include:
-- js_garbage_marker_007
+must_include_content:
+- INCREMENT = 'INCREMENT'
+- DECREMENT = 'DECREMENT'

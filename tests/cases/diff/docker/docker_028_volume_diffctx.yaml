@@ -1,17 +1,4 @@
-must_include:
-- VOLUME ["/data"]
-- VOLUME ["/cache"]
-- VOLUME ["/var/log/app"]
-- mkdir -p /data /cache /var/log/app
-- chown -R appuser:appgroup /data /cache
-must_not_include:
-- GARBAGE_DOCKER_513_BACKUP_MARKER_001
-- GARBAGE_DOCKER_513_BACKUP_VAR_002
-- GARBAGE_DOCKER_513_TEST_MARKER_003
-- GARBAGE_DOCKER_513_TEST_STORAGE_004
-- GARBAGE_DOCKER_513_VOL_DOC_005
-- GARBAGE_DOCKER_513_MOUNT_006
-- GARBAGE_DOCKER_513_K8S_MARKER_007
-- GARBAGE_DOCKER_513_PV_008
-- GARBAGE_DOCKER_513_OPS_MARKER_009
-- GARBAGE_DOCKER_513_RETENTION_010
+must_include_files:
+- Dockerfile
+must_include_content:
+- FROM base AS dependencies

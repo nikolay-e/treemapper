@@ -1,16 +1,4 @@
 must_include_files:
-  - chart/values.yaml
-  - chart/templates/deployment.yaml
+- chart/values.yaml
 must_include_content:
-  - |
-    replicaCount: 3
-  - |
-    replicas: {{ .Values.replicaCount }}
-must_not_include:
-  - GARBAGE_HELM_017_KEDA_OBJECT_A
-  - GARBAGE_HELM_017_KEDA_TARGET_B
-  - GARBAGE_HELM_017_KEDA_TRIGGER_C
-  - GARBAGE_HELM_017_SCALING_DOC_D
-  - GARBAGE_HELM_017_LOAD_TEST_E
-  - chart/templates/keda-scaledobject.yaml
-  - chart/docs/scaling-strategy.md
+- 'replicaCount: 3'

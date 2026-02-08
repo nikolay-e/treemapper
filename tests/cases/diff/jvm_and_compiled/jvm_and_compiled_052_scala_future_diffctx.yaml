@@ -1,16 +1,11 @@
 must_include_files:
-  - AsyncProcessor.scala
+- AsyncProcessor.scala
 must_include_content:
-  - |
-    Future
-  - |
-    Future.sequence
+- import scala.concurrent.{Future, ExecutionContext}
 must_not_include:
-  - GARBAGE_JVM_052_PROMISE_MARKER_A
-  - GARBAGE_JVM_052_AWAIT_MARKER_B
-  - GARBAGE_JVM_052_CALLBACK_MARKER_C
-  - GARBAGE_JVM_052_DEFERRED_MARKER_D
-  - GarbagePromise
-  - GarbageDeferred
-  - GarbagePromise.scala
-  - GarbageDeferred.scala
+- GARBAGE_JVM_052_AWAIT_MARKER_B
+- GARBAGE_JVM_052_CALLBACK_MARKER_C
+- GARBAGE_JVM_052_DEFERRED_MARKER_D
+- GARBAGE_JVM_052_PROMISE_MARKER_A
+- GarbageDeferred.scala
+- GarbagePromise.scala

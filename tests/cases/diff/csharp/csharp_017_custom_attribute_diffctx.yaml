@@ -1,13 +1,10 @@
 must_include_files:
-  - Models/Customer.cs
-  - Attributes/ValidateAttribute.cs
+- Models/Customer.cs
 must_include_content:
-  - |
-    [Validate(Required = true, MaxLength = 100)]
+- using MyApp.Attributes;
+- public class Customer
 must_not_include:
-  - GARBAGE_CS_017_DATA_SEEDER_A
-  - GARBAGE_CS_017_SCHEMA_MIGRATOR_B
-  - DataSeeder
-  - SchemaMigrator
-  - Unrelated/DataSeeder.cs
-  - Unrelated/SchemaMigrator.cs
+- GARBAGE_CS_017_DATA_SEEDER_A
+- GARBAGE_CS_017_SCHEMA_MIGRATOR_B
+- DataSeeder.cs
+- SchemaMigrator.cs

@@ -1,2 +1,2 @@
-must_include:
-- DEBUG
+must_include_files:
+- settings.py

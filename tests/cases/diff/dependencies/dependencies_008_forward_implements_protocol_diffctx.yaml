@@ -1,12 +1,8 @@
 must_include_files:
-  - impl.py
+- impl.py
 must_include_content:
-  - |
-    Repository
+- from typing import Optional
+- 'def __init__(self):'
 must_not_include:
-  - GARBAGE_DEP_008_WEATHER_A
-  - GARBAGE_DEP_008_INVENTORY_B
-  - ForecastModel
-  - Warehouse
-  - dew_point
-  - reorder_point
+- inventory_GARBAGE_DEP_008_INVENTORY_B.py
+- weather_station_GARBAGE_DEP_008_WEATHER_A.py

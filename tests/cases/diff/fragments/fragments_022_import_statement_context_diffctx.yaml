@@ -1,23 +1,5 @@
-must_include:
+must_include_files:
 - utils.py
-- helper
 must_not_include:
-- GARBAGE_FRAG_unrelatedutil081
-- GARBAGE_FRAG_utilclass081
-- GARBAGE_FRAG_utilmethod081
-- GARBAGE_FRAG_anotherutil081
-- GARBAGE_FRAG_utilconst081
-- GARBAGE_FRAG_unrelatedmain081
-- GARBAGE_FRAG_mainclass081
-- GARBAGE_FRAG_trailingmain081
-- GARBAGE_FRAG_garbfunc081
-- GARBAGE_FRAG_garbclass081
-- GARBAGE_FRAG_garbconst081
+- GARBAGE_CONST_081
 - garbage_module_081.py
-- unrelated_util_081
-- another_util_081
-- unrelated_main_081
-- trailing_main_081
-- UnrelatedUtilClass
-- UnrelatedMainClass
-- GarbageClass081

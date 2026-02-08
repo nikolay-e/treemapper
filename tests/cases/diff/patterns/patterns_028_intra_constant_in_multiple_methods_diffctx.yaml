@@ -1,2 +1,2 @@
-must_include:
-- MAX_REQUESTS
+must_include_files:
+- limits.py

@@ -1,4 +1,5 @@
-must_include:
-- func_alpha
-- func_beta
-- func_gamma
+must_include_files:
+- cycle.py
+must_include_content:
+- 'def func_alpha():'
+- 'def func_beta():'

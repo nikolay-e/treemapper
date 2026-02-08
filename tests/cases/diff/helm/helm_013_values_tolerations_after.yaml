@@ -1,53 +1,22 @@
-chart/Chart.yaml: |
-  apiVersion: v2
+chart/Chart.yaml: 'apiVersion: v2
+
   name: gpu-worker
+
   description: GPU worker with dedicated node tolerations
+
   type: application
+
   version: 1.0.0
-chart/values.yaml: |
-  replicaCount: 1
-  image:
-    repository: gpu-worker
-    tag: "1.0.0"
-  tolerations:
-    - key: "dedicated"
-      operator: "Equal"
-      value: "app"
-      effect: "NoSchedule"
-  resources:
-    limits:
-      nvidia.com/gpu: 1
-chart/templates/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: {{ .Release.Name }}-{{ .Chart.Name }}
-  spec:
-    replicas: {{ .Values.replicaCount }}
-    template:
-      spec:
-        containers:
-          - name: {{ .Chart.Name }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            resources:
-              {{- toYaml .Values.resources | nindent 14 }}
-        {{- with .Values.tolerations }}
-        tolerations:
-          {{- toYaml . | nindent 8 }}
-        {{- end }}
-chart/templates/otel-collector.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: GARBAGE_HELM_013_OTEL_COLLECTOR_A
-  spec:
-    template:
-      spec:
-        containers:
-          - name: GARBAGE_HELM_013_OTEL_CONTAINER_B
-            image: GARBAGE_HELM_013_OTEL_IMAGE_C
-chart/docs/gpu-setup.md: |
-  # GPU Setup Guide
-  GARBAGE_HELM_013_GPU_GUIDE_D
+
+  '
+chart/values.yaml: "replicaCount: 1\nimage:\n  repository: gpu-worker\n  tag: \"1.0.0\"\ntolerations:\n  - key: \"dedicated\"\n    operator: \"Equal\"\n    value: \"app\"\n    effect: \"NoSchedule\"\nresources:\n\
+  \  limits:\n    nvidia.com/gpu: 1\n"
+chart/templates/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}-{{ .Chart.Name }}\nspec:\n  replicas: {{ .Values.replicaCount }}\n  template:\n    spec:\n\
+  \      containers:\n        - name: {{ .Chart.Name }}\n          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n          resources:\n            {{- toYaml .Values.resources | nindent\
+  \ 14 }}\n      {{- with .Values.tolerations }}\n      tolerations:\n        {{- toYaml . | nindent 8 }}\n      {{- end }}\n"
+chart/templates/otel-collector.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\nspec:\n  template:\n    spec:\n      containers:\n"
+chart/docs/gpu-setup.md: '# GPU Setup Guide
+
   ## Driver Installation
-  GARBAGE_HELM_013_DRIVER_INSTALL_E
+
+  '

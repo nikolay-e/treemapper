@@ -1,5 +1,6 @@
-must_include:
+must_include_files:
 - large.txt
+must_include_content:
 - MODIFIED line 20
 must_not_include:
 - GARBAGE_FRAG_boundary1_061
@@ -14,5 +15,5 @@ must_not_include:
 - GARBAGE_FRAG_dat2_061
 - GARBAGE_FRAG_dat3_061
 - GARBAGE_FRAG_dat4_061
-- garbage_boundary_061.txt
 - garbage_061.dat
+- garbage_boundary_061.txt

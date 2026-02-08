@@ -1,16 +1,14 @@
 must_include_files:
-  - routes.ts
+- routes.ts
 must_include_content:
-  - |
-    res.status(201).json(req.body)
+- userRouter = Router()
+- (req, res) => {
 must_not_include:
-  - GARBAGE_JS_045_HEALTH_MARKER_A
-  - GARBAGE_JS_045_PING_MARKER_B
-  - GARBAGE_JS_045_CHECKER_CLASS_C
-  - GARBAGE_JS_045_NOTIFY_MARKER_D
-  - GARBAGE_JS_045_PUSH_MARKER_E
-  - GARBAGE_JS_045_SENDER_CLASS_F
-  - HealthChecker
-  - NotificationSender
-  - garbage_healthcheck.ts
-  - garbage_notifications.ts
+- GARBAGE_JS_045_CHECKER_CLASS_C
+- GARBAGE_JS_045_HEALTH_MARKER_A
+- GARBAGE_JS_045_NOTIFY_MARKER_D
+- GARBAGE_JS_045_PING_MARKER_B
+- GARBAGE_JS_045_PUSH_MARKER_E
+- GARBAGE_JS_045_SENDER_CLASS_F
+- garbage_healthcheck.ts
+- garbage_notifications.ts

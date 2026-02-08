@@ -1,41 +1,14 @@
 must_include_files:
-  - src/core/application.py
+- src/core/application.py
 must_include_content:
-  - |
-    APP_NAME = "MyApplication"
-    VERSION = "2.0.0"
-    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-  - |
-    def initialize_config() -> Dict[str, Any]:
-        return {
-            "name": APP_NAME,
-            "version": VERSION,
-            "debug": DEBUG,
-            "environment": os.getenv("ENVIRONMENT", "development"),
-        }
-  - |
-    class ApplicationContext:
-        def __init__(self, config: Dict[str, Any]):
-            self.config = config
-            self.initialized = False
-            self.plugins: List[str] = []
-
-        def start(self) -> None:
-            if not self.initialized:
-                setup_logging(self.config.get("log_level", "INFO"))
-                self.initialized = True
-                logger.info(f"Application {APP_NAME} v{VERSION} started")
-
-        def get_setting(self, key: str, default: Any = None) -> Optional[Any]:
-            return self.config.get(key, default)
+- from typing import Dict, Any, Optional, List
+- '"environment": os.getenv("ENVIRONMENT", "development"),'
 must_not_include:
-  - GARBAGE_ALGO_012_PLUGIN_MARKER_A
-  - GARBAGE_ALGO_012_LOADER_MARKER_B
-  - GARBAGE_ALGO_012_REGISTRY_MARKER_C
-  - GARBAGE_ALGO_012_EXT_MARKER_D
-  - GARBAGE_ALGO_012_HOOK_MARKER_E
-  - GARBAGE_ALGO_012_ACTIVE_MARKER_F
-  - PluginLoader
-  - ExtensionManager
-  - garbage_plugins.py
-  - garbage_extensions.py
+- GARBAGE_ALGO_012_ACTIVE_MARKER_F
+- GARBAGE_ALGO_012_EXT_MARKER_D
+- GARBAGE_ALGO_012_HOOK_MARKER_E
+- GARBAGE_ALGO_012_LOADER_MARKER_B
+- GARBAGE_ALGO_012_PLUGIN_MARKER_A
+- GARBAGE_ALGO_012_REGISTRY_MARKER_C
+- garbage_extensions.py
+- garbage_plugins.py

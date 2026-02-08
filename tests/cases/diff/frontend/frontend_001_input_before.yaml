@@ -1,25 +1,3 @@
-user.model.ts: |
-  export interface User {
-      id: string;
-      name: string;
-      email: string;
-      avatar?: string;
-      role: 'admin' | 'user' | 'guest';
-  }
-
-  export interface UserDisplayOptions {
-      showAvatar: boolean;
-      showRole: boolean;
-      compact: boolean;
-  }
-
-  // angular_garbage_marker_001
-  const GARBAGE_USER_CONFIG = { maxUsers: 100 };
-user-card.component.ts: |
-  import { Component } from '@angular/core';
-
-  @Component({
-      selector: 'app-user-card',
-      template: '<div>Initial</div>',
-  })
-  export class UserCardComponent {}
+user.model.ts: "export interface User {\n    id: string;\n    name: string;\n    email: string;\n    avatar?: string;\n    role: 'admin' | 'user' | 'guest';\n}\n\nexport interface UserDisplayOptions {\n\
+  \    showAvatar: boolean;\n    showRole: boolean;\n    compact: boolean;\n}\n\n// angular_garbage_marker_001\n"
+user-card.component.ts: "import { Component } from '@angular/core';\n\n@Component({\n    selector: 'app-user-card',\n    template: '<div>Initial</div>',\n})\nexport class UserCardComponent {}\n"

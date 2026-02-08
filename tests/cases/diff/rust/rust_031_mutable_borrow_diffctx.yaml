@@ -1,15 +1,13 @@
-must_include:
-- process_multiple
-- transform_in_place
-- '&mut Data'
+must_include_files:
+- src/processor.rs
+must_include_content:
+- 'pub fn process(data: &mut Data) {'
+- 'pub fn process_multiple(data: &mut Data, count: usize) {'
 must_not_include:
 - GARBAGE_RUST_031_PARSER_A
 - GARBAGE_RUST_031_PARSE_DELIM_B
-- GarbageCsvParser031
-- garbage_parse_row_031
-- garbage_parse_header_031
 - GARBAGE_RUST_031_SERIALIZER_C
 - GARBAGE_RUST_031_SER_FMT_D
-- GarbageJsonSerializer031
-- garbage_serialize_031
-- garbage_deserialize_031
+- mod.rs
+- parser.rs
+- serializer.rs

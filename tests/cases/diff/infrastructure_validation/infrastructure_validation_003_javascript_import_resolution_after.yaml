@@ -1,57 +1,22 @@
-src/utils.ts: |
-  export interface UserResponse {
-      id: string;
-      name: string;
-      email: string;
-  }
+src/utils.ts: "export interface UserResponse {\n    id: string;\n    name: string;\n    email: string;\n}\n\nexport function fetchUser(id: string): Promise<UserResponse> {\n    return fetch(`/api/users/${id}`).then(res\
+  \ => res.json());\n}\n\nexport function fetchUsers(): Promise<UserResponse[]> {\n    return fetch('/api/users').then(res => res.json());\n}\n\nexport function formatUserName(user: UserResponse): string\
+  \ {\n    return `${user.name} <${user.email}>`;\n}\n"
+src/api.ts: "import { fetchUser, fetchUsers, UserResponse } from './utils';\n\nexport async function getUserProfile(id: string): Promise<UserResponse> {\n    const user = await fetchUser(id);\n    return\
+  \ user;\n}\n\nexport async function listActiveUsers(): Promise<UserResponse[]> {\n    const users = await fetchUsers();\n    return users.filter(u => u.email.includes('@'));\n}\n"
+src/main.ts: "import { fetchUser } from './utils';\n\nasync function main() {\n    const user = await fetchUser('123');\n    console.log(user);\n}\n\nmain();\n"
+scripts/build.sh: '#!/bin/bash
 
-  export function fetchUser(id: string): Promise<UserResponse> {
-      return fetch(`/api/users/${id}`).then(res => res.json());
-  }
-
-  export function fetchUsers(): Promise<UserResponse[]> {
-      return fetch('/api/users').then(res => res.json());
-  }
-
-  export function formatUserName(user: UserResponse): string {
-      return `${user.name} <${user.email}>`;
-  }
-src/api.ts: |
-  import { fetchUser, fetchUsers, UserResponse } from './utils';
-
-  export async function getUserProfile(id: string): Promise<UserResponse> {
-      const user = await fetchUser(id);
-      return user;
-  }
-
-  export async function listActiveUsers(): Promise<UserResponse[]> {
-      const users = await fetchUsers();
-      return users.filter(u => u.email.includes('@'));
-  }
-src/main.ts: |
-  import { fetchUser } from './utils';
-
-  async function main() {
-      const user = await fetchUser('123');
-      console.log(user);
-  }
-
-  main();
-scripts/build.sh: |
-  #!/bin/bash
-  # GARBAGE_INFRA_003_BUILD_SCRIPT_A
-  GARBAGE_INFRA_003_OUTPUT_DIR_B="dist"
   tsc --outDir dist
-tests/utils.test.ts: |
-  // GARBAGE_INFRA_003_TEST_UTIL_A
-  // GARBAGE_INFRA_003_MOCK_FETCH_B = "jest.fn()"
-  describe('utils', () => { it('passes', () => {}); });
-docs/api-reference.md: |
-  # API Reference
-  GARBAGE_INFRA_003_API_DOC_A
-  GARBAGE_INFRA_003_ENDPOINT_LIST_B="/api/users,/api/profile"
-config/tsconfig.json: |
-  {
-    "GARBAGE_INFRA_003_TS_CONFIG_A": true,
-    "GARBAGE_INFRA_003_STRICT_MODE_B": true
+
+  '
+tests/utils.test.ts: 'describe(''utils'', () => { it(''passes'', () => {}); });
+
+  '
+docs/api-reference.md: '# API Reference
+
+  '
+config/tsconfig.json: '{
+
   }
+
+  '

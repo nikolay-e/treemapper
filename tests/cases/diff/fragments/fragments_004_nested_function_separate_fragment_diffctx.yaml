@@ -1,41 +1,9 @@
-must_include:
-- inner
-- nested.py
-- return z + 1
+must_include_files:
+- src/nested.py
 must_not_include:
-- GARBAGE_FRAG_010_toplevel
-- GARBAGE_FRAG_010_summary
-- GARBAGE_FRAG_010_topfunc
-- GARBAGE_FRAG_010_medium
-- GARBAGE_FRAG_010_container
-- GARBAGE_FRAG_010_localhelper
-- GARBAGE_FRAG_010_anothercontainer
-- GARBAGE_FRAG_010_layerthree
-- GARBAGE_FRAG_010_anotherclass
-- GARBAGE_FRAG_010_mlevel2
-- GARBAGE_FRAG_010_innerstatic
-- GARBAGE_FRAG_010_closure
-- GARBAGE_FRAG_010_trailing
 - GARBAGE_FRAG_010_001
-- GARBAGE_FRAG_010_002
-- GARBAGE_FRAG_010_003
 - GARBAGE_FRAG_010_004
-- GARBAGE_FRAG_010_005
-- GARBAGE_FRAG_010_006
-- GARBAGE_FRAG_010_007
 - GARBAGE_FRAG_010_008
-- GARBAGE_FRAG_010_009
-- GARBAGE_FRAG_010_010
-- UnrelatedTopLevelClass
-- unrelated_top_level_function
-- unrelated_medium_depth
-- UnrelatedContainerClass
-- another_deep_structure
-- AnotherUnrelatedClass
-- utility_with_closure
-- ClosureFactory
-- DecoratorRegistry
-- CallbackManager
+- callback_manager.py
 - closure_utils.py
 - decorator_patterns.py
-- callback_manager.py

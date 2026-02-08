@@ -1,2 +1,4 @@
-must_include:
-- aws_vpc
+must_include_files:
+- outputs.tf
+must_include_content:
+- output "vpc_cidr" {

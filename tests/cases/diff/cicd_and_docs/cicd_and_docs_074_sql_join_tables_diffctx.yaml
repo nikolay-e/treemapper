@@ -1,21 +1,15 @@
 must_include_files:
-  - order_details.sql
+- sql/queries/order_details.sql
+- src/models/order_detail.py
 must_include_content:
-  - |
-    LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN discounts d ON o.discount_id = d.id
-  - |
-    (oi.quantity * oi.price) AS line_total,
-    d.code AS discount_code,
-    d.percent AS discount_percent
+- -- Get order details with customer, product, and category info
+- from datetime import datetime
 must_not_include:
-  - GARBAGE_CICD_DOCS_074_JOIN_MARKER_A
-  - GARBAGE_CICD_DOCS_074_OUTER_MARKER_B
-  - GARBAGE_CICD_DOCS_074_HASH_MARKER_C
-  - GARBAGE_CICD_DOCS_074_PLAN_MARKER_D
-  - GARBAGE_CICD_DOCS_074_INDEX_MARKER_E
-  - GARBAGE_CICD_DOCS_074_CACHE_MARKER_F
-  - GarbageJoinOptimizer
-  - GarbageQueryPlanner
-  - garbage_join_optimizer.ts
-  - garbage_query_planner.ts
+- GARBAGE_CICD_DOCS_074_CACHE_MARKER_F
+- GARBAGE_CICD_DOCS_074_HASH_MARKER_C
+- GARBAGE_CICD_DOCS_074_INDEX_MARKER_E
+- GARBAGE_CICD_DOCS_074_JOIN_MARKER_A
+- GARBAGE_CICD_DOCS_074_OUTER_MARKER_B
+- GARBAGE_CICD_DOCS_074_PLAN_MARKER_D
+- garbage_join_optimizer.ts
+- garbage_query_planner.ts

@@ -1,15 +1,14 @@
-must_include:
-- field_count
-- Fields
-- Data::Struct
+must_include_files:
+- derive_macro/src/lib.rs
+- src/main.rs
+must_include_content:
+- use syn::{parse_macro_input, DeriveInput, Data, Fields};
+- let field_count = match input.data {
 must_not_include:
-- GARBAGE_RUST_029_RENDERER_A
-- GARBAGE_RUST_029_RENDER_FMT_B
-- GarbageTemplateRenderer029
-- garbage_render_029
-- garbage_render_partial_029
 - GARBAGE_RUST_029_ENCODER_C
 - GARBAGE_RUST_029_ENCODING_D
-- GarbageBase64Encoder029
-- garbage_encode_029
-- garbage_decode_029
+- GARBAGE_RUST_029_RENDERER_A
+- GARBAGE_RUST_029_RENDER_FMT_B
+- encoder.rs
+- mod.rs
+- renderer.rs

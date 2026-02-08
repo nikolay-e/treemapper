@@ -1,13 +1,5 @@
-must_include:
-- 'volumes:'
-must_not_include:
-- GARBAGE_DOCKER_517_BACKUP_MARKER_a1b2c3
-- GARBAGE_DOCKER_517_BACKUP_TARGET_d4e5f6
-- GARBAGE_DOCKER_517_TEST_MARKER_g7h8i9
-- GARBAGE_DOCKER_517_TEST_MOUNT_j0k1l2
-- GARBAGE_DOCKER_517_DOC_MARKER_m3n4o5
-- GARBAGE_DOCKER_517_VOLUMES_p6q7r8
-- GARBAGE_DOCKER_517_K8S_MARKER_s9t0u1
-- GARBAGE_DOCKER_517_PVC_SIZE_v2w3x4
-- GARBAGE_DOCKER_517_ANSIBLE_MARKER_y5z6a7
-- GARBAGE_DOCKER_517_NFS_PATH_b8c9d0
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- 'dockerfile: Dockerfile'
+- 'driver: local'

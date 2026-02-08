@@ -1,5 +1,6 @@
-must_include:
-- Capabilities.APIVersions
+must_include_files:
+- templates/ingress.yaml
+must_include_content:
+- '{{- if .Capabilities.APIVersions.Has "networking.k8s.io/v1" }}'
 must_not_include:
-- garbage_marker_12345
-- unused_marker_67890
+- unrelated.txt

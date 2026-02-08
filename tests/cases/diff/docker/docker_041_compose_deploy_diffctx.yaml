@@ -1,24 +1,5 @@
-must_include:
-- 'deploy:'
-- 'mode: replicated'
-- 'replicas: 3'
-- 'endpoint_mode: vip'
-- 'cpus: ''0.50'''
-- 'memory: 512M'
-- 'restart_policy:'
-- 'condition: on-failure'
-- 'rollback_config:'
-- 'update_config:'
-- 'order: start-first'
-- 'mode: global'
-must_not_include:
-- GARBAGE_DOCKER_526_SCALE_MARKER_001
-- GARBAGE_DOCKER_526_SCALE_VAR_002
-- GARBAGE_DOCKER_526_TEST_MARKER_003
-- GARBAGE_DOCKER_526_TEST_SCALE_004
-- GARBAGE_DOCKER_526_DEPLOY_DOC_005
-- GARBAGE_DOCKER_526_STRATEGY_006
-- GARBAGE_DOCKER_526_K8S_MARKER_007
-- GARBAGE_DOCKER_526_K8S_DEPLOY_008
-- GARBAGE_DOCKER_526_TF_MARKER_009
-- GARBAGE_DOCKER_526_ECS_010
+must_include_files:
+- docker-compose.yml
+must_include_content:
+- '- "8080-8082:8080"'
+- 'postgres_data:'

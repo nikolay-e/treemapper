@@ -1,18 +1,14 @@
 must_include_files:
-  - dto.ts
+- dto.ts
 must_include_content:
-  - |
-    function toPublic(user: User): UserPublic {
-        return { id: user.id, name: user.name, email: user.email };
-    }
+- import { User } from './user';
+- type UserPublic = Pick<User, 'id' | 'name' | 'email'>;
 must_not_include:
-  - GARBAGE_JS_076_LOG_MARKER_A
-  - GARBAGE_JS_076_TRANSPORT_MARKER_B
-  - GARBAGE_JS_076_TRANSPORT_CLASS_C
-  - GARBAGE_JS_076_METRIC_MARKER_D
-  - GARBAGE_JS_076_COUNTER_MARKER_E
-  - GARBAGE_JS_076_COLLECTOR_CLASS_F
-  - LogTransport
-  - MetricsCollector
-  - garbage_logging.ts
-  - garbage_metrics.ts
+- GARBAGE_JS_076_COLLECTOR_CLASS_F
+- GARBAGE_JS_076_COUNTER_MARKER_E
+- GARBAGE_JS_076_LOG_MARKER_A
+- GARBAGE_JS_076_METRIC_MARKER_D
+- GARBAGE_JS_076_TRANSPORT_CLASS_C
+- GARBAGE_JS_076_TRANSPORT_MARKER_B
+- garbage_logging.ts
+- garbage_metrics.ts

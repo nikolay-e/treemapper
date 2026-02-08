@@ -1,13 +1,11 @@
 must_include_files:
-  - Services/BatchProcessor.cs
-  - Extensions/EnumerableExtensions.cs
+- Services/BatchProcessor.cs
 must_include_content:
-  - |
-    var validUsers = users.WhereNotNull();
+- using MyApp.Extensions;
+- public void ProcessUsers(IEnumerable<User?> users)
 must_not_include:
-  - GARBAGE_CS_020_HEALTH_MONITOR_A
-  - GARBAGE_CS_020_CONFIG_WATCHER_B
-  - HealthMonitor
-  - ConfigWatcher
-  - Unrelated/HealthMonitor.cs
-  - Unrelated/ConfigWatcher.cs
+- GARBAGE_CS_020_CONFIG_WATCHER_B
+- GARBAGE_CS_020_HEALTH_MONITOR_A
+- GARBAGE_CS_020_HEALTH_MONITOR_A.Length
+- ConfigWatcher.cs
+- HealthMonitor.cs

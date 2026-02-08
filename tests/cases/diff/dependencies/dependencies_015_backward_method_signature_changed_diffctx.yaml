@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - user.py
-must_not_include:
-- garbage_marker_12345
+must_include_content:
+- 'def __init__(self, first, last, title=None):'
+- 'def get_full_name(self, include_title=False):'

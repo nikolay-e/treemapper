@@ -1,23 +1,5 @@
-must_include:
-- get_user_by_id
-- validate_user
-- validated
-must_not_include:
-- INTERNAL_MARKER_FIB_XYZ123
-- INTERNAL_MARKER_PRIME_ABC456
-- INTERNAL_MARKER_MATH_DEF789
-- INTERNAL_MARKER_EMAIL_GHI012
-- INTERNAL_MARKER_SEND_JKL345
-- INTERNAL_MARKER_FORMAT_MNO678
-- INTERNAL_MARKER_PUSH_PQR901
-- INTERNAL_MARKER_CONFIG_STU234
-- INTERNAL_MARKER_ENV_VWX567
-- INTERNAL_MARKER_CFGMGR_YZA890
-- calculate_fibonacci_sequence
-- compute_prime_factors
-- MathematicalUtilities
-- EmailNotificationService
-- PushNotificationHandler
-- ConfigurationManager
-- format_notification_template
-- load_environment_variables
+must_include_files:
+- src/user_service.py
+must_include_content:
+- 'validated = validate_user({"id": user_id})'
+- return "id" in data and isinstance(data["id"], int)

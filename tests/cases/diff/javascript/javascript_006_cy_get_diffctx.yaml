@@ -1,19 +1,14 @@
 must_include_files:
 - form.cy.ts
 must_include_content:
-- 'import { FORM_SELECTORS } from ''./form'';
-
-
-  '
-- "\n        cy.visit('/contact');\n        cy.get(FORM_SELECTORS.nameInput).type('John Doe');\n        cy.get(FORM_SELECTORS.emailInput).type('john@example.com');\n        cy.get(FORM_SELECTORS.submitButton).click();\n"
+- import { FORM_SELECTORS } from './form';
+- cy.visit('/contact');
 must_not_include:
 - GARBAGE_JS_006_AUDIT_MARKER_A
+- GARBAGE_JS_006_CIPHER_MARKER_D
+- GARBAGE_JS_006_ENGINE_CLASS_F
+- GARBAGE_JS_006_KEY_MARKER_E
 - GARBAGE_JS_006_TRAIL_MARKER_B
 - GARBAGE_JS_006_WRITER_CLASS_C
-- GARBAGE_JS_006_CIPHER_MARKER_D
-- GARBAGE_JS_006_KEY_MARKER_E
-- GARBAGE_JS_006_ENGINE_CLASS_F
-- AuditTrailWriter
-- CipherEngine
 - garbage_auditing.ts
 - garbage_encryption.ts

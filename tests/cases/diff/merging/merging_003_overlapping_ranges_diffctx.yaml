@@ -1,13 +1,9 @@
-must_include:
-- find_by_id
-- update_email
-- user_service.py
+must_include_files:
+- src/user_service.py
+must_include_content:
+- logger.debug(f"Cache hit for user {user_id}")
 must_not_include:
 - GARBAGE_MERGE_003_MARKER_A
 - GARBAGE_MERGE_003_MARKER_B
-- GARBAGE_MERGE_003_A_CLEAN
-- GARBAGE_MERGE_003_A_VERSION
-- GARBAGE_MERGE_003_B_SUMMARY
-- GARBAGE_MERGE_003_B_VERSION
-- text_sanitizer.py
 - health_monitor.py
+- text_sanitizer.py

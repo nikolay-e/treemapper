@@ -1,12 +1,8 @@
-must_include:
-- use_service
-- process
+must_include_files:
+- caller.py
+must_include_content:
+- 'if not svc.validate(result):'
 must_not_include:
-- GARBAGE_GRAPH_def001
-- GARBAGE_GRAPH_def002
-- GARBAGE_GRAPH_def003
-- GeoLocationService
-- CacheManager
-- NotificationSender
-- calculate_distance
-- send_email
+- cache_manager_GARBAGE_GRAPH_def002.py
+- geo_service_GARBAGE_GRAPH_def001.py
+- notification_GARBAGE_GRAPH_def003.py

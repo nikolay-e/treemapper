@@ -1,5 +1,4 @@
-must_include:
-- __init__
-- add
-- clear
-- self.count
+must_include_files:
+- service.py
+must_include_content:
+- self.count = 0

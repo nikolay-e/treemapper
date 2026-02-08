@@ -1,50 +1,16 @@
-chart/Chart.yaml: |
-  apiVersion: v2
+chart/Chart.yaml: 'apiVersion: v2
+
   name: health-api
+
   version: 1.5.0
-chart/values.yaml: |
-  replicaCount: 2
-  image:
-    repository: health-api
-    tag: "1.5.0"
-  probes:
-    liveness:
-      path: /healthz
-      port: 8080
-      initialDelaySeconds: 30
-    readiness:
-      path: /ready
-      port: 8080
-chart/templates/deployment.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: {{ .Release.Name }}-{{ .Chart.Name }}
-  spec:
-    replicas: {{ .Values.replicaCount }}
-    template:
-      spec:
-        containers:
-          - name: {{ .Chart.Name }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            livenessProbe:
-              httpGet:
-                path: {{ .Values.probes.liveness.path }}
-                port: {{ .Values.probes.liveness.port }}
-              initialDelaySeconds: 15
-              periodSeconds: 10
-chart/templates/canary-deploy.yaml: |
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: GARBAGE_HELM_009_CANARY_NAME_A
-  spec:
-    template:
-      spec:
-        containers:
-          - name: GARBAGE_HELM_009_CANARY_CONTAINER_B
-            image: GARBAGE_HELM_009_CANARY_IMAGE_C
-chart/scripts/healthcheck.sh: |
-  #!/bin/bash
-  # GARBAGE_HELM_009_HEALTHCHECK_SCRIPT_D
-  GARBAGE_HELM_009_HEALTHCHECK_ENDPOINT_E="http://localhost/health"
+
+  '
+chart/values.yaml: "replicaCount: 2\nimage:\n  repository: health-api\n  tag: \"1.5.0\"\nprobes:\n  liveness:\n    path: /healthz\n    port: 8080\n    initialDelaySeconds: 30\n  readiness:\n    path: /ready\n\
+  \    port: 8080\n"
+chart/templates/deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}-{{ .Chart.Name }}\nspec:\n  replicas: {{ .Values.replicaCount }}\n  template:\n    spec:\n\
+  \      containers:\n        - name: {{ .Chart.Name }}\n          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n          livenessProbe:\n            httpGet:\n              path:\
+  \ {{ .Values.probes.liveness.path }}\n              port: {{ .Values.probes.liveness.port }}\n            initialDelaySeconds: 15\n            periodSeconds: 10\n"
+chart/templates/canary-deploy.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\nspec:\n  template:\n    spec:\n      containers:\n"
+chart/scripts/healthcheck.sh: '#!/bin/bash
+
+  '

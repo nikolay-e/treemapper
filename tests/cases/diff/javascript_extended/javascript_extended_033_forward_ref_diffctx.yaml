@@ -1,4 +1,5 @@
-must_include:
+must_include_files:
 - Form.tsx
-must_not_include:
-- react_adv_garbage_marker_007
+must_include_content:
+- import { useRef } from 'react';
+- emailRef = useRef<HTMLInputElement>(null)

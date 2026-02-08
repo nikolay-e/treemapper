@@ -1,24 +1,16 @@
-actions.ts: |
-  export const INCREMENT = 'INCREMENT';
-  export const DECREMENT = 'DECREMENT';
+actions.ts: 'export const INCREMENT = ''INCREMENT'';
+
+  export const DECREMENT = ''DECREMENT'';
+
 
   export const increment = () => ({ type: INCREMENT });
+
   export const decrement = () => ({ type: DECREMENT });
 
+
   // js_garbage_marker_007
-  const GARBAGE_ACTION = 'GARBAGE';
-reducer.ts: |
-  import { INCREMENT, DECREMENT } from './actions';
 
-  const initialState = { count: 0 };
-
-  export function counterReducer(state = initialState, action: any) {
-      switch (action.type) {
-          case INCREMENT:
-              return { count: state.count + 1 };
-          case DECREMENT:
-              return { count: state.count - 1 };
-          default:
-              return state;
-      }
-  }
+  '
+reducer.ts: "import { INCREMENT, DECREMENT } from './actions';\n\nconst initialState = { count: 0 };\n\nexport function counterReducer(state = initialState, action: any) {\n    switch (action.type) {\n\
+  \        case INCREMENT:\n            return { count: state.count + 1 };\n        case DECREMENT:\n            return { count: state.count - 1 };\n        default:\n            return state;\n    }\n\
+  }\n"

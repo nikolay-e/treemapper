@@ -1,2 +1,4 @@
-must_include:
-- aws_iam_role
+must_include_files:
+- iam.tf
+must_include_content:
+- identifiers = ["lambda.amazonaws.com", "edgelambda.amazonaws.com"]

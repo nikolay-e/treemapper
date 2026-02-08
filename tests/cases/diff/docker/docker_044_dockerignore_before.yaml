@@ -1,56 +1,37 @@
-src/app.py: |
-  from flask import Flask, jsonify
-  import os
+src/app.py: "from flask import Flask, jsonify\nimport os\n\napp = Flask(__name__)\n\n@app.route('/health')\ndef health():\n    return jsonify(status='ok')\n\n@app.route('/version')\ndef version():\n   \
+  \ return jsonify(version=os.getenv('APP_VERSION', 'unknown'))\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=8080)\n"
+src/config.py: "import os\n\nclass Config:\n    DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'\n    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')\n    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret')\n"
+requirements.txt: 'flask==2.3.0
 
-  app = Flask(__name__)
-
-  @app.route('/health')
-  def health():
-      return jsonify(status='ok')
-
-  @app.route('/version')
-  def version():
-      return jsonify(version=os.getenv('APP_VERSION', 'unknown'))
-
-  if __name__ == '__main__':
-      app.run(host='0.0.0.0', port=8080)
-src/config.py: |
-  import os
-
-  class Config:
-      DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
-      LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
-      SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret')
-requirements.txt: |
-  flask==2.3.0
   gunicorn==21.2.0
-Dockerfile: |
-  FROM python:3.12-slim
+
+  '
+Dockerfile: 'FROM python:3.12-slim
+
   WORKDIR /app
+
   COPY requirements.txt .
+
   RUN pip install -r requirements.txt
+
   COPY src/ ./src/
+
   CMD ["gunicorn", "-b", "0.0.0.0:8080", "src.app:app"]
-.dockerignore: |
-  *.log
-scripts/build_image.sh: |
-  #!/bin/bash
-  # GARBAGE_DOCKER_529_BUILD_MARKER_z1x2c3
-  GARBAGE_DOCKER_529_IMAGE_TAG_v4b5n6="latest"
+
+  '
+.dockerignore: '*.log
+
+  '
+scripts/build_image.sh: '#!/bin/bash
+
   docker build -t app:latest .
-tests/test_app.py: |
-  # GARBAGE_DOCKER_529_TEST_MARKER_m7k8j9
-  GARBAGE_DOCKER_529_TEST_ENV_h0g1f2 = "test"
-  def test_health():
-      pass
-docs/docker.md: |
-  # Docker Configuration
-  GARBAGE_DOCKER_529_DOC_MARKER_d3s4a5
-  GARBAGE_DOCKER_529_IGNORE_LIST_q6w7e8="node_modules,.git,.env"
-.github/workflows/docker.yml: |
-  # GARBAGE_DOCKER_529_GH_MARKER_r9t0y1
-  name: Docker
-  GARBAGE_DOCKER_529_WORKFLOW_u2i3o4: push
-makefile.ignore: |
-  # GARBAGE_DOCKER_529_MAKE_MARKER_p5a6s7
-  GARBAGE_DOCKER_529_TARGET_d8f9g0: build
+
+  '
+tests/test_app.py: "def test_health():\n    pass\n"
+docs/docker.md: '# Docker Configuration
+
+  '
+.github/workflows/docker.yml: 'name: Docker
+
+  '
+makefile.ignore: ''

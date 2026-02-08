@@ -1,19 +1,11 @@
-must_include:
-- serde
-- serde_json
-- features
-- serialization
-- Serialize
-- Deserialize
-- to_json
-- from_json
+must_include_files:
+- Cargo.toml
+- src/lib.rs
+must_include_content:
+- version = "0.2.0"
+- serde = ["dep:serde", "dep:serde_json"]
 must_not_include:
-- GARBAGE_RUST_METRICS_FEAT_001
 - GARBAGE_METRICS_INTERVAL_002
-- GarbageMetricsCollector003
-- garbage_increment_004
-- garbage_set_gauge_005
-- garbage_export_006
-- GARBAGE_METRICS_EXPORT_007
-- GarbageMetricsReporter008
-- garbage_report_009
+- GARBAGE_RUST_METRICS_FEAT_001
+- metrics.rs
+- mod.rs

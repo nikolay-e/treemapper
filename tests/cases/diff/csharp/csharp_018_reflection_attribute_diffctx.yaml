@@ -1,13 +1,10 @@
 must_include_files:
-  - Services/Router.cs
-  - Attributes/RouteAttribute.cs
+- Services/Router.cs
 must_include_content:
-  - |
-    var attr = method.GetCustomAttribute<RouteAttribute>();
+- using System.Reflection;
+- public Dictionary<string, MethodInfo> BuildRoutes(Type controllerType)
 must_not_include:
-  - GARBAGE_CS_018_BLOB_STORAGE_A
-  - GARBAGE_CS_018_CDN_MANAGER_B
-  - BlobStorage
-  - CdnManager
-  - Unrelated/BlobStorage.cs
-  - Unrelated/CdnManager.cs
+- GARBAGE_CS_018_BLOB_STORAGE_A
+- GARBAGE_CS_018_CDN_MANAGER_B
+- BlobStorage.cs
+- CdnManager.cs

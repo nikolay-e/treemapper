@@ -1,14 +1,9 @@
-must_include:
-- func1
-- process_data_1
+must_include_files:
 - module1.py
+must_include_content:
+- from logger import log, Logger, log_error
+- logger.info('func1 completed successfully')
 must_not_include:
-- GARBAGE_GRAPH_klm001
-- GARBAGE_GRAPH_klm002
-- GARBAGE_GRAPH_klm003
-- track_event
-- track_page_view
-- record_metric
-- increment_counter
-- audit_log
-- audit_create
+- analytics_hub_GARBAGE_GRAPH_klm001.py
+- audit_hub_GARBAGE_GRAPH_klm003.py
+- metrics_hub_GARBAGE_GRAPH_klm002.py

@@ -1,10 +1,12 @@
-must_include:
-- database
-- host
+must_include_files:
+- config.yaml
+must_include_content:
+- 'host: db.example.com'
+- 'host: redis.example.com'
 must_not_include:
 - GARBAGE_GRAPH_yza001
 - GARBAGE_GRAPH_yza002
-- setup_logging
-- Logger_GARBAGE
-- collect_metrics
-- MetricsExporter
+- logger_GARBAGE_GRAPH_yza001.py
+- logging_config_GARBAGE_GRAPH_yza001.yaml
+- metrics_GARBAGE_GRAPH_yza002.py
+- metrics_config_GARBAGE_GRAPH_yza002.yaml

@@ -1,29 +1,15 @@
-must_include:
-- User
-- email
-- PartialEq
-- Eq
-- Hash
-- UserProfile
-- is_active
-- deactivate
+must_include_files:
+- src/models.rs
+must_include_content:
+- use std::hash::{Hash, Hasher};
+- 'pub fn with_status(id: u64, name: String, email: String, active: bool) -> Self
+  {'
 must_not_include:
-- GARBAGE_RUST_EVENTS_001
-- GARBAGE_MAX_EVENTS_002
-- GarbageEventType003
-- GarbageEvent004
-- garbage_emit_005
-- GARBAGE_EMIT_IMPL_006
-- garbage_serialize_007
-- GARBAGE_SERIALIZED_008
-- GarbageEventBus009
-- garbage_publish_010
-- GARBAGE_RUST_COMMANDS_011
 - GARBAGE_CMD_TIMEOUT_012
-- GarbageCommand013
-- garbage_execute_014
-- garbage_undo_015
-- GarbageCommandHandler016
-- garbage_run_017
-- garbage_undo_last_018
-- GARBAGE_NO_HISTORY_019
+- GARBAGE_EMIT_IMPL_006
+- GARBAGE_MAX_EVENTS_002
+- GARBAGE_RUST_COMMANDS_011
+- GARBAGE_RUST_EVENTS_001
+- commands.rs
+- events.rs
+- mod.rs

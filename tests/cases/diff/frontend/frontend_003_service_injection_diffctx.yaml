@@ -1,6 +1,5 @@
-must_include:
+must_include_files:
 - dashboard.component.ts
-- AuthService
-- UserService
-must_not_include:
-- angular_garbage_marker_003
+must_include_content:
+- import { Component, OnInit } from '@angular/core';
+- 'private authService: AuthService,'
