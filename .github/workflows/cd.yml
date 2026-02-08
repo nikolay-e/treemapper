@@ -65,12 +65,13 @@ jobs:
         env:
           VERSION: ${{ github.event.inputs.version }}
         run: |
-          CURRENT=$(python -c "
+          CURRENT=$(python - <<'PY'
           import re
           content = open('src/treemapper/version.py').read()
-          m = re.search(r'__version__\s*=\s*[\"'\'']([^\"'\'']+)[\"'\'']', content)
+          m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
           print(m.group(1) if m else '')
-          ")
+          PY
+          )
           if [ "$CURRENT" = "$VERSION" ]; then
             echo "Error: version.py already contains version $VERSION"
             echo "Nothing to release - version is already set."
