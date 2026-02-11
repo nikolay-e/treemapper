@@ -115,6 +115,7 @@ def write_tree_yaml(file: TextIO, tree: dict[str, Any]) -> None:
     file.write(f"type: {tree['type']}\n")
 
     if tree.get("type") == "diff_context" and tree.get("fragments"):
+        file.write(f"fragment_count: {len(tree['fragments'])}\n")
         file.write("fragments:\n")
         for frag in tree["fragments"]:
             _write_yaml_fragment(file, frag, "  ")

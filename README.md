@@ -38,6 +38,7 @@ children:
 ## Usage
 
 ```bash
+treemapper                               # current dir, YAML to stdout
 treemapper .                          # YAML to stdout + token count
 treemapper . -o tree.yaml             # save to file
 treemapper . -o                       # save to tree.yaml (default)
@@ -47,12 +48,12 @@ treemapper . -f txt                   # plain text with indentation
 treemapper . -f md                    # Markdown with fenced code
 treemapper . -f yml                   # YAML (alias)
 treemapper . --no-content             # structure only
-treemapper . --max-depth 3            # limit directory depth
-treemapper . --max-file-bytes 10000   # skip files > 10KB
+treemapper . --max-depth 3            # limit depth (0=root, 1=children)
+treemapper . --max-file-bytes 10000   # skip files > 10KB (default: 10 MB)
 treemapper . --max-file-bytes 0       # no limit
 treemapper . -i custom.ignore         # custom ignore patterns
-treemapper . --no-default-ignores     # disable default ignores
-treemapper . --log-level info         # log level
+treemapper . --no-default-ignores     # disable .gitignore + defaults
+treemapper . --log-level info         # log level (default: error)
 treemapper . -c                       # copy to clipboard
 treemapper . -c -o tree.yaml          # clipboard + save to file
 treemapper -v                         # show version
@@ -66,7 +67,7 @@ minimal set of code fragments needed to understand a change:
 ```bash
 treemapper . --diff HEAD~1..HEAD      # recent changes
 treemapper . --diff main..feature     # feature branch
-treemapper . --diff HEAD~1 --budget 30000  # limit tokens
+treemapper . --diff HEAD~1 --budget 30000  # limit tokens (HEAD~1 = HEAD~1..HEAD)
 treemapper . --diff HEAD~1 --full     # all changed code
 ```
 
@@ -156,7 +157,8 @@ md_str = to_markdown(tree)
 ## Ignore Patterns
 
 Respects `.gitignore` and `.treemapperignore` automatically.
-Use `--no-default-ignores` to include everything.
+Use `--no-default-ignores` to disable all ignore processing
+(`.gitignore`, `.treemapperignore`, and built-in defaults).
 
 - Hierarchical: nested ignore files at each directory level
 - Negation patterns: `!important.log` un-ignores a file
