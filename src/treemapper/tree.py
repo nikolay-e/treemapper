@@ -39,7 +39,6 @@ KNOWN_BINARY_EXTENSIONS = frozenset(
         ".bmp",
         ".ico",
         ".webp",
-        ".svg",
         ".tiff",
         ".tif",
         ".mp3",

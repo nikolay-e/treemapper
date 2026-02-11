@@ -198,6 +198,7 @@ def build_diff_context(
     full: bool = False,
 ) -> dict[str, Any]:
     _validate_inputs(root_dir, alpha, tau, budget_tokens)
+    root_dir = root_dir.resolve()
 
     hunks = parse_diff(root_dir, diff_range)
     if not hunks:
@@ -265,6 +266,9 @@ def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: in
         raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
 
+_CONTAINER_FRAGMENT_KINDS = frozenset({"class", "interface", "struct"})
+
+
 def _identify_core_fragments(hunks: list[DiffHunk], all_fragments: list[Fragment]) -> set[FragmentId]:
     frags_by_path: dict[Path, list[Fragment]] = defaultdict(list)
     for frag in all_fragments:
@@ -276,7 +280,23 @@ def _identify_core_fragments(hunks: list[DiffHunk], all_fragments: list[Fragment
         if frags:
             h_start, h_end = h.core_selection_range
             core_ids.update(_find_core_for_hunk(frags, h_start, h_end))
+
+    _add_container_headers(core_ids, frags_by_path)
     return core_ids
+
+
+def _add_container_headers(core_ids: set[FragmentId], frags_by_path: dict[Path, list[Fragment]]) -> None:
+    core_paths = {fid.path for fid in core_ids}
+    headers_to_add: list[FragmentId] = []
+    for path in core_paths:
+        for frag in frags_by_path.get(path, []):
+            if frag.kind not in _CONTAINER_FRAGMENT_KINDS or frag.id in core_ids:
+                continue
+            for core_id in core_ids:
+                if core_id.path == path and core_id.start_line > frag.end_line:
+                    headers_to_add.append(frag.id)
+                    break
+    core_ids.update(headers_to_add)
 
 
 def _log_full_mode(selected: list[Fragment]) -> None:
@@ -409,6 +429,22 @@ def _collect_expansion_files(
     return list(expansion_files)
 
 
+def _filter_ignored(
+    files: list[Path],
+    root_dir: Path,
+    combined_spec: pathspec.PathSpec,
+) -> list[Path]:
+    result: list[Path] = []
+    for file_path in files:
+        try:
+            rel_path = file_path.relative_to(root_dir).as_posix()
+            if not should_ignore(rel_path, combined_spec):
+                result.append(file_path)
+        except ValueError:
+            pass
+    return result
+
+
 def _expand_universe_by_rare_identifiers(
     root_dir: Path,
     concepts: frozenset[str],
@@ -422,22 +458,6 @@ def _expand_universe_by_rare_identifiers(
     files = _collect_candidate_files(root_dir, included_set, combined_spec)
     inverted_index = _build_ident_index(files, concepts)
     return _collect_expansion_files(inverted_index, concepts, included_set)
-
-
-def _filter_ignored(
-    files: list[Path],
-    root_dir: Path,
-    combined_spec: pathspec.PathSpec,
-) -> list[Path]:
-    result: list[Path] = []
-    for file_path in files:
-        try:
-            rel_path = file_path.relative_to(root_dir).as_posix()
-            if not should_ignore(rel_path, combined_spec):
-                result.append(file_path)
-        except ValueError:
-            result.append(file_path)
-    return result
 
 
 def _empty_tree(root_dir: Path) -> dict[str, Any]:

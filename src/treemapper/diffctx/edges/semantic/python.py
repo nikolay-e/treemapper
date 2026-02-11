@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 from __future__ import annotations
 
 import re
@@ -6,7 +7,7 @@ from pathlib import Path
 
 from ...python_semantics import PyFragmentInfo, analyze_python_fragment
 from ...types import Fragment, FragmentId
-from ..base import EdgeBuilder, EdgeDict, add_ref_edges, path_to_module
+from ..base import EdgeBuilder, EdgeDict, add_semantic_edges, path_to_module
 
 _PYTHON_EXTS = {".py", ".pyi", ".pyw"}
 
@@ -164,7 +165,7 @@ class PythonEdgeBuilder(EdgeBuilder):
             return False
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
-        py_frags = [f for f in fragments if f.path.suffix.lower() == ".py"]
+        py_frags = [f for f in fragments if _is_python_file(f.path)]
         if not py_frags:
             return {}
 
@@ -187,8 +188,16 @@ class PythonEdgeBuilder(EdgeBuilder):
             info = info_cache[f.id]
             self_defs = set(frag_defines.get(f.id, frozenset()))
 
-            add_ref_edges(edges, f.id, set(info.calls), name_to_defs, _CALL_WEIGHT)
-            add_ref_edges(edges, f.id, set(info.references), name_to_defs, _SYMBOL_REF_WEIGHT, skip_self_defs=self_defs)
-            add_ref_edges(edges, f.id, set(info.type_refs), name_to_defs, _TYPE_REF_WEIGHT, skip_self_defs=self_defs)
+            add_semantic_edges(
+                edges,
+                f.id,
+                info,
+                name_to_defs,
+                _CALL_WEIGHT,
+                _SYMBOL_REF_WEIGHT,
+                _TYPE_REF_WEIGHT,
+                self.reverse_weight_factor,
+                self_defs,
+            )
 
         return edges

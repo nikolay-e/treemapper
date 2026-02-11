@@ -66,7 +66,7 @@ def _build_embedding_edges(
                 break
             f2 = fragments[j]
             weight = clamp_weight_fn(score, f1.path, f2.path) * _EMBED_WEIGHT
-            edges[(f1.id, f2.id)] = weight
-            edges[(f2.id, f1.id)] = weight * _BACKWARD_WEIGHT_FACTOR
+            edges[(f1.id, f2.id)] = max(edges.get((f1.id, f2.id), 0.0), weight)
+            edges[(f2.id, f1.id)] = max(edges.get((f2.id, f1.id), 0.0), weight * _BACKWARD_WEIGHT_FACTOR)
 
     return edges

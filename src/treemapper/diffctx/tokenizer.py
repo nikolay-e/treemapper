@@ -38,6 +38,9 @@ def _get_nlp() -> Language | None:
         except ImportError:
             _nlp_available = False
             return None
+        except Exception:
+            _nlp_available = False
+            return None
 
     return _nlp
 

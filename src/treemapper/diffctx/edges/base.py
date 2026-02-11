@@ -23,9 +23,12 @@ def path_to_module(path: Path, repo_root: Path | None = None) -> str:
             parts = parts[i + 1 :]
             break
 
-    if parts and parts[-1].endswith(".py"):
-        parts[-1] = parts[-1][:-3]
-        if parts[-1] == "__init__":
+    if parts:
+        for _ext in (".pyw", ".pyi", ".py"):
+            if parts[-1].endswith(_ext):
+                parts[-1] = parts[-1][: -len(_ext)]
+                break
+        if parts and parts[-1] == "__init__":
             parts = parts[:-1]
 
     return ".".join(parts) if parts else ""
@@ -125,6 +128,26 @@ def add_ref_edges(
                 continue
             edges[(src_id, dst)] = max(edges.get((src_id, dst), 0.0), weight)
             edges[(dst, src_id)] = max(edges.get((dst, src_id), 0.0), weight * reverse_factor)
+
+
+def add_semantic_edges(
+    edges: EdgeDict,
+    src_id: FragmentId,
+    info: object,
+    name_to_defs: dict[str, list[FragmentId]],
+    call_weight: float,
+    ref_weight: float,
+    type_weight: float,
+    reverse_factor: float,
+    self_defs: set[str],
+) -> None:
+    add_ref_edges(edges, src_id, set(info.calls), name_to_defs, call_weight, reverse_factor=reverse_factor)  # type: ignore[attr-defined]
+    add_ref_edges(
+        edges, src_id, set(info.references), name_to_defs, ref_weight, reverse_factor=reverse_factor, skip_self_defs=self_defs  # type: ignore[attr-defined]
+    )
+    add_ref_edges(
+        edges, src_id, set(info.type_refs), name_to_defs, type_weight, reverse_factor=reverse_factor, skip_self_defs=self_defs  # type: ignore[attr-defined]
+    )
 
 
 class EdgeBuilder(ABC):

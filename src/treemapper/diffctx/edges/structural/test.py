@@ -70,14 +70,21 @@ def _has_direct_import(test_frag: Fragment, src_frag: Fragment, repo_root: Path 
 
 
 def _extract_target_name_from_test(test_name: str) -> str | None:
-    if test_name.startswith("test_"):
-        return test_name[5:]
-    if test_name.endswith("_test"):
-        return test_name[:-5]
-    if ".test" in test_name:
-        return test_name.split(".test")[0]
-    if ".spec" in test_name:
-        return test_name.split(".spec")[0]
+    lower = test_name.lower()
+    if lower.startswith("test_"):
+        return lower[5:]
+    if lower.endswith("_test"):
+        return lower[:-5]
+    if ".test" in lower:
+        return lower.split(".test")[0]
+    if ".spec" in lower:
+        return lower.split(".spec")[0]
+    if test_name.startswith("Test") and len(test_name) > 4 and test_name[4].isupper():
+        return test_name[4:].lower()
+    if test_name.endswith("Tests") and len(test_name) > 5 and test_name[-6].islower():
+        return test_name[:-5].lower()
+    if test_name.endswith("Test") and len(test_name) > 4 and test_name[-5].islower():
+        return test_name[:-4].lower()
     return None
 
 
@@ -99,7 +106,7 @@ class TestEdgeBuilder(EdgeBuilder):
                 by_base[f.path.stem.lower()].append(f)
 
         for test_frag in test_frags:
-            target_name = _extract_target_name_from_test(test_frag.path.stem.lower())
+            target_name = _extract_target_name_from_test(test_frag.path.stem)
             if not target_name:
                 continue
 

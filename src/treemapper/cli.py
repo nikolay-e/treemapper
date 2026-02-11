@@ -96,7 +96,7 @@ class ParsedArgs:
     force_stdout: bool
     diff_range: str | None = None
     budget: int | None = None
-    alpha: float = 0.55
+    alpha: float = 0.60
     tau: float = 0.08
     full_diff: bool = False
 

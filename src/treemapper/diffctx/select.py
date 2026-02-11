@@ -240,8 +240,7 @@ def _run_greedy_loop_heap(
             selections_for_baseline += 1
             if selections_for_baseline == _BASELINE_K and baseline_densities:
                 threshold = tau * statistics.median(baseline_densities)
-
-        if selections_for_baseline >= _BASELINE_K and best_density < threshold:
+        elif best_density < threshold:
             break
 
         state.selected.append(best_frag)

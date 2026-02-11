@@ -40,7 +40,7 @@ class TestDetectClipboardCommand:
 
     @patch("platform.system", return_value="Linux")
     @patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-0"}, clear=False)
-    @patch("shutil.which", return_value="/usr/bin/wl-copy")
+    @patch("shutil.which", side_effect=lambda x: "/usr/bin/wl-copy" if x == "wl-copy" else None)
     def test_linux_wayland_uses_wl_copy(self, mock_which, mock_system):
         assert detect_clipboard_command() == ["wl-copy", "--type", "text/plain"]
 
@@ -123,6 +123,44 @@ class TestCopyToClipboard:
         with pytest.raises(ClipboardError, match="Failed to execute"):
             copy_to_clipboard("test")
 
+    @patch("platform.system", return_value="Darwin")
+    @patch("treemapper.clipboard.detect_clipboard_command", return_value=["pbcopy"])
+    @patch("subprocess.run")
+    def test_empty_string(self, mock_run, mock_detect, mock_system):
+        result = copy_to_clipboard("")
+        mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["input"] == b""
+        assert result == 0
+
+    @patch("platform.system", return_value="Darwin")
+    @patch("treemapper.clipboard.detect_clipboard_command", return_value=["pbcopy"])
+    @patch("subprocess.run")
+    def test_unicode_content_utf8(self, mock_run, mock_detect, mock_system):
+        content = "\u65e5\u672c\u8a9e\u30c6\u30b9\u30c8"
+        result = copy_to_clipboard(content)
+        mock_run.assert_called_once()
+        expected_bytes = content.encode("utf-8")
+        assert mock_run.call_args.kwargs["input"] == expected_bytes
+        assert result == len(expected_bytes)
+
+    @patch("platform.system", return_value="Windows")
+    @patch("treemapper.clipboard.detect_clipboard_command", return_value=["clip"])
+    @patch("subprocess.run")
+    def test_unicode_content_utf16le(self, mock_run, mock_detect, mock_system):
+        content = "\u65e5\u672c\u8a9e\u30c6\u30b9\u30c8"
+        result = copy_to_clipboard(content)
+        mock_run.assert_called_once()
+        expected_bytes = content.encode("utf-16le")
+        assert mock_run.call_args.kwargs["input"] == expected_bytes
+        assert result == len(expected_bytes)
+
+    @patch("treemapper.clipboard.detect_clipboard_command", return_value=["pbcopy"])
+    @patch("subprocess.run")
+    def test_raises_on_command_failure_no_stderr(self, mock_run, mock_detect):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "pbcopy")
+        with pytest.raises(ClipboardError):
+            copy_to_clipboard("test")
+
 
 class TestClipboardAvailable:
     @patch("treemapper.clipboard.detect_clipboard_command", return_value=["pbcopy"])
@@ -194,7 +232,6 @@ class TestClipboardWarnings:
 
 class TestForceStdout:
     def test_explicit_stdout_with_copy_flag(self, temp_project):
-        """Test that -o - forces stdout output even when --copy succeeds."""
         result = run_treemapper_subprocess([".", "-c", "-o", "-"], cwd=temp_project)
         assert result.returncode == 0
         # With -o -, output should always go to stdout (force_stdout=True)
@@ -202,7 +239,6 @@ class TestForceStdout:
         assert "file.txt" in result.stdout
 
     def test_explicit_stdout_without_copy(self, temp_project):
-        """Test that -o - outputs to stdout normally."""
         result = run_treemapper_subprocess([".", "-o", "-"], cwd=temp_project)
         assert result.returncode == 0
         assert result.stdout != ""
@@ -210,7 +246,6 @@ class TestForceStdout:
 
     @pytest.mark.skipif(not clipboard_available(), reason="Clipboard not available (no display or clipboard tool)")
     def test_copy_without_explicit_stdout_suppresses_output(self, temp_project):
-        """Test that -c without -o - suppresses stdout when clipboard succeeds."""
         result = run_treemapper_subprocess([".", "-c"], cwd=temp_project)
         assert result.returncode == 0
         # Without -o -, stdout should be suppressed when clipboard succeeds
