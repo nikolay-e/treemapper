@@ -13,11 +13,19 @@ from treemapper.diffctx.fragments import (
     PythonAstStrategy,
     RegexMarkdownStrategy,
     RuamelYamlStrategy,
-    TreeSitterStrategy,
     fragment_file,
 )
 
+try:
+    from treemapper.diffctx.parsers.tree_sitter import TreeSitterStrategy
 
+    _HAS_TREE_SITTER = True
+except ImportError:
+    TreeSitterStrategy = None  # type: ignore[assignment,misc]
+    _HAS_TREE_SITTER = False
+
+
+@pytest.mark.skipif(not _HAS_TREE_SITTER, reason="tree-sitter not installed")
 class TestTreeSitterStrategy:
     def test_can_handle_python(self):
         strategy = TreeSitterStrategy()

@@ -18,6 +18,7 @@ from .git import (
     GitError,
     get_changed_files,
     get_diff_text,
+    get_untracked_files,
     is_git_repo,
     parse_diff,
     show_file_at_revision,
@@ -201,18 +202,29 @@ def build_diff_context(
     root_dir = root_dir.resolve()
 
     hunks = parse_diff(root_dir, diff_range)
+
+    base_rev, head_rev = split_diff_range(diff_range)
+    is_working_tree_diff = base_rev is None and head_rev is None
+    combined_spec = get_ignore_specs(root_dir, ignore_file, no_default_ignores, None)
+
+    untracked: list[Path] = []
+    if is_working_tree_diff:
+        untracked = _discover_untracked_files(root_dir, combined_spec)
+        hunks.extend(_synthetic_hunks(untracked))
+
     if not hunks:
         return _empty_tree(root_dir)
 
-    combined_spec = get_ignore_specs(root_dir, ignore_file, no_default_ignores, None)
     diff_text = get_diff_text(root_dir, diff_range)
     concepts = concepts_from_diff_text(diff_text)
+    if untracked:
+        concepts = _enrich_concepts(concepts, untracked)
 
     changed_files = get_changed_files(root_dir, diff_range)
     changed_files = [_normalize_path(p, root_dir) for p in changed_files]
+    changed_files.extend(untracked)
     changed_files = _filter_ignored(changed_files, root_dir, combined_spec)
 
-    base_rev, head_rev = split_diff_range(diff_range)
     preferred_revs = _build_preferred_revs(base_rev, head_rev)
 
     seen_frag_ids: set[FragmentId] = set()
@@ -458,6 +470,52 @@ def _expand_universe_by_rare_identifiers(
     files = _collect_candidate_files(root_dir, included_set, combined_spec)
     inverted_index = _build_ident_index(files, concepts)
     return _collect_expansion_files(inverted_index, concepts, included_set)
+
+
+def _discover_untracked_files(root_dir: Path, combined_spec: pathspec.PathSpec) -> list[Path]:
+    try:
+        raw = get_untracked_files(root_dir)
+    except GitError:
+        return []
+    result: list[Path] = []
+    for f in raw:
+        normalized = _normalize_path(f, root_dir)
+        if not normalized.is_file() or not _is_allowed_file(normalized):
+            continue
+        try:
+            if normalized.stat().st_size > _MAX_FILE_SIZE:
+                continue
+            rel = normalized.relative_to(root_dir).as_posix()
+            if should_ignore(rel, combined_spec):
+                continue
+        except (ValueError, OSError):
+            continue
+        result.append(normalized)
+    return result
+
+
+def _synthetic_hunks(files: list[Path]) -> list[DiffHunk]:
+    hunks: list[DiffHunk] = []
+    for f in files:
+        try:
+            content = f.read_text(encoding="utf-8")
+            line_count = len(content.splitlines())
+            if line_count > 0:
+                hunks.append(DiffHunk(path=f, new_start=1, new_len=line_count))
+        except (OSError, UnicodeDecodeError):
+            continue
+    return hunks
+
+
+def _enrich_concepts(concepts: frozenset[str], files: list[Path]) -> frozenset[str]:
+    extra: set[str] = set()
+    for f in files:
+        try:
+            content = f.read_text(encoding="utf-8")
+            extra.update(extract_identifiers(content))
+        except (OSError, UnicodeDecodeError):
+            continue
+    return concepts | frozenset(extra)
 
 
 def _empty_tree(root_dir: Path) -> dict[str, Any]:

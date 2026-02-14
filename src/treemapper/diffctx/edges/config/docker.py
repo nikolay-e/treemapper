@@ -40,7 +40,10 @@ def _strip_dot_slash(s: str) -> str:
 def _normalize_path(base_dir: Path, rel_path: str) -> Path:
     rel_path = rel_path.strip().strip("'\"")
     rel_path = _strip_dot_slash(rel_path)
-    return base_dir / rel_path
+    normalized = base_dir / rel_path
+    if ".." in normalized.parts:
+        return base_dir
+    return normalized
 
 
 def _collect_docker_refs(docker_files: list[Path]) -> set[str]:

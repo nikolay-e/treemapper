@@ -177,7 +177,7 @@ def parse_args() -> ParsedArgs:
         type=int,
         default=None,
         metavar="N",
-        help="Token budget for diff context output (default: 50000)",
+        help="Token budget for diff context (default: algorithm convergence via τ-stopping)",
     )
     diff_group.add_argument(
         "--alpha",
