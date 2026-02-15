@@ -20,7 +20,10 @@ _CS_CLASS_RE = re.compile(
     rf"^\s{{0,20}}(?:(?:{_CS_ACCESS})\s{{1,10}})?(?:(?:{_CS_MODIFIERS})\s{{1,10}})*(?:{_CS_TYPE_KW})\s+([A-Z]\w{{0,100}})",
     re.MULTILINE,
 )
-_CS_INHERIT_RE = re.compile(r"(?:class|struct|record)\s+\w+[^:\n]{0,200}:\s*([A-Z]\w*(?:,\s*[A-Z]\w*)*)")
+_CS_INHERIT_RE = re.compile(
+    r"(?:class|struct|record)\s+\w+[^{]{0,300}?:\s*((?:[A-Z]\w*(?:\s*,\s*)?)+)",
+    re.DOTALL,
+)
 _CS_GENERIC_RE = re.compile(r"<([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)>")
 _CS_METHOD_RE = re.compile(
     r"^\s*(?:public |private |protected |internal )?(?:\w+ )?[A-Z]\w*(?:<[^>]+>)? ([A-Z]\w*)\s*\(",

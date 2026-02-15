@@ -61,7 +61,7 @@ class KubernetesYamlStrategy:
         fragments: list[Fragment] = []
         for i, start_idx in enumerate(doc_starts):
             if i + 1 < len(doc_starts):
-                end_idx = doc_starts[i + 1] - 2
+                end_idx = doc_starts[i + 1] - 1
             else:
                 end_idx = len(lines) - 1
 

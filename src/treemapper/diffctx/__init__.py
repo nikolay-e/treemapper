@@ -30,13 +30,14 @@ from .ppr import personalized_pagerank
 from .render import build_partial_tree
 from .select import lazy_greedy_select
 from .types import DiffHunk, Fragment, FragmentId, extract_identifiers
-from .utility import concepts_from_diff_text
+from .utility import concepts_from_diff, concepts_from_diff_text
 
 __all__ = ["GitError", "build_diff_context"]
 
 _RARE_THRESHOLD = LIMITS.rare_identifier_threshold
 _MAX_EXPANSION_FILES = LIMITS.max_expansion_files
 _OVERHEAD_PER_FRAGMENT = LIMITS.overhead_per_fragment
+_FALLBACK_MAX_FILES = 10_000
 
 _SEMANTIC_KINDS = frozenset(
     {
@@ -166,7 +167,7 @@ def _select_full_mode(
 def _select_with_ppr(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
-    concepts: frozenset[str],
+    diff_text: str,
     budget_tokens: int | None,
     alpha: float,
     tau: float,
@@ -174,6 +175,11 @@ def _select_with_ppr(
 ) -> tuple[list[Fragment], Any]:
     graph = build_graph(all_fragments, repo_root=repo_root)
     rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha)
+
+    concepts = concepts_from_diff(all_fragments, core_ids, graph, diff_text)
+    if not concepts:
+        concepts = concepts_from_diff_text(diff_text)
+
     effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
 
     result = lazy_greedy_select(
@@ -216,9 +222,9 @@ def build_diff_context(
         return _empty_tree(root_dir)
 
     diff_text = get_diff_text(root_dir, diff_range)
-    concepts = concepts_from_diff_text(diff_text)
+    expansion_concepts = concepts_from_diff_text(diff_text)
     if untracked:
-        concepts = _enrich_concepts(concepts, untracked)
+        expansion_concepts = _enrich_concepts(expansion_concepts, untracked)
 
     changed_files = get_changed_files(root_dir, diff_range)
     changed_files = [_normalize_path(p, root_dir) for p in changed_files]
@@ -236,7 +242,9 @@ def build_diff_context(
     edge_discovered = [_normalize_path(p, root_dir) for p in edge_discovered]
     all_fragments.extend(_process_files_for_fragments(edge_discovered, root_dir, preferred_revs, seen_frag_ids))
 
-    expanded_files = _expand_universe_by_rare_identifiers(root_dir, concepts, changed_files + edge_discovered, combined_spec)
+    expanded_files = _expand_universe_by_rare_identifiers(
+        root_dir, expansion_concepts, changed_files + edge_discovered, combined_spec
+    )
     expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
     all_fragments.extend(_process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids))
 
@@ -252,7 +260,7 @@ def build_diff_context(
         selected, result = _select_with_ppr(
             all_fragments,
             core_ids,
-            concepts,
+            diff_text,
             budget_tokens,
             alpha,
             tau,
@@ -274,6 +282,8 @@ def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: in
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")
     if tau < 0.0:
         raise ValueError(f"tau must be >= 0, got {tau}")
+    if tau == 0.0:
+        logging.warning("tau=0 disables adaptive stopping; budget will be fully consumed")
     if budget_tokens is not None and budget_tokens <= 0:
         raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
@@ -403,7 +413,15 @@ def _collect_candidate_files(root_dir: Path, included_set: set[Path], combined_s
             return [f for f in files if _is_candidate_file(f, root_dir, included_set, combined_spec)]
     except (subprocess.SubprocessError, OSError):
         pass
-    return [f for f in root_dir.rglob("*") if _is_candidate_file(f, root_dir, included_set, combined_spec)]
+    logging.warning("diffctx: git ls-files failed, falling back to rglob (limit %d files)", _FALLBACK_MAX_FILES)
+    candidates: list[Path] = []
+    for f in root_dir.rglob("*"):
+        if len(candidates) >= _FALLBACK_MAX_FILES:
+            logging.warning("diffctx: fallback scan hit limit, results may be incomplete")
+            break
+        if _is_candidate_file(f, root_dir, included_set, combined_spec):
+            candidates.append(f)
+    return candidates
 
 
 def _build_ident_index(files: list[Path], concepts: frozenset[str]) -> dict[str, list[Path]]:

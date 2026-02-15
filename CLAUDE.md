@@ -220,7 +220,11 @@ to YAML/JSON/text/Markdown. Deterministic, side-effect-free.
 Analyzes a git diff to intelligently select the minimal set of
 code fragments needed to understand a change. This is the core
 intellectual property of the project — a graph-based relevance
-engine described in detail below.
+engine described in detail below. For the formal theoretical
+foundation, see the research paper:
+[Context-Selection for Git Diff][paper].
+
+[paper]: https://nikolay-eremeev.com/blog/context-selection-git-diff/
 
 ---
 

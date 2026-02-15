@@ -4,9 +4,22 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from pathlib import Path
 
+from ..parsers.base import CODE_EXTENSIONS
 from ..types import Fragment, FragmentId
 
 EdgeDict = dict[tuple[FragmentId, FragmentId], float]
+
+
+_STRIP_EXTENSIONS = CODE_EXTENSIONS | frozenset(
+    {
+        ".sc",
+        ".fs",
+        ".fsi",
+        ".fsx",
+    }
+)
+
+_INDEX_FILE_STEMS = frozenset({"__init__", "index", "mod"})
 
 
 def path_to_module(path: Path, repo_root: Path | None = None) -> str:
@@ -24,11 +37,12 @@ def path_to_module(path: Path, repo_root: Path | None = None) -> str:
             break
 
     if parts:
-        for _ext in (".pyw", ".pyi", ".py"):
-            if parts[-1].endswith(_ext):
-                parts[-1] = parts[-1][: -len(_ext)]
+        stem = parts[-1]
+        for ext in sorted(_STRIP_EXTENSIONS, key=len, reverse=True):
+            if stem.endswith(ext):
+                parts[-1] = stem[: -len(ext)]
                 break
-        if parts and parts[-1] == "__init__":
+        if parts and parts[-1] in _INDEX_FILE_STEMS:
             parts = parts[:-1]
 
     return ".".join(parts) if parts else ""

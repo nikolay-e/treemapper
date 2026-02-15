@@ -5,7 +5,6 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .config import LEXICAL
 from .edges import collect_all_edges
 from .edges.similarity.lexical import clamp_lexical_weight
 from .embeddings import _build_embedding_edges
@@ -66,20 +65,17 @@ def _apply_hub_suppression(
         return edges
 
     in_degree: dict[FragmentId, int] = {}
-    for src, dst in edges.keys():
+    for _src, dst in edges.keys():
         in_degree[dst] = in_degree.get(dst, 0) + 1
 
     if not in_degree:
         return edges
 
-    sorted_degrees = sorted(in_degree.values())
-    threshold_idx = int(len(sorted_degrees) * LEXICAL.hub_percentile)
-    threshold = sorted_degrees[min(threshold_idx, len(sorted_degrees) - 1)]
-
     suppressed: dict[tuple[FragmentId, FragmentId], float] = {}
     for (src, dst), weight in edges.items():
-        if in_degree.get(dst, 0) > threshold:
-            weight = weight / math.log(1 + in_degree[dst])
+        deg = in_degree.get(dst, 0)
+        if deg > 0:
+            weight = weight / math.log(1 + deg)
         suppressed[(src, dst)] = weight
 
     return suppressed

@@ -185,6 +185,8 @@ class TreeSitterStrategy:
                     )
                 return
 
+            sym_name = self._extract_symbol_name(node)
+
             if kind in _CONTAINER_KINDS:
                 first_child_start = self._first_child_def_line(node, definition_types)
                 if first_child_start is not None and first_child_start > start:
@@ -197,6 +199,7 @@ class TreeSitterStrategy:
                                 kind=kind,
                                 content=snippet,
                                 identifiers=extract_identifiers(snippet, profile="code"),
+                                symbol_name=sym_name,
                             )
                         )
                         covered.add((start, header_end))
@@ -218,6 +221,7 @@ class TreeSitterStrategy:
                         kind=kind,
                         content=snippet,
                         identifiers=extract_identifiers(snippet, profile="code"),
+                        symbol_name=sym_name,
                     )
                 )
                 covered.add((start, end))
@@ -253,3 +257,24 @@ class TreeSitterStrategy:
             if child.type == "class_definition":
                 return "class"
         return "function"
+
+    @staticmethod
+    def _extract_symbol_name(node: Node) -> str | None:
+        if node.type == "decorated_definition":
+            for child in node.children:
+                if child.type in {"function_definition", "class_definition"}:
+                    node = child
+                    break
+
+        name_fields = ("name", "declarator")
+        for field_name in name_fields:
+            name_node = node.child_by_field_name(field_name)
+            if name_node is not None:
+                while name_node.type in ("pointer_declarator", "function_declarator"):
+                    inner = name_node.child_by_field_name("declarator")
+                    if inner is None:
+                        break
+                    name_node = inner
+                if name_node.type == "identifier" or name_node.named_child_count == 0:
+                    return name_node.text.decode("utf-8") if name_node.text else None
+        return None
