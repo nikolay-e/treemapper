@@ -5,15 +5,17 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
+from ...config.weights import LANG_WEIGHTS
 from ...python_semantics import PyFragmentInfo, analyze_python_fragment
 from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict, add_semantic_edges, path_to_module
 
 _PYTHON_EXTS = {".py", ".pyi", ".pyw"}
 
-_CALL_WEIGHT = 0.85
-_SYMBOL_REF_WEIGHT = 0.95
-_TYPE_REF_WEIGHT = 0.60
+_PY_WEIGHTS = LANG_WEIGHTS["python"]
+_CALL_WEIGHT = _PY_WEIGHTS.call
+_SYMBOL_REF_WEIGHT = _PY_WEIGHTS.symbol_ref
+_TYPE_REF_WEIGHT = _PY_WEIGHTS.type_ref
 
 _PY_IMPORT_RE = re.compile(r"(?:from\s{1,20}(\.{0,3}[\w.]{0,200})\s{1,20}import|import\s{1,20}([\w.]{1,200}))")
 

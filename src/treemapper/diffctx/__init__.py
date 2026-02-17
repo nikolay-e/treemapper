@@ -24,13 +24,13 @@ from .git import (
     show_file_at_revision,
     split_diff_range,
 )
-from .graph import build_graph
+from .graph import Graph, build_graph
 from .languages import FILENAME_TO_LANGUAGE
 from .ppr import personalized_pagerank
 from .render import build_partial_tree
-from .select import lazy_greedy_select
+from .select import SelectionResult, lazy_greedy_select
 from .types import DiffHunk, Fragment, FragmentId, extract_identifiers
-from .utility import concepts_from_diff, concepts_from_diff_text
+from .utility import concepts_from_diff_text, needs_from_diff
 
 __all__ = ["GitError", "build_diff_context"]
 
@@ -172,13 +172,12 @@ def _select_with_ppr(
     alpha: float,
     tau: float,
     repo_root: Path | None = None,
+    seed_weights: dict[FragmentId, float] | None = None,
 ) -> tuple[list[Fragment], Any]:
     graph = build_graph(all_fragments, repo_root=repo_root)
-    rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha)
+    rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha, seed_weights=seed_weights)
 
-    concepts = concepts_from_diff(all_fragments, core_ids, graph, diff_text)
-    if not concepts:
-        concepts = concepts_from_diff_text(diff_text)
+    needs = needs_from_diff(all_fragments, core_ids, graph, diff_text)
 
     effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
 
@@ -186,11 +185,13 @@ def _select_with_ppr(
         fragments=all_fragments,
         core_ids=core_ids,
         rel=rel_scores,
-        concepts=concepts,
+        needs=needs,
         budget_tokens=effective_budget,
         tau=tau,
     )
-    return result.selected, result
+
+    selected = _coherence_post_pass(result, all_fragments, graph, effective_budget)
+    return selected.selected, selected
 
 
 def build_diff_context(
@@ -253,10 +254,16 @@ def build_diff_context(
 
     core_ids = _identify_core_fragments(hunks, all_fragments)
 
+    signature_frags = _generate_signature_variants(all_fragments, core_ids)
+    for frag in signature_frags:
+        frag.token_count = count_tokens(frag.content).count + _OVERHEAD_PER_FRAGMENT
+    all_fragments.extend(signature_frags)
+
     if full:
         selected = _select_full_mode(all_fragments, changed_files)
         _log_full_mode(selected)
     else:
+        seed_weights = _compute_seed_weights(hunks, core_ids, all_fragments)
         selected, result = _select_with_ppr(
             all_fragments,
             core_ids,
@@ -265,6 +272,7 @@ def build_diff_context(
             alpha,
             tau,
             repo_root=root_dir,
+            seed_weights=seed_weights,
         )
         _log_ppr_mode(selected, core_ids, budget_tokens, result, alpha, tau)
 
@@ -288,7 +296,110 @@ def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: in
         raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
 
+def _coherence_post_pass(
+    result: SelectionResult,
+    all_fragments: list[Fragment],
+    graph: Graph,
+    budget: int,
+) -> SelectionResult:
+    selected_ids = {f.id for f in result.selected}
+    remaining = budget - result.used_tokens
+
+    name_to_frags: dict[str, list[Fragment]] = {}
+    for f in all_fragments:
+        if f.symbol_name:
+            name_to_frags.setdefault(f.symbol_name.lower(), []).append(f)
+
+    frag_by_id: dict[FragmentId, Fragment] = {f.id: f for f in all_fragments}
+
+    dangling_names: set[str] = set()
+    for frag in result.selected:
+        for nbr_id in graph.neighbors(frag.id):
+            if nbr_id in selected_ids:
+                continue
+            cat = graph.edge_categories.get((frag.id, nbr_id), "")
+            if cat == "semantic":
+                nbr_frag = frag_by_id.get(nbr_id)
+                if nbr_frag and nbr_frag.symbol_name:
+                    dangling_names.add(nbr_frag.symbol_name.lower())
+
+    added: list[Fragment] = []
+    for name in dangling_names:
+        candidates = name_to_frags.get(name, [])
+        for c in candidates:
+            if c.id in selected_ids:
+                break
+        else:
+            sig_candidates = [f for f in candidates if "_signature" in f.kind]
+            full_candidates = [f for f in candidates if "_signature" not in f.kind]
+            pick = sig_candidates[0] if sig_candidates else (full_candidates[0] if full_candidates else None)
+            if pick and pick.token_count <= remaining and pick.id not in selected_ids:
+                added.append(pick)
+                selected_ids.add(pick.id)
+                remaining -= pick.token_count
+
+    if not added:
+        return result
+
+    return SelectionResult(
+        selected=result.selected + added,
+        reason=result.reason,
+        used_tokens=result.used_tokens + sum(f.token_count for f in added),
+        utility=result.utility,
+    )
+
+
+def _compute_seed_weights(
+    hunks: list[DiffHunk],
+    core_ids: set[FragmentId],
+    all_fragments: list[Fragment],
+) -> dict[FragmentId, float]:
+    frag_hunk_lines: dict[FragmentId, float] = {}
+    for h in hunks:
+        h_start, h_end = h.core_selection_range
+        hunk_size = max(1, h_end - h_start + 1)
+        for frag in all_fragments:
+            if frag.id not in core_ids or frag.path != h.path:
+                continue
+            if frag.start_line <= h_end and frag.end_line >= h_start:
+                frag_hunk_lines[frag.id] = frag_hunk_lines.get(frag.id, 0) + hunk_size
+    if not frag_hunk_lines:
+        return {}
+    return frag_hunk_lines
+
+
 _CONTAINER_FRAGMENT_KINDS = frozenset({"class", "interface", "struct"})
+_SIGNATURE_ELIGIBLE_KINDS = frozenset({"function", "class", "method", "struct", "interface", "enum"})
+_MIN_LINES_FOR_SIGNATURE = 5
+
+
+def _generate_signature_variants(fragments: list[Fragment], core_ids: set[FragmentId]) -> list[Fragment]:
+    signatures: list[Fragment] = []
+    seen: set[FragmentId] = set()
+    for frag in fragments:
+        if frag.id in core_ids:
+            continue
+        if frag.kind not in _SIGNATURE_ELIGIBLE_KINDS:
+            continue
+        if frag.line_count < _MIN_LINES_FOR_SIGNATURE:
+            continue
+        lines = frag.content.splitlines()
+        sig_end = min(2, len(lines))
+        sig_content = "\n".join(lines[:sig_end])
+        sig_id = FragmentId(frag.path, frag.start_line, frag.start_line + sig_end - 1)
+        if sig_id in seen:
+            continue
+        seen.add(sig_id)
+        signatures.append(
+            Fragment(
+                id=sig_id,
+                kind=f"{frag.kind}_signature",
+                content=sig_content,
+                identifiers=frag.identifiers,
+                symbol_name=frag.symbol_name,
+            )
+        )
+    return signatures
 
 
 def _identify_core_fragments(hunks: list[DiffHunk], all_fragments: list[Fragment]) -> set[FragmentId]:

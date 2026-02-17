@@ -93,6 +93,39 @@ class TestEdgeBuilder(EdgeBuilder):
     weight_naming = EDGE_WEIGHTS["test_naming"].forward
     reverse_weight_factor = EDGE_WEIGHTS["test_reverse"].forward / EDGE_WEIGHTS["test_direct"].forward
 
+    def discover_related_files(
+        self,
+        changed_files: list[Path],
+        all_candidate_files: list[Path],
+        repo_root: Path | None = None,
+    ) -> list[Path]:
+        changed_set = set(changed_files)
+        discovered: list[Path] = []
+
+        candidate_by_stem: dict[str, list[Path]] = defaultdict(list)
+        for c in all_candidate_files:
+            if c not in changed_set:
+                candidate_by_stem[c.stem.lower()].append(c)
+
+        for changed in changed_files:
+            stem = changed.stem.lower()
+            suffix = changed.suffix.lower()
+
+            if _is_test_file(changed):
+                target = _extract_target_name_from_test(changed.stem)
+                if target:
+                    for cand in candidate_by_stem.get(target, []):
+                        if cand.suffix.lower() == suffix:
+                            discovered.append(cand)
+            else:
+                test_stems = [f"test_{stem}", f"{stem}_test"]
+                for ts in test_stems:
+                    for cand in candidate_by_stem.get(ts, []):
+                        if cand.suffix.lower() == suffix and _is_test_file(cand):
+                            discovered.append(cand)
+
+        return discovered
+
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         edges: EdgeDict = {}
 

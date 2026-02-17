@@ -21,21 +21,28 @@ def _personalized_pagerank_sparse(
     seeds: set[FragmentId],
     alpha: float = 0.60,
     tol: float = 1e-4,
+    seed_weights: dict[FragmentId, float] | None = None,
 ) -> dict[FragmentId, float]:
     n = len(graph.nodes)
     if n == 0:
         return {}
 
     restart = 1.0 - alpha
-    seed_weight = 1.0 / len(seeds) if seeds else 0.0
     push_threshold = tol / n
 
     residual: dict[FragmentId, float] = {}
     estimate: dict[FragmentId, float] = {}
 
-    for s in seeds:
-        if s in graph.nodes:
-            residual[s] = seed_weight
+    if seed_weights:
+        total_sw = sum(seed_weights.get(s, 1.0) for s in seeds if s in graph.nodes)
+        for s in seeds:
+            if s in graph.nodes:
+                residual[s] = seed_weights.get(s, 1.0) / total_sw if total_sw > 0 else 0.0
+    else:
+        seed_weight = 1.0 / len(seeds) if seeds else 0.0
+        for s in seeds:
+            if s in graph.nodes:
+                residual[s] = seed_weight
 
     queue: deque[FragmentId] = deque(residual.keys())
     visited: set[FragmentId] = set(queue)
@@ -67,9 +74,6 @@ def _personalized_pagerank_sparse(
                     queue.append(v)
                     visited.add(v)
 
-    total = sum(estimate.values())
-    if total > 0:
-        return {n: s / total for n, s in estimate.items()}
     return estimate
 
 
@@ -79,6 +83,7 @@ def personalized_pagerank(
     alpha: float = 0.60,
     tol: float = 1e-4,
     lam: float = 0.5,
+    seed_weights: dict[FragmentId, float] | None = None,
 ) -> dict[FragmentId, float]:
     if not graph.nodes:
         return {}
@@ -87,10 +92,10 @@ def personalized_pagerank(
     if not valid_seeds:
         return {n: 1.0 / len(graph.nodes) for n in graph.nodes}
 
-    forward_scores = _personalized_pagerank_sparse(graph, valid_seeds, alpha, tol)
+    forward_scores = _personalized_pagerank_sparse(graph, valid_seeds, alpha, tol, seed_weights)
 
     transposed = _transpose_graph(graph)
-    backward_scores = _personalized_pagerank_sparse(transposed, valid_seeds, alpha, tol)
+    backward_scores = _personalized_pagerank_sparse(transposed, valid_seeds, alpha, tol, seed_weights)
 
     combined: dict[FragmentId, float] = {}
     all_nodes = set(forward_scores) | set(backward_scores)
