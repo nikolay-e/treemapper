@@ -164,6 +164,21 @@ def _select_full_mode(
     return selected
 
 
+_SAME_FILE_FLOOR = 0.10
+
+
+def _apply_same_file_floor(
+    rel: dict[FragmentId, float],
+    core_ids: set[FragmentId],
+    fragments: list[Fragment],
+) -> None:
+    core_paths = {fid.path for fid in core_ids}
+    for frag in fragments:
+        if frag.id not in core_ids and frag.path in core_paths:
+            if rel.get(frag.id, 0.0) < _SAME_FILE_FLOOR:
+                rel[frag.id] = _SAME_FILE_FLOOR
+
+
 def _select_with_ppr(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
@@ -176,6 +191,7 @@ def _select_with_ppr(
 ) -> tuple[list[Fragment], Any]:
     graph = build_graph(all_fragments, repo_root=repo_root)
     rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha, seed_weights=seed_weights)
+    _apply_same_file_floor(rel_scores, core_ids, all_fragments)
 
     needs = needs_from_diff(all_fragments, core_ids, graph, diff_text)
 

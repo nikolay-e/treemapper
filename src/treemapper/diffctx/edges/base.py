@@ -98,7 +98,9 @@ def _matches_any_ref(candidate_name: str, candidate_rel: str, refs: set[str]) ->
             return True
         ref_lower = ref.lower()
         if len(ref_lower) >= _MIN_REF_LENGTH_FOR_PATH_MATCH and ref_lower in candidate_rel:
-            return True
+            idx = candidate_rel.index(ref_lower)
+            if idx == 0 or candidate_rel[idx - 1] in "/\\":
+                return True
     return False
 
 

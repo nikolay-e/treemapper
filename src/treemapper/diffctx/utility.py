@@ -206,6 +206,13 @@ def needs_from_diff(
         fallback = concepts_from_diff_text(diff_text)
         return tuple(InformationNeed("definition", c, None, 0.5) for c in fallback)
 
+    covered_symbols = {n.symbol for n in needs.values()}
+    for c in concepts_from_diff_text(diff_text):
+        if c not in covered_symbols:
+            key = ("background", c)
+            if key not in needs:
+                needs[key] = InformationNeed("background", c, None, 0.3)
+
     return tuple(needs.values())
 
 
@@ -219,6 +226,11 @@ class UtilityState:
 
 def _phi(x: float) -> float:
     return math.sqrt(x) if x > 0 else 0.0
+
+
+_MIN_REL_FOR_BONUS = 0.03
+_STRONG_REL_THRESHOLD = 0.10
+_RELATEDNESS_BONUS = 0.25
 
 
 def _needs_from_identifiers(frag: Fragment) -> tuple[InformationNeed, ...]:
@@ -255,6 +267,9 @@ def marginal_gain(
         old_max = state.max_rel.get(need.symbol, 0.0)
         new_max = max(old_max, a_fz)
         gain += _phi(new_max) - _phi(old_max)
+
+    if rel_score >= _MIN_REL_FOR_BONUS and (gain > 0 or rel_score >= _STRONG_REL_THRESHOLD):
+        gain = max(gain, rel_score * _RELATEDNESS_BONUS)
 
     return gain
 
