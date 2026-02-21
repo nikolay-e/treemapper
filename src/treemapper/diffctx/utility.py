@@ -56,6 +56,18 @@ def concepts_from_diff_text(diff_text: str, profile: str = "code", *, use_nlp: b
     return frozenset(ident.lower() for ident in raw if len(ident) >= 3 and ident.lower() not in CODE_STOPWORDS)
 
 
+def _extract_diff_symbols(diff_text: str) -> set[str]:
+    symbols: set[str] = set()
+    for line in _extract_changed_lines(diff_text):
+        for m in _CALL_RE.finditer(line):
+            name = m.group(1)
+            if len(name) >= 3 and name.lower() not in CODE_STOPWORDS:
+                symbols.add(name.lower())
+        for m in _TYPE_REF_RE.finditer(line):
+            symbols.add(m.group(1).lower())
+    return symbols
+
+
 def _build_sigma(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
@@ -67,21 +79,34 @@ def _build_sigma(
         if frag.id in core_ids and frag.symbol_name:
             sigma.add(frag.symbol_name.lower())
 
-    for line in _extract_changed_lines(diff_text):
-        for m in _CALL_RE.finditer(line):
-            name = m.group(1)
-            if len(name) >= 3 and name.lower() not in CODE_STOPWORDS:
-                sigma.add(name.lower())
-        for m in _TYPE_REF_RE.finditer(line):
-            sigma.add(m.group(1).lower())
+    sigma.update(_extract_diff_symbols(diff_text))
 
     for frag in all_fragments:
-        if frag.symbol_name and frag.symbol_name.lower().startswith("test_"):
-            tested = frag.symbol_name.lower().removeprefix("test_")
-            if tested in sigma:
-                sigma.add(frag.symbol_name.lower())
+        if not frag.symbol_name or not frag.symbol_name.lower().startswith("test_"):
+            continue
+        tested = frag.symbol_name.lower().removeprefix("test_")
+        if tested in sigma:
+            sigma.add(frag.symbol_name.lower())
 
     return sigma
+
+
+def _closure_expand_step(
+    closure: set[str],
+    frag_by_symbol: dict[str, list[Fragment]],
+    frag_by_id: dict[FragmentId, Fragment],
+    graph: Graph,
+) -> set[str]:
+    new_symbols: set[str] = set()
+    for sym in closure:
+        for frag in frag_by_symbol.get(sym, []):
+            for nbr_id, weight in graph.neighbors(frag.id).items():
+                if weight < _CLOSURE_MIN_EDGE_WEIGHT:
+                    continue
+                nbr = frag_by_id.get(nbr_id)
+                if nbr and nbr.symbol_name and nbr.symbol_name.lower() not in closure:
+                    new_symbols.add(nbr.symbol_name.lower())
+    return new_symbols
 
 
 def _apply_closure(
@@ -99,15 +124,7 @@ def _apply_closure(
 
     closure: set[str] = set(sigma)
     for _ in range(closure_depth):
-        new_symbols: set[str] = set()
-        for sym in closure:
-            for frag in frag_by_symbol.get(sym, []):
-                for nbr_id, weight in graph.neighbors(frag.id).items():
-                    if weight < _CLOSURE_MIN_EDGE_WEIGHT:
-                        continue
-                    nbr = frag_by_id.get(nbr_id)
-                    if nbr and nbr.symbol_name and nbr.symbol_name.lower() not in closure:
-                        new_symbols.add(nbr.symbol_name.lower())
+        new_symbols = _closure_expand_step(closure, frag_by_symbol, frag_by_id, graph)
         if not new_symbols:
             break
         closure |= new_symbols
@@ -155,16 +172,12 @@ def _collect_diff_line_needs(
     for line in _extract_changed_lines(diff_text):
         for m in _CALL_RE.finditer(line):
             name = m.group(1)
-            if len(name) >= 3 and name.lower() not in CODE_STOPWORDS:
-                sym = name.lower()
-                key = ("definition", sym)
-                if key not in needs:
-                    needs[key] = InformationNeed("definition", sym, None, 1.0)
+            if len(name) < 3 or name.lower() in CODE_STOPWORDS:
+                continue
+            needs.setdefault(("definition", name.lower()), InformationNeed("definition", name.lower(), None, 1.0))
         for m in _TYPE_REF_RE.finditer(line):
             sym = m.group(1).lower()
-            key = ("signature", sym)
-            if key not in needs:
-                needs[key] = InformationNeed("signature", sym, None, 0.7)
+            needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, 0.7))
 
 
 def _collect_test_needs(

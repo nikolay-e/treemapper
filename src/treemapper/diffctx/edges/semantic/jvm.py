@@ -26,7 +26,7 @@ _KOTLIN_CLASS_RE = re.compile(
     re.MULTILINE,
 )
 _KOTLIN_FUN_RE = re.compile(
-    r"^\s*(?:(?:public|private|internal|protected|abstract|open|final|override|inline|external|tailrec|operator|infix|suspend|expect|actual)\s+)*fun\s+(?:<[^>]+>\s+)?([a-z]\w*)",
+    r"^\s*(?:\w+\s+)*fun\s+(?:<[^>]+>\s+)?([a-z]\w*)",
     re.MULTILINE,
 )
 
@@ -38,9 +38,7 @@ _SCALA_CLASS_RE = re.compile(
 _SCALA_DEF_RE = re.compile(r"^\s*(?:private |protected )?def\s+([a-z]\w*)", re.MULTILINE)
 
 _TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
-_KOTLIN_INHERIT_RE = re.compile(
-    r"(?:class|interface|object)\s+\w+(?:<[^>]*>)?(?:\([^)]*\))?\s*:\s*([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)"
-)
+_KOTLIN_INHERIT_RE = re.compile(r"(?:class|interface|object)\s+\w+[^:\n]*:\s*([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)")
 _SCALA_WITH_RE = re.compile(r"\bwith\s+([A-Z]\w*)")
 
 _ANNOTATION_RE = re.compile(r"@([A-Z]\w*)")
@@ -88,27 +86,25 @@ def _extract_classes(content: str, path: Path) -> set[str]:
     return classes
 
 
-def _extract_inheritance(content: str, path: Path) -> set[str]:
+def _split_class_list(regex: re.Pattern[str], content: str) -> set[str]:
     refs: set[str] = set()
+    for m in regex.finditer(content):
+        for cls in m.group(1).split(","):
+            stripped = cls.strip()
+            if stripped:
+                refs.add(stripped)
+    return refs
+
+
+def _extract_inheritance(content: str, path: Path) -> set[str]:
     if _is_kotlin(path):
-        for m in _KOTLIN_INHERIT_RE.finditer(content):
-            for cls in m.group(1).split(","):
-                cls = cls.strip()
-                if cls:
-                    refs.add(cls)
-    elif _is_scala(path):
-        for m in _JAVA_EXTENDS_RE.finditer(content):
-            for cls in m.group(1).split(","):
-                refs.add(cls.strip())
-        for m in _SCALA_WITH_RE.finditer(content):
-            refs.add(m.group(1))
-    else:
-        for m in _JAVA_EXTENDS_RE.finditer(content):
-            for cls in m.group(1).split(","):
-                refs.add(cls.strip())
-        for m in _JAVA_IMPLEMENTS_RE.finditer(content):
-            for cls in m.group(1).split(","):
-                refs.add(cls.strip())
+        return _split_class_list(_KOTLIN_INHERIT_RE, content)
+    if _is_scala(path):
+        refs = _split_class_list(_JAVA_EXTENDS_RE, content)
+        refs.update(m.group(1) for m in _SCALA_WITH_RE.finditer(content))
+        return refs
+    refs = _split_class_list(_JAVA_EXTENDS_RE, content)
+    refs.update(_split_class_list(_JAVA_IMPLEMENTS_RE, content))
     return refs
 
 

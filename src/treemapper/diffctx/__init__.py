@@ -316,6 +316,33 @@ def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: in
         raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
 
+def _find_dangling_semantic_names(
+    selected: list[Fragment],
+    graph: Graph,
+    frag_by_id: dict[FragmentId, Fragment],
+    selected_ids: set[FragmentId],
+) -> set[str]:
+    dangling: set[str] = set()
+    for frag in selected:
+        for nbr_id in graph.neighbors(frag.id):
+            if nbr_id in selected_ids:
+                continue
+            if graph.edge_categories.get((frag.id, nbr_id), "") != "semantic":
+                continue
+            nbr_frag = frag_by_id.get(nbr_id)
+            if nbr_frag and nbr_frag.symbol_name:
+                dangling.add(nbr_frag.symbol_name.lower())
+    return dangling
+
+
+def _pick_best_fragment(candidates: list[Fragment], selected_ids: set[FragmentId]) -> Fragment | None:
+    if any(c.id in selected_ids for c in candidates):
+        return None
+    sig_candidates = [f for f in candidates if "_signature" in f.kind]
+    full_candidates = [f for f in candidates if "_signature" not in f.kind]
+    return next(iter(sig_candidates or full_candidates), None)
+
+
 def _coherence_post_pass(
     result: SelectionResult,
     all_fragments: list[Fragment],
@@ -331,32 +358,15 @@ def _coherence_post_pass(
             name_to_frags.setdefault(f.symbol_name.lower(), []).append(f)
 
     frag_by_id: dict[FragmentId, Fragment] = {f.id: f for f in all_fragments}
-
-    dangling_names: set[str] = set()
-    for frag in result.selected:
-        for nbr_id in graph.neighbors(frag.id):
-            if nbr_id in selected_ids:
-                continue
-            cat = graph.edge_categories.get((frag.id, nbr_id), "")
-            if cat == "semantic":
-                nbr_frag = frag_by_id.get(nbr_id)
-                if nbr_frag and nbr_frag.symbol_name:
-                    dangling_names.add(nbr_frag.symbol_name.lower())
+    dangling_names = _find_dangling_semantic_names(result.selected, graph, frag_by_id, selected_ids)
 
     added: list[Fragment] = []
     for name in dangling_names:
-        candidates = name_to_frags.get(name, [])
-        for c in candidates:
-            if c.id in selected_ids:
-                break
-        else:
-            sig_candidates = [f for f in candidates if "_signature" in f.kind]
-            full_candidates = [f for f in candidates if "_signature" not in f.kind]
-            pick = next(iter(sig_candidates or full_candidates), None)
-            if pick and pick.token_count <= remaining and pick.id not in selected_ids:
-                added.append(pick)
-                selected_ids.add(pick.id)
-                remaining -= pick.token_count
+        pick = _pick_best_fragment(name_to_frags.get(name, []), selected_ids)
+        if pick and pick.token_count <= remaining and pick.id not in selected_ids:
+            added.append(pick)
+            selected_ids.add(pick.id)
+            remaining -= pick.token_count
 
     if not added:
         return result
