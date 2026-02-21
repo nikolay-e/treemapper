@@ -1,8 +1,11 @@
 # TreeMapper
 
+[![CI](https://github.com/nikolay-e/treemapper/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolay-e/treemapper/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nikolay-e/treemapper/branch/main/graph/badge.svg)](https://codecov.io/gh/nikolay-e/treemapper)
 [![PyPI](https://img.shields.io/pypi/v/treemapper)](https://pypi.org/project/treemapper/)
+[![Python versions](https://img.shields.io/pypi/pyversions/treemapper)](https://pypi.org/project/treemapper/)
 [![Downloads](https://img.shields.io/pypi/dm/treemapper)](https://pypi.org/project/treemapper/)
-[![License](https://img.shields.io/github/license/nikolay-e/treemapper)](https://github.com/nikolay-e/treemapper/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/treemapper)](https://pypi.org/project/treemapper/)
 
 **Export your codebase for AI/LLM context in one command.**
 
