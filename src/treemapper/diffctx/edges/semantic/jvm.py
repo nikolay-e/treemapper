@@ -38,7 +38,7 @@ _SCALA_CLASS_RE = re.compile(
 _SCALA_DEF_RE = re.compile(r"^\s*(?:private |protected )?def\s+([a-z]\w*)", re.MULTILINE)
 
 _TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
-_KOTLIN_INHERIT_RE = re.compile(r"(?:class|interface|object)\s+\w+[^:\n]*:\s*([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)")
+_KOTLIN_DECL_RE = re.compile(r"(?:class|interface|object)\s+\w+")
 _SCALA_WITH_RE = re.compile(r"\bwith\s+([A-Z]\w*)")
 
 _ANNOTATION_RE = re.compile(r"@([A-Z]\w*)")
@@ -96,9 +96,40 @@ def _split_class_list(regex: re.Pattern[str], content: str) -> set[str]:
     return refs
 
 
+def _find_kotlin_colon(text: str) -> int | None:
+    depth = 0
+    for i, ch in enumerate(text):
+        if ch in "<(":
+            depth += 1
+        elif ch in ">)":
+            depth = max(0, depth - 1)
+        elif ch == ":" and depth == 0:
+            return i
+        elif ch in "{\n":
+            return None
+    return None
+
+
+def _extract_kotlin_supertypes(content: str) -> set[str]:
+    refs: set[str] = set()
+    for m in _KOTLIN_DECL_RE.finditer(content):
+        rest = content[m.end() :]
+        colon_pos = _find_kotlin_colon(rest)
+        if colon_pos is None:
+            continue
+        after = rest[colon_pos + 1 :]
+        for i, ch in enumerate(after):
+            if ch in "{\n":
+                after = after[:i]
+                break
+        for tm in _TYPE_REF_RE.finditer(after):
+            refs.add(tm.group(1))
+    return refs
+
+
 def _extract_inheritance(content: str, path: Path) -> set[str]:
     if _is_kotlin(path):
-        return _split_class_list(_KOTLIN_INHERIT_RE, content)
+        return _extract_kotlin_supertypes(content)
     if _is_scala(path):
         refs = _split_class_list(_JAVA_EXTENDS_RE, content)
         refs.update(m.group(1) for m in _SCALA_WITH_RE.finditer(content))
