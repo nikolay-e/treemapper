@@ -8,7 +8,7 @@ from typing import Any
 
 import pathspec
 
-from ..ignore import get_ignore_specs, should_ignore
+from ..ignore import get_ignore_specs, get_whitelist_spec, is_whitelisted, should_ignore
 from ..tokens import count_tokens
 from .config import LIMITS
 from .config.extensions import CODE_EXTENSIONS, CONFIG_EXTENSIONS, DOC_EXTENSIONS
@@ -220,6 +220,7 @@ def build_diff_context(
     ignore_file: Path | None = None,
     no_default_ignores: bool = False,
     full: bool = False,
+    whitelist_file: Path | None = None,
 ) -> dict[str, Any]:
     _validate_inputs(root_dir, alpha, tau, budget_tokens)
     root_dir = root_dir.resolve()
@@ -229,6 +230,7 @@ def build_diff_context(
     base_rev, head_rev = split_diff_range(diff_range)
     is_working_tree_diff = base_rev is None and head_rev is None
     combined_spec = get_ignore_specs(root_dir, ignore_file, no_default_ignores, None)
+    wl_spec = get_whitelist_spec(whitelist_file, root_dir)
 
     untracked: list[Path] = []
     if is_working_tree_diff:
@@ -247,6 +249,7 @@ def build_diff_context(
     changed_files = [_normalize_path(p, root_dir) for p in changed_files]
     changed_files.extend(untracked)
     changed_files = _filter_ignored(changed_files, root_dir, combined_spec)
+    changed_files = _filter_whitelist(changed_files, root_dir, wl_spec)
 
     preferred_revs = _build_preferred_revs(base_rev, head_rev)
 
@@ -254,6 +257,7 @@ def build_diff_context(
     all_fragments = _process_files_for_fragments(changed_files, root_dir, preferred_revs, seen_frag_ids)
 
     all_candidate_files = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
+    all_candidate_files = _filter_whitelist(all_candidate_files, root_dir, wl_spec)
 
     edge_discovered = discover_all_related_files(changed_files, all_candidate_files, root_dir)
     edge_discovered = [_normalize_path(p, root_dir) for p in edge_discovered]
@@ -584,6 +588,24 @@ def _collect_expansion_files(
                     return list(expansion_files)
 
     return list(expansion_files)
+
+
+def _filter_whitelist(
+    files: list[Path],
+    root_dir: Path,
+    wl_spec: pathspec.PathSpec | None,
+) -> list[Path]:
+    if wl_spec is None:
+        return files
+    result: list[Path] = []
+    for file_path in files:
+        try:
+            rel_path = file_path.relative_to(root_dir).as_posix()
+            if is_whitelisted(rel_path, wl_spec):
+                result.append(file_path)
+        except ValueError:
+            pass
+    return result
 
 
 def _filter_ignored(
