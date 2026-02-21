@@ -6,6 +6,26 @@
 [![Downloads](https://img.shields.io/pypi/dm/treemapper)](https://pypi.org/project/treemapper/)
 [![License](https://img.shields.io/github/license/nikolay-e/treemapper)](https://github.com/nikolay-e/treemapper/blob/main/LICENSE)
 
+## Ultimate Goal
+
+**CRITICAL: This is the guiding star of the entire project.
+Every feature, every design decision, every line of code must
+serve this goal. It is an asymptotic ideal — not a finish line
+to cross, but a direction to relentlessly pursue.**
+
+**Maximize the speed and depth of understanding textual
+information — for any reader, in any scenario.**
+
+Whether the consumer is an LLM processing a context window or a
+human reviewing a code change, TreeMapper's job is the same:
+extract the maximum signal from a codebase and present it in the
+clearest, most information-dense form possible. Every design
+decision optimizes for **comprehension-per-token** — the ratio
+of understanding gained to attention spent. This metric is the
+single lens through which all trade-offs are evaluated.
+
+---
+
 **Export your codebase for AI/LLM context in one command.**
 
 ```bash
@@ -17,7 +37,7 @@ treemapper . -o context.yaml              # paste into ChatGPT/Claude
 ## Why TreeMapper?
 
 Unlike `tree` or `find`, TreeMapper exports **structure + file
-contents** in a format optimized for LLM context windows:
+contents** in a format optimized for fast comprehension:
 
 ```yaml
 name: myproject
