@@ -456,7 +456,7 @@ def _add_container_headers(core_ids: set[FragmentId], frags_by_path: dict[Path, 
             if frag.kind not in _CONTAINER_FRAGMENT_KINDS or frag.id in core_ids:
                 continue
             for core_id in core_ids:
-                if core_id.path == path and core_id.start_line > frag.end_line:
+                if core_id.path == path and frag.start_line <= core_id.start_line and core_id.end_line <= frag.end_line:
                     headers_to_add.append(frag.id)
                     break
     core_ids.update(headers_to_add)

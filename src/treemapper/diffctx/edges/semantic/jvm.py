@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
+from ...config.weights import EDGE_WEIGHTS
 from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict
 
@@ -149,12 +150,12 @@ def _extract_annotations(content: str) -> set[str]:
 
 class JVMEdgeBuilder(EdgeBuilder):
     weight = 0.70
-    import_weight = 0.75
-    inheritance_weight = 0.80
-    type_weight = 0.60
-    same_package_weight = 0.55
-    annotation_weight = 0.50
-    reverse_weight_factor = 0.4
+    import_weight = EDGE_WEIGHTS["jvm_import"].forward
+    inheritance_weight = EDGE_WEIGHTS["jvm_inheritance"].forward
+    type_weight = EDGE_WEIGHTS["jvm_type"].forward
+    same_package_weight = EDGE_WEIGHTS["jvm_same_package"].forward
+    annotation_weight = EDGE_WEIGHTS["jvm_annotation"].forward
+    reverse_weight_factor = EDGE_WEIGHTS["jvm_import"].reverse_factor
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         jvm_frags = [f for f in fragments if _is_jvm_file(f.path)]

@@ -10,6 +10,8 @@ from .edges.similarity.lexical import clamp_lexical_weight
 from .embeddings import _build_embedding_edges
 from .types import Fragment, FragmentId
 
+_STRUCTURAL_EDGE_CATEGORIES = frozenset({"semantic", "structural", "config", "document"})
+
 
 @dataclass
 class Graph:
@@ -33,6 +35,12 @@ class Graph:
 
     def neighbors(self, node: FragmentId) -> dict[FragmentId, float]:
         return self.adjacency.get(node, {})
+
+    def structural_neighbors(self, node: FragmentId) -> dict[FragmentId, float]:
+        nbrs = self.adjacency.get(node, {})
+        return {
+            dst: w for dst, w in nbrs.items() if self.edge_categories.get((node, dst), "generic") in _STRUCTURAL_EDGE_CATEGORIES
+        }
 
 
 def build_graph(fragments: list[Fragment], repo_root: Path | None = None) -> Graph:
