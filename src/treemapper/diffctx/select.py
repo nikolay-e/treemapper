@@ -9,7 +9,6 @@ from .types import Fragment, FragmentId
 from .utility import InformationNeed, UtilityState, apply_fragment, compute_density, marginal_gain, utility_value
 
 _BASELINE_K = 5
-_CORE_BUDGET_FRACTION = 0.7
 
 
 @dataclass
@@ -46,22 +45,16 @@ def _select_core_fragments(
     rel: dict[FragmentId, float],
     needs: tuple[InformationNeed, ...],
     state: _SelectionState,
-    total_budget: int,
 ) -> None:
-    core_budget = int(_CORE_BUDGET_FRACTION * total_budget)
-    core_used = 0
     sorted_core = sorted(core_fragments, key=lambda f: rel.get(f.id, 0.0), reverse=True)
 
     for frag in sorted_core:
         if _is_subset_of_selected(frag, state.selected_ids):
             continue
-        if core_used + frag.token_count > core_budget:
-            continue
 
         state.selected.append(frag)
         state.selected_ids.add(frag.id)
         state.remaining_budget -= frag.token_count
-        core_used += frag.token_count
         apply_fragment(frag, rel.get(frag.id, 0.0), needs, state.utility_state)
 
 
@@ -167,7 +160,7 @@ def lazy_greedy_select(
     non_core_fragments = [f for f in fragments if f.id not in core_ids]
 
     state = _SelectionState(remaining_budget=budget_tokens)
-    _select_core_fragments(core_fragments, rel, needs, state, budget_tokens)
+    _select_core_fragments(core_fragments, rel, needs, state)
 
     if state.remaining_budget <= 0:
         used = budget_tokens - state.remaining_budget

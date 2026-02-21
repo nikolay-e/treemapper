@@ -27,24 +27,12 @@ class InformationNeed:
     priority: float
 
 
-_NEED_TYPE_WEIGHT = {
-    "definition": 1.0,
-    "impact": 0.8,
-    "signature": 0.7,
-    "test": 0.6,
-    "background": 0.3,
-}
-
-
 def _match_strength_typed(frag: Fragment, need: InformationNeed) -> float:
     sym = need.symbol
-    type_factor = _NEED_TYPE_WEIGHT.get(need.need_type, 0.5)
     if frag.symbol_name and frag.symbol_name.lower() == sym:
-        if need.scope is not None and frag.path != need.scope:
-            return type_factor * 0.5
-        return type_factor
+        return 1.0
     if sym in frag.identifiers:
-        return type_factor * 0.5
+        return 0.5
     return 0.0
 
 
@@ -112,7 +100,7 @@ def _closure_expand_step(
     new_symbols: set[str] = set()
     for sym in closure:
         for frag in frag_by_symbol.get(sym, []):
-            for nbr_id, weight in graph.structural_neighbors(frag.id).items():
+            for nbr_id, weight in graph.neighbors(frag.id).items():
                 if weight < _CLOSURE_MIN_EDGE_WEIGHT:
                     continue
                 nbr = frag_by_id.get(nbr_id)
@@ -244,19 +232,18 @@ def needs_from_diff(
 @dataclass
 class UtilityState:
     max_rel: dict[str, float] = field(default_factory=dict)
-    structural_sum: float = 0.0
 
     def copy(self) -> UtilityState:
-        return UtilityState(max_rel=dict(self.max_rel), structural_sum=self.structural_sum)
+        return UtilityState(max_rel=dict(self.max_rel))
 
 
 def _phi(x: float) -> float:
     return math.sqrt(x) if x > 0 else 0.0
 
 
-_GAMMA = 0.25
-_R_CAP = 0.5
-_MIN_REL_FOR_PROXIMITY = 0.03
+_MIN_REL_FOR_BONUS = 0.03
+_STRONG_REL_THRESHOLD = 0.10
+_RELATEDNESS_BONUS = 0.25
 
 
 def _needs_from_identifiers(frag: Fragment) -> tuple[InformationNeed, ...]:
@@ -294,8 +281,8 @@ def marginal_gain(
         new_max = max(old_max, a_fz)
         gain += _phi(new_max) - _phi(old_max)
 
-    if rel_score >= _MIN_REL_FOR_PROXIMITY and gain > 0:
-        gain += _GAMMA * min(rel_score, _R_CAP)
+    if rel_score >= _MIN_REL_FOR_BONUS and (gain > 0 or rel_score >= _STRONG_REL_THRESHOLD):
+        gain = max(gain, rel_score * _RELATEDNESS_BONUS)
 
     return gain
 
@@ -314,7 +301,6 @@ def apply_fragment(
         a_fz = rel_score * m
         old_max = state.max_rel.get(need.symbol, 0.0)
         state.max_rel[need.symbol] = max(old_max, a_fz)
-    state.structural_sum += _GAMMA * min(rel_score, _R_CAP)
 
 
 def compute_density(frag: Fragment, rel_score: float, needs: tuple[InformationNeed, ...], state: UtilityState) -> float:
@@ -325,4 +311,4 @@ def compute_density(frag: Fragment, rel_score: float, needs: tuple[InformationNe
 
 
 def utility_value(state: UtilityState) -> float:
-    return sum(_phi(v) for v in state.max_rel.values()) + state.structural_sum
+    return sum(_phi(v) for v in state.max_rel.values())
