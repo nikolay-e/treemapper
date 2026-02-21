@@ -306,12 +306,12 @@ def build_diff_context(
 def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: int | None) -> None:
     if not is_git_repo(root_dir):
         raise GitError(f"'{root_dir}' is not a git repository")
-    if not (0.0 < alpha < 1.0):
+    if alpha <= 0.0 or alpha >= 1.0:
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")
     if tau < 0.0:
         raise ValueError(f"tau must be >= 0, got {tau}")
-    if tau == 0.0:
-        logging.warning("tau=0 disables adaptive stopping; budget will be fully consumed")
+    if tau < 1e-15:
+        logging.warning("tau≈0 disables adaptive stopping; budget will be fully consumed")
     if budget_tokens is not None and budget_tokens <= 0:
         raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
@@ -352,7 +352,7 @@ def _coherence_post_pass(
         else:
             sig_candidates = [f for f in candidates if "_signature" in f.kind]
             full_candidates = [f for f in candidates if "_signature" not in f.kind]
-            pick = sig_candidates[0] if sig_candidates else (full_candidates[0] if full_candidates else None)
+            pick = next(iter(sig_candidates or full_candidates), None)
             if pick and pick.token_count <= remaining and pick.id not in selected_ids:
                 added.append(pick)
                 selected_ids.add(pick.id)
