@@ -46,10 +46,11 @@ def collect_all_edges(fragments: list[Fragment], repo_root: Path | None = None) 
     for category, get_builders in _BUILDER_CATEGORIES:
         for cls in get_builders():
             builder = cls()
+            cat = builder.category or category
             for (src, dst), weight in builder.build(fragments, repo_root).items():
                 if weight > all_edges.get((src, dst), 0.0):
                     all_edges[(src, dst)] = weight
-                    edge_categories[(src, dst)] = category
+                    edge_categories[(src, dst)] = cat
     return all_edges, edge_categories
 
 

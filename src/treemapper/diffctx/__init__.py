@@ -179,6 +179,119 @@ def _apply_same_file_floor(
                 rel[frag.id] = _SAME_FILE_FLOOR
 
 
+_HUB_REVERSE_THRESHOLD = 5
+
+
+def _find_hub_noise_paths(
+    graph: Graph,
+    changed_paths: set[Path],
+) -> set[Path]:
+    reverse_deps: dict[Path, set[Path]] = defaultdict(set)
+    for (src, dst), category in graph.edge_categories.items():
+        if category != "semantic":
+            continue
+        src_changed = src.path in changed_paths
+        dst_changed = dst.path in changed_paths
+        if not (src_changed ^ dst_changed):
+            continue
+
+        changed_frag = src if src_changed else dst
+        other_frag = dst if src_changed else src
+
+        fwd_w = graph.adjacency.get(changed_frag, {}).get(other_frag, 0.0)
+        rev_w = graph.adjacency.get(other_frag, {}).get(changed_frag, 0.0)
+
+        if rev_w > fwd_w:
+            reverse_deps[changed_frag.path].add(other_frag.path)
+
+    noise: set[Path] = set()
+    for deps in reverse_deps.values():
+        if len(deps) > _HUB_REVERSE_THRESHOLD:
+            noise.update(deps)
+    return noise
+
+
+def _find_config_generic_code_files(
+    graph: Graph,
+    changed_paths: set[Path],
+) -> set[Path]:
+    has_real_edge: set[Path] = set()
+    has_generic_config: set[Path] = set()
+    for (src, dst), category in graph.edge_categories.items():
+        src_changed = src.path in changed_paths
+        dst_changed = dst.path in changed_paths
+        if not (src_changed ^ dst_changed):
+            continue
+        other_path = (dst if src_changed else src).path
+        if category == "config_generic":
+            has_generic_config.add(other_path)
+        elif category in ("semantic", "config"):
+            has_real_edge.add(other_path)
+
+    generic_only = has_generic_config - has_real_edge
+    return {p for p in generic_only if p.suffix.lower() in CODE_EXTENSIONS}
+
+
+def _filter_unrelated_fragments(
+    fragments: list[Fragment],
+    core_ids: set[FragmentId],
+    graph: Graph,
+) -> list[Fragment]:
+    changed_paths = {fid.path for fid in core_ids}
+
+    paths_to_remove = _find_hub_noise_paths(graph, changed_paths)
+    paths_to_remove |= _find_config_generic_code_files(graph, changed_paths)
+    paths_to_remove -= changed_paths
+
+    if not paths_to_remove:
+        return fragments
+
+    kept = [f for f in fragments if f.path not in paths_to_remove]
+    removed_count = len(fragments) - len(kept)
+    if removed_count:
+        logging.debug(
+            "diffctx: filtered %d fragments from %d unrelated files",
+            removed_count,
+            len(paths_to_remove),
+        )
+    return kept
+
+
+_MAX_CONTEXT_FRAGMENTS_PER_FILE = 10
+
+
+def _cap_context_fragments(
+    fragments: list[Fragment],
+    core_ids: set[FragmentId],
+    rel: dict[FragmentId, float],
+) -> list[Fragment]:
+    changed_paths = {fid.path for fid in core_ids}
+
+    ctx_by_path: dict[Path, list[Fragment]] = defaultdict(list)
+    result: list[Fragment] = []
+
+    for f in fragments:
+        if f.path in changed_paths:
+            result.append(f)
+        else:
+            ctx_by_path[f.path].append(f)
+
+    for path, file_frags in ctx_by_path.items():
+        if len(file_frags) <= _MAX_CONTEXT_FRAGMENTS_PER_FILE:
+            result.extend(file_frags)
+        else:
+            file_frags.sort(key=lambda f: rel.get(f.id, 0.0), reverse=True)
+            result.extend(file_frags[:_MAX_CONTEXT_FRAGMENTS_PER_FILE])
+            logging.debug(
+                "diffctx: capped %s from %d to %d fragments",
+                path,
+                len(file_frags),
+                _MAX_CONTEXT_FRAGMENTS_PER_FILE,
+            )
+
+    return result
+
+
 def _select_with_ppr(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
@@ -193,12 +306,15 @@ def _select_with_ppr(
     rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha, seed_weights=seed_weights)
     _apply_same_file_floor(rel_scores, core_ids, all_fragments)
 
-    needs = needs_from_diff(all_fragments, core_ids, graph, diff_text)
+    filtered_fragments = _filter_unrelated_fragments(all_fragments, core_ids, graph)
+    filtered_fragments = _cap_context_fragments(filtered_fragments, core_ids, rel_scores)
+
+    needs = needs_from_diff(filtered_fragments, core_ids, graph, diff_text)
 
     effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
 
     result = lazy_greedy_select(
-        fragments=all_fragments,
+        fragments=filtered_fragments,
         core_ids=core_ids,
         rel=rel_scores,
         needs=needs,
@@ -206,7 +322,7 @@ def _select_with_ppr(
         tau=tau,
     )
 
-    selected = _coherence_post_pass(result, all_fragments, graph, effective_budget)
+    selected = _coherence_post_pass(result, filtered_fragments, graph, effective_budget)
     return selected.selected, selected
 
 
