@@ -274,7 +274,7 @@ def build_diff_context(
 
     core_ids = _identify_core_fragments(hunks, all_fragments)
 
-    signature_frags = _generate_signature_variants(all_fragments, core_ids)
+    signature_frags = _generate_signature_variants(all_fragments)
     for frag in signature_frags:
         frag.token_count = count_tokens(frag.content).count + _OVERHEAD_PER_FRAGMENT
     all_fragments.extend(signature_frags)
@@ -403,12 +403,10 @@ _SIGNATURE_ELIGIBLE_KINDS = frozenset({"function", "class", "method", "struct", 
 _MIN_LINES_FOR_SIGNATURE = 5
 
 
-def _generate_signature_variants(fragments: list[Fragment], core_ids: set[FragmentId]) -> list[Fragment]:
+def _generate_signature_variants(fragments: list[Fragment]) -> list[Fragment]:
     signatures: list[Fragment] = []
     seen: set[FragmentId] = set()
     for frag in fragments:
-        if frag.id in core_ids:
-            continue
         if frag.kind not in _SIGNATURE_ELIGIBLE_KINDS:
             continue
         if frag.line_count < _MIN_LINES_FOR_SIGNATURE:
@@ -456,7 +454,7 @@ def _add_container_headers(core_ids: set[FragmentId], frags_by_path: dict[Path, 
             if frag.kind not in _CONTAINER_FRAGMENT_KINDS or frag.id in core_ids:
                 continue
             for core_id in core_ids:
-                if core_id.path == path and core_id.start_line > frag.end_line:
+                if core_id.path == path and frag.start_line <= core_id.start_line and core_id.end_line <= frag.end_line:
                     headers_to_add.append(frag.id)
                     break
     core_ids.update(headers_to_add)
