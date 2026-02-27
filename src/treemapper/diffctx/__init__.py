@@ -179,7 +179,7 @@ def _apply_same_file_floor(
                 rel[frag.id] = _SAME_FILE_FLOOR
 
 
-_HUB_REVERSE_THRESHOLD = 5
+_HUB_REVERSE_THRESHOLD = 3
 
 
 def _find_hub_noise_paths(
@@ -292,6 +292,66 @@ def _cap_context_fragments(
     return result
 
 
+_LOW_RELEVANCE_THRESHOLD = 0.005
+
+
+def _filter_low_relevance_fragments(
+    fragments: list[Fragment],
+    core_ids: set[FragmentId],
+    rel: dict[FragmentId, float],
+) -> list[Fragment]:
+    changed_paths = {fid.path for fid in core_ids}
+    kept = [
+        f
+        for f in fragments
+        if f.path in changed_paths or rel.get(f.id, 0.0) >= _LOW_RELEVANCE_THRESHOLD
+    ]
+    removed = len(fragments) - len(kept)
+    if removed:
+        logging.debug("diffctx: filtered %d low-relevance fragments (threshold=%.4f)", removed, _LOW_RELEVANCE_THRESHOLD)
+    return kept
+
+
+def _ensure_changed_files_represented(
+    selected: list[Fragment],
+    all_fragments: list[Fragment],
+    changed_files: list[Path],
+    remaining_budget: int,
+) -> list[Fragment]:
+    selected_paths = {f.path for f in selected}
+    changed_paths = set(changed_files)
+    missing_paths = changed_paths - selected_paths
+
+    if not missing_paths:
+        return selected
+
+    frags_by_path: dict[Path, list[Fragment]] = defaultdict(list)
+    for f in all_fragments:
+        if f.path in missing_paths:
+            frags_by_path[f.path].append(f)
+
+    added: list[Fragment] = []
+    budget_left = remaining_budget
+    selected_ids = {f.id for f in selected}
+
+    for path in sorted(missing_paths):
+        candidates = frags_by_path.get(path, [])
+        if not candidates:
+            continue
+        best = max(candidates, key=lambda f: f.token_count if f.token_count > 0 else 0)
+        if best.token_count <= 0 or best.id in selected_ids:
+            continue
+        if best.token_count <= budget_left:
+            added.append(best)
+            selected_ids.add(best.id)
+            budget_left -= best.token_count
+
+    if added:
+        logging.debug("diffctx: injected %d fragments to cover %d missing changed files", len(added), len(missing_paths))
+
+    return selected + added
+
+
 def _select_with_ppr(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
@@ -307,6 +367,7 @@ def _select_with_ppr(
     _apply_same_file_floor(rel_scores, core_ids, all_fragments)
 
     filtered_fragments = _filter_unrelated_fragments(all_fragments, core_ids, graph)
+    filtered_fragments = _filter_low_relevance_fragments(filtered_fragments, core_ids, rel_scores)
     filtered_fragments = _cap_context_fragments(filtered_fragments, core_ids, rel_scores)
 
     needs = needs_from_diff(filtered_fragments, core_ids, graph, diff_text)
@@ -410,6 +471,9 @@ def build_diff_context(
             repo_root=root_dir,
             seed_weights=seed_weights,
         )
+        effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
+        remaining = effective_budget - result.used_tokens
+        selected = _ensure_changed_files_represented(selected, all_fragments, changed_files, remaining)
         _log_ppr_mode(selected, core_ids, budget_tokens, result, alpha, tau)
 
     if no_content:
