@@ -38,7 +38,7 @@ _RARE_THRESHOLD = LIMITS.rare_identifier_threshold
 _MAX_EXPANSION_FILES = LIMITS.max_expansion_files
 _OVERHEAD_PER_FRAGMENT = LIMITS.overhead_per_fragment
 _FALLBACK_MAX_FILES = 10_000
-_MAX_DISCOVERED_FILES = 200
+_MAX_DISCOVERED_FILES = LIMITS.max_discovered_files
 
 _SEMANTIC_KINDS = frozenset(
     {
