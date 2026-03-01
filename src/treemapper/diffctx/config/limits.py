@@ -51,8 +51,16 @@ class SiblingConfig:
     max_files_per_dir: int = 20
 
 
+@dataclass(frozen=True)
+class UtilityConfig:
+    eta: float = 0.20
+    gamma: float = 0.0
+    r_cap_sigma: float = 2.0
+
+
 LIMITS = AlgorithmLimits()
 PPR = PPRConfig()
 LEXICAL = LexicalConfig()
 COCHANGE = CochangeConfig()
 SIBLING = SiblingConfig()
+UTILITY = UtilityConfig()

@@ -7,6 +7,7 @@ import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .config.limits import UTILITY
 from .types import Fragment, FragmentId
 from .utility import InformationNeed, UtilityState, apply_fragment, compute_density, marginal_gain, utility_value
 
@@ -162,6 +163,15 @@ def _find_best_singleton(
     return best_singleton, best_gain
 
 
+def _compute_r_cap(rel: dict[FragmentId, float]) -> float:
+    values = [v for v in rel.values() if v > 0]
+    if len(values) < 2:
+        return max(values[0], 1e-9) if values else 1.0
+    med = statistics.median(values)
+    std = statistics.stdev(values)
+    return max(med + UTILITY.r_cap_sigma * std, 1e-9)
+
+
 def lazy_greedy_select(
     fragments: list[Fragment],
     core_ids: set[FragmentId],
@@ -191,6 +201,7 @@ def lazy_greedy_select(
             sig_lookup[cf.id] = sig_by_loc[key]
 
     state = _SelectionState(remaining_budget=budget_tokens)
+    state.utility_state.r_cap = _compute_r_cap(rel)
     _select_core_fragments(core_fragments, rel, needs, state, budget_tokens, sig_lookup)
 
     if state.remaining_budget <= 0:

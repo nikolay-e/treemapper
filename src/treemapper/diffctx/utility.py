@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .config.limits import UTILITY
 from .stopwords import CODE_STOPWORDS
 from .tokenizer import extract_tokens
 from .types import Fragment, FragmentId
@@ -238,9 +239,21 @@ def needs_from_diff(
 @dataclass
 class UtilityState:
     max_rel: dict[str, float] = field(default_factory=dict)
+    priorities: dict[str, float] = field(default_factory=dict)
+    structural_sum: float = 0.0
+    eta: float = UTILITY.eta
+    gamma: float = UTILITY.gamma
+    r_cap: float = 1.0
 
     def copy(self) -> UtilityState:
-        return UtilityState(max_rel=dict(self.max_rel))
+        return UtilityState(
+            max_rel=dict(self.max_rel),
+            priorities=dict(self.priorities),
+            structural_sum=self.structural_sum,
+            eta=self.eta,
+            gamma=self.gamma,
+            r_cap=self.r_cap,
+        )
 
 
 def _phi(x: float) -> float:
@@ -250,6 +263,13 @@ def _phi(x: float) -> float:
 _MIN_REL_FOR_BONUS = 0.03
 _STRONG_REL_THRESHOLD = 0.10
 _RELATEDNESS_BONUS = 0.25
+
+
+def _augmented_score(m: float, rel_score: float, state: UtilityState) -> float:
+    # Paper: a(f,n) = m(f,n) + η·R(f). We normalize R by R_cap
+    # to keep η interpretable across repos of different scale.
+    r_norm = min(rel_score / state.r_cap, 1.0) if state.r_cap > 0 else 0.0
+    return m + state.eta * r_norm
 
 
 def _needs_from_identifiers(frag: Fragment) -> tuple[InformationNeed, ...]:
@@ -262,36 +282,39 @@ def marginal_gain(
     needs: tuple[InformationNeed, ...],
     state: UtilityState,
 ) -> float:
-    if not needs:
-        effective = _needs_from_identifiers(frag)
-        if not effective:
-            return 0.0
-        gain = 0.0
-        for need in effective:
-            m = _match_strength_typed(frag, need)
-            if m <= 0.0:
-                continue
-            a_fz = rel_score * m
-            old_max = state.max_rel.get(need.symbol, 0.0)
-            new_max = max(old_max, a_fz)
-            gain += _phi(new_max) - _phi(old_max)
-        return gain
+    effective = needs if needs else _needs_from_identifiers(frag)
+    if not effective:
+        return 0.0
 
+    has_match = False
     gain = 0.0
-    for need in needs:
+    for need in effective:
         m = _match_strength_typed(frag, need)
         if m <= 0.0:
             continue
-        a_fz = rel_score * m
+        has_match = True
+        a_fz = _augmented_score(m, rel_score, state)
         old_max = state.max_rel.get(need.symbol, 0.0)
         new_max = max(old_max, a_fz)
-        gain += _phi(new_max) - _phi(old_max)
+        gain += need.priority * (_phi(new_max) - _phi(old_max))
 
-    if rel_score >= _MIN_REL_FOR_BONUS and (gain > 0 or rel_score >= _STRONG_REL_THRESHOLD):
+    # Diversity floor: after needs saturate (U₁ gain → 0), high-PPR
+    # fragments still get nonzero gain proportional to unsatisfied needs.
+    # Prevents garbage with accidental identifier overlap from winning
+    # over structurally relevant fragments when all gains are near-zero.
+    if needs and rel_score >= _MIN_REL_FOR_BONUS and (gain > 0 or rel_score >= _STRONG_REL_THRESHOLD):
         total_covered = sum(min(state.max_rel.get(n.symbol, 0.0), 1.0) for n in needs)
         unsatisfied = max(0.0, 1.0 - total_covered / max(1, len(needs)))
         floor = rel_score * _RELATEDNESS_BONUS * unsatisfied
         gain = max(gain, floor)
+
+    # Structural proximity layer (U2): gamma * min(R/R_cap, 1).
+    # Gated on has_match: paper assumes high PPR implies relevance,
+    # but noisy edges (sibling, cochange) leak PPR mass to unrelated
+    # fragments. Requiring at least one identifier overlap prevents this.
+    if has_match:
+        r_norm = min(rel_score / state.r_cap, 1.0) if state.r_cap > 0 else 0.0
+        gain += state.gamma * r_norm
 
     return gain
 
@@ -303,13 +326,19 @@ def apply_fragment(
     state: UtilityState,
 ) -> None:
     effective = needs if needs else _needs_from_identifiers(frag)
+    has_match = False
     for need in effective:
         m = _match_strength_typed(frag, need)
         if m <= 0.0:
             continue
-        a_fz = rel_score * m
+        has_match = True
+        a_fz = _augmented_score(m, rel_score, state)
         old_max = state.max_rel.get(need.symbol, 0.0)
         state.max_rel[need.symbol] = max(old_max, a_fz)
+        state.priorities[need.symbol] = max(state.priorities.get(need.symbol, 0.0), need.priority)
+    if has_match:
+        r_norm = min(rel_score / state.r_cap, 1.0) if state.r_cap > 0 else 0.0
+        state.structural_sum += state.gamma * r_norm
 
 
 def compute_density(frag: Fragment, rel_score: float, needs: tuple[InformationNeed, ...], state: UtilityState) -> float:
@@ -320,4 +349,5 @@ def compute_density(frag: Fragment, rel_score: float, needs: tuple[InformationNe
 
 
 def utility_value(state: UtilityState) -> float:
-    return sum(_phi(v) for v in state.max_rel.values())
+    u1 = sum(state.priorities.get(sym, 1.0) * _phi(v) for sym, v in state.max_rel.items())
+    return u1 + state.structural_sum
