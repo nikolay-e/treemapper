@@ -18,6 +18,7 @@ _CONCEPT_RE = re.compile(r"[A-Za-z_]\w*")
 _CALL_RE = re.compile(r"(\w+)\s*\(")
 _TYPE_REF_RE = re.compile(r"(?::|->)\s*([A-Z]\w+)")
 _CLOSURE_MIN_EDGE_WEIGHT = 0.5
+_INVARIANT_RE = re.compile(r"\b(?:assert|require|ensure|precondition|postcondition|invariant)\s*[(\s]+(\w+)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -30,10 +31,27 @@ class InformationNeed:
 
 def _match_strength_typed(frag: Fragment, need: InformationNeed) -> float:
     sym = need.symbol
-    if frag.symbol_name and frag.symbol_name.lower() == sym:
+    defines = frag.symbol_name is not None and frag.symbol_name.lower() == sym
+    is_signature = "_signature" in frag.kind
+    mentions = sym in frag.identifiers
+    is_test_frag = frag.symbol_name is not None and frag.symbol_name.lower().startswith("test_")
+
+    scope_match = need.scope is None or need.scope == frag.path
+
+    if defines and not is_signature:
+        if not scope_match:
+            return 0.3
         return 1.0
-    if sym in frag.identifiers:
-        return 0.5
+    if need.need_type == "impact" and not defines and mentions:
+        return 0.8
+    if is_signature and defines:
+        return 0.7
+    if need.need_type == "signature" and defines:
+        return 0.7
+    if need.need_type == "test" and is_test_frag and mentions:
+        return 0.6
+    if mentions:
+        return 0.3
     return 0.0
 
 
@@ -202,6 +220,17 @@ def _collect_test_needs(
                 needs[key] = InformationNeed("test", tested, None, 0.6)
 
 
+def _collect_invariant_needs(
+    diff_text: str,
+    needs: dict[tuple[str, str], InformationNeed],
+) -> None:
+    for line in _extract_changed_lines(diff_text):
+        for m in _INVARIANT_RE.finditer(line):
+            sym = m.group(1).lower()
+            if len(sym) >= 3 and sym not in CODE_STOPWORDS:
+                needs.setdefault(("invariant", sym), InformationNeed("invariant", sym, None, 0.85))
+
+
 def needs_from_diff(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
@@ -213,6 +242,7 @@ def needs_from_diff(
 
     core_symbol_names = _collect_core_needs(all_fragments, core_ids, needs)
     _collect_diff_line_needs(diff_text, needs)
+    _collect_invariant_needs(diff_text, needs)
     _collect_test_needs(all_fragments, core_symbol_names, needs)
 
     base_symbols = {n.symbol for n in needs.values()}
@@ -238,8 +268,8 @@ def needs_from_diff(
 
 @dataclass
 class UtilityState:
-    max_rel: dict[str, float] = field(default_factory=dict)
-    priorities: dict[str, float] = field(default_factory=dict)
+    max_rel: dict[tuple[str, str], float] = field(default_factory=dict)
+    priorities: dict[tuple[str, str], float] = field(default_factory=dict)
     structural_sum: float = 0.0
     eta: float = UTILITY.eta
     gamma: float = UTILITY.gamma
@@ -294,16 +324,15 @@ def marginal_gain(
             continue
         has_match = True
         a_fz = _augmented_score(m, rel_score, state)
-        old_max = state.max_rel.get(need.symbol, 0.0)
+        nkey = (need.need_type, need.symbol)
+        old_max = state.max_rel.get(nkey, 0.0)
         new_max = max(old_max, a_fz)
         gain += need.priority * (_phi(new_max) - _phi(old_max))
 
-    # Diversity floor: after needs saturate (U₁ gain → 0), high-PPR
+    # Diversity floor: after needs saturate (U1 gain -> 0), high-PPR
     # fragments still get nonzero gain proportional to unsatisfied needs.
-    # Prevents garbage with accidental identifier overlap from winning
-    # over structurally relevant fragments when all gains are near-zero.
     if needs and rel_score >= _MIN_REL_FOR_BONUS and (gain > 0 or rel_score >= _STRONG_REL_THRESHOLD):
-        total_covered = sum(min(state.max_rel.get(n.symbol, 0.0), 1.0) for n in needs)
+        total_covered = sum(min(state.max_rel.get((n.need_type, n.symbol), 0.0), 1.0) for n in needs)
         unsatisfied = max(0.0, 1.0 - total_covered / max(1, len(needs)))
         floor = rel_score * _RELATEDNESS_BONUS * unsatisfied
         gain = max(gain, floor)
@@ -333,9 +362,10 @@ def apply_fragment(
             continue
         has_match = True
         a_fz = _augmented_score(m, rel_score, state)
-        old_max = state.max_rel.get(need.symbol, 0.0)
-        state.max_rel[need.symbol] = max(old_max, a_fz)
-        state.priorities[need.symbol] = max(state.priorities.get(need.symbol, 0.0), need.priority)
+        nkey = (need.need_type, need.symbol)
+        old_max = state.max_rel.get(nkey, 0.0)
+        state.max_rel[nkey] = max(old_max, a_fz)
+        state.priorities[nkey] = max(state.priorities.get(nkey, 0.0), need.priority)
     if has_match:
         r_norm = min(rel_score / state.r_cap, 1.0) if state.r_cap > 0 else 0.0
         state.structural_sum += state.gamma * r_norm
