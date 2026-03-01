@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -10,6 +11,7 @@ import pathspec
 
 from ..ignore import get_ignore_specs, get_whitelist_spec, is_whitelisted, should_ignore
 from ..tokens import count_tokens
+from ..tree import KNOWN_BINARY_EXTENSIONS
 from .config import LIMITS
 from .config.extensions import CODE_EXTENSIONS, CONFIG_EXTENSIONS, DOC_EXTENSIONS
 from .edges import discover_all_related_files
@@ -17,7 +19,9 @@ from .fragments import enclosing_fragment, fragment_file  # type: ignore[attr-de
 from .git import (
     GitError,
     get_changed_files,
+    get_deleted_files,
     get_diff_text,
+    get_renamed_old_paths,
     get_untracked_files,
     is_git_repo,
     parse_diff,
@@ -64,11 +68,21 @@ def _kind_priority(kind: str) -> int:
     return 0 if kind in _SEMANTIC_KINDS else 1
 
 
+_BINARY_CTRL_RE = re.compile(r"[\x00-\x08\x0e-\x1f]")
+
+
+def _looks_binary(content: str) -> bool:
+    return bool(_BINARY_CTRL_RE.search(content[:8192]))
+
+
 def _read_file_content(
     file_path: Path,
     root_dir: Path,
     preferred_revs: list[str],
 ) -> str | None:
+    if file_path.suffix.lower() in KNOWN_BINARY_EXTENSIONS:
+        return None
+
     abs_path = _normalize_path(file_path, root_dir)
     try:
         rel = abs_path.relative_to(root_dir.resolve())
@@ -78,13 +92,19 @@ def _read_file_content(
 
     for rev in preferred_revs:
         try:
-            return show_file_at_revision(root_dir, rev, rel)
+            content = show_file_at_revision(root_dir, rev, rel)
+            if _looks_binary(content):
+                return None
+            return content
         except GitError:
             continue
 
     if abs_path.exists() and abs_path.is_file():
         try:
-            return abs_path.read_text(encoding="utf-8")
+            content = abs_path.read_text(encoding="utf-8")
+            if _looks_binary(content):
+                return None
+            return content
         except (OSError, UnicodeDecodeError):
             pass
 
@@ -104,6 +124,7 @@ def _build_preferred_revs(base_rev: str | None, head_rev: str | None) -> list[st
 
 
 _MAX_GENERATED_FRAGMENTS = LIMITS.max_generated_fragments
+_MAX_GENERATED_LINES = LIMITS.max_generated_lines
 
 
 _GENERATED_FILENAME_PATTERNS = frozenset(
@@ -117,6 +138,7 @@ _GENERATED_FILENAME_PATTERNS = frozenset(
         ".min.js",
         ".min.css",
         ".designer.cs",
+        ".api",
     }
 )
 
@@ -194,6 +216,26 @@ def _process_files_for_fragments(
                 cap,
                 " (generated)" if is_generated else "",
             )
+
+        if is_generated:
+            truncated: list[Fragment] = []
+            for frag in file_frags:
+                if frag.line_count > _MAX_GENERATED_LINES:
+                    lines = frag.content.splitlines()
+                    remaining = len(lines) - _MAX_GENERATED_LINES
+                    lines = lines[:_MAX_GENERATED_LINES]
+                    truncated_content = "\n".join(lines) + f"\n# ... [{remaining} more lines]"
+                    truncated.append(
+                        Fragment(
+                            id=FragmentId(frag.path, frag.start_line, frag.start_line + len(lines) - 1),
+                            kind=frag.kind,
+                            content=truncated_content,
+                            identifiers=extract_identifiers(truncated_content),
+                        )
+                    )
+                else:
+                    truncated.append(frag)
+            file_frags = truncated
 
         for frag in file_frags:
             fragments.append(frag)
@@ -520,6 +562,10 @@ def build_diff_context(
     changed_files.extend(untracked)
     changed_files = _filter_ignored(changed_files, root_dir, combined_spec)
     changed_files = _filter_whitelist(changed_files, root_dir, wl_spec)
+
+    excluded_paths = get_deleted_files(root_dir, diff_range) | get_renamed_old_paths(root_dir, diff_range)
+    if excluded_paths:
+        changed_files = [f for f in changed_files if f.resolve() not in excluded_paths]
 
     preferred_revs = _build_preferred_revs(base_rev, head_rev)
 
