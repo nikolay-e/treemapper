@@ -106,7 +106,7 @@ def personalized_pagerank(
     seeds: set[FragmentId],
     alpha: float = 0.60,
     tol: float = 1e-4,
-    lam: float = 0.5,
+    lam: float = 0.4,
     seed_weights: dict[FragmentId, float] | None = None,
 ) -> dict[FragmentId, float]:
     if not graph.nodes:

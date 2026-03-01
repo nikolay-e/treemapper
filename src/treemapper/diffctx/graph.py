@@ -79,7 +79,7 @@ def build_graph(fragments: list[Fragment], repo_root: Path | None = None) -> Gra
     return graph
 
 
-_SUPPRESSION_EXEMPT = frozenset({"semantic", "structural", "config", "document"})
+_SUPPRESSION_EXEMPT = frozenset({"semantic", "structural"})
 
 
 def _apply_hub_suppression(
