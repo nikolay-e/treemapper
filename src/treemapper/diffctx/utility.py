@@ -18,7 +18,7 @@ _CONCEPT_RE = re.compile(r"[A-Za-z_]\w*")
 _CALL_RE = re.compile(r"(\w+)\s*\(")
 _TYPE_REF_RE = re.compile(r"(?::|->)\s*([A-Z]\w+)")
 _CLOSURE_MIN_EDGE_WEIGHT = 0.5
-_INVARIANT_RE = re.compile(r"\b(?:assert|require|ensure|precondition|postcondition|invariant)\s*[(\s]+(\w+)", re.IGNORECASE)
+_INVARIANT_RE = re.compile(r"\b(?:assert|require|ensure|precondition|postcondition|invariant)\s*\(\s*(\w+)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
