@@ -65,6 +65,8 @@ treemapper -v                         # show version
 
 ## Diff Context Mode
 
+**Paper:** [Context-Selection for Git Diff (Zenodo, 2026)](https://doi.org/10.5281/zenodo.18824580)
+
 Smart context selection for git diffs — automatically finds the
 minimal set of code fragments needed to understand a change:
 
