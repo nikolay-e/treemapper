@@ -534,3 +534,138 @@ def test_parent_ignore_stops_at_git_root(tmp_path, run_mapper):
     assert find_node_by_path(result, ["beyond_git_root"]) is not None
     assert find_node_by_path(result, ["beyond_git_root", "visible.txt"]) is not None
     assert find_node_by_path(result, ["keep.txt"]) is not None
+
+
+# --- .treemapper/ config directory tests ---
+
+
+def test_treemapper_dir_ignore(temp_project, run_mapper):
+    from .utils import find_node_by_path
+
+    config_dir = temp_project / ".treemapper"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "ignore").write_text("*.log\ndocs/\n")
+    (temp_project / "app.log").touch()
+    (temp_project / "keep.txt").touch()
+
+    output_path = temp_project / "dir_ignore_output.yaml"
+    assert run_mapper([".", "-o", str(output_path)])
+    result = load_yaml(output_path)
+
+    assert find_node_by_path(result, ["app.log"]) is None
+    assert find_node_by_path(result, ["docs"]) is None
+    assert find_node_by_path(result, ["keep.txt"]) is not None
+
+
+def test_treemapper_dir_ignore_combined_with_legacy(temp_project, run_mapper):
+    from .utils import find_node_by_path
+
+    (temp_project / ".treemapperignore").write_text("*.tmp\n")
+    config_dir = temp_project / ".treemapper"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "ignore").write_text("*.bak\n")
+    (temp_project / "file.tmp").touch()
+    (temp_project / "file.bak").touch()
+    (temp_project / "file.txt").touch()
+
+    output_path = temp_project / "combined_dir_output.yaml"
+    assert run_mapper([".", "-o", str(output_path)])
+    result = load_yaml(output_path)
+
+    assert find_node_by_path(result, ["file.tmp"]) is None
+    assert find_node_by_path(result, ["file.bak"]) is None
+    assert find_node_by_path(result, ["file.txt"]) is not None
+
+
+def test_treemapper_dir_ignore_hierarchical(temp_project, run_mapper):
+    from .utils import find_node_by_path
+
+    subdir = temp_project / "subdir"
+    subdir.mkdir()
+    sub_config = subdir / ".treemapper"
+    sub_config.mkdir()
+    (sub_config / "ignore").write_text("*.secret\n")
+
+    (temp_project / "root.secret").touch()
+    (subdir / "nested.secret").touch()
+    (subdir / "keep.txt").touch()
+
+    output_path = temp_project / "hier_dir_output.yaml"
+    assert run_mapper([".", "-o", str(output_path)])
+    result = load_yaml(output_path)
+
+    assert find_node_by_path(result, ["root.secret"]) is not None
+    assert find_node_by_path(result, ["subdir", "nested.secret"]) is None
+    assert find_node_by_path(result, ["subdir", "keep.txt"]) is not None
+
+
+def test_treemapper_dir_ignore_parent(tmp_path, run_mapper):
+    from .utils import find_node_by_path
+
+    parent = tmp_path / "parent_project"
+    parent.mkdir()
+    (parent / ".git").mkdir()
+    config_dir = parent / ".treemapper"
+    config_dir.mkdir()
+    (config_dir / "ignore").write_text("packages/app/secret_dir/\n")
+
+    child = parent / "packages" / "app"
+    child.mkdir(parents=True)
+    (child / "secret_dir").mkdir()
+    (child / "secret_dir" / "secret.txt").write_text("secret")
+    (child / "src").mkdir()
+    (child / "src" / "main.py").write_text("print('hello')")
+
+    output_path = tmp_path / "parent_dir_output.yaml"
+    assert run_mapper([str(child), "-o", str(output_path)])
+    result = load_yaml(output_path)
+
+    assert find_node_by_path(result, ["secret_dir"]) is None
+    assert find_node_by_path(result, ["src", "main.py"]) is not None
+
+
+def test_treemapper_dir_whitelist(temp_project, run_mapper):
+    config_dir = temp_project / ".treemapper"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "whitelist").write_text("src/**/*.py\n")
+
+    output_path = temp_project / "dir_wl_output.yaml"
+    assert run_mapper([".", "-o", str(output_path)])
+    result = load_yaml(output_path)
+    all_files = get_all_files_in_tree(result)
+
+    assert "main.py" in all_files
+    assert "test.py" in all_files
+    assert "readme.md" not in all_files
+
+
+def test_treemapper_dir_hidden_from_output(temp_project, run_mapper):
+    config_dir = temp_project / ".treemapper"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "ignore").write_text("*.log\n")
+    (config_dir / "whitelist").write_text("src/**\n")
+    (temp_project / "keep.txt").touch()
+
+    output_path = temp_project / "hidden_dir_output.yaml"
+    assert run_mapper([".", "-o", str(output_path)])
+    result = load_yaml(output_path)
+    all_files = get_all_files_in_tree(result)
+
+    assert ".treemapper" not in all_files
+    assert "ignore" not in all_files
+    assert "whitelist" not in all_files
+
+
+def test_treemapper_dir_whitelist_over_legacy(temp_project, run_mapper):
+    (temp_project / ".treemapperwhitelist").write_text("docs/**\n")
+    config_dir = temp_project / ".treemapper"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "whitelist").write_text("src/**/*.py\n")
+
+    output_path = temp_project / "wl_precedence_output.yaml"
+    assert run_mapper([".", "-o", str(output_path)])
+    result = load_yaml(output_path)
+    all_files = get_all_files_in_tree(result)
+
+    assert "main.py" in all_files
+    assert "readme.md" not in all_files

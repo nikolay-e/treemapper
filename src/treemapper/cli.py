@@ -127,7 +127,12 @@ Default ignored patterns (use --no-default-ignores to include all):
 
 Ignore files (hierarchical, like git):
   .gitignore            Standard git ignore patterns
-  .treemapperignore     TreeMapper-specific patterns
+  .treemapper/ignore    TreeMapper-specific patterns (preferred)
+  .treemapperignore     TreeMapper-specific patterns (legacy)
+
+Whitelist files (auto-discovered):
+  .treemapper/whitelist  Include-only filter (preferred)
+  .treemapperwhitelist   Include-only filter (legacy)
 """
 
 

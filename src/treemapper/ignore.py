@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pathspec
 
+TREEMAPPER_CONFIG_DIR = ".treemapper"
+TREEMAPPER_DIR_IGNORE = "ignore"
+TREEMAPPER_DIR_WHITELIST = "whitelist"
+
 
 def read_ignore_file(file_path: Path) -> list[str]:
     ignore_patterns: list[str] = []
@@ -57,6 +61,7 @@ PRUNE_DIRS = frozenset(
         ".git",
         ".svn",
         ".hg",
+        ".treemapper",
         "__pycache__",
         "node_modules",
         ".npm",
@@ -105,15 +110,17 @@ def _aggregate_all_ignore_patterns(root: Path, ignore_filenames: list[str]) -> l
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         dirnames[:] = sorted(d for d in dirnames if d not in PRUNE_DIRS and not _is_cache_dir(d))
 
-        found_files = filenames_set & set(filenames)
-        if not found_files:
-            continue
-
         ignore_dir = Path(dirpath)
         rel = "" if ignore_dir == root else ignore_dir.relative_to(root).as_posix()
 
+        found_files = filenames_set & set(filenames)
         for ignore_filename in sorted(found_files):
             for line in read_ignore_file(ignore_dir / ignore_filename):
+                out.append(_process_ignore_line(line, rel))
+
+        config_ignore = ignore_dir / TREEMAPPER_CONFIG_DIR / TREEMAPPER_DIR_IGNORE
+        if config_ignore.is_file():
+            for line in read_ignore_file(config_ignore):
                 out.append(_process_ignore_line(line, rel))
 
     logging.debug("Aggregated %d ignore patterns from %s", len(out), root)
@@ -184,6 +191,9 @@ def _collect_parent_ignore_patterns(root: Path, ignore_filenames: list[str]) -> 
         for filename in ignore_filenames:
             _process_parent_ignore_file(current / filename, resolved_root, current, out)
 
+        config_ignore = current / TREEMAPPER_CONFIG_DIR / TREEMAPPER_DIR_IGNORE
+        _process_parent_ignore_file(config_ignore, resolved_root, current, out)
+
         if is_git_root:
             break
 
@@ -232,7 +242,8 @@ DEFAULT_IGNORE_PATTERNS = [
     # OS files
     "**/.DS_Store",
     "**/Thumbs.db",
-    # TreeMapper default output files
+    # TreeMapper config and output files
+    "**/.treemapper/",
     "**/tree.yaml",
     "**/tree.yml",
     "**/tree.json",
@@ -280,9 +291,13 @@ DEFAULT_WHITELIST_FILENAME = ".treemapperwhitelist"
 def get_whitelist_spec(whitelist_file: Path | None, root_dir: Path | None = None) -> pathspec.PathSpec | None:
     effective_file = whitelist_file
     if not effective_file and root_dir:
-        default = root_dir / DEFAULT_WHITELIST_FILENAME
-        if default.is_file():
-            effective_file = default
+        config_whitelist = root_dir / TREEMAPPER_CONFIG_DIR / TREEMAPPER_DIR_WHITELIST
+        if config_whitelist.is_file():
+            effective_file = config_whitelist
+        else:
+            default = root_dir / DEFAULT_WHITELIST_FILENAME
+            if default.is_file():
+                effective_file = default
     if not effective_file:
         return None
     patterns = read_ignore_file(effective_file)

@@ -3,7 +3,6 @@
 .pytest_cache
 .coverage
 htmlcov
-.treemapperignore
 *.yaml
 *.yml
 tests
