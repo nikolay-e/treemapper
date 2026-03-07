@@ -1,0 +1,34 @@
+initial:
+  Chart.yaml: |
+    apiVersion: v2
+    name: myapp
+    version: 1.0.0
+  unrelated.py: |
+    garbage_marker_12345 = True
+    unused_marker_67890 = False
+changed:
+  Chart.yaml: |
+    apiVersion: v2
+    name: myapp
+    version: 1.0.0
+    dependencies:
+      - name: frontend
+        version: 1.0.0
+        repository: file://./charts/frontend
+      - name: backend
+        version: 1.0.0
+        repository: file://./charts/backend
+      - name: redis
+        version: 17.0.0
+        repository: https://charts.bitnami.com/bitnami
+  unrelated.py: |
+    garbage_marker_12345 = True
+    unused_marker_67890 = False
+must_include_files:
+- Chart.yaml
+must_include_content:
+- 'dependencies:'
+must_not_include:
+- unrelated.py
+add_garbage_files: false
+skip_garbage_check: true

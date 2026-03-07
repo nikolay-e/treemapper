@@ -1,0 +1,12 @@
+initial:
+  test.py: |
+    def calculate():
+        return x + 1
+changed:
+  test.py: |
+    def calculate():
+        return x + 2
+must_include_files:
+- test.py
+add_garbage_files: false
+skip_garbage_check: true

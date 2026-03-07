@@ -1,0 +1,159 @@
+initial:
+  main.tf: |
+    variable "bucket_name" {
+      type = string
+      validation {
+        condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.bucket_name))
+        error_message = "Bucket name must be valid S3 bucket name."
+      }
+    }
+
+    resource "aws_s3_bucket" "data" {
+      bucket = var.bucket_name
+      tags = {
+        Name = var.bucket_name
+      }
+    }
+
+  # --- Tricky garbage: same resource type aws_s3_bucket but for logs ---
+  garbage_log_bucket.tf: |
+    GARBAGE_TF_071_LOGBKT_MARKER_A = "log-bucket"
+    GARBAGE_TF_071_LOGBKT_MARKER_B = "access-logs"
+
+    variable "log_bucket_name" {
+      type = string
+      validation {
+        condition     = can(regex("^logs-", var.log_bucket_name))
+        error_message = "Log bucket must start with logs-."
+      }
+    }
+
+    resource "aws_s3_bucket" "logs" {
+      bucket = var.log_bucket_name
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_codebuild.tf: |
+    GARBAGE_TF_071_BUILD_MARKER_C = "codebuild-project"
+    GARBAGE_TF_071_BUILD_MARKER_D = "build-environment"
+
+    resource "aws_codebuild_project" "app" {
+      name         = "app-build"
+      service_role = aws_iam_role.build.arn
+      artifacts {
+        type = "NO_ARTIFACTS"
+      }
+      environment {
+        compute_type = "BUILD_GENERAL1_SMALL"
+        image        = "aws/codebuild/standard:7.0"
+        type         = "LINUX_CONTAINER"
+      }
+      source {
+        type     = "GITHUB"
+        location = "https://github.com/org/repo.git"
+      }
+    }
+
+changed:
+  main.tf: |
+    variable "bucket_name" {
+      type = string
+      validation {
+        condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.bucket_name))
+        error_message = "Bucket name must be valid S3 bucket name."
+      }
+    }
+
+    variable "allowed_origins" {
+      type    = list(string)
+      default = []
+      validation {
+        condition     = alltrue([for origin in var.allowed_origins : can(regex("^https://", origin))])
+        error_message = "All origins must use HTTPS."
+      }
+    }
+
+    resource "aws_s3_bucket" "data" {
+      bucket = var.bucket_name
+      tags = {
+        Name = var.bucket_name
+      }
+    }
+
+    resource "aws_s3_bucket_cors_configuration" "data" {
+      bucket = aws_s3_bucket.data.id
+      cors_rule {
+        allowed_headers = ["*"]
+        allowed_methods = ["GET", "PUT"]
+        allowed_origins = var.allowed_origins
+        max_age_seconds = 3600
+      }
+    }
+
+  # --- Tricky garbage: same resource type aws_s3_bucket but for logs ---
+  garbage_log_bucket.tf: |
+    GARBAGE_TF_071_LOGBKT_MARKER_A = "log-bucket"
+    GARBAGE_TF_071_LOGBKT_MARKER_B = "access-logs"
+
+    variable "log_bucket_name" {
+      type = string
+      validation {
+        condition     = can(regex("^logs-", var.log_bucket_name))
+        error_message = "Log bucket must start with logs-."
+      }
+    }
+
+    resource "aws_s3_bucket" "logs" {
+      bucket = var.log_bucket_name
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_codebuild.tf: |
+    GARBAGE_TF_071_BUILD_MARKER_C = "codebuild-project"
+    GARBAGE_TF_071_BUILD_MARKER_D = "build-environment"
+
+    resource "aws_codebuild_project" "app" {
+      name         = "app-build"
+      service_role = aws_iam_role.build.arn
+      artifacts {
+        type = "NO_ARTIFACTS"
+      }
+      environment {
+        compute_type = "BUILD_GENERAL1_SMALL"
+        image        = "aws/codebuild/standard:7.0"
+        type         = "LINUX_CONTAINER"
+      }
+      source {
+        type     = "GITHUB"
+        location = "https://github.com/org/repo.git"
+      }
+    }
+
+# === Assertions ===
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - variable "allowed_origins" {
+    - 'can(regex("^https://", origin))'
+    - 'resource "aws_s3_bucket_cors_configuration" "data"'
+    - 'allowed_methods = ["GET", "PUT"]'
+
+must_not_include:
+# Tricky garbage markers (sibling aws_s3_bucket resource)
+- GARBAGE_TF_071_LOGBKT_MARKER_A
+- GARBAGE_TF_071_LOGBKT_MARKER_B
+# Plain garbage markers
+- GARBAGE_TF_071_BUILD_MARKER_C
+- GARBAGE_TF_071_BUILD_MARKER_D
+
+must_not_include_files:
+- garbage_log_bucket.tf
+- garbage_codebuild.tf
+
+max_fragments: 4
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

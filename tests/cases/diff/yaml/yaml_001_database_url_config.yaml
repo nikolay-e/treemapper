@@ -1,0 +1,82 @@
+initial:
+  config.yaml: |
+    database:
+      host: localhost
+      port: 5432
+      name: myapp
+  src/db.py: |
+    import os
+
+    def get_database_url():
+        host = os.getenv("DB_HOST", "localhost")
+        port = os.getenv("DB_PORT", "5432")
+        name = os.getenv("DB_NAME", "myapp")
+        return f"postgresql://{host}:{port}/{name}"
+  garbage_email_service.py: |
+    GARBAGE_YAML_001_EMAIL_MARKER_A = "email"
+    GARBAGE_YAML_001_SMTP_MARKER_B = True
+
+    class EmailService:
+        GARBAGE_YAML_001_SERVICE_CLASS_C = "service"
+
+        def send(self, to: str, subject: str) -> None:
+            pass
+  garbage_payment_processor.py: |
+    GARBAGE_YAML_001_PAYMENT_MARKER_D = "payment"
+    GARBAGE_YAML_001_STRIPE_MARKER_E = 42
+
+    class PaymentProcessor:
+        GARBAGE_YAML_001_PROCESSOR_CLASS_F = True
+
+        def charge(self, amount: float) -> bool:
+            return True
+changed:
+  config.yaml: |
+    database:
+      host: production-db.example.com
+      port: 5432
+      name: myapp_prod
+  src/db.py: |
+    import os
+
+    def get_database_url():
+        host = os.getenv("DB_HOST", "localhost")
+        port = os.getenv("DB_PORT", "5432")
+        name = os.getenv("DB_NAME", "myapp")
+        return f"postgresql://{host}:{port}/{name}"
+  garbage_email_service.py: |
+    GARBAGE_YAML_001_EMAIL_MARKER_A = "email"
+    GARBAGE_YAML_001_SMTP_MARKER_B = True
+
+    class EmailService:
+        GARBAGE_YAML_001_SERVICE_CLASS_C = "service"
+
+        def send(self, to: str, subject: str) -> None:
+            pass
+  garbage_payment_processor.py: |
+    GARBAGE_YAML_001_PAYMENT_MARKER_D = "payment"
+    GARBAGE_YAML_001_STRIPE_MARKER_E = 42
+
+    class PaymentProcessor:
+        GARBAGE_YAML_001_PROCESSOR_CLASS_F = True
+
+        def charge(self, amount: float) -> bool:
+            return True
+must_include_files:
+- config.yaml
+must_include_content:
+- |2
+    host: production-db.example.com
+must_not_include:
+- GARBAGE_YAML_001_EMAIL_MARKER_A
+- GARBAGE_YAML_001_SMTP_MARKER_B
+- GARBAGE_YAML_001_SERVICE_CLASS_C
+- GARBAGE_YAML_001_PAYMENT_MARKER_D
+- GARBAGE_YAML_001_STRIPE_MARKER_E
+- GARBAGE_YAML_001_PROCESSOR_CLASS_F
+- EmailService
+- PaymentProcessor
+- garbage_email_service.py
+- garbage_payment_processor.py
+add_garbage_files: false
+skip_garbage_check: true

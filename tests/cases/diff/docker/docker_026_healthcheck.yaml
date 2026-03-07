@@ -1,0 +1,137 @@
+initial:
+  app.py: |
+    from flask import Flask, jsonify
+    import os
+    import time
+
+    app = Flask(__name__)
+    START_TIME = time.time()
+
+    @app.route('/health')
+    def health():
+        return 'OK', 200
+
+    @app.route('/healthz')
+    def healthz():
+        uptime = time.time() - START_TIME
+        return jsonify({
+            'status': 'healthy',
+            'uptime_seconds': round(uptime, 2)
+        })
+
+    @app.route('/ready')
+    def ready():
+        return jsonify({'status': 'ready'})
+
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=8080)
+  config.py: |
+    import os
+
+    HEALTH_CHECK_INTERVAL = int(os.getenv('HEALTH_CHECK_INTERVAL', '30'))
+    HEALTH_CHECK_TIMEOUT = int(os.getenv('HEALTH_CHECK_TIMEOUT', '3'))
+    START_PERIOD = int(os.getenv('START_PERIOD', '5'))
+  requirements.txt: |
+    flask==2.3.0
+    gunicorn==21.2.0
+  Dockerfile: |
+    FROM python:3.11-slim
+    COPY app.py .
+    RUN pip install flask
+    CMD ["python", "app.py"]
+  scripts/health_test.sh: |
+    #!/bin/bash
+    curl -f http://localhost:8080/health
+  tests/test_health.py: |
+    def test_health_endpoint():
+        pass
+  docs/health.md: |
+    # Health Check Documentation
+  k8s/probes.yaml: |
+    livenessProbe:
+  prometheus/scrape.yml: ''
+changed:
+  app.py: |
+    from flask import Flask, jsonify
+    import os
+    import time
+
+    app = Flask(__name__)
+    START_TIME = time.time()
+
+    @app.route('/health')
+    def health():
+        return 'OK', 200
+
+    @app.route('/healthz')
+    def healthz():
+        uptime = time.time() - START_TIME
+        return jsonify({
+            'status': 'healthy',
+            'uptime_seconds': round(uptime, 2)
+        })
+
+    @app.route('/ready')
+    def ready():
+        return jsonify({'status': 'ready'})
+
+    if __name__ == '__main__':
+        app.run(host='0.0.0.0', port=8080)
+  config.py: |
+    import os
+
+    HEALTH_CHECK_INTERVAL = int(os.getenv('HEALTH_CHECK_INTERVAL', '30'))
+    HEALTH_CHECK_TIMEOUT = int(os.getenv('HEALTH_CHECK_TIMEOUT', '3'))
+    START_PERIOD = int(os.getenv('START_PERIOD', '5'))
+  requirements.txt: |
+    flask==2.3.0
+    gunicorn==21.2.0
+  Dockerfile: |
+    # Build stage
+    FROM python:3.12-slim AS builder
+    WORKDIR /build
+    COPY requirements.txt .
+    RUN pip install --no-cache-dir --target=/deps -r requirements.txt
+
+    # Production stage
+    FROM python:3.12-slim AS production
+    WORKDIR /app
+
+    # Install curl for health checks
+    RUN apt-get update && \
+        apt-get install -y --no-install-recommends curl && \
+        rm -rf /var/lib/apt/lists/* && \
+        useradd --create-home --shell /bin/bash appuser
+
+    # Copy dependencies and application
+    COPY --from=builder /deps /usr/local/lib/python3.12/site-packages
+    COPY app.py config.py ./
+
+    ENV PYTHONUNBUFFERED=1
+    ENV PYTHONDONTWRITEBYTECODE=1
+
+    USER appuser
+    EXPOSE 8080
+
+    # Comprehensive health check configuration
+    HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+        CMD curl -f http://localhost:8080/health || exit 1
+
+    CMD ["python", "app.py"]
+  scripts/health_test.sh: |
+    #!/bin/bash
+    curl -f http://localhost:8080/health
+  tests/test_health.py: |
+    def test_health_endpoint():
+        pass
+  docs/health.md: |
+    # Health Check Documentation
+  k8s/probes.yaml: |
+    livenessProbe:
+  prometheus/scrape.yml: ''
+must_include_files:
+- Dockerfile
+must_include_content:
+- FROM python:3.12-slim AS builder
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,128 @@
+initial:
+  test.py: |
+    def func0():
+        pass
+
+    def func1():
+        func0()
+
+    def func2():
+        func1()
+
+    def func3():
+        func2()
+
+    def func4():
+        func3()
+  # --- Tricky garbage: same function name "func0" in different module ---
+  garbage_func0_collision.py: |
+    GARBAGE_PPR_007_FUNC0_COLLISION_A = "func0_collision"
+    GARBAGE_PPR_007_FUNC0_COLLISION_B = True
+
+    def func0():
+        return "totally_different_func0"
+
+    def func0_extended():
+        return func0() + "_extended"
+  # --- Tricky garbage: imports func0 pattern (same-import consumer) ---
+  garbage_func_consumer.py: |
+    GARBAGE_PPR_007_FUNC_CONSUMER_C = "func_consumer"
+    GARBAGE_PPR_007_FUNC_CONSUMER_D = 42
+
+    def consume_func_output(result):
+        return result + "_consumed"
+
+    class FuncResultProcessor:
+        def process(self, data):
+            return len(data)
+  # --- Tricky garbage: same directory sibling with similar chain structure ---
+  garbage_chain_sibling.py: |
+    GARBAGE_PPR_007_CHAIN_SIBLING_E = "chain_sibling"
+    GARBAGE_PPR_007_CHAIN_SIBLING_F = 99
+
+    def sibling_func0():
+        return "sibling_base"
+
+    def sibling_func1():
+        return sibling_func0()
+
+    def sibling_func2():
+        return sibling_func1()
+changed:
+  test.py: |
+    def func0():
+        return 1
+
+    def func1():
+        func0()
+
+    def func2():
+        func1()
+
+    def func3():
+        func2()
+
+    def func4():
+        func3()
+  garbage_func0_collision.py: |
+    GARBAGE_PPR_007_FUNC0_COLLISION_A = "func0_collision"
+    GARBAGE_PPR_007_FUNC0_COLLISION_B = True
+
+    def func0():
+        return "totally_different_func0"
+
+    def func0_extended():
+        return func0() + "_extended"
+  garbage_func_consumer.py: |
+    GARBAGE_PPR_007_FUNC_CONSUMER_C = "func_consumer"
+    GARBAGE_PPR_007_FUNC_CONSUMER_D = 42
+
+    def consume_func_output(result):
+        return result + "_consumed"
+
+    class FuncResultProcessor:
+        def process(self, data):
+            return len(data)
+  garbage_chain_sibling.py: |
+    GARBAGE_PPR_007_CHAIN_SIBLING_E = "chain_sibling"
+    GARBAGE_PPR_007_CHAIN_SIBLING_F = 99
+
+    def sibling_func0():
+        return "sibling_base"
+
+    def sibling_func1():
+        return sibling_func0()
+
+    def sibling_func2():
+        return sibling_func1()
+
+# === Assertions ===
+
+must_include_files:
+- test.py
+
+must_include_content_from:
+  test.py:
+    - 'def func0():'
+    - return 1
+
+must_not_include:
+# Tricky: name collision with func0
+- GARBAGE_PPR_007_FUNC0_COLLISION_A
+- GARBAGE_PPR_007_FUNC0_COLLISION_B
+# Tricky: consumer pattern
+- GARBAGE_PPR_007_FUNC_CONSUMER_C
+- GARBAGE_PPR_007_FUNC_CONSUMER_D
+# Tricky: same directory sibling with chain structure
+- GARBAGE_PPR_007_CHAIN_SIBLING_E
+- GARBAGE_PPR_007_CHAIN_SIBLING_F
+
+must_not_include_files:
+- garbage_func0_collision.py
+- garbage_func_consumer.py
+- garbage_chain_sibling.py
+
+max_fragments: 4
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

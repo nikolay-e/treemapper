@@ -1,0 +1,116 @@
+initial:
+  user.py: |
+    from typing import Optional
+
+    class User:
+        def __init__(self, first: str, last: str):
+            self.first = first
+            self.last = last
+
+        @property
+        def full_name(self) -> str:
+            return f"{self.first} {self.last}"
+
+        @property
+        def initials(self) -> str:
+            return f"{self.first[0]}{self.last[0]}".upper()
+
+        def greet(self) -> str:
+            return f"Hello, {self.full_name}!"
+  views.py: |
+    from user import User
+
+    def render_user(user: User) -> str:
+        return f"Name: {user.full_name}"
+
+    def render_user_card(user: User) -> str:
+        return f"[{user.initials}] {user.full_name}"
+
+    def render_greeting(user: User) -> str:
+        return user.greet()
+  serializers.py: |
+    from user import User
+
+    def user_to_dict(user: User) -> dict:
+        return {
+            "first": user.first,
+            "last": user.last,
+            "full_name": user.full_name,
+            "initials": user.initials,
+        }
+
+    def user_to_display(user: User) -> str:
+        return f"{user.full_name} ({user.initials})"
+  scripts/create_users.sh: |
+    #!/bin/bash
+    python create_users.py
+  tests/test_user.py: |
+    def test_user_creation():
+        pass
+  docs/user-model.md: |
+    # User Model
+  migrations/002_add_title.sql: |
+    ALTER TABLE users ADD COLUMN title VARCHAR(50);
+changed:
+  user.py: |
+    from typing import Optional
+
+    class User:
+        def __init__(self, first: str, last: str, title: Optional[str] = None):
+            self.first = first
+            self.last = last
+            self.title = title
+
+        @property
+        def full_name(self) -> str:
+            if self.title:
+                return f"{self.title} {self.first} {self.last}"
+            return f"{self.first} {self.last}"
+
+        @property
+        def initials(self) -> str:
+            return f"{self.first[0]}{self.last[0]}".upper()
+
+        def greet(self) -> str:
+            return f"Hello, {self.full_name}!"
+  views.py: |
+    from user import User
+
+    def render_user(user: User) -> str:
+        return f"Name: {user.full_name}"
+
+    def render_user_card(user: User) -> str:
+        return f"[{user.initials}] {user.full_name}"
+
+    def render_greeting(user: User) -> str:
+        return user.greet()
+  serializers.py: |
+    from user import User
+
+    def user_to_dict(user: User) -> dict:
+        return {
+            "first": user.first,
+            "last": user.last,
+            "full_name": user.full_name,
+            "initials": user.initials,
+        }
+
+    def user_to_display(user: User) -> str:
+        return f"{user.full_name} ({user.initials})"
+  scripts/create_users.sh: |
+    #!/bin/bash
+    python create_users.py
+  tests/test_user.py: |
+    def test_user_creation():
+        pass
+  docs/user-model.md: |
+    # User Model
+  migrations/002_add_title.sql: |
+    ALTER TABLE users ADD COLUMN title VARCHAR(50);
+must_include_files:
+- user.py
+must_include_content:
+- 'def __init__(self, first: str, last: str, title: Optional[str] = None):'
+- 'if self.title:'
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,110 @@
+initial:
+  kms.tf: |
+    resource "aws_kms_key" "main" {
+      description = "Main encryption key"
+    }
+  src/encrypt.py: |
+    import boto3
+
+    def encrypt_data(key_id: str, plaintext: bytes) -> bytes:
+        kms = boto3.client("kms")
+        response = kms.encrypt(KeyId=key_id, Plaintext=plaintext)
+        return response["CiphertextBlob"]
+
+  # --- Tricky garbage: sibling .tf with same aws_kms_key resource type ---
+  garbage_kms_s3.tf: |
+    GARBAGE_TF_079_S3_KEY_MARKER_A = "s3-encryption"
+    GARBAGE_TF_079_SSE_MARKER_B = "aws:kms"
+
+    resource "aws_kms_key" "s3_encryption" {
+      description             = "S3 bucket encryption key"
+      deletion_window_in_days = 30
+      enable_key_rotation     = true
+    }
+
+    resource "aws_kms_alias" "s3_encryption" {
+      name          = "alias/s3-encryption"
+      target_key_id = aws_kms_key.s3_encryption.key_id
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_auth.py: |
+    GARBAGE_TF_079_AUTH_MARKER_C = "jwt-validator"
+    GARBAGE_TF_079_TOKEN_MARKER_D = "bearer"
+
+    class AuthValidator:
+        GARBAGE_TF_079_ISSUER_MARKER_E = True
+
+        def validate(self, token: str) -> bool:
+            return len(token) > 0
+
+changed:
+  kms.tf: |
+    resource "aws_kms_key" "main" {
+      description             = "Main encryption key"
+      deletion_window_in_days = 7
+      enable_key_rotation     = true
+    }
+  src/encrypt.py: |
+    import boto3
+
+    def encrypt_data(key_id: str, plaintext: bytes) -> bytes:
+        kms = boto3.client("kms")
+        response = kms.encrypt(KeyId=key_id, Plaintext=plaintext)
+        return response["CiphertextBlob"]
+
+  garbage_kms_s3.tf: |
+    GARBAGE_TF_079_S3_KEY_MARKER_A = "s3-encryption"
+    GARBAGE_TF_079_SSE_MARKER_B = "aws:kms"
+
+    resource "aws_kms_key" "s3_encryption" {
+      description             = "S3 bucket encryption key"
+      deletion_window_in_days = 30
+      enable_key_rotation     = true
+    }
+
+    resource "aws_kms_alias" "s3_encryption" {
+      name          = "alias/s3-encryption"
+      target_key_id = aws_kms_key.s3_encryption.key_id
+    }
+
+  garbage_auth.py: |
+    GARBAGE_TF_079_AUTH_MARKER_C = "jwt-validator"
+    GARBAGE_TF_079_TOKEN_MARKER_D = "bearer"
+
+    class AuthValidator:
+        GARBAGE_TF_079_ISSUER_MARKER_E = True
+
+        def validate(self, token: str) -> bool:
+            return len(token) > 0
+
+# === Assertions ===
+
+must_include_files:
+- kms.tf
+
+must_include_content_from:
+  kms.tf:
+    - description             = "Main encryption key"
+    - deletion_window_in_days = 7
+    - enable_key_rotation     = true
+    - 'resource "aws_kms_key" "main"'
+
+must_not_include:
+# Tricky garbage: sibling .tf with same resource type
+- GARBAGE_TF_079_S3_KEY_MARKER_A
+- GARBAGE_TF_079_SSE_MARKER_B
+# Plain garbage
+- GARBAGE_TF_079_AUTH_MARKER_C
+- GARBAGE_TF_079_TOKEN_MARKER_D
+- GARBAGE_TF_079_ISSUER_MARKER_E
+
+must_not_include_files:
+- garbage_kms_s3.tf
+- garbage_auth.py
+- src/encrypt.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

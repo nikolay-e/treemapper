@@ -1,0 +1,84 @@
+initial:
+  config.ts: |
+    export interface FullConfig {
+        host: string;
+        port: number;
+        ssl: boolean;
+        timeout: number;
+    }
+  updater.ts: |
+    console.log('initial');
+  garbage_auth.ts: |
+    const GARBAGE_JS_074_AUTH_MARKER_A = "authentication";
+    const GARBAGE_JS_074_TOKEN_MARKER_B = true;
+
+    class AuthProvider {
+        static GARBAGE_JS_074_PROVIDER_CLASS_C = "provider";
+
+        validate(token: string): boolean {
+            return token.length > 0;
+        }
+    }
+  garbage_encryption.ts: |
+    const GARBAGE_JS_074_ENCRYPT_MARKER_D = "encryption";
+    const GARBAGE_JS_074_KEY_SIZE_MARKER_E = 256;
+
+    class EncryptionService {
+        static GARBAGE_JS_074_SERVICE_CLASS_F = true;
+
+        encrypt(plaintext: string): string {
+            return plaintext;
+        }
+    }
+changed:
+  config.ts: |
+    export interface FullConfig {
+        host: string;
+        port: number;
+        ssl: boolean;
+        timeout: number;
+    }
+  updater.ts: |
+    import { FullConfig } from './config';
+
+    function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {
+        return { ...current, ...updates };
+    }
+  garbage_auth.ts: |
+    const GARBAGE_JS_074_AUTH_MARKER_A = "authentication";
+    const GARBAGE_JS_074_TOKEN_MARKER_B = true;
+
+    class AuthProvider {
+        static GARBAGE_JS_074_PROVIDER_CLASS_C = "provider";
+
+        validate(token: string): boolean {
+            return token.length > 0;
+        }
+    }
+  garbage_encryption.ts: |
+    const GARBAGE_JS_074_ENCRYPT_MARKER_D = "encryption";
+    const GARBAGE_JS_074_KEY_SIZE_MARKER_E = 256;
+
+    class EncryptionService {
+        static GARBAGE_JS_074_SERVICE_CLASS_F = true;
+
+        encrypt(plaintext: string): string {
+            return plaintext;
+        }
+    }
+must_include_files:
+- updater.ts
+must_include_content:
+- import { FullConfig } from './config';
+- 'function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {'
+must_not_include:
+- GARBAGE_JS_074_AUTH_MARKER_A
+- GARBAGE_JS_074_ENCRYPT_MARKER_D
+- GARBAGE_JS_074_KEY_SIZE_MARKER_E
+- GARBAGE_JS_074_PROVIDER_CLASS_C
+- GARBAGE_JS_074_SERVICE_CLASS_F
+- GARBAGE_JS_074_TOKEN_MARKER_B
+- garbage_auth.ts
+- garbage_encryption.ts
+add_garbage_files: false
+skip_garbage_check: true

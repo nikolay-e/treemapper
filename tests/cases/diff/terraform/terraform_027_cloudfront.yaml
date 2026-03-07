@@ -1,0 +1,179 @@
+initial:
+  cdn.tf: |
+    # CDN resources
+
+  # --- Tricky garbage: same resource type aws_cloudfront_distribution but for API caching ---
+  api_cdn.tf: |
+    GARBAGE_TF_027_API_CDN_A = "api-cache-layer"
+    GARBAGE_TF_027_API_TTL_B = 3600
+
+    resource "aws_cloudfront_distribution" "api" {
+      enabled         = true
+      is_ipv6_enabled = true
+
+      origin {
+        domain_name = aws_lb.api.dns_name
+        origin_id   = "ALB-API"
+
+        custom_origin_config {
+          http_port              = 80
+          https_port             = 443
+          origin_protocol_policy = "https-only"
+          origin_ssl_protocols   = ["TLSv1.2"]
+        }
+      }
+
+      default_cache_behavior {
+        allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+        cached_methods   = ["GET", "HEAD"]
+        target_origin_id = "ALB-API"
+
+        forwarded_values {
+          query_string = true
+          cookies {
+            forward = "all"
+          }
+        }
+
+        viewer_protocol_policy = "https-only"
+      }
+
+      restrictions {
+        geo_restriction {
+          restriction_type = "none"
+        }
+      }
+
+      viewer_certificate {
+        acm_certificate_arn = aws_acm_certificate.api.arn
+        ssl_support_method  = "sni-only"
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_queue_processor.java: |
+    // GARBAGE_TF_027_QUEUE_PROC_C
+    // GARBAGE_TF_027_QUEUE_BATCH_D
+    public class QueueProcessor {
+        public void process() { }
+    }
+
+changed:
+  cdn.tf: |
+    resource "aws_cloudfront_distribution" "main" {
+      enabled             = true
+      is_ipv6_enabled     = true
+      default_root_object = "index.html"
+
+      origin {
+        domain_name = aws_s3_bucket.website.bucket_regional_domain_name
+        origin_id   = "S3-Website"
+
+        s3_origin_config {
+          origin_access_identity = aws_cloudfront_origin_access_identity.main.cloudfront_access_identity_path
+        }
+      }
+
+      default_cache_behavior {
+        allowed_methods  = ["GET", "HEAD"]
+        cached_methods   = ["GET", "HEAD"]
+        target_origin_id = "S3-Website"
+
+        forwarded_values {
+          query_string = false
+          cookies {
+            forward = "none"
+          }
+        }
+
+        viewer_protocol_policy = "redirect-to-https"
+      }
+
+      restrictions {
+        geo_restriction {
+          restriction_type = "none"
+        }
+      }
+
+      viewer_certificate {
+        acm_certificate_arn = aws_acm_certificate.main.arn
+        ssl_support_method  = "sni-only"
+      }
+    }
+
+  api_cdn.tf: |
+    GARBAGE_TF_027_API_CDN_A = "api-cache-layer"
+    GARBAGE_TF_027_API_TTL_B = 3600
+
+    resource "aws_cloudfront_distribution" "api" {
+      enabled         = true
+      is_ipv6_enabled = true
+
+      origin {
+        domain_name = aws_lb.api.dns_name
+        origin_id   = "ALB-API"
+
+        custom_origin_config {
+          http_port              = 80
+          https_port             = 443
+          origin_protocol_policy = "https-only"
+          origin_ssl_protocols   = ["TLSv1.2"]
+        }
+      }
+
+      default_cache_behavior {
+        allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+        cached_methods   = ["GET", "HEAD"]
+        target_origin_id = "ALB-API"
+
+        forwarded_values {
+          query_string = true
+          cookies {
+            forward = "all"
+          }
+        }
+
+        viewer_protocol_policy = "https-only"
+      }
+
+      restrictions {
+        geo_restriction {
+          restriction_type = "none"
+        }
+      }
+
+      viewer_certificate {
+        acm_certificate_arn = aws_acm_certificate.api.arn
+        ssl_support_method  = "sni-only"
+      }
+    }
+
+  garbage_queue_processor.java: |
+    // GARBAGE_TF_027_QUEUE_PROC_C
+    // GARBAGE_TF_027_QUEUE_BATCH_D
+    public class QueueProcessor {
+        public void process() { }
+    }
+
+must_include_files:
+- cdn.tf
+
+must_include_content_from:
+  cdn.tf:
+    - resource "aws_cloudfront_distribution" "main" {
+    - viewer_protocol_policy = "redirect-to-https"
+
+must_not_include:
+- GARBAGE_TF_027_API_CDN_A
+- GARBAGE_TF_027_API_TTL_B
+- GARBAGE_TF_027_QUEUE_PROC_C
+- GARBAGE_TF_027_QUEUE_BATCH_D
+
+must_not_include_files:
+- api_cdn.tf
+- garbage_queue_processor.java
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

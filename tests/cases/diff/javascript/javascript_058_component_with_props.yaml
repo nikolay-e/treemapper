@@ -1,0 +1,102 @@
+initial:
+  Card.tsx: |
+    interface CardProps {
+        title: string;
+        children: React.ReactNode;
+    }
+
+    export function Card({ title, children }: CardProps) {
+        return (
+            <div className="card">
+                <h2>{title}</h2>
+                {children}
+            </div>
+        );
+    }
+  App.tsx: |
+    console.log('initial');
+  garbage_webhook.ts: |
+    const GARBAGE_JS_058_WEBHOOK_MARKER_A = "webhook";
+    const GARBAGE_JS_058_ENDPOINT_MARKER_B = true;
+
+    class WebhookDispatcher {
+        static GARBAGE_JS_058_WEBHOOK_CLASS_C = "dispatcher";
+
+        deliver(url: string, payload: object): boolean {
+            return true;
+        }
+    }
+  garbage_templating.ts: |
+    const GARBAGE_JS_058_TEMPLATE_MARKER_D = "templating";
+    const GARBAGE_JS_058_RENDER_MARKER_E = 64;
+
+    class TemplateRenderer {
+        static GARBAGE_JS_058_TEMPLATE_CLASS_F = true;
+
+        render(template: string, context: Record<string, string>): string {
+            return template;
+        }
+    }
+changed:
+  Card.tsx: |
+    interface CardProps {
+        title: string;
+        children: React.ReactNode;
+    }
+
+    export function Card({ title, children }: CardProps) {
+        return (
+            <div className="card">
+                <h2>{title}</h2>
+                {children}
+            </div>
+        );
+    }
+  App.tsx: |
+    import { Card } from './Card';
+
+    export function App() {
+        return (
+            <Card title="Welcome">
+                <p>Hello World</p>
+            </Card>
+        );
+    }
+  garbage_webhook.ts: |
+    const GARBAGE_JS_058_WEBHOOK_MARKER_A = "webhook";
+    const GARBAGE_JS_058_ENDPOINT_MARKER_B = true;
+
+    class WebhookDispatcher {
+        static GARBAGE_JS_058_WEBHOOK_CLASS_C = "dispatcher";
+
+        deliver(url: string, payload: object): boolean {
+            return true;
+        }
+    }
+  garbage_templating.ts: |
+    const GARBAGE_JS_058_TEMPLATE_MARKER_D = "templating";
+    const GARBAGE_JS_058_RENDER_MARKER_E = 64;
+
+    class TemplateRenderer {
+        static GARBAGE_JS_058_TEMPLATE_CLASS_F = true;
+
+        render(template: string, context: Record<string, string>): string {
+            return template;
+        }
+    }
+must_include_files:
+- App.tsx
+must_include_content:
+- import { Card } from './Card';
+- function App() {
+must_not_include:
+- GARBAGE_JS_058_ENDPOINT_MARKER_B
+- GARBAGE_JS_058_RENDER_MARKER_E
+- GARBAGE_JS_058_TEMPLATE_CLASS_F
+- GARBAGE_JS_058_TEMPLATE_MARKER_D
+- GARBAGE_JS_058_WEBHOOK_CLASS_C
+- GARBAGE_JS_058_WEBHOOK_MARKER_A
+- garbage_templating.ts
+- garbage_webhook.ts
+add_garbage_files: false
+skip_garbage_check: true

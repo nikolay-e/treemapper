@@ -1,0 +1,212 @@
+initial:
+  delete_test.py: |
+    def func1():
+        func1_marker = "func1_important"
+        return func1_marker
+
+    def func2_to_delete():
+        x = 1
+        y = 2
+        delete_marker = "this_will_be_deleted"
+        return x + y
+
+    def func3():
+        func3_marker = "func3_important"
+        return func3_marker
+
+    def func4_unchanged():
+        unchanged_value = 42
+        return unchanged_value
+
+    def func5_unchanged():
+        another_unchanged = 99
+        return another_unchanged
+  support_module.py: |
+    def support_helper_alpha():
+        return "support_alpha_value"
+
+    def support_helper_beta():
+        return "support_beta_value"
+
+    def support_helper_gamma():
+        return "support_gamma_value"
+  garbage_sel_002_file.py: |
+    def GARBAGE_SEL_002_func_one():
+        return "GARBAGE_SEL_002_marker_one"
+
+    def GARBAGE_SEL_002_func_two():
+        return "GARBAGE_SEL_002_marker_two"
+
+    def GARBAGE_SEL_002_func_three():
+        return "GARBAGE_SEL_002_marker_three"
+
+    class GARBAGE_SEL_002_Handler:
+        def handle_garbage(self):
+            return "GARBAGE_SEL_002_handler_result"
+
+        def process_garbage(self):
+            return "GARBAGE_SEL_002_process_result"
+  garbage_sel_002_constants.py: |
+    GARBAGE_SEL_002_CONST_ONE = "garbage_sel_002_const_one_value"
+    GARBAGE_SEL_002_CONST_TWO = "garbage_sel_002_const_two_value"
+    GARBAGE_SEL_002_CONST_THREE = "garbage_sel_002_const_three_value"
+    GARBAGE_SEL_002_CONST_FOUR = "garbage_sel_002_const_four_value"
+
+    def GARBAGE_SEL_002_util_func():
+        return "GARBAGE_SEL_002_util_result"
+  # --- Tricky garbage: similar function names but self-contained ---
+  tricky_delete_sibling.py: |
+    GARBAGE_SEL_002_DELETE_SIBLING_A = "delete_sibling_module"
+    GARBAGE_SEL_002_DELETE_VARIANT_B = True
+
+    def sibling_func1_GARBAGE_SEL_002():
+        marker = "func1_copy"
+        return marker
+
+    def sibling_removed_GARBAGE_SEL_002():
+        marker = "also_deleted"
+        return 0
+
+    def sibling_func3_GARBAGE_SEL_002():
+        marker = "func3_copy"
+        return marker
+  # --- Tricky garbage: same body pattern as deleted function ---
+  tricky_delete_consumer.py: |
+    GARBAGE_SEL_002_CONSUMER_REF_C = "delete_consumer"
+    GARBAGE_SEL_002_CONSUMER_FLAG_D = 99
+
+    def consume_deleted_GARBAGE_SEL_002():
+        x = 1
+        y = 2
+        removed_marker = "was_deleted"
+        return x + y
+
+    def consumer_func1_GARBAGE_SEL_002():
+        marker = "func1_important"
+        return marker
+changed:
+  delete_test.py: |
+    def func1():
+        func1_marker = "func1_important"
+        return func1_marker
+
+    def func3():
+        func3_marker = "func3_important"
+        return func3_marker
+
+    def func4_unchanged():
+        unchanged_value = 42
+        return unchanged_value
+
+    def func5_unchanged():
+        another_unchanged = 99
+        return another_unchanged
+  support_module.py: |
+    def support_helper_alpha():
+        return "support_alpha_value"
+
+    def support_helper_beta():
+        return "support_beta_value"
+
+    def support_helper_gamma():
+        return "support_gamma_value"
+  garbage_sel_002_file.py: |
+    def GARBAGE_SEL_002_func_one():
+        return "GARBAGE_SEL_002_marker_one"
+
+    def GARBAGE_SEL_002_func_two():
+        return "GARBAGE_SEL_002_marker_two"
+
+    def GARBAGE_SEL_002_func_three():
+        return "GARBAGE_SEL_002_marker_three"
+
+    class GARBAGE_SEL_002_Handler:
+        def handle_garbage(self):
+            return "GARBAGE_SEL_002_handler_result"
+
+        def process_garbage(self):
+            return "GARBAGE_SEL_002_process_result"
+  garbage_sel_002_constants.py: |
+    GARBAGE_SEL_002_CONST_ONE = "garbage_sel_002_const_one_value"
+    GARBAGE_SEL_002_CONST_TWO = "garbage_sel_002_const_two_value"
+    GARBAGE_SEL_002_CONST_THREE = "garbage_sel_002_const_three_value"
+    GARBAGE_SEL_002_CONST_FOUR = "garbage_sel_002_const_four_value"
+
+    def GARBAGE_SEL_002_util_func():
+        return "GARBAGE_SEL_002_util_result"
+  tricky_delete_sibling.py: |
+    GARBAGE_SEL_002_DELETE_SIBLING_A = "delete_sibling_module"
+    GARBAGE_SEL_002_DELETE_VARIANT_B = True
+
+    def sibling_func1_GARBAGE_SEL_002():
+        marker = "func1_copy"
+        return marker
+
+    def sibling_removed_GARBAGE_SEL_002():
+        marker = "also_deleted"
+        return 0
+
+    def sibling_func3_GARBAGE_SEL_002():
+        marker = "func3_copy"
+        return marker
+  tricky_delete_consumer.py: |
+    GARBAGE_SEL_002_CONSUMER_REF_C = "delete_consumer"
+    GARBAGE_SEL_002_CONSUMER_FLAG_D = 99
+
+    def consume_deleted_GARBAGE_SEL_002():
+        x = 1
+        y = 2
+        removed_marker = "was_deleted"
+        return x + y
+
+    def consumer_func1_GARBAGE_SEL_002():
+        marker = "func1_important"
+        return marker
+
+# === Assertions ===
+
+must_include:
+- func1
+
+must_include_content_from:
+  delete_test.py:
+    - 'def func1():'
+    - func1_marker = "func1_important"
+    - 'def func3():'
+
+must_not_include:
+- func2_to_delete
+- this_will_be_deleted
+# Plain garbage markers
+- GARBAGE_SEL_002_func_one
+- GARBAGE_SEL_002_func_two
+- GARBAGE_SEL_002_func_three
+- GARBAGE_SEL_002_marker_one
+- GARBAGE_SEL_002_marker_two
+- GARBAGE_SEL_002_Handler
+- GARBAGE_SEL_002_handler_result
+- GARBAGE_SEL_002_process_result
+- GARBAGE_SEL_002_CONST_ONE
+- GARBAGE_SEL_002_CONST_TWO
+- garbage_sel_002_const_one_value
+- GARBAGE_SEL_002_util_func
+- GARBAGE_SEL_002_util_result
+- garbage_sel_002_file.py
+- garbage_sel_002_constants.py
+# Tricky: similar function names
+- GARBAGE_SEL_002_DELETE_SIBLING_A
+- GARBAGE_SEL_002_DELETE_VARIANT_B
+# Tricky: same body pattern as deleted function
+- GARBAGE_SEL_002_CONSUMER_REF_C
+- GARBAGE_SEL_002_CONSUMER_FLAG_D
+
+must_not_include_files:
+- garbage_sel_002_file.py
+- garbage_sel_002_constants.py
+- tricky_delete_sibling.py
+- tricky_delete_consumer.py
+
+max_fragments: 4
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

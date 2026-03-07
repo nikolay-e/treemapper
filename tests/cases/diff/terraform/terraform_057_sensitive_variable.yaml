@@ -1,0 +1,95 @@
+initial:
+  variables.tf: |
+    variable "db_password" {
+      type = string
+    }
+
+  # --- Tricky garbage: sibling .tf with sensitive variables for different purpose ---
+  garbage_tf_057_sensitive_api.tf: |
+    GARBAGE_TF_057_SENSITIVE_API_A = "api_secrets"
+    GARBAGE_TF_057_TOKEN_TYPE_B = "bearer"
+
+    variable "stripe_api_key" {
+      type      = string
+      sensitive = true
+    }
+
+    variable "sendgrid_token" {
+      type      = string
+      sensitive = true
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_057_vpc.tf: |
+    GARBAGE_TF_057_VPC_CIDR_C = "10.0.0.0/16"
+    GARBAGE_TF_057_VPC_TENANCY_D = "default"
+
+    resource "aws_vpc" "main" {
+      cidr_block           = "10.0.0.0/16"
+      enable_dns_hostnames = true
+    }
+
+changed:
+  variables.tf: |
+    variable "db_password" {
+      type      = string
+      sensitive = true
+    }
+
+    variable "api_key" {
+      type      = string
+      sensitive = true
+    }
+
+    variable "ssl_certificate" {
+      type      = string
+      sensitive = true
+    }
+
+  garbage_tf_057_sensitive_api.tf: |
+    GARBAGE_TF_057_SENSITIVE_API_A = "api_secrets"
+    GARBAGE_TF_057_TOKEN_TYPE_B = "bearer"
+
+    variable "stripe_api_key" {
+      type      = string
+      sensitive = true
+    }
+
+    variable "sendgrid_token" {
+      type      = string
+      sensitive = true
+    }
+
+  garbage_tf_057_vpc.tf: |
+    GARBAGE_TF_057_VPC_CIDR_C = "10.0.0.0/16"
+    GARBAGE_TF_057_VPC_TENANCY_D = "default"
+
+    resource "aws_vpc" "main" {
+      cidr_block           = "10.0.0.0/16"
+      enable_dns_hostnames = true
+    }
+
+must_include_files:
+- variables.tf
+
+must_include_content_from:
+  variables.tf:
+    - sensitive = true
+    - variable "api_key" {
+    - variable "ssl_certificate" {
+    - variable "db_password" {
+
+must_not_include:
+- GARBAGE_TF_057_SENSITIVE_API_A
+- GARBAGE_TF_057_TOKEN_TYPE_B
+- GARBAGE_TF_057_VPC_CIDR_C
+- GARBAGE_TF_057_VPC_TENANCY_D
+
+must_not_include_files:
+- garbage_tf_057_sensitive_api.tf
+- garbage_tf_057_vpc.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

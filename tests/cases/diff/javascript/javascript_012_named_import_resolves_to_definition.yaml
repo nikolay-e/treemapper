@@ -1,0 +1,89 @@
+initial:
+  utils.ts: |
+    export function fetchUser(id: string): Promise<User> {
+        return fetch(`/api/users/${id}`).then(res => res.json());
+    }
+
+    export function fetchPosts(userId: string): Promise<Post[]> {
+        return fetch(`/api/users/${userId}/posts`).then(res => res.json());
+    }
+  main.ts: |
+    console.log('initial');
+  garbage_telemetry.ts: |
+    const GARBAGE_JS_012_SPAN_MARKER_A = "telemetry";
+    const GARBAGE_JS_012_EXPORT_MARKER_B = true;
+
+    class SpanExporter {
+        static GARBAGE_JS_012_EXPORTER_CLASS_C = "exporter";
+
+        export(spans: string[]): void {
+            // noop
+        }
+    }
+  garbage_retry.ts: |
+    const GARBAGE_JS_012_BACKOFF_MARKER_D = "retry";
+    const GARBAGE_JS_012_DELAY_MARKER_E = 42;
+
+    class ExponentialBackoff {
+        static GARBAGE_JS_012_BACKOFF_CLASS_F = true;
+
+        retry(fn: () => void, attempts: number): void {
+            fn();
+        }
+    }
+changed:
+  utils.ts: |
+    export function fetchUser(id: string): Promise<User> {
+        return fetch(`/api/users/${id}`).then(res => res.json());
+    }
+
+    export function fetchPosts(userId: string): Promise<Post[]> {
+        return fetch(`/api/users/${userId}/posts`).then(res => res.json());
+    }
+  main.ts: |
+    import { fetchUser } from './utils';
+
+    async function main() {
+        const user = await fetchUser('123');
+        console.log(user);
+    }
+
+    main();
+  garbage_telemetry.ts: |
+    const GARBAGE_JS_012_SPAN_MARKER_A = "telemetry";
+    const GARBAGE_JS_012_EXPORT_MARKER_B = true;
+
+    class SpanExporter {
+        static GARBAGE_JS_012_EXPORTER_CLASS_C = "exporter";
+
+        export(spans: string[]): void {
+            // noop
+        }
+    }
+  garbage_retry.ts: |
+    const GARBAGE_JS_012_BACKOFF_MARKER_D = "retry";
+    const GARBAGE_JS_012_DELAY_MARKER_E = 42;
+
+    class ExponentialBackoff {
+        static GARBAGE_JS_012_BACKOFF_CLASS_F = true;
+
+        retry(fn: () => void, attempts: number): void {
+            fn();
+        }
+    }
+must_include_files:
+- main.ts
+must_include_content:
+- import { fetchUser } from './utils';
+- user = await fetchUser('123')
+must_not_include:
+- GARBAGE_JS_012_BACKOFF_CLASS_F
+- GARBAGE_JS_012_BACKOFF_MARKER_D
+- GARBAGE_JS_012_DELAY_MARKER_E
+- GARBAGE_JS_012_EXPORTER_CLASS_C
+- GARBAGE_JS_012_EXPORT_MARKER_B
+- GARBAGE_JS_012_SPAN_MARKER_A
+- garbage_retry.ts
+- garbage_telemetry.ts
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,97 @@
+initial:
+  ecs.tf: |
+    resource "aws_ecs_cluster" "main" {
+      name = "main-cluster"
+    }
+
+  # --- Tricky garbage: same resource type aws_ecs_service but for background workers ---
+  ecs_workers.tf: |
+    GARBAGE_TF_013_WORKER_SVC_A = "background-worker"
+    GARBAGE_TF_013_WORKER_COUNT_B = 4
+
+    resource "aws_ecs_service" "worker" {
+      name            = "worker-service"
+      cluster         = aws_ecs_cluster.main.id
+      task_definition = aws_ecs_task_definition.worker.arn
+      desired_count   = 4
+      launch_type     = "FARGATE"
+
+      network_configuration {
+        subnets         = var.private_subnet_ids
+        security_groups = [aws_security_group.worker.id]
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_deploy_script.sh: |
+    GARBAGE_TF_013_DEPLOY_MARKER_C="deploy-hook"
+    GARBAGE_TF_013_ROLLBACK_FLAG_D=true
+
+    echo "Running deployment script"
+    kubectl apply -f manifests/
+
+changed:
+  ecs.tf: |
+    resource "aws_ecs_cluster" "main" {
+      name = "main-cluster"
+    }
+
+    resource "aws_ecs_service" "app" {
+      name            = "app-service"
+      cluster         = aws_ecs_cluster.main.id
+      task_definition = aws_ecs_task_definition.app.arn
+      desired_count   = 2
+      launch_type     = "FARGATE"
+
+      network_configuration {
+        subnets         = var.subnet_ids
+        security_groups = [aws_security_group.app.id]
+      }
+    }
+
+  ecs_workers.tf: |
+    GARBAGE_TF_013_WORKER_SVC_A = "background-worker"
+    GARBAGE_TF_013_WORKER_COUNT_B = 4
+
+    resource "aws_ecs_service" "worker" {
+      name            = "worker-service"
+      cluster         = aws_ecs_cluster.main.id
+      task_definition = aws_ecs_task_definition.worker.arn
+      desired_count   = 4
+      launch_type     = "FARGATE"
+
+      network_configuration {
+        subnets         = var.private_subnet_ids
+        security_groups = [aws_security_group.worker.id]
+      }
+    }
+
+  garbage_deploy_script.sh: |
+    GARBAGE_TF_013_DEPLOY_MARKER_C="deploy-hook"
+    GARBAGE_TF_013_ROLLBACK_FLAG_D=true
+
+    echo "Running deployment script"
+    kubectl apply -f manifests/
+
+must_include_files:
+- ecs.tf
+
+must_include_content_from:
+  ecs.tf:
+    - resource "aws_ecs_service" "app" {
+    - aws_ecs_cluster.main.id
+
+must_not_include:
+- GARBAGE_TF_013_WORKER_SVC_A
+- GARBAGE_TF_013_WORKER_COUNT_B
+- GARBAGE_TF_013_DEPLOY_MARKER_C
+- GARBAGE_TF_013_ROLLBACK_FLAG_D
+
+must_not_include_files:
+- ecs_workers.tf
+- garbage_deploy_script.sh
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

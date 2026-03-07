@@ -1,0 +1,98 @@
+initial:
+  tests/conftest.py: |
+    import pytest
+
+    @pytest.fixture
+    def db_session():
+        return {"connected": True}
+
+    @pytest.fixture
+    def sample_products():
+        return [
+            {"id": 1, "name": "Widget"},
+            {"id": 2, "name": "Gadget"},
+        ]
+  tests/test_orders.py: |
+    def test_create_order():
+        assert True
+  garbage_backup.py: |
+    GARBAGE_REL_006_BACKUP_MARKER_A = "backup"
+    GARBAGE_REL_006_SNAPSHOT_MARKER_B = True
+
+    class BackupAgent:
+        GARBAGE_REL_006_AGENT_CLASS_C = "daily"
+
+        def create_snapshot(self, target: str) -> str:
+            return ""
+  garbage_monitoring.py: |
+    GARBAGE_REL_006_MONITOR_MARKER_D = "monitoring"
+    GARBAGE_REL_006_ALERT_MARKER_E = 300
+
+    class AlertDispatcher:
+        GARBAGE_REL_006_DISPATCH_CLASS_F = True
+
+        def dispatch(self, severity: str, message: str) -> None:
+            pass
+changed:
+  tests/conftest.py: |
+    import pytest
+
+    @pytest.fixture
+    def db_session():
+        return {"connected": True}
+
+    @pytest.fixture
+    def sample_products():
+        return [
+            {"id": 1, "name": "Widget"},
+            {"id": 2, "name": "Gadget"},
+        ]
+  tests/test_orders.py: |
+    def test_create_order(db_session):
+        assert db_session["connected"]
+
+    def test_bulk_order(db_session, sample_products):
+        assert len(sample_products) == 2
+  garbage_backup.py: |
+    GARBAGE_REL_006_BACKUP_MARKER_A = "backup"
+    GARBAGE_REL_006_SNAPSHOT_MARKER_B = True
+
+    class BackupAgent:
+        GARBAGE_REL_006_AGENT_CLASS_C = "daily"
+
+        def create_snapshot(self, target: str) -> str:
+            return ""
+  garbage_monitoring.py: |
+    GARBAGE_REL_006_MONITOR_MARKER_D = "monitoring"
+    GARBAGE_REL_006_ALERT_MARKER_E = 300
+
+    class AlertDispatcher:
+        GARBAGE_REL_006_DISPATCH_CLASS_F = True
+
+        def dispatch(self, severity: str, message: str) -> None:
+            pass
+must_include_files:
+- tests/test_orders.py
+- tests/conftest.py
+must_include_content:
+- |+
+  def test_create_order(db_session):
+      assert db_session["connected"]
+
+- |2
+
+  def test_bulk_order(db_session, sample_products):
+      assert len(sample_products) == 2
+must_not_include:
+- GARBAGE_REL_006_BACKUP_MARKER_A
+- GARBAGE_REL_006_SNAPSHOT_MARKER_B
+- GARBAGE_REL_006_AGENT_CLASS_C
+- GARBAGE_REL_006_MONITOR_MARKER_D
+- GARBAGE_REL_006_ALERT_MARKER_E
+- GARBAGE_REL_006_DISPATCH_CLASS_F
+- BackupAgent
+- AlertDispatcher
+- garbage_backup.py
+- garbage_monitoring.py
+add_garbage_files: false
+skip_garbage_check: true

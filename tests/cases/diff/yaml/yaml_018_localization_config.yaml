@@ -1,0 +1,89 @@
+initial:
+  config/i18n.yaml: |
+    localization:
+      default_locale: en
+      supported_locales:
+        - en
+        - es
+  src/i18n.py: |
+    class Translator:
+        def __init__(self, default_locale: str = "en"):
+            self.default_locale = default_locale
+            self.translations = {}
+
+        def translate(self, key: str, locale: str = None) -> str:
+            locale = locale or self.default_locale
+            return self.translations.get(locale, {}).get(key, key)
+  garbage_token_bucket.py: |
+    GARBAGE_YAML_018_TOKEN_MARKER_A = "token"
+    GARBAGE_YAML_018_BUCKET_MARKER_B = True
+
+    class TokenBucket:
+        GARBAGE_YAML_018_BUCKET_CLASS_C = "bucket"
+
+        def consume(self, tokens: int) -> bool:
+            return True
+  garbage_bloom_filter.py: |
+    GARBAGE_YAML_018_BLOOM_MARKER_D = "bloom"
+    GARBAGE_YAML_018_HASH_MARKER_E = 42
+
+    class BloomFilter:
+        GARBAGE_YAML_018_FILTER_CLASS_F = True
+
+        def add(self, item: str) -> None:
+            pass
+changed:
+  config/i18n.yaml: |
+    localization:
+      default_locale: en
+      supported_locales:
+        - en
+        - es
+        - fr
+        - de
+  src/i18n.py: |
+    class Translator:
+        def __init__(self, default_locale: str = "en"):
+            self.default_locale = default_locale
+            self.translations = {}
+
+        def translate(self, key: str, locale: str = None) -> str:
+            locale = locale or self.default_locale
+            return self.translations.get(locale, {}).get(key, key)
+  garbage_token_bucket.py: |
+    GARBAGE_YAML_018_TOKEN_MARKER_A = "token"
+    GARBAGE_YAML_018_BUCKET_MARKER_B = True
+
+    class TokenBucket:
+        GARBAGE_YAML_018_BUCKET_CLASS_C = "bucket"
+
+        def consume(self, tokens: int) -> bool:
+            return True
+  garbage_bloom_filter.py: |
+    GARBAGE_YAML_018_BLOOM_MARKER_D = "bloom"
+    GARBAGE_YAML_018_HASH_MARKER_E = 42
+
+    class BloomFilter:
+        GARBAGE_YAML_018_FILTER_CLASS_F = True
+
+        def add(self, item: str) -> None:
+            pass
+must_include_files:
+- config/i18n.yaml
+must_include_content:
+- |2
+      - fr
+      - de
+must_not_include:
+- GARBAGE_YAML_018_TOKEN_MARKER_A
+- GARBAGE_YAML_018_BUCKET_MARKER_B
+- GARBAGE_YAML_018_BUCKET_CLASS_C
+- GARBAGE_YAML_018_BLOOM_MARKER_D
+- GARBAGE_YAML_018_HASH_MARKER_E
+- GARBAGE_YAML_018_FILTER_CLASS_F
+- TokenBucket
+- BloomFilter
+- garbage_token_bucket.py
+- garbage_bloom_filter.py
+add_garbage_files: false
+skip_garbage_check: true

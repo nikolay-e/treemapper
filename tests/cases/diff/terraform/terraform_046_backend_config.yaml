@@ -1,0 +1,98 @@
+initial:
+  main.tf: |
+    terraform {
+    }
+
+    resource "aws_instance" "web" {
+      ami = "ami-12345"
+    }
+
+  # --- Tricky garbage: sibling .tf with terraform block but for provider config ---
+  garbage_tf_046_provider_setup.tf: |
+    GARBAGE_TF_046_PROVIDER_SETUP_A = "provider_setup"
+    GARBAGE_TF_046_PROVIDER_REGION_B = "us-west-2"
+
+    terraform {
+      required_providers {
+        azurerm = {
+          source  = "hashicorp/azurerm"
+          version = "~> 3.0"
+        }
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_046_monitoring.tf: |
+    GARBAGE_TF_046_MONITORING_C = "cloudwatch"
+    GARBAGE_TF_046_ALERT_THRESHOLD_D = 90
+
+    resource "aws_cloudwatch_metric_alarm" "cpu" {
+      alarm_name          = "high-cpu"
+      comparison_operator = "GreaterThanThreshold"
+      threshold           = 80
+    }
+
+changed:
+  main.tf: |
+    terraform {
+      backend "s3" {
+        bucket         = "my-terraform-state"
+        key            = "prod/terraform.tfstate"
+        region         = "us-east-1"
+        encrypt        = true
+        dynamodb_table = "terraform-locks"
+        kms_key_id     = "alias/terraform-state"
+      }
+    }
+
+    resource "aws_instance" "web" {
+      ami = "ami-12345"
+    }
+
+  garbage_tf_046_provider_setup.tf: |
+    GARBAGE_TF_046_PROVIDER_SETUP_A = "provider_setup"
+    GARBAGE_TF_046_PROVIDER_REGION_B = "us-west-2"
+
+    terraform {
+      required_providers {
+        azurerm = {
+          source  = "hashicorp/azurerm"
+          version = "~> 3.0"
+        }
+      }
+    }
+
+  garbage_tf_046_monitoring.tf: |
+    GARBAGE_TF_046_MONITORING_C = "cloudwatch"
+    GARBAGE_TF_046_ALERT_THRESHOLD_D = 90
+
+    resource "aws_cloudwatch_metric_alarm" "cpu" {
+      alarm_name          = "high-cpu"
+      comparison_operator = "GreaterThanThreshold"
+      threshold           = 80
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - backend "s3" {
+    - bucket         = "my-terraform-state"
+    - encrypt        = true
+    - dynamodb_table = "terraform-locks"
+
+must_not_include:
+- GARBAGE_TF_046_PROVIDER_SETUP_A
+- GARBAGE_TF_046_PROVIDER_REGION_B
+- GARBAGE_TF_046_MONITORING_C
+- GARBAGE_TF_046_ALERT_THRESHOLD_D
+
+must_not_include_files:
+- garbage_tf_046_provider_setup.tf
+- garbage_tf_046_monitoring.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

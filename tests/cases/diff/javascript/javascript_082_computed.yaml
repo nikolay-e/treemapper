@@ -1,0 +1,85 @@
+initial:
+  utils.ts: |
+    export function formatName(first: string, last: string): string {
+        return `${first} ${last}`;
+    }
+  Profile.vue: |
+    <template><div>initial</div></template>
+  garbage_profiling.ts: |
+    const GARBAGE_JS_082_PROFILE_MARKER_A = "profiling";
+    const GARBAGE_JS_082_DURATION_MARKER_B = true;
+
+    class PerformanceProfiler {
+        static GARBAGE_JS_082_PROFILER_CLASS_C = "profiler";
+
+        measure(label: string): number {
+            return 0;
+        }
+    }
+  garbage_health_checks.ts: |
+    const GARBAGE_JS_082_HEALTH_MARKER_D = "health_checks";
+    const GARBAGE_JS_082_STATUS_MARKER_E = 200;
+
+    class HealthChecker {
+        static GARBAGE_JS_082_CHECKER_CLASS_F = true;
+
+        ping(service: string): boolean {
+            return true;
+        }
+    }
+changed:
+  utils.ts: |
+    export function formatName(first: string, last: string): string {
+        return `${first} ${last}`;
+    }
+  Profile.vue: |
+    <script setup lang="ts">
+    import { ref, computed } from 'vue';
+    import { formatName } from './utils';
+
+    const firstName = ref('John');
+    const lastName = ref('Doe');
+
+    const fullName = computed(() => formatName(firstName.value, lastName.value));
+    </script>
+
+    <template>
+        <div>{{ fullName }}</div>
+    </template>
+  garbage_profiling.ts: |
+    const GARBAGE_JS_082_PROFILE_MARKER_A = "profiling";
+    const GARBAGE_JS_082_DURATION_MARKER_B = true;
+
+    class PerformanceProfiler {
+        static GARBAGE_JS_082_PROFILER_CLASS_C = "profiler";
+
+        measure(label: string): number {
+            return 0;
+        }
+    }
+  garbage_health_checks.ts: |
+    const GARBAGE_JS_082_HEALTH_MARKER_D = "health_checks";
+    const GARBAGE_JS_082_STATUS_MARKER_E = 200;
+
+    class HealthChecker {
+        static GARBAGE_JS_082_CHECKER_CLASS_F = true;
+
+        ping(service: string): boolean {
+            return true;
+        }
+    }
+must_include_files:
+- Profile.vue
+must_include_content:
+- <script setup lang="ts">
+must_not_include:
+- GARBAGE_JS_082_CHECKER_CLASS_F
+- GARBAGE_JS_082_DURATION_MARKER_B
+- GARBAGE_JS_082_HEALTH_MARKER_D
+- GARBAGE_JS_082_PROFILER_CLASS_C
+- GARBAGE_JS_082_PROFILE_MARKER_A
+- GARBAGE_JS_082_STATUS_MARKER_E
+- garbage_health_checks.ts
+- garbage_profiling.ts
+add_garbage_files: false
+skip_garbage_check: true

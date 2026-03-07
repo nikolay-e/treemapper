@@ -1,0 +1,70 @@
+initial:
+  StringExtensions.swift: |
+    extension String {
+        func isValidEmail() -> Bool {
+            let pattern = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+            return self.range(of: pattern, options: .regularExpression) != nil
+        }
+
+        var trimmed: String {
+            trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+  Validator.swift: |
+    // Initial
+    struct Validator {}
+  GarbageProtocolDefault.swift: |
+    class GarbageProtocolDefault {
+        static let GARBAGE_JVM_064_PROTOCOL_MARKER_A = "marker"
+        static let GARBAGE_JVM_064_DEFAULT_MARKER_B = "marker"
+        func noop() {}
+    }
+  GarbageConformance.swift: |
+    class GarbageConformance {
+        static let GARBAGE_JVM_064_CONFORM_MARKER_C = "marker"
+        static let GARBAGE_JVM_064_WITNESS_MARKER_D = "marker"
+        func noop() {}
+    }
+changed:
+  StringExtensions.swift: |
+    extension String {
+        func isValidEmail() -> Bool {
+            let pattern = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+            return self.range(of: pattern, options: .regularExpression) != nil
+        }
+
+        var trimmed: String {
+            trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+  Validator.swift: |
+    struct Validator {
+        func validateEmail(_ email: String) -> Bool {
+            return email.trimmed.isValidEmail()
+        }
+    }
+  GarbageProtocolDefault.swift: |
+    class GarbageProtocolDefault {
+        static let GARBAGE_JVM_064_PROTOCOL_MARKER_A = "marker"
+        static let GARBAGE_JVM_064_DEFAULT_MARKER_B = "marker"
+        func noop() {}
+    }
+  GarbageConformance.swift: |
+    class GarbageConformance {
+        static let GARBAGE_JVM_064_CONFORM_MARKER_C = "marker"
+        static let GARBAGE_JVM_064_WITNESS_MARKER_D = "marker"
+        func noop() {}
+    }
+must_include_files:
+- Validator.swift
+must_include_content:
+- struct Validator {
+must_not_include:
+- GARBAGE_JVM_064_CONFORM_MARKER_C
+- GARBAGE_JVM_064_DEFAULT_MARKER_B
+- GARBAGE_JVM_064_PROTOCOL_MARKER_A
+- GARBAGE_JVM_064_WITNESS_MARKER_D
+- GarbageConformance.swift
+- GarbageProtocolDefault.swift
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,91 @@
+initial:
+  network.tf: |
+    resource "aws_vpc" "main" {
+      cidr_block = "10.0.0.0/16"
+    }
+
+  # --- Tricky garbage: same resource type aws_subnet but for database tier ---
+  db_network.tf: |
+    GARBAGE_TF_020_DB_SUBNET_A = "database-tier"
+    GARBAGE_TF_020_DB_CIDR_B = "10.0.200.0/24"
+
+    resource "aws_subnet" "database" {
+      count             = 2
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet("10.0.200.0/24", 2, count.index)
+      availability_zone = data.aws_availability_zones.available.names[count.index]
+
+      tags = {
+        Name = "database-subnet-${count.index}"
+        Tier = "database"
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_notification_handler.go: |
+    // GARBAGE_TF_020_NOTIFY_HANDLER_C
+    // GARBAGE_TF_020_NOTIFY_CHANNEL_D
+    package notify
+    func SendAlert(msg string) error { return nil }
+
+changed:
+  network.tf: |
+    resource "aws_vpc" "main" {
+      cidr_block = "10.0.0.0/16"
+    }
+
+    resource "aws_subnet" "private" {
+      count             = 2
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
+      availability_zone = data.aws_availability_zones.available.names[count.index]
+
+      tags = {
+        Name = "private-subnet-${count.index}"
+      }
+    }
+
+  db_network.tf: |
+    GARBAGE_TF_020_DB_SUBNET_A = "database-tier"
+    GARBAGE_TF_020_DB_CIDR_B = "10.0.200.0/24"
+
+    resource "aws_subnet" "database" {
+      count             = 2
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet("10.0.200.0/24", 2, count.index)
+      availability_zone = data.aws_availability_zones.available.names[count.index]
+
+      tags = {
+        Name = "database-subnet-${count.index}"
+        Tier = "database"
+      }
+    }
+
+  garbage_notification_handler.go: |
+    // GARBAGE_TF_020_NOTIFY_HANDLER_C
+    // GARBAGE_TF_020_NOTIFY_CHANNEL_D
+    package notify
+    func SendAlert(msg string) error { return nil }
+
+must_include_files:
+- network.tf
+
+must_include_content_from:
+  network.tf:
+    - resource "aws_subnet" "private" {
+    - aws_vpc.main.cidr_block
+
+must_not_include:
+- GARBAGE_TF_020_DB_SUBNET_A
+- GARBAGE_TF_020_DB_CIDR_B
+- GARBAGE_TF_020_NOTIFY_HANDLER_C
+- GARBAGE_TF_020_NOTIFY_CHANNEL_D
+
+must_not_include_files:
+- db_network.tf
+- garbage_notification_handler.go
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

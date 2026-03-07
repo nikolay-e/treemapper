@@ -1,0 +1,110 @@
+initial:
+  network.tf: |
+    resource "aws_vpc" "main" {
+      cidr_block = "10.0.0.0/16"
+    }
+
+    resource "aws_subnet" "private" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = "10.0.1.0/24"
+    }
+
+  # --- Tricky garbage: same resource type aws_route_table but for public subnet ---
+  public_routes.tf: |
+    GARBAGE_TF_021_PUB_ROUTE_A = "public-routing"
+    GARBAGE_TF_021_PUB_IGW_B = "igw-main"
+
+    resource "aws_route_table" "public" {
+      vpc_id = aws_vpc.main.id
+
+      route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.main.id
+      }
+    }
+
+    resource "aws_route_table_association" "public" {
+      subnet_id      = aws_subnet.public.id
+      route_table_id = aws_route_table.public.id
+    }
+
+  # --- Plain garbage ---
+  garbage_health_checker.py: |
+    GARBAGE_TF_021_HEALTH_CHECK_C = "uptime"
+    GARBAGE_TF_021_HEALTH_INTERVAL_D = 30
+
+    def check_endpoint(url):
+        return 200
+
+changed:
+  network.tf: |
+    resource "aws_vpc" "main" {
+      cidr_block = "10.0.0.0/16"
+    }
+
+    resource "aws_subnet" "private" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = "10.0.1.0/24"
+    }
+
+    resource "aws_route_table" "private" {
+      vpc_id = aws_vpc.main.id
+
+      route {
+        cidr_block     = "0.0.0.0/0"
+        nat_gateway_id = aws_nat_gateway.main.id
+      }
+    }
+
+    resource "aws_route_table_association" "private" {
+      subnet_id      = aws_subnet.private.id
+      route_table_id = aws_route_table.private.id
+    }
+
+  public_routes.tf: |
+    GARBAGE_TF_021_PUB_ROUTE_A = "public-routing"
+    GARBAGE_TF_021_PUB_IGW_B = "igw-main"
+
+    resource "aws_route_table" "public" {
+      vpc_id = aws_vpc.main.id
+
+      route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.main.id
+      }
+    }
+
+    resource "aws_route_table_association" "public" {
+      subnet_id      = aws_subnet.public.id
+      route_table_id = aws_route_table.public.id
+    }
+
+  garbage_health_checker.py: |
+    GARBAGE_TF_021_HEALTH_CHECK_C = "uptime"
+    GARBAGE_TF_021_HEALTH_INTERVAL_D = 30
+
+    def check_endpoint(url):
+        return 200
+
+must_include_files:
+- network.tf
+
+must_include_content_from:
+  network.tf:
+    - resource "aws_route_table" "private" {
+    - aws_nat_gateway.main.id
+
+must_not_include:
+- GARBAGE_TF_021_PUB_ROUTE_A
+- GARBAGE_TF_021_PUB_IGW_B
+- GARBAGE_TF_021_HEALTH_CHECK_C
+- GARBAGE_TF_021_HEALTH_INTERVAL_D
+
+must_not_include_files:
+- public_routes.tf
+- garbage_health_checker.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

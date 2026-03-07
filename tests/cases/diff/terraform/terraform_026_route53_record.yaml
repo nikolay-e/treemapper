@@ -1,0 +1,90 @@
+initial:
+  dns.tf: |
+    resource "aws_route53_zone" "main" {
+      name = "example.com"
+    }
+
+  # --- Tricky garbage: same resource type aws_route53_record but for MX records ---
+  mail_records.tf: |
+    GARBAGE_TF_026_MAIL_REC_A = "mx-records"
+    GARBAGE_TF_026_MAIL_PRI_B = 10
+
+    resource "aws_route53_record" "mx" {
+      zone_id = aws_route53_zone.main.zone_id
+      name    = "example.com"
+      type    = "MX"
+      ttl     = 3600
+
+      records = [
+        "10 mail.example.com",
+        "20 mail2.example.com",
+      ]
+    }
+
+  # --- Plain garbage ---
+  garbage_token_refresh.ts: |
+    // GARBAGE_TF_026_TOKEN_REFRESH_C
+    // GARBAGE_TF_026_TOKEN_EXPIRY_D
+    const refreshToken = async (token: string): Promise<string> => token;
+
+changed:
+  dns.tf: |
+    resource "aws_route53_zone" "main" {
+      name = "example.com"
+    }
+
+    resource "aws_route53_record" "api" {
+      zone_id = aws_route53_zone.main.zone_id
+      name    = "api.example.com"
+      type    = "A"
+
+      alias {
+        name                   = aws_lb.main.dns_name
+        zone_id                = aws_lb.main.zone_id
+        evaluate_target_health = true
+      }
+    }
+
+  mail_records.tf: |
+    GARBAGE_TF_026_MAIL_REC_A = "mx-records"
+    GARBAGE_TF_026_MAIL_PRI_B = 10
+
+    resource "aws_route53_record" "mx" {
+      zone_id = aws_route53_zone.main.zone_id
+      name    = "example.com"
+      type    = "MX"
+      ttl     = 3600
+
+      records = [
+        "10 mail.example.com",
+        "20 mail2.example.com",
+      ]
+    }
+
+  garbage_token_refresh.ts: |
+    // GARBAGE_TF_026_TOKEN_REFRESH_C
+    // GARBAGE_TF_026_TOKEN_EXPIRY_D
+    const refreshToken = async (token: string): Promise<string> => token;
+
+must_include_files:
+- dns.tf
+
+must_include_content_from:
+  dns.tf:
+    - resource "aws_route53_record" "api" {
+    - aws_lb.main.dns_name
+
+must_not_include:
+- GARBAGE_TF_026_MAIL_REC_A
+- GARBAGE_TF_026_MAIL_PRI_B
+- GARBAGE_TF_026_TOKEN_REFRESH_C
+- GARBAGE_TF_026_TOKEN_EXPIRY_D
+
+must_not_include_files:
+- mail_records.tf
+- garbage_token_refresh.ts
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

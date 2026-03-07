@@ -1,0 +1,228 @@
+initial:
+  mod00.py: |
+    def func00():
+        return 0
+  mod01.py: |
+    def func01():
+        return 1
+  mod02.py: |
+    def func02():
+        return 2
+  mod03.py: |
+    def func03():
+        return 3
+  mod04.py: |
+    def func04():
+        return 4
+  mod05.py: |
+    def func05():
+        return 5
+  mod06.py: |
+    def func06():
+        return 6
+  mod07.py: |
+    def func07():
+        return 7
+  mod08.py: |
+    def func08():
+        return 8
+  mod09.py: |
+    def func09():
+        return 9
+  mod10.py: |
+    def func10():
+        return 10
+  mod11.py: |
+    def func11():
+        return 11
+  mod12.py: |
+    def func12():
+        return 12
+  mod13.py: |
+    def func13():
+        return 13
+  mod14.py: |
+    def func14():
+        return 14
+  mod15.py: |
+    def func15():
+        return 15
+  mod16.py: |
+    def func16():
+        return 16
+  mod17.py: |
+    def func17():
+        return 17
+  mod18.py: |
+    def func18():
+        return 18
+  mod19.py: |
+    def func19():
+        return 19
+
+  # --- Tricky garbage: same func00 name, returns 1000 like changed diff ---
+  garbage_func00_dup.py: |
+    GARBAGE_PPR032_DUP00_A = "dup00"
+    GARBAGE_PPR032_DUP00_B = True
+
+    def func00():
+        return 1000
+
+    def func00_helper():
+        GARBAGE_PPR032_HELPER_C = 42
+        return func00()
+
+  # --- Tricky garbage: same func10 name, returns 1010 like changed diff ---
+  garbage_func10_dup.py: |
+    GARBAGE_PPR032_DUP10_D = "dup10"
+    GARBAGE_PPR032_DUP10_E = False
+
+    def func10():
+        return 1010
+
+    class Mod10Processor:
+        GARBAGE_PPR032_PROC_F = 99
+
+        def process(self):
+            return func10()
+
+  # --- Tricky garbage: modNN naming pattern, structural sibling ---
+  garbage_mod_registry.py: |
+    GARBAGE_PPR032_REGISTRY_G = "registry"
+    GARBAGE_PPR032_REGISTRY_H = 0
+
+    def mod_registry():
+        return [func00, func10]
+
+    def mod_lookup(n):
+        return n
+
+changed:
+  mod00.py: |
+    def func00():
+        return 1000
+  mod01.py: |
+    def func01():
+        return 1
+  mod02.py: |
+    def func02():
+        return 2
+  mod03.py: |
+    def func03():
+        return 3
+  mod04.py: |
+    def func04():
+        return 4
+  mod05.py: |
+    def func05():
+        return 5
+  mod06.py: |
+    def func06():
+        return 6
+  mod07.py: |
+    def func07():
+        return 7
+  mod08.py: |
+    def func08():
+        return 8
+  mod09.py: |
+    def func09():
+        return 9
+  mod10.py: |
+    def func10():
+        return 1010
+  mod11.py: |
+    def func11():
+        return 11
+  mod12.py: |
+    def func12():
+        return 12
+  mod13.py: |
+    def func13():
+        return 13
+  mod14.py: |
+    def func14():
+        return 14
+  mod15.py: |
+    def func15():
+        return 15
+  mod16.py: |
+    def func16():
+        return 16
+  mod17.py: |
+    def func17():
+        return 17
+  mod18.py: |
+    def func18():
+        return 18
+  mod19.py: |
+    def func19():
+        return 19
+  garbage_func00_dup.py: |
+    GARBAGE_PPR032_DUP00_A = "dup00"
+    GARBAGE_PPR032_DUP00_B = True
+
+    def func00():
+        return 1000
+
+    def func00_helper():
+        GARBAGE_PPR032_HELPER_C = 42
+        return func00()
+  garbage_func10_dup.py: |
+    GARBAGE_PPR032_DUP10_D = "dup10"
+    GARBAGE_PPR032_DUP10_E = False
+
+    def func10():
+        return 1010
+
+    class Mod10Processor:
+        GARBAGE_PPR032_PROC_F = 99
+
+        def process(self):
+            return func10()
+  garbage_mod_registry.py: |
+    GARBAGE_PPR032_REGISTRY_G = "registry"
+    GARBAGE_PPR032_REGISTRY_H = 0
+
+    def mod_registry():
+        return [func00, func10]
+
+    def mod_lookup(n):
+        return n
+
+# === Assertions ===
+
+must_include_files:
+- mod00.py
+- mod10.py
+
+must_include_content_from:
+  mod00.py:
+    - 'def func00():'
+    - return 1000
+  mod10.py:
+    - 'def func10():'
+    - return 1010
+
+must_not_include:
+# Tricky: same func00 name, returns 1000
+- GARBAGE_PPR032_DUP00_A
+- GARBAGE_PPR032_DUP00_B
+- GARBAGE_PPR032_HELPER_C
+# Tricky: same func10 name, returns 1010
+- GARBAGE_PPR032_DUP10_D
+- GARBAGE_PPR032_DUP10_E
+- GARBAGE_PPR032_PROC_F
+# Tricky: references func00 and func10
+- GARBAGE_PPR032_REGISTRY_G
+- GARBAGE_PPR032_REGISTRY_H
+
+must_not_include_files:
+- garbage_func00_dup.py
+- garbage_func10_dup.py
+- garbage_mod_registry.py
+
+max_fragments: 6
+max_files: 4
+add_garbage_files: false
+skip_garbage_check: true

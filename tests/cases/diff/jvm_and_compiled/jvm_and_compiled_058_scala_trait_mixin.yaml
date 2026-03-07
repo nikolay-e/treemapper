@@ -1,0 +1,72 @@
+initial:
+  Logging.scala: |
+    trait Logging {
+      def log(message: String): Unit = println(s"[LOG] $message")
+      def debug(message: String): Unit = println(s"[DEBUG] $message")
+    }
+  Metrics.scala: |
+    trait Metrics {
+      def recordMetric(name: String, value: Double): Unit = {
+        println(s"Metric: $name = $value")
+      }
+    }
+  Service.scala: |
+    // Initial
+    class Service {}
+  GarbageCakePattern.scala: |
+    object GarbageCakePattern {
+      val GARBAGE_JVM_058_CAKE_MARKER_A = "marker"
+      val GARBAGE_JVM_058_LAYER_MARKER_B = "marker"
+      def noop(): Unit = {}
+    }
+  GarbageModuleLoader.scala: |
+    object GarbageModuleLoader {
+      val GARBAGE_JVM_058_MODULE_MARKER_C = "marker"
+      val GARBAGE_JVM_058_COMPONENT_MARKER_D = "marker"
+      def noop(): Unit = {}
+    }
+changed:
+  Logging.scala: |
+    trait Logging {
+      def log(message: String): Unit = println(s"[LOG] $message")
+      def debug(message: String): Unit = println(s"[DEBUG] $message")
+    }
+  Metrics.scala: |
+    trait Metrics {
+      def recordMetric(name: String, value: Double): Unit = {
+        println(s"Metric: $name = $value")
+      }
+    }
+  Service.scala: |
+    class Service extends Logging with Metrics {
+      def process(data: String): Unit = {
+        log(s"Processing: $data")
+        recordMetric("process_count", 1.0)
+        debug("Process complete")
+      }
+    }
+  GarbageCakePattern.scala: |
+    object GarbageCakePattern {
+      val GARBAGE_JVM_058_CAKE_MARKER_A = "marker"
+      val GARBAGE_JVM_058_LAYER_MARKER_B = "marker"
+      def noop(): Unit = {}
+    }
+  GarbageModuleLoader.scala: |
+    object GarbageModuleLoader {
+      val GARBAGE_JVM_058_MODULE_MARKER_C = "marker"
+      val GARBAGE_JVM_058_COMPONENT_MARKER_D = "marker"
+      def noop(): Unit = {}
+    }
+must_include_files:
+- Service.scala
+must_include_content:
+- class Service extends Logging with Metrics {
+must_not_include:
+- GARBAGE_JVM_058_CAKE_MARKER_A
+- GARBAGE_JVM_058_COMPONENT_MARKER_D
+- GARBAGE_JVM_058_LAYER_MARKER_B
+- GARBAGE_JVM_058_MODULE_MARKER_C
+- GarbageCakePattern.scala
+- GarbageModuleLoader.scala
+add_garbage_files: false
+skip_garbage_check: true

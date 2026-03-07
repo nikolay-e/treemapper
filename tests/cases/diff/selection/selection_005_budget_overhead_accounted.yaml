@@ -1,0 +1,238 @@
+initial:
+  overhead.py: |
+    def func():
+        original_marker = "func_original_state"
+        return original_marker
+  auxiliary_one.py: |
+    def aux_func_one():
+        return "aux_one_result"
+
+    def aux_func_two():
+        return "aux_two_result"
+  auxiliary_two.py: |
+    def aux_func_three():
+        return "aux_three_result"
+
+    def aux_func_four():
+        return "aux_four_result"
+  garbage_sel_005_large_file.py: |
+    def GARBAGE_SEL_005_large_func_alpha():
+        result = []
+        for i in range(100):
+            result.append(f"GARBAGE_SEL_005_large_alpha_{i}")
+        return result
+
+    def GARBAGE_SEL_005_large_func_beta():
+        result = []
+        for i in range(100):
+            result.append(f"GARBAGE_SEL_005_large_beta_{i}")
+        return result
+
+    def GARBAGE_SEL_005_large_func_gamma():
+        result = []
+        for i in range(100):
+            result.append(f"GARBAGE_SEL_005_large_gamma_{i}")
+        return result
+
+    class GARBAGE_SEL_005_LargeClass:
+        def method_one(self):
+            return "GARBAGE_SEL_005_large_class_one"
+
+        def method_two(self):
+            return "GARBAGE_SEL_005_large_class_two"
+
+        def method_three(self):
+            return "GARBAGE_SEL_005_large_class_three"
+  garbage_sel_005_config.py: |
+    GARBAGE_SEL_005_BUDGET_CONFIG = {
+        "limit_one": "GARBAGE_SEL_005_limit_one_value",
+        "limit_two": "GARBAGE_SEL_005_limit_two_value",
+        "limit_three": "GARBAGE_SEL_005_limit_three_value",
+    }
+
+    GARBAGE_SEL_005_OVERHEAD_SETTINGS = [
+        "GARBAGE_SEL_005_setting_alpha",
+        "GARBAGE_SEL_005_setting_beta",
+        "GARBAGE_SEL_005_setting_gamma",
+    ]
+
+    def GARBAGE_SEL_005_get_config():
+        return "GARBAGE_SEL_005_config_result"
+  garbage_sel_005_extras.py: |
+    def GARBAGE_SEL_005_extra_one():
+        return "GARBAGE_SEL_005_extra_one_result"
+
+    def GARBAGE_SEL_005_extra_two():
+        return "GARBAGE_SEL_005_extra_two_result"
+
+    def GARBAGE_SEL_005_extra_three():
+        return "GARBAGE_SEL_005_extra_three_result"
+  # --- Tricky garbage: similar func pattern but fully suffixed ---
+  tricky_overhead_twin.py: |
+    GARBAGE_SEL_005_TWIN_OVERHEAD_A = "overhead_twin_module"
+    GARBAGE_SEL_005_TWIN_MARKER_B = True
+
+    def twin_func_GARBAGE_SEL_005():
+        twin_marker = "twin_modified_state"
+        return twin_marker
+
+    def twin_helper_GARBAGE_SEL_005():
+        prev_marker = "twin_previous_state"
+        return prev_marker
+  # --- Tricky garbage: cost estimation vocabulary ---
+  tricky_budget_calc.py: |
+    GARBAGE_SEL_005_BUDGET_CALC_C = "budget_calculator"
+    GARBAGE_SEL_005_BUDGET_LIMIT_D = 1000
+
+    def estimate_cost_GARBAGE_SEL_005(quantity):
+        total = quantity * 0.2
+        return total
+
+    def project_spend_GARBAGE_SEL_005():
+        spend_label = "spend_estimate_copy"
+        return spend_label
+changed:
+  overhead.py: |
+    def func():
+        modified_marker = "func_modified_state"
+        return modified_marker
+  auxiliary_one.py: |
+    def aux_func_one():
+        return "aux_one_result"
+
+    def aux_func_two():
+        return "aux_two_result"
+  auxiliary_two.py: |
+    def aux_func_three():
+        return "aux_three_result"
+
+    def aux_func_four():
+        return "aux_four_result"
+  garbage_sel_005_large_file.py: |
+    def GARBAGE_SEL_005_large_func_alpha():
+        result = []
+        for i in range(100):
+            result.append(f"GARBAGE_SEL_005_large_alpha_{i}")
+        return result
+
+    def GARBAGE_SEL_005_large_func_beta():
+        result = []
+        for i in range(100):
+            result.append(f"GARBAGE_SEL_005_large_beta_{i}")
+        return result
+
+    def GARBAGE_SEL_005_large_func_gamma():
+        result = []
+        for i in range(100):
+            result.append(f"GARBAGE_SEL_005_large_gamma_{i}")
+        return result
+
+    class GARBAGE_SEL_005_LargeClass:
+        def method_one(self):
+            return "GARBAGE_SEL_005_large_class_one"
+
+        def method_two(self):
+            return "GARBAGE_SEL_005_large_class_two"
+
+        def method_three(self):
+            return "GARBAGE_SEL_005_large_class_three"
+  garbage_sel_005_config.py: |
+    GARBAGE_SEL_005_BUDGET_CONFIG = {
+        "limit_one": "GARBAGE_SEL_005_limit_one_value",
+        "limit_two": "GARBAGE_SEL_005_limit_two_value",
+        "limit_three": "GARBAGE_SEL_005_limit_three_value",
+    }
+
+    GARBAGE_SEL_005_OVERHEAD_SETTINGS = [
+        "GARBAGE_SEL_005_setting_alpha",
+        "GARBAGE_SEL_005_setting_beta",
+        "GARBAGE_SEL_005_setting_gamma",
+    ]
+
+    def GARBAGE_SEL_005_get_config():
+        return "GARBAGE_SEL_005_config_result"
+  garbage_sel_005_extras.py: |
+    def GARBAGE_SEL_005_extra_one():
+        return "GARBAGE_SEL_005_extra_one_result"
+
+    def GARBAGE_SEL_005_extra_two():
+        return "GARBAGE_SEL_005_extra_two_result"
+
+    def GARBAGE_SEL_005_extra_three():
+        return "GARBAGE_SEL_005_extra_three_result"
+  tricky_overhead_twin.py: |
+    GARBAGE_SEL_005_TWIN_OVERHEAD_A = "overhead_twin_module"
+    GARBAGE_SEL_005_TWIN_MARKER_B = True
+
+    def twin_func_GARBAGE_SEL_005():
+        twin_marker = "twin_modified_state"
+        return twin_marker
+
+    def twin_helper_GARBAGE_SEL_005():
+        prev_marker = "twin_previous_state"
+        return prev_marker
+  tricky_budget_calc.py: |
+    GARBAGE_SEL_005_BUDGET_CALC_C = "budget_calculator"
+    GARBAGE_SEL_005_BUDGET_LIMIT_D = 1000
+
+    def estimate_cost_GARBAGE_SEL_005(quantity):
+        total = quantity * 0.2
+        return total
+
+    def project_spend_GARBAGE_SEL_005():
+        spend_label = "spend_estimate_copy"
+        return spend_label
+
+# === Assertions ===
+
+must_include:
+- func
+- func_modified_state
+
+must_include_content_from:
+  overhead.py:
+    - 'def func():'
+    - modified_marker = "func_modified_state"
+    - return modified_marker
+
+must_not_include:
+- func_original_state
+# Plain garbage markers
+- GARBAGE_SEL_005_large_func_alpha
+- GARBAGE_SEL_005_large_func_beta
+- GARBAGE_SEL_005_large_func_gamma
+- GARBAGE_SEL_005_large_alpha
+- GARBAGE_SEL_005_large_beta
+- GARBAGE_SEL_005_LargeClass
+- GARBAGE_SEL_005_large_class_one
+- GARBAGE_SEL_005_BUDGET_CONFIG
+- GARBAGE_SEL_005_limit_one_value
+- GARBAGE_SEL_005_OVERHEAD_SETTINGS
+- GARBAGE_SEL_005_setting_alpha
+- GARBAGE_SEL_005_get_config
+- GARBAGE_SEL_005_config_result
+- GARBAGE_SEL_005_extra_one
+- GARBAGE_SEL_005_extra_two
+- GARBAGE_SEL_005_extra_three
+- GARBAGE_SEL_005_extra_one_result
+- garbage_sel_005_large_file.py
+- garbage_sel_005_config.py
+- garbage_sel_005_extras.py
+# Tricky: similar func pattern
+- GARBAGE_SEL_005_TWIN_OVERHEAD_A
+- GARBAGE_SEL_005_TWIN_MARKER_B
+# Tricky: budget/overhead vocabulary
+- GARBAGE_SEL_005_BUDGET_CALC_C
+- GARBAGE_SEL_005_BUDGET_LIMIT_D
+
+must_not_include_files:
+- garbage_sel_005_large_file.py
+- garbage_sel_005_config.py
+- garbage_sel_005_extras.py
+- tricky_overhead_twin.py
+- tricky_budget_calc.py
+
+max_fragments: 4
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

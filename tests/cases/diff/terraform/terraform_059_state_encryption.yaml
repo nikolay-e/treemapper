@@ -1,0 +1,95 @@
+initial:
+  backend.tf: |
+    terraform {
+      backend "s3" {
+        bucket = "my-terraform-state"
+        key    = "terraform.tfstate"
+        region = "us-east-1"
+      }
+    }
+
+  # --- Tricky garbage: sibling .tf with backend block for different environment ---
+  garbage_tf_059_backend_staging.tf: |
+    GARBAGE_TF_059_BACKEND_STAGING_A = "staging_state"
+    GARBAGE_TF_059_STATE_BUCKET_B = "staging-tf-state"
+
+    terraform {
+      backend "s3" {
+        bucket         = "staging-terraform-state"
+        key            = "staging/terraform.tfstate"
+        region         = "eu-west-1"
+        encrypt        = true
+        dynamodb_table = "staging-state-lock"
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_059_logs.tf: |
+    GARBAGE_TF_059_LOG_GROUP_C = "/app/production"
+    GARBAGE_TF_059_RETENTION_D = 30
+
+    resource "aws_cloudwatch_log_group" "app" {
+      name              = "/app/production"
+      retention_in_days = 30
+    }
+
+changed:
+  backend.tf: |
+    terraform {
+      backend "s3" {
+        bucket         = "my-terraform-state"
+        key            = "terraform.tfstate"
+        region         = "us-east-1"
+        encrypt        = true
+        kms_key_id     = "arn:aws:kms:us-east-1:123456789:key/abc123"
+        dynamodb_table = "terraform-state-lock"
+      }
+    }
+
+  garbage_tf_059_backend_staging.tf: |
+    GARBAGE_TF_059_BACKEND_STAGING_A = "staging_state"
+    GARBAGE_TF_059_STATE_BUCKET_B = "staging-tf-state"
+
+    terraform {
+      backend "s3" {
+        bucket         = "staging-terraform-state"
+        key            = "staging/terraform.tfstate"
+        region         = "eu-west-1"
+        encrypt        = true
+        dynamodb_table = "staging-state-lock"
+      }
+    }
+
+  garbage_tf_059_logs.tf: |
+    GARBAGE_TF_059_LOG_GROUP_C = "/app/production"
+    GARBAGE_TF_059_RETENTION_D = 30
+
+    resource "aws_cloudwatch_log_group" "app" {
+      name              = "/app/production"
+      retention_in_days = 30
+    }
+
+must_include_files:
+- backend.tf
+
+must_include_content_from:
+  backend.tf:
+    - encrypt        = true
+    - kms_key_id     = "arn:aws:kms:us-east-1:123456789:key/abc123"
+    - dynamodb_table = "terraform-state-lock"
+    - bucket         = "my-terraform-state"
+
+must_not_include:
+- GARBAGE_TF_059_BACKEND_STAGING_A
+- GARBAGE_TF_059_STATE_BUCKET_B
+- GARBAGE_TF_059_LOG_GROUP_C
+- GARBAGE_TF_059_RETENTION_D
+
+must_not_include_files:
+- garbage_tf_059_backend_staging.tf
+- garbage_tf_059_logs.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

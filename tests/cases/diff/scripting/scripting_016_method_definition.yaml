@@ -1,0 +1,37 @@
+initial:
+  processor.rb: |
+    class Processor
+      def process(data)
+        data.upcase
+      end
+    end
+  app.rb: |
+    # Initial file
+    puts 'Hello'
+  garbage.rb: |
+    garbage_marker_12345 = "never used"
+    unused_marker_67890 = "not used"
+changed:
+  processor.rb: |
+    class Processor
+      def process(data)
+        data.upcase
+      end
+    end
+  app.rb: |
+    require_relative 'processor'
+
+    processor = Processor.new
+    result = processor.process("hello")
+    puts result
+  garbage.rb: |
+    garbage_marker_12345 = "never used"
+    unused_marker_67890 = "not used"
+must_include:
+- app.rb
+- process
+must_not_include:
+- garbage_marker_12345
+- unused_marker_67890
+add_garbage_files: false
+skip_garbage_check: true

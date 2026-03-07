@@ -1,0 +1,129 @@
+initial:
+  isolated1.py: |
+    def isolated1():
+        return 1
+  isolated2.py: |
+    def isolated2():
+        return 2
+  isolated3.py: |
+    def isolated3():
+        return 3
+
+  # --- Tricky garbage: also defines isolated1 but different module, no import ---
+  garbage_alt_isolated.py: |
+    GARBAGE_PPR_023_ALT_ISO_A = "alt_isolated"
+    GARBAGE_PPR_023_ALT_RET_B = 1
+
+    def isolated1():
+        return "alternate_isolated"
+
+    class IsolatedGroup:
+        GARBAGE_PPR_023_ALT_GROUP_C = True
+
+        def run_all(self):
+            return isolated1()
+
+  # --- Tricky garbage: structural sibling isolated4 matching naming ---
+  garbage_isolated4.py: |
+    GARBAGE_PPR_023_ISO4_INIT_D = "isolated4"
+    GARBAGE_PPR_023_ISO4_FLAG_E = True
+
+    def isolated4():
+        return 4
+
+    class Isolated4Runner:
+        GARBAGE_PPR_023_ISO4_RUN_F = 44
+
+        def execute(self):
+            return isolated4()
+
+  # --- Plain garbage: no overlap ---
+  garbage_template.py: |
+    GARBAGE_PPR_023_TMPL_ENGINE_G = "jinja2"
+    GARBAGE_PPR_023_TMPL_EXT_H = ".html"
+
+    class TemplateRenderer:
+        def render(self, template: str):
+            pass
+
+changed:
+  isolated1.py: |
+    def isolated1():
+        return 100
+  isolated2.py: |
+    def isolated2():
+        return 2
+  isolated3.py: |
+    def isolated3():
+        return 3
+
+  garbage_alt_isolated.py: |
+    GARBAGE_PPR_023_ALT_ISO_A = "alt_isolated"
+    GARBAGE_PPR_023_ALT_RET_B = 1
+
+    def isolated1():
+        return "alternate_isolated"
+
+    class IsolatedGroup:
+        GARBAGE_PPR_023_ALT_GROUP_C = True
+
+        def run_all(self):
+            return isolated1()
+
+  garbage_isolated4.py: |
+    GARBAGE_PPR_023_ISO4_INIT_D = "isolated4"
+    GARBAGE_PPR_023_ISO4_FLAG_E = True
+
+    def isolated4():
+        return 4
+
+    class Isolated4Runner:
+        GARBAGE_PPR_023_ISO4_RUN_F = 44
+
+        def execute(self):
+            return isolated4()
+
+  garbage_template.py: |
+    GARBAGE_PPR_023_TMPL_ENGINE_G = "jinja2"
+    GARBAGE_PPR_023_TMPL_EXT_H = ".html"
+
+    class TemplateRenderer:
+        def render(self, template: str):
+            pass
+
+# === Assertions ===
+
+must_include:
+- isolated1
+- return 100
+
+must_include_files:
+- isolated1.py
+
+must_include_content_from:
+  isolated1.py:
+    - 'def isolated1():'
+    - return 100
+
+must_not_include:
+# Plain garbage markers
+- GARBAGE_PPR_023_TMPL_ENGINE_G
+- GARBAGE_PPR_023_TMPL_EXT_H
+# Tricky: also defines isolated1
+- GARBAGE_PPR_023_ALT_ISO_A
+- GARBAGE_PPR_023_ALT_RET_B
+- GARBAGE_PPR_023_ALT_GROUP_C
+# Tricky: structural sibling isolated4
+- GARBAGE_PPR_023_ISO4_INIT_D
+- GARBAGE_PPR_023_ISO4_FLAG_E
+- GARBAGE_PPR_023_ISO4_RUN_F
+
+must_not_include_files:
+- garbage_alt_isolated.py
+- garbage_isolated4.py
+- garbage_template.py
+
+max_fragments: 4
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

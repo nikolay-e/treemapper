@@ -1,0 +1,124 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      subnet_id = "subnet-12345"
+    }
+  # --- Tricky garbage: sibling .tf with same terraform_remote_state pattern for a different state ---
+  database/remote_state_GARBAGE_TF_043_A.tf: |
+    # GARBAGE_TF_043_DB_REMOTE_A - Database remote state lookup
+    data "terraform_remote_state" "database_GARBAGE_TF_043_A" {
+      backend = "s3"
+      config = {
+        bucket = "terraform-state-GARBAGE_TF_043_A"
+        key    = "database/terraform.tfstate"
+        region = "us-east-1"
+      }
+    }
+
+    # GARBAGE_TF_043_DB_SUBNET_B
+    resource "aws_db_subnet_group" "main_GARBAGE_TF_043_B" {
+      name       = "db-subnet-GARBAGE_TF_043_B"
+      subnet_ids = data.terraform_remote_state.database_GARBAGE_TF_043_A.outputs.subnet_ids
+    }
+  # --- Plain garbage: unrelated CDN config ---
+  cdn/cloudfront_GARBAGE_TF_043_C.tf: |
+    # GARBAGE_TF_043_CDN_CF_C - CloudFront distribution
+    resource "aws_cloudfront_distribution" "static_GARBAGE_TF_043_C" {
+      enabled             = true
+      default_root_object = "index.html"
+
+      origin {
+        domain_name = "static-assets-GARBAGE_TF_043_C.s3.amazonaws.com"
+        origin_id   = "s3-static-GARBAGE_TF_043_C"
+      }
+
+      default_cache_behavior {
+        allowed_methods  = ["GET", "HEAD"]
+        cached_methods   = ["GET", "HEAD"]
+        target_origin_id = "s3-static-GARBAGE_TF_043_C"
+        viewer_protocol_policy = "redirect-to-https"
+      }
+
+      tags = {
+        Name = "static-cdn-GARBAGE_TF_043_C"
+        Team = "frontend-GARBAGE_TF_043_CDN_D"
+      }
+    }
+
+changed:
+  main.tf: |
+    data "terraform_remote_state" "vpc" {
+      backend = "s3"
+      config = {
+        bucket = "terraform-state"
+        key    = "vpc/terraform.tfstate"
+        region = "us-east-1"
+      }
+    }
+
+    resource "aws_instance" "web" {
+      subnet_id = data.terraform_remote_state.vpc.outputs.subnet_id
+    }
+  database/remote_state_GARBAGE_TF_043_A.tf: |
+    # GARBAGE_TF_043_DB_REMOTE_A - Database remote state lookup
+    data "terraform_remote_state" "database_GARBAGE_TF_043_A" {
+      backend = "s3"
+      config = {
+        bucket = "terraform-state-GARBAGE_TF_043_A"
+        key    = "database/terraform.tfstate"
+        region = "us-east-1"
+      }
+    }
+
+    # GARBAGE_TF_043_DB_SUBNET_B
+    resource "aws_db_subnet_group" "main_GARBAGE_TF_043_B" {
+      name       = "db-subnet-GARBAGE_TF_043_B"
+      subnet_ids = data.terraform_remote_state.database_GARBAGE_TF_043_A.outputs.subnet_ids
+    }
+  cdn/cloudfront_GARBAGE_TF_043_C.tf: |
+    # GARBAGE_TF_043_CDN_CF_C - CloudFront distribution
+    resource "aws_cloudfront_distribution" "static_GARBAGE_TF_043_C" {
+      enabled             = true
+      default_root_object = "index.html"
+
+      origin {
+        domain_name = "static-assets-GARBAGE_TF_043_C.s3.amazonaws.com"
+        origin_id   = "s3-static-GARBAGE_TF_043_C"
+      }
+
+      default_cache_behavior {
+        allowed_methods  = ["GET", "HEAD"]
+        cached_methods   = ["GET", "HEAD"]
+        target_origin_id = "s3-static-GARBAGE_TF_043_C"
+        viewer_protocol_policy = "redirect-to-https"
+      }
+
+      tags = {
+        Name = "static-cdn-GARBAGE_TF_043_C"
+        Team = "frontend-GARBAGE_TF_043_CDN_D"
+      }
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - data "terraform_remote_state" "vpc" {
+    - key    = "vpc/terraform.tfstate"
+    - data.terraform_remote_state.vpc.outputs.subnet_id
+
+must_not_include:
+- GARBAGE_TF_043_DB_REMOTE_A
+- GARBAGE_TF_043_B
+- GARBAGE_TF_043_CDN_CF_C
+- GARBAGE_TF_043_CDN_D
+
+must_not_include_files:
+- database/remote_state_GARBAGE_TF_043_A.tf
+- cdn/cloudfront_GARBAGE_TF_043_C.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

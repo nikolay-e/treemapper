@@ -1,0 +1,43 @@
+initial:
+  user.rb: |
+    class User
+      attr_accessor :name, :email
+
+      def initialize(name:, email:)
+        @name = name
+        @email = email
+      end
+    end
+  app.rb: |
+    # Initial
+    puts 'Hello'
+  garbage.rb: |
+    garbage_user_unused_99999 = "never accessed"
+    unused_marker_12345 = "not used"
+changed:
+  user.rb: |
+    class User
+      attr_accessor :name, :email
+
+      def initialize(name:, email:)
+        @name = name
+        @email = email
+      end
+    end
+  app.rb: |
+    require_relative 'user'
+
+    user = User.new(name: 'John', email: 'john@example.com')
+    puts user.name
+    user.email = 'new@example.com'
+  garbage.rb: |
+    garbage_user_unused_99999 = "never accessed"
+    unused_marker_12345 = "not used"
+must_include:
+- app.rb
+- name
+must_not_include:
+- garbage_user_unused_99999
+- unused_marker_12345
+add_garbage_files: false
+skip_garbage_check: true

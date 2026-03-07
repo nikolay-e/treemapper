@@ -1,0 +1,129 @@
+initial:
+  src/config.ts: |
+    export const config = {
+        nodeEnv: process.env.NODE_ENV || 'development',
+        port: parseInt(process.env.PORT || '3000'),
+        dbUrl: process.env.DATABASE_URL,
+        redisUrl: process.env.REDIS_URL,
+        logLevel: process.env.LOG_LEVEL || 'info'
+    };
+  src/index.ts: |
+    import { config } from './config';
+    console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
+  package.json: |
+    {
+      "name": "api-service",
+      "version": "1.0.0",
+      "main": "dist/index.js",
+      "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js"
+      }
+    }
+  Dockerfile: |
+    FROM node:20-alpine
+    WORKDIR /app
+    COPY . .
+    RUN npm ci && npm run build
+    CMD ["node", "dist/index.js"]
+  scripts/local_dev.sh: |
+    #!/bin/bash
+    export NODE_ENV=development
+    npm run dev
+  tests/config.test.ts: |
+    describe('Config', () => {
+        it('should load env vars', () => {});
+    });
+  docs/environment.md: |
+    # Environment Variables
+  terraform/variables.tf: |
+    variable "environment" { default = "production" }
+  .env.example: ''
+changed:
+  src/config.ts: |
+    export const config = {
+        nodeEnv: process.env.NODE_ENV || 'development',
+        port: parseInt(process.env.PORT || '3000'),
+        dbUrl: process.env.DATABASE_URL,
+        redisUrl: process.env.REDIS_URL,
+        logLevel: process.env.LOG_LEVEL || 'info'
+    };
+  src/index.ts: |
+    import { config } from './config';
+    console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
+  package.json: |
+    {
+      "name": "api-service",
+      "version": "1.0.0",
+      "main": "dist/index.js",
+      "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js"
+      }
+    }
+  Dockerfile: |
+    FROM node:20-alpine AS base
+
+    # Build-time arguments for metadata
+    ARG BUILD_DATE
+    ARG GIT_SHA
+    ARG VERSION=0.0.0
+
+    # Python optimization environment variables
+    ENV NODE_ENV=production \
+        NPM_CONFIG_LOGLEVEL=warn \
+        NPM_CONFIG_FUND=false \
+        NPM_CONFIG_AUDIT=false
+
+    # Runtime configuration with secure defaults
+    ENV PORT=3000 \
+        LOG_LEVEL=info \
+        LOG_FORMAT=json \
+        REQUEST_TIMEOUT=30000 \
+        MAX_CONNECTIONS=100 \
+        GRACEFUL_SHUTDOWN_TIMEOUT=10000
+
+    # Container metadata labels
+    LABEL org.opencontainers.image.created="${BUILD_DATE}" \
+          org.opencontainers.image.revision="${GIT_SHA}" \
+          org.opencontainers.image.version="${VERSION}" \
+          org.opencontainers.image.title="api-service"
+
+    FROM base AS builder
+    WORKDIR /app
+    COPY package*.json ./
+    RUN npm ci --only=production && cp -R node_modules /prod_modules && npm ci
+    COPY . .
+    RUN npm run build
+
+    FROM base AS production
+    WORKDIR /app
+    RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+    COPY --from=builder --chown=nodejs:nodejs /prod_modules ./node_modules
+    COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+    USER nodejs
+    EXPOSE ${PORT}
+
+    HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+        CMD node -e "require('http').get('http://localhost:'+process.env.PORT+'/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+    CMD ["node", "dist/index.js"]
+  scripts/local_dev.sh: |
+    #!/bin/bash
+    export NODE_ENV=development
+    npm run dev
+  tests/config.test.ts: |
+    describe('Config', () => {
+        it('should load env vars', () => {});
+    });
+  docs/environment.md: |
+    # Environment Variables
+  terraform/variables.tf: |
+    variable "environment" { default = "production" }
+  .env.example: ''
+must_include_files:
+- Dockerfile
+must_include_content:
+- ARG BUILD_DATE
+add_garbage_files: false
+skip_garbage_check: true

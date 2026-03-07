@@ -1,0 +1,13 @@
+initial:
+  test.py: |
+    def process():
+        return 42
+changed:
+  test.py: |
+    # TODO: refactor this later
+    def process():
+        return 42
+must_include_files:
+- test.py
+add_garbage_files: false
+skip_garbage_check: true

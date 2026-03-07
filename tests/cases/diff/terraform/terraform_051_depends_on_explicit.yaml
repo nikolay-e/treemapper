@@ -1,0 +1,98 @@
+initial:
+  main.tf: |
+    resource "aws_lambda_function" "api" {
+      function_name = "api-handler"
+    }
+
+  # --- Tricky garbage: sibling .tf with depends_on on different resource ---
+  garbage_tf_051_depends_ecs.tf: |
+    GARBAGE_TF_051_DEPENDS_ECS_A = "ecs_dependency"
+    GARBAGE_TF_051_SERVICE_ORDER_B = "after-alb"
+
+    resource "aws_ecs_service" "app" {
+      name            = "app-service"
+      cluster         = "main-cluster"
+      task_definition = "app:1"
+
+      depends_on = [
+        aws_lb_listener.https,
+        aws_iam_role_policy.ecs_task,
+      ]
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_051_variables.tf: |
+    GARBAGE_TF_051_VAR_REGION_C = "us-east-1"
+    GARBAGE_TF_051_VAR_ENV_D = "staging"
+
+    variable "region" {
+      default = "us-east-1"
+    }
+
+    variable "environment" {
+      default = "staging"
+    }
+
+changed:
+  main.tf: |
+    resource "aws_lambda_function" "api" {
+      function_name = "api-handler"
+
+      depends_on = [
+        aws_iam_role_policy_attachment.lambda_logs,
+        aws_cloudwatch_log_group.lambda,
+        aws_vpc_endpoint.s3,
+      ]
+    }
+
+  garbage_tf_051_depends_ecs.tf: |
+    GARBAGE_TF_051_DEPENDS_ECS_A = "ecs_dependency"
+    GARBAGE_TF_051_SERVICE_ORDER_B = "after-alb"
+
+    resource "aws_ecs_service" "app" {
+      name            = "app-service"
+      cluster         = "main-cluster"
+      task_definition = "app:1"
+
+      depends_on = [
+        aws_lb_listener.https,
+        aws_iam_role_policy.ecs_task,
+      ]
+    }
+
+  garbage_tf_051_variables.tf: |
+    GARBAGE_TF_051_VAR_REGION_C = "us-east-1"
+    GARBAGE_TF_051_VAR_ENV_D = "staging"
+
+    variable "region" {
+      default = "us-east-1"
+    }
+
+    variable "environment" {
+      default = "staging"
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - depends_on = [
+    - aws_iam_role_policy_attachment.lambda_logs,
+    - aws_cloudwatch_log_group.lambda,
+    - resource "aws_lambda_function" "api" {
+
+must_not_include:
+- GARBAGE_TF_051_DEPENDS_ECS_A
+- GARBAGE_TF_051_SERVICE_ORDER_B
+- GARBAGE_TF_051_VAR_REGION_C
+- GARBAGE_TF_051_VAR_ENV_D
+
+must_not_include_files:
+- garbage_tf_051_depends_ecs.tf
+- garbage_tf_051_variables.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

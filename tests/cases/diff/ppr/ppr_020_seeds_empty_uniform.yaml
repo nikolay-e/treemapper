@@ -1,0 +1,126 @@
+initial:
+  existing_a.py: |
+    def existing_a():
+        return "a"
+  existing_b.py: |
+    def existing_b():
+        return "b"
+
+  # --- Tricky garbage: similar "new" naming but different identifiers ---
+  garbage_new_handler.py: |
+    GARBAGE_PPR_020_HANDLER_INIT_A = "new_handler"
+    GARBAGE_PPR_020_HANDLER_FLAG_B = True
+
+    def create_new_item():
+        return "created"
+
+    class NewItemHandler:
+        GARBAGE_PPR_020_HANDLER_CLASS_C = 42
+
+        def handle(self):
+            return create_new_item()
+
+  # --- Tricky garbage: structural sibling existing_c matching naming ---
+  garbage_existing_c.py: |
+    GARBAGE_PPR_020_SIBLING_INIT_D = "existing_c"
+    GARBAGE_PPR_020_SIBLING_VER_E = "1.0"
+
+    def existing_c():
+        return "c"
+
+    class ExistingCProcessor:
+        GARBAGE_PPR_020_SIBLING_PROC_F = True
+
+        def process(self):
+            return existing_c()
+
+  # --- Plain garbage: no overlap ---
+  garbage_queue.py: |
+    GARBAGE_PPR_020_QUEUE_SIZE_G = 256
+    GARBAGE_PPR_020_QUEUE_TYPE_H = "fifo"
+
+    class MessageQueue:
+        def enqueue(self, item):
+            pass
+
+changed:
+  existing_a.py: |
+    def existing_a():
+        return "a"
+  existing_b.py: |
+    def existing_b():
+        return "b"
+  new_file.py: |
+    def new_func():
+        return "new"
+
+  garbage_new_handler.py: |
+    GARBAGE_PPR_020_HANDLER_INIT_A = "new_handler"
+    GARBAGE_PPR_020_HANDLER_FLAG_B = True
+
+    def create_new_item():
+        return "created"
+
+    class NewItemHandler:
+        GARBAGE_PPR_020_HANDLER_CLASS_C = 42
+
+        def handle(self):
+            return create_new_item()
+
+  garbage_existing_c.py: |
+    GARBAGE_PPR_020_SIBLING_INIT_D = "existing_c"
+    GARBAGE_PPR_020_SIBLING_VER_E = "1.0"
+
+    def existing_c():
+        return "c"
+
+    class ExistingCProcessor:
+        GARBAGE_PPR_020_SIBLING_PROC_F = True
+
+        def process(self):
+            return existing_c()
+
+  garbage_queue.py: |
+    GARBAGE_PPR_020_QUEUE_SIZE_G = 256
+    GARBAGE_PPR_020_QUEUE_TYPE_H = "fifo"
+
+    class MessageQueue:
+        def enqueue(self, item):
+            pass
+
+# === Assertions ===
+
+must_include:
+- new_func
+- new
+
+must_include_files:
+- new_file.py
+
+must_include_content_from:
+  new_file.py:
+    - 'def new_func():'
+    - return "new"
+
+must_not_include:
+# Plain garbage markers
+- GARBAGE_PPR_020_QUEUE_SIZE_G
+- GARBAGE_PPR_020_QUEUE_TYPE_H
+# Tricky: similar "new" naming patterns
+- GARBAGE_PPR_020_HANDLER_INIT_A
+- GARBAGE_PPR_020_HANDLER_FLAG_B
+- GARBAGE_PPR_020_HANDLER_CLASS_C
+# Tricky: structural sibling with similar naming pattern
+- GARBAGE_PPR_020_SIBLING_INIT_D
+- GARBAGE_PPR_020_SIBLING_VER_E
+- GARBAGE_PPR_020_SIBLING_PROC_F
+
+must_not_include_files:
+- garbage_new_handler.py
+- garbage_existing_c.py
+- garbage_queue.py
+
+max_fragments: 4
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

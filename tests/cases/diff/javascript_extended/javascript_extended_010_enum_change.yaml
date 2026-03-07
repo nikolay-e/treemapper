@@ -1,0 +1,46 @@
+initial:
+  enums.ts: |
+    export enum Status {
+        Pending = 'PENDING',
+        Active = 'ACTIVE',
+        Completed = 'COMPLETED',
+    }
+
+    // js_garbage_marker_005
+  task.ts: |
+    import { Status } from './enums';
+
+    export class Task {
+        status: Status = Status.Pending;
+
+        complete() {
+            this.status = Status.Completed;
+        }
+    }
+changed:
+  enums.ts: |
+    export enum Status {
+        Pending = 'PENDING',
+        Active = 'ACTIVE',
+        Completed = 'COMPLETED',
+        Cancelled = 'CANCELLED',
+        OnHold = 'ON_HOLD',
+    }
+
+    // js_garbage_marker_005
+  task.ts: |
+    import { Status } from './enums';
+
+    export class Task {
+        status: Status = Status.Pending;
+
+        complete() {
+            this.status = Status.Completed;
+        }
+    }
+must_include_files:
+- enums.ts
+must_include_content:
+- enum Status {
+add_garbage_files: false
+skip_garbage_check: true

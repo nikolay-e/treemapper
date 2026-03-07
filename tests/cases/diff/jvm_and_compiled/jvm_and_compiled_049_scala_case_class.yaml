@@ -1,0 +1,72 @@
+initial:
+  User.scala: |
+    case class User(name: String, age: Int) {
+      def isAdult: Boolean = age >= 18
+    }
+
+    object User {
+      def apply(name: String): User = User(name, 0)
+    }
+  UserService.scala: |
+    // Initial
+    class UserService {}
+  GarbageTupleOps.scala: |
+    object GarbageTupleOps {
+      val GARBAGE_JVM_049_TUPLE_MARKER_A = "marker"
+      val GARBAGE_JVM_049_PAIR_MARKER_B = "marker"
+      def noop(): Unit = {}
+    }
+  GarbageTripleOps.scala: |
+    object GarbageTripleOps {
+      val GARBAGE_JVM_049_TRIPLE_MARKER_C = "marker"
+      val GARBAGE_JVM_049_QUAD_MARKER_D = "marker"
+      def noop(): Unit = {}
+    }
+changed:
+  User.scala: |
+    case class User(name: String, age: Int) {
+      def isAdult: Boolean = age >= 18
+    }
+
+    object User {
+      def apply(name: String): User = User(name, 0)
+    }
+  UserService.scala: |
+    class UserService {
+      def createUser(name: String, age: Int): User = {
+        User(name, age)
+      }
+
+      def copyWithNewAge(user: User, newAge: Int): User = {
+        user.copy(age = newAge)
+      }
+
+      def compareUsers(u1: User, u2: User): Boolean = {
+        u1 == u2
+      }
+    }
+  GarbageTupleOps.scala: |
+    object GarbageTupleOps {
+      val GARBAGE_JVM_049_TUPLE_MARKER_A = "marker"
+      val GARBAGE_JVM_049_PAIR_MARKER_B = "marker"
+      def noop(): Unit = {}
+    }
+  GarbageTripleOps.scala: |
+    object GarbageTripleOps {
+      val GARBAGE_JVM_049_TRIPLE_MARKER_C = "marker"
+      val GARBAGE_JVM_049_QUAD_MARKER_D = "marker"
+      def noop(): Unit = {}
+    }
+must_include_files:
+- UserService.scala
+must_include_content:
+- class UserService {
+must_not_include:
+- GARBAGE_JVM_049_PAIR_MARKER_B
+- GARBAGE_JVM_049_QUAD_MARKER_D
+- GARBAGE_JVM_049_TRIPLE_MARKER_C
+- GARBAGE_JVM_049_TUPLE_MARKER_A
+- GarbageTripleOps.scala
+- GarbageTupleOps.scala
+add_garbage_files: false
+skip_garbage_check: true

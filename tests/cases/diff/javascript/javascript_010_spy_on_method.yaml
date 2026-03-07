@@ -1,0 +1,99 @@
+initial:
+  logger.ts: |
+    export const logger = {
+        log: (message: string) => console.log(message),
+        error: (message: string) => console.error(message),
+    };
+  app.ts: |
+    import { logger } from './logger';
+
+    export function processData(data: string) {
+        logger.log(`Processing: ${data}`);
+        return data.toUpperCase();
+    }
+  app.test.ts: |
+    console.log('initial');
+  garbage_queue.ts: |
+    const GARBAGE_JS_010_FIFO_MARKER_A = "queue";
+    const GARBAGE_JS_010_DEQUEUE_MARKER_B = true;
+
+    class FifoQueue {
+        static GARBAGE_JS_010_QUEUE_CLASS_C = "queue";
+
+        enqueue(item: string): void {
+            // noop
+        }
+    }
+  garbage_websocket.ts: |
+    const GARBAGE_JS_010_CHANNEL_MARKER_D = "websocket";
+    const GARBAGE_JS_010_BROADCAST_MARKER_E = 42;
+
+    class ChannelBroadcaster {
+        static GARBAGE_JS_010_BROADCASTER_CLASS_F = true;
+
+        broadcast(channel: string, message: string): void {
+            // noop
+        }
+    }
+changed:
+  logger.ts: |
+    export const logger = {
+        log: (message: string) => console.log(message),
+        error: (message: string) => console.error(message),
+    };
+  app.ts: |
+    import { logger } from './logger';
+
+    export function processData(data: string) {
+        logger.log(`Processing: ${data}`);
+        return data.toUpperCase();
+    }
+  app.test.ts: |
+    import { processData } from './app';
+    import { logger } from './logger';
+
+    describe('App', () => {
+        it('should log when processing', () => {
+            const spy = jest.spyOn(logger, 'log');
+            processData('test');
+            expect(spy).toHaveBeenCalledWith('Processing: test');
+            spy.mockRestore();
+        });
+    });
+  garbage_queue.ts: |
+    const GARBAGE_JS_010_FIFO_MARKER_A = "queue";
+    const GARBAGE_JS_010_DEQUEUE_MARKER_B = true;
+
+    class FifoQueue {
+        static GARBAGE_JS_010_QUEUE_CLASS_C = "queue";
+
+        enqueue(item: string): void {
+            // noop
+        }
+    }
+  garbage_websocket.ts: |
+    const GARBAGE_JS_010_CHANNEL_MARKER_D = "websocket";
+    const GARBAGE_JS_010_BROADCAST_MARKER_E = 42;
+
+    class ChannelBroadcaster {
+        static GARBAGE_JS_010_BROADCASTER_CLASS_F = true;
+
+        broadcast(channel: string, message: string): void {
+            // noop
+        }
+    }
+must_include_files:
+- app.test.ts
+must_include_content:
+- it('should log when processing', () => {
+must_not_include:
+- GARBAGE_JS_010_BROADCASTER_CLASS_F
+- GARBAGE_JS_010_BROADCAST_MARKER_E
+- GARBAGE_JS_010_CHANNEL_MARKER_D
+- GARBAGE_JS_010_DEQUEUE_MARKER_B
+- GARBAGE_JS_010_FIFO_MARKER_A
+- GARBAGE_JS_010_QUEUE_CLASS_C
+- garbage_queue.ts
+- garbage_websocket.ts
+add_garbage_files: false
+skip_garbage_check: true

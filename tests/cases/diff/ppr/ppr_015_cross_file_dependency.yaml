@@ -1,0 +1,141 @@
+initial:
+  utils.py: |
+    def helper():
+        return 42
+  main.py: |
+    from utils import helper
+
+    def main():
+        return helper()
+  unrelated.py: |
+    def unrelated_func():
+        pass
+
+  # --- Tricky garbage: also defines helper() like utils.py ---
+  garbage_alt_helper.py: |
+    GARBAGE_PPR_015_ALT_HELPER_A = "alt_helper_module"
+    GARBAGE_PPR_015_ALT_RETURN_B = 42
+
+    def helper():
+        return 99
+
+    def helper_v2():
+        return helper() + 1
+
+    class HelperRegistry:
+        GARBAGE_PPR_015_ALT_REGISTRY_C = True
+
+        def get_helper(self):
+            return helper()
+
+  # --- Tricky garbage: imports from utils like main.py does ---
+  garbage_utils_consumer.py: |
+    from utils import helper
+    GARBAGE_PPR_015_CONSUMER_INIT_D = "consumer"
+    GARBAGE_PPR_015_CONSUMER_FLAG_E = 500
+
+    class UtilsConsumer:
+        def process(self):
+            return helper() * 10
+
+        def validate(self):
+            GARBAGE_PPR_015_CONSUMER_VALID_F = True
+            return True
+
+  # --- Plain garbage: no overlap ---
+  garbage_database.py: |
+    GARBAGE_PPR_015_DB_CONN_G = "postgresql://localhost"
+    GARBAGE_PPR_015_DB_POOL_H = 10
+
+    class DatabasePool:
+        def connect(self):
+            pass
+
+changed:
+  utils.py: |
+    def helper():
+        return 42
+  main.py: |
+    from utils import helper
+
+    def main():
+        return helper() + 1
+  unrelated.py: |
+    def unrelated_func():
+        pass
+
+  garbage_alt_helper.py: |
+    GARBAGE_PPR_015_ALT_HELPER_A = "alt_helper_module"
+    GARBAGE_PPR_015_ALT_RETURN_B = 42
+
+    def helper():
+        return 99
+
+    def helper_v2():
+        return helper() + 1
+
+    class HelperRegistry:
+        GARBAGE_PPR_015_ALT_REGISTRY_C = True
+
+        def get_helper(self):
+            return helper()
+
+  garbage_utils_consumer.py: |
+    from utils import helper
+    GARBAGE_PPR_015_CONSUMER_INIT_D = "consumer"
+    GARBAGE_PPR_015_CONSUMER_FLAG_E = 500
+
+    class UtilsConsumer:
+        def process(self):
+            return helper() * 10
+
+        def validate(self):
+            GARBAGE_PPR_015_CONSUMER_VALID_F = True
+            return True
+
+  garbage_database.py: |
+    GARBAGE_PPR_015_DB_CONN_G = "postgresql://localhost"
+    GARBAGE_PPR_015_DB_POOL_H = 10
+
+    class DatabasePool:
+        def connect(self):
+            pass
+
+# === Assertions ===
+
+must_include:
+- main
+- helper
+
+must_include_files:
+- main.py
+
+must_include_content_from:
+  main.py:
+    - 'def main():'
+    - return helper() + 1
+
+must_not_include:
+- unrelated_func
+# Plain garbage markers
+- GARBAGE_PPR_015_DB_CONN_G
+- GARBAGE_PPR_015_DB_POOL_H
+# Tricky: also defines helper() function
+- GARBAGE_PPR_015_ALT_HELPER_A
+- GARBAGE_PPR_015_ALT_RETURN_B
+- GARBAGE_PPR_015_ALT_REGISTRY_C
+# Tricky: imports from utils just like main.py
+- GARBAGE_PPR_015_CONSUMER_INIT_D
+- GARBAGE_PPR_015_CONSUMER_FLAG_E
+- GARBAGE_PPR_015_CONSUMER_VALID_F
+
+must_not_include_files:
+- unrelated.py
+- garbage_alt_helper.py
+- garbage_utils_consumer.py
+- garbage_database.py
+
+max_fragments: 6
+max_files: 3
+add_garbage_files: false
+skip_garbage_check: true

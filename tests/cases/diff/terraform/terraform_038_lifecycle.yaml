@@ -1,0 +1,115 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+    }
+  # --- Tricky garbage: sibling .tf with same lifecycle block for a different resource ---
+  database/rds_lifecycle_GARBAGE_TF_038_A.tf: |
+    # GARBAGE_TF_038_RDS_LIFECYCLE_A - RDS lifecycle rules
+    resource "aws_db_instance" "primary_GARBAGE_TF_038_A" {
+      identifier     = "primary-db-GARBAGE_TF_038_A"
+      engine         = "postgres"
+      instance_class = "db.t3.medium"
+
+      lifecycle {
+        create_before_destroy = true
+        prevent_destroy       = true
+        ignore_changes        = [password, engine_version]
+      }
+    }
+
+    # GARBAGE_TF_038_RDS_REPLICA_B
+    resource "aws_db_instance" "replica_GARBAGE_TF_038_B" {
+      replicate_source_db = aws_db_instance.primary_GARBAGE_TF_038_A.id
+    }
+  # --- Plain garbage: unrelated storage config ---
+  storage/s3_buckets_GARBAGE_TF_038_C.tf: |
+    # GARBAGE_TF_038_S3_BUCKETS_C - S3 bucket definitions
+    resource "aws_s3_bucket" "logs_GARBAGE_TF_038_C" {
+      bucket = "app-logs-GARBAGE_TF_038_C"
+
+      tags = {
+        Name    = "logs-bucket-GARBAGE_TF_038_C"
+        Purpose = "logging-GARBAGE_TF_038_S3_D"
+      }
+    }
+
+    resource "aws_s3_bucket_versioning" "logs_GARBAGE_TF_038_C" {
+      bucket = aws_s3_bucket.logs_GARBAGE_TF_038_C.id
+      versioning_configuration {
+        status = "Enabled"
+      }
+    }
+
+changed:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+
+      lifecycle {
+        create_before_destroy = true
+        prevent_destroy       = true
+        ignore_changes        = [tags]
+      }
+    }
+  database/rds_lifecycle_GARBAGE_TF_038_A.tf: |
+    # GARBAGE_TF_038_RDS_LIFECYCLE_A - RDS lifecycle rules
+    resource "aws_db_instance" "primary_GARBAGE_TF_038_A" {
+      identifier     = "primary-db-GARBAGE_TF_038_A"
+      engine         = "postgres"
+      instance_class = "db.t3.medium"
+
+      lifecycle {
+        create_before_destroy = true
+        prevent_destroy       = true
+        ignore_changes        = [password, engine_version]
+      }
+    }
+
+    # GARBAGE_TF_038_RDS_REPLICA_B
+    resource "aws_db_instance" "replica_GARBAGE_TF_038_B" {
+      replicate_source_db = aws_db_instance.primary_GARBAGE_TF_038_A.id
+    }
+  storage/s3_buckets_GARBAGE_TF_038_C.tf: |
+    # GARBAGE_TF_038_S3_BUCKETS_C - S3 bucket definitions
+    resource "aws_s3_bucket" "logs_GARBAGE_TF_038_C" {
+      bucket = "app-logs-GARBAGE_TF_038_C"
+
+      tags = {
+        Name    = "logs-bucket-GARBAGE_TF_038_C"
+        Purpose = "logging-GARBAGE_TF_038_S3_D"
+      }
+    }
+
+    resource "aws_s3_bucket_versioning" "logs_GARBAGE_TF_038_C" {
+      bucket = aws_s3_bucket.logs_GARBAGE_TF_038_C.id
+      versioning_configuration {
+        status = "Enabled"
+      }
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - create_before_destroy = true
+    - prevent_destroy       = true
+    - ignore_changes        = [tags]
+
+must_not_include:
+- GARBAGE_TF_038_RDS_LIFECYCLE_A
+- GARBAGE_TF_038_B
+- GARBAGE_TF_038_S3_BUCKETS_C
+- GARBAGE_TF_038_S3_D
+
+must_not_include_files:
+- database/rds_lifecycle_GARBAGE_TF_038_A.tf
+- storage/s3_buckets_GARBAGE_TF_038_C.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

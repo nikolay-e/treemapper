@@ -1,0 +1,39 @@
+initial:
+  user.ts: |
+    export interface User {
+        id: string;
+        name: string;
+        email: string;
+        password: string;
+        createdAt: Date;
+    }
+
+    // ts_ext_garbage_marker_007
+  dto.ts: |
+    console.log('initial');
+changed:
+  user.ts: |
+    export interface User {
+        id: string;
+        name: string;
+        email: string;
+        password: string;
+        createdAt: Date;
+    }
+
+    // ts_ext_garbage_marker_007
+  dto.ts: |
+    import { User } from './user';
+
+    type UserPublic = Pick<User, 'id' | 'name' | 'email'>;
+
+    function toPublic(user: User): UserPublic {
+        return { id: user.id, name: user.name, email: user.email };
+    }
+must_include_files:
+- dto.ts
+must_include_content:
+- import { User } from './user';
+- type UserPublic = Pick<User, 'id' | 'name' | 'email'>;
+add_garbage_files: false
+skip_garbage_check: true

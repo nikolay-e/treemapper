@@ -1,0 +1,96 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+    }
+
+  # --- Tricky garbage: sibling .tf with lifecycle block on different resource ---
+  garbage_tf_049_lifecycle_rds.tf: |
+    GARBAGE_TF_049_LIFECYCLE_RDS_A = "rds_lifecycle"
+    GARBAGE_TF_049_SNAPSHOT_FLAG_B = true
+
+    resource "aws_db_instance" "replica" {
+      identifier     = "read-replica"
+      engine         = "mysql"
+      instance_class = "db.t3.micro"
+
+      lifecycle {
+        ignore_changes = [
+          engine_version,
+        ]
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_049_dns.tf: |
+    GARBAGE_TF_049_DNS_ZONE_C = "example.com"
+    GARBAGE_TF_049_DNS_TTL_D = 300
+
+    resource "aws_route53_zone" "primary" {
+      name = "example.com"
+    }
+
+changed:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+
+      lifecycle {
+        ignore_changes = [
+          ami,
+          user_data,
+          tags["LastModified"],
+        ]
+      }
+    }
+
+  garbage_tf_049_lifecycle_rds.tf: |
+    GARBAGE_TF_049_LIFECYCLE_RDS_A = "rds_lifecycle"
+    GARBAGE_TF_049_SNAPSHOT_FLAG_B = true
+
+    resource "aws_db_instance" "replica" {
+      identifier     = "read-replica"
+      engine         = "mysql"
+      instance_class = "db.t3.micro"
+
+      lifecycle {
+        ignore_changes = [
+          engine_version,
+        ]
+      }
+    }
+
+  garbage_tf_049_dns.tf: |
+    GARBAGE_TF_049_DNS_ZONE_C = "example.com"
+    GARBAGE_TF_049_DNS_TTL_D = 300
+
+    resource "aws_route53_zone" "primary" {
+      name = "example.com"
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - ignore_changes = [
+    - ami,
+    - user_data,
+    - resource "aws_instance" "web" {
+
+must_not_include:
+- GARBAGE_TF_049_LIFECYCLE_RDS_A
+- GARBAGE_TF_049_SNAPSHOT_FLAG_B
+- GARBAGE_TF_049_DNS_ZONE_C
+- GARBAGE_TF_049_DNS_TTL_D
+
+must_not_include_files:
+- garbage_tf_049_lifecycle_rds.tf
+- garbage_tf_049_dns.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

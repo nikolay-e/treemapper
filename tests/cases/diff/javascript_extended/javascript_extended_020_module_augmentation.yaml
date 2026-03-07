@@ -1,0 +1,56 @@
+initial:
+  original.ts: |
+    export interface User {
+        id: string;
+        name: string;
+    }
+
+    export function createUser(name: string): User {
+        return { id: Date.now().toString(), name };
+    }
+
+    // js_garbage_marker_015
+  augmentation.ts: |
+    import { User } from './original';
+
+    declare module './original' {
+        interface User {
+            email?: string;
+        }
+    }
+
+    export function createUserWithEmail(name: string, email: string): User {
+        return { id: Date.now().toString(), name, email };
+    }
+changed:
+  original.ts: |
+    export interface User {
+        id: string;
+        name: string;
+    }
+
+    export function createUser(name: string): User {
+        return { id: Date.now().toString(), name };
+    }
+
+    // js_garbage_marker_015
+  augmentation.ts: |
+    import { User } from './original';
+
+    declare module './original' {
+        interface User {
+            email?: string;
+            role?: 'admin' | 'user';
+        }
+    }
+
+    export function createUserWithEmail(name: string, email: string, role?: 'admin' | 'user'): User {
+        return { id: Date.now().toString(), name, email, role };
+    }
+must_include_files:
+- augmentation.ts
+must_include_content:
+- 'role?: ''admin'' | ''user'';'
+- 'function createUserWithEmail(name: string, email: string, role?: ''admin'' | ''user''): User {'
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,87 @@
+initial:
+  database.tf: |
+    resource "aws_db_instance" "main" {
+      identifier     = "production-db"
+      engine         = "postgres"
+      instance_class = "db.r5.large"
+    }
+
+  # --- Tricky garbage: sibling .tf with lifecycle block on different resource ---
+  garbage_tf_050_lifecycle_s3.tf: |
+    GARBAGE_TF_050_LIFECYCLE_S3_A = "s3_lifecycle"
+    GARBAGE_TF_050_BUCKET_LOCK_B = true
+
+    resource "aws_s3_bucket" "logs" {
+      bucket = "app-logs-archive"
+
+      lifecycle {
+        prevent_destroy = true
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_050_iam.tf: |
+    GARBAGE_TF_050_IAM_ROLE_C = "lambda-exec"
+    GARBAGE_TF_050_IAM_PATH_D = "/service/"
+
+    resource "aws_iam_role" "lambda" {
+      name               = "lambda-execution-role"
+      assume_role_policy = "{}"
+    }
+
+changed:
+  database.tf: |
+    resource "aws_db_instance" "main" {
+      identifier     = "production-db"
+      engine         = "postgres"
+      instance_class = "db.r5.large"
+
+      lifecycle {
+        prevent_destroy = true
+      }
+    }
+
+  garbage_tf_050_lifecycle_s3.tf: |
+    GARBAGE_TF_050_LIFECYCLE_S3_A = "s3_lifecycle"
+    GARBAGE_TF_050_BUCKET_LOCK_B = true
+
+    resource "aws_s3_bucket" "logs" {
+      bucket = "app-logs-archive"
+
+      lifecycle {
+        prevent_destroy = true
+      }
+    }
+
+  garbage_tf_050_iam.tf: |
+    GARBAGE_TF_050_IAM_ROLE_C = "lambda-exec"
+    GARBAGE_TF_050_IAM_PATH_D = "/service/"
+
+    resource "aws_iam_role" "lambda" {
+      name               = "lambda-execution-role"
+      assume_role_policy = "{}"
+    }
+
+must_include_files:
+- database.tf
+
+must_include_content_from:
+  database.tf:
+    - prevent_destroy = true
+    - resource "aws_db_instance" "main" {
+    - engine         = "postgres"
+
+must_not_include:
+- GARBAGE_TF_050_LIFECYCLE_S3_A
+- GARBAGE_TF_050_BUCKET_LOCK_B
+- GARBAGE_TF_050_IAM_ROLE_C
+- GARBAGE_TF_050_IAM_PATH_D
+
+must_not_include_files:
+- garbage_tf_050_lifecycle_s3.tf
+- garbage_tf_050_iam.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

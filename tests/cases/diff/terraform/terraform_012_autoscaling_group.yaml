@@ -1,0 +1,115 @@
+initial:
+  compute.tf: |
+    resource "aws_launch_template" "web" {
+      name = "web-template"
+      image_id = var.ami_id
+      instance_type = "t3.micro"
+    }
+
+  # --- Tricky garbage: same resource type aws_autoscaling_group but for worker tier ---
+  worker_scaling.tf: |
+    GARBAGE_TF_012_WORKER_SCALING_A = "worker-tier"
+    GARBAGE_TF_012_WORKER_CAPACITY_B = 5
+
+    resource "aws_autoscaling_group" "worker" {
+      name                = "worker-asg"
+      min_size            = 0
+      max_size            = 20
+      desired_capacity    = 3
+      vpc_zone_identifier = var.worker_subnet_ids
+
+      launch_template {
+        id      = aws_launch_template.worker.id
+        version = "$Latest"
+      }
+
+      tag {
+        key                 = "Name"
+        value               = "worker-instance"
+        propagate_at_launch = true
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_billing_report.py: |
+    GARBAGE_TF_012_BILLING_MARKER_C = "billing"
+    GARBAGE_TF_012_COST_TRACKER_D = 9999
+
+    class BillingReport:
+        def generate(self):
+            return {"total": 0}
+
+changed:
+  compute.tf: |
+    resource "aws_launch_template" "web" {
+      name = "web-template"
+      image_id = var.ami_id
+      instance_type = "t3.micro"
+    }
+
+    resource "aws_autoscaling_group" "web" {
+      name                = "web-asg"
+      min_size            = 1
+      max_size            = 10
+      desired_capacity    = 2
+      vpc_zone_identifier = var.subnet_ids
+
+      launch_template {
+        id      = aws_launch_template.web.id
+        version = "$Latest"
+      }
+    }
+
+  worker_scaling.tf: |
+    GARBAGE_TF_012_WORKER_SCALING_A = "worker-tier"
+    GARBAGE_TF_012_WORKER_CAPACITY_B = 5
+
+    resource "aws_autoscaling_group" "worker" {
+      name                = "worker-asg"
+      min_size            = 0
+      max_size            = 20
+      desired_capacity    = 3
+      vpc_zone_identifier = var.worker_subnet_ids
+
+      launch_template {
+        id      = aws_launch_template.worker.id
+        version = "$Latest"
+      }
+
+      tag {
+        key                 = "Name"
+        value               = "worker-instance"
+        propagate_at_launch = true
+      }
+    }
+
+  garbage_billing_report.py: |
+    GARBAGE_TF_012_BILLING_MARKER_C = "billing"
+    GARBAGE_TF_012_COST_TRACKER_D = 9999
+
+    class BillingReport:
+        def generate(self):
+            return {"total": 0}
+
+must_include_files:
+- compute.tf
+
+must_include_content_from:
+  compute.tf:
+    - resource "aws_autoscaling_group" "web" {
+    - aws_launch_template.web.id
+
+must_not_include:
+- GARBAGE_TF_012_WORKER_SCALING_A
+- GARBAGE_TF_012_WORKER_CAPACITY_B
+- GARBAGE_TF_012_BILLING_MARKER_C
+- GARBAGE_TF_012_COST_TRACKER_D
+
+must_not_include_files:
+- worker_scaling.tf
+- garbage_billing_report.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

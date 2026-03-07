@@ -1,0 +1,146 @@
+initial:
+  networking.tf: |
+    variable "vpc_cidr" {
+      default = "10.0.0.0/16"
+    }
+
+    resource "aws_subnet" "public_a" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 1)
+      availability_zone = "us-east-1a"
+    }
+
+    resource "aws_subnet" "private_a" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 10)
+      availability_zone = "us-east-1a"
+    }
+
+  # --- Tricky garbage: same resource type aws_subnet but for database tier ---
+  garbage_db_subnets.tf: |
+    GARBAGE_TF_065_DBSUB_MARKER_A = "database-subnets"
+    GARBAGE_TF_065_DBSUB_MARKER_B = "db-tier-network"
+
+    resource "aws_subnet" "db_a" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 100)
+      availability_zone = "us-east-1a"
+    }
+
+    resource "aws_subnet" "db_b" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 101)
+      availability_zone = "us-east-1b"
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_waf.tf: |
+    GARBAGE_TF_065_WAF_MARKER_C = "waf-rules"
+    GARBAGE_TF_065_WAF_MARKER_D = "rate-limiting"
+
+    resource "aws_wafv2_web_acl" "main" {
+      name  = "app-waf"
+      scope = "REGIONAL"
+      default_action {
+        allow {}
+      }
+      visibility_config {
+        metric_name                = "app-waf"
+        sampled_requests_enabled   = true
+        cloudwatch_metrics_enabled = true
+      }
+    }
+
+changed:
+  networking.tf: |
+    variable "vpc_cidr" {
+      default = "10.0.0.0/16"
+    }
+
+    resource "aws_subnet" "public_a" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 1)
+      availability_zone = "us-east-1a"
+    }
+
+    resource "aws_subnet" "public_b" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 2)
+      availability_zone = "us-east-1b"
+    }
+
+    resource "aws_subnet" "private_a" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 10)
+      availability_zone = "us-east-1a"
+    }
+
+    resource "aws_subnet" "private_b" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 11)
+      availability_zone = "us-east-1b"
+    }
+
+  # --- Tricky garbage: same resource type aws_subnet but for database tier ---
+  garbage_db_subnets.tf: |
+    GARBAGE_TF_065_DBSUB_MARKER_A = "database-subnets"
+    GARBAGE_TF_065_DBSUB_MARKER_B = "db-tier-network"
+
+    resource "aws_subnet" "db_a" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 100)
+      availability_zone = "us-east-1a"
+    }
+
+    resource "aws_subnet" "db_b" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = cidrsubnet(var.vpc_cidr, 8, 101)
+      availability_zone = "us-east-1b"
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_waf.tf: |
+    GARBAGE_TF_065_WAF_MARKER_C = "waf-rules"
+    GARBAGE_TF_065_WAF_MARKER_D = "rate-limiting"
+
+    resource "aws_wafv2_web_acl" "main" {
+      name  = "app-waf"
+      scope = "REGIONAL"
+      default_action {
+        allow {}
+      }
+      visibility_config {
+        metric_name                = "app-waf"
+        sampled_requests_enabled   = true
+        cloudwatch_metrics_enabled = true
+      }
+    }
+
+# === Assertions ===
+
+must_include_files:
+- networking.tf
+
+must_include_content_from:
+  networking.tf:
+    - 'resource "aws_subnet" "public_b"'
+    - cidrsubnet(var.vpc_cidr, 8, 2)
+    - 'resource "aws_subnet" "private_b"'
+    - cidrsubnet(var.vpc_cidr, 8, 11)
+
+must_not_include:
+# Tricky garbage markers (sibling aws_subnet resource)
+- GARBAGE_TF_065_DBSUB_MARKER_A
+- GARBAGE_TF_065_DBSUB_MARKER_B
+# Plain garbage markers
+- GARBAGE_TF_065_WAF_MARKER_C
+- GARBAGE_TF_065_WAF_MARKER_D
+
+must_not_include_files:
+- garbage_db_subnets.tf
+- garbage_waf.tf
+
+max_fragments: 4
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

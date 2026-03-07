@@ -1,0 +1,93 @@
+initial:
+  events.tf: |
+    # EventBridge resources
+
+  # --- Tricky garbage: same resource type aws_cloudwatch_event_rule but for backup schedule ---
+  backup_schedule.tf: |
+    GARBAGE_TF_018_BACKUP_RULE_A = "backup-trigger"
+    GARBAGE_TF_018_BACKUP_CRON_B = "cron(0 4 * * ? *)"
+
+    resource "aws_cloudwatch_event_rule" "backup" {
+      name                = "nightly-backup"
+      schedule_expression = "cron(0 4 * * ? *)"
+    }
+
+    resource "aws_cloudwatch_event_target" "backup_lambda" {
+      rule      = aws_cloudwatch_event_rule.backup.name
+      target_id = "backup-lambda"
+      arn       = aws_lambda_function.backup.arn
+    }
+
+  # --- Plain garbage ---
+  garbage_inventory_sync.py: |
+    GARBAGE_TF_018_INVENTORY_MARKER_C = "sync"
+    GARBAGE_TF_018_INVENTORY_BATCH_D = 500
+
+    def sync_inventory(source, dest):
+        pass
+
+changed:
+  events.tf: |
+    resource "aws_cloudwatch_event_rule" "schedule" {
+      name                = "daily-cleanup"
+      schedule_expression = "cron(0 2 * * ? *)"
+    }
+
+    resource "aws_cloudwatch_event_target" "lambda" {
+      rule      = aws_cloudwatch_event_rule.schedule.name
+      target_id = "cleanup-lambda"
+      arn       = aws_lambda_function.cleanup.arn
+    }
+
+    resource "aws_lambda_permission" "eventbridge" {
+      statement_id  = "AllowEventBridge"
+      action        = "lambda:InvokeFunction"
+      function_name = aws_lambda_function.cleanup.function_name
+      principal     = "events.amazonaws.com"
+      source_arn    = aws_cloudwatch_event_rule.schedule.arn
+    }
+
+  backup_schedule.tf: |
+    GARBAGE_TF_018_BACKUP_RULE_A = "backup-trigger"
+    GARBAGE_TF_018_BACKUP_CRON_B = "cron(0 4 * * ? *)"
+
+    resource "aws_cloudwatch_event_rule" "backup" {
+      name                = "nightly-backup"
+      schedule_expression = "cron(0 4 * * ? *)"
+    }
+
+    resource "aws_cloudwatch_event_target" "backup_lambda" {
+      rule      = aws_cloudwatch_event_rule.backup.name
+      target_id = "backup-lambda"
+      arn       = aws_lambda_function.backup.arn
+    }
+
+  garbage_inventory_sync.py: |
+    GARBAGE_TF_018_INVENTORY_MARKER_C = "sync"
+    GARBAGE_TF_018_INVENTORY_BATCH_D = 500
+
+    def sync_inventory(source, dest):
+        pass
+
+must_include_files:
+- events.tf
+
+must_include_content_from:
+  events.tf:
+    - resource "aws_cloudwatch_event_rule" "schedule" {
+    - aws_lambda_function.cleanup.arn
+
+must_not_include:
+- GARBAGE_TF_018_BACKUP_RULE_A
+- GARBAGE_TF_018_BACKUP_CRON_B
+- GARBAGE_TF_018_INVENTORY_MARKER_C
+- GARBAGE_TF_018_INVENTORY_BATCH_D
+
+must_not_include_files:
+- backup_schedule.tf
+- garbage_inventory_sync.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

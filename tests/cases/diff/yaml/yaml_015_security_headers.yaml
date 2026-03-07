@@ -1,0 +1,81 @@
+initial:
+  config/security.yaml: |
+    security:
+      headers:
+        x_frame_options: DENY
+        content_security_policy: default-src 'self'
+  src/security.py: |
+    def apply_security_headers(response, headers: dict):
+        for key, value in headers.items():
+            header_name = key.replace("_", "-").title()
+            response.headers[header_name] = value
+        return response
+  garbage_image_resizer.py: |
+    GARBAGE_YAML_015_IMAGE_MARKER_A = "image"
+    GARBAGE_YAML_015_RESIZE_MARKER_B = True
+
+    class ImageResizer:
+        GARBAGE_YAML_015_RESIZER_CLASS_C = "resizer"
+
+        def resize(self, width: int, height: int) -> bytes:
+            return b""
+  garbage_pdf_generator.py: |
+    GARBAGE_YAML_015_PDF_MARKER_D = "pdf"
+    GARBAGE_YAML_015_RENDER_MARKER_E = 42
+
+    class PdfGenerator:
+        GARBAGE_YAML_015_GENERATOR_CLASS_F = True
+
+        def generate(self, html_content: str) -> bytes:
+            return b""
+changed:
+  config/security.yaml: |
+    security:
+      headers:
+        x_frame_options: SAMEORIGIN
+        content_security_policy: default-src 'self'; script-src 'self' 'unsafe-inline'
+        strict_transport_security: max-age=31536000
+  src/security.py: |
+    def apply_security_headers(response, headers: dict):
+        for key, value in headers.items():
+            header_name = key.replace("_", "-").title()
+            response.headers[header_name] = value
+        return response
+  garbage_image_resizer.py: |
+    GARBAGE_YAML_015_IMAGE_MARKER_A = "image"
+    GARBAGE_YAML_015_RESIZE_MARKER_B = True
+
+    class ImageResizer:
+        GARBAGE_YAML_015_RESIZER_CLASS_C = "resizer"
+
+        def resize(self, width: int, height: int) -> bytes:
+            return b""
+  garbage_pdf_generator.py: |
+    GARBAGE_YAML_015_PDF_MARKER_D = "pdf"
+    GARBAGE_YAML_015_RENDER_MARKER_E = 42
+
+    class PdfGenerator:
+        GARBAGE_YAML_015_GENERATOR_CLASS_F = True
+
+        def generate(self, html_content: str) -> bytes:
+            return b""
+must_include_files:
+- config/security.yaml
+must_include_content:
+- |2
+      x_frame_options: SAMEORIGIN
+      content_security_policy: default-src 'self'; script-src 'self' 'unsafe-inline'
+      strict_transport_security: max-age=31536000
+must_not_include:
+- GARBAGE_YAML_015_IMAGE_MARKER_A
+- GARBAGE_YAML_015_RESIZE_MARKER_B
+- GARBAGE_YAML_015_RESIZER_CLASS_C
+- GARBAGE_YAML_015_PDF_MARKER_D
+- GARBAGE_YAML_015_RENDER_MARKER_E
+- GARBAGE_YAML_015_GENERATOR_CLASS_F
+- ImageResizer
+- PdfGenerator
+- garbage_image_resizer.py
+- garbage_pdf_generator.py
+add_garbage_files: false
+skip_garbage_check: true

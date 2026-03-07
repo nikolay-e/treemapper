@@ -1,0 +1,40 @@
+initial:
+  ThemeContext.tsx: |
+    import { createContext } from 'react';
+
+    export interface Theme {
+        primary: string;
+        secondary: string;
+    }
+
+    export const ThemeContext = createContext<Theme>({ primary: '#000', secondary: '#fff' });
+
+    // react_adv_garbage_marker_003
+  Button.tsx: |
+    console.log('initial');
+changed:
+  ThemeContext.tsx: |
+    import { createContext } from 'react';
+
+    export interface Theme {
+        primary: string;
+        secondary: string;
+    }
+
+    export const ThemeContext = createContext<Theme>({ primary: '#000', secondary: '#fff' });
+
+    // react_adv_garbage_marker_003
+  Button.tsx: |
+    import { useContext } from 'react';
+    import { ThemeContext } from './ThemeContext';
+
+    export function Button({ children }: { children: React.ReactNode }) {
+        const theme = useContext(ThemeContext);
+        return <button style={{ backgroundColor: theme.primary }}>{children}</button>;
+    }
+must_include_files:
+- Button.tsx
+must_include_content:
+- 'function Button({ children }: { children: React.ReactNode }) {'
+add_garbage_files: false
+skip_garbage_check: true

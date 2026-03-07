@@ -1,0 +1,44 @@
+initial:
+  variables.tf: |
+    variable "environment" {
+      default = "dev"
+    }
+
+    variable "instance_type" {
+      default = "t3.micro"
+    }
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-12345678"
+      instance_type = var.instance_type
+      tags = {
+        Environment = var.environment
+      }
+    }
+changed:
+  variables.tf: |
+    variable "environment" {
+      default = "prod"
+    }
+
+    variable "instance_type" {
+      default = "t3.large"
+    }
+
+    variable "vpc_id" {
+      type = string
+    }
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-12345678"
+      instance_type = var.instance_type
+      tags = {
+        Environment = var.environment
+      }
+    }
+must_include_files:
+- variables.tf
+must_include_content:
+- default = "prod"
+add_garbage_files: false
+skip_garbage_check: true

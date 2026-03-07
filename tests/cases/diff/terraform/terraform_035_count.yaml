@@ -1,0 +1,88 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+    }
+  # --- Tricky garbage: sibling .tf with same count pattern for a different resource ---
+  database/replicas_GARBAGE_TF_035_A.tf: |
+    # GARBAGE_TF_035_DB_REPLICAS_A - Database read replicas with count
+    variable "replica_count_GARBAGE_TF_035_A" {
+      default = 2
+    }
+
+    resource "aws_db_instance" "replica_GARBAGE_TF_035_A" {
+      count               = var.replica_count_GARBAGE_TF_035_A
+      replicate_source_db = aws_db_instance.primary.id
+      instance_class      = "db.t3.medium"
+
+      tags = {
+        Name = "replica-${count.index}-GARBAGE_TF_035_B"
+      }
+    }
+  # --- Plain garbage: unrelated script ---
+  scripts/scale_check_GARBAGE_TF_035_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_035_SCALE_C - Instance scaling checker
+    echo "Checking scale GARBAGE_TF_035_SCALE_D"
+    aws ec2 describe-instances --query 'Reservations[].Instances[].InstanceId'
+
+changed:
+  main.tf: |
+    variable "instance_count" {
+      default = 3
+    }
+
+    resource "aws_instance" "web" {
+      count         = var.instance_count
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+
+      tags = {
+        Name = "web-${count.index}"
+      }
+    }
+  database/replicas_GARBAGE_TF_035_A.tf: |
+    # GARBAGE_TF_035_DB_REPLICAS_A - Database read replicas with count
+    variable "replica_count_GARBAGE_TF_035_A" {
+      default = 2
+    }
+
+    resource "aws_db_instance" "replica_GARBAGE_TF_035_A" {
+      count               = var.replica_count_GARBAGE_TF_035_A
+      replicate_source_db = aws_db_instance.primary.id
+      instance_class      = "db.t3.medium"
+
+      tags = {
+        Name = "replica-${count.index}-GARBAGE_TF_035_B"
+      }
+    }
+  scripts/scale_check_GARBAGE_TF_035_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_035_SCALE_C - Instance scaling checker
+    echo "Checking scale GARBAGE_TF_035_SCALE_D"
+    aws ec2 describe-instances --query 'Reservations[].Instances[].InstanceId'
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - variable "instance_count" {
+    - count         = var.instance_count
+    - Name = "web-${count.index}"
+
+must_not_include:
+- GARBAGE_TF_035_DB_REPLICAS_A
+- GARBAGE_TF_035_B
+- GARBAGE_TF_035_SCALE_C
+- GARBAGE_TF_035_SCALE_D
+
+must_not_include_files:
+- database/replicas_GARBAGE_TF_035_A.tf
+- scripts/scale_check_GARBAGE_TF_035_C.sh
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

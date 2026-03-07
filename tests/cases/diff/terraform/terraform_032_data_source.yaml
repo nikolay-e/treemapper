@@ -1,0 +1,93 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-12345"
+      instance_type = "t3.micro"
+    }
+  # --- Tricky garbage: sibling .tf with same data source pattern for a different purpose ---
+  networking/ami_lookup_GARBAGE_TF_032_A.tf: |
+    # GARBAGE_TF_032_NET_AMI_A - Networking AMI lookup
+    data "aws_ami" "networking_GARBAGE_TF_032_A" {
+      most_recent = true
+      owners      = ["self"]
+
+      filter {
+        name   = "name"
+        values = ["network-appliance-GARBAGE_TF_032_A-*"]
+      }
+    }
+
+    # GARBAGE_TF_032_NET_INSTANCE_B - Networking instance
+    resource "aws_instance" "firewall_GARBAGE_TF_032_B" {
+      ami           = data.aws_ami.networking_GARBAGE_TF_032_A.id
+      instance_type = "c5.xlarge"
+    }
+  # --- Plain garbage: unrelated helper ---
+  scripts/rotate_amis_GARBAGE_TF_032_C.py: |
+    # GARBAGE_TF_032_ROTATE_C - AMI rotation script
+    def rotate_amis_GARBAGE_TF_032_C():
+        print("Rotating AMIs GARBAGE_TF_032_ROTATE_D")
+        return []
+
+changed:
+  main.tf: |
+    data "aws_ami" "amazon_linux" {
+      most_recent = true
+      owners      = ["amazon"]
+
+      filter {
+        name   = "name"
+        values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+      }
+    }
+
+    resource "aws_instance" "web" {
+      ami           = data.aws_ami.amazon_linux.id
+      instance_type = "t3.micro"
+    }
+  networking/ami_lookup_GARBAGE_TF_032_A.tf: |
+    # GARBAGE_TF_032_NET_AMI_A - Networking AMI lookup
+    data "aws_ami" "networking_GARBAGE_TF_032_A" {
+      most_recent = true
+      owners      = ["self"]
+
+      filter {
+        name   = "name"
+        values = ["network-appliance-GARBAGE_TF_032_A-*"]
+      }
+    }
+
+    # GARBAGE_TF_032_NET_INSTANCE_B - Networking instance
+    resource "aws_instance" "firewall_GARBAGE_TF_032_B" {
+      ami           = data.aws_ami.networking_GARBAGE_TF_032_A.id
+      instance_type = "c5.xlarge"
+    }
+  scripts/rotate_amis_GARBAGE_TF_032_C.py: |
+    # GARBAGE_TF_032_ROTATE_C - AMI rotation script
+    def rotate_amis_GARBAGE_TF_032_C():
+        print("Rotating AMIs GARBAGE_TF_032_ROTATE_D")
+        return []
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - data "aws_ami" "amazon_linux" {
+    - owners      = ["amazon"]
+    - data.aws_ami.amazon_linux.id
+
+must_not_include:
+- GARBAGE_TF_032_NET_AMI_A
+- GARBAGE_TF_032_B
+- GARBAGE_TF_032_ROTATE_C
+- GARBAGE_TF_032_ROTATE_D
+
+must_not_include_files:
+- networking/ami_lookup_GARBAGE_TF_032_A.tf
+- scripts/rotate_amis_GARBAGE_TF_032_C.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

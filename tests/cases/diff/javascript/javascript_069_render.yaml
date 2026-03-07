@@ -1,0 +1,90 @@
+initial:
+  Greeting.tsx: |
+    interface GreetingProps {
+        name: string;
+    }
+
+    export function Greeting({ name }: GreetingProps) {
+        return <h1>Hello, {name}!</h1>;
+    }
+  Greeting.test.tsx: |
+    console.log('initial');
+  garbage_migration.ts: |
+    const GARBAGE_JS_069_MIGRATE_MARKER_A = "migration";
+    const GARBAGE_JS_069_VERSION_MARKER_B = true;
+
+    class SchemaMigrator {
+        static GARBAGE_JS_069_MIGRATOR_CLASS_C = "migrator";
+
+        migrate(fromVersion: number, toVersion: number): void {
+            // noop
+        }
+    }
+  garbage_backup.ts: |
+    const GARBAGE_JS_069_BACKUP_MARKER_D = "backup";
+    const GARBAGE_JS_069_SNAPSHOT_MARKER_E = 86400;
+
+    class BackupCoordinator {
+        static GARBAGE_JS_069_COORDINATOR_CLASS_F = true;
+
+        snapshot(targetPath: string): boolean {
+            return true;
+        }
+    }
+changed:
+  Greeting.tsx: |
+    interface GreetingProps {
+        name: string;
+    }
+
+    export function Greeting({ name }: GreetingProps) {
+        return <h1>Hello, {name}!</h1>;
+    }
+  Greeting.test.tsx: |
+    import { render, screen } from '@testing-library/react';
+    import { Greeting } from './Greeting';
+
+    describe('Greeting', () => {
+        it('should display name', () => {
+            render(<Greeting name="World" />);
+            expect(screen.getByText('Hello, World!')).toBeInTheDocument();
+        });
+    });
+  garbage_migration.ts: |
+    const GARBAGE_JS_069_MIGRATE_MARKER_A = "migration";
+    const GARBAGE_JS_069_VERSION_MARKER_B = true;
+
+    class SchemaMigrator {
+        static GARBAGE_JS_069_MIGRATOR_CLASS_C = "migrator";
+
+        migrate(fromVersion: number, toVersion: number): void {
+            // noop
+        }
+    }
+  garbage_backup.ts: |
+    const GARBAGE_JS_069_BACKUP_MARKER_D = "backup";
+    const GARBAGE_JS_069_SNAPSHOT_MARKER_E = 86400;
+
+    class BackupCoordinator {
+        static GARBAGE_JS_069_COORDINATOR_CLASS_F = true;
+
+        snapshot(targetPath: string): boolean {
+            return true;
+        }
+    }
+must_include_files:
+- Greeting.test.tsx
+must_include_content:
+- import { render, screen } from '@testing-library/react';
+- render(<Greeting name="World" />);
+must_not_include:
+- GARBAGE_JS_069_BACKUP_MARKER_D
+- GARBAGE_JS_069_COORDINATOR_CLASS_F
+- GARBAGE_JS_069_MIGRATE_MARKER_A
+- GARBAGE_JS_069_MIGRATOR_CLASS_C
+- GARBAGE_JS_069_SNAPSHOT_MARKER_E
+- GARBAGE_JS_069_VERSION_MARKER_B
+- garbage_backup.ts
+- garbage_migration.ts
+add_garbage_files: false
+skip_garbage_check: true

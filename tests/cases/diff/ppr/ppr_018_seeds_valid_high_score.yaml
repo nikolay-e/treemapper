@@ -1,0 +1,129 @@
+initial:
+  seed_module.py: |
+    def seed_func():
+        return "seed"
+  other_module.py: |
+    def other_func():
+        return "other"
+
+  # --- Tricky garbage: similar seed-related naming but different identifiers ---
+  garbage_seed_config.py: |
+    GARBAGE_PPR_018_SEED_CFG_A = "seed_configuration"
+    GARBAGE_PPR_018_SEED_MODE_B = "random"
+
+    SEED_INITIAL = 12345
+
+    def initialize_seed():
+        return SEED_INITIAL
+
+    class SeedGenerator:
+        GARBAGE_PPR_018_SEED_GEN_C = True
+
+        def generate(self):
+            return initialize_seed()
+
+  # --- Tricky garbage: structural sibling with similar module naming ---
+  garbage_seed_helper.py: |
+    GARBAGE_PPR_018_HELPER_INIT_D = "seed_helper"
+    GARBAGE_PPR_018_HELPER_VER_E = "2.0"
+
+    def seed_helper():
+        return "helper"
+
+    class SeedProcessor:
+        GARBAGE_PPR_018_HELPER_PROC_F = True
+
+        def process(self):
+            return seed_helper()
+
+  # --- Plain garbage: no overlap ---
+  garbage_cache.py: |
+    GARBAGE_PPR_018_CACHE_SIZE_G = 1024
+    GARBAGE_PPR_018_CACHE_TTL_H = 3600
+
+    class CacheManager:
+        def get(self, key: str):
+            pass
+
+changed:
+  seed_module.py: |
+    def seed_func():
+        return "modified seed"
+  other_module.py: |
+    def other_func():
+        return "other"
+
+  garbage_seed_config.py: |
+    GARBAGE_PPR_018_SEED_CFG_A = "seed_configuration"
+    GARBAGE_PPR_018_SEED_MODE_B = "random"
+
+    SEED_INITIAL = 12345
+
+    def initialize_seed():
+        return SEED_INITIAL
+
+    class SeedGenerator:
+        GARBAGE_PPR_018_SEED_GEN_C = True
+
+        def generate(self):
+            return initialize_seed()
+
+  garbage_seed_helper.py: |
+    GARBAGE_PPR_018_HELPER_INIT_D = "seed_helper"
+    GARBAGE_PPR_018_HELPER_VER_E = "2.0"
+
+    def seed_helper():
+        return "helper"
+
+    class SeedProcessor:
+        GARBAGE_PPR_018_HELPER_PROC_F = True
+
+        def process(self):
+            return seed_helper()
+
+  garbage_cache.py: |
+    GARBAGE_PPR_018_CACHE_SIZE_G = 1024
+    GARBAGE_PPR_018_CACHE_TTL_H = 3600
+
+    class CacheManager:
+        def get(self, key: str):
+            pass
+
+# === Assertions ===
+
+must_include:
+- seed_func
+- modified seed
+
+must_include_files:
+- seed_module.py
+
+must_include_content_from:
+  seed_module.py:
+    - 'def seed_func():'
+    - return "modified seed"
+
+must_not_include:
+- other_func
+# Plain garbage markers
+- GARBAGE_PPR_018_CACHE_SIZE_G
+- GARBAGE_PPR_018_CACHE_TTL_H
+# Tricky: seed-related naming and patterns
+- GARBAGE_PPR_018_SEED_CFG_A
+- GARBAGE_PPR_018_SEED_MODE_B
+- GARBAGE_PPR_018_SEED_GEN_C
+# Tricky: similar naming pattern (seed_*)
+- GARBAGE_PPR_018_HELPER_INIT_D
+- GARBAGE_PPR_018_HELPER_VER_E
+- GARBAGE_PPR_018_HELPER_PROC_F
+
+must_not_include_files:
+- other_module.py
+- garbage_seed_config.py
+- garbage_seed_helper.py
+- garbage_cache.py
+
+max_fragments: 4
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

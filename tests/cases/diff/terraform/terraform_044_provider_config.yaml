@@ -1,0 +1,99 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami = "ami-12345"
+    }
+  # --- Tricky garbage: sibling .tf with same provider block for a different provider/region ---
+  eu_region/providers_GARBAGE_TF_044_A.tf: |
+    # GARBAGE_TF_044_EU_PROVIDER_A - EU region provider config
+    provider "aws" {
+      alias  = "eu_west_GARBAGE_TF_044_A"
+      region = "eu-west-1"
+
+      default_tags {
+        tags = {
+          Environment = "production"
+          ManagedBy   = "terraform"
+          Region      = "eu-GARBAGE_TF_044_A"
+        }
+      }
+
+      assume_role {
+        role_arn = "arn:aws:iam::987654321:role/EURole-GARBAGE_TF_044_B"
+      }
+    }
+  # --- Plain garbage: unrelated script ---
+  scripts/provider_check_GARBAGE_TF_044_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_044_PROVCHECK_C - Provider version checker
+    echo "Checking providers GARBAGE_TF_044_PROVCHECK_D"
+    terraform providers
+
+changed:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami = "ami-12345"
+    }
+  providers.tf: |
+    provider "aws" {
+      region = "us-east-1"
+
+      default_tags {
+        tags = {
+          Environment = "production"
+          ManagedBy   = "terraform"
+        }
+      }
+
+      assume_role {
+        role_arn = "arn:aws:iam::123456789:role/TerraformRole"
+      }
+    }
+  eu_region/providers_GARBAGE_TF_044_A.tf: |
+    # GARBAGE_TF_044_EU_PROVIDER_A - EU region provider config
+    provider "aws" {
+      alias  = "eu_west_GARBAGE_TF_044_A"
+      region = "eu-west-1"
+
+      default_tags {
+        tags = {
+          Environment = "production"
+          ManagedBy   = "terraform"
+          Region      = "eu-GARBAGE_TF_044_A"
+        }
+      }
+
+      assume_role {
+        role_arn = "arn:aws:iam::987654321:role/EURole-GARBAGE_TF_044_B"
+      }
+    }
+  scripts/provider_check_GARBAGE_TF_044_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_044_PROVCHECK_C - Provider version checker
+    echo "Checking providers GARBAGE_TF_044_PROVCHECK_D"
+    terraform providers
+
+must_include_files:
+- providers.tf
+
+must_include_content_from:
+  providers.tf:
+    - provider "aws" {
+    - region = "us-east-1"
+    - role_arn = "arn:aws:iam::123456789:role/TerraformRole"
+
+must_not_include:
+- GARBAGE_TF_044_EU_PROVIDER_A
+- GARBAGE_TF_044_B
+- GARBAGE_TF_044_PROVCHECK_C
+- GARBAGE_TF_044_PROVCHECK_D
+
+must_not_include_files:
+- eu_region/providers_GARBAGE_TF_044_A.tf
+- scripts/provider_check_GARBAGE_TF_044_C.sh
+- main.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

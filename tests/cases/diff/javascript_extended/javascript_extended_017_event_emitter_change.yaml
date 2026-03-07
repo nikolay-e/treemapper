@@ -1,0 +1,49 @@
+initial:
+  emitter.ts: |
+    import { EventEmitter } from 'events';
+
+    export const appEmitter = new EventEmitter();
+
+    export function emitUserCreated(user: { id: string; name: string }) {
+        appEmitter.emit('userCreated', user);
+    }
+
+    // js_garbage_marker_012
+  listener.ts: |
+    import { appEmitter } from './emitter';
+
+    appEmitter.on('userCreated', (user) => {
+        console.log('User created:', user);
+    });
+changed:
+  emitter.ts: |
+    import { EventEmitter } from 'events';
+
+    export const appEmitter = new EventEmitter();
+
+    export function emitUserCreated(user: { id: string; name: string }) {
+        appEmitter.emit('userCreated', user);
+    }
+
+    export function emitUserDeleted(userId: string) {
+        appEmitter.emit('userDeleted', userId);
+    }
+
+    export function emitUserUpdated(user: { id: string; name: string }) {
+        appEmitter.emit('userUpdated', user);
+    }
+
+    // js_garbage_marker_012
+  listener.ts: |
+    import { appEmitter } from './emitter';
+
+    appEmitter.on('userCreated', (user) => {
+        console.log('User created:', user);
+    });
+must_include_files:
+- emitter.ts
+must_include_content:
+- appEmitter = new EventEmitter()
+- 'function emitUserCreated(user: { id: string; name: string }) {'
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,43 @@
+initial:
+  login.ts: |
+    export function getLoginUrl(): string {
+        return '/login';
+    }
+
+    export function getCredentials() {
+        return { username: 'test', password: 'test123' };  // pragma: allowlist secret
+    }
+
+    // playwright_garbage_marker_001
+  login.spec.ts: |
+    console.log('initial');
+changed:
+  login.ts: |
+    export function getLoginUrl(): string {
+        return '/login';
+    }
+
+    export function getCredentials() {
+        return { username: 'test', password: 'test123' };  // pragma: allowlist secret
+    }
+
+    // playwright_garbage_marker_001
+  login.spec.ts: |
+    import { test, expect } from '@playwright/test';
+    import { getLoginUrl, getCredentials } from './login';
+
+    test('user can log in', async ({ page }) => {
+        await page.goto(getLoginUrl());
+        const { username, password } = getCredentials();
+        await page.fill('[name=username]', username);
+        await page.fill('[name=password]', password);
+        await page.click('button[type=submit]');
+        await expect(page).toHaveURL('/dashboard');
+    });
+must_include_files:
+- login.spec.ts
+must_include_content:
+- import { test, expect } from '@playwright/test';
+- async ({ page }) => {
+add_garbage_files: false
+skip_garbage_check: true

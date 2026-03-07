@@ -1,0 +1,81 @@
+initial:
+  module.js: |
+    const a = 1;
+    const b = 2;
+
+    module.exports = { a, b };
+  main.js: |
+    console.log('initial');
+  garbage_auth.ts: |
+    const GARBAGE_JS_014_AUTH_MARKER_A = "auth";
+    const GARBAGE_JS_014_SESSION_MARKER_B = true;
+
+    class SessionManager {
+        static GARBAGE_JS_014_SESSION_CLASS_C = "session";
+
+        validate(token: string): boolean {
+            return true;
+        }
+    }
+  garbage_encryption.ts: |
+    const GARBAGE_JS_014_ENCRYPT_MARKER_D = "encrypt";
+    const GARBAGE_JS_014_CIPHER_MARKER_E = 42;
+
+    class CipherEngine {
+        static GARBAGE_JS_014_CIPHER_CLASS_F = true;
+
+        encrypt(data: string): string {
+            return data;
+        }
+    }
+changed:
+  module.js: |
+    const a = 1;
+    const b = 2;
+
+    module.exports = { a, b };
+  main.js: |
+    const { a, b } = require('./module');
+
+    function main() {
+        console.log(a + b);
+    }
+
+    main();
+  garbage_auth.ts: |
+    const GARBAGE_JS_014_AUTH_MARKER_A = "auth";
+    const GARBAGE_JS_014_SESSION_MARKER_B = true;
+
+    class SessionManager {
+        static GARBAGE_JS_014_SESSION_CLASS_C = "session";
+
+        validate(token: string): boolean {
+            return true;
+        }
+    }
+  garbage_encryption.ts: |
+    const GARBAGE_JS_014_ENCRYPT_MARKER_D = "encrypt";
+    const GARBAGE_JS_014_CIPHER_MARKER_E = 42;
+
+    class CipherEngine {
+        static GARBAGE_JS_014_CIPHER_CLASS_F = true;
+
+        encrypt(data: string): string {
+            return data;
+        }
+    }
+must_include_files:
+- main.js
+must_include_content:
+- '{ a, b } = require(''./module'')'
+must_not_include:
+- GARBAGE_JS_014_AUTH_MARKER_A
+- GARBAGE_JS_014_CIPHER_CLASS_F
+- GARBAGE_JS_014_CIPHER_MARKER_E
+- GARBAGE_JS_014_ENCRYPT_MARKER_D
+- GARBAGE_JS_014_SESSION_CLASS_C
+- GARBAGE_JS_014_SESSION_MARKER_B
+- garbage_auth.ts
+- garbage_encryption.ts
+add_garbage_files: false
+skip_garbage_check: true

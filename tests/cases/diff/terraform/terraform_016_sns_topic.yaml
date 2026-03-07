@@ -1,0 +1,78 @@
+initial:
+  monitoring.tf: |
+    # SNS resources
+
+  # --- Tricky garbage: same resource type aws_sns_topic but for ops notifications ---
+  ops_notifications.tf: |
+    GARBAGE_TF_016_OPS_TOPIC_A = "ops-channel"
+    GARBAGE_TF_016_OPS_PROTO_B = "slack"
+
+    resource "aws_sns_topic" "ops" {
+      name = "ops-notifications"
+    }
+
+    resource "aws_sns_topic_subscription" "ops_slack" {
+      topic_arn = aws_sns_topic.ops.arn
+      protocol  = "https"
+      endpoint  = "https://hooks.slack.com/services/T00/B00/XXXX"
+    }
+
+  # --- Plain garbage ---
+  garbage_user_migration.sql: |
+    -- GARBAGE_TF_016_MIGRATION_MARKER_C
+    -- GARBAGE_TF_016_SCHEMA_VERSION_D
+    ALTER TABLE users ADD COLUMN migrated BOOLEAN DEFAULT FALSE;
+
+changed:
+  monitoring.tf: |
+    resource "aws_sns_topic" "alerts" {
+      name = "alerts-topic"
+    }
+
+    resource "aws_sns_topic_subscription" "email" {
+      topic_arn = aws_sns_topic.alerts.arn
+      protocol  = "email"
+      endpoint  = var.alert_email
+    }
+
+  ops_notifications.tf: |
+    GARBAGE_TF_016_OPS_TOPIC_A = "ops-channel"
+    GARBAGE_TF_016_OPS_PROTO_B = "slack"
+
+    resource "aws_sns_topic" "ops" {
+      name = "ops-notifications"
+    }
+
+    resource "aws_sns_topic_subscription" "ops_slack" {
+      topic_arn = aws_sns_topic.ops.arn
+      protocol  = "https"
+      endpoint  = "https://hooks.slack.com/services/T00/B00/XXXX"
+    }
+
+  garbage_user_migration.sql: |
+    -- GARBAGE_TF_016_MIGRATION_MARKER_C
+    -- GARBAGE_TF_016_SCHEMA_VERSION_D
+    ALTER TABLE users ADD COLUMN migrated BOOLEAN DEFAULT FALSE;
+
+must_include_files:
+- monitoring.tf
+
+must_include_content_from:
+  monitoring.tf:
+    - resource "aws_sns_topic" "alerts" {
+    - aws_sns_topic.alerts.arn
+
+must_not_include:
+- GARBAGE_TF_016_OPS_TOPIC_A
+- GARBAGE_TF_016_OPS_PROTO_B
+- GARBAGE_TF_016_MIGRATION_MARKER_C
+- GARBAGE_TF_016_SCHEMA_VERSION_D
+
+must_not_include_files:
+- ops_notifications.tf
+- garbage_user_migration.sql
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

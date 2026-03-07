@@ -1,0 +1,39 @@
+initial:
+  processor.py: |
+    def helper_validate(data):
+        return data is not None and len(data) > 0
+
+    def helper_transform(data):
+        return data.strip().lower()
+
+    def helper_format(data):
+        return f"[{data}]"
+
+    def main_function(data):
+        if not helper_validate(data):
+            return None
+        transformed = helper_transform(data)
+        return helper_format(transformed)
+changed:
+  processor.py: |
+    def helper_validate(data):
+        return data is not None and len(data) > 0
+
+    def helper_transform(data):
+        return data.strip().lower()
+
+    def helper_format(data):
+        return f"[{data}]"
+
+    def main_function(data):
+        if not helper_validate(data):
+            return None
+        transformed = helper_transform(data)
+        formatted = helper_format(transformed)
+        return f"Result: {formatted}"
+must_include_files:
+- processor.py
+must_include_content:
+- formatted = helper_format(transformed)
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,84 @@
+initial:
+  auth/login.py: |
+    def authenticate(username, password):
+        return username == "admin" and password == "secret"
+  tests/auth/test_login.py: |
+    from auth.login import authenticate
+
+    def test_authenticate_success():
+        assert authenticate("admin", "secret") is True
+
+    def test_authenticate_failure():
+        assert authenticate("user", "wrong") is False
+  garbage_feature_flags.py: |
+    GARBAGE_REL_004_FLAGS_MARKER_A = "flags"
+    GARBAGE_REL_004_TOGGLE_MARKER_B = True
+
+    class FeatureFlagService:
+        GARBAGE_REL_004_SERVICE_CLASS_C = "flags"
+
+        def is_enabled(self, flag_name: str) -> bool:
+            return False
+  garbage_audit_log.py: |
+    GARBAGE_REL_004_AUDIT_MARKER_D = "audit"
+    GARBAGE_REL_004_TRAIL_MARKER_E = 1000
+
+    class AuditLogger:
+        GARBAGE_REL_004_LOGGER_CLASS_F = True
+
+        def log_action(self, actor: str, action: str) -> None:
+            pass
+changed:
+  auth/login.py: |
+    def authenticate(username, password):
+        if not username or not password:
+            return False
+        return username == "admin" and password == "secret"
+  tests/auth/test_login.py: |
+    from auth.login import authenticate
+
+    def test_authenticate_success():
+        assert authenticate("admin", "secret") is True
+
+    def test_authenticate_failure():
+        assert authenticate("user", "wrong") is False
+  garbage_feature_flags.py: |
+    GARBAGE_REL_004_FLAGS_MARKER_A = "flags"
+    GARBAGE_REL_004_TOGGLE_MARKER_B = True
+
+    class FeatureFlagService:
+        GARBAGE_REL_004_SERVICE_CLASS_C = "flags"
+
+        def is_enabled(self, flag_name: str) -> bool:
+            return False
+  garbage_audit_log.py: |
+    GARBAGE_REL_004_AUDIT_MARKER_D = "audit"
+    GARBAGE_REL_004_TRAIL_MARKER_E = 1000
+
+    class AuditLogger:
+        GARBAGE_REL_004_LOGGER_CLASS_F = True
+
+        def log_action(self, actor: str, action: str) -> None:
+            pass
+must_include_files:
+- auth/login.py
+- tests/auth/test_login.py
+must_include_content:
+- |
+  def authenticate(username, password):
+      if not username or not password:
+          return False
+      return username == "admin" and password == "secret"
+must_not_include:
+- GARBAGE_REL_004_FLAGS_MARKER_A
+- GARBAGE_REL_004_TOGGLE_MARKER_B
+- GARBAGE_REL_004_SERVICE_CLASS_C
+- GARBAGE_REL_004_AUDIT_MARKER_D
+- GARBAGE_REL_004_TRAIL_MARKER_E
+- GARBAGE_REL_004_LOGGER_CLASS_F
+- FeatureFlagService
+- AuditLogger
+- garbage_feature_flags.py
+- garbage_audit_log.py
+add_garbage_files: false
+skip_garbage_check: true

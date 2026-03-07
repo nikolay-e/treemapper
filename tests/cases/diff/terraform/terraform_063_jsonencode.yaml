@@ -1,0 +1,118 @@
+initial:
+  ecs.tf: |
+    resource "aws_ecs_task_definition" "worker" {
+      family = "worker"
+      container_definitions = jsonencode([{
+        name      = "worker"
+        image     = "worker:latest"
+        cpu       = 256
+        memory    = 512
+        essential = true
+        environment = [
+          { name = "APP_ENV", value = "staging" }
+        ]
+      }])
+    }
+
+  # --- Tricky garbage: same resource type aws_ecs_task_definition but for scheduler ---
+  garbage_scheduler.tf: |
+    GARBAGE_TF_063_SCHED_MARKER_A = "scheduler-task"
+    GARBAGE_TF_063_SCHED_MARKER_B = "cron-runner"
+
+    resource "aws_ecs_task_definition" "scheduler" {
+      family = "scheduler"
+      container_definitions = jsonencode([{
+        name      = "scheduler"
+        image     = "scheduler:latest"
+        cpu       = 128
+        memory    = 256
+        essential = true
+      }])
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_backup.tf: |
+    GARBAGE_TF_063_BACKUP_MARKER_C = "s3-backup"
+    GARBAGE_TF_063_BACKUP_MARKER_D = "retention-policy"
+
+    resource "aws_s3_bucket" "backups" {
+      bucket = "app-backups-bucket"
+    }
+
+changed:
+  ecs.tf: |
+    resource "aws_ecs_task_definition" "worker" {
+      family = "worker"
+      container_definitions = jsonencode([{
+        name      = "worker"
+        image     = "worker:v2"
+        cpu       = 512
+        memory    = 1024
+        essential = true
+        environment = [
+          { name = "APP_ENV", value = "production" },
+          { name = "LOG_FORMAT", value = "json" }
+        ]
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group"  = "/ecs/worker"
+            "awslogs-region" = "us-east-1"
+          }
+        }
+      }])
+    }
+
+  # --- Tricky garbage: same resource type aws_ecs_task_definition but for scheduler ---
+  garbage_scheduler.tf: |
+    GARBAGE_TF_063_SCHED_MARKER_A = "scheduler-task"
+    GARBAGE_TF_063_SCHED_MARKER_B = "cron-runner"
+
+    resource "aws_ecs_task_definition" "scheduler" {
+      family = "scheduler"
+      container_definitions = jsonencode([{
+        name      = "scheduler"
+        image     = "scheduler:latest"
+        cpu       = 128
+        memory    = 256
+        essential = true
+      }])
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_backup.tf: |
+    GARBAGE_TF_063_BACKUP_MARKER_C = "s3-backup"
+    GARBAGE_TF_063_BACKUP_MARKER_D = "retention-policy"
+
+    resource "aws_s3_bucket" "backups" {
+      bucket = "app-backups-bucket"
+    }
+
+# === Assertions ===
+
+must_include_files:
+- ecs.tf
+
+must_include_content_from:
+  ecs.tf:
+    - image     = "worker:v2"
+    - cpu       = 512
+    - logDriver = "awslogs"
+    - 'resource "aws_ecs_task_definition" "worker"'
+
+must_not_include:
+# Tricky garbage markers (sibling aws_ecs_task_definition resource)
+- GARBAGE_TF_063_SCHED_MARKER_A
+- GARBAGE_TF_063_SCHED_MARKER_B
+# Plain garbage markers
+- GARBAGE_TF_063_BACKUP_MARKER_C
+- GARBAGE_TF_063_BACKUP_MARKER_D
+
+must_not_include_files:
+- garbage_scheduler.tf
+- garbage_backup.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

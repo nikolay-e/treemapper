@@ -1,0 +1,36 @@
+initial:
+  decorator.py: |
+    def outer_function(config):
+        def inner_validator(value):
+            return value is not None
+
+        def inner_transformer(value):
+            return value.upper()
+
+        def process(data):
+            if not inner_validator(data):
+                return None
+            return inner_transformer(data)
+
+        return process
+changed:
+  decorator.py: |
+    def outer_function(config):
+        def inner_validator(value):
+            return value is not None and len(value) > 0
+
+        def inner_transformer(value):
+            return value.upper()
+
+        def process(data):
+            if not inner_validator(data):
+                return None
+            return inner_transformer(data)
+
+        return process
+must_include_files:
+- decorator.py
+must_include_content:
+- return value is not None and len(value) > 0
+add_garbage_files: false
+skip_garbage_check: true

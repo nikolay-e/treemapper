@@ -1,0 +1,115 @@
+initial:
+  src/main.go: |
+    package main
+    import (
+        "fmt"
+        "net/http"
+        "os"
+    )
+    func main() {
+        port := os.Getenv("PORT")
+        if port == "" {
+            port = "8080"
+        }
+        http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+            fmt.Fprintf(w, "OK")
+        })
+        http.ListenAndServe(":"+port, nil)
+    }
+  go.mod: |
+    module myapp
+    go 1.22
+    require github.com/gorilla/mux v1.8.1
+  go.sum: |
+    github.com/gorilla/mux v1.8.1 h1:TuBL49tXwgrFYWhqrNgrUNEY92u81SPhu7sTdzQEiWY=
+    github.com/gorilla/mux v1.8.1/go.mod h1:AKf9I4AEqPTmMytcMc0KkNouC66V3BtZ4qD5fmWSiMQ=
+  Dockerfile: |
+    FROM golang:1.21-alpine
+    COPY . /go/src/app
+    RUN cd /go/src/app && go build -o /app
+    CMD ["/app"]
+  scripts/release.sh: |
+    #!/bin/bash
+    goreleaser release --rm-dist
+  tests/main_test.go: |
+    package main
+    import "testing"
+    func TestHealthEndpoint(t *testing.T) {}
+  docs/contributing.md: |
+    # Contributing
+  .github/workflows/ci.yml: |
+    name: CI
+    on: [push]
+  internal/config/config.go: |
+    package config
+changed:
+  src/main.go: |
+    package main
+    import (
+        "fmt"
+        "net/http"
+        "os"
+    )
+    func main() {
+        port := os.Getenv("PORT")
+        if port == "" {
+            port = "8080"
+        }
+        http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+            fmt.Fprintf(w, "OK")
+        })
+        http.ListenAndServe(":"+port, nil)
+    }
+  go.mod: |
+    module myapp
+    go 1.22
+    require github.com/gorilla/mux v1.8.1
+  go.sum: |
+    github.com/gorilla/mux v1.8.1 h1:TuBL49tXwgrFYWhqrNgrUNEY92u81SPhu7sTdzQEiWY=
+    github.com/gorilla/mux v1.8.1/go.mod h1:AKf9I4AEqPTmMytcMc0KkNouC66V3BtZ4qD5fmWSiMQ=
+  Dockerfile: |
+    # Build stage with explicit WORKDIR
+    FROM golang:1.22-alpine AS builder
+    WORKDIR /build
+
+    # Cache dependencies
+    COPY go.mod go.sum ./
+    RUN go mod download && go mod verify
+
+    # Build with optimizations
+    COPY src/ ./src/
+    WORKDIR /build/src
+    RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+        go build -ldflags="-w -s -X main.Version=${VERSION}" \
+        -o /app ./...
+
+    # Production stage with minimal image
+    FROM gcr.io/distroless/static-debian12:nonroot AS production
+    WORKDIR /home/nonroot
+
+    COPY --from=builder --chown=nonroot:nonroot /app ./app
+
+    USER nonroot:nonroot
+    EXPOSE 8080
+
+    ENTRYPOINT ["./app"]
+  scripts/release.sh: |
+    #!/bin/bash
+    goreleaser release --rm-dist
+  tests/main_test.go: |
+    package main
+    import "testing"
+    func TestHealthEndpoint(t *testing.T) {}
+  docs/contributing.md: |
+    # Contributing
+  .github/workflows/ci.yml: |
+    name: CI
+    on: [push]
+  internal/config/config.go: |
+    package config
+must_include_files:
+- Dockerfile
+must_include_content:
+- FROM golang:1.22-alpine AS builder
+add_garbage_files: false
+skip_garbage_check: true

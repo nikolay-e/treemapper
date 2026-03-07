@@ -1,0 +1,227 @@
+initial:
+  core.py: |
+    from rare_module import unique_helper
+
+    def main():
+        main_marker = "main_function_original"
+        return unique_helper()
+
+    def secondary_function():
+        return "secondary_result"
+
+    def tertiary_function():
+        return "tertiary_result"
+  rare_module.py: |
+    def unique_helper():
+        unique_marker = "unique_helper_implementation"
+        return 42
+
+    def rare_helper_alpha():
+        return "rare_alpha_result"
+
+    def rare_helper_beta():
+        return "rare_beta_result"
+  common_utils.py: |
+    def common_util_one():
+        return "common_one_result"
+
+    def common_util_two():
+        return "common_two_result"
+
+    def common_util_three():
+        return "common_three_result"
+  garbage_sel_006_importable.py: |
+    def GARBAGE_SEL_006_importable_func():
+        return "GARBAGE_SEL_006_importable_result"
+
+    def GARBAGE_SEL_006_another_import():
+        return "GARBAGE_SEL_006_another_import_result"
+
+    class GARBAGE_SEL_006_ImportClass:
+        def import_method(self):
+            return "GARBAGE_SEL_006_import_method_result"
+  garbage_sel_006_identifiers.py: |
+    GARBAGE_SEL_006_RARE_ID_ONE = "garbage_sel_006_rare_id_one_value"
+    GARBAGE_SEL_006_RARE_ID_TWO = "garbage_sel_006_rare_id_two_value"
+    GARBAGE_SEL_006_RARE_ID_THREE = "garbage_sel_006_rare_id_three_value"
+
+    def GARBAGE_SEL_006_identify():
+        return "GARBAGE_SEL_006_identify_result"
+
+    def GARBAGE_SEL_006_expand():
+        return "GARBAGE_SEL_006_expand_result"
+  garbage_sel_006_dependencies.py: |
+    class GARBAGE_SEL_006_DependencyAlpha:
+        def resolve(self):
+            return "GARBAGE_SEL_006_resolve_alpha"
+
+    class GARBAGE_SEL_006_DependencyBeta:
+        def resolve(self):
+            return "GARBAGE_SEL_006_resolve_beta"
+
+    def GARBAGE_SEL_006_inject_dependency():
+        return "GARBAGE_SEL_006_injected"
+  # --- Tricky garbage: self-contained with rare vocabulary ---
+  tricky_rare_consumer.py: |
+    GARBAGE_SEL_006_RARE_CONSUMER_A = "rare_consumer_module"
+    GARBAGE_SEL_006_RARE_USAGE_B = True
+
+    def consume_rare_GARBAGE_SEL_006():
+        result = fetch_rare_GARBAGE_SEL_006()
+        return result * 3
+
+    def fetch_rare_GARBAGE_SEL_006():
+        return 42
+  # --- Tricky garbage: self-contained helper copy ---
+  tricky_unique_helper_copy.py: |
+    GARBAGE_SEL_006_HELPER_COPY_C = "unique_helper_copy"
+    GARBAGE_SEL_006_HELPER_IMPL_D = 42
+
+    def special_helper_GARBAGE_SEL_006():
+        special_marker = "special_helper_implementation"
+        return 42
+
+    def invoke_special_GARBAGE_SEL_006():
+        marker = "invoke_special_modified"
+        result = special_helper_GARBAGE_SEL_006()
+        return result * 2
+changed:
+  core.py: |
+    from rare_module import unique_helper
+
+    def main():
+        main_marker = "main_function_modified"
+        result = unique_helper()
+        return result * 2
+
+    def secondary_function():
+        return "secondary_result"
+
+    def tertiary_function():
+        return "tertiary_result"
+  rare_module.py: |
+    def unique_helper():
+        unique_marker = "unique_helper_implementation"
+        return 42
+
+    def rare_helper_alpha():
+        return "rare_alpha_result"
+
+    def rare_helper_beta():
+        return "rare_beta_result"
+  common_utils.py: |
+    def common_util_one():
+        return "common_one_result"
+
+    def common_util_two():
+        return "common_two_result"
+
+    def common_util_three():
+        return "common_three_result"
+  garbage_sel_006_importable.py: |
+    def GARBAGE_SEL_006_importable_func():
+        return "GARBAGE_SEL_006_importable_result"
+
+    def GARBAGE_SEL_006_another_import():
+        return "GARBAGE_SEL_006_another_import_result"
+
+    class GARBAGE_SEL_006_ImportClass:
+        def import_method(self):
+            return "GARBAGE_SEL_006_import_method_result"
+  garbage_sel_006_identifiers.py: |
+    GARBAGE_SEL_006_RARE_ID_ONE = "garbage_sel_006_rare_id_one_value"
+    GARBAGE_SEL_006_RARE_ID_TWO = "garbage_sel_006_rare_id_two_value"
+    GARBAGE_SEL_006_RARE_ID_THREE = "garbage_sel_006_rare_id_three_value"
+
+    def GARBAGE_SEL_006_identify():
+        return "GARBAGE_SEL_006_identify_result"
+
+    def GARBAGE_SEL_006_expand():
+        return "GARBAGE_SEL_006_expand_result"
+  garbage_sel_006_dependencies.py: |
+    class GARBAGE_SEL_006_DependencyAlpha:
+        def resolve(self):
+            return "GARBAGE_SEL_006_resolve_alpha"
+
+    class GARBAGE_SEL_006_DependencyBeta:
+        def resolve(self):
+            return "GARBAGE_SEL_006_resolve_beta"
+
+    def GARBAGE_SEL_006_inject_dependency():
+        return "GARBAGE_SEL_006_injected"
+  tricky_rare_consumer.py: |
+    GARBAGE_SEL_006_RARE_CONSUMER_A = "rare_consumer_module"
+    GARBAGE_SEL_006_RARE_USAGE_B = True
+
+    def consume_rare_GARBAGE_SEL_006():
+        result = fetch_rare_GARBAGE_SEL_006()
+        return result * 3
+
+    def fetch_rare_GARBAGE_SEL_006():
+        return 42
+  tricky_unique_helper_copy.py: |
+    GARBAGE_SEL_006_HELPER_COPY_C = "unique_helper_copy"
+    GARBAGE_SEL_006_HELPER_IMPL_D = 42
+
+    def special_helper_GARBAGE_SEL_006():
+        special_marker = "special_helper_implementation"
+        return 42
+
+    def invoke_special_GARBAGE_SEL_006():
+        marker = "invoke_special_modified"
+        result = special_helper_GARBAGE_SEL_006()
+        return result * 2
+
+# === Assertions ===
+
+must_include:
+- core.py
+- main
+- main_function_modified
+
+must_include_content_from:
+  core.py:
+    - 'def main():'
+    - main_marker = "main_function_modified"
+    - result = unique_helper()
+
+must_not_include:
+- main_function_original
+# Plain garbage markers
+- GARBAGE_SEL_006_importable_func
+- GARBAGE_SEL_006_importable_result
+- GARBAGE_SEL_006_another_import
+- GARBAGE_SEL_006_ImportClass
+- GARBAGE_SEL_006_import_method_result
+- GARBAGE_SEL_006_RARE_ID_ONE
+- GARBAGE_SEL_006_RARE_ID_TWO
+- garbage_sel_006_rare_id_one_value
+- GARBAGE_SEL_006_identify
+- GARBAGE_SEL_006_expand
+- GARBAGE_SEL_006_DependencyAlpha
+- GARBAGE_SEL_006_DependencyBeta
+- GARBAGE_SEL_006_resolve_alpha
+- GARBAGE_SEL_006_resolve_beta
+- GARBAGE_SEL_006_inject_dependency
+- GARBAGE_SEL_006_injected
+- garbage_sel_006_importable.py
+- garbage_sel_006_identifiers.py
+- garbage_sel_006_dependencies.py
+# Tricky: self-contained with rare vocabulary
+- GARBAGE_SEL_006_RARE_CONSUMER_A
+- GARBAGE_SEL_006_RARE_USAGE_B
+# Tricky: self-contained helper copy
+- GARBAGE_SEL_006_HELPER_COPY_C
+- GARBAGE_SEL_006_HELPER_IMPL_D
+
+must_not_include_files:
+- garbage_sel_006_importable.py
+- garbage_sel_006_identifiers.py
+- garbage_sel_006_dependencies.py
+- tricky_rare_consumer.py
+- tricky_unique_helper_copy.py
+
+max_fragments: 5
+max_files: 3
+add_garbage_files: false
+skip_garbage_check: true

@@ -1,0 +1,134 @@
+initial:
+  main.tf: |
+    variable "config" {
+      type = any
+      default = {
+        app = {
+          port = 8080
+        }
+      }
+    }
+
+    resource "aws_lb_target_group" "app" {
+      name     = "app-tg"
+      port     = try(var.config.app.port, 80)
+      protocol = "HTTP"
+      vpc_id   = aws_vpc.main.id
+
+      health_check {
+        path = "/health"
+        port = try(var.config.app.health_port, "traffic-port")
+      }
+    }
+
+  # --- Tricky garbage: same resource type aws_lb_target_group but for admin ---
+  garbage_admin_tg.tf: |
+    GARBAGE_TF_069_ADMIN_MARKER_A = "admin-target-group"
+    GARBAGE_TF_069_ADMIN_MARKER_B = "admin-backend"
+
+    resource "aws_lb_target_group" "admin" {
+      name     = "admin-tg"
+      port     = try(var.config.admin.port, 9090)
+      protocol = "HTTP"
+      vpc_id   = aws_vpc.main.id
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_codepipeline.tf: |
+    GARBAGE_TF_069_PIPE_MARKER_C = "ci-cd-pipeline"
+    GARBAGE_TF_069_PIPE_MARKER_D = "deploy-stage"
+
+    resource "aws_codepipeline" "app" {
+      name     = "app-pipeline"
+      role_arn = aws_iam_role.pipeline.arn
+      artifact_store {
+        location = aws_s3_bucket.artifacts.bucket
+        type     = "S3"
+      }
+    }
+
+changed:
+  main.tf: |
+    variable "config" {
+      type = any
+      default = {
+        app = {
+          port = 8080
+        }
+      }
+    }
+
+    resource "aws_lb_target_group" "app" {
+      name     = "app-tg"
+      port     = try(var.config.app.port, 80)
+      protocol = "HTTP"
+      vpc_id   = aws_vpc.main.id
+
+      health_check {
+        path     = try(var.config.app.health_path, "/health")
+        port     = try(var.config.app.health_port, "traffic-port")
+        interval = try(var.config.app.health_interval, 30)
+        matcher  = try(var.config.app.health_matcher, "200-299")
+      }
+
+      stickiness {
+        type            = "lb_cookie"
+        cookie_duration = try(var.config.app.sticky_duration, 86400)
+        enabled         = try(var.config.app.sticky_enabled, false)
+      }
+    }
+
+  # --- Tricky garbage: same resource type aws_lb_target_group but for admin ---
+  garbage_admin_tg.tf: |
+    GARBAGE_TF_069_ADMIN_MARKER_A = "admin-target-group"
+    GARBAGE_TF_069_ADMIN_MARKER_B = "admin-backend"
+
+    resource "aws_lb_target_group" "admin" {
+      name     = "admin-tg"
+      port     = try(var.config.admin.port, 9090)
+      protocol = "HTTP"
+      vpc_id   = aws_vpc.main.id
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_codepipeline.tf: |
+    GARBAGE_TF_069_PIPE_MARKER_C = "ci-cd-pipeline"
+    GARBAGE_TF_069_PIPE_MARKER_D = "deploy-stage"
+
+    resource "aws_codepipeline" "app" {
+      name     = "app-pipeline"
+      role_arn = aws_iam_role.pipeline.arn
+      artifact_store {
+        location = aws_s3_bucket.artifacts.bucket
+        type     = "S3"
+      }
+    }
+
+# === Assertions ===
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - try(var.config.app.health_path, "/health")
+    - try(var.config.app.health_interval, 30)
+    - cookie_duration = try(var.config.app.sticky_duration, 86400)
+    - 'resource "aws_lb_target_group" "app"'
+
+must_not_include:
+# Tricky garbage markers (sibling aws_lb_target_group resource)
+- GARBAGE_TF_069_ADMIN_MARKER_A
+- GARBAGE_TF_069_ADMIN_MARKER_B
+# Plain garbage markers
+- GARBAGE_TF_069_PIPE_MARKER_C
+- GARBAGE_TF_069_PIPE_MARKER_D
+
+must_not_include_files:
+- garbage_admin_tg.tf
+- garbage_codepipeline.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

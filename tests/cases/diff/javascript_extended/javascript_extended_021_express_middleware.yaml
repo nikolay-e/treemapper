@@ -1,0 +1,45 @@
+initial:
+  authMiddleware.ts: |
+    import { Request, Response, NextFunction } from 'express';
+
+    export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+        const token = req.headers.authorization;
+        if (!token) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        next();
+    }
+
+    // node_garbage_marker_001
+  app.ts: |
+    console.log('initial');
+changed:
+  authMiddleware.ts: |
+    import { Request, Response, NextFunction } from 'express';
+
+    export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+        const token = req.headers.authorization;
+        if (!token) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        next();
+    }
+
+    // node_garbage_marker_001
+  app.ts: |
+    import express from 'express';
+    import { authMiddleware } from './authMiddleware';
+
+    const app = express();
+    app.use(authMiddleware);
+
+    app.get('/protected', (req, res) => {
+        res.json({ message: 'Protected content' });
+    });
+must_include_files:
+- app.ts
+must_include_content:
+- import express from 'express';
+- app = express()
+add_garbage_files: false
+skip_garbage_check: true

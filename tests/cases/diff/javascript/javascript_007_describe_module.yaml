@@ -1,0 +1,96 @@
+initial:
+  calculator.ts: |
+    export function add(a: number, b: number): number {
+        return a + b;
+    }
+
+    export function multiply(a: number, b: number): number {
+        return a * b;
+    }
+  calculator.test.ts: |
+    console.log('initial');
+  garbage_compression.ts: |
+    const GARBAGE_JS_007_GZIP_MARKER_A = "compression";
+    const GARBAGE_JS_007_LEVEL_MARKER_B = true;
+
+    class GzipCompressor {
+        static GARBAGE_JS_007_COMPRESSOR_CLASS_C = "compressor";
+
+        compress(data: string): string {
+            return data;
+        }
+    }
+  garbage_serialization.ts: |
+    const GARBAGE_JS_007_BINARY_MARKER_D = "serialization";
+    const GARBAGE_JS_007_CODEC_MARKER_E = 42;
+
+    class BinaryCodec {
+        static GARBAGE_JS_007_CODEC_CLASS_F = true;
+
+        encode(value: unknown): string {
+            return String(value);
+        }
+    }
+changed:
+  calculator.ts: |
+    export function add(a: number, b: number): number {
+        return a + b;
+    }
+
+    export function multiply(a: number, b: number): number {
+        return a * b;
+    }
+  calculator.test.ts: |
+    import { add, multiply } from './calculator';
+
+    describe('Calculator', () => {
+        describe('add', () => {
+            it('should add two numbers', () => {
+                expect(add(1, 2)).toBe(3);
+            });
+        });
+
+        describe('multiply', () => {
+            it('should multiply two numbers', () => {
+                expect(multiply(2, 3)).toBe(6);
+            });
+        });
+    });
+  garbage_compression.ts: |
+    const GARBAGE_JS_007_GZIP_MARKER_A = "compression";
+    const GARBAGE_JS_007_LEVEL_MARKER_B = true;
+
+    class GzipCompressor {
+        static GARBAGE_JS_007_COMPRESSOR_CLASS_C = "compressor";
+
+        compress(data: string): string {
+            return data;
+        }
+    }
+  garbage_serialization.ts: |
+    const GARBAGE_JS_007_BINARY_MARKER_D = "serialization";
+    const GARBAGE_JS_007_CODEC_MARKER_E = 42;
+
+    class BinaryCodec {
+        static GARBAGE_JS_007_CODEC_CLASS_F = true;
+
+        encode(value: unknown): string {
+            return String(value);
+        }
+    }
+must_include_files:
+- calculator.test.ts
+must_include_content:
+- import { add, multiply } from './calculator';
+- it('should add two numbers', () => {
+must_not_include:
+- GARBAGE_JS_007_BINARY_MARKER_D
+- GARBAGE_JS_007_CODEC_CLASS_F
+- GARBAGE_JS_007_CODEC_MARKER_E
+- GARBAGE_JS_007_COMPRESSOR_CLASS_C
+- GARBAGE_JS_007_GZIP_MARKER_A
+- GARBAGE_JS_007_LEVEL_MARKER_B
+- garbage_compression.ts
+- garbage_serialization.ts
+add_garbage_files: false
+skip_garbage_check: true

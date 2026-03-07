@@ -1,0 +1,154 @@
+initial:
+  mod0.py: |
+    def func0():
+        return 0
+  mod1.py: |
+    def func1():
+        return 1
+  mod2.py: |
+    def func2():
+        return 2
+  mod3.py: |
+    def func3():
+        return 3
+  mod4.py: |
+    def func4():
+        return 4
+
+  # --- Tricky garbage: same function naming pattern funcN ---
+  garbage_func_utils.py: |
+    GARBAGE_PPR026_FUNCUTIL_A = "utils"
+    GARBAGE_PPR026_FUNCUTIL_B = True
+
+    def func0():
+        return "unrelated_zero"
+
+    def func2():
+        return "unrelated_two"
+
+    class FuncRegistry:
+        GARBAGE_PPR026_REGISTRY_C = 999
+
+        def get_func(self, n):
+            return n
+
+  # --- Tricky garbage: returns numeric values like the diff ---
+  garbage_numeric_ops.py: |
+    GARBAGE_PPR026_NUMOPS_D = 100
+    GARBAGE_PPR026_NUMOPS_E = 200
+
+    def compute_hundred():
+        return 100
+
+    def compute_two_hundred():
+        return 200
+
+    class NumericProcessor:
+        GARBAGE_PPR026_PROCESSOR_F = "numeric"
+
+        def process(self, value):
+            return value * 100
+
+  # --- Tricky garbage: same directory, modN.py sibling pattern ---
+  garbage_mod_helper.py: |
+    GARBAGE_PPR026_MODHELP_G = "helper"
+    GARBAGE_PPR026_MODHELP_H = 42
+
+    def mod_helper():
+        return 0
+
+    def mod_validator():
+        return True
+
+changed:
+  mod0.py: |
+    def func0():
+        return 100
+  mod1.py: |
+    def func1():
+        return 1
+  mod2.py: |
+    def func2():
+        return 200
+  mod3.py: |
+    def func3():
+        return 3
+  mod4.py: |
+    def func4():
+        return 4
+  garbage_func_utils.py: |
+    GARBAGE_PPR026_FUNCUTIL_A = "utils"
+    GARBAGE_PPR026_FUNCUTIL_B = True
+
+    def func0():
+        return "unrelated_zero"
+
+    def func2():
+        return "unrelated_two"
+
+    class FuncRegistry:
+        GARBAGE_PPR026_REGISTRY_C = 999
+
+        def get_func(self, n):
+            return n
+  garbage_numeric_ops.py: |
+    GARBAGE_PPR026_NUMOPS_D = 100
+    GARBAGE_PPR026_NUMOPS_E = 200
+
+    def compute_hundred():
+        return 100
+
+    def compute_two_hundred():
+        return 200
+
+    class NumericProcessor:
+        GARBAGE_PPR026_PROCESSOR_F = "numeric"
+
+        def process(self, value):
+            return value * 100
+  garbage_mod_helper.py: |
+    GARBAGE_PPR026_MODHELP_G = "helper"
+    GARBAGE_PPR026_MODHELP_H = 42
+
+    def mod_helper():
+        return 0
+
+    def mod_validator():
+        return True
+
+# === Assertions ===
+
+must_include_files:
+- mod0.py
+- mod2.py
+
+must_include_content_from:
+  mod0.py:
+    - 'def func0():'
+    - return 100
+  mod2.py:
+    - 'def func2():'
+    - return 200
+
+must_not_include:
+# Tricky: same func0/func2 names
+- GARBAGE_PPR026_FUNCUTIL_A
+- GARBAGE_PPR026_FUNCUTIL_B
+- GARBAGE_PPR026_REGISTRY_C
+# Tricky: same numeric values 100/200
+- GARBAGE_PPR026_NUMOPS_D
+- GARBAGE_PPR026_NUMOPS_E
+- GARBAGE_PPR026_PROCESSOR_F
+# Tricky: structural sibling mod_helper
+- GARBAGE_PPR026_MODHELP_G
+- GARBAGE_PPR026_MODHELP_H
+
+must_not_include_files:
+- garbage_func_utils.py
+- garbage_numeric_ops.py
+- garbage_mod_helper.py
+
+max_fragments: 6
+max_files: 3
+add_garbage_files: false
+skip_garbage_check: true

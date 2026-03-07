@@ -1,0 +1,28 @@
+initial:
+  templates/configmap.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: app-config
+  junk.md: |
+    garbage_marker_12345
+    unused_marker_67890
+changed:
+  templates/configmap.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: {{ .Release.Name }}-config
+      namespace: {{ .Release.Namespace }}
+      labels:
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+  junk.md: |
+    garbage_marker_12345
+    unused_marker_67890
+must_include_files:
+- templates/configmap.yaml
+must_include_content:
+- 'name: {{ .Release.Name }}-config'
+add_garbage_files: false
+skip_garbage_check: true

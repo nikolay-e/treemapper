@@ -1,0 +1,13 @@
+initial:
+  broken.py: |
+    def broken(
+        x = 1
+changed:
+  broken.py: |
+    def broken(
+        x = 1
+        y = 2
+must_include_files:
+- broken.py
+add_garbage_files: false
+skip_garbage_check: true

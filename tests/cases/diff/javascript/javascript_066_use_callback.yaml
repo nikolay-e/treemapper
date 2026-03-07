@@ -1,0 +1,83 @@
+initial:
+  handlers.ts: |
+    export function createClickHandler(id: string) {
+        return () => console.log('Clicked:', id);
+    }
+  ActionButton.tsx: |
+    console.log('initial');
+  garbage_rate_limiting.ts: |
+    const GARBAGE_JS_066_RATELIMIT_MARKER_A = "ratelimit";
+    const GARBAGE_JS_066_WINDOW_MARKER_B = true;
+
+    class RateLimiter {
+        static GARBAGE_JS_066_LIMITER_CLASS_C = "limiter";
+
+        allow(clientId: string): boolean {
+            return true;
+        }
+    }
+  garbage_feature_flags.ts: |
+    const GARBAGE_JS_066_FLAG_MARKER_D = "feature_flags";
+    const GARBAGE_JS_066_TOGGLE_MARKER_E = 100;
+
+    class FeatureFlagService {
+        static GARBAGE_JS_066_FLAGSERVICE_CLASS_F = true;
+
+        isEnabled(flagName: string): boolean {
+            return false;
+        }
+    }
+changed:
+  handlers.ts: |
+    export function createClickHandler(id: string) {
+        return () => console.log('Clicked:', id);
+    }
+  ActionButton.tsx: |
+    import { useCallback } from 'react';
+    import { createClickHandler } from './handlers';
+
+    export function ActionButton({ id }: { id: string }) {
+        const handleClick = useCallback(() => {
+            createClickHandler(id)();
+        }, [id]);
+
+        return <button onClick={handleClick}>Action</button>;
+    }
+  garbage_rate_limiting.ts: |
+    const GARBAGE_JS_066_RATELIMIT_MARKER_A = "ratelimit";
+    const GARBAGE_JS_066_WINDOW_MARKER_B = true;
+
+    class RateLimiter {
+        static GARBAGE_JS_066_LIMITER_CLASS_C = "limiter";
+
+        allow(clientId: string): boolean {
+            return true;
+        }
+    }
+  garbage_feature_flags.ts: |
+    const GARBAGE_JS_066_FLAG_MARKER_D = "feature_flags";
+    const GARBAGE_JS_066_TOGGLE_MARKER_E = 100;
+
+    class FeatureFlagService {
+        static GARBAGE_JS_066_FLAGSERVICE_CLASS_F = true;
+
+        isEnabled(flagName: string): boolean {
+            return false;
+        }
+    }
+must_include_files:
+- ActionButton.tsx
+must_include_content:
+- import { useCallback } from 'react';
+- 'function ActionButton({ id }: { id: string }) {'
+must_not_include:
+- GARBAGE_JS_066_FLAGSERVICE_CLASS_F
+- GARBAGE_JS_066_FLAG_MARKER_D
+- GARBAGE_JS_066_LIMITER_CLASS_C
+- GARBAGE_JS_066_RATELIMIT_MARKER_A
+- GARBAGE_JS_066_TOGGLE_MARKER_E
+- GARBAGE_JS_066_WINDOW_MARKER_B
+- garbage_feature_flags.ts
+- garbage_rate_limiting.ts
+add_garbage_files: false
+skip_garbage_check: true

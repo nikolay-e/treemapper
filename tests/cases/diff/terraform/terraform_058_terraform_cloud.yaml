@@ -1,0 +1,93 @@
+initial:
+  main.tf: |
+    terraform {
+      backend "local" {}
+    }
+
+  # --- Tricky garbage: sibling .tf with terraform cloud block for different org ---
+  garbage_tf_058_cloud_staging.tf: |
+    GARBAGE_TF_058_CLOUD_STAGING_A = "staging_cloud"
+    GARBAGE_TF_058_ORG_NAME_B = "staging-org"
+
+    terraform {
+      cloud {
+        organization = "staging-org"
+
+        workspaces {
+          tags = ["app:api", "env:staging"]
+        }
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_058_eip.tf: |
+    GARBAGE_TF_058_EIP_DOMAIN_C = "vpc"
+    GARBAGE_TF_058_EIP_TAG_D = "nat-eip"
+
+    resource "aws_eip" "nat" {
+      domain = "vpc"
+      tags = {
+        Name = "nat-gateway-eip"
+      }
+    }
+
+changed:
+  main.tf: |
+    terraform {
+      cloud {
+        organization = "my-org"
+
+        workspaces {
+          tags = ["app:web", "env:production"]
+        }
+      }
+    }
+
+  garbage_tf_058_cloud_staging.tf: |
+    GARBAGE_TF_058_CLOUD_STAGING_A = "staging_cloud"
+    GARBAGE_TF_058_ORG_NAME_B = "staging-org"
+
+    terraform {
+      cloud {
+        organization = "staging-org"
+
+        workspaces {
+          tags = ["app:api", "env:staging"]
+        }
+      }
+    }
+
+  garbage_tf_058_eip.tf: |
+    GARBAGE_TF_058_EIP_DOMAIN_C = "vpc"
+    GARBAGE_TF_058_EIP_TAG_D = "nat-eip"
+
+    resource "aws_eip" "nat" {
+      domain = "vpc"
+      tags = {
+        Name = "nat-gateway-eip"
+      }
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - organization = "my-org"
+    - tags = ["app:web", "env:production"]
+    - cloud {
+
+must_not_include:
+- GARBAGE_TF_058_CLOUD_STAGING_A
+- GARBAGE_TF_058_ORG_NAME_B
+- GARBAGE_TF_058_EIP_DOMAIN_C
+- GARBAGE_TF_058_EIP_TAG_D
+
+must_not_include_files:
+- garbage_tf_058_cloud_staging.tf
+- garbage_tf_058_eip.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

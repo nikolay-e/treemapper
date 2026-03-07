@@ -1,0 +1,100 @@
+initial:
+  modules/app/main.tf: |
+    resource "aws_lambda_function" "app" {
+      function_name = var.name
+      runtime       = var.runtime
+    }
+  modules/app/variables.tf: |
+    variable "name" {
+      type = string
+    }
+  # --- Tricky garbage: sibling .tf with same variable blocks for a different module ---
+  modules/cache/variables_GARBAGE_TF_029_A.tf: |
+    # GARBAGE_TF_029_CACHE_VARS_A - Cache module variables
+    variable "cache_name_GARBAGE_TF_029_A" {
+      type    = string
+      default = "redis-cluster"
+    }
+
+    variable "cache_runtime_GARBAGE_TF_029_B" {
+      type    = string
+      default = "6.x"
+    }
+
+    variable "cache_node_type_GARBAGE_TF_029_A" {
+      type    = string
+      default = "cache.t3.micro"
+    }
+  # --- Plain garbage: unrelated script ---
+  scripts/cleanup_GARBAGE_TF_029_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_029_CLEANUP_C - Old cleanup script
+    echo "Running cleanup GARBAGE_TF_029_CLEANUP_D"
+    rm -rf /tmp/terraform-cache
+
+changed:
+  modules/app/main.tf: |
+    resource "aws_lambda_function" "app" {
+      function_name = var.name
+      runtime       = var.runtime
+    }
+  modules/app/variables.tf: |
+    variable "name" {
+      type = string
+    }
+
+    variable "runtime" {
+      type    = string
+      default = "python3.9"
+    }
+
+    variable "memory_size" {
+      type    = number
+      default = 128
+    }
+  modules/cache/variables_GARBAGE_TF_029_A.tf: |
+    # GARBAGE_TF_029_CACHE_VARS_A - Cache module variables
+    variable "cache_name_GARBAGE_TF_029_A" {
+      type    = string
+      default = "redis-cluster"
+    }
+
+    variable "cache_runtime_GARBAGE_TF_029_B" {
+      type    = string
+      default = "6.x"
+    }
+
+    variable "cache_node_type_GARBAGE_TF_029_A" {
+      type    = string
+      default = "cache.t3.micro"
+    }
+  scripts/cleanup_GARBAGE_TF_029_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_029_CLEANUP_C - Old cleanup script
+    echo "Running cleanup GARBAGE_TF_029_CLEANUP_D"
+    rm -rf /tmp/terraform-cache
+
+must_include_files:
+- modules/app/variables.tf
+
+must_include_content_from:
+  modules/app/variables.tf:
+    - variable "runtime" {
+    - default = "python3.9"
+    - variable "memory_size" {
+
+must_not_include:
+- GARBAGE_TF_029_CACHE_VARS_A
+- GARBAGE_TF_029_B
+- GARBAGE_TF_029_CLEANUP_C
+- GARBAGE_TF_029_CLEANUP_D
+
+must_not_include_files:
+- modules/cache/variables_GARBAGE_TF_029_A.tf
+- scripts/cleanup_GARBAGE_TF_029_C.sh
+- modules/app/main.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

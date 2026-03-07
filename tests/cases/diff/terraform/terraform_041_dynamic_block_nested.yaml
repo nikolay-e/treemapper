@@ -1,0 +1,132 @@
+initial:
+  lb.tf: |
+    resource "aws_lb_listener" "https" {
+      load_balancer_arn = aws_lb.main.arn
+      port              = 443
+      protocol          = "HTTPS"
+    }
+  # --- Tricky garbage: sibling .tf with same dynamic block / lb_listener for a different LB ---
+  internal/internal_lb_GARBAGE_TF_041_A.tf: |
+    # GARBAGE_TF_041_INTERNAL_LB_A - Internal load balancer listener
+    variable "internal_redirects_GARBAGE_TF_041_A" {
+      default = [
+        { host = "old-internal.corp.com", target = "new-internal.corp.com" }
+      ]
+    }
+
+    resource "aws_lb_listener" "internal_GARBAGE_TF_041_A" {
+      load_balancer_arn = aws_lb.internal.arn
+      port              = 443
+      protocol          = "HTTPS"
+
+      dynamic "default_action" {
+        for_each = var.internal_redirects_GARBAGE_TF_041_A
+        content {
+          type = "redirect"
+          redirect {
+            host        = default_action.value.target
+            status_code = "HTTP_301"
+          }
+        }
+      }
+    }
+
+    # GARBAGE_TF_041_INTERNAL_TG_B
+    resource "aws_lb_target_group" "internal_GARBAGE_TF_041_B" {
+      name = "internal-tg-GARBAGE_TF_041_B"
+      port = 8080
+    }
+  # --- Plain garbage: unrelated script ---
+  scripts/lb_health_GARBAGE_TF_041_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_041_LBHEALTH_C - LB health check script
+    echo "Checking LB health GARBAGE_TF_041_LBHEALTH_D"
+    aws elbv2 describe-target-health --target-group-arn "$1"
+
+changed:
+  lb.tf: |
+    variable "redirects" {
+      default = [
+        { host = "old.example.com", target = "new.example.com" },
+        { host = "legacy.example.com", target = "app.example.com" }
+      ]
+    }
+
+    resource "aws_lb_listener" "https" {
+      load_balancer_arn = aws_lb.main.arn
+      port              = 443
+      protocol          = "HTTPS"
+
+      dynamic "default_action" {
+        for_each = var.redirects
+        content {
+          type = "redirect"
+          redirect {
+            host        = default_action.value.target
+            port        = "443"
+            protocol    = "HTTPS"
+            status_code = "HTTP_301"
+          }
+        }
+      }
+    }
+  internal/internal_lb_GARBAGE_TF_041_A.tf: |
+    # GARBAGE_TF_041_INTERNAL_LB_A - Internal load balancer listener
+    variable "internal_redirects_GARBAGE_TF_041_A" {
+      default = [
+        { host = "old-internal.corp.com", target = "new-internal.corp.com" }
+      ]
+    }
+
+    resource "aws_lb_listener" "internal_GARBAGE_TF_041_A" {
+      load_balancer_arn = aws_lb.internal.arn
+      port              = 443
+      protocol          = "HTTPS"
+
+      dynamic "default_action" {
+        for_each = var.internal_redirects_GARBAGE_TF_041_A
+        content {
+          type = "redirect"
+          redirect {
+            host        = default_action.value.target
+            status_code = "HTTP_301"
+          }
+        }
+      }
+    }
+
+    # GARBAGE_TF_041_INTERNAL_TG_B
+    resource "aws_lb_target_group" "internal_GARBAGE_TF_041_B" {
+      name = "internal-tg-GARBAGE_TF_041_B"
+      port = 8080
+    }
+  scripts/lb_health_GARBAGE_TF_041_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_041_LBHEALTH_C - LB health check script
+    echo "Checking LB health GARBAGE_TF_041_LBHEALTH_D"
+    aws elbv2 describe-target-health --target-group-arn "$1"
+
+must_include_files:
+- lb.tf
+
+must_include_content_from:
+  lb.tf:
+    - variable "redirects" {
+    - dynamic "default_action" {
+    - host        = default_action.value.target
+    - status_code = "HTTP_301"
+
+must_not_include:
+- GARBAGE_TF_041_INTERNAL_LB_A
+- GARBAGE_TF_041_B
+- GARBAGE_TF_041_LBHEALTH_C
+- GARBAGE_TF_041_LBHEALTH_D
+
+must_not_include_files:
+- internal/internal_lb_GARBAGE_TF_041_A.tf
+- scripts/lb_health_GARBAGE_TF_041_C.sh
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

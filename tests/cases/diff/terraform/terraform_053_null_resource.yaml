@@ -1,0 +1,98 @@
+initial:
+  scripts/deploy.sh: |
+    #!/bin/bash
+    echo "Deploying application..."
+  main.tf: |
+    # Main resources
+
+  # --- Tricky garbage: sibling .tf with null_resource for different purpose ---
+  garbage_tf_053_null_healthcheck.tf: |
+    GARBAGE_TF_053_HEALTHCHECK_A = "null_healthcheck"
+    GARBAGE_TF_053_INTERVAL_B = 30
+
+    resource "null_resource" "healthcheck" {
+      triggers = {
+        endpoint = "https://api.example.com/health"
+      }
+
+      provisioner "local-exec" {
+        command = "curl -f https://api.example.com/health"
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_053_subnet.tf: |
+    GARBAGE_TF_053_SUBNET_CIDR_C = "10.0.1.0/24"
+    GARBAGE_TF_053_SUBNET_AZ_D = "us-east-1a"
+
+    resource "aws_subnet" "private" {
+      vpc_id     = "vpc-12345"
+      cidr_block = "10.0.1.0/24"
+    }
+
+changed:
+  scripts/deploy.sh: |
+    #!/bin/bash
+    echo "Deploying application..."
+  main.tf: |
+    resource "null_resource" "deploy" {
+      triggers = {
+        build_version = var.build_version
+        config_hash   = md5(file("config.json"))
+      }
+
+      provisioner "local-exec" {
+        command = "./scripts/deploy.sh ${var.environment}"
+      }
+
+      depends_on = [aws_instance.web]
+    }
+
+  garbage_tf_053_null_healthcheck.tf: |
+    GARBAGE_TF_053_HEALTHCHECK_A = "null_healthcheck"
+    GARBAGE_TF_053_INTERVAL_B = 30
+
+    resource "null_resource" "healthcheck" {
+      triggers = {
+        endpoint = "https://api.example.com/health"
+      }
+
+      provisioner "local-exec" {
+        command = "curl -f https://api.example.com/health"
+      }
+    }
+
+  garbage_tf_053_subnet.tf: |
+    GARBAGE_TF_053_SUBNET_CIDR_C = "10.0.1.0/24"
+    GARBAGE_TF_053_SUBNET_AZ_D = "us-east-1a"
+
+    resource "aws_subnet" "private" {
+      vpc_id     = "vpc-12345"
+      cidr_block = "10.0.1.0/24"
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - resource "null_resource" "deploy" {
+    - build_version = var.build_version
+    - config_hash   = md5(file("config.json"))
+    - depends_on = [aws_instance.web]
+
+must_not_include:
+- GARBAGE_TF_053_HEALTHCHECK_A
+- GARBAGE_TF_053_INTERVAL_B
+- GARBAGE_TF_053_SUBNET_CIDR_C
+- GARBAGE_TF_053_SUBNET_AZ_D
+
+must_not_include_files:
+- garbage_tf_053_null_healthcheck.tf
+- garbage_tf_053_subnet.tf
+- scripts/deploy.sh
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

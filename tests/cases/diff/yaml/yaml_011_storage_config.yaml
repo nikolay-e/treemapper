@@ -1,0 +1,83 @@
+initial:
+  config/storage.yaml: |
+    storage:
+      backend: local
+      path: /data/uploads
+  src/storage.py: |
+    class StorageBackend:
+        def __init__(self, backend: str, path: str):
+            self.backend = backend
+            self.path = path
+
+        def save(self, filename: str, data: bytes):
+            pass
+  garbage_template_engine.py: |
+    GARBAGE_YAML_011_TEMPLATE_MARKER_A = "template"
+    GARBAGE_YAML_011_RENDER_MARKER_B = True
+
+    class TemplateEngine:
+        GARBAGE_YAML_011_ENGINE_CLASS_C = "engine"
+
+        def render(self, template_name: str, context: dict) -> str:
+            return ""
+  garbage_file_uploader.py: |
+    GARBAGE_YAML_011_UPLOAD_MARKER_D = "upload"
+    GARBAGE_YAML_011_CHUNK_MARKER_E = 42
+
+    class FileUploader:
+        GARBAGE_YAML_011_UPLOADER_CLASS_F = True
+
+        def upload(self, file_path: str, destination: str) -> bool:
+            return True
+changed:
+  config/storage.yaml: |
+    storage:
+      backend: s3
+      bucket: my-bucket
+      region: us-east-1
+  src/storage.py: |
+    class StorageBackend:
+        def __init__(self, backend: str, path: str):
+            self.backend = backend
+            self.path = path
+
+        def save(self, filename: str, data: bytes):
+            pass
+  garbage_template_engine.py: |
+    GARBAGE_YAML_011_TEMPLATE_MARKER_A = "template"
+    GARBAGE_YAML_011_RENDER_MARKER_B = True
+
+    class TemplateEngine:
+        GARBAGE_YAML_011_ENGINE_CLASS_C = "engine"
+
+        def render(self, template_name: str, context: dict) -> str:
+            return ""
+  garbage_file_uploader.py: |
+    GARBAGE_YAML_011_UPLOAD_MARKER_D = "upload"
+    GARBAGE_YAML_011_CHUNK_MARKER_E = 42
+
+    class FileUploader:
+        GARBAGE_YAML_011_UPLOADER_CLASS_F = True
+
+        def upload(self, file_path: str, destination: str) -> bool:
+            return True
+must_include_files:
+- config/storage.yaml
+must_include_content:
+- |2
+    backend: s3
+    bucket: my-bucket
+    region: us-east-1
+must_not_include:
+- GARBAGE_YAML_011_TEMPLATE_MARKER_A
+- GARBAGE_YAML_011_RENDER_MARKER_B
+- GARBAGE_YAML_011_ENGINE_CLASS_C
+- GARBAGE_YAML_011_UPLOAD_MARKER_D
+- GARBAGE_YAML_011_CHUNK_MARKER_E
+- GARBAGE_YAML_011_UPLOADER_CLASS_F
+- TemplateEngine
+- FileUploader
+- garbage_template_engine.py
+- garbage_file_uploader.py
+add_garbage_files: false
+skip_garbage_check: true

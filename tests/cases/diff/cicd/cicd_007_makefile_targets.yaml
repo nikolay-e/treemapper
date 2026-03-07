@@ -1,0 +1,309 @@
+initial:
+  Makefile: ".PHONY: build test clean install dev\n\nPYTHON := python3\nVENV := venv\n\
+    PIP := $(VENV)/bin/pip\nPYTEST := $(VENV)/bin/pytest\n\nbuild:\n\tpython setup.py\
+    \ build\n\ntest:\n\tpytest tests/\n\nclean:\n\trm -rf build/ dist/ *.egg-info\n\
+    \tfind . -type d -name __pycache__ -exec rm -rf {} +\n\tfind . -type f -name \"\
+    *.pyc\" -delete\n\ninstall:\n\t$(PIP) install -e .\n\ndev:\n\t$(PIP) install\
+    \ -e \".[dev]\"\n"
+  src/app.py: |
+    import logging
+    from typing import Optional
+    from dataclasses import dataclass
+
+    from .config import load_config, AppConfig
+    from .services import DatabaseService, CacheService
+
+    logger = logging.getLogger(__name__)
+
+    @dataclass
+    class Application:
+        config: AppConfig
+        database: DatabaseService
+        cache: Optional[CacheService] = None
+
+        def run(self) -> None:
+            logger.info(f"Starting application in {self.config.environment} mode")
+            self.database.connect()
+            if self.cache:
+                self.cache.connect()
+            logger.info("Application started successfully")
+
+        def shutdown(self) -> None:
+            logger.info("Shutting down application")
+            if self.cache:
+                self.cache.disconnect()
+            self.database.disconnect()
+            logger.info("Application shut down complete")
+
+    def create_application() -> Application:
+        config = load_config()
+        database = DatabaseService(config.database)
+        cache = CacheService(config.cache) if config.cache.enabled else None
+        return Application(config=config, database=database, cache=cache)
+
+    def run() -> None:
+        app = create_application()
+        try:
+            app.run()
+        except KeyboardInterrupt:
+            app.shutdown()
+  src/config.py: |
+    import os
+    from dataclasses import dataclass
+    from typing import Optional
+
+    @dataclass
+    class DatabaseConfig:
+        host: str
+        port: int
+        name: str
+        user: str
+        password: str
+
+    @dataclass
+    class CacheConfig:
+        enabled: bool
+        host: str
+        port: int
+
+    @dataclass
+    class AppConfig:
+        environment: str
+        database: DatabaseConfig
+        cache: CacheConfig
+
+    def load_config() -> AppConfig:
+        return AppConfig(
+            environment=os.getenv("ENV", "development"),
+            database=DatabaseConfig(
+                host=os.getenv("DB_HOST", "localhost"),
+                port=int(os.getenv("DB_PORT", "5432")),
+                name=os.getenv("DB_NAME", "app"),
+                user=os.getenv("DB_USER", "postgres"),
+                password=os.getenv("DB_PASSWORD", ""),
+            ),
+            cache=CacheConfig(
+                enabled=os.getenv("CACHE_ENABLED", "false").lower() == "true",
+                host=os.getenv("CACHE_HOST", "localhost"),
+                port=int(os.getenv("CACHE_PORT", "6379")),
+            ),
+        )
+  # --- Plain garbage ---
+  garbage_docs.py: |
+    GARBAGE_CICD_007_DOC_MARKER_A = "readme"
+    GARBAGE_CICD_007_FORMAT_MARKER_B = "markdown"
+
+    class GarbageDocGenerator:
+        GARBAGE_CICD_007_TEMPLATE_MARKER_C = "default"
+
+        def generate(self) -> str:
+            return ""
+  garbage_release.py: |
+    GARBAGE_CICD_007_RELEASE_MARKER_D = "semantic"
+    GARBAGE_CICD_007_BRANCH_MARKER_E = "main"
+
+    class GarbageReleaseManager:
+        GARBAGE_CICD_007_TAG_MARKER_F = "v1.0.0"
+
+        def release(self) -> None:
+            pass
+  # --- Tricky garbage: sibling Makefile with lint target ---
+  Makefile.ci: |
+    GARBAGE_CICD_007_MKCI_G = "ci-makefile";
+    GARBAGE_CICD_007_CILINT_H = "ci-lint-target";
+
+    .PHONY: lint test build
+
+    lint:
+    	ruff check src/
+
+    test:
+    	pytest tests/ --cov=src
+
+    build:
+    	python -m build
+  # --- Tricky garbage: pyproject.toml with pytest config ---
+  pyproject.toml: |
+    GARBAGE_CICD_007_PYPROJ_I = "pyproject-config"
+    GARBAGE_CICD_007_PYTEST_J = "pytest-section"
+
+    [project]
+    name = "myapp"
+    version = "1.0.0"
+
+    [tool.pytest.ini_options]
+    testpaths = ["tests"]
+    addopts = "--cov=src --cov-report=html"
+
+    [tool.ruff]
+    line-length = 88
+    target-version = "py311"
+changed:
+  Makefile: ".PHONY: build test lint deploy clean install dev\n\nPYTHON := python3\n\
+    VENV := venv\nPIP := $(VENV)/bin/pip\nPYTEST := $(VENV)/bin/pytest\n\nbuild:\n\
+    \tpython -m build\n\ntest:\n\tpytest tests/ --cov=src\n\nlint:\n\truff check src/\n\
+    \ndeploy:\n\t./scripts/deploy.sh\n\nclean:\n\trm -rf build/ dist/ *.egg-info\n\
+    \tfind . -type d -name __pycache__ -exec rm -rf {} +\n\tfind . -type f -name \"\
+    *.pyc\" -delete\n\ninstall:\n\t$(PIP) install -e .\n\ndev:\n\t$(PIP) install\
+    \ -e \".[dev]\"\n"
+  src/app.py: |
+    import logging
+    from typing import Optional
+    from dataclasses import dataclass
+
+    from .config import load_config, AppConfig
+    from .services import DatabaseService, CacheService
+
+    logger = logging.getLogger(__name__)
+
+    @dataclass
+    class Application:
+        config: AppConfig
+        database: DatabaseService
+        cache: Optional[CacheService] = None
+
+        def run(self) -> None:
+            logger.info(f"Starting application in {self.config.environment} mode")
+            self.database.connect()
+            if self.cache:
+                self.cache.connect()
+            logger.info("Application started successfully")
+
+        def shutdown(self) -> None:
+            logger.info("Shutting down application")
+            if self.cache:
+                self.cache.disconnect()
+            self.database.disconnect()
+            logger.info("Application shut down complete")
+
+    def create_application() -> Application:
+        config = load_config()
+        database = DatabaseService(config.database)
+        cache = CacheService(config.cache) if config.cache.enabled else None
+        return Application(config=config, database=database, cache=cache)
+
+    def run() -> None:
+        app = create_application()
+        try:
+            app.run()
+        except KeyboardInterrupt:
+            app.shutdown()
+  src/config.py: |
+    import os
+    from dataclasses import dataclass
+    from typing import Optional
+
+    @dataclass
+    class DatabaseConfig:
+        host: str
+        port: int
+        name: str
+        user: str
+        password: str
+
+    @dataclass
+    class CacheConfig:
+        enabled: bool
+        host: str
+        port: int
+
+    @dataclass
+    class AppConfig:
+        environment: str
+        database: DatabaseConfig
+        cache: CacheConfig
+
+    def load_config() -> AppConfig:
+        return AppConfig(
+            environment=os.getenv("ENV", "development"),
+            database=DatabaseConfig(
+                host=os.getenv("DB_HOST", "localhost"),
+                port=int(os.getenv("DB_PORT", "5432")),
+                name=os.getenv("DB_NAME", "app"),
+                user=os.getenv("DB_USER", "postgres"),
+                password=os.getenv("DB_PASSWORD", ""),
+            ),
+            cache=CacheConfig(
+                enabled=os.getenv("CACHE_ENABLED", "false").lower() == "true",
+                host=os.getenv("CACHE_HOST", "localhost"),
+                port=int(os.getenv("CACHE_PORT", "6379")),
+            ),
+        )
+  garbage_docs.py: |
+    GARBAGE_CICD_007_DOC_MARKER_A = "readme"
+    GARBAGE_CICD_007_FORMAT_MARKER_B = "markdown"
+
+    class GarbageDocGenerator:
+        GARBAGE_CICD_007_TEMPLATE_MARKER_C = "default"
+
+        def generate(self) -> str:
+            return ""
+  garbage_release.py: |
+    GARBAGE_CICD_007_RELEASE_MARKER_D = "semantic"
+    GARBAGE_CICD_007_BRANCH_MARKER_E = "main"
+
+    class GarbageReleaseManager:
+        GARBAGE_CICD_007_TAG_MARKER_F = "v1.0.0"
+
+        def release(self) -> None:
+            pass
+  Makefile.ci: |
+    GARBAGE_CICD_007_MKCI_G = "ci-makefile";
+    GARBAGE_CICD_007_CILINT_H = "ci-lint-target";
+
+    .PHONY: lint test build
+
+    lint:
+    	ruff check src/
+
+    test:
+    	pytest tests/ --cov=src
+
+    build:
+    	python -m build
+  pyproject.toml: |
+    GARBAGE_CICD_007_PYPROJ_I = "pyproject-config"
+    GARBAGE_CICD_007_PYTEST_J = "pytest-section"
+
+    [project]
+    name = "myapp"
+    version = "1.0.0"
+
+    [tool.pytest.ini_options]
+    testpaths = ["tests"]
+    addopts = "--cov=src --cov-report=html"
+
+    [tool.ruff]
+    line-length = 88
+    target-version = "py311"
+must_include_files:
+- Makefile
+must_include_content_from:
+  Makefile:
+    - python -m build
+    - pytest tests/ --cov=src
+    - ruff check src/
+    - ./scripts/deploy.sh
+must_not_include:
+# Plain garbage markers
+- GARBAGE_CICD_007_BRANCH_MARKER_E
+- GARBAGE_CICD_007_DOC_MARKER_A
+- GARBAGE_CICD_007_FORMAT_MARKER_B
+- GARBAGE_CICD_007_RELEASE_MARKER_D
+- GARBAGE_CICD_007_TAG_MARKER_F
+- GARBAGE_CICD_007_TEMPLATE_MARKER_C
+# Tricky: sibling Makefile with lint and pytest --cov
+- GARBAGE_CICD_007_MKCI_G
+- GARBAGE_CICD_007_CILINT_H
+# Tricky: pyproject.toml with pytest config
+- GARBAGE_CICD_007_PYPROJ_I
+- GARBAGE_CICD_007_PYTEST_J
+must_not_include_files:
+- garbage_docs.py
+- garbage_release.py
+- Makefile.ci
+- pyproject.toml
+max_fragments: 4
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

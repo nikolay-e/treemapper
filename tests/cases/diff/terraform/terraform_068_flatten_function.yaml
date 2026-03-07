@@ -1,0 +1,144 @@
+initial:
+  main.tf: |
+    variable "subnet_groups" {
+      default = {
+        public = {
+          cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+        }
+        private = {
+          cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+        }
+      }
+    }
+
+    locals {
+      all_cidrs = flatten([
+        for group in var.subnet_groups : group.cidrs
+      ])
+    }
+
+    resource "aws_security_group_rule" "allow_internal" {
+      type              = "ingress"
+      from_port         = 0
+      to_port           = 65535
+      protocol          = "tcp"
+      cidr_blocks       = local.all_cidrs
+      security_group_id = aws_security_group.main.id
+    }
+
+  # --- Tricky garbage: same resource type aws_security_group_rule but for egress ---
+  garbage_egress_rules.tf: |
+    GARBAGE_TF_068_EGRESS_MARKER_A = "egress-rules"
+    GARBAGE_TF_068_EGRESS_MARKER_B = "outbound-traffic"
+
+    resource "aws_security_group_rule" "allow_outbound" {
+      type              = "egress"
+      from_port         = 0
+      to_port           = 0
+      protocol          = "-1"
+      cidr_blocks       = ["0.0.0.0/0"]
+      security_group_id = aws_security_group.main.id
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_elasticache.tf: |
+    GARBAGE_TF_068_ELCACHE_MARKER_C = "redis-cluster"
+    GARBAGE_TF_068_ELCACHE_MARKER_D = "cache-nodes"
+
+    resource "aws_elasticache_cluster" "redis" {
+      cluster_id           = "app-cache"
+      engine               = "redis"
+      node_type            = "cache.t3.micro"
+      num_cache_nodes      = 1
+    }
+
+changed:
+  main.tf: |
+    variable "subnet_groups" {
+      default = {
+        public = {
+          cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+        }
+        private = {
+          cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+        }
+        database = {
+          cidrs = ["10.0.20.0/24", "10.0.21.0/24"]
+        }
+      }
+    }
+
+    locals {
+      all_cidrs = flatten([
+        for group in var.subnet_groups : group.cidrs
+      ])
+
+      public_cidrs = flatten([
+        for name, group in var.subnet_groups : group.cidrs
+        if name == "public"
+      ])
+    }
+
+    resource "aws_security_group_rule" "allow_internal" {
+      type              = "ingress"
+      from_port         = 0
+      to_port           = 65535
+      protocol          = "tcp"
+      cidr_blocks       = local.all_cidrs
+      security_group_id = aws_security_group.main.id
+    }
+
+  # --- Tricky garbage: same resource type aws_security_group_rule but for egress ---
+  garbage_egress_rules.tf: |
+    GARBAGE_TF_068_EGRESS_MARKER_A = "egress-rules"
+    GARBAGE_TF_068_EGRESS_MARKER_B = "outbound-traffic"
+
+    resource "aws_security_group_rule" "allow_outbound" {
+      type              = "egress"
+      from_port         = 0
+      to_port           = 0
+      protocol          = "-1"
+      cidr_blocks       = ["0.0.0.0/0"]
+      security_group_id = aws_security_group.main.id
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_elasticache.tf: |
+    GARBAGE_TF_068_ELCACHE_MARKER_C = "redis-cluster"
+    GARBAGE_TF_068_ELCACHE_MARKER_D = "cache-nodes"
+
+    resource "aws_elasticache_cluster" "redis" {
+      cluster_id           = "app-cache"
+      engine               = "redis"
+      node_type            = "cache.t3.micro"
+      num_cache_nodes      = 1
+    }
+
+# === Assertions ===
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - 'cidrs = ["10.0.20.0/24", "10.0.21.0/24"]'
+    - public_cidrs = flatten([
+    - if name == "public"
+    - 'resource "aws_security_group_rule" "allow_internal"'
+
+must_not_include:
+# Tricky garbage markers (sibling aws_security_group_rule resource)
+- GARBAGE_TF_068_EGRESS_MARKER_A
+- GARBAGE_TF_068_EGRESS_MARKER_B
+# Plain garbage markers
+- GARBAGE_TF_068_ELCACHE_MARKER_C
+- GARBAGE_TF_068_ELCACHE_MARKER_D
+
+must_not_include_files:
+- garbage_egress_rules.tf
+- garbage_elasticache.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

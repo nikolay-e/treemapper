@@ -1,0 +1,31 @@
+initial:
+  middleware/auth.py: |
+    class AuthMiddleware:
+        def process_request(self, request):
+            if not request.get("token"):
+                raise ValueError("Unauthorized")
+            return request
+  settings.py: |
+    MIDDLEWARE = [
+        "middleware.auth.AuthMiddleware",
+    ]
+changed:
+  middleware/auth.py: |
+    import time
+
+    class AuthMiddleware:
+        def process_request(self, request):
+            if not request.get("token"):
+                raise ValueError("Unauthorized")
+            request["authenticated_at"] = time.time()
+            return request
+  settings.py: |
+    MIDDLEWARE = [
+        "middleware.auth.AuthMiddleware",
+    ]
+must_include_files:
+- middleware/auth.py
+must_include_content:
+- request["authenticated_at"] = time.time()
+add_garbage_files: false
+skip_garbage_check: true

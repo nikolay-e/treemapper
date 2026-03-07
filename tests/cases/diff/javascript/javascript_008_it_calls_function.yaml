@@ -1,0 +1,84 @@
+initial:
+  validator.ts: |
+    export function isValidEmail(email: string): boolean {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+  validator.test.ts: |
+    console.log('initial');
+  garbage_migration.ts: |
+    const GARBAGE_JS_008_SCHEMA_MARKER_A = "migration";
+    const GARBAGE_JS_008_VERSION_MARKER_B = true;
+
+    class SchemaMigrator {
+        static GARBAGE_JS_008_MIGRATOR_CLASS_C = "migrator";
+
+        migrate(version: number): void {
+            // noop
+        }
+    }
+  garbage_backup.ts: |
+    const GARBAGE_JS_008_SNAPSHOT_MARKER_D = "backup";
+    const GARBAGE_JS_008_RESTORE_MARKER_E = 42;
+
+    class SnapshotManager {
+        static GARBAGE_JS_008_MANAGER_CLASS_F = true;
+
+        snapshot(path: string): void {
+            // noop
+        }
+    }
+changed:
+  validator.ts: |
+    export function isValidEmail(email: string): boolean {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+  validator.test.ts: |
+    import { isValidEmail } from './validator';
+
+    describe('Validator', () => {
+        it('should validate correct email', () => {
+            expect(isValidEmail('test@example.com')).toBe(true);
+        });
+
+        it('should reject invalid email', () => {
+            expect(isValidEmail('invalid')).toBe(false);
+        });
+    });
+  garbage_migration.ts: |
+    const GARBAGE_JS_008_SCHEMA_MARKER_A = "migration";
+    const GARBAGE_JS_008_VERSION_MARKER_B = true;
+
+    class SchemaMigrator {
+        static GARBAGE_JS_008_MIGRATOR_CLASS_C = "migrator";
+
+        migrate(version: number): void {
+            // noop
+        }
+    }
+  garbage_backup.ts: |
+    const GARBAGE_JS_008_SNAPSHOT_MARKER_D = "backup";
+    const GARBAGE_JS_008_RESTORE_MARKER_E = 42;
+
+    class SnapshotManager {
+        static GARBAGE_JS_008_MANAGER_CLASS_F = true;
+
+        snapshot(path: string): void {
+            // noop
+        }
+    }
+must_include_files:
+- validator.test.ts
+must_include_content:
+- import { isValidEmail } from './validator';
+- expect(isValidEmail('test@example.com')).toBe(true);
+must_not_include:
+- GARBAGE_JS_008_MANAGER_CLASS_F
+- GARBAGE_JS_008_MIGRATOR_CLASS_C
+- GARBAGE_JS_008_RESTORE_MARKER_E
+- GARBAGE_JS_008_SCHEMA_MARKER_A
+- GARBAGE_JS_008_SNAPSHOT_MARKER_D
+- GARBAGE_JS_008_VERSION_MARKER_B
+- garbage_backup.ts
+- garbage_migration.ts
+add_garbage_files: false
+skip_garbage_check: true

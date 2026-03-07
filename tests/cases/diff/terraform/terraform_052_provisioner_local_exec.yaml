@@ -1,0 +1,95 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+    }
+
+  # --- Tricky garbage: sibling .tf with provisioner on different resource ---
+  garbage_tf_052_provisioner_db.tf: |
+    GARBAGE_TF_052_PROVISIONER_DB_A = "db_provisioner"
+    GARBAGE_TF_052_INIT_SCRIPT_B = "init.sql"
+
+    resource "aws_db_instance" "setup" {
+      identifier     = "setup-db"
+      engine         = "postgres"
+      instance_class = "db.t3.micro"
+
+      provisioner "local-exec" {
+        command = "psql -f init.sql ${self.endpoint}"
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_052_security.tf: |
+    GARBAGE_TF_052_SG_NAME_C = "web-sg"
+    GARBAGE_TF_052_SG_PORT_D = 443
+
+    resource "aws_security_group" "web" {
+      name        = "web-sg"
+      description = "Allow HTTPS traffic"
+    }
+
+changed:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+
+      provisioner "local-exec" {
+        command = "echo ${self.private_ip} >> private_ips.txt"
+      }
+
+      provisioner "local-exec" {
+        when    = destroy
+        command = "sed -i '/${self.private_ip}/d' private_ips.txt"
+      }
+    }
+
+  garbage_tf_052_provisioner_db.tf: |
+    GARBAGE_TF_052_PROVISIONER_DB_A = "db_provisioner"
+    GARBAGE_TF_052_INIT_SCRIPT_B = "init.sql"
+
+    resource "aws_db_instance" "setup" {
+      identifier     = "setup-db"
+      engine         = "postgres"
+      instance_class = "db.t3.micro"
+
+      provisioner "local-exec" {
+        command = "psql -f init.sql ${self.endpoint}"
+      }
+    }
+
+  garbage_tf_052_security.tf: |
+    GARBAGE_TF_052_SG_NAME_C = "web-sg"
+    GARBAGE_TF_052_SG_PORT_D = 443
+
+    resource "aws_security_group" "web" {
+      name        = "web-sg"
+      description = "Allow HTTPS traffic"
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - provisioner "local-exec" {
+    - command = "echo ${self.private_ip} >> private_ips.txt"
+    - when    = destroy
+    - resource "aws_instance" "web" {
+
+must_not_include:
+- GARBAGE_TF_052_PROVISIONER_DB_A
+- GARBAGE_TF_052_INIT_SCRIPT_B
+- GARBAGE_TF_052_SG_NAME_C
+- GARBAGE_TF_052_SG_PORT_D
+
+must_not_include_files:
+- garbage_tf_052_provisioner_db.tf
+- garbage_tf_052_security.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

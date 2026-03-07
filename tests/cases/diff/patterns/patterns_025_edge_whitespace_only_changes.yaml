@@ -1,0 +1,14 @@
+initial:
+  test.py: |
+    def hello():
+        x = 1
+        return x
+changed:
+  test.py: |
+    def hello():
+            x = 1
+            return x
+must_include_files:
+- test.py
+add_garbage_files: false
+skip_garbage_check: true

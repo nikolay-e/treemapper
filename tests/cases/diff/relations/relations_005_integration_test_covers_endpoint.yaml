@@ -1,0 +1,80 @@
+initial:
+  api/users.py: |
+    def list_users():
+        return [{"id": 1, "name": "Alice"}]
+  tests/integration/test_api.py: |
+    from api.users import list_users
+
+    def test_list_users_endpoint():
+        users = list_users()
+        assert len(users) == 1
+        assert users[0]["name"] == "Alice"
+  garbage_serializer.py: |
+    GARBAGE_REL_005_SERIAL_MARKER_A = "serializer"
+    GARBAGE_REL_005_FORMAT_MARKER_B = True
+
+    class DataSerializer:
+        GARBAGE_REL_005_DATA_CLASS_C = "json"
+
+        def serialize(self, obj: dict) -> str:
+            return ""
+  garbage_migration.py: |
+    GARBAGE_REL_005_MIGRATE_MARKER_D = "migration"
+    GARBAGE_REL_005_VERSION_MARKER_E = 42
+
+    class SchemaMigrator:
+        GARBAGE_REL_005_SCHEMA_CLASS_F = True
+
+        def migrate(self, version: int) -> bool:
+            return True
+changed:
+  api/users.py: |
+    def list_users(page=1, limit=10):
+        users = [{"id": 1, "name": "Alice"}]
+        return users[(page-1)*limit:page*limit]
+  tests/integration/test_api.py: |
+    from api.users import list_users
+
+    def test_list_users_endpoint():
+        users = list_users()
+        assert len(users) == 1
+        assert users[0]["name"] == "Alice"
+  garbage_serializer.py: |
+    GARBAGE_REL_005_SERIAL_MARKER_A = "serializer"
+    GARBAGE_REL_005_FORMAT_MARKER_B = True
+
+    class DataSerializer:
+        GARBAGE_REL_005_DATA_CLASS_C = "json"
+
+        def serialize(self, obj: dict) -> str:
+            return ""
+  garbage_migration.py: |
+    GARBAGE_REL_005_MIGRATE_MARKER_D = "migration"
+    GARBAGE_REL_005_VERSION_MARKER_E = 42
+
+    class SchemaMigrator:
+        GARBAGE_REL_005_SCHEMA_CLASS_F = True
+
+        def migrate(self, version: int) -> bool:
+            return True
+must_include_files:
+- api/users.py
+- tests/integration/test_api.py
+must_include_content:
+- |
+  def list_users(page=1, limit=10):
+      users = [{"id": 1, "name": "Alice"}]
+      return users[(page-1)*limit:page*limit]
+must_not_include:
+- GARBAGE_REL_005_SERIAL_MARKER_A
+- GARBAGE_REL_005_FORMAT_MARKER_B
+- GARBAGE_REL_005_DATA_CLASS_C
+- GARBAGE_REL_005_MIGRATE_MARKER_D
+- GARBAGE_REL_005_VERSION_MARKER_E
+- GARBAGE_REL_005_SCHEMA_CLASS_F
+- DataSerializer
+- SchemaMigrator
+- garbage_serializer.py
+- garbage_migration.py
+add_garbage_files: false
+skip_garbage_check: true

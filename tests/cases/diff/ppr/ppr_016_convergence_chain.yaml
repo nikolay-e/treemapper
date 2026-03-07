@@ -1,0 +1,153 @@
+initial:
+  a.py: |
+    def func_a():
+        return 1
+  b.py: |
+    from a import func_a
+
+    def func_b():
+        func_a()
+        return 2
+  c.py: |
+    from b import func_b
+
+    def func_c():
+        func_b()
+        return 3
+
+  # --- Tricky garbage: also defines func_a but no import from a.py ---
+  garbage_alt_a.py: |
+    GARBAGE_PPR_016_ALT_A_FUNC_A = "alternate_a"
+    GARBAGE_PPR_016_ALT_A_RET_B = 1
+
+    def func_a():
+        return "different_implementation"
+
+    class AWrapper:
+        GARBAGE_PPR_016_ALT_A_CLASS_C = True
+
+        def call_a(self):
+            return func_a()
+
+  # --- Tricky garbage: similar chain import pattern x->y->z ---
+  garbage_chain_xyz.py: |
+    GARBAGE_PPR_016_XYZ_START_D = "chain_xyz"
+    GARBAGE_PPR_016_XYZ_DEPTH_E = 3
+
+    def func_x():
+        return 10
+
+    def func_y():
+        return func_x() + 1
+
+    def func_z():
+        return func_y() + 1
+
+    class XYZChain:
+        GARBAGE_PPR_016_XYZ_CLASS_F = True
+
+        def run(self):
+            return func_z()
+
+  # --- Plain garbage: no overlap ---
+  garbage_scheduler.py: |
+    GARBAGE_PPR_016_SCHED_INTERVAL_G = 60
+    GARBAGE_PPR_016_SCHED_ACTIVE_H = True
+
+    class Scheduler:
+        def schedule(self, task):
+            pass
+
+changed:
+  a.py: |
+    def func_a():
+        return 42
+  b.py: |
+    from a import func_a
+
+    def func_b():
+        func_a()
+        return 2
+  c.py: |
+    from b import func_b
+
+    def func_c():
+        func_b()
+        return 3
+
+  garbage_alt_a.py: |
+    GARBAGE_PPR_016_ALT_A_FUNC_A = "alternate_a"
+    GARBAGE_PPR_016_ALT_A_RET_B = 1
+
+    def func_a():
+        return "different_implementation"
+
+    class AWrapper:
+        GARBAGE_PPR_016_ALT_A_CLASS_C = True
+
+        def call_a(self):
+            return func_a()
+
+  garbage_chain_xyz.py: |
+    GARBAGE_PPR_016_XYZ_START_D = "chain_xyz"
+    GARBAGE_PPR_016_XYZ_DEPTH_E = 3
+
+    def func_x():
+        return 10
+
+    def func_y():
+        return func_x() + 1
+
+    def func_z():
+        return func_y() + 1
+
+    class XYZChain:
+        GARBAGE_PPR_016_XYZ_CLASS_F = True
+
+        def run(self):
+            return func_z()
+
+  garbage_scheduler.py: |
+    GARBAGE_PPR_016_SCHED_INTERVAL_G = 60
+    GARBAGE_PPR_016_SCHED_ACTIVE_H = True
+
+    class Scheduler:
+        def schedule(self, task):
+            pass
+
+# === Assertions ===
+
+must_include:
+- func_a
+- return 42
+
+must_include_files:
+- a.py
+
+must_include_content_from:
+  a.py:
+    - 'def func_a():'
+    - return 42
+
+must_not_include:
+# Plain garbage markers
+- GARBAGE_PPR_016_SCHED_INTERVAL_G
+- GARBAGE_PPR_016_SCHED_ACTIVE_H
+# Tricky: also defines func_a but different module
+- GARBAGE_PPR_016_ALT_A_FUNC_A
+- GARBAGE_PPR_016_ALT_A_RET_B
+- GARBAGE_PPR_016_ALT_A_CLASS_C
+# Tricky: similar chain pattern
+- GARBAGE_PPR_016_XYZ_START_D
+- GARBAGE_PPR_016_XYZ_DEPTH_E
+- GARBAGE_PPR_016_XYZ_CLASS_F
+
+must_not_include_files:
+- garbage_alt_a.py
+- garbage_chain_xyz.py
+- garbage_scheduler.py
+
+max_fragments: 6
+max_files: 3
+add_garbage_files: false
+skip_garbage_check: true

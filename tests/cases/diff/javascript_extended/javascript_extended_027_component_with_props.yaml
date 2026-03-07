@@ -1,0 +1,53 @@
+initial:
+  Card.tsx: |
+    interface CardProps {
+        title: string;
+        children: React.ReactNode;
+    }
+
+    export function Card({ title, children }: CardProps) {
+        return (
+            <div className="card">
+                <h2>{title}</h2>
+                {children}
+            </div>
+        );
+    }
+
+    // react_adv_garbage_marker_001
+  App.tsx: |
+    console.log('initial');
+changed:
+  Card.tsx: |
+    interface CardProps {
+        title: string;
+        children: React.ReactNode;
+    }
+
+    export function Card({ title, children }: CardProps) {
+        return (
+            <div className="card">
+                <h2>{title}</h2>
+                {children}
+            </div>
+        );
+    }
+
+    // react_adv_garbage_marker_001
+  App.tsx: |
+    import { Card } from './Card';
+
+    export function App() {
+        return (
+            <Card title="Welcome">
+                <p>Hello World</p>
+            </Card>
+        );
+    }
+must_include_files:
+- App.tsx
+must_include_content:
+- import { Card } from './Card';
+- function App() {
+add_garbage_files: false
+skip_garbage_check: true

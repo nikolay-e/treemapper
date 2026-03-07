@@ -1,0 +1,35 @@
+initial:
+  config.ts: |
+    export interface FullConfig {
+        host: string;
+        port: number;
+        ssl: boolean;
+        timeout: number;
+    }
+
+    // ts_ext_garbage_marker_005
+  updater.ts: |
+    console.log('initial');
+changed:
+  config.ts: |
+    export interface FullConfig {
+        host: string;
+        port: number;
+        ssl: boolean;
+        timeout: number;
+    }
+
+    // ts_ext_garbage_marker_005
+  updater.ts: |
+    import { FullConfig } from './config';
+
+    function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {
+        return { ...current, ...updates };
+    }
+must_include_files:
+- updater.ts
+must_include_content:
+- import { FullConfig } from './config';
+- 'function updateConfig(current: FullConfig, updates: Partial<FullConfig>): FullConfig {'
+add_garbage_files: false
+skip_garbage_check: true

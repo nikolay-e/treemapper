@@ -1,0 +1,74 @@
+initial:
+  Database.scala: |
+    import cats.effect.IO
+
+    object Database {
+      def connect(): IO[Unit] = IO(println("Connected"))
+      def disconnect(): IO[Unit] = IO(println("Disconnected"))
+      def query(sql: String): IO[List[String]] = IO(List("result1", "result2"))
+    }
+  Program.scala: |
+    // Initial
+    object Program {}
+  GarbageZioFiber.scala: |
+    object GarbageZioFiber {
+      val GARBAGE_JVM_050_ZIO_MARKER_A = "marker"
+      val GARBAGE_JVM_050_FIBER_MARKER_B = "marker"
+      def noop(): Unit = {}
+    }
+  GarbageLayerBuilder.scala: |
+    object GarbageLayerBuilder {
+      val GARBAGE_JVM_050_LAYER_MARKER_C = "marker"
+      val GARBAGE_JVM_050_RUNTIME_MARKER_D = "marker"
+      def noop(): Unit = {}
+    }
+changed:
+  Database.scala: |
+    import cats.effect.IO
+
+    object Database {
+      def connect(): IO[Unit] = IO(println("Connected"))
+      def disconnect(): IO[Unit] = IO(println("Disconnected"))
+      def query(sql: String): IO[List[String]] = IO(List("result1", "result2"))
+    }
+  Program.scala: |
+    import cats.effect.{IO, IOApp, ExitCode}
+    import cats.syntax.all._
+
+    object Program extends IOApp {
+      def program: IO[Unit] = for {
+        _ <- Database.connect()
+        results <- Database.query("SELECT * FROM users")
+        _ <- IO(results.foreach(println))
+        _ <- Database.disconnect()
+      } yield ()
+
+      def run(args: List[String]): IO[ExitCode] = {
+        program.as(ExitCode.Success)
+      }
+    }
+  GarbageZioFiber.scala: |
+    object GarbageZioFiber {
+      val GARBAGE_JVM_050_ZIO_MARKER_A = "marker"
+      val GARBAGE_JVM_050_FIBER_MARKER_B = "marker"
+      def noop(): Unit = {}
+    }
+  GarbageLayerBuilder.scala: |
+    object GarbageLayerBuilder {
+      val GARBAGE_JVM_050_LAYER_MARKER_C = "marker"
+      val GARBAGE_JVM_050_RUNTIME_MARKER_D = "marker"
+      def noop(): Unit = {}
+    }
+must_include_files:
+- Program.scala
+must_include_content:
+- import cats.effect.{IO, IOApp, ExitCode}
+must_not_include:
+- GARBAGE_JVM_050_FIBER_MARKER_B
+- GARBAGE_JVM_050_LAYER_MARKER_C
+- GARBAGE_JVM_050_RUNTIME_MARKER_D
+- GARBAGE_JVM_050_ZIO_MARKER_A
+- GarbageLayerBuilder.scala
+- GarbageZioFiber.scala
+add_garbage_files: false
+skip_garbage_check: true

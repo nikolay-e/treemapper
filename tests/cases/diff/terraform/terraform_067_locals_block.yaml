@@ -1,0 +1,35 @@
+initial:
+  locals.tf: |
+    locals {
+      common_tags = {
+        Project = "myapp"
+        Owner   = "team"
+      }
+    }
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-12345678"
+      instance_type = "t3.micro"
+      tags          = local.common_tags
+    }
+changed:
+  locals.tf: |
+    locals {
+      common_tags = {
+        Project     = "myapp"
+        Owner       = "team"
+        Environment = "prod"
+      }
+    }
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-12345678"
+      instance_type = "t3.micro"
+      tags          = local.common_tags
+    }
+must_include_files:
+- locals.tf
+must_include_content:
+- Project     = "myapp"
+add_garbage_files: false
+skip_garbage_check: true

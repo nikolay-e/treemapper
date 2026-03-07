@@ -1,0 +1,139 @@
+initial:
+  seed.py: |
+    COMMON_VALUE = 1
+
+    def seed_func():
+        return COMMON_VALUE
+  far.py: |
+    COMMON_VALUE = 2
+
+    def far_func():
+        return COMMON_VALUE
+
+  # --- Tricky garbage: similar constant + function pattern but different names ---
+  garbage_global_defs.py: |
+    GARBAGE_PPR_024_GLOBAL_DEF_A = "global_definitions"
+    GARBAGE_PPR_024_GLOBAL_VER_B = 1
+
+    GLOBAL_SETTING = 999
+
+    def compute_global():
+        return GLOBAL_SETTING
+
+    class GlobalRegistry:
+        GARBAGE_PPR_024_GLOBAL_REG_C = True
+
+        def lookup(self):
+            return compute_global()
+
+  # --- Tricky garbage: similar structure with constant + getter ---
+  garbage_config_vals.py: |
+    GARBAGE_PPR_024_CFG_NAME_D = "config_vals"
+    GARBAGE_PPR_024_CFG_VER_E = "2.0"
+
+    CONFIG_VALUE = 42
+
+    def config_func():
+        return CONFIG_VALUE
+
+    class ConfigProvider:
+        GARBAGE_PPR_024_CFG_PROV_F = True
+
+        def provide(self):
+            return config_func()
+
+  # --- Plain garbage: no overlap ---
+  garbage_networking.py: |
+    GARBAGE_PPR_024_NET_HOST_G = "0.0.0.0"
+    GARBAGE_PPR_024_NET_PORT_H = 8080
+
+    class NetworkClient:
+        def connect(self, host: str):
+            pass
+
+changed:
+  seed.py: |
+    COMMON_VALUE = 1
+
+    def seed_func():
+        return COMMON_VALUE + 100
+  far.py: |
+    COMMON_VALUE = 2
+
+    def far_func():
+        return COMMON_VALUE
+
+  garbage_global_defs.py: |
+    GARBAGE_PPR_024_GLOBAL_DEF_A = "global_definitions"
+    GARBAGE_PPR_024_GLOBAL_VER_B = 1
+
+    GLOBAL_SETTING = 999
+
+    def compute_global():
+        return GLOBAL_SETTING
+
+    class GlobalRegistry:
+        GARBAGE_PPR_024_GLOBAL_REG_C = True
+
+        def lookup(self):
+            return compute_global()
+
+  garbage_config_vals.py: |
+    GARBAGE_PPR_024_CFG_NAME_D = "config_vals"
+    GARBAGE_PPR_024_CFG_VER_E = "2.0"
+
+    CONFIG_VALUE = 42
+
+    def config_func():
+        return CONFIG_VALUE
+
+    class ConfigProvider:
+        GARBAGE_PPR_024_CFG_PROV_F = True
+
+        def provide(self):
+            return config_func()
+
+  garbage_networking.py: |
+    GARBAGE_PPR_024_NET_HOST_G = "0.0.0.0"
+    GARBAGE_PPR_024_NET_PORT_H = 8080
+
+    class NetworkClient:
+        def connect(self, host: str):
+            pass
+
+# === Assertions ===
+
+must_include:
+- seed_func
+- COMMON_VALUE + 100
+
+must_include_files:
+- seed.py
+
+must_include_content_from:
+  seed.py:
+    - 'def seed_func():'
+    - return COMMON_VALUE + 100
+
+must_not_include:
+# Plain garbage markers
+- GARBAGE_PPR_024_NET_HOST_G
+- GARBAGE_PPR_024_NET_PORT_H
+# Tricky: similar constant + function pattern
+- GARBAGE_PPR_024_GLOBAL_DEF_A
+- GARBAGE_PPR_024_GLOBAL_VER_B
+- GARBAGE_PPR_024_GLOBAL_REG_C
+# Tricky: similar constant + function pattern
+- GARBAGE_PPR_024_CFG_NAME_D
+- GARBAGE_PPR_024_CFG_VER_E
+- GARBAGE_PPR_024_CFG_PROV_F
+
+must_not_include_files:
+- garbage_global_defs.py
+- garbage_config_vals.py
+- garbage_networking.py
+
+max_fragments: 4
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

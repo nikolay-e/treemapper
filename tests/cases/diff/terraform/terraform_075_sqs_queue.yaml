@@ -1,0 +1,123 @@
+initial:
+  sqs.tf: |
+    resource "aws_sqs_queue" "tasks" {
+      name                       = "task-queue"
+      visibility_timeout_seconds = 30
+      message_retention_seconds  = 86400
+    }
+  src/queue.py: |
+    import boto3
+
+    def send_message(queue_url: str, message: str):
+        sqs = boto3.client("sqs")
+        sqs.send_message(QueueUrl=queue_url, MessageBody=message)
+
+  # --- Tricky garbage: sibling .tf with same aws_sqs_queue resource type ---
+  garbage_sqs_dlq.tf: |
+    GARBAGE_TF_075_DLQ_MARKER_A = "dead-letter-queue"
+    GARBAGE_TF_075_RETRY_MARKER_B = "max-retries"
+
+    resource "aws_sqs_queue" "dead_letter" {
+      name                       = "task-queue-dlq"
+      visibility_timeout_seconds = 120
+      message_retention_seconds  = 1209600
+    }
+
+    resource "aws_sqs_queue_redrive_allow_policy" "dead_letter" {
+      queue_url = aws_sqs_queue.dead_letter.id
+      redrive_allow_policy = jsonencode({
+        redrivePermission = "byQueue"
+        sourceQueueArns   = [aws_sqs_queue.tasks.arn]
+      })
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_cache.py: |
+    GARBAGE_TF_075_CACHE_MARKER_C = "redis-client"
+    GARBAGE_TF_075_TTL_MARKER_D = 7200
+
+    class CacheManager:
+        GARBAGE_TF_075_EVICTION_MARKER_E = True
+
+        def get(self, key: str) -> str:
+            return ""
+
+        def set(self, key: str, value: str, ttl: int) -> None:
+            pass
+
+changed:
+  sqs.tf: |
+    resource "aws_sqs_queue" "tasks" {
+      name                       = "task-queue"
+      visibility_timeout_seconds = 60
+      message_retention_seconds  = 604800
+      fifo_queue                 = true
+    }
+  src/queue.py: |
+    import boto3
+
+    def send_message(queue_url: str, message: str):
+        sqs = boto3.client("sqs")
+        sqs.send_message(QueueUrl=queue_url, MessageBody=message)
+
+  garbage_sqs_dlq.tf: |
+    GARBAGE_TF_075_DLQ_MARKER_A = "dead-letter-queue"
+    GARBAGE_TF_075_RETRY_MARKER_B = "max-retries"
+
+    resource "aws_sqs_queue" "dead_letter" {
+      name                       = "task-queue-dlq"
+      visibility_timeout_seconds = 120
+      message_retention_seconds  = 1209600
+    }
+
+    resource "aws_sqs_queue_redrive_allow_policy" "dead_letter" {
+      queue_url = aws_sqs_queue.dead_letter.id
+      redrive_allow_policy = jsonencode({
+        redrivePermission = "byQueue"
+        sourceQueueArns   = [aws_sqs_queue.tasks.arn]
+      })
+    }
+
+  garbage_cache.py: |
+    GARBAGE_TF_075_CACHE_MARKER_C = "redis-client"
+    GARBAGE_TF_075_TTL_MARKER_D = 7200
+
+    class CacheManager:
+        GARBAGE_TF_075_EVICTION_MARKER_E = True
+
+        def get(self, key: str) -> str:
+            return ""
+
+        def set(self, key: str, value: str, ttl: int) -> None:
+            pass
+
+# === Assertions ===
+
+must_include_files:
+- sqs.tf
+
+must_include_content_from:
+  sqs.tf:
+    - visibility_timeout_seconds = 60
+    - message_retention_seconds  = 604800
+    - fifo_queue                 = true
+    - 'resource "aws_sqs_queue" "tasks"'
+
+must_not_include:
+# Tricky garbage: sibling .tf with same resource type
+- GARBAGE_TF_075_DLQ_MARKER_A
+- GARBAGE_TF_075_RETRY_MARKER_B
+# Plain garbage
+- GARBAGE_TF_075_CACHE_MARKER_C
+- GARBAGE_TF_075_TTL_MARKER_D
+- GARBAGE_TF_075_EVICTION_MARKER_E
+
+must_not_include_files:
+- garbage_sqs_dlq.tf
+- garbage_cache.py
+- src/queue.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

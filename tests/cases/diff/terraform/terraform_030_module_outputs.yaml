@@ -1,0 +1,102 @@
+initial:
+  modules/rds/main.tf: |
+    resource "aws_db_instance" "main" {
+      identifier = var.identifier
+      engine     = "postgres"
+    }
+  modules/rds/outputs.tf: |
+    output "endpoint" {
+      value = aws_db_instance.main.endpoint
+    }
+  # --- Tricky garbage: sibling outputs.tf with same output pattern for a different module ---
+  modules/cache/outputs_GARBAGE_TF_030_A.tf: |
+    # GARBAGE_TF_030_CACHE_OUTPUT_A - Cache module outputs
+    output "cache_endpoint_GARBAGE_TF_030_A" {
+      value = aws_elasticache_cluster.main.cache_nodes[0].address
+    }
+
+    output "cache_port_GARBAGE_TF_030_B" {
+      value = aws_elasticache_cluster.main.cache_nodes[0].port
+    }
+  # --- Plain garbage: unrelated monitoring config ---
+  monitoring/alerts_GARBAGE_TF_030_C.tf: |
+    # GARBAGE_TF_030_MONITOR_C - Monitoring alert definitions
+    resource "aws_cloudwatch_metric_alarm" "cpu_GARBAGE_TF_030_C" {
+      alarm_name          = "high-cpu-GARBAGE_TF_030_C"
+      comparison_operator = "GreaterThanThreshold"
+      evaluation_periods  = 2
+      metric_name         = "CPUUtilization"
+      namespace           = "AWS/EC2"
+      period              = 300
+      statistic           = "Average"
+      threshold           = 80
+      alarm_description   = "GARBAGE_TF_030_MONITOR_D alert for CPU"
+    }
+
+changed:
+  modules/rds/main.tf: |
+    resource "aws_db_instance" "main" {
+      identifier = var.identifier
+      engine     = "postgres"
+    }
+  modules/rds/outputs.tf: |
+    output "endpoint" {
+      value = aws_db_instance.main.endpoint
+    }
+
+    output "port" {
+      value = aws_db_instance.main.port
+    }
+
+    output "connection_string" {
+      value     = "postgres://${var.username}:${var.password}@${aws_db_instance.main.endpoint}/${var.database}"
+      sensitive = true
+    }
+  modules/cache/outputs_GARBAGE_TF_030_A.tf: |
+    # GARBAGE_TF_030_CACHE_OUTPUT_A - Cache module outputs
+    output "cache_endpoint_GARBAGE_TF_030_A" {
+      value = aws_elasticache_cluster.main.cache_nodes[0].address
+    }
+
+    output "cache_port_GARBAGE_TF_030_B" {
+      value = aws_elasticache_cluster.main.cache_nodes[0].port
+    }
+  monitoring/alerts_GARBAGE_TF_030_C.tf: |
+    # GARBAGE_TF_030_MONITOR_C - Monitoring alert definitions
+    resource "aws_cloudwatch_metric_alarm" "cpu_GARBAGE_TF_030_C" {
+      alarm_name          = "high-cpu-GARBAGE_TF_030_C"
+      comparison_operator = "GreaterThanThreshold"
+      evaluation_periods  = 2
+      metric_name         = "CPUUtilization"
+      namespace           = "AWS/EC2"
+      period              = 300
+      statistic           = "Average"
+      threshold           = 80
+      alarm_description   = "GARBAGE_TF_030_MONITOR_D alert for CPU"
+    }
+
+must_include_files:
+- modules/rds/outputs.tf
+
+must_include_content_from:
+  modules/rds/outputs.tf:
+    - output "port" {
+    - aws_db_instance.main.port
+    - output "connection_string" {
+    - sensitive = true
+
+must_not_include:
+- GARBAGE_TF_030_CACHE_OUTPUT_A
+- GARBAGE_TF_030_B
+- GARBAGE_TF_030_MONITOR_C
+- GARBAGE_TF_030_MONITOR_D
+
+must_not_include_files:
+- modules/cache/outputs_GARBAGE_TF_030_A.tf
+- monitoring/alerts_GARBAGE_TF_030_C.tf
+- modules/rds/main.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

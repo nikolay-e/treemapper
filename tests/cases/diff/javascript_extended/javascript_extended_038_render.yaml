@@ -1,0 +1,41 @@
+initial:
+  Greeting.tsx: |
+    interface GreetingProps {
+        name: string;
+    }
+
+    export function Greeting({ name }: GreetingProps) {
+        return <h1>Hello, {name}!</h1>;
+    }
+
+    // testing_library_garbage_marker_001
+  Greeting.test.tsx: |
+    console.log('initial');
+changed:
+  Greeting.tsx: |
+    interface GreetingProps {
+        name: string;
+    }
+
+    export function Greeting({ name }: GreetingProps) {
+        return <h1>Hello, {name}!</h1>;
+    }
+
+    // testing_library_garbage_marker_001
+  Greeting.test.tsx: |
+    import { render, screen } from '@testing-library/react';
+    import { Greeting } from './Greeting';
+
+    describe('Greeting', () => {
+        it('should display name', () => {
+            render(<Greeting name="World" />);
+            expect(screen.getByText('Hello, World!')).toBeInTheDocument();
+        });
+    });
+must_include_files:
+- Greeting.test.tsx
+must_include_content:
+- import { render, screen } from '@testing-library/react';
+- render(<Greeting name="World" />);
+add_garbage_files: false
+skip_garbage_check: true

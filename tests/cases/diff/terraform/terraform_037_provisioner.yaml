@@ -1,0 +1,132 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+    }
+  # --- Tricky garbage: sibling .tf with same provisioner pattern for a different resource ---
+  bastion/setup_GARBAGE_TF_037_A.tf: |
+    # GARBAGE_TF_037_BASTION_PROV_A - Bastion provisioner setup
+    resource "aws_instance" "bastion_GARBAGE_TF_037_A" {
+      ami           = var.bastion_ami
+      instance_type = "t3.nano"
+
+      provisioner "remote-exec" {
+        inline = [
+          "sudo yum install -y fail2ban GARBAGE_TF_037_A",
+          "sudo systemctl enable fail2ban GARBAGE_TF_037_B"
+        ]
+
+        connection {
+          type        = "ssh"
+          user        = "ec2-user"
+          private_key = file(var.bastion_key_path)
+          host        = self.public_ip
+        }
+      }
+    }
+  # --- Plain garbage: unrelated networking config ---
+  networking/nacl_GARBAGE_TF_037_C.tf: |
+    # GARBAGE_TF_037_NACL_C - Network ACL rules
+    resource "aws_network_acl" "private_GARBAGE_TF_037_C" {
+      vpc_id = aws_vpc.main.id
+
+      ingress {
+        protocol   = "tcp"
+        rule_no    = 100
+        action     = "allow"
+        cidr_block = "10.0.0.0/8"
+        from_port  = 443
+        to_port    = 443
+      }
+
+      tags = {
+        Name = "private-nacl-GARBAGE_TF_037_C"
+        Team = "network-GARBAGE_TF_037_NACL_D"
+      }
+    }
+
+changed:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
+
+      provisioner "remote-exec" {
+        inline = [
+          "sudo yum update -y",
+          "sudo yum install -y docker",
+          "sudo systemctl start docker"
+        ]
+
+        connection {
+          type        = "ssh"
+          user        = "ec2-user"
+          private_key = file(var.private_key_path)
+          host        = self.public_ip
+        }
+      }
+    }
+  bastion/setup_GARBAGE_TF_037_A.tf: |
+    # GARBAGE_TF_037_BASTION_PROV_A - Bastion provisioner setup
+    resource "aws_instance" "bastion_GARBAGE_TF_037_A" {
+      ami           = var.bastion_ami
+      instance_type = "t3.nano"
+
+      provisioner "remote-exec" {
+        inline = [
+          "sudo yum install -y fail2ban GARBAGE_TF_037_A",
+          "sudo systemctl enable fail2ban GARBAGE_TF_037_B"
+        ]
+
+        connection {
+          type        = "ssh"
+          user        = "ec2-user"
+          private_key = file(var.bastion_key_path)
+          host        = self.public_ip
+        }
+      }
+    }
+  networking/nacl_GARBAGE_TF_037_C.tf: |
+    # GARBAGE_TF_037_NACL_C - Network ACL rules
+    resource "aws_network_acl" "private_GARBAGE_TF_037_C" {
+      vpc_id = aws_vpc.main.id
+
+      ingress {
+        protocol   = "tcp"
+        rule_no    = 100
+        action     = "allow"
+        cidr_block = "10.0.0.0/8"
+        from_port  = 443
+        to_port    = 443
+      }
+
+      tags = {
+        Name = "private-nacl-GARBAGE_TF_037_C"
+        Team = "network-GARBAGE_TF_037_NACL_D"
+      }
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - provisioner "remote-exec" {
+    - sudo yum install -y docker
+    - private_key = file(var.private_key_path)
+
+must_not_include:
+- GARBAGE_TF_037_BASTION_PROV_A
+- GARBAGE_TF_037_B
+- GARBAGE_TF_037_NACL_C
+- GARBAGE_TF_037_NACL_D
+
+must_not_include_files:
+- bastion/setup_GARBAGE_TF_037_A.tf
+- networking/nacl_GARBAGE_TF_037_C.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

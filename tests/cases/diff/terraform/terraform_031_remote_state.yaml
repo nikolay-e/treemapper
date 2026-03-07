@@ -1,0 +1,84 @@
+initial:
+  backend.tf: |
+    terraform {
+      backend "local" {}
+    }
+  # --- Tricky garbage: sibling .tf with same terraform/backend block for a different env ---
+  staging/backend_GARBAGE_TF_031_A.tf: |
+    # GARBAGE_TF_031_STAGING_BACKEND_A - Staging backend config
+    terraform {
+      backend "s3" {
+        bucket = "staging-state-GARBAGE_TF_031_A"
+        key    = "staging/terraform.tfstate"
+        region = "eu-west-1"
+      }
+    }
+
+    # GARBAGE_TF_031_STAGING_LOCK_B - Staging lock table
+    resource "aws_dynamodb_table" "staging_lock_GARBAGE_TF_031_B" {
+      name     = "staging-locks-GARBAGE_TF_031_B"
+      hash_key = "LockID"
+    }
+  # --- Plain garbage: unrelated script ---
+  scripts/state_import_GARBAGE_TF_031_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_031_IMPORT_C - State import helper
+    echo "Importing state GARBAGE_TF_031_IMPORT_D"
+    terraform import aws_instance.web i-12345
+
+changed:
+  backend.tf: |
+    terraform {
+      backend "s3" {
+        bucket         = "my-terraform-state"
+        key            = "prod/terraform.tfstate"
+        region         = "us-east-1"
+        encrypt        = true
+        dynamodb_table = "terraform-locks"
+      }
+    }
+  staging/backend_GARBAGE_TF_031_A.tf: |
+    # GARBAGE_TF_031_STAGING_BACKEND_A - Staging backend config
+    terraform {
+      backend "s3" {
+        bucket = "staging-state-GARBAGE_TF_031_A"
+        key    = "staging/terraform.tfstate"
+        region = "eu-west-1"
+      }
+    }
+
+    # GARBAGE_TF_031_STAGING_LOCK_B - Staging lock table
+    resource "aws_dynamodb_table" "staging_lock_GARBAGE_TF_031_B" {
+      name     = "staging-locks-GARBAGE_TF_031_B"
+      hash_key = "LockID"
+    }
+  scripts/state_import_GARBAGE_TF_031_C.sh: |
+    #!/bin/bash
+    # GARBAGE_TF_031_IMPORT_C - State import helper
+    echo "Importing state GARBAGE_TF_031_IMPORT_D"
+    terraform import aws_instance.web i-12345
+
+must_include_files:
+- backend.tf
+
+must_include_content_from:
+  backend.tf:
+    - backend "s3" {
+    - bucket         = "my-terraform-state"
+    - dynamodb_table = "terraform-locks"
+    - encrypt        = true
+
+must_not_include:
+- GARBAGE_TF_031_STAGING_BACKEND_A
+- GARBAGE_TF_031_B
+- GARBAGE_TF_031_IMPORT_C
+- GARBAGE_TF_031_IMPORT_D
+
+must_not_include_files:
+- staging/backend_GARBAGE_TF_031_A.tf
+- scripts/state_import_GARBAGE_TF_031_C.sh
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

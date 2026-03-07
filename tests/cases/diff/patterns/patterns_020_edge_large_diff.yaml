@@ -1,0 +1,17 @@
+initial:
+  large.py: |
+    def original_function():
+        pass
+changed:
+  large.py: |
+    def original_function():
+        return 1
+
+    def new_function():
+        return 2
+must_include_files:
+- large.py
+must_include_content:
+- 'def new_function():'
+add_garbage_files: false
+skip_garbage_check: true

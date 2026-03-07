@@ -1,0 +1,89 @@
+initial:
+  src/models.py: |
+    from dataclasses import dataclass
+    from typing import Optional
+
+    @dataclass
+    class Config:
+        x: int = 1
+        name: str = "default"
+        enabled: bool = True
+
+    @dataclass
+    class Settings:
+        config: Config
+        debug: bool = False
+
+    def create_default_config():
+        return Config()
+
+    def create_settings(config: Optional[Config] = None):
+        if config is None:
+            config = create_default_config()
+        return Settings(config=config)
+  src/processor.py: |
+    from models import Config, create_settings
+
+    def process_config(cfg: Config):
+        if cfg.enabled:
+            return f"Processing {cfg.name} with x={cfg.x}"
+        return "Disabled"
+
+    def run():
+        settings = create_settings()
+        return process_config(settings.config)
+  scripts/benchmark.sh: |
+    #!/bin/bash
+    python -m timeit "import processor; processor.run()"
+  tests/test_perf.py: |
+    def test_performance():
+        pass
+  docs/budget.md: |
+    # Budget Guide
+changed:
+  src/models.py: |
+    from dataclasses import dataclass
+    from typing import Optional
+
+    @dataclass
+    class Config:
+        x: int = 2
+        y: int = 3
+        name: str = "default"
+        enabled: bool = True
+
+    @dataclass
+    class Settings:
+        config: Config
+        debug: bool = False
+
+    def create_default_config():
+        return Config()
+
+    def create_settings(config: Optional[Config] = None):
+        if config is None:
+            config = create_default_config()
+        return Settings(config=config)
+  src/processor.py: |
+    from models import Config, create_settings
+
+    def process_config(cfg: Config):
+        if cfg.enabled:
+            return f"Processing {cfg.name} with x={cfg.x}"
+        return "Disabled"
+
+    def run():
+        settings = create_settings()
+        return process_config(settings.config)
+  scripts/benchmark.sh: |
+    #!/bin/bash
+    python -m timeit "import processor; processor.run()"
+  tests/test_perf.py: |
+    def test_performance():
+        pass
+  docs/budget.md: |
+    # Budget Guide
+must_include_files:
+- src/models.py
+add_garbage_files: false
+skip_garbage_check: true

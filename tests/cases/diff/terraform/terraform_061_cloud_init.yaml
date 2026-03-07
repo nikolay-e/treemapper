@@ -1,0 +1,120 @@
+initial:
+  cloud_init.tf: |
+    data "cloudinit_config" "web" {
+      gzip          = true
+      base64_encode = true
+
+      part {
+        content_type = "text/x-shellscript"
+        content      = file("${path.module}/scripts/setup.sh")
+      }
+    }
+
+    resource "aws_instance" "web" {
+      ami           = "ami-12345678"
+      instance_type = "t3.micro"
+      user_data     = data.cloudinit_config.web.rendered
+    }
+
+  # --- Tricky garbage: same resource type aws_instance but for unrelated bastion ---
+  garbage_bastion.tf: |
+    GARBAGE_TF_061_BASTION_MARKER_A = "bastion-host"
+    GARBAGE_TF_061_BASTION_MARKER_B = "ssh-jumpbox"
+
+    resource "aws_instance" "bastion" {
+      ami           = "ami-99887766"
+      instance_type = "t3.nano"
+      tags = {
+        Name = "bastion-host"
+        Role = "jumpbox"
+      }
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_monitoring.tf: |
+    GARBAGE_TF_061_MONITOR_MARKER_C = "cloudwatch-agent"
+    GARBAGE_TF_061_MONITOR_MARKER_D = "metrics-export"
+
+    resource "aws_cloudwatch_log_group" "app_logs" {
+      name              = "/app/logs"
+      retention_in_days = 30
+    }
+
+changed:
+  cloud_init.tf: |
+    data "cloudinit_config" "web" {
+      gzip          = true
+      base64_encode = true
+
+      part {
+        content_type = "text/x-shellscript"
+        content      = file("${path.module}/scripts/setup.sh")
+      }
+
+      part {
+        content_type = "text/cloud-config"
+        content      = yamlencode({
+          packages = ["nginx", "docker.io"]
+          runcmd   = ["systemctl start nginx"]
+        })
+      }
+    }
+
+    resource "aws_instance" "web" {
+      ami           = "ami-12345678"
+      instance_type = "t3.small"
+      user_data     = data.cloudinit_config.web.rendered
+    }
+
+  # --- Tricky garbage: same resource type aws_instance but for unrelated bastion ---
+  garbage_bastion.tf: |
+    GARBAGE_TF_061_BASTION_MARKER_A = "bastion-host"
+    GARBAGE_TF_061_BASTION_MARKER_B = "ssh-jumpbox"
+
+    resource "aws_instance" "bastion" {
+      ami           = "ami-99887766"
+      instance_type = "t3.nano"
+      tags = {
+        Name = "bastion-host"
+        Role = "jumpbox"
+      }
+    }
+
+  # --- Plain garbage: no overlap ---
+  garbage_monitoring.tf: |
+    GARBAGE_TF_061_MONITOR_MARKER_C = "cloudwatch-agent"
+    GARBAGE_TF_061_MONITOR_MARKER_D = "metrics-export"
+
+    resource "aws_cloudwatch_log_group" "app_logs" {
+      name              = "/app/logs"
+      retention_in_days = 30
+    }
+
+# === Assertions ===
+
+must_include_files:
+- cloud_init.tf
+
+must_include_content_from:
+  cloud_init.tf:
+    - content_type = "text/cloud-config"
+    - 'packages = ["nginx", "docker.io"]'
+    - instance_type = "t3.small"
+    - 'data "cloudinit_config" "web"'
+
+must_not_include:
+# Tricky garbage markers (sibling aws_instance resource)
+- GARBAGE_TF_061_BASTION_MARKER_A
+- GARBAGE_TF_061_BASTION_MARKER_B
+# Plain garbage markers
+- GARBAGE_TF_061_MONITOR_MARKER_C
+- GARBAGE_TF_061_MONITOR_MARKER_D
+
+must_not_include_files:
+- garbage_bastion.tf
+- garbage_monitoring.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

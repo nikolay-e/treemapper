@@ -1,0 +1,86 @@
+initial:
+  config/validation.yaml: |
+    validation:
+      username:
+        min_length: 3
+        max_length: 20
+      password:
+        min_length: 8
+  src/validators.py: |
+    def validate_username(username: str, min_len: int = 3, max_len: int = 20) -> bool:
+        return min_len <= len(username) <= max_len
+
+    def validate_password(password: str, min_len: int = 8) -> bool:
+        return len(password) >= min_len
+  garbage_graph_traverser.py: |
+    GARBAGE_YAML_019_GRAPH_MARKER_A = "graph"
+    GARBAGE_YAML_019_TRAVERSE_MARKER_B = True
+
+    class GraphTraverser:
+        GARBAGE_YAML_019_TRAVERSER_CLASS_C = "traverser"
+
+        def bfs(self, start_node: str) -> list:
+            return []
+  garbage_state_machine.py: |
+    GARBAGE_YAML_019_STATE_MARKER_D = "state"
+    GARBAGE_YAML_019_TRANSITION_MARKER_E = 42
+
+    class StateMachine:
+        GARBAGE_YAML_019_MACHINE_CLASS_F = True
+
+        def transition(self, event: str) -> str:
+            return "idle"
+changed:
+  config/validation.yaml: |
+    validation:
+      username:
+        min_length: 4
+        max_length: 30
+        pattern: "^[a-zA-Z0-9_]+$"
+      password:
+        min_length: 12
+        require_special: true
+  src/validators.py: |
+    def validate_username(username: str, min_len: int = 3, max_len: int = 20) -> bool:
+        return min_len <= len(username) <= max_len
+
+    def validate_password(password: str, min_len: int = 8) -> bool:
+        return len(password) >= min_len
+  garbage_graph_traverser.py: |
+    GARBAGE_YAML_019_GRAPH_MARKER_A = "graph"
+    GARBAGE_YAML_019_TRAVERSE_MARKER_B = True
+
+    class GraphTraverser:
+        GARBAGE_YAML_019_TRAVERSER_CLASS_C = "traverser"
+
+        def bfs(self, start_node: str) -> list:
+            return []
+  garbage_state_machine.py: |
+    GARBAGE_YAML_019_STATE_MARKER_D = "state"
+    GARBAGE_YAML_019_TRANSITION_MARKER_E = 42
+
+    class StateMachine:
+        GARBAGE_YAML_019_MACHINE_CLASS_F = True
+
+        def transition(self, event: str) -> str:
+            return "idle"
+must_include_files:
+- config/validation.yaml
+must_include_content:
+- |2
+      min_length: 4
+      max_length: 30
+      pattern: "^[a-zA-Z0-9_]+$"
+must_not_include:
+- GARBAGE_YAML_019_GRAPH_MARKER_A
+- GARBAGE_YAML_019_TRAVERSE_MARKER_B
+- GARBAGE_YAML_019_TRAVERSER_CLASS_C
+- GARBAGE_YAML_019_STATE_MARKER_D
+- GARBAGE_YAML_019_TRANSITION_MARKER_E
+- GARBAGE_YAML_019_MACHINE_CLASS_F
+- GraphTraverser
+- StateMachine
+- garbage_graph_traverser.py
+- garbage_state_machine.py
+add_garbage_files: false
+skip_garbage_check: true

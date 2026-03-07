@@ -1,0 +1,33 @@
+initial:
+  rds.tf: |
+    resource "aws_db_instance" "main" {
+      identifier        = "mydb"
+      engine            = "postgres"
+      instance_class    = "db.t3.micro"
+      allocated_storage = 20
+    }
+  src/db.py: |
+    import psycopg2
+
+    def connect():
+        return psycopg2.connect(host="mydb.example.com", database="mydb")
+changed:
+  rds.tf: |
+    resource "aws_db_instance" "main" {
+      identifier        = "mydb"
+      engine            = "postgres"
+      engine_version    = "15.4"
+      instance_class    = "db.t3.medium"
+      allocated_storage = 50
+    }
+  src/db.py: |
+    import psycopg2
+
+    def connect():
+        return psycopg2.connect(host="mydb.example.com", database="mydb")
+must_include_files:
+- rds.tf
+must_include_content:
+- engine_version    = "15.4"
+add_garbage_files: false
+skip_garbage_check: true

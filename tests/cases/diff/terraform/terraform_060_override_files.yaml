@@ -1,0 +1,99 @@
+initial:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-production"
+      instance_type = "t3.large"
+    }
+
+  # --- Tricky garbage: sibling override .tf for different resource ---
+  garbage_tf_060_override_rds.tf: |
+    GARBAGE_TF_060_OVERRIDE_RDS_A = "rds_override"
+    GARBAGE_TF_060_DEV_ENGINE_B = "mysql-dev"
+
+    resource "aws_db_instance" "main" {
+      identifier     = "dev-database"
+      instance_class = "db.t3.micro"
+
+      tags = {
+        Environment = "dev"
+      }
+    }
+
+  # --- Plain garbage ---
+  garbage_tf_060_sqs.tf: |
+    GARBAGE_TF_060_SQS_NAME_C = "task-queue"
+    GARBAGE_TF_060_SQS_DELAY_D = 0
+
+    resource "aws_sqs_queue" "tasks" {
+      name                      = "task-queue"
+      delay_seconds             = 0
+      max_message_size          = 262144
+      message_retention_seconds = 86400
+    }
+
+changed:
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-production"
+      instance_type = "t3.large"
+    }
+
+  main_override.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-development"
+      instance_type = "t3.micro"
+
+      tags = {
+        Environment = "dev"
+      }
+    }
+
+  garbage_tf_060_override_rds.tf: |
+    GARBAGE_TF_060_OVERRIDE_RDS_A = "rds_override"
+    GARBAGE_TF_060_DEV_ENGINE_B = "mysql-dev"
+
+    resource "aws_db_instance" "main" {
+      identifier     = "dev-database"
+      instance_class = "db.t3.micro"
+
+      tags = {
+        Environment = "dev"
+      }
+    }
+
+  garbage_tf_060_sqs.tf: |
+    GARBAGE_TF_060_SQS_NAME_C = "task-queue"
+    GARBAGE_TF_060_SQS_DELAY_D = 0
+
+    resource "aws_sqs_queue" "tasks" {
+      name                      = "task-queue"
+      delay_seconds             = 0
+      max_message_size          = 262144
+      message_retention_seconds = 86400
+    }
+
+must_include_files:
+- main_override.tf
+
+must_include_content_from:
+  main_override.tf:
+    - ami           = "ami-development"
+    - instance_type = "t3.micro"
+    - Environment = "dev"
+    - resource "aws_instance" "web" {
+
+must_not_include:
+- GARBAGE_TF_060_OVERRIDE_RDS_A
+- GARBAGE_TF_060_DEV_ENGINE_B
+- GARBAGE_TF_060_SQS_NAME_C
+- GARBAGE_TF_060_SQS_DELAY_D
+
+must_not_include_files:
+- garbage_tf_060_override_rds.tf
+- garbage_tf_060_sqs.tf
+- main.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

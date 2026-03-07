@@ -1,0 +1,98 @@
+initial:
+  worker.py: |
+    import boto3
+    sqs = boto3.client('sqs')
+    messages = sqs.receive_message(QueueUrl=queue_url)
+  messaging.tf: |
+    # Messaging resources
+
+  # --- Tricky garbage: same resource type aws_sqs_queue but for audit events ---
+  audit_queue.tf: |
+    GARBAGE_TF_017_AUDIT_QUEUE_A = "audit-events"
+    GARBAGE_TF_017_AUDIT_RETAIN_B = 1209600
+
+    resource "aws_sqs_queue" "audit" {
+      name                      = "audit-events-queue"
+      delay_seconds             = 10
+      max_message_size          = 131072
+      message_retention_seconds = 1209600
+      visibility_timeout_seconds = 60
+    }
+
+    resource "aws_sqs_queue" "audit_dlq" {
+      name = "audit-events-queue-dlq"
+    }
+
+  # --- Plain garbage ---
+  garbage_cache_warmer.js: |
+    // GARBAGE_TF_017_CACHE_WARMER_C
+    // GARBAGE_TF_017_CACHE_TTL_D
+    const warmCache = (keys) => keys.forEach(k => cache.set(k, null));
+
+changed:
+  worker.py: |
+    import boto3
+    sqs = boto3.client('sqs')
+    messages = sqs.receive_message(QueueUrl=queue_url)
+  messaging.tf: |
+    resource "aws_sqs_queue" "tasks" {
+      name                      = "tasks-queue"
+      delay_seconds             = 0
+      max_message_size          = 262144
+      message_retention_seconds = 345600
+      visibility_timeout_seconds = 30
+
+      redrive_policy = jsonencode({
+        deadLetterTargetArn = aws_sqs_queue.tasks_dlq.arn
+        maxReceiveCount     = 3
+      })
+    }
+
+    resource "aws_sqs_queue" "tasks_dlq" {
+      name = "tasks-queue-dlq"
+    }
+
+  audit_queue.tf: |
+    GARBAGE_TF_017_AUDIT_QUEUE_A = "audit-events"
+    GARBAGE_TF_017_AUDIT_RETAIN_B = 1209600
+
+    resource "aws_sqs_queue" "audit" {
+      name                      = "audit-events-queue"
+      delay_seconds             = 10
+      max_message_size          = 131072
+      message_retention_seconds = 1209600
+      visibility_timeout_seconds = 60
+    }
+
+    resource "aws_sqs_queue" "audit_dlq" {
+      name = "audit-events-queue-dlq"
+    }
+
+  garbage_cache_warmer.js: |
+    // GARBAGE_TF_017_CACHE_WARMER_C
+    // GARBAGE_TF_017_CACHE_TTL_D
+    const warmCache = (keys) => keys.forEach(k => cache.set(k, null));
+
+must_include_files:
+- messaging.tf
+
+must_include_content_from:
+  messaging.tf:
+    - resource "aws_sqs_queue" "tasks" {
+    - aws_sqs_queue.tasks_dlq.arn
+
+must_not_include:
+- GARBAGE_TF_017_AUDIT_QUEUE_A
+- GARBAGE_TF_017_AUDIT_RETAIN_B
+- GARBAGE_TF_017_CACHE_WARMER_C
+- GARBAGE_TF_017_CACHE_TTL_D
+
+must_not_include_files:
+- audit_queue.tf
+- garbage_cache_warmer.js
+- worker.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

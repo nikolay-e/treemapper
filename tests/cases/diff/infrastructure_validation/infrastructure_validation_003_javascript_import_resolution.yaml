@@ -1,0 +1,100 @@
+initial:
+  src/utils.ts: |
+    export interface UserResponse {
+        id: string;
+        name: string;
+        email: string;
+    }
+
+    export function fetchUser(id: string): Promise<UserResponse> {
+        return fetch(`/api/users/${id}`).then(res => res.json());
+    }
+
+    export function fetchUsers(): Promise<UserResponse[]> {
+        return fetch('/api/users').then(res => res.json());
+    }
+
+    export function formatUserName(user: UserResponse): string {
+        return `${user.name} <${user.email}>`;
+    }
+  src/api.ts: |
+    import { fetchUser, fetchUsers, UserResponse } from './utils';
+
+    export async function getUserProfile(id: string): Promise<UserResponse> {
+        const user = await fetchUser(id);
+        return user;
+    }
+
+    export async function listActiveUsers(): Promise<UserResponse[]> {
+        const users = await fetchUsers();
+        return users.filter(u => u.email.includes('@'));
+    }
+  src/main.ts: |
+    console.log("initial");
+  scripts/build.sh: |
+    #!/bin/bash
+    tsc --outDir dist
+  tests/utils.test.ts: |
+    describe('utils', () => { it('passes', () => {}); });
+  docs/api-reference.md: |
+    # API Reference
+  config/tsconfig.json: |
+    {
+    }
+changed:
+  src/utils.ts: |
+    export interface UserResponse {
+        id: string;
+        name: string;
+        email: string;
+    }
+
+    export function fetchUser(id: string): Promise<UserResponse> {
+        return fetch(`/api/users/${id}`).then(res => res.json());
+    }
+
+    export function fetchUsers(): Promise<UserResponse[]> {
+        return fetch('/api/users').then(res => res.json());
+    }
+
+    export function formatUserName(user: UserResponse): string {
+        return `${user.name} <${user.email}>`;
+    }
+  src/api.ts: |
+    import { fetchUser, fetchUsers, UserResponse } from './utils';
+
+    export async function getUserProfile(id: string): Promise<UserResponse> {
+        const user = await fetchUser(id);
+        return user;
+    }
+
+    export async function listActiveUsers(): Promise<UserResponse[]> {
+        const users = await fetchUsers();
+        return users.filter(u => u.email.includes('@'));
+    }
+  src/main.ts: |
+    import { fetchUser } from './utils';
+
+    async function main() {
+        const user = await fetchUser('123');
+        console.log(user);
+    }
+
+    main();
+  scripts/build.sh: |
+    #!/bin/bash
+    tsc --outDir dist
+  tests/utils.test.ts: |
+    describe('utils', () => { it('passes', () => {}); });
+  docs/api-reference.md: |
+    # API Reference
+  config/tsconfig.json: |
+    {
+    }
+must_include_files:
+- src/main.ts
+must_include_content:
+- import { fetchUser } from './utils';
+- user = await fetchUser('123')
+add_garbage_files: false
+skip_garbage_check: true

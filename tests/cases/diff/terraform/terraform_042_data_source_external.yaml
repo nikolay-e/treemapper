@@ -1,0 +1,119 @@
+initial:
+  scripts/get_ami.sh: |
+    #!/bin/bash
+    echo '{"ami_id": "ami-12345678"}'
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami = "ami-static"
+    }
+  # --- Tricky garbage: sibling .tf with same data "external" pattern for a different script ---
+  networking/dns_lookup_GARBAGE_TF_042_A.tf: |
+    # GARBAGE_TF_042_DNS_EXTERNAL_A - External DNS lookup
+    data "external" "dns_resolver_GARBAGE_TF_042_A" {
+      program = ["${path.module}/scripts/resolve_dns_GARBAGE_TF_042_A.sh"]
+    }
+
+    # GARBAGE_TF_042_DNS_RECORD_B
+    resource "aws_route53_record" "resolved_GARBAGE_TF_042_B" {
+      name    = "app-GARBAGE_TF_042_B"
+      type    = "A"
+      records = [data.external.dns_resolver_GARBAGE_TF_042_A.result.ip]
+    }
+  # --- Plain garbage: unrelated storage config ---
+  storage/lifecycle_GARBAGE_TF_042_C.tf: |
+    # GARBAGE_TF_042_LIFECYCLE_C - S3 lifecycle rules
+    resource "aws_s3_bucket_lifecycle_configuration" "archive_GARBAGE_TF_042_C" {
+      bucket = aws_s3_bucket.data.id
+
+      rule {
+        id     = "archive-rule-GARBAGE_TF_042_C"
+        status = "Enabled"
+
+        transition {
+          days          = 90
+          storage_class = "GLACIER"
+        }
+
+        expiration {
+          days = 365
+        }
+      }
+
+      tags = {
+        Name = "archive-lifecycle-GARBAGE_TF_042_C"
+        Team = "data-GARBAGE_TF_042_STORAGE_D"
+      }
+    }
+
+changed:
+  scripts/get_ami.sh: |
+    #!/bin/bash
+    echo '{"ami_id": "ami-12345678"}'
+  main.tf: |
+    data "external" "ami" {
+      program = ["${path.module}/scripts/get_ami.sh"]
+    }
+
+    resource "aws_instance" "web" {
+      ami = data.external.ami.result.ami_id
+    }
+  networking/dns_lookup_GARBAGE_TF_042_A.tf: |
+    # GARBAGE_TF_042_DNS_EXTERNAL_A - External DNS lookup
+    data "external" "dns_resolver_GARBAGE_TF_042_A" {
+      program = ["${path.module}/scripts/resolve_dns_GARBAGE_TF_042_A.sh"]
+    }
+
+    # GARBAGE_TF_042_DNS_RECORD_B
+    resource "aws_route53_record" "resolved_GARBAGE_TF_042_B" {
+      name    = "app-GARBAGE_TF_042_B"
+      type    = "A"
+      records = [data.external.dns_resolver_GARBAGE_TF_042_A.result.ip]
+    }
+  storage/lifecycle_GARBAGE_TF_042_C.tf: |
+    # GARBAGE_TF_042_LIFECYCLE_C - S3 lifecycle rules
+    resource "aws_s3_bucket_lifecycle_configuration" "archive_GARBAGE_TF_042_C" {
+      bucket = aws_s3_bucket.data.id
+
+      rule {
+        id     = "archive-rule-GARBAGE_TF_042_C"
+        status = "Enabled"
+
+        transition {
+          days          = 90
+          storage_class = "GLACIER"
+        }
+
+        expiration {
+          days = 365
+        }
+      }
+
+      tags = {
+        Name = "archive-lifecycle-GARBAGE_TF_042_C"
+        Team = "data-GARBAGE_TF_042_STORAGE_D"
+      }
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - data "external" "ami" {
+    - scripts/get_ami.sh
+    - data.external.ami.result.ami_id
+
+must_not_include:
+- GARBAGE_TF_042_DNS_EXTERNAL_A
+- GARBAGE_TF_042_B
+- GARBAGE_TF_042_LIFECYCLE_C
+- GARBAGE_TF_042_STORAGE_D
+
+must_not_include_files:
+- networking/dns_lookup_GARBAGE_TF_042_A.tf
+- storage/lifecycle_GARBAGE_TF_042_C.tf
+
+max_fragments: 3
+max_files: 2
+add_garbage_files: false
+skip_garbage_check: true

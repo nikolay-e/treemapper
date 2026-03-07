@@ -1,0 +1,112 @@
+initial:
+  main.tf: |
+    locals {
+      name = "myapp"
+    }
+  # --- Tricky garbage: sibling .tf with same locals/function pattern for a different purpose ---
+  networking/transforms_GARBAGE_TF_040_A.tf: |
+    # GARBAGE_TF_040_NET_FUNCS_A - Networking transformation locals
+    locals {
+      net_name_GARBAGE_TF_040_A = "network"
+
+      upper_net_name_GARBAGE_TF_040_A = upper(local.net_name_GARBAGE_TF_040_A)
+      merged_cidrs_GARBAGE_TF_040_B   = merge(var.private_cidrs, var.public_cidrs)
+      encoded_config_GARBAGE_TF_040_A = base64encode("network-config")
+    }
+  # --- Plain garbage: unrelated IAM config ---
+  iam/roles_GARBAGE_TF_040_C.tf: |
+    # GARBAGE_TF_040_IAM_ROLES_C - IAM role definitions
+    resource "aws_iam_role" "lambda_GARBAGE_TF_040_C" {
+      name = "lambda-exec-GARBAGE_TF_040_C"
+
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Action = "sts:AssumeRole"
+          Effect = "Allow"
+          Principal = {
+            Service = "lambda.amazonaws.com"
+          }
+        }]
+      })
+
+      tags = {
+        Name = "lambda-role-GARBAGE_TF_040_C"
+        Team = "platform-GARBAGE_TF_040_IAM_D"
+      }
+    }
+
+changed:
+  main.tf: |
+    locals {
+      name = "myapp"
+
+      # String functions
+      upper_name = upper(local.name)
+      trimmed    = trimspace("  hello  ")
+
+      # Collection functions
+      merged_tags = merge(var.common_tags, var.extra_tags)
+      flattened   = flatten([var.subnet_ids, var.extra_subnet_ids])
+
+      # Encoding functions
+      encoded = base64encode("secret")
+      decoded = jsondecode(file("config.json"))
+
+      # Math functions
+      max_count = max(var.min_count, var.desired_count)
+    }
+  networking/transforms_GARBAGE_TF_040_A.tf: |
+    # GARBAGE_TF_040_NET_FUNCS_A - Networking transformation locals
+    locals {
+      net_name_GARBAGE_TF_040_A = "network"
+
+      upper_net_name_GARBAGE_TF_040_A = upper(local.net_name_GARBAGE_TF_040_A)
+      merged_cidrs_GARBAGE_TF_040_B   = merge(var.private_cidrs, var.public_cidrs)
+      encoded_config_GARBAGE_TF_040_A = base64encode("network-config")
+    }
+  iam/roles_GARBAGE_TF_040_C.tf: |
+    # GARBAGE_TF_040_IAM_ROLES_C - IAM role definitions
+    resource "aws_iam_role" "lambda_GARBAGE_TF_040_C" {
+      name = "lambda-exec-GARBAGE_TF_040_C"
+
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Action = "sts:AssumeRole"
+          Effect = "Allow"
+          Principal = {
+            Service = "lambda.amazonaws.com"
+          }
+        }]
+      })
+
+      tags = {
+        Name = "lambda-role-GARBAGE_TF_040_C"
+        Team = "platform-GARBAGE_TF_040_IAM_D"
+      }
+    }
+
+must_include_files:
+- main.tf
+
+must_include_content_from:
+  main.tf:
+    - upper_name = upper(local.name)
+    - merged_tags = merge(var.common_tags, var.extra_tags)
+    - max_count = max(var.min_count, var.desired_count)
+
+must_not_include:
+- GARBAGE_TF_040_NET_FUNCS_A
+- GARBAGE_TF_040_B
+- GARBAGE_TF_040_IAM_ROLES_C
+- GARBAGE_TF_040_IAM_D
+
+must_not_include_files:
+- networking/transforms_GARBAGE_TF_040_A.tf
+- iam/roles_GARBAGE_TF_040_C.tf
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

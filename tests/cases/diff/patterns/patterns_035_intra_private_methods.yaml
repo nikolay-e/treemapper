@@ -1,0 +1,42 @@
+initial:
+  service.py: |
+    class UserService:
+        def _validate_email(self, email):
+            return "@" in email and "." in email
+
+        def _hash_password(self, password):
+            return f"hashed_{password}"
+
+        def _generate_token(self):
+            return "token_123"
+
+        def create_user(self, email, password):
+            if not self._validate_email(email):
+                raise ValueError("Invalid email")
+            hashed = self._hash_password(password)
+            token = self._generate_token()
+            return {"email": email, "password": hashed, "token": token}
+changed:
+  service.py: |
+    class UserService:
+        def _validate_email(self, email):
+            return "@" in email and "." in email
+
+        def _hash_password(self, password):
+            return f"hashed_{password}"
+
+        def _generate_token(self):
+            return "token_123"
+
+        def create_user(self, email, password):
+            if not self._validate_email(email):
+                raise ValueError("Invalid email")
+            hashed = self._hash_password(password)
+            token = self._generate_token()
+            return {"email": email, "password": hashed, "token": token, "verified": False}
+must_include_files:
+- service.py
+must_include_content:
+- 'return {"email": email, "password": hashed, "token": token, "verified": False}'
+add_garbage_files: false
+skip_garbage_check: true

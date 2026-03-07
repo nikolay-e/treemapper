@@ -1,0 +1,103 @@
+initial:
+  network.tf: |
+    resource "aws_vpc" "main" {
+      cidr_block = "10.0.0.0/16"
+    }
+
+    resource "aws_subnet" "public" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = "10.0.0.0/24"
+    }
+
+  # --- Tricky garbage: same resource type aws_nat_gateway but for a secondary VPC ---
+  secondary_nat.tf: |
+    GARBAGE_TF_022_SEC_NAT_A = "secondary-vpc-nat"
+    GARBAGE_TF_022_SEC_EIP_B = "secondary-eip"
+
+    resource "aws_eip" "secondary_nat" {
+      domain = "vpc"
+    }
+
+    resource "aws_nat_gateway" "secondary" {
+      allocation_id = aws_eip.secondary_nat.id
+      subnet_id     = aws_subnet.secondary_public.id
+
+      depends_on = [aws_internet_gateway.secondary]
+    }
+
+  # --- Plain garbage ---
+  garbage_email_sender.py: |
+    GARBAGE_TF_022_EMAIL_SENDER_C = "mailer"
+    GARBAGE_TF_022_EMAIL_QUEUE_D = "outbox"
+
+    class EmailSender:
+        def send(self, to, subject, body):
+            pass
+
+changed:
+  network.tf: |
+    resource "aws_vpc" "main" {
+      cidr_block = "10.0.0.0/16"
+    }
+
+    resource "aws_subnet" "public" {
+      vpc_id     = aws_vpc.main.id
+      cidr_block = "10.0.0.0/24"
+    }
+
+    resource "aws_eip" "nat" {
+      domain = "vpc"
+    }
+
+    resource "aws_nat_gateway" "main" {
+      allocation_id = aws_eip.nat.id
+      subnet_id     = aws_subnet.public.id
+
+      depends_on = [aws_internet_gateway.main]
+    }
+
+  secondary_nat.tf: |
+    GARBAGE_TF_022_SEC_NAT_A = "secondary-vpc-nat"
+    GARBAGE_TF_022_SEC_EIP_B = "secondary-eip"
+
+    resource "aws_eip" "secondary_nat" {
+      domain = "vpc"
+    }
+
+    resource "aws_nat_gateway" "secondary" {
+      allocation_id = aws_eip.secondary_nat.id
+      subnet_id     = aws_subnet.secondary_public.id
+
+      depends_on = [aws_internet_gateway.secondary]
+    }
+
+  garbage_email_sender.py: |
+    GARBAGE_TF_022_EMAIL_SENDER_C = "mailer"
+    GARBAGE_TF_022_EMAIL_QUEUE_D = "outbox"
+
+    class EmailSender:
+        def send(self, to, subject, body):
+            pass
+
+must_include_files:
+- network.tf
+
+must_include_content_from:
+  network.tf:
+    - resource "aws_eip" "nat" {
+    - resource "aws_nat_gateway" "main" {
+
+must_not_include:
+- GARBAGE_TF_022_SEC_NAT_A
+- GARBAGE_TF_022_SEC_EIP_B
+- GARBAGE_TF_022_EMAIL_SENDER_C
+- GARBAGE_TF_022_EMAIL_QUEUE_D
+
+must_not_include_files:
+- secondary_nat.tf
+- garbage_email_sender.py
+
+max_fragments: 3
+max_files: 1
+add_garbage_files: false
+skip_garbage_check: true

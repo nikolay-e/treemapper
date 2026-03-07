@@ -1,0 +1,90 @@
+initial:
+  events.ts: |
+    export interface ChatMessage {
+        userId: string;
+        text: string;
+        timestamp: number;
+    }
+
+    export const CHAT_EVENT = 'chat:message';
+  socket.ts: |
+    console.log('initial');
+  garbage_backup.ts: |
+    const GARBAGE_JS_056_BACKUP_MARKER_A = "backup";
+    const GARBAGE_JS_056_SNAPSHOT_MARKER_B = true;
+
+    class SnapshotManager {
+        static GARBAGE_JS_056_BACKUP_CLASS_C = "snapshot";
+
+        createSnapshot(name: string): string {
+            return name;
+        }
+    }
+  garbage_monitoring.ts: |
+    const GARBAGE_JS_056_MONITOR_MARKER_D = "monitoring";
+    const GARBAGE_JS_056_ALERT_MARKER_E = 500;
+
+    class AlertDispatcher {
+        static GARBAGE_JS_056_MONITOR_CLASS_F = true;
+
+        dispatch(severity: string, message: string): void {
+            // noop
+        }
+    }
+changed:
+  events.ts: |
+    export interface ChatMessage {
+        userId: string;
+        text: string;
+        timestamp: number;
+    }
+
+    export const CHAT_EVENT = 'chat:message';
+  socket.ts: |
+    import { Server } from 'socket.io';
+    import { CHAT_EVENT, ChatMessage } from './events';
+
+    export function setupSocket(io: Server) {
+        io.on('connection', (socket) => {
+            socket.on(CHAT_EVENT, (message: ChatMessage) => {
+                io.emit(CHAT_EVENT, message);
+            });
+        });
+    }
+  garbage_backup.ts: |
+    const GARBAGE_JS_056_BACKUP_MARKER_A = "backup";
+    const GARBAGE_JS_056_SNAPSHOT_MARKER_B = true;
+
+    class SnapshotManager {
+        static GARBAGE_JS_056_BACKUP_CLASS_C = "snapshot";
+
+        createSnapshot(name: string): string {
+            return name;
+        }
+    }
+  garbage_monitoring.ts: |
+    const GARBAGE_JS_056_MONITOR_MARKER_D = "monitoring";
+    const GARBAGE_JS_056_ALERT_MARKER_E = 500;
+
+    class AlertDispatcher {
+        static GARBAGE_JS_056_MONITOR_CLASS_F = true;
+
+        dispatch(severity: string, message: string): void {
+            // noop
+        }
+    }
+must_include_files:
+- socket.ts
+must_include_content:
+- 'function setupSocket(io: Server) {'
+must_not_include:
+- GARBAGE_JS_056_ALERT_MARKER_E
+- GARBAGE_JS_056_BACKUP_CLASS_C
+- GARBAGE_JS_056_BACKUP_MARKER_A
+- GARBAGE_JS_056_MONITOR_CLASS_F
+- GARBAGE_JS_056_MONITOR_MARKER_D
+- GARBAGE_JS_056_SNAPSHOT_MARKER_B
+- garbage_backup.ts
+- garbage_monitoring.ts
+add_garbage_files: false
+skip_garbage_check: true

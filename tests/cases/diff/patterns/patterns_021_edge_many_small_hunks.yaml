@@ -1,0 +1,18 @@
+initial:
+  utils.py: |
+    def func1():
+        pass
+
+    def func2():
+        pass
+changed:
+  utils.py: |
+    def func1():
+        return 1
+
+    def func2():
+        return 2
+must_include_files:
+- utils.py
+add_garbage_files: false
+skip_garbage_check: true
