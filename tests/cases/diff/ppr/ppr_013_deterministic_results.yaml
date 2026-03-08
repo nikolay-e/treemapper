@@ -1,3 +1,10 @@
+# Scenario: func0 in a 5-function chain gets return value — tests determinism of PPR results
+# Changed: test.py — func0() returns 1, chain func0->func1->...->func4
+# Reviewer needs: test.py (changed, entire chain is in one file)
+# Trap: math_ops.py — defines func0/func1 with identical names, same call pattern
+# Trap: transform.py — similar chain structure with transform_a->transform_b->transform_c
+# Trap: logging_config.py — completely unrelated, no function overlap
+
 initial:
   test.py: |
     def func0():
@@ -15,11 +22,7 @@ initial:
     def func4():
         func3()
 
-  # --- Tricky garbage: same function names func0/func1 but no import edge ---
-  garbage_math_funcs.py: |
-    GARBAGE_PPR_013_MATH_FUNCS_A = "math_operations"
-    GARBAGE_PPR_013_MATH_OVERLAP_B = True
-
+  math_ops.py: |
     def func0():
         return 3.14159
 
@@ -27,32 +30,24 @@ initial:
         return func0() * 2
 
     class MathHelper:
-        GARBAGE_PPR_013_MATH_CLASS_C = 99
-
         def compute(self):
             return func0() + func1()
-
-  # --- Tricky garbage: similar call chain pattern, similar names ---
-  garbage_chain_funcs.py: |
-    GARBAGE_PPR_013_CHAIN_START_D = "chain"
-    GARBAGE_PPR_013_CHAIN_DEPTH_E = 5
-
-    def chain_func0():
+  transform.py: |
+    def transform_a():
         return "start"
 
-    def chain_func1():
-        return chain_func0()
+    def transform_b():
+        return transform_a() + "_b"
 
-    class ChainRunner:
-        GARBAGE_PPR_013_CHAIN_RUN_F = True
+    def transform_c():
+        return transform_b() + "_c"
 
+    class TransformRunner:
         def run(self):
-            return chain_func1()
-
-  # --- Plain garbage: no overlap ---
-  garbage_logger.py: |
-    GARBAGE_PPR_013_LOGGER_INIT_G = "logger"
-    GARBAGE_PPR_013_LOGGER_LEVEL_H = "DEBUG"
+            return transform_c()
+  logging_config.py: |
+    LOG_LEVEL = "DEBUG"
+    LOG_FORMAT = "%(asctime)s %(message)s"
 
     class Logger:
         def log(self, msg: str) -> None:
@@ -75,10 +70,7 @@ changed:
     def func4():
         func3()
 
-  garbage_math_funcs.py: |
-    GARBAGE_PPR_013_MATH_FUNCS_A = "math_operations"
-    GARBAGE_PPR_013_MATH_OVERLAP_B = True
-
+  math_ops.py: |
     def func0():
         return 3.14159
 
@@ -86,30 +78,24 @@ changed:
         return func0() * 2
 
     class MathHelper:
-        GARBAGE_PPR_013_MATH_CLASS_C = 99
-
         def compute(self):
             return func0() + func1()
-
-  garbage_chain_funcs.py: |
-    GARBAGE_PPR_013_CHAIN_START_D = "chain"
-    GARBAGE_PPR_013_CHAIN_DEPTH_E = 5
-
-    def chain_func0():
+  transform.py: |
+    def transform_a():
         return "start"
 
-    def chain_func1():
-        return chain_func0()
+    def transform_b():
+        return transform_a() + "_b"
 
-    class ChainRunner:
-        GARBAGE_PPR_013_CHAIN_RUN_F = True
+    def transform_c():
+        return transform_b() + "_c"
 
+    class TransformRunner:
         def run(self):
-            return chain_func1()
-
-  garbage_logger.py: |
-    GARBAGE_PPR_013_LOGGER_INIT_G = "logger"
-    GARBAGE_PPR_013_LOGGER_LEVEL_H = "DEBUG"
+            return transform_c()
+  logging_config.py: |
+    LOG_LEVEL = "DEBUG"
+    LOG_FORMAT = "%(asctime)s %(message)s"
 
     class Logger:
         def log(self, msg: str) -> None:
@@ -130,22 +116,16 @@ must_include_content_from:
     - return 1
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_PPR_013_LOGGER_INIT_G
-- GARBAGE_PPR_013_LOGGER_LEVEL_H
-# Tricky: same function names func0/func1 in different file
-- GARBAGE_PPR_013_MATH_FUNCS_A
-- GARBAGE_PPR_013_MATH_OVERLAP_B
-- GARBAGE_PPR_013_MATH_CLASS_C
-# Tricky: similar call chain pattern
-- GARBAGE_PPR_013_CHAIN_START_D
-- GARBAGE_PPR_013_CHAIN_DEPTH_E
-- GARBAGE_PPR_013_CHAIN_RUN_F
+- MathHelper
+- TransformRunner
+- LOG_LEVEL
+- LOG_FORMAT
+- transform_a
 
 must_not_include_files:
-- garbage_math_funcs.py
-- garbage_chain_funcs.py
-- garbage_logger.py
+- math_ops.py
+- transform.py
+- logging_config.py
 
 max_fragments: 6
 max_files: 2

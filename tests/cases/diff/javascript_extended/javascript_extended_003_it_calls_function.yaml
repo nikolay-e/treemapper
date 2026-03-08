@@ -1,3 +1,17 @@
+# Reviewer sees: validator.test.ts tests isValidEmail, isValidUrl,
+# isNonEmpty, and isWithinLength from validator.ts.
+# Q: "What regex patterns and logic do these validators use?"
+#    -> src/validator.ts: EMAIL_REGEX and URL_REGEX are module-level
+#       constants; isNonEmpty trims then checks length; isWithinLength
+#       trims then checks min/max bounds. Reviewer verifies the test
+#       cases exercise correct boundary conditions.
+#
+# Not needed:
+#   - src/unrelated/cache.ts: in-memory cache manager. Different
+#     infrastructure concern (caching vs validation).
+#   - src/unrelated/queue.ts: task queue. Different infrastructure,
+#     no relation to string validation.
+
 initial:
   src/validator.ts: |
     const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,11 +34,9 @@ initial:
         return len >= min && len <= max;
     }
   src/validator.test.ts: |
-    console.log('initial');
+    console.log('placeholder');
   src/unrelated/cache.ts: |
-    const GARBAGE_JSX_003_CACHE_STORE_A = 'cache_garbage_marker';
-
-    export class GarbageCacheManager {
+    export class CacheManager {
         private store = new Map<string, unknown>();
 
         set(key: string, value: unknown): void {
@@ -40,13 +52,11 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_003_EVICT_CACHE_B(): void {
-        console.log('GARBAGE_JSX_003_EVICTION_OUTPUT_C');
+    export function evictCache(key: string): void {
+        console.log('evicting cache for:', key);
     }
   src/unrelated/queue.ts: |
-    const GARBAGE_JSX_003_QUEUE_CONFIG_D = { maxRetries: 3, backoff: 1000 };
-
-    export class GARBAGE_JSX_003_TASK_QUEUE_E {
+    export class TaskQueue {
         private tasks: string[] = [];
 
         enqueue(task: string): void {
@@ -58,7 +68,7 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_003_PROCESS_QUEUE_F(): void {
+    export function processQueue(): void {
         console.log('processing queue');
     }
 changed:
@@ -113,9 +123,7 @@ changed:
         });
     });
   src/unrelated/cache.ts: |
-    const GARBAGE_JSX_003_CACHE_STORE_A = 'cache_garbage_marker';
-
-    export class GarbageCacheManager {
+    export class CacheManager {
         private store = new Map<string, unknown>();
 
         set(key: string, value: unknown): void {
@@ -131,13 +139,11 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_003_EVICT_CACHE_B(): void {
-        console.log('GARBAGE_JSX_003_EVICTION_OUTPUT_C');
+    export function evictCache(key: string): void {
+        console.log('evicting cache for:', key);
     }
   src/unrelated/queue.ts: |
-    const GARBAGE_JSX_003_QUEUE_CONFIG_D = { maxRetries: 3, backoff: 1000 };
-
-    export class GARBAGE_JSX_003_TASK_QUEUE_E {
+    export class TaskQueue {
         private tasks: string[] = [];
 
         enqueue(task: string): void {
@@ -149,20 +155,26 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_003_PROCESS_QUEUE_F(): void {
+    export function processQueue(): void {
         console.log('processing queue');
     }
 must_include_files:
-- src/validator.test.ts
-must_include_content:
-- it('should validate correct email', () => {
+  # Unchanged file — the module under test. Reviewer needs to see
+  # the regex patterns and trim logic to verify test coverage.
+  - src/validator.ts
+must_include_content_from:
+  src/validator.ts:
+    - "EMAIL_REGEX"
+    - "isValidEmail"
+    - "isWithinLength"
 must_not_include:
-- GARBAGE_JSX_003_CACHE_STORE_A
-- GARBAGE_JSX_003_EVICT_CACHE_B
-- GARBAGE_JSX_003_PROCESS_QUEUE_F
-- GARBAGE_JSX_003_QUEUE_CONFIG_D
-- GARBAGE_JSX_003_TASK_QUEUE_E
-- cache.ts
-- queue.ts
+  # cache.ts: caching infrastructure, unrelated to validation
+  - CacheManager
+  - evictCache
+  # queue.ts: task queue, different infrastructure concern
+  - TaskQueue
+  - processQueue
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,12 +1,32 @@
+# Scenario: Add an ACM certificate with DNS validation via Route53
+#
+# Reviewer questions:
+#   1. What hosted zone completes the DNS validation? (route53.tf aws_route53_zone.main)
+#   2. Is the validation record wired correctly? (route53.tf aws_route53_record.cert_validation)
+#
+# The diff adds aws_acm_certificate and aws_acm_certificate_validation in
+# certs.tf. The Route53 zone and validation record in route53.tf are unchanged
+# but essential to verify the validation chain is correct.
+#
+# Traps: internal_certs.tf has same ACM type but for a wildcard internal cert.
+# alb.tf references certificate_arn but is about load balancing, not certs.
+
 initial:
-  dns.tf: |
-    # DNS resources
+  certs.tf: |
+    # ACM certificates placeholder
+  route53.tf: |
+    resource "aws_route53_zone" "main" {
+      name = "example.com"
+    }
 
-  # --- Tricky garbage: same resource type aws_acm_certificate but for internal services ---
+    resource "aws_route53_record" "cert_validation" {
+      zone_id = aws_route53_zone.main.zone_id
+      name    = aws_acm_certificate.main.domain_validation_options[0].resource_record_name
+      type    = aws_acm_certificate.main.domain_validation_options[0].resource_record_type
+      ttl     = 60
+      records = [aws_acm_certificate.main.domain_validation_options[0].resource_record_value]
+    }
   internal_certs.tf: |
-    GARBAGE_TF_025_INT_CERT_A = "internal-tls"
-    GARBAGE_TF_025_INT_DOMAIN_B = "*.internal.example.com"
-
     resource "aws_acm_certificate" "internal" {
       domain_name       = "*.internal.example.com"
       validation_method = "DNS"
@@ -15,23 +35,21 @@ initial:
         create_before_destroy = true
       }
     }
+  alb.tf: |
+    resource "aws_lb_listener" "https" {
+      load_balancer_arn = aws_lb.main.arn
+      port              = 443
+      protocol          = "HTTPS"
+      certificate_arn   = aws_acm_certificate.main.arn
 
-    resource "aws_acm_certificate_validation" "internal" {
-      certificate_arn         = aws_acm_certificate.internal.arn
-      validation_record_fqdns = [aws_route53_record.internal_cert_validation.fqdn]
+      default_action {
+        type             = "forward"
+        target_group_arn = aws_lb_target_group.app.arn
+      }
     }
 
-  # --- Plain garbage ---
-  garbage_report_generator.py: |
-    GARBAGE_TF_025_REPORT_GEN_C = "weekly-report"
-    GARBAGE_TF_025_REPORT_FMT_D = "pdf"
-
-    class ReportGenerator:
-        def create_report(self, data):
-            return b"%PDF-1.4"
-
 changed:
-  dns.tf: |
+  certs.tf: |
     resource "aws_acm_certificate" "main" {
       domain_name       = "api.example.com"
       validation_method = "DNS"
@@ -45,11 +63,19 @@ changed:
       certificate_arn         = aws_acm_certificate.main.arn
       validation_record_fqdns = [aws_route53_record.cert_validation.fqdn]
     }
+  route53.tf: |
+    resource "aws_route53_zone" "main" {
+      name = "example.com"
+    }
 
+    resource "aws_route53_record" "cert_validation" {
+      zone_id = aws_route53_zone.main.zone_id
+      name    = aws_acm_certificate.main.domain_validation_options[0].resource_record_name
+      type    = aws_acm_certificate.main.domain_validation_options[0].resource_record_type
+      ttl     = 60
+      records = [aws_acm_certificate.main.domain_validation_options[0].resource_record_value]
+    }
   internal_certs.tf: |
-    GARBAGE_TF_025_INT_CERT_A = "internal-tls"
-    GARBAGE_TF_025_INT_DOMAIN_B = "*.internal.example.com"
-
     resource "aws_acm_certificate" "internal" {
       domain_name       = "*.internal.example.com"
       validation_method = "DNS"
@@ -58,39 +84,39 @@ changed:
         create_before_destroy = true
       }
     }
+  alb.tf: |
+    resource "aws_lb_listener" "https" {
+      load_balancer_arn = aws_lb.main.arn
+      port              = 443
+      protocol          = "HTTPS"
+      certificate_arn   = aws_acm_certificate.main.arn
 
-    resource "aws_acm_certificate_validation" "internal" {
-      certificate_arn         = aws_acm_certificate.internal.arn
-      validation_record_fqdns = [aws_route53_record.internal_cert_validation.fqdn]
+      default_action {
+        type             = "forward"
+        target_group_arn = aws_lb_target_group.app.arn
+      }
     }
 
-  garbage_report_generator.py: |
-    GARBAGE_TF_025_REPORT_GEN_C = "weekly-report"
-    GARBAGE_TF_025_REPORT_FMT_D = "pdf"
-
-    class ReportGenerator:
-        def create_report(self, data):
-            return b"%PDF-1.4"
-
 must_include_files:
-- dns.tf
+- route53.tf
 
 must_include_content_from:
-  dns.tf:
-    - resource "aws_acm_certificate" "main" {
-    - 'domain_name       = "api.example.com"'
+  route53.tf:
+    # Reviewer needs the zone and validation record to verify the DNS chain
+    - resource "aws_route53_zone" "main" {
+    - resource "aws_route53_record" "cert_validation" {
 
 must_not_include:
-- GARBAGE_TF_025_INT_CERT_A
-- GARBAGE_TF_025_INT_DOMAIN_B
-- GARBAGE_TF_025_REPORT_GEN_C
-- GARBAGE_TF_025_REPORT_FMT_D
+# Internal cert is same ACM type but for wildcard internal domain
+- '*.internal.example.com'
+# ALB listener references the cert but is about load balancing, not provisioning
+- aws_lb_target_group.app.arn
 
 must_not_include_files:
-- internal_certs.tf
-- garbage_report_generator.py
+- internal_certs.tf  # same ACM type, different domain (internal wildcard)
+- alb.tf  # consumes cert_arn but is about load balancing, not cert provisioning
 
-max_fragments: 3
-max_files: 1
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

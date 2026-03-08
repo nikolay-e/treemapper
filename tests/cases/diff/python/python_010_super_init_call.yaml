@@ -1,3 +1,8 @@
+# Scenario: AppConfig becomes a BaseConfig subclass via super().__init__() call
+# Changed: app.py imports BaseConfig and refactors AppConfig to inherit from it
+# Reviewer questions: Does validate_specific() cover all app-specific fields? Are errors propagated?
+# Trap 1: env_loader.py — loads environment variables for config, shares "config" vocabulary but independent
+# Trap 2: config_watcher.py — watches config file changes, shares "config" domain but no dep on base.py
 initial:
   base.py: |
     from typing import Dict, Any, Optional, List
@@ -112,49 +117,71 @@ initial:
                 version=config.get("version", "1.0.0"),
                 environment=config.get("environment", "development")
             )
-  garbage_secrets.py: |
-    GARBAGE_MARKER_SECRETS_001 = "secrets garbage"
-    UNRELATED_SECRET_KEY_002 = "not-a-real-secret"
+  env_loader.py: |
+    import os
+    from typing import Dict, Any, Optional, List
+    from dataclasses import dataclass
 
-    class SecretManager:
-        GARBAGE_SECRET_CLASS_003 = "secret class marker"
+    @dataclass
+    class EnvConfig:
+        prefix: str = "APP_"
+        required_vars: List[str] = None
+        defaults: Dict[str, str] = None
 
-        def __init__(self, vault_url: str = ""):
-            self.vault_url = vault_url
+    class EnvironmentLoader:
+        def __init__(self, config: EnvConfig):
+            self._config = config
+            self._loaded: Dict[str, str] = {}
 
-        def get_secret(self, name: str) -> Optional[str]:
-            return None
+        def load(self) -> Dict[str, str]:
+            prefix = self._config.prefix
+            self._loaded = {
+                key[len(prefix):].lower(): value
+                for key, value in os.environ.items()
+                if key.startswith(prefix)
+            }
+            return self._loaded
 
-        def rotate_secret(self, name: str) -> bool:
+        def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+            return self._loaded.get(key, default)
+
+        def validate_required(self) -> List[str]:
+            if not self._config.required_vars:
+                return []
+            return [v for v in self._config.required_vars if v not in self._loaded]
+  config_watcher.py: |
+    import time
+    from typing import Callable, Optional, Dict
+    from dataclasses import dataclass
+    from pathlib import Path
+
+    @dataclass
+    class WatcherConfig:
+        config_path: str
+        poll_interval: float = 5.0
+        auto_reload: bool = True
+
+    class ConfigFileWatcher:
+        def __init__(self, config: WatcherConfig):
+            self._config = config
+            self._last_modified: Optional[float] = None
+            self._callbacks: list[Callable] = []
+
+        def register_callback(self, callback: Callable) -> None:
+            self._callbacks.append(callback)
+
+        def check_for_changes(self) -> bool:
+            path = Path(self._config.config_path)
+            if not path.exists():
+                return False
+            mtime = path.stat().st_mtime
+            if self._last_modified and mtime > self._last_modified:
+                self._last_modified = mtime
+                for cb in self._callbacks:
+                    cb(self._config.config_path)
+                return True
+            self._last_modified = mtime
             return False
-
-    class EncryptionService:
-        GARBAGE_ENCRYPT_MARKER_004 = "encrypt marker"
-
-        def encrypt(self, data: bytes) -> bytes:
-            return data
-
-        def decrypt(self, data: bytes) -> bytes:
-            return data
-  garbage_feature_flags.py: |
-    GARBAGE_MARKER_FLAGS_005 = "feature flags garbage"
-    UNRELATED_FLAG_DEFAULT_006 = True
-
-    class FeatureFlagManager:
-        GARBAGE_FLAG_CLASS_007 = True
-
-        def __init__(self):
-            self._flags: Dict[str, bool] = {}
-
-        def is_enabled(self, flag_name: str) -> bool:
-            return self._flags.get(flag_name, False)
-
-        def set_flag(self, flag_name: str, enabled: bool) -> None:
-            self._flags[flag_name] = enabled
-
-    def format_flag_name(name: str) -> str:
-        GARBAGE_FORMAT_FLAG_008 = "format flag marker"
-        return f"feature_{name}"
 changed:
   base.py: |
     from typing import Dict, Any, Optional, List
@@ -288,61 +315,89 @@ changed:
                 version=self.version,
                 environment=self.environment
             )
-  garbage_secrets.py: |
-    GARBAGE_MARKER_SECRETS_001 = "secrets garbage"
-    UNRELATED_SECRET_KEY_002 = "not-a-real-secret"
+  env_loader.py: |
+    import os
+    from typing import Dict, Any, Optional, List
+    from dataclasses import dataclass
 
-    class SecretManager:
-        GARBAGE_SECRET_CLASS_003 = "secret class marker"
+    @dataclass
+    class EnvConfig:
+        prefix: str = "APP_"
+        required_vars: List[str] = None
+        defaults: Dict[str, str] = None
 
-        def __init__(self, vault_url: str = ""):
-            self.vault_url = vault_url
+    class EnvironmentLoader:
+        def __init__(self, config: EnvConfig):
+            self._config = config
+            self._loaded: Dict[str, str] = {}
 
-        def get_secret(self, name: str) -> Optional[str]:
-            return None
+        def load(self) -> Dict[str, str]:
+            prefix = self._config.prefix
+            self._loaded = {
+                key[len(prefix):].lower(): value
+                for key, value in os.environ.items()
+                if key.startswith(prefix)
+            }
+            return self._loaded
 
-        def rotate_secret(self, name: str) -> bool:
+        def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+            return self._loaded.get(key, default)
+
+        def validate_required(self) -> List[str]:
+            if not self._config.required_vars:
+                return []
+            return [v for v in self._config.required_vars if v not in self._loaded]
+  config_watcher.py: |
+    import time
+    from typing import Callable, Optional, Dict
+    from dataclasses import dataclass
+    from pathlib import Path
+
+    @dataclass
+    class WatcherConfig:
+        config_path: str
+        poll_interval: float = 5.0
+        auto_reload: bool = True
+
+    class ConfigFileWatcher:
+        def __init__(self, config: WatcherConfig):
+            self._config = config
+            self._last_modified: Optional[float] = None
+            self._callbacks: list[Callable] = []
+
+        def register_callback(self, callback: Callable) -> None:
+            self._callbacks.append(callback)
+
+        def check_for_changes(self) -> bool:
+            path = Path(self._config.config_path)
+            if not path.exists():
+                return False
+            mtime = path.stat().st_mtime
+            if self._last_modified and mtime > self._last_modified:
+                self._last_modified = mtime
+                for cb in self._callbacks:
+                    cb(self._config.config_path)
+                return True
+            self._last_modified = mtime
             return False
-
-    class EncryptionService:
-        GARBAGE_ENCRYPT_MARKER_004 = "encrypt marker"
-
-        def encrypt(self, data: bytes) -> bytes:
-            return data
-
-        def decrypt(self, data: bytes) -> bytes:
-            return data
-  garbage_feature_flags.py: |
-    GARBAGE_MARKER_FLAGS_005 = "feature flags garbage"
-    UNRELATED_FLAG_DEFAULT_006 = True
-
-    class FeatureFlagManager:
-        GARBAGE_FLAG_CLASS_007 = True
-
-        def __init__(self):
-            self._flags: Dict[str, bool] = {}
-
-        def is_enabled(self, flag_name: str) -> bool:
-            return self._flags.get(flag_name, False)
-
-        def set_flag(self, flag_name: str, enabled: bool) -> None:
-            self._flags[flag_name] = enabled
-
-    def format_flag_name(name: str) -> str:
-        GARBAGE_FORMAT_FLAG_008 = "format flag marker"
-        return f"feature_{name}"
 must_include_files:
 - app.py
-must_include_content:
-- 'class AppConfig(BaseConfig):'
+- base.py
+must_include_content_from:
+  app.py:
+  - 'class AppConfig(BaseConfig):'
+  - from base import BaseConfig, ConfigValidationError
 must_not_include:
-- GARBAGE_ENCRYPT_MARKER_004
-- GARBAGE_FLAG_CLASS_007
-- GARBAGE_FORMAT_FLAG_008
-- GARBAGE_MARKER_FLAGS_005
-- GARBAGE_MARKER_SECRETS_001
-- GARBAGE_SECRET_CLASS_003
-- garbage_feature_flags.py
-- garbage_secrets.py
+- EnvironmentLoader
+- EnvConfig
+- validate_required
+- ConfigFileWatcher
+- WatcherConfig
+- check_for_changes
+must_not_include_files:
+- env_loader.py
+- config_watcher.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

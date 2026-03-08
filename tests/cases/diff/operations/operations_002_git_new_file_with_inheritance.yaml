@@ -1,3 +1,8 @@
+# Scenario: A new feature class is added that inherits from BaseFeature.
+# Reviewer asks: "Does NewFeature correctly implement the BaseFeature contract?"
+# Trap rationale: event_bus.py and permission_manager.py use similar OOP
+# patterns (classes, registries) but are not imported by the features package.
+
 initial:
   features/__init__.py: ''
   features/base.py: |
@@ -38,42 +43,45 @@ initial:
 
     def list_enabled() -> list[str]:
         return [name for name, f in _registry.items() if f.is_enabled()]
-  garbage_telemetry.py: |
-    GARBAGE_OPS_002_TELEM_A = "telemetry collector marker"
-    GARBAGE_OPS_002_SPAN_B = "tracing span marker"
+  infra/event_bus.py: |
+    from typing import Callable, Any
 
-    class TelemetryCollector:
-        GARBAGE_OPS_002_METRIC_C = "metric endpoint marker"
+    class EventBus:
+        def __init__(self):
+            self._subscribers: dict[str, list[Callable]] = {}
 
-        def __init__(self, service_name: str = "app"):
-            self.service_name = service_name
-            self._spans: list[dict] = []
+        def subscribe(self, topic: str, handler: Callable) -> None:
+            if topic not in self._subscribers:
+                self._subscribers[topic] = []
+            self._subscribers[topic].append(handler)
 
-        def start_span(self, name: str) -> dict:
-            span = {"name": name, "service": self.service_name}
-            self._spans.append(span)
-            return span
+        def publish(self, topic: str, payload: Any) -> int:
+            handlers = self._subscribers.get(topic, [])
+            for h in handlers:
+                h(payload)
+            return len(handlers)
 
-        def end_span(self, span: dict) -> None:
-            GARBAGE_OPS_002_EXPORT_D = "span export marker"
-            pass
-  garbage_profiler.py: |
-    GARBAGE_OPS_002_PROFILE_E = "cpu profiler marker"
-    GARBAGE_OPS_002_FLAME_F = "flame graph marker"
+        def topics(self) -> list[str]:
+            return list(self._subscribers.keys())
+  infra/permission_manager.py: |
+    from enum import Enum
 
-    class Profiler:
-        GARBAGE_OPS_002_SAMPLE_G = True
+    class Permission(Enum):
+        READ = "read"
+        WRITE = "write"
+        ADMIN = "admin"
 
-        def __init__(self, sample_rate: float = 0.01):
-            self.sample_rate = sample_rate
-            self._samples: list[dict] = []
+    class PermissionManager:
+        def __init__(self):
+            self._grants: dict[str, set[Permission]] = {}
 
-        def start(self) -> None:
-            pass
+        def grant(self, user_id: str, perm: Permission) -> None:
+            if user_id not in self._grants:
+                self._grants[user_id] = set()
+            self._grants[user_id].add(perm)
 
-        def stop(self) -> dict:
-            GARBAGE_OPS_002_REPORT_H = "profile report marker"
-            return {"samples": len(self._samples)}
+        def has_permission(self, user_id: str, perm: Permission) -> bool:
+            return perm in self._grants.get(user_id, set())
 changed:
   features/__init__.py: ''
   features/base.py: |
@@ -131,58 +139,59 @@ changed:
 
         def adjust_threshold(self, new_threshold: float) -> None:
             self.threshold = new_threshold
-  garbage_telemetry.py: |
-    GARBAGE_OPS_002_TELEM_A = "telemetry collector marker"
-    GARBAGE_OPS_002_SPAN_B = "tracing span marker"
+  infra/event_bus.py: |
+    from typing import Callable, Any
 
-    class TelemetryCollector:
-        GARBAGE_OPS_002_METRIC_C = "metric endpoint marker"
+    class EventBus:
+        def __init__(self):
+            self._subscribers: dict[str, list[Callable]] = {}
 
-        def __init__(self, service_name: str = "app"):
-            self.service_name = service_name
-            self._spans: list[dict] = []
+        def subscribe(self, topic: str, handler: Callable) -> None:
+            if topic not in self._subscribers:
+                self._subscribers[topic] = []
+            self._subscribers[topic].append(handler)
 
-        def start_span(self, name: str) -> dict:
-            span = {"name": name, "service": self.service_name}
-            self._spans.append(span)
-            return span
+        def publish(self, topic: str, payload: Any) -> int:
+            handlers = self._subscribers.get(topic, [])
+            for h in handlers:
+                h(payload)
+            return len(handlers)
 
-        def end_span(self, span: dict) -> None:
-            GARBAGE_OPS_002_EXPORT_D = "span export marker"
-            pass
-  garbage_profiler.py: |
-    GARBAGE_OPS_002_PROFILE_E = "cpu profiler marker"
-    GARBAGE_OPS_002_FLAME_F = "flame graph marker"
+        def topics(self) -> list[str]:
+            return list(self._subscribers.keys())
+  infra/permission_manager.py: |
+    from enum import Enum
 
-    class Profiler:
-        GARBAGE_OPS_002_SAMPLE_G = True
+    class Permission(Enum):
+        READ = "read"
+        WRITE = "write"
+        ADMIN = "admin"
 
-        def __init__(self, sample_rate: float = 0.01):
-            self.sample_rate = sample_rate
-            self._samples: list[dict] = []
+    class PermissionManager:
+        def __init__(self):
+            self._grants: dict[str, set[Permission]] = {}
 
-        def start(self) -> None:
-            pass
+        def grant(self, user_id: str, perm: Permission) -> None:
+            if user_id not in self._grants:
+                self._grants[user_id] = set()
+            self._grants[user_id].add(perm)
 
-        def stop(self) -> dict:
-            GARBAGE_OPS_002_REPORT_H = "profile report marker"
-            return {"samples": len(self._samples)}
-must_include:
-- new_feature.py
+        def has_permission(self, user_id: str, perm: Permission) -> bool:
+            return perm in self._grants.get(user_id, set())
+must_include_files:
+- features/new_feature.py
+must_include_content:
 - BaseFeature
 - class NewFeature
 must_not_include:
-- GARBAGE_OPS_002_TELEM_A
-- GARBAGE_OPS_002_SPAN_B
-- GARBAGE_OPS_002_METRIC_C
-- GARBAGE_OPS_002_EXPORT_D
-- GARBAGE_OPS_002_PROFILE_E
-- GARBAGE_OPS_002_FLAME_F
-- GARBAGE_OPS_002_SAMPLE_G
-- GARBAGE_OPS_002_REPORT_H
-- TelemetryCollector
-- Profiler
-- garbage_telemetry.py
-- garbage_profiler.py
+- EventBus
+- PermissionManager
+- Permission
+- event_bus.py
+- permission_manager.py
+must_not_include_files:
+- infra/event_bus.py
+- infra/permission_manager.py
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

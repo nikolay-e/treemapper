@@ -1,3 +1,21 @@
+# Scenario: New file creates a discriminated union Result<T> from imported interfaces.
+#
+# Diff: handlers.ts imports Success, Failure, Loading from results.ts, composes
+# Result<T> = Success<T> | Failure | Loading, and adds an exhaustive switch.
+#
+# Reviewer questions:
+#   Q1: "What are the discriminant values for each variant?" -> results.ts (UNCHANGED)
+#        defines type: 'success', type: 'failure', type: 'loading' — the reviewer
+#        must verify the switch in handlers.ts covers all three discriminants.
+#   Q2: "What fields are available after narrowing?" -> results.ts shows Success has
+#        data and timestamp, Failure has error and code, Loading has progress.
+#
+# Not needed:
+#   - src/types/action.ts: another discriminated union (CounterAction) but for Redux
+#     actions. Same structural pattern, different domain, no import edge.
+#   - src/utils/either.ts: tagged union (Left|Right) with tag: discriminant.
+#     Overlapping concept but different tag field name and no dependency.
+
 initial:
   src/results.ts: |
     export interface Success<T> {
@@ -18,56 +36,27 @@ initial:
     }
   src/handlers.ts: |
     console.log('initial');
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_022_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/types/action.ts: |
+    export interface IncrementAction {
+        type: 'INCREMENT';
+        payload: number;
     }
 
-    // GARBAGE_FE_022_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export interface DecrementAction {
+        type: 'DECREMENT';
+        payload: number;
     }
 
-    // GARBAGE_FE_022_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_022_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export type CounterAction = IncrementAction | DecrementAction;
+  src/utils/either.ts: |
+    export type Left<L> = { tag: 'left'; value: L };
+    export type Right<R> = { tag: 'right'; value: R };
+    export type Either<L, R> = Left<L> | Right<R>;
+
+    export function isLeft<L, R>(either: Either<L, R>): either is Left<L> {
+        return either.tag === 'left';
     }
 
-    // GARBAGE_FE_022_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 changed:
   src/results.ts: |
     export interface Success<T> {
@@ -105,72 +94,46 @@ changed:
     export function isSuccess<T>(result: Result<T>): result is Success<T> {
         return result.type === 'success';
     }
-
-    export function isFailure<T>(result: Result<T>): result is Failure {
-        return result.type === 'failure';
-    }
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_022_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/types/action.ts: |
+    export interface IncrementAction {
+        type: 'INCREMENT';
+        payload: number;
     }
 
-    // GARBAGE_FE_022_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export interface DecrementAction {
+        type: 'DECREMENT';
+        payload: number;
     }
 
-    // GARBAGE_FE_022_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_022_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export type CounterAction = IncrementAction | DecrementAction;
+  src/utils/either.ts: |
+    export type Left<L> = { tag: 'left'; value: L };
+    export type Right<R> = { tag: 'right'; value: R };
+    export type Either<L, R> = Left<L> | Right<R>;
+
+    export function isLeft<L, R>(either: Either<L, R>): either is Left<L> {
+        return either.tag === 'left';
     }
 
-    // GARBAGE_FE_022_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 must_include_files:
-- src/handlers.ts
-must_include_content:
-- import { Success, Failure, Loading } from './results';
-- type Result<T> = Success<T> | Failure | Loading;
+  # Q1+Q2: results.ts defines the discriminant values and per-variant fields
+  - src/results.ts
+must_include_content_from:
+  src/results.ts:
+    - "type: 'success'"
+    - "type: 'failure'"
+    - "type: 'loading'"
 must_not_include:
-- GARBAGE_FE_022_COLOR_A
-- GARBAGE_FE_022_COLOR_B
-- GARBAGE_FE_022_CONTRAST_C
-- GARBAGE_FE_022_DEBOUNCE_D
-- GARBAGE_FE_022_THROTTLE_E
-- color_utils.ts
-- debounce_utils.ts
+  # action.ts: discriminated union but for Redux actions, no import edge
+  - CounterAction
+  - IncrementAction
+  # either.ts: tagged union with 'tag' discriminant, different pattern
+  - Either
+  - isLeft
+must_not_include_files:
+  - src/types/action.ts
+  - src/utils/either.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

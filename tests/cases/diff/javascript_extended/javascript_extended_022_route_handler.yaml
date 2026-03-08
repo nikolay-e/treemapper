@@ -1,139 +1,178 @@
+# Reviewer sees: src/routes/users.ts changes from an inline stub to a Router
+# that imports getUserHandler and listUsersHandler from the handler module.
+#
+# Reviewer questions:
+#   Q1: "What do these handlers do — what responses will these routes produce?"
+#       -> src/handlers/user-handler.ts: defines getUserHandler and
+#          listUsersHandler. The reviewer needs handler signatures to verify
+#          routes map to correct handlers.
+#
+# Not needed:
+#   - src/middleware/cors-handler.ts: CORS configuration middleware. Not
+#     referenced in this diff. Different middleware layer.
+#   - src/handlers/product-handler.ts: another resource's handlers. Same
+#     directory sibling, similar structure, but different domain.
+
 initial:
-  src/userHandler.ts: |
-    import { Request, Response } from 'express';
-
-    export interface UserDTO {
-        id: string;
-        name: string;
-        email: string;
-    }
-
-    export async function getUserHandler(req: Request, res: Response): Promise<void> {
-        const { id } = req.params;
-        const user: UserDTO = { id, name: 'John Doe', email: 'john@example.com' };
-        res.json(user);
-    }
-
-    export async function listUsersHandler(req: Request, res: Response): Promise<void> {
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 10;
-        res.json({ page, limit, users: [] });
-    }
-  src/routes.ts: |
-    console.log('initial');
-  src/unrelated/cors.ts: |
-    const GARBAGE_JSX_022_CORS_CONFIG_A = 'cors_garbage_marker';
-
-    export class GarbageCorsHandler {
-        private allowedOrigins: string[] = [];
-
-        addOrigin(origin: string): void {
-            this.allowedOrigins.push(origin);
-        }
-
-        isAllowed(origin: string): boolean {
-            return this.allowedOrigins.includes(origin);
-        }
-    }
-
-    export function GARBAGE_JSX_022_APPLY_CORS_B(): void {
-        console.log('GARBAGE_JSX_022_CORS_OUTPUT_C');
-    }
-  src/unrelated/session.ts: |
-    const GARBAGE_JSX_022_SESSION_STORE_D = { ttl: 3600, secure: true };
-
-    export class GARBAGE_JSX_022_SESSION_MANAGER_E {
-        private sessions: Map<string, unknown> = new Map();
-
-        create(id: string): void {
-            this.sessions.set(id, { created: Date.now() });
-        }
-
-        destroy(id: string): void {
-            this.sessions.delete(id);
-        }
-    }
-
-    export function GARBAGE_JSX_022_CLEANUP_SESSIONS_F(): void {
-        console.log('cleaning up sessions');
-    }
-changed:
-  src/userHandler.ts: |
-    import { Request, Response } from 'express';
-
-    export interface UserDTO {
-        id: string;
-        name: string;
-        email: string;
-    }
-
-    export async function getUserHandler(req: Request, res: Response): Promise<void> {
-        const { id } = req.params;
-        const user: UserDTO = { id, name: 'John Doe', email: 'john@example.com' };
-        res.json(user);
-    }
-
-    export async function listUsersHandler(req: Request, res: Response): Promise<void> {
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 10;
-        res.json({ page, limit, users: [] });
-    }
-  src/routes.ts: |
+  src/routes/users.ts: |
     import { Router } from 'express';
-    import { getUserHandler, listUsersHandler } from './userHandler';
+
+    export const userRouter = Router();
+
+    userRouter.get('/users', (req, res) => {
+        res.json({ users: [] });
+    });
+  src/handlers/user-handler.ts: |
+    import { Request, Response } from 'express';
+
+    export interface UserDTO {
+        id: string;
+        name: string;
+        email: string;
+    }
+
+    export async function getUserHandler(req: Request, res: Response): Promise<void> {
+        const { id } = req.params;
+        const user: UserDTO = { id, name: 'John Doe', email: 'john@example.com' };
+        res.json(user);
+    }
+
+    export async function listUsersHandler(req: Request, res: Response): Promise<void> {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        res.json({ page, limit, users: [] });
+    }
+  # --- Not needed: CORS middleware, not referenced in diff ---
+  src/middleware/cors-handler.ts: |
+    import { Request, Response, NextFunction } from 'express';
+
+    const ALLOWED_ORIGINS = ['http://localhost:3000', 'https://app.example.com'];
+
+    export function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
+        const origin = req.headers.origin;
+        if (origin && ALLOWED_ORIGINS.includes(origin)) {
+            res.setHeader('Access-Control-Allow-Origin', origin);
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        }
+        next();
+    }
+
+    export function preflight(req: Request, res: Response): void {
+        res.status(204).end();
+    }
+  # --- Not needed: different resource handlers, same directory sibling ---
+  src/handlers/product-handler.ts: |
+    import { Request, Response } from 'express';
+
+    export interface ProductDTO {
+        id: string;
+        name: string;
+        price: number;
+        category: string;
+    }
+
+    export async function getProductHandler(req: Request, res: Response): Promise<void> {
+        const { id } = req.params;
+        const product: ProductDTO = { id, name: 'Widget', price: 9.99, category: 'gadgets' };
+        res.json(product);
+    }
+
+    export async function listProductsHandler(req: Request, res: Response): Promise<void> {
+        const page = parseInt(req.query.page as string) || 1;
+        res.json({ page, products: [] });
+    }
+
+changed:
+  src/routes/users.ts: |
+    import { Router } from 'express';
+    import { getUserHandler, listUsersHandler } from '../handlers/user-handler';
 
     export const userRouter = Router();
 
     userRouter.get('/users', listUsersHandler);
     userRouter.get('/users/:id', getUserHandler);
-  src/unrelated/cors.ts: |
-    const GARBAGE_JSX_022_CORS_CONFIG_A = 'cors_garbage_marker';
+  # Unchanged
+  src/handlers/user-handler.ts: |
+    import { Request, Response } from 'express';
 
-    export class GarbageCorsHandler {
-        private allowedOrigins: string[] = [];
-
-        addOrigin(origin: string): void {
-            this.allowedOrigins.push(origin);
-        }
-
-        isAllowed(origin: string): boolean {
-            return this.allowedOrigins.includes(origin);
-        }
+    export interface UserDTO {
+        id: string;
+        name: string;
+        email: string;
     }
 
-    export function GARBAGE_JSX_022_APPLY_CORS_B(): void {
-        console.log('GARBAGE_JSX_022_CORS_OUTPUT_C');
+    export async function getUserHandler(req: Request, res: Response): Promise<void> {
+        const { id } = req.params;
+        const user: UserDTO = { id, name: 'John Doe', email: 'john@example.com' };
+        res.json(user);
     }
-  src/unrelated/session.ts: |
-    const GARBAGE_JSX_022_SESSION_STORE_D = { ttl: 3600, secure: true };
 
-    export class GARBAGE_JSX_022_SESSION_MANAGER_E {
-        private sessions: Map<string, unknown> = new Map();
+    export async function listUsersHandler(req: Request, res: Response): Promise<void> {
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        res.json({ page, limit, users: [] });
+    }
+  src/middleware/cors-handler.ts: |
+    import { Request, Response, NextFunction } from 'express';
 
-        create(id: string): void {
-            this.sessions.set(id, { created: Date.now() });
+    const ALLOWED_ORIGINS = ['http://localhost:3000', 'https://app.example.com'];
+
+    export function corsMiddleware(req: Request, res: Response, next: NextFunction): void {
+        const origin = req.headers.origin;
+        if (origin && ALLOWED_ORIGINS.includes(origin)) {
+            res.setHeader('Access-Control-Allow-Origin', origin);
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         }
-
-        destroy(id: string): void {
-            this.sessions.delete(id);
-        }
+        next();
     }
 
-    export function GARBAGE_JSX_022_CLEANUP_SESSIONS_F(): void {
-        console.log('cleaning up sessions');
+    export function preflight(req: Request, res: Response): void {
+        res.status(204).end();
     }
+  src/handlers/product-handler.ts: |
+    import { Request, Response } from 'express';
+
+    export interface ProductDTO {
+        id: string;
+        name: string;
+        price: number;
+        category: string;
+    }
+
+    export async function getProductHandler(req: Request, res: Response): Promise<void> {
+        const { id } = req.params;
+        const product: ProductDTO = { id, name: 'Widget', price: 9.99, category: 'gadgets' };
+        res.json(product);
+    }
+
+    export async function listProductsHandler(req: Request, res: Response): Promise<void> {
+        const page = parseInt(req.query.page as string) || 1;
+        res.json({ page, products: [] });
+    }
+
 must_include_files:
-- src/routes.ts
-must_include_content:
-- import { Router } from 'express';
-- userRouter = Router()
+  # Q1: Handler definitions — reviewer must verify route paths match
+  # handler expectations.
+  - src/handlers/user-handler.ts
+must_include_content_from:
+  src/handlers/user-handler.ts:
+    - "getUserHandler"
+    - "listUsersHandler"
 must_not_include:
-- GARBAGE_JSX_022_APPLY_CORS_B
-- GARBAGE_JSX_022_CLEANUP_SESSIONS_F
-- GARBAGE_JSX_022_CORS_CONFIG_A
-- GARBAGE_JSX_022_SESSION_MANAGER_E
-- GARBAGE_JSX_022_SESSION_STORE_D
-- cors.ts
-- session.ts
+  # cors-handler.ts: CORS middleware, not mounted in this diff
+  - corsMiddleware
+  - ALLOWED_ORIGINS
+  - preflight
+  # product-handler.ts: different resource, same directory sibling
+  - ProductDTO
+  - getProductHandler
+  - listProductsHandler
+must_not_include_files:
+  - src/middleware/cors-handler.ts
+  - src/handlers/product-handler.ts
+max_fragments: 8
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

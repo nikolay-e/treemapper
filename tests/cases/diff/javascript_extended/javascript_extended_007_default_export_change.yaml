@@ -1,3 +1,25 @@
+# Test: Default export gains post() method and baseUrl param — reviewer needs caller
+#
+# Scenario: src/api.ts default export apiClient() adds a post() method to the
+# returned ApiClient interface and accepts an optional baseUrl parameter.
+# The caller src/service.ts is unchanged but uses the default import.
+#
+# Reviewer questions:
+#   Q1: "Who calls apiClient() and will they break?"
+#       → src/service.ts: imports `client` (default export), calls
+#         client() then api.get(). The new baseUrl param defaults to '',
+#         so existing callers compile. But service.ts doesn't use post()
+#         yet — is that expected?
+#   Q2: "What methods did ApiClient have before?"
+#       → src/api.ts: only get(). Now adds post(). The reviewer can
+#         verify the interface expansion makes sense.
+#
+# Not needed:
+#   - src/unrelated/featureFlags.ts: feature flag toggling. Different
+#     infrastructure concern (feature management vs HTTP client).
+#   - src/unrelated/rateLimit.ts: rate limiting logic. Different
+#     infrastructure concern (throttling vs API shape).
+
 initial:
   src/api.ts: |
     interface ApiClient {
@@ -34,10 +56,9 @@ initial:
         const data = await response.json();
         return data.status;
     }
+  # --- Not needed: feature flag toggling, different concern ---
   src/unrelated/featureFlags.ts: |
-    const GARBAGE_JSX_007_FEATURE_STORE_A = 'feature_flags_garbage_marker';
-
-    export class GarbageFeatureFlagService {
+    export class FeatureFlagService {
         private flags: Record<string, boolean> = {};
 
         isEnabled(flag: string): boolean {
@@ -49,13 +70,17 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_007_EVALUATE_FLAGS_B(): void {
-        console.log('GARBAGE_JSX_007_FLAG_OUTPUT_C');
+    export function evaluateFlags(userId: string): Record<string, boolean> {
+        return { darkMode: false, betaFeatures: true };
     }
+  # --- Not needed: rate limiting, different infrastructure concern ---
   src/unrelated/rateLimit.ts: |
-    const GARBAGE_JSX_007_RATE_LIMITER_D = { maxRequests: 100, windowMs: 60000 };
+    interface RateLimitConfig {
+        maxRequests: number;
+        windowMs: number;
+    }
 
-    export class GARBAGE_JSX_007_RATE_LIMIT_SERVICE_E {
+    export class RateLimiter {
         private count = 0;
 
         check(): boolean {
@@ -67,7 +92,7 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_007_RESET_LIMITS_F(): void {
+    export function resetLimits(limiter: RateLimiter): void {
         console.log('resetting rate limits');
     }
 changed:
@@ -113,9 +138,7 @@ changed:
         return data.status;
     }
   src/unrelated/featureFlags.ts: |
-    const GARBAGE_JSX_007_FEATURE_STORE_A = 'feature_flags_garbage_marker';
-
-    export class GarbageFeatureFlagService {
+    export class FeatureFlagService {
         private flags: Record<string, boolean> = {};
 
         isEnabled(flag: string): boolean {
@@ -127,13 +150,16 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_007_EVALUATE_FLAGS_B(): void {
-        console.log('GARBAGE_JSX_007_FLAG_OUTPUT_C');
+    export function evaluateFlags(userId: string): Record<string, boolean> {
+        return { darkMode: false, betaFeatures: true };
     }
   src/unrelated/rateLimit.ts: |
-    const GARBAGE_JSX_007_RATE_LIMITER_D = { maxRequests: 100, windowMs: 60000 };
+    interface RateLimitConfig {
+        maxRequests: number;
+        windowMs: number;
+    }
 
-    export class GARBAGE_JSX_007_RATE_LIMIT_SERVICE_E {
+    export class RateLimiter {
         private count = 0;
 
         check(): boolean {
@@ -145,7 +171,7 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_007_RESET_LIMITS_F(): void {
+    export function resetLimits(limiter: RateLimiter): void {
         console.log('resetting rate limits');
     }
 must_include_files:
@@ -154,12 +180,11 @@ must_include_content:
 - 'post(url: string, data: unknown): Promise<Response>;'
 - '(url: string) => fetch(baseUrl + url)'
 must_not_include:
-- GARBAGE_JSX_007_EVALUATE_FLAGS_B
-- GARBAGE_JSX_007_FEATURE_STORE_A
-- GARBAGE_JSX_007_RATE_LIMITER_D
-- GARBAGE_JSX_007_RATE_LIMIT_SERVICE_E
-- GARBAGE_JSX_007_RESET_LIMITS_F
-- featureFlags.ts
-- rateLimit.ts
+  # featureFlags.ts: feature management, unrelated to HTTP client
+  - FeatureFlagService
+  - evaluateFlags
+  # rateLimit.ts: request throttling, different infrastructure concern
+  - RateLimiter
+  - resetLimits
 add_garbage_files: false
 skip_garbage_check: true

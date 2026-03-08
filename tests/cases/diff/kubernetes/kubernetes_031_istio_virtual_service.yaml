@@ -1,3 +1,45 @@
+# Scenario: Istio VirtualService gains canary routing — header match, path-prefix
+#   match, weighted 90/10 split with retries and timeout.
+#
+# Diff shows:
+#   + http routing rules: x-canary header -> v2, /api/v2 prefix -> v2
+#   + default route: 90% v1, 10% v2 with retries (3 attempts, 2s per try)
+#   + timeout: 10s on default route
+#   + labels added to metadata
+#
+# Reviewer questions:
+#   Q1: "Do subsets v1 and v2 exist in the DestinationRule?"
+#       -> Needs k8s/base/destination-rule.yaml: defines subsets v1 (version: v1)
+#          and v2 (version: v2) for host product-service. The VirtualService
+#          routes to these subsets — reviewer must verify they match.
+#
+#   Q2: "Are the gateway names correct — does product-gateway exist?"
+#       -> The VirtualService references gateways: product-gateway and mesh.
+#          The gateway definition is a separate concern, but the name must match.
+#
+#   Q3: "Is the 90/10 split with 3 retries safe for canary?"
+#       -> Pure config review: weights sum to 100, perTryTimeout < timeout/attempts.
+#
+# Not needed for comprehension:
+#   - k8s/base/deployment-v1.yaml: v1 deployment with version: v1 label.
+#     Direct structural edge (DestinationRule subset -> label -> deployment).
+#     But the VirtualService references subsets by name, not deployment labels.
+#     The reviewer needs the DestinationRule, not the deployment details.
+#
+#   - k8s/base/deployment-v2.yaml: v2 deployment. Same reasoning as v1.
+#
+#   - k8s/base/service.yaml: Service selecting app: product-service. The
+#     VirtualService host: product-service references this service. But the
+#     service config (port mapping) doesn't help review routing rules.
+#
+#   - k8s/gateway/ambassador-mapping.yaml: Ambassador Mapping for a DIFFERENT
+#     service (catalog-service). Shares API gateway/routing vocabulary (timeout,
+#     retry_policy). But different mesh API, different service entirely.
+#
+#   - k8s/gateway/kong-ingress.yaml: Kong ingress config for yet another
+#     service (inventory). Shares routing vocabulary (strip_path, protocols).
+#     But Kong and Istio are different mesh implementations.
+
 initial:
   k8s/base/deployment-v1.yaml: |
     apiVersion: apps/v1
@@ -112,54 +154,34 @@ initial:
       gateways:
       - product-gateway
       - mesh
-  k8s/unrelated/linkerd/service-profile.yaml: |
-    # GARBAGE_K8S_431_LINKERD_PROFILE
-    apiVersion: linkerd.io/v1alpha2
-    kind: ServiceProfile
+  k8s/gateway/ambassador-mapping.yaml: |
+    apiVersion: getambassador.io/v3alpha1
+    kind: Mapping
     metadata:
-      name: GARBAGE_K8S_431_PROFILE_NAME
-      namespace: linkerd
+      name: catalog-service
+      namespace: ambassador
     spec:
-      routes:
-      - name: GARBAGE_K8S_431_ROUTE_NAME
-        condition:
-          method: GARBAGE_K8S_431_METHOD
-          pathRegex: GARBAGE_K8S_431_PATH_REGEX
-  k8s/unrelated/contour/httpproxy.yaml: |
-    # GARBAGE_K8S_431_CONTOUR_PROXY
-    apiVersion: projectcontour.io/v1
-    kind: HTTPProxy
+      hostname: catalog.example.com
+      prefix: /api/catalog/
+      service: catalog-service.catalog:80
+      timeout_ms: 5000
+      retry_policy:
+        retry_on: 5xx
+        num_retries: 3
+  k8s/gateway/kong-ingress.yaml: |
+    apiVersion: configuration.konghq.com/v1
+    kind: KongIngress
     metadata:
-      name: GARBAGE_K8S_431_HTTPPROXY_NAME
-      namespace: contour
-    spec:
-      virtualhost:
-        fqdn: GARBAGE_K8S_431_FQDN
-      routes:
-      - services:
-        - name: GARBAGE_K8S_431_PROXY_SVC
-          port: GARBAGE_K8S_431_PROXY_PORT
-  k8s/unrelated/traefik/ingressroute.yaml: |
-    # GARBAGE_K8S_431_TRAEFIK_ROUTE
-    apiVersion: traefik.containo.us/v1alpha1
-    kind: IngressRoute
-    metadata:
-      name: GARBAGE_K8S_431_INGRESSROUTE
-      namespace: traefik
-    spec:
-      entryPoints:
-      - GARBAGE_K8S_431_ENTRYPOINT
-      routes:
-      - match: GARBAGE_K8S_431_MATCH_RULE
-        services:
-        - name: GARBAGE_K8S_431_TRAEFIK_SVC
-  skaffold.yaml: |
-    apiVersion: skaffold/v4beta5
-    kind: Config
-    metadata:
-    build:
-      artifacts:
-        docker:
+      name: inventory-rate-limit
+      namespace: kong
+    proxy:
+      protocol: http
+      connect_timeout: 10000
+    route:
+      strip_path: true
+      protocols:
+      - https
+
 changed:
   k8s/base/deployment-v1.yaml: |
     apiVersion: apps/v1
@@ -307,76 +329,75 @@ changed:
           attempts: 3
           perTryTimeout: 2s
         timeout: 10s
-  k8s/unrelated/linkerd/service-profile.yaml: |
-    # GARBAGE_K8S_431_LINKERD_PROFILE
-    apiVersion: linkerd.io/v1alpha2
-    kind: ServiceProfile
+  k8s/gateway/ambassador-mapping.yaml: |
+    apiVersion: getambassador.io/v3alpha1
+    kind: Mapping
     metadata:
-      name: GARBAGE_K8S_431_PROFILE_NAME
-      namespace: linkerd
+      name: catalog-service
+      namespace: ambassador
     spec:
-      routes:
-      - name: GARBAGE_K8S_431_ROUTE_NAME
-        condition:
-          method: GARBAGE_K8S_431_METHOD
-          pathRegex: GARBAGE_K8S_431_PATH_REGEX
-  k8s/unrelated/contour/httpproxy.yaml: |
-    # GARBAGE_K8S_431_CONTOUR_PROXY
-    apiVersion: projectcontour.io/v1
-    kind: HTTPProxy
+      hostname: catalog.example.com
+      prefix: /api/catalog/
+      service: catalog-service.catalog:80
+      timeout_ms: 5000
+      retry_policy:
+        retry_on: 5xx
+        num_retries: 3
+  k8s/gateway/kong-ingress.yaml: |
+    apiVersion: configuration.konghq.com/v1
+    kind: KongIngress
     metadata:
-      name: GARBAGE_K8S_431_HTTPPROXY_NAME
-      namespace: contour
-    spec:
-      virtualhost:
-        fqdn: GARBAGE_K8S_431_FQDN
-      routes:
-      - services:
-        - name: GARBAGE_K8S_431_PROXY_SVC
-          port: GARBAGE_K8S_431_PROXY_PORT
-  k8s/unrelated/traefik/ingressroute.yaml: |
-    # GARBAGE_K8S_431_TRAEFIK_ROUTE
-    apiVersion: traefik.containo.us/v1alpha1
-    kind: IngressRoute
-    metadata:
-      name: GARBAGE_K8S_431_INGRESSROUTE
-      namespace: traefik
-    spec:
-      entryPoints:
-      - GARBAGE_K8S_431_ENTRYPOINT
-      routes:
-      - match: GARBAGE_K8S_431_MATCH_RULE
-        services:
-        - name: GARBAGE_K8S_431_TRAEFIK_SVC
-  skaffold.yaml: |
-    apiVersion: skaffold/v4beta5
-    kind: Config
-    metadata:
-    build:
-      artifacts:
-        docker:
+      name: inventory-rate-limit
+      namespace: kong
+    proxy:
+      protocol: http
+      connect_timeout: 10000
+    route:
+      strip_path: true
+      protocols:
+      - https
+
 must_include_files:
-- k8s/base/virtual-service.yaml
-must_include_content:
-- 'app: product-service'
+  - k8s/base/virtual-service.yaml
+  # Q1: DestinationRule defines the subsets referenced by the VirtualService.
+  - k8s/base/destination-rule.yaml
+
+must_include_content_from:
+  k8s/base/virtual-service.yaml:
+    - "x-canary"
+    - "subset: v1"
+    - "weight: 90"
+    - "perTryTimeout: 2s"
+  k8s/base/destination-rule.yaml:
+    - "name: v1"
+    - "name: v2"
+    - "version: v1"
+
 must_not_include:
-- GARBAGE_K8S_431_CONTOUR_PROXY
-- GARBAGE_K8S_431_ENTRYPOINT
-- GARBAGE_K8S_431_FQDN
-- GARBAGE_K8S_431_HTTPPROXY_NAME
-- GARBAGE_K8S_431_INGRESSROUTE
-- GARBAGE_K8S_431_LINKERD_PROFILE
-- GARBAGE_K8S_431_MATCH_RULE
-- GARBAGE_K8S_431_METHOD
-- GARBAGE_K8S_431_PATH_REGEX
-- GARBAGE_K8S_431_PROFILE_NAME
-- GARBAGE_K8S_431_PROXY_PORT
-- GARBAGE_K8S_431_PROXY_SVC
-- GARBAGE_K8S_431_ROUTE_NAME
-- GARBAGE_K8S_431_TRAEFIK_ROUTE
-- GARBAGE_K8S_431_TRAEFIK_SVC
-- httpproxy.yaml
-- ingressroute.yaml
-- service-profile.yaml
+  # --- deployment-v1: VirtualService routes to subsets, not deployments ---
+  - "product-service:v1.0.0"
+  - "sidecar.istio.io/inject"
+  # --- deployment-v2: same reasoning ---
+  - "product-service:v2.0.0"
+  # --- service: port mapping, not needed for routing rule review ---
+  - "targetPort: 8080"
+  # --- ambassador mapping: DIFFERENT service, different mesh API ---
+  - catalog-service
+  - catalog.example.com
+  - "timeout_ms: 5000"
+  # --- kong ingress: DIFFERENT mesh, different service ---
+  - inventory-rate-limit
+  - KongIngress
+  - strip_path
+
+must_not_include_files:
+  - k8s/base/deployment-v1.yaml
+  - k8s/base/deployment-v2.yaml
+  - k8s/base/service.yaml
+  - k8s/gateway/ambassador-mapping.yaml
+  - k8s/gateway/kong-ingress.yaml
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

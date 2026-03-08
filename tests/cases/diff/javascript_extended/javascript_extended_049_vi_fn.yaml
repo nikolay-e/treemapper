@@ -1,3 +1,35 @@
+# Scenario: callback.test.ts is created with vitest tests that mock callbacks
+#   via vi.fn() and verify processNumbers/processWithTransform behavior.
+#   The callback.ts implementation module is unchanged.
+#
+# Reviewer questions:
+#   Q1: "What does processNumbers do? Does forEach really call the callback
+#        once per element, making toHaveBeenCalledTimes(3) correct?"
+#       -> src/callback.ts: processNumbers calls numbers.forEach(n => callback(n)).
+#          For [1, 2, 3] that's 3 invocations, each with the element value.
+#
+#   Q2: "Does processWithTransform apply transform before callback?"
+#       -> src/callback.ts: calls callback(transform(n)), so with
+#          double = n => n*2 and [1,2,3], callback receives 2, 4, 6.
+#
+#   Q3: "What is the Callback type that vi.fn() must satisfy?"
+#       -> src/callback.ts: Callback = (value: number) => void. vi.fn()
+#          returns a compatible mock function.
+#
+# Not needed:
+#   - src/formatter.ts: String formatting utilities. Same src/ directory
+#     but completely different domain. No imports from callback.ts.
+#
+#   - src/validator.ts: Input validation module. Same directory, different
+#     concern (email/range validation vs number processing).
+#
+#   - src/aggregator.ts: Another number-processing module. Same domain
+#     (number operations). Imports from callback.ts. Direct structural edge.
+#     But how aggregator uses processNumbers doesn't help review the tests.
+#
+#   - vitest.config.ts: Test framework configuration. Same test domain.
+#     But config doesn't help review test correctness.
+
 initial:
   src/callback.ts: |
     export type Callback = (value: number) => void;
@@ -17,61 +49,81 @@ initial:
     export function sumNumbers(numbers: number[]): number {
         return numbers.reduce((acc, n) => acc + n, 0);
     }
+
   src/callback.test.ts: |
-    console.log('initial');
-  src/unrelated/encoder.ts: |
-    const GARBAGE_JSX_049_ENCODER_CONFIG_A = 'encoder_garbage_marker';
+    console.log('placeholder');
 
-    export class GarbageEncoder {
-        encode(data: string): string {
-            return btoa(data);
-        }
-
-        decode(data: string): string {
-            return atob(data);
-        }
+  src/formatter.ts: |
+    export function formatCurrency(amount: number, currency: string = 'USD'): string {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency,
+        }).format(amount);
     }
 
-    export function GARBAGE_JSX_049_COMPRESS_DATA_B(): string {
-        return 'GARBAGE_JSX_049_COMPRESSED_OUTPUT_C';
-    }
-  src/unrelated/profiler.ts: |
-    const GARBAGE_JSX_049_PROFILER_CONFIG_D = { sampleRate: 100 };
-
-    export class GARBAGE_JSX_049_PERFORMANCE_PROFILER_E {
-        private marks: Map<string, number> = new Map();
-
-        mark(label: string): void {
-            this.marks.set(label, Date.now());
-        }
-
-        measure(from: string, to: string): number {
-            return (this.marks.get(to) ?? 0) - (this.marks.get(from) ?? 0);
-        }
+    export function formatPercentage(value: number, decimals: number = 1): string {
+        return `${(value * 100).toFixed(decimals)}%`;
     }
 
-    export function GARBAGE_JSX_049_REPORT_PERF_F(): void {
-        console.log('reporting performance');
+    export function truncate(text: string, maxLength: number): string {
+        if (text.length <= maxLength) return text;
+        return text.slice(0, maxLength - 3) + '...';
     }
+
+  src/validator.ts: |
+    export interface ValidationResult {
+        valid: boolean;
+        errors: string[];
+    }
+
+    export function validateEmail(email: string): ValidationResult {
+        const errors: string[] = [];
+        if (!email.includes('@')) errors.push('Missing @ symbol');
+        if (!email.includes('.')) errors.push('Missing domain');
+        return { valid: errors.length === 0, errors };
+    }
+
+    export function validateRange(value: number, min: number, max: number): ValidationResult {
+        const errors: string[] = [];
+        if (value < min) errors.push(`Value below minimum ${min}`);
+        if (value > max) errors.push(`Value above maximum ${max}`);
+        return { valid: errors.length === 0, errors };
+    }
+
+  src/aggregator.ts: |
+    import { processNumbers, Callback } from './callback';
+
+    export function collectValues(numbers: number[]): number[] {
+        const collected: number[] = [];
+        const collector: Callback = (value) => collected.push(value);
+        processNumbers(numbers, collector);
+        return collected;
+    }
+
+    export function countPositive(numbers: number[]): number {
+        let count = 0;
+        processNumbers(numbers, (value) => {
+            if (value > 0) count++;
+        });
+        return count;
+    }
+
+  vitest.config.ts: |
+    import { defineConfig } from 'vitest/config';
+
+    export default defineConfig({
+        test: {
+            globals: true,
+            environment: 'node',
+            include: ['src/**/*.test.ts'],
+            coverage: {
+                provider: 'v8',
+                reporter: ['text', 'lcov'],
+            },
+        },
+    });
+
 changed:
-  src/callback.ts: |
-    export type Callback = (value: number) => void;
-
-    export function processNumbers(numbers: number[], callback: Callback): void {
-        numbers.forEach(n => callback(n));
-    }
-
-    export function processWithTransform(
-        numbers: number[],
-        transform: (n: number) => number,
-        callback: Callback
-    ): void {
-        numbers.forEach(n => callback(transform(n)));
-    }
-
-    export function sumNumbers(numbers: number[]): number {
-        return numbers.reduce((acc, n) => acc + n, 0);
-    }
   src/callback.test.ts: |
     import { describe, it, expect, vi } from 'vitest';
     import { processNumbers, processWithTransform } from './callback';
@@ -103,52 +155,42 @@ changed:
             expect(callback).toHaveBeenCalledWith(6);
         });
     });
-  src/unrelated/encoder.ts: |
-    const GARBAGE_JSX_049_ENCODER_CONFIG_A = 'encoder_garbage_marker';
 
-    export class GarbageEncoder {
-        encode(data: string): string {
-            return btoa(data);
-        }
-
-        decode(data: string): string {
-            return atob(data);
-        }
-    }
-
-    export function GARBAGE_JSX_049_COMPRESS_DATA_B(): string {
-        return 'GARBAGE_JSX_049_COMPRESSED_OUTPUT_C';
-    }
-  src/unrelated/profiler.ts: |
-    const GARBAGE_JSX_049_PROFILER_CONFIG_D = { sampleRate: 100 };
-
-    export class GARBAGE_JSX_049_PERFORMANCE_PROFILER_E {
-        private marks: Map<string, number> = new Map();
-
-        mark(label: string): void {
-            this.marks.set(label, Date.now());
-        }
-
-        measure(from: string, to: string): number {
-            return (this.marks.get(to) ?? 0) - (this.marks.get(from) ?? 0);
-        }
-    }
-
-    export function GARBAGE_JSX_049_REPORT_PERF_F(): void {
-        console.log('reporting performance');
-    }
 must_include_files:
-- src/callback.test.ts
-must_include_content:
-- import { describe, it, expect, vi } from 'vitest';
-- it('should call callback for each number', () => {
+  # Unchanged — the module under test. Reviewer needs to verify that
+  # the mock assertions match the actual implementation behavior.
+  - src/callback.ts
+
+must_include_content_from:
+  src/callback.ts:
+    - "processNumbers"
+    - "forEach"
+    - "processWithTransform"
+    - "Callback"
+
 must_not_include:
-- GARBAGE_JSX_049_COMPRESS_DATA_B
-- GARBAGE_JSX_049_ENCODER_CONFIG_A
-- GARBAGE_JSX_049_PERFORMANCE_PROFILER_E
-- GARBAGE_JSX_049_PROFILER_CONFIG_D
-- GARBAGE_JSX_049_REPORT_PERF_F
-- encoder.ts
-- profiler.ts
+  # formatter.ts: string formatting, different domain
+  - formatCurrency
+  - formatPercentage
+  # validator.ts: input validation, unrelated to callback processing
+  - validateEmail
+  - validateRange
+  - ValidationResult
+  # aggregator.ts: uses processNumbers but doesn't help review tests
+  - collectValues
+  - countPositive
+  - "collected.push"
+  # vitest.config.ts: framework config
+  - defineConfig
+  - "provider: 'v8'"
+
+must_not_include_files:
+  - src/formatter.ts
+  - src/validator.ts
+  - src/aggregator.ts
+  - vitest.config.ts
+
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

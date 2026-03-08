@@ -1,3 +1,19 @@
+# Scenario: UserAPI is implemented with Swift async/await to fetch and
+# decode User objects from a remote API endpoint.
+#
+# Diff: UserAPI.swift goes from empty class to async fetchUsers() and
+# getUser(id:) methods using URLSession.shared.data(from:) and JSONDecoder.
+#
+# Reviewer questions:
+#   Q1: "What does the User struct look like?"
+#       -> User.swift (UNCHANGED) defines struct User: Codable with id and name.
+#
+# Not needed:
+#   - ImageDownloader.swift: downloads images asynchronously.
+#     Same async/await pattern but no dependency on UserAPI.
+#   - URLBuilder.swift: constructs API URLs with query parameters.
+#     URL-related vocabulary but UserAPI builds URLs inline.
+
 initial:
   User.swift: |
     struct User: Codable {
@@ -7,18 +23,43 @@ initial:
   UserAPI.swift: |
     // Initial
     class UserAPI {}
-  GarbageCombinePublisher.swift: |
-    class GarbageCombinePublisher {
-        static let GARBAGE_JVM_060_COMBINE_MARKER_A = "marker"
-        static let GARBAGE_JVM_060_PUBLISHER_MARKER_B = "marker"
-        func noop() {}
+  ImageDownloader.swift: |
+    import Foundation
+
+    class ImageDownloader {
+        func downloadImage(from urlString: String) async throws -> Data {
+            let url = URL(string: urlString)!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return data
+        }
+
+        func downloadThumbnail(from urlString: String) async throws -> Data {
+            let url = URL(string: "\(urlString)?size=thumb")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return data
+        }
     }
-  GarbageSubscriberSink.swift: |
-    class GarbageSubscriberSink {
-        static let GARBAGE_JVM_060_SUBSCRIBER_MARKER_C = "marker"
-        static let GARBAGE_JVM_060_SINK_MARKER_D = "marker"
-        func noop() {}
+  URLBuilder.swift: |
+    import Foundation
+
+    struct URLBuilder {
+        private var components: URLComponents
+
+        init(base: String) {
+            components = URLComponents(string: base) ?? URLComponents()
+        }
+
+        mutating func addQueryItem(name: String, value: String) {
+            var items = components.queryItems ?? []
+            items.append(URLQueryItem(name: name, value: value))
+            components.queryItems = items
+        }
+
+        func build() -> URL? {
+            return components.url
+        }
     }
+
 changed:
   User.swift: |
     struct User: Codable {
@@ -43,28 +84,61 @@ changed:
             return user
         }
     }
-  GarbageCombinePublisher.swift: |
-    class GarbageCombinePublisher {
-        static let GARBAGE_JVM_060_COMBINE_MARKER_A = "marker"
-        static let GARBAGE_JVM_060_PUBLISHER_MARKER_B = "marker"
-        func noop() {}
+  ImageDownloader.swift: |
+    import Foundation
+
+    class ImageDownloader {
+        func downloadImage(from urlString: String) async throws -> Data {
+            let url = URL(string: urlString)!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return data
+        }
+
+        func downloadThumbnail(from urlString: String) async throws -> Data {
+            let url = URL(string: "\(urlString)?size=thumb")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return data
+        }
     }
-  GarbageSubscriberSink.swift: |
-    class GarbageSubscriberSink {
-        static let GARBAGE_JVM_060_SUBSCRIBER_MARKER_C = "marker"
-        static let GARBAGE_JVM_060_SINK_MARKER_D = "marker"
-        func noop() {}
+  URLBuilder.swift: |
+    import Foundation
+
+    struct URLBuilder {
+        private var components: URLComponents
+
+        init(base: String) {
+            components = URLComponents(string: base) ?? URLComponents()
+        }
+
+        mutating func addQueryItem(name: String, value: String) {
+            var items = components.queryItems ?? []
+            items.append(URLQueryItem(name: name, value: value))
+            components.queryItems = items
+        }
+
+        func build() -> URL? {
+            return components.url
+        }
     }
+
 must_include_files:
-- UserAPI.swift
-must_include_content:
-- import Foundation
+  - UserAPI.swift
+must_include_content_from:
+  UserAPI.swift:
+    - "import Foundation"
 must_not_include:
-- GARBAGE_JVM_060_COMBINE_MARKER_A
-- GARBAGE_JVM_060_PUBLISHER_MARKER_B
-- GARBAGE_JVM_060_SINK_MARKER_D
-- GARBAGE_JVM_060_SUBSCRIBER_MARKER_C
-- GarbageCombinePublisher.swift
-- GarbageSubscriberSink.swift
+  # ImageDownloader.swift: async downloader, no dependency on UserAPI
+  - ImageDownloader
+  - downloadImage
+  - downloadThumbnail
+  # URLBuilder.swift: URL utility, not used by UserAPI
+  - URLBuilder
+  - addQueryItem
+  - URLComponents
+must_not_include_files:
+  - ImageDownloader.swift
+  - URLBuilder.swift
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

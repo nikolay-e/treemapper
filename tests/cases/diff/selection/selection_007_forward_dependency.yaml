@@ -1,7 +1,36 @@
+# Scenario: app.py modifies main() which calls helper_function() imported
+# from lib.py. This tests forward dependency resolution — the changed file
+# imports an unchanged module, and the selector should follow the import
+# edge forward to include the dependency.
+#
+# Diff: app.py changes main() to transform helper_function()'s return value.
+#
+# Reviewer questions:
+#   Q1: "What does helper_function return?"
+#       -> lib.py (UNCHANGED) defines helper_function returning 42.
+#          Reviewer needs this to verify `x + 1` produces 43.
+#   Q2: "Is helper_function a pure function with no side effects?"
+#       -> lib.py shows a simple return statement. Reviewer confirms the
+#          transformation in main() is safe.
+#
+# Not needed:
+#   - file_io.py: reads/writes files. Same utility layer but no import
+#     from app.py and no shared identifiers.
+#   - config_loader.py: loads YAML config. Plausible dependency for an
+#     "app" module, but not imported.
+#   - transform.py: also imports helper_function from lib. DIRECT
+#     structural edge (same import, same function) but is a different
+#     consumer applying its own transformation.
+#   - math_utils.py: provides arithmetic operations. Same "numeric
+#     utility" domain as helper_function's return but independent.
+#   - test_app.py: tests app.main() by calling it. References main
+#     by name but test assertions don't help verify the function.
+#   - constants.py: defines numeric constants. Same "returns a number"
+#     pattern but no import relationship.
+
 initial:
   lib.py: |
     def helper_function():
-        helper_marker = "helper_implementation"
         return 42
 
     def lib_util_alpha():
@@ -16,7 +45,6 @@ initial:
     from lib import helper_function
 
     def main():
-        main_marker = "main_original_state"
         return helper_function()
 
     def app_secondary():
@@ -24,94 +52,106 @@ initial:
 
     def app_tertiary():
         return "app_tertiary_result"
-  shared_module.py: |
-    def shared_func_one():
-        return "shared_one_result"
+  file_io.py: |
+    import os
 
-    def shared_func_two():
-        return "shared_two_result"
+    def read_lines(path):
+        with open(path, "r") as fh:
+            return fh.readlines()
 
-    class SharedHelper:
-        def help(self):
-            return "shared_helper_result"
-  garbage_sel_007_forward.py: |
-    def GARBAGE_SEL_007_forward_func_alpha():
-        return "GARBAGE_SEL_007_forward_alpha_result"
+    def write_lines(path, lines):
+        with open(path, "w") as fh:
+            fh.writelines(lines)
 
-    def GARBAGE_SEL_007_forward_func_beta():
-        return "GARBAGE_SEL_007_forward_beta_result"
+    def file_exists(path):
+        return os.path.isfile(path)
 
-    def GARBAGE_SEL_007_forward_func_gamma():
-        return "GARBAGE_SEL_007_forward_gamma_result"
+    def ensure_directory(path):
+        os.makedirs(path, exist_ok=True)
+  config_loader.py: |
+    import json
 
-    class GARBAGE_SEL_007_ForwardClass:
-        def forward_method_one(self):
-            return "GARBAGE_SEL_007_forward_method_one"
+    class ConfigLoader:
+        def __init__(self, config_path):
+            self.config_path = config_path
+            self._cache = None
 
-        def forward_method_two(self):
-            return "GARBAGE_SEL_007_forward_method_two"
-  garbage_sel_007_deps.py: |
-    GARBAGE_SEL_007_DEP_CONST_ONE = "garbage_sel_007_dep_const_one_value"
-    GARBAGE_SEL_007_DEP_CONST_TWO = "garbage_sel_007_dep_const_two_value"
+        def load(self):
+            if self._cache is None:
+                with open(self.config_path) as fh:
+                    self._cache = json.load(fh)
+            return self._cache
 
-    def GARBAGE_SEL_007_resolve_dep():
-        return "GARBAGE_SEL_007_resolve_dep_result"
+        def get(self, key, default=None):
+            config = self.load()
+            return config.get(key, default)
 
-    def GARBAGE_SEL_007_inject_dep():
-        return "GARBAGE_SEL_007_inject_dep_result"
+        def reload(self):
+            self._cache = None
+            return self.load()
+  transform.py: |
+    from lib import helper_function
 
-    class GARBAGE_SEL_007_DepManager:
-        def manage(self):
-            return "GARBAGE_SEL_007_manage_result"
-  garbage_sel_007_graph.py: |
-    class GARBAGE_SEL_007_GraphNode:
-        def __init__(self):
-            self.value = "GARBAGE_SEL_007_graph_node_value"
+    def doubled_value():
+        return helper_function() * 2
 
-        def traverse(self):
-            return "GARBAGE_SEL_007_traverse_result"
+    def stringified_value():
+        return str(helper_function())
 
-    class GARBAGE_SEL_007_GraphEdge:
-        def connect(self):
-            return "GARBAGE_SEL_007_connect_result"
+    def negated_value():
+        return -helper_function()
 
-    def GARBAGE_SEL_007_build_graph():
-        return "GARBAGE_SEL_007_build_graph_result"
-  # --- Tricky garbage: self-contained consumer with similar vocabulary ---
-  tricky_lib_consumer.py: |
-    GARBAGE_SEL_007_LIB_CONSUMER_A = "lib_consumer_module"
-    GARBAGE_SEL_007_LIB_VERSION_B = 3
+    def value_plus_offset(offset):
+        return helper_function() + offset
+  math_utils.py: |
+    import math
 
-    def consume_lib_GARBAGE_SEL_007():
-        x = fetch_value_GARBAGE_SEL_007()
-        return x + 1
+    def add(a, b):
+        return a + b
 
-    def fetch_value_GARBAGE_SEL_007():
-        marker = "fetch_implementation"
-        return 42
+    def multiply(a, b):
+        return a * b
 
-    def invoke_consumer_GARBAGE_SEL_007():
-        marker = "invoke_modified_state"
-        return consume_lib_GARBAGE_SEL_007()
-  # --- Tricky garbage: self-contained app clone with similar structure ---
-  tricky_app_clone.py: |
-    GARBAGE_SEL_007_APP_CLONE_C = "app_clone_module"
-    GARBAGE_SEL_007_APP_CLONE_FLAG_D = True
+    def clamp(value, low, high):
+        return max(low, min(high, value))
 
-    def launch_app_GARBAGE_SEL_007():
-        launch_marker = "launch_modified_state"
-        x = compute_GARBAGE_SEL_007()
-        return x + 1
+    def round_to(value, decimals=2):
+        return round(value, decimals)
 
-    def compute_GARBAGE_SEL_007():
-        return 42
+    def is_positive(value):
+        return value > 0
+  test_app.py: |
+    from app import main, app_secondary
 
-    def secondary_GARBAGE_SEL_007():
-        return "secondary_clone_result"
+    def test_main_returns_value():
+        result = main()
+        assert result is not None
+
+    def test_main_returns_correct_type():
+        result = main()
+        assert isinstance(result, int)
+
+    def test_secondary():
+        assert app_secondary() == "app_secondary_result"
+
+    def test_main_positive():
+        assert main() > 0
+  constants.py: |
+    DEFAULT_VALUE = 42
+    MAX_RETRIES = 3
+    TIMEOUT_SECONDS = 30
+    BUFFER_SIZE = 4096
+
+    def get_constant(name):
+        return globals().get(name)
+
+    def all_constants():
+        return {k: v for k, v in globals().items()
+                if k.isupper() and not k.startswith('_')}
+
 changed:
   lib.py: |
     def helper_function():
-        helper_marker = "helper_implementation"
         return 42
 
     def lib_util_alpha():
@@ -126,7 +166,6 @@ changed:
     from lib import helper_function
 
     def main():
-        main_marker = "main_modified_state"
         x = helper_function()
         return x + 1
 
@@ -135,141 +174,53 @@ changed:
 
     def app_tertiary():
         return "app_tertiary_result"
-  shared_module.py: |
-    def shared_func_one():
-        return "shared_one_result"
 
-    def shared_func_two():
-        return "shared_two_result"
-
-    class SharedHelper:
-        def help(self):
-            return "shared_helper_result"
-  garbage_sel_007_forward.py: |
-    def GARBAGE_SEL_007_forward_func_alpha():
-        return "GARBAGE_SEL_007_forward_alpha_result"
-
-    def GARBAGE_SEL_007_forward_func_beta():
-        return "GARBAGE_SEL_007_forward_beta_result"
-
-    def GARBAGE_SEL_007_forward_func_gamma():
-        return "GARBAGE_SEL_007_forward_gamma_result"
-
-    class GARBAGE_SEL_007_ForwardClass:
-        def forward_method_one(self):
-            return "GARBAGE_SEL_007_forward_method_one"
-
-        def forward_method_two(self):
-            return "GARBAGE_SEL_007_forward_method_two"
-  garbage_sel_007_deps.py: |
-    GARBAGE_SEL_007_DEP_CONST_ONE = "garbage_sel_007_dep_const_one_value"
-    GARBAGE_SEL_007_DEP_CONST_TWO = "garbage_sel_007_dep_const_two_value"
-
-    def GARBAGE_SEL_007_resolve_dep():
-        return "GARBAGE_SEL_007_resolve_dep_result"
-
-    def GARBAGE_SEL_007_inject_dep():
-        return "GARBAGE_SEL_007_inject_dep_result"
-
-    class GARBAGE_SEL_007_DepManager:
-        def manage(self):
-            return "GARBAGE_SEL_007_manage_result"
-  garbage_sel_007_graph.py: |
-    class GARBAGE_SEL_007_GraphNode:
-        def __init__(self):
-            self.value = "GARBAGE_SEL_007_graph_node_value"
-
-        def traverse(self):
-            return "GARBAGE_SEL_007_traverse_result"
-
-    class GARBAGE_SEL_007_GraphEdge:
-        def connect(self):
-            return "GARBAGE_SEL_007_connect_result"
-
-    def GARBAGE_SEL_007_build_graph():
-        return "GARBAGE_SEL_007_build_graph_result"
-  tricky_lib_consumer.py: |
-    GARBAGE_SEL_007_LIB_CONSUMER_A = "lib_consumer_module"
-    GARBAGE_SEL_007_LIB_VERSION_B = 3
-
-    def consume_lib_GARBAGE_SEL_007():
-        x = fetch_value_GARBAGE_SEL_007()
-        return x + 1
-
-    def fetch_value_GARBAGE_SEL_007():
-        marker = "fetch_implementation"
-        return 42
-
-    def invoke_consumer_GARBAGE_SEL_007():
-        marker = "invoke_modified_state"
-        return consume_lib_GARBAGE_SEL_007()
-  tricky_app_clone.py: |
-    GARBAGE_SEL_007_APP_CLONE_C = "app_clone_module"
-    GARBAGE_SEL_007_APP_CLONE_FLAG_D = True
-
-    def launch_app_GARBAGE_SEL_007():
-        launch_marker = "launch_modified_state"
-        x = compute_GARBAGE_SEL_007()
-        return x + 1
-
-    def compute_GARBAGE_SEL_007():
-        return 42
-
-    def secondary_GARBAGE_SEL_007():
-        return "secondary_clone_result"
-
-# === Assertions ===
-
-must_include:
-- main
-- main_modified_state
-
+must_include_files:
+  # Q1+Q2: lib.py defines the imported helper_function
+  - lib.py
 must_include_content_from:
   app.py:
-    - 'def main():'
-    - main_marker = "main_modified_state"
-    - x = helper_function()
-
+    - "from lib import helper_function"
+    - "x = helper_function()"
+  lib.py:
+    - "def helper_function()"
+    - "return 42"
 must_not_include:
-- main_original_state
-# Plain garbage markers
-- GARBAGE_SEL_007_forward_func_alpha
-- GARBAGE_SEL_007_forward_func_beta
-- GARBAGE_SEL_007_forward_func_gamma
-- GARBAGE_SEL_007_forward_alpha_result
-- GARBAGE_SEL_007_forward_beta_result
-- GARBAGE_SEL_007_ForwardClass
-- GARBAGE_SEL_007_forward_method_one
-- GARBAGE_SEL_007_DEP_CONST_ONE
-- GARBAGE_SEL_007_DEP_CONST_TWO
-- garbage_sel_007_dep_const_one_value
-- GARBAGE_SEL_007_resolve_dep
-- GARBAGE_SEL_007_inject_dep
-- GARBAGE_SEL_007_DepManager
-- GARBAGE_SEL_007_manage_result
-- GARBAGE_SEL_007_GraphNode
-- GARBAGE_SEL_007_graph_node_value
-- GARBAGE_SEL_007_traverse_result
-- GARBAGE_SEL_007_GraphEdge
-- GARBAGE_SEL_007_connect_result
-- GARBAGE_SEL_007_build_graph
-- garbage_sel_007_forward.py
-- garbage_sel_007_deps.py
-- garbage_sel_007_graph.py
-# Tricky: self-contained consumer with similar vocabulary
-- GARBAGE_SEL_007_LIB_CONSUMER_A
-- GARBAGE_SEL_007_LIB_VERSION_B
-# Tricky: self-contained app clone with similar structure
-- GARBAGE_SEL_007_APP_CLONE_C
-- GARBAGE_SEL_007_APP_CLONE_FLAG_D
-
+  # file_io.py: file I/O utilities, no import from app.py
+  - read_lines
+  - write_lines
+  - file_exists
+  - ensure_directory
+  # config_loader.py: JSON config loading, not imported
+  - ConfigLoader
+  - reload
+  # transform.py: HARDEST TRAP — imports helper_function from lib
+  # Same import, same function, but different consumer
+  - doubled_value
+  - stringified_value
+  - negated_value
+  - value_plus_offset
+  # math_utils.py: arithmetic operations, independent
+  - multiply
+  - clamp
+  - round_to
+  - is_positive
+  # test_app.py: tests app.main() but doesn't define it
+  - test_main_returns_value
+  - test_main_returns_correct_type
+  - test_main_positive
+  # constants.py: numeric constants, no import relationship
+  - DEFAULT_VALUE
+  - MAX_RETRIES
+  - TIMEOUT_SECONDS
+  - all_constants
 must_not_include_files:
-- garbage_sel_007_forward.py
-- garbage_sel_007_deps.py
-- garbage_sel_007_graph.py
-- tricky_lib_consumer.py
-- tricky_app_clone.py
-
+  - file_io.py
+  - config_loader.py
+  - transform.py
+  - math_utils.py
+  - test_app.py
+  - constants.py
 max_fragments: 5
 max_files: 3
 add_garbage_files: false

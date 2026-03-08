@@ -1,3 +1,20 @@
+# Scenario: Angular component uses RxJS pipe with imported filter function.
+#
+# Diff: list.component.ts is rewritten to import filterActive from transformers.ts
+# and use it inside an Observable pipe(map(filterActive)).
+#
+# Reviewer questions:
+#   Q1: "What generic constraint does filterActive require?"
+#       -> transformers.ts (UNCHANGED) defines filterActive<T extends { active: boolean }>.
+#          The component defines Item with an `active` field — reviewer must verify
+#          Item satisfies the constraint.
+#
+# Not needed:
+#   - sort-utils.ts: another data transformation in the same directory.
+#     Similar generics pattern but for sorting, not used by the component.
+#   - item.service.ts: Angular HTTP service for fetching items.
+#     The component uses inline data, not this service.
+
 initial:
   transformers.ts: |
     export function filterActive<T extends { active: boolean }>(items: T[]): T[] {
@@ -5,28 +22,28 @@ initial:
     }
   list.component.ts: |
     console.log('initial');
-  garbage_ratelimit.ts: |
-    const GARBAGE_JS_005_RATE_MARKER_A = "ratelimit";
-    const GARBAGE_JS_005_WINDOW_MARKER_B = true;
+  sort-utils.ts: |
+    export function sortByName<T extends { name: string }>(items: T[]): T[] {
+        return [...items].sort((a, b) => a.name.localeCompare(b.name));
+    }
 
-    class SlidingWindowLimiter {
-        static GARBAGE_JS_005_LIMITER_CLASS_C = "limiter";
+    export function sortById<T extends { id: string }>(items: T[]): T[] {
+        return [...items].sort((a, b) => a.id.localeCompare(b.id));
+    }
+  item.service.ts: |
+    import { Injectable } from '@angular/core';
+    import { HttpClient } from '@angular/common/http';
+    import { Observable } from 'rxjs';
 
-        allow(key: string): boolean {
-            return false;
+    @Injectable({ providedIn: 'root' })
+    export class ItemService {
+        constructor(private http: HttpClient) {}
+
+        getItems(): Observable<any[]> {
+            return this.http.get<any[]>('/api/items');
         }
     }
-  garbage_featureflags.ts: |
-    const GARBAGE_JS_005_FLAG_MARKER_D = "featureflags";
-    const GARBAGE_JS_005_TOGGLE_MARKER_E = 42;
 
-    class FeatureToggle {
-        static GARBAGE_JS_005_TOGGLE_CLASS_F = true;
-
-        isEnabled(flag: string): boolean {
-            return false;
-        }
-    }
 changed:
   transformers.ts: |
     export function filterActive<T extends { active: boolean }>(items: T[]): T[] {
@@ -54,41 +71,45 @@ changed:
             { id: '2', name: 'Item 2', active: false },
         ]).pipe(map(filterActive));
     }
-  garbage_ratelimit.ts: |
-    const GARBAGE_JS_005_RATE_MARKER_A = "ratelimit";
-    const GARBAGE_JS_005_WINDOW_MARKER_B = true;
+  sort-utils.ts: |
+    export function sortByName<T extends { name: string }>(items: T[]): T[] {
+        return [...items].sort((a, b) => a.name.localeCompare(b.name));
+    }
 
-    class SlidingWindowLimiter {
-        static GARBAGE_JS_005_LIMITER_CLASS_C = "limiter";
+    export function sortById<T extends { id: string }>(items: T[]): T[] {
+        return [...items].sort((a, b) => a.id.localeCompare(b.id));
+    }
+  item.service.ts: |
+    import { Injectable } from '@angular/core';
+    import { HttpClient } from '@angular/common/http';
+    import { Observable } from 'rxjs';
 
-        allow(key: string): boolean {
-            return false;
+    @Injectable({ providedIn: 'root' })
+    export class ItemService {
+        constructor(private http: HttpClient) {}
+
+        getItems(): Observable<any[]> {
+            return this.http.get<any[]>('/api/items');
         }
     }
-  garbage_featureflags.ts: |
-    const GARBAGE_JS_005_FLAG_MARKER_D = "featureflags";
-    const GARBAGE_JS_005_TOGGLE_MARKER_E = 42;
 
-    class FeatureToggle {
-        static GARBAGE_JS_005_TOGGLE_CLASS_F = true;
-
-        isEnabled(flag: string): boolean {
-            return false;
-        }
-    }
 must_include_files:
-- list.component.ts
-must_include_content:
-- import { Component } from '@angular/core';
-- interface Item {
+  # Q1: transformers.ts defines filterActive's generic constraint
+  - transformers.ts
+must_include_content_from:
+  transformers.ts:
+    - "function filterActive<T extends { active: boolean }>"
 must_not_include:
-- GARBAGE_JS_005_FLAG_MARKER_D
-- GARBAGE_JS_005_LIMITER_CLASS_C
-- GARBAGE_JS_005_RATE_MARKER_A
-- GARBAGE_JS_005_TOGGLE_CLASS_F
-- GARBAGE_JS_005_TOGGLE_MARKER_E
-- GARBAGE_JS_005_WINDOW_MARKER_B
-- garbage_featureflags.ts
-- garbage_ratelimit.ts
+  # sort-utils.ts: different transformation utility, not used by the component
+  - sortByName
+  - sortById
+  # item.service.ts: HTTP layer, component uses inline data
+  - ItemService
+  - getItems
+must_not_include_files:
+  - sort-utils.ts
+  - item.service.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

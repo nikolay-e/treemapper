@@ -1,3 +1,35 @@
+# Scenario: resolvers.ts is expanded to add a `users` query and a `createUser`
+#   mutation. schema.ts imports resolvers and re-exports them alongside typeDefs.
+#   Only resolvers.ts is changed; schema.ts is unchanged.
+#
+# Diff shows:
+#   - Query: { user: ... }
+#   + Query: { user: ..., users: ... }
+#   + Mutation: { createUser: ... }
+#
+# Reviewer questions:
+#   Q1: "Does the schema define types and operations matching the new resolvers?"
+#       -> schema.ts: typeDefs only has `type Query { user(id: ID!): User }`.
+#          The new `users` query and `Mutation { createUser }` are NOT in the
+#          schema yet. This is a potential bug the reviewer must catch.
+#
+#   Q2: "How are the resolvers wired to the schema?"
+#       -> schema.ts: imports resolvers from './resolvers' and re-exports them
+#          alongside typeDefs. Reviewer can see the wiring pattern.
+#
+# Not needed for comprehension:
+#   - post-resolvers.ts: Parallel resolvers for Post type with Query and Mutation.
+#     Same resolver structure, same GraphQL pattern. HARD TRAP: identical
+#     resolver object shape with Query/Mutation at same nesting level.
+#
+#   - resolver-context.ts: Context type passed to all resolvers (auth, db).
+#     Same resolver ecosystem but infrastructure concern, not related to
+#     understanding what the new resolvers do.
+#
+#   - resolver.test.ts: Tests for the user resolver using mock context.
+#     Direct structural edge — calls resolver functions. But test setup
+#     doesn't help review the schema/resolver alignment.
+
 initial:
   resolvers.ts: |
     export const resolvers = {
@@ -8,7 +40,7 @@ initial:
   schema.ts: |
     import { resolvers } from './resolvers';
 
-    export const typeDefs = \`
+    export const typeDefs = `
         type User {
             id: ID!
             name: String!
@@ -17,31 +49,45 @@ initial:
         type Query {
             user(id: ID!): User
         }
-    \`;
+    `;
 
     export { resolvers };
-  garbage_logging.ts: |
-    const GARBAGE_JS_046_LOG_MARKER_A = "logging";
-    const GARBAGE_JS_046_TRANSPORT_MARKER_B = true;
-
-    class LogTransport {
-        static GARBAGE_JS_046_TRANSPORT_CLASS_C = "transport";
-
-        write(level: string, message: string): void {
-            // noop
-        }
+  post-resolvers.ts: |
+    export const postResolvers = {
+        Query: {
+            post: (_: any, { id }: { id: string }) => ({ id, title: 'Test Post', content: 'Content' }),
+            posts: () => [{ id: '1', title: 'Post 1', content: 'Content 1' }],
+        },
+        Mutation: {
+            createPost: (_: any, { title, content }: { title: string; content: string }) =>
+                ({ id: Date.now().toString(), title, content }),
+        },
+    };
+  resolver-context.ts: |
+    export interface ResolverContext {
+        userId: string | null;
+        db: {
+            users: Map<string, { id: string; name: string }>;
+            posts: Map<string, { id: string; title: string }>;
+        };
     }
-  garbage_metrics.ts: |
-    const GARBAGE_JS_046_METRIC_MARKER_D = "metrics";
-    const GARBAGE_JS_046_COUNTER_MARKER_E = 42;
 
-    class MetricsCollector {
-        static GARBAGE_JS_046_COLLECTOR_CLASS_F = true;
-
-        record(name: string, value: number): void {
-            // noop
-        }
+    export function createContext(token?: string): ResolverContext {
+        return {
+            userId: token ? 'user-from-token' : null,
+            db: { users: new Map(), posts: new Map() },
+        };
     }
+  resolver.test.ts: |
+    import { resolvers } from './resolvers';
+
+    describe('user resolver', () => {
+        it('returns user by id', () => {
+            const result = resolvers.Query.user(null, { id: '123' });
+            expect(result).toEqual({ id: '123', name: 'Test' });
+        });
+    });
+
 changed:
   resolvers.ts: |
     export const resolvers = {
@@ -56,7 +102,7 @@ changed:
   schema.ts: |
     import { resolvers } from './resolvers';
 
-    export const typeDefs = \`
+    export const typeDefs = `
         type User {
             id: ID!
             name: String!
@@ -65,43 +111,82 @@ changed:
         type Query {
             user(id: ID!): User
         }
-    \`;
+    `;
 
     export { resolvers };
-  garbage_logging.ts: |
-    const GARBAGE_JS_046_LOG_MARKER_A = "logging";
-    const GARBAGE_JS_046_TRANSPORT_MARKER_B = true;
-
-    class LogTransport {
-        static GARBAGE_JS_046_TRANSPORT_CLASS_C = "transport";
-
-        write(level: string, message: string): void {
-            // noop
-        }
+  post-resolvers.ts: |
+    export const postResolvers = {
+        Query: {
+            post: (_: any, { id }: { id: string }) => ({ id, title: 'Test Post', content: 'Content' }),
+            posts: () => [{ id: '1', title: 'Post 1', content: 'Content 1' }],
+        },
+        Mutation: {
+            createPost: (_: any, { title, content }: { title: string; content: string }) =>
+                ({ id: Date.now().toString(), title, content }),
+        },
+    };
+  resolver-context.ts: |
+    export interface ResolverContext {
+        userId: string | null;
+        db: {
+            users: Map<string, { id: string; name: string }>;
+            posts: Map<string, { id: string; title: string }>;
+        };
     }
-  garbage_metrics.ts: |
-    const GARBAGE_JS_046_METRIC_MARKER_D = "metrics";
-    const GARBAGE_JS_046_COUNTER_MARKER_E = 42;
 
-    class MetricsCollector {
-        static GARBAGE_JS_046_COLLECTOR_CLASS_F = true;
-
-        record(name: string, value: number): void {
-            // noop
-        }
+    export function createContext(token?: string): ResolverContext {
+        return {
+            userId: token ? 'user-from-token' : null,
+            db: { users: new Map(), posts: new Map() },
+        };
     }
+  resolver.test.ts: |
+    import { resolvers } from './resolvers';
+
+    describe('user resolver', () => {
+        it('returns user by id', () => {
+            const result = resolvers.Query.user(null, { id: '123' });
+            expect(result).toEqual({ id: '123', name: 'Test' });
+        });
+    });
+
 must_include_files:
-- resolvers.ts
-must_include_content:
-- resolvers = {
+  - resolvers.ts
+  # Q1+Q2: schema.ts defines typeDefs and wires resolvers — reviewer needs
+  # to see that the new query/mutation are NOT in the schema yet.
+  - schema.ts
+
+must_include_content_from:
+  resolvers.ts:
+    - "users: ()"
+    - "createUser:"
+  schema.ts:
+    - "import { resolvers } from './resolvers'"
+    - "type Query {"
+    - "user(id: ID!): User"
+    - "export { resolvers }"
+
 must_not_include:
-- GARBAGE_JS_046_COLLECTOR_CLASS_F
-- GARBAGE_JS_046_COUNTER_MARKER_E
-- GARBAGE_JS_046_LOG_MARKER_A
-- GARBAGE_JS_046_METRIC_MARKER_D
-- GARBAGE_JS_046_TRANSPORT_CLASS_C
-- GARBAGE_JS_046_TRANSPORT_MARKER_B
-- garbage_logging.ts
-- garbage_metrics.ts
+  # --- post-resolvers.ts: parallel resolver for Post type ---
+  # HARD TRAP: identical structure with Query/Mutation, same nesting.
+  - postResolvers
+  - createPost
+  - "Test Post"
+  # --- resolver-context.ts: context type for resolvers ---
+  - ResolverContext
+  - createContext
+  - "user-from-token"
+  # --- resolver.test.ts: tests the changed resolver ---
+  # Direct edge: imports resolvers, calls Query.user.
+  - "returns user by id"
+  - "resolvers.Query.user"
+
+must_not_include_files:
+  - post-resolvers.ts
+  - resolver-context.ts
+  - resolver.test.ts
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,30 +1,109 @@
+# Scenario: Refactoring from a single hardcoded subnet to comprehensive
+#   for_each-driven infrastructure with environments, subnet tiers, security
+#   groups, NAT gateways, launch templates, and ASGs -- all from locals maps.
+#
+# Reviewer questions:
+#   Q1: "What variables feed the for_each maps?"
+#       -> variables.tf defines vpc_cidr, environment, ami_id, admin_cidr_blocks.
+#   Q2: "How are outputs structured from for_each resources?"
+#       -> outputs.tf (new) exports subnet_ids, public/private/database IDs, ASG names.
+#   Q3: "Is this replacing legacy infrastructure?"
+#       -> legacy/static_subnets.tf has the old hardcoded pattern being replaced.
+#
+# Not needed:
+#   - legacy/static_subnets.tf: Old hardcoded subnets in a different VPC.
+#     Same resource type (aws_subnet), same domain. But the legacy VPC
+#     (172.16.x.x) is being deprecated, not migrated.
+#
+#   - modules/database/main.tf: Database module that consumes subnet IDs.
+#     References the outputs from this module. But downstream consumption
+#     doesn't help review the for_each logic.
+#
+#   - monitoring/dashboards.tf: CloudWatch dashboard for VPC metrics.
+#     Same VPC domain but monitoring is downstream observation.
+#
+#   - tests/validate_subnets.sh: Script that validates CIDR ranges.
+#     Same CIDR values, but operational tooling.
+
 initial:
   main.tf: |
     resource "aws_subnet" "main" {
       vpc_id     = aws_vpc.main.id
       cidr_block = "10.0.1.0/24"
     }
-  legacy/static_subnets_GARBAGE_TF_fe474a.tf: |
-    # GARBAGE_TF_fe474a - Legacy hardcoded subnets
-    resource "aws_subnet" "legacy_subnet_1_GARBAGE_TF_fe474a" {
+  legacy/static_subnets.tf: |
+    resource "aws_subnet" "legacy_subnet_1" {
       vpc_id     = aws_vpc.legacy.id
       cidr_block = "172.16.1.0/24"
     }
 
-    resource "aws_subnet" "legacy_subnet_2_GARBAGE_TF_fe474a" {
+    resource "aws_subnet" "legacy_subnet_2" {
       vpc_id     = aws_vpc.legacy.id
       cidr_block = "172.16.2.0/24"
     }
 
-    resource "aws_subnet" "legacy_subnet_3_GARBAGE_TF_fe474a" {
+    resource "aws_subnet" "legacy_subnet_3" {
       vpc_id     = aws_vpc.legacy.id
       cidr_block = "172.16.3.0/24"
     }
-  scripts/subnet_generator_GARBAGE_TF_fe474b.py: |
-    # GARBAGE_TF_fe474b - Legacy subnet generator
-    def generate_legacy_subnets_GARBAGE_TF_fe474b():
-        for i in range(1, 10):
-            print(f"Creating legacy subnet {i} GARBAGE_TF_fe474b")
+  variables.tf: |
+    variable "vpc_cidr" {
+      type    = string
+      default = "10.0.0.0/16"
+    }
+
+    variable "environment" {
+      type = string
+    }
+
+    variable "ami_id" {
+      type = string
+    }
+
+    variable "admin_cidr_blocks" {
+      type = list(string)
+    }
+  modules/database/main.tf: |
+    variable "subnet_ids" {
+      type = list(string)
+    }
+
+    resource "aws_db_subnet_group" "main" {
+      name       = "database-subnet-group"
+      subnet_ids = var.subnet_ids
+    }
+
+    resource "aws_db_instance" "main" {
+      identifier          = "app-database"
+      engine              = "postgres"
+      instance_class      = "db.t3.medium"
+      db_subnet_group_name = aws_db_subnet_group.main.name
+    }
+  monitoring/dashboards.tf: |
+    resource "aws_cloudwatch_dashboard" "vpc" {
+      dashboard_name = "vpc-monitoring"
+      dashboard_body = jsonencode({
+        widgets = [{
+          type = "metric"
+          properties = {
+            metrics = [
+              ["AWS/VPC", "ActiveConnections"]
+            ]
+            period = 300
+            stat   = "Sum"
+          }
+        }]
+      })
+    }
+  tests/validate_subnets.sh: |
+    #!/bin/bash
+    echo "Validating subnet CIDR ranges..."
+    for cidr in "10.0.1.0/24" "10.0.2.0/24" "10.0.10.0/24" "10.0.11.0/24"; do
+      echo "Checking $cidr"
+      ipcalc "$cidr"
+    done
+    echo "Validation complete"
+
 changed:
   main.tf: |
     locals {
@@ -322,62 +401,62 @@ changed:
         create_before_destroy = true
       }
     }
-  legacy/static_subnets_GARBAGE_TF_fe474a.tf: |
-    # GARBAGE_TF_fe474a - Legacy hardcoded subnets
-    resource "aws_subnet" "legacy_subnet_1_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.1.0/24"
-    }
-
-    resource "aws_subnet" "legacy_subnet_2_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.2.0/24"
-    }
-
-    resource "aws_subnet" "legacy_subnet_3_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.3.0/24"
-    }
-  scripts/subnet_generator_GARBAGE_TF_fe474b.py: |
-    # GARBAGE_TF_fe474b - Legacy subnet generator
-    def generate_legacy_subnets_GARBAGE_TF_fe474b():
-        for i in range(1, 10):
-            print(f"Creating legacy subnet {i} GARBAGE_TF_fe474b")
   outputs.tf: |
     output "subnet_ids" {
-      description = "Map of subnet names to IDs"
-      value       = { for k, v in aws_subnet.main : k => v.id }
+      value = { for k, v in aws_subnet.main : k => v.id }
     }
 
     output "public_subnet_ids" {
-      description = "List of public subnet IDs"
-      value       = [for k, v in local.public_subnets : aws_subnet.main[k].id]
+      value = [for k, v in local.public_subnets : aws_subnet.main[k].id]
     }
 
     output "private_subnet_ids" {
-      description = "List of private subnet IDs"
-      value       = [for k, v in local.private_subnets : aws_subnet.main[k].id]
+      value = [for k, v in local.private_subnets : aws_subnet.main[k].id]
     }
 
     output "database_subnet_ids" {
-      description = "List of database subnet IDs"
-      value       = [for k, v in local.database_subnets : aws_subnet.main[k].id]
+      value = [for k, v in local.database_subnets : aws_subnet.main[k].id]
     }
 
     output "asg_names" {
-      description = "Map of environment to ASG names"
-      value       = { for k, v in aws_autoscaling_group.env : k => v.name }
+      value = { for k, v in aws_autoscaling_group.env : k => v.name }
     }
+
+# variables.tf is unchanged but the reviewer needs it to understand what
+# var.vpc_cidr, var.environment, var.ami_id, and var.admin_cidr_blocks are --
+# these variables are referenced throughout the new for_each infrastructure
 must_include_files:
-- main.tf
-- outputs.tf
-must_include_content:
-- environments = {
-- subnet_id      = aws_subnet.main[each.key].id
+  - variables.tf
+
+must_include_content_from:
+  variables.tf:
+    - variable "vpc_cidr" {
+    - variable "environment" {
+    - variable "admin_cidr_blocks" {
+
 must_not_include:
-- GARBAGE_TF_fe474a
-- GARBAGE_TF_fe474b
-- static_subnets_GARBAGE_TF_fe474a.tf
-- subnet_generator_GARBAGE_TF_fe474b.py
+  # --- legacy hardcoded subnets being replaced ---
+  - legacy_subnet_1
+  - legacy_subnet_2
+  - aws_vpc.legacy.id
+  - 172.16.1.0/24
+  # --- database module: downstream consumer ---
+  - database-subnet-group
+  - db_subnet_group_name
+  # --- monitoring dashboard: observation concern ---
+  - vpc-monitoring
+  - ActiveConnections
+  # --- validation script: operational tooling ---
+  - Validating subnet CIDR
+  - Validation complete
+
+must_not_include_files:
+  - legacy/static_subnets.tf
+  - modules/database/main.tf
+  - monitoring/dashboards.tf
+  - tests/validate_subnets.sh
+
+max_fragments: 10
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,18 @@
+# Scenario: Adding ISO format support, currency symbols, text truncation, and
+#   DateRange.overlaps() to a helpers module imported by event_view.py.
+#
+# Reviewer questions:
+#   - Does event_view.py need updating for the new helpers?
+#   - Are the new date format constants consistent with existing ones?
+#
+# Trap files:
+#   - utils/timezone_helpers.py: date/time vocabulary overlaps heavily with helpers.py
+#     (format_date, parse, datetime) but has no import relationship
+#   - utils/string_sanitizer.py: text manipulation functions (strip, truncate-like)
+#     but completely independent
+#   - utils/currency_converter.py: currency-related code (symbols, exchange rates)
+#     but does not import from helpers.py
+
 initial:
   helpers.py: |
     from typing import Optional, List, Dict, Any
@@ -62,34 +77,59 @@ initial:
 
     def render():
         pass
-  unrelated/image_processor.py: |
-    GARBAGE_PYTHON_037_001 = "image processor marker"
-    GARBAGE_PYTHON_037_002 = "image format constant"
+  utils/timezone_helpers.py: |
+    from datetime import datetime, timezone, timedelta
 
-    class ImageDimensions:
-        GARBAGE_PYTHON_037_003 = "dimensions class marker"
+    UTC = timezone.utc
+    EASTERN = timezone(timedelta(hours=-5))
+    PACIFIC = timezone(timedelta(hours=-8))
 
-        def __init__(self, width: int, height: int):
-            self.width = width
-            self.height = height
-  unrelated/pdf_generator.py: |
-    GARBAGE_PYTHON_037_004 = "pdf generator marker"
-    GARBAGE_PYTHON_037_005 = "pdf page size constant"
+    def to_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
 
-    class PDFDocument:
-        GARBAGE_PYTHON_037_006 = "document class marker"
+    def format_local(dt: datetime, tz: timezone = EASTERN) -> str:
+        local_dt = dt.astimezone(tz)
+        return local_dt.strftime("%Y-%m-%d %H:%M:%S %Z")
 
-        def __init__(self, title: str):
-            self.title = title
-  unrelated/csv_exporter.py: |
-    GARBAGE_PYTHON_037_007 = "csv exporter marker"
-    GARBAGE_PYTHON_037_008 = "csv delimiter constant"
+    def parse_iso_timestamp(iso_str: str) -> datetime:
+        return datetime.fromisoformat(iso_str)
+  utils/string_sanitizer.py: |
+    import re
+    from html import escape
 
-    class CSVExporter:
-        GARBAGE_PYTHON_037_009 = "exporter class marker"
+    def sanitize_html(text: str) -> str:
+        return escape(text)
 
-        def __init__(self, delimiter: str = ","):
-            self.delimiter = delimiter
+    def strip_tags(html: str) -> str:
+        return re.sub(r"<[^>]+>", "", html)
+
+    def normalize_whitespace(text: str) -> str:
+        return re.sub(r"\s+", " ", text).strip()
+
+    def truncate_text(text: str, max_len: int = 100) -> str:
+        if len(text) <= max_len:
+            return text
+        return text[:max_len - 3] + "..."
+  utils/currency_converter.py: |
+    from decimal import Decimal
+
+    EXCHANGE_RATES = {
+        ("USD", "EUR"): Decimal("0.92"),
+        ("USD", "GBP"): Decimal("0.79"),
+        ("EUR", "USD"): Decimal("1.09"),
+        ("GBP", "USD"): Decimal("1.27"),
+    }
+
+    def convert(amount: Decimal, from_currency: str, to_currency: str) -> Decimal:
+        if from_currency == to_currency:
+            return amount
+        rate = EXCHANGE_RATES.get((from_currency, to_currency))
+        if rate is None:
+            raise ValueError(f"No rate for {from_currency} -> {to_currency}")
+        return amount * rate
+
 changed:
   helpers.py: |
     from typing import Optional, List, Dict, Any
@@ -172,51 +212,79 @@ changed:
 
     def render():
         pass
-  unrelated/image_processor.py: |
-    GARBAGE_PYTHON_037_001 = "image processor marker"
-    GARBAGE_PYTHON_037_002 = "image format constant"
+  utils/timezone_helpers.py: |
+    from datetime import datetime, timezone, timedelta
 
-    class ImageDimensions:
-        GARBAGE_PYTHON_037_003 = "dimensions class marker"
+    UTC = timezone.utc
+    EASTERN = timezone(timedelta(hours=-5))
+    PACIFIC = timezone(timedelta(hours=-8))
 
-        def __init__(self, width: int, height: int):
-            self.width = width
-            self.height = height
-  unrelated/pdf_generator.py: |
-    GARBAGE_PYTHON_037_004 = "pdf generator marker"
-    GARBAGE_PYTHON_037_005 = "pdf page size constant"
+    def to_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
 
-    class PDFDocument:
-        GARBAGE_PYTHON_037_006 = "document class marker"
+    def format_local(dt: datetime, tz: timezone = EASTERN) -> str:
+        local_dt = dt.astimezone(tz)
+        return local_dt.strftime("%Y-%m-%d %H:%M:%S %Z")
 
-        def __init__(self, title: str):
-            self.title = title
-  unrelated/csv_exporter.py: |
-    GARBAGE_PYTHON_037_007 = "csv exporter marker"
-    GARBAGE_PYTHON_037_008 = "csv delimiter constant"
+    def parse_iso_timestamp(iso_str: str) -> datetime:
+        return datetime.fromisoformat(iso_str)
+  utils/string_sanitizer.py: |
+    import re
+    from html import escape
 
-    class CSVExporter:
-        GARBAGE_PYTHON_037_009 = "exporter class marker"
+    def sanitize_html(text: str) -> str:
+        return escape(text)
 
-        def __init__(self, delimiter: str = ","):
-            self.delimiter = delimiter
+    def strip_tags(html: str) -> str:
+        return re.sub(r"<[^>]+>", "", html)
+
+    def normalize_whitespace(text: str) -> str:
+        return re.sub(r"\s+", " ", text).strip()
+
+    def truncate_text(text: str, max_len: int = 100) -> str:
+        if len(text) <= max_len:
+            return text
+        return text[:max_len - 3] + "..."
+  utils/currency_converter.py: |
+    from decimal import Decimal
+
+    EXCHANGE_RATES = {
+        ("USD", "EUR"): Decimal("0.92"),
+        ("USD", "GBP"): Decimal("0.79"),
+        ("EUR", "USD"): Decimal("1.09"),
+        ("GBP", "USD"): Decimal("1.27"),
+    }
+
+    def convert(amount: Decimal, from_currency: str, to_currency: str) -> Decimal:
+        if from_currency == to_currency:
+            return amount
+        rate = EXCHANGE_RATES.get((from_currency, to_currency))
+        if rate is None:
+            raise ValueError(f"No rate for {from_currency} -> {to_currency}")
+        return amount * rate
+
 must_include_files:
 - helpers.py
 must_include_content:
 - 'def format_iso(dt: datetime) -> str:'
 - 'def parse_iso(dt_str: str) -> Optional[datetime]:'
+must_include_content_from:
+  event_view.py:
+  - from helpers import format_date
 must_not_include:
-- GARBAGE_PYTHON_037_001
-- GARBAGE_PYTHON_037_002
-- GARBAGE_PYTHON_037_003
-- GARBAGE_PYTHON_037_004
-- GARBAGE_PYTHON_037_005
-- GARBAGE_PYTHON_037_006
-- GARBAGE_PYTHON_037_007
-- GARBAGE_PYTHON_037_008
-- GARBAGE_PYTHON_037_009
-- csv_exporter.py
-- image_processor.py
-- pdf_generator.py
+- parse_iso_timestamp
+- EXCHANGE_RATES
+- sanitize_html
+- strip_tags
+- truncate_text
+- format_local
+must_not_include_files:
+- utils/timezone_helpers.py
+- utils/string_sanitizer.py
+- utils/currency_converter.py
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

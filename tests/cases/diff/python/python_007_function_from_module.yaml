@@ -1,3 +1,8 @@
+# Scenario: billing.py starts importing and using tax calculation functions from utils/tax.py
+# Changed: services/billing.py adds tax_amount field and calls calculate_tax, format_tax_summary
+# Reviewer questions: Is calculate_tax correct for invoice amounts? Are tax rates appropriate?
+# Trap 1: services/reporting.py — generates financial reports, shares billing vocabulary but independent
+# Trap 2: services/notifications.py — sends invoice notifications, shares "invoice" domain but no dep
 initial:
   utils/tax.py: |
     from typing import Optional, Dict, List, Tuple
@@ -105,46 +110,67 @@ initial:
                 self._invoices[invoice_id].paid_at = datetime.now()
                 return True
             return False
-  garbage_reporting.py: |
-    GARBAGE_MARKER_REPORT_001 = "reporting garbage"
-    UNRELATED_REPORT_FORMAT_002 = "pdf"
+  services/reporting.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime, timedelta
 
-    class ReportGenerator:
-        GARBAGE_REPORT_CLASS_003 = "report class marker"
+    @dataclass
+    class RevenueReport:
+        period_start: datetime
+        period_end: datetime
+        total_revenue: float
+        invoice_count: int
+        average_invoice: float
 
-        def __init__(self, output_dir: str = "/tmp"):
-            self.output_dir = output_dir
+    class ReportingService:
+        def __init__(self):
+            self._reports: List[RevenueReport] = []
 
-        def generate_pdf(self, data: dict) -> str:
-            return f"{self.output_dir}/report.pdf"
+        def generate_monthly_report(self, year: int, month: int) -> RevenueReport:
+            period_start = datetime(year, month, 1)
+            period_end = period_start + timedelta(days=30)
+            return RevenueReport(
+                period_start=period_start,
+                period_end=period_end,
+                total_revenue=0.0,
+                invoice_count=0,
+                average_invoice=0.0,
+            )
 
-        def generate_csv(self, data: dict) -> str:
-            return f"{self.output_dir}/report.csv"
+        def calculate_growth_rate(self, current: float, previous: float) -> float:
+            if previous == 0:
+                return 0.0
+            return (current - previous) / previous * 100
+  services/notifications.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class ChartBuilder:
-        GARBAGE_CHART_MARKER_004 = "chart marker"
+    @dataclass
+    class InvoiceNotification:
+        invoice_id: str
+        customer_email: str
+        subject: str
+        sent_at: Optional[datetime] = None
 
-        def create_bar_chart(self, data: list) -> bytes:
-            return b""
-  garbage_email.py: |
-    GARBAGE_MARKER_EMAIL_005 = "email garbage"
-    UNRELATED_SMTP_PORT_006 = 587
-
-    class EmailSender:
-        GARBAGE_EMAIL_CLASS_007 = True
-
+    class NotificationService:
         def __init__(self, smtp_host: str = "localhost"):
-            self.smtp_host = smtp_host
+            self._smtp_host = smtp_host
+            self._sent: List[InvoiceNotification] = []
 
-        def send(self, to: str, subject: str, body: str) -> bool:
+        def send_invoice_email(self, invoice_id: str, email: str, amount: float) -> bool:
+            notification = InvoiceNotification(
+                invoice_id=invoice_id,
+                customer_email=email,
+                subject=f"Invoice {invoice_id} - ${amount:.2f}",
+                sent_at=datetime.now(),
+            )
+            self._sent.append(notification)
             return True
 
-        def send_template(self, to: str, template_name: str, context: dict) -> bool:
-            return True
-
-    def format_email_address(name: str, email: str) -> str:
-        GARBAGE_FORMAT_EMAIL_008 = "format email marker"
-        return f"{name} <{email}>"
+        def get_sent_count(self) -> int:
+            return len(self._sent)
 changed:
   utils/tax.py: |
     from typing import Optional, Dict, List, Tuple
@@ -265,59 +291,85 @@ changed:
                 return None
             invoice = self._invoices[invoice_id]
             return format_tax_summary(invoice.amount, invoice.tax_amount)
-  garbage_reporting.py: |
-    GARBAGE_MARKER_REPORT_001 = "reporting garbage"
-    UNRELATED_REPORT_FORMAT_002 = "pdf"
+  services/reporting.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime, timedelta
 
-    class ReportGenerator:
-        GARBAGE_REPORT_CLASS_003 = "report class marker"
+    @dataclass
+    class RevenueReport:
+        period_start: datetime
+        period_end: datetime
+        total_revenue: float
+        invoice_count: int
+        average_invoice: float
 
-        def __init__(self, output_dir: str = "/tmp"):
-            self.output_dir = output_dir
+    class ReportingService:
+        def __init__(self):
+            self._reports: List[RevenueReport] = []
 
-        def generate_pdf(self, data: dict) -> str:
-            return f"{self.output_dir}/report.pdf"
+        def generate_monthly_report(self, year: int, month: int) -> RevenueReport:
+            period_start = datetime(year, month, 1)
+            period_end = period_start + timedelta(days=30)
+            return RevenueReport(
+                period_start=period_start,
+                period_end=period_end,
+                total_revenue=0.0,
+                invoice_count=0,
+                average_invoice=0.0,
+            )
 
-        def generate_csv(self, data: dict) -> str:
-            return f"{self.output_dir}/report.csv"
+        def calculate_growth_rate(self, current: float, previous: float) -> float:
+            if previous == 0:
+                return 0.0
+            return (current - previous) / previous * 100
+  services/notifications.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class ChartBuilder:
-        GARBAGE_CHART_MARKER_004 = "chart marker"
+    @dataclass
+    class InvoiceNotification:
+        invoice_id: str
+        customer_email: str
+        subject: str
+        sent_at: Optional[datetime] = None
 
-        def create_bar_chart(self, data: list) -> bytes:
-            return b""
-  garbage_email.py: |
-    GARBAGE_MARKER_EMAIL_005 = "email garbage"
-    UNRELATED_SMTP_PORT_006 = 587
-
-    class EmailSender:
-        GARBAGE_EMAIL_CLASS_007 = True
-
+    class NotificationService:
         def __init__(self, smtp_host: str = "localhost"):
-            self.smtp_host = smtp_host
+            self._smtp_host = smtp_host
+            self._sent: List[InvoiceNotification] = []
 
-        def send(self, to: str, subject: str, body: str) -> bool:
+        def send_invoice_email(self, invoice_id: str, email: str, amount: float) -> bool:
+            notification = InvoiceNotification(
+                invoice_id=invoice_id,
+                customer_email=email,
+                subject=f"Invoice {invoice_id} - ${amount:.2f}",
+                sent_at=datetime.now(),
+            )
+            self._sent.append(notification)
             return True
 
-        def send_template(self, to: str, template_name: str, context: dict) -> bool:
-            return True
-
-    def format_email_address(name: str, email: str) -> str:
-        GARBAGE_FORMAT_EMAIL_008 = "format email marker"
-        return f"{name} <{email}>"
+        def get_sent_count(self) -> int:
+            return len(self._sent)
 must_include_files:
 - services/billing.py
-must_include_content:
-- from utils.tax import calculate_tax, get_effective_rate, format_tax_summary
-- 'def __init__(self, apply_tax: bool = True):'
+- utils/tax.py
+must_include_content_from:
+  services/billing.py:
+  - from utils.tax import calculate_tax, get_effective_rate, format_tax_summary
+  - 'def __init__(self, apply_tax: bool = True):'
 must_not_include:
-- GARBAGE_CHART_MARKER_004
-- GARBAGE_EMAIL_CLASS_007
-- GARBAGE_FORMAT_EMAIL_008
-- GARBAGE_MARKER_EMAIL_005
-- GARBAGE_MARKER_REPORT_001
-- GARBAGE_REPORT_CLASS_003
-- garbage_email.py
-- garbage_reporting.py
+- ReportingService
+- RevenueReport
+- generate_monthly_report
+- NotificationService
+- InvoiceNotification
+- send_invoice_email
+must_not_include_files:
+- services/reporting.py
+- services/notifications.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

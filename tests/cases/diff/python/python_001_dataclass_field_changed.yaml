@@ -1,3 +1,9 @@
+# Scenario: Order dataclass gains priority field and is_high_priority method
+# Changed: models.py — Order gets new priority:int field and is_high_priority() method
+# Reviewer needs: models.py (changed) + services.py (unchanged, imports Order and calls its methods)
+# Trap: warehouse.py — has priority-related logic and inventory management, same domain
+# Trap: notifications.py — different service that also references "order" vocabulary
+
 initial:
   models.py: |
     from dataclasses import dataclass, field
@@ -82,47 +88,52 @@ initial:
 
         def _generate_id(self) -> int:
             return self.repository.next_id()
-  garbage_analytics.py: |
-    GARBAGE_MARKER_ANALYTICS_001 = "analytics module marker"
-    UNRELATED_CONSTANT_ANALYTICS_002 = 42
+  warehouse.py: |
+    from dataclasses import dataclass, field
+    from typing import List
+    from enum import Enum
 
-    class AnalyticsTracker:
-        GARBAGE_TRACKER_MARKER_003 = "tracker class marker"
+    class ShipmentPriority(Enum):
+        LOW = "low"
+        NORMAL = "normal"
+        HIGH = "high"
+        URGENT = "urgent"
 
+    @dataclass
+    class WarehouseItem:
+        sku: str
+        quantity: int
+        priority: int = 0
+
+        def is_high_priority(self) -> bool:
+            return self.priority >= 3
+
+    class WarehouseService:
         def __init__(self):
-            self.events = []
+            self.items: List[WarehouseItem] = []
 
-        def track_event(self, event_name: str, properties: dict) -> None:
-            self.events.append({"name": event_name, "props": properties})
+        def allocate_stock(self, sku: str, quantity: int) -> bool:
+            return True
 
-        def flush_events(self) -> int:
-            count = len(self.events)
-            self.events.clear()
-            return count
-
-    def calculate_conversion_rate(visits: int, conversions: int) -> float:
-        GARBAGE_CONVERSION_MARKER_004 = "local marker"
-        if visits == 0:
-            return 0.0
-        return conversions / visits
-  garbage_notifications.py: |
-    GARBAGE_MARKER_NOTIFY_005 = "notification garbage"
-    UNRELATED_NOTIFY_CONSTANT_006 = "should not appear"
+        def get_priority_items(self) -> List[WarehouseItem]:
+            return [i for i in self.items if i.is_high_priority()]
+  notifications.py: |
+    from typing import List
 
     class NotificationService:
-        GARBAGE_NOTIFY_CLASS_MARKER_007 = True
-
-        def send_email(self, to: str, subject: str, body: str) -> bool:
+        def send_order_confirmation(self, order_id: int, email: str) -> bool:
             return True
 
-        def send_sms(self, phone: str, message: str) -> bool:
+        def send_shipping_update(self, order_id: int, tracking: str) -> bool:
             return True
+
+        def send_priority_alert(self, message: str) -> None:
+            pass
 
     class PushNotifier:
-        GARBAGE_PUSH_MARKER_008 = "push marker"
-
         def notify(self, device_token: str, payload: dict) -> None:
             pass
+
 changed:
   models.py: |
     from dataclasses import dataclass, field
@@ -211,59 +222,74 @@ changed:
 
         def _generate_id(self) -> int:
             return self.repository.next_id()
-  garbage_analytics.py: |
-    GARBAGE_MARKER_ANALYTICS_001 = "analytics module marker"
-    UNRELATED_CONSTANT_ANALYTICS_002 = 42
+  warehouse.py: |
+    from dataclasses import dataclass, field
+    from typing import List
+    from enum import Enum
 
-    class AnalyticsTracker:
-        GARBAGE_TRACKER_MARKER_003 = "tracker class marker"
+    class ShipmentPriority(Enum):
+        LOW = "low"
+        NORMAL = "normal"
+        HIGH = "high"
+        URGENT = "urgent"
 
+    @dataclass
+    class WarehouseItem:
+        sku: str
+        quantity: int
+        priority: int = 0
+
+        def is_high_priority(self) -> bool:
+            return self.priority >= 3
+
+    class WarehouseService:
         def __init__(self):
-            self.events = []
+            self.items: List[WarehouseItem] = []
 
-        def track_event(self, event_name: str, properties: dict) -> None:
-            self.events.append({"name": event_name, "props": properties})
+        def allocate_stock(self, sku: str, quantity: int) -> bool:
+            return True
 
-        def flush_events(self) -> int:
-            count = len(self.events)
-            self.events.clear()
-            return count
-
-    def calculate_conversion_rate(visits: int, conversions: int) -> float:
-        GARBAGE_CONVERSION_MARKER_004 = "local marker"
-        if visits == 0:
-            return 0.0
-        return conversions / visits
-  garbage_notifications.py: |
-    GARBAGE_MARKER_NOTIFY_005 = "notification garbage"
-    UNRELATED_NOTIFY_CONSTANT_006 = "should not appear"
+        def get_priority_items(self) -> List[WarehouseItem]:
+            return [i for i in self.items if i.is_high_priority()]
+  notifications.py: |
+    from typing import List
 
     class NotificationService:
-        GARBAGE_NOTIFY_CLASS_MARKER_007 = True
-
-        def send_email(self, to: str, subject: str, body: str) -> bool:
+        def send_order_confirmation(self, order_id: int, email: str) -> bool:
             return True
 
-        def send_sms(self, phone: str, message: str) -> bool:
+        def send_shipping_update(self, order_id: int, tracking: str) -> bool:
             return True
+
+        def send_priority_alert(self, message: str) -> None:
+            pass
 
     class PushNotifier:
-        GARBAGE_PUSH_MARKER_008 = "push marker"
-
         def notify(self, device_token: str, payload: dict) -> None:
             pass
+
 must_include_files:
 - models.py
-must_include_content:
-- 'def is_high_priority(self) -> bool:'
+
+must_include_content_from:
+  models.py:
+    - 'def is_high_priority(self) -> bool:'
+    - 'priority: int = 0'
+
 must_not_include:
-- GARBAGE_CONVERSION_MARKER_004
-- GARBAGE_MARKER_ANALYTICS_001
-- GARBAGE_MARKER_NOTIFY_005
-- GARBAGE_NOTIFY_CLASS_MARKER_007
-- GARBAGE_PUSH_MARKER_008
-- GARBAGE_TRACKER_MARKER_003
-- garbage_analytics.py
-- garbage_notifications.py
+- WarehouseItem
+- WarehouseService
+- ShipmentPriority
+- NotificationService
+- PushNotifier
+- send_order_confirmation
+- allocate_stock
+
+must_not_include_files:
+- warehouse.py
+- notifications.py
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

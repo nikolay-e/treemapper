@@ -1,5 +1,23 @@
+# Test: launch.json changes program path and adds env vars — reviewer needs entry point
+#
+# Scenario: config/launch.json changes the debug target from src/index.js
+# to src/server.js and adds NODE_ENV/LOG_LEVEL environment variables.
+# The application source files are unchanged.
+#
+# Reviewer questions:
+#   Q1: "The debug program changed from index.js to server.js — why?"
+#       -> The diff itself shows the change. src/index.js is the old
+#          entry point, but JSON config has no import edges to JS files.
+#   Q2: "What routes exist in the application?"
+#       -> src/routes.js defines /api/users and /api/health, but again
+#          launch.json has no import relationship to it.
+#
+# Not needed:
+#   - src/middleware/cors.js: CORS middleware, unrelated to debug config.
+#   - src/middleware/logger.js: request logging, not connected to launch.json.
+
 initial:
-  .vscode/launch.json: |
+  config/launch.json: |
     {
       "version": "0.2.0",
       "configurations": [
@@ -50,72 +68,33 @@ initial:
     }
 
     module.exports = { setupRoutes };
-  unrelated/debugger.js: |
-    const GARBAGE_JSON_011_DEBUG_LEVEL_A = 'verbose';
-
-    class GARBAGE_JSON_011_STEP_DEBUGGER_B {
-        constructor(level) {
-            this.level = level || GARBAGE_JSON_011_DEBUG_LEVEL_A;
-            this.breakpoints = new Map();
-            this.log = [];
+  # --- Not needed: CORS middleware, unrelated to launch config ---
+  src/middleware/cors.js: |
+    function corsMiddleware(req, res, next) {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        if (req.method === 'OPTIONS') {
+            return res.sendStatus(200);
         }
-
-        setBreakpoint(file, line) {
-            if (!this.breakpoints.has(file)) this.breakpoints.set(file, new Set());
-            this.breakpoints.get(file).add(line);
-        }
-
-        trace(file, line, context) {
-            this.log.push({ file, line, context, timestamp: Date.now() });
-        }
-
-        getTrace() {
-            return [...this.log];
-        }
+        next();
     }
 
-    function GARBAGE_JSON_011_START_DEBUG_C(config) {
-        const debugger_ = new GARBAGE_JSON_011_STEP_DEBUGGER_B(config.level);
-        return debugger_;
+    module.exports = { corsMiddleware };
+  # --- Not needed: request logger, unrelated to debug configuration ---
+  src/middleware/logger.js: |
+    function requestLogger(req, res, next) {
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            console.log(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+        });
+        next();
     }
 
-    module.exports = { GARBAGE_JSON_011_STEP_DEBUGGER_B, GARBAGE_JSON_011_START_DEBUG_C };
-  unrelated/profiler.js: |
-    const GARBAGE_JSON_011_PROFILE_INTERVAL_D = 1000;
-
-    class GARBAGE_JSON_011_PERF_PROFILER_E {
-        constructor(interval) {
-            this.interval = interval || GARBAGE_JSON_011_PROFILE_INTERVAL_D;
-            this.snapshots = [];
-        }
-
-        snapshot(label) {
-            this.snapshots.push({
-                label,
-                memory: process.memoryUsage().heapUsed,
-                timestamp: Date.now(),
-            });
-        }
-
-        compare(labelA, labelB) {
-            const a = this.snapshots.find(s => s.label === labelA);
-            const b = this.snapshots.find(s => s.label === labelB);
-            if (!a || !b) return null;
-            return { memoryDiff: b.memory - a.memory, timeDiff: b.timestamp - a.timestamp };
-        }
-    }
-
-    function GARBAGE_JSON_011_PROFILE_SECTION_F(fn, label) {
-        const profiler = new GARBAGE_JSON_011_PERF_PROFILER_E();
-        profiler.snapshot(`${label}_start`);
-        fn();
-        profiler.snapshot(`${label}_end`);
-        return profiler.compare(`${label}_start`, `${label}_end`);
-    }
-
-    module.exports = { GARBAGE_JSON_011_PERF_PROFILER_E, GARBAGE_JSON_011_PROFILE_SECTION_F };
+    module.exports = { requestLogger };
 changed:
-  .vscode/launch.json: |
+  config/launch.json: |
     {
       "version": "0.2.0",
       "configurations": [
@@ -167,85 +146,38 @@ changed:
     }
 
     module.exports = { setupRoutes };
-  unrelated/debugger.js: |
-    const GARBAGE_JSON_011_DEBUG_LEVEL_A = 'verbose';
-
-    class GARBAGE_JSON_011_STEP_DEBUGGER_B {
-        constructor(level) {
-            this.level = level || GARBAGE_JSON_011_DEBUG_LEVEL_A;
-            this.breakpoints = new Map();
-            this.log = [];
+  src/middleware/cors.js: |
+    function corsMiddleware(req, res, next) {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        if (req.method === 'OPTIONS') {
+            return res.sendStatus(200);
         }
-
-        setBreakpoint(file, line) {
-            if (!this.breakpoints.has(file)) this.breakpoints.set(file, new Set());
-            this.breakpoints.get(file).add(line);
-        }
-
-        trace(file, line, context) {
-            this.log.push({ file, line, context, timestamp: Date.now() });
-        }
-
-        getTrace() {
-            return [...this.log];
-        }
+        next();
     }
 
-    function GARBAGE_JSON_011_START_DEBUG_C(config) {
-        const debugger_ = new GARBAGE_JSON_011_STEP_DEBUGGER_B(config.level);
-        return debugger_;
+    module.exports = { corsMiddleware };
+  src/middleware/logger.js: |
+    function requestLogger(req, res, next) {
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            console.log(`${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+        });
+        next();
     }
 
-    module.exports = { GARBAGE_JSON_011_STEP_DEBUGGER_B, GARBAGE_JSON_011_START_DEBUG_C };
-  unrelated/profiler.js: |
-    const GARBAGE_JSON_011_PROFILE_INTERVAL_D = 1000;
-
-    class GARBAGE_JSON_011_PERF_PROFILER_E {
-        constructor(interval) {
-            this.interval = interval || GARBAGE_JSON_011_PROFILE_INTERVAL_D;
-            this.snapshots = [];
-        }
-
-        snapshot(label) {
-            this.snapshots.push({
-                label,
-                memory: process.memoryUsage().heapUsed,
-                timestamp: Date.now(),
-            });
-        }
-
-        compare(labelA, labelB) {
-            const a = this.snapshots.find(s => s.label === labelA);
-            const b = this.snapshots.find(s => s.label === labelB);
-            if (!a || !b) return null;
-            return { memoryDiff: b.memory - a.memory, timeDiff: b.timestamp - a.timestamp };
-        }
-    }
-
-    function GARBAGE_JSON_011_PROFILE_SECTION_F(fn, label) {
-        const profiler = new GARBAGE_JSON_011_PERF_PROFILER_E();
-        profiler.snapshot(`${label}_start`);
-        fn();
-        profiler.snapshot(`${label}_end`);
-        return profiler.compare(`${label}_start`, `${label}_end`);
-    }
-
-    module.exports = { GARBAGE_JSON_011_PERF_PROFILER_E, GARBAGE_JSON_011_PROFILE_SECTION_F };
+    module.exports = { requestLogger };
 must_include_files:
-- .vscode/launch.json
-must_include_content:
-- '"program": "${workspaceFolder}/src/server.js",'
+  - config/launch.json
 must_not_include:
-- GARBAGE_JSON_011_DEBUG_LEVEL_A
-- GARBAGE_JSON_011_PERF_PROFILER_E
-- GARBAGE_JSON_011_PROFILE_INTERVAL_D
-- GARBAGE_JSON_011_PROFILE_SECTION_F
-- GARBAGE_JSON_011_PROFILE_SECTION_F(fn
-- GARBAGE_JSON_011_START_DEBUG_C
-- GARBAGE_JSON_011_START_DEBUG_C(config
-- GARBAGE_JSON_011_STEP_DEBUGGER_B
-- GARBAGE_JSON_011_STEP_DEBUGGER_B(config.level
-- debugger.js
-- profiler.js
+  # cors.js: CORS middleware, unrelated to debug launch configuration
+  - corsMiddleware
+  - "Access-Control-Allow-Origin"
+  # logger.js: request logging, doesn't relate to launch config
+  - requestLogger
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

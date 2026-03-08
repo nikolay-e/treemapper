@@ -1,3 +1,23 @@
+# Scenario: Test mocks an API module — reviewer needs both the service and the API.
+#
+# Diff: service.test.ts is written from scratch. It imports getUserName from
+# service.ts, mocks api.ts's fetchUser with jest.mock(), and verifies the
+# service returns the user's name.
+#
+# Reviewer questions:
+#   Q1: "What does getUserName do with fetchUser's return value?"
+#       -> service.ts (UNCHANGED) imports fetchUser, calls it, and returns user.name.
+#          The reviewer must see the real implementation to evaluate the mock.
+#   Q2: "What is fetchUser's real signature and return shape?"
+#       -> api.ts (UNCHANGED) shows fetchUser(id: string) returns response.json().
+#          The mock returns { id: '1', name: 'Test User' } — reviewer verifies this
+#          matches the real shape.
+#
+# Not needed:
+#   - user.types.ts: TypeScript interfaces for User. Not imported by service.ts
+#     or the test — the service uses implicit types from JSON response.
+#   - auth.ts: authentication functions. Different concern, no import edge.
+
 initial:
   api.ts: |
     export async function fetchUser(id: string) {
@@ -13,28 +33,24 @@ initial:
     }
   service.test.ts: |
     console.log('initial');
-  garbage_monitoring.ts: |
-    const GARBAGE_JS_009_ALERT_MARKER_A = "monitoring";
-    const GARBAGE_JS_009_DISPATCH_MARKER_B = true;
-
-    class AlertDispatcher {
-        static GARBAGE_JS_009_DISPATCHER_CLASS_C = "dispatcher";
-
-        fire(alert: string): void {
-            // noop
-        }
+  user.types.ts: |
+    export interface User {
+        id: string;
+        name: string;
+        email: string;
+        createdAt: string;
     }
-  garbage_profiling.ts: |
-    const GARBAGE_JS_009_TRACE_MARKER_D = "profiling";
-    const GARBAGE_JS_009_SPAN_MARKER_E = 42;
 
-    class TraceProfiler {
-        static GARBAGE_JS_009_PROFILER_CLASS_F = true;
-
-        begin(name: string): void {
-            // noop
-        }
+    export type UserSummary = Pick<User, 'id' | 'name'>;
+  auth.ts: |
+    export function getAuthToken(): string | null {
+        return localStorage.getItem('auth_token');
     }
+
+    export function isAuthenticated(): boolean {
+        return getAuthToken() !== null;
+    }
+
 changed:
   api.ts: |
     export async function fetchUser(id: string) {
@@ -63,41 +79,46 @@ changed:
             expect(name).toBe('Test User');
         });
     });
-  garbage_monitoring.ts: |
-    const GARBAGE_JS_009_ALERT_MARKER_A = "monitoring";
-    const GARBAGE_JS_009_DISPATCH_MARKER_B = true;
-
-    class AlertDispatcher {
-        static GARBAGE_JS_009_DISPATCHER_CLASS_C = "dispatcher";
-
-        fire(alert: string): void {
-            // noop
-        }
+  user.types.ts: |
+    export interface User {
+        id: string;
+        name: string;
+        email: string;
+        createdAt: string;
     }
-  garbage_profiling.ts: |
-    const GARBAGE_JS_009_TRACE_MARKER_D = "profiling";
-    const GARBAGE_JS_009_SPAN_MARKER_E = 42;
 
-    class TraceProfiler {
-        static GARBAGE_JS_009_PROFILER_CLASS_F = true;
-
-        begin(name: string): void {
-            // noop
-        }
+    export type UserSummary = Pick<User, 'id' | 'name'>;
+  auth.ts: |
+    export function getAuthToken(): string | null {
+        return localStorage.getItem('auth_token');
     }
+
+    export function isAuthenticated(): boolean {
+        return getAuthToken() !== null;
+    }
+
 must_include_files:
-- service.test.ts
-must_include_content:
-- import { getUserName } from './service';
-- mockedFetchUser = fetchUser as jest.MockedFunction<typeof fetchUser>
+  # Q1: service.ts shows what getUserName does with fetchUser's result
+  - service.ts
+  # Q2: api.ts defines fetchUser's real signature
+  - api.ts
+must_include_content_from:
+  service.ts:
+    - "import { fetchUser } from './api'"
+    - "return user.name"
+  api.ts:
+    - "function fetchUser(id: string)"
 must_not_include:
-- GARBAGE_JS_009_ALERT_MARKER_A
-- GARBAGE_JS_009_DISPATCHER_CLASS_C
-- GARBAGE_JS_009_DISPATCH_MARKER_B
-- GARBAGE_JS_009_PROFILER_CLASS_F
-- GARBAGE_JS_009_SPAN_MARKER_E
-- GARBAGE_JS_009_TRACE_MARKER_D
-- garbage_monitoring.ts
-- garbage_profiling.ts
+  # user.types.ts: type definitions not imported by service.ts or the test
+  - UserSummary
+  - createdAt
+  # auth.ts: authentication concern, unrelated to user fetching
+  - getAuthToken
+  - isAuthenticated
+must_not_include_files:
+  - user.types.ts
+  - auth.ts
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

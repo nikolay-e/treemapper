@@ -1,3 +1,12 @@
+# Scenario: Adding security compliance tags via merge() alongside existing base
+#   tags, creating a three-way merge for the instance tags.
+# Reviewer questions:
+#   1. What resources consume these merged tags? (main.tf has the instance)
+#   2. What extra_tags variable is expected? (main.tf defines var.extra_tags)
+# Traps:
+#   - cache/instances.tf: another instance also using merge() for tags (same function, different resource)
+#   - ecr/repository.tf: ECR repository (unrelated to tagging strategy)
+
 initial:
   main.tf: |
     variable "extra_tags" {
@@ -17,23 +26,13 @@ initial:
       instance_type = "t3.micro"
       tags          = merge(local.base_tags, var.extra_tags)
     }
-
-  # --- Tricky garbage: same resource type aws_instance but for cache layer ---
-  garbage_cache_instance.tf: |
-    GARBAGE_TF_067_CACHE_MARKER_A = "cache-instance"
-    GARBAGE_TF_067_CACHE_MARKER_B = "redis-host"
-
+  cache/instances.tf: |
     resource "aws_instance" "cache" {
       ami           = "ami-44556677"
       instance_type = "r5.large"
       tags          = merge(local.base_tags, { Role = "cache" })
     }
-
-  # --- Plain garbage: no overlap ---
-  garbage_ecr.tf: |
-    GARBAGE_TF_067_ECR_MARKER_C = "container-registry"
-    GARBAGE_TF_067_ECR_MARKER_D = "image-repo"
-
+  ecr/repository.tf: |
     resource "aws_ecr_repository" "app" {
       name = "app-images"
       image_scanning_configuration {
@@ -67,33 +66,8 @@ changed:
       tags          = merge(local.base_tags, local.security_tags, var.extra_tags)
     }
 
-  # --- Tricky garbage: same resource type aws_instance but for cache layer ---
-  garbage_cache_instance.tf: |
-    GARBAGE_TF_067_CACHE_MARKER_A = "cache-instance"
-    GARBAGE_TF_067_CACHE_MARKER_B = "redis-host"
-
-    resource "aws_instance" "cache" {
-      ami           = "ami-44556677"
-      instance_type = "r5.large"
-      tags          = merge(local.base_tags, { Role = "cache" })
-    }
-
-  # --- Plain garbage: no overlap ---
-  garbage_ecr.tf: |
-    GARBAGE_TF_067_ECR_MARKER_C = "container-registry"
-    GARBAGE_TF_067_ECR_MARKER_D = "image-repo"
-
-    resource "aws_ecr_repository" "app" {
-      name = "app-images"
-      image_scanning_configuration {
-        scan_on_push = true
-      }
-    }
-
-# === Assertions ===
-
 must_include_files:
-- main.tf
+  - main.tf
 
 must_include_content_from:
   main.tf:
@@ -103,16 +77,15 @@ must_include_content_from:
     - merge(local.base_tags, local.security_tags, var.extra_tags)
 
 must_not_include:
-# Tricky garbage markers (sibling aws_instance resource)
-- GARBAGE_TF_067_CACHE_MARKER_A
-- GARBAGE_TF_067_CACHE_MARKER_B
-# Plain garbage markers
-- GARBAGE_TF_067_ECR_MARKER_C
-- GARBAGE_TF_067_ECR_MARKER_D
+  # Cache instance - also uses merge() for tags but on a different resource
+  - Role = "cache"
+  - r5.large
+  # ECR - container registry, no relation to tagging strategy
+  - app-images
 
 must_not_include_files:
-- garbage_cache_instance.tf
-- garbage_ecr.tf
+  - cache/instances.tf
+  - ecr/repository.tf
 
 max_fragments: 3
 max_files: 1

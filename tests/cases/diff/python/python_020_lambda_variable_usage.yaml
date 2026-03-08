@@ -1,3 +1,8 @@
+# Scenario: TextProcessor uses lambda variables (transformer, normalizer, slugifier) from transforms
+# Changed: processor.py imports lambdas and TransformPipeline, builds processing pipeline
+# Reviewer questions: Is compose() used correctly? Does pipeline order matter for normalization?
+# Trap 1: text_cleaner.py — cleans text with regex, shares "transform/text" vocabulary but independent
+# Trap 2: string_utils.py — string utility functions, shares "string processing" domain but no dep
 initial:
   transforms.py: |
     from typing import Callable, TypeVar, Any
@@ -37,20 +42,40 @@ initial:
   processor.py: |
     def process():
         pass
-  garbage_auth_handler.py: |
-    GARBAGE_PY_AUTH_827364 = "authentication handler garbage"
-    UNRELATED_AUTH_MARKER_918273 = "unused oauth tokens"
+  text_cleaner.py: |
+    import re
+    from typing import Optional
 
-    class GarbageAuthHandler:
-        def garbage_authenticate(self, token):
-            return f"Garbage auth: {token}"
-  garbage_email_sender.py: |
-    GARBAGE_PY_EMAIL_918273 = "email sender garbage"
-    UNRELATED_EMAIL_MARKER_726381 = "unused smtp config"
+    class TextCleaner:
+        def __init__(self):
+            self._whitespace_re = re.compile(r'\s+')
+            self._special_re = re.compile(r'[^a-zA-Z0-9\s]')
 
-    class GarbageEmailSender:
-        def garbage_send_email(self, to, subject, body):
-            return f"Garbage email to: {to}"
+        def clean(self, text: str) -> str:
+            text = self._whitespace_re.sub(' ', text)
+            return text.strip()
+
+        def remove_special(self, text: str) -> str:
+            return self._special_re.sub('', text)
+
+        def normalize_whitespace(self, text: str) -> str:
+            return self._whitespace_re.sub(' ', text).strip()
+  string_utils.py: |
+    from typing import List, Optional
+
+    def truncate(text: str, max_length: int = 100, suffix: str = "...") -> str:
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - len(suffix)] + suffix
+
+    def capitalize_words(text: str) -> str:
+        return ' '.join(word.capitalize() for word in text.split())
+
+    def extract_words(text: str) -> List[str]:
+        return [w for w in text.split() if w.strip()]
+
+    def pad_string(text: str, width: int, fill_char: str = ' ') -> str:
+        return text.center(width, fill_char)
 changed:
   transforms.py: |
     from typing import Callable, TypeVar, Any
@@ -110,29 +135,58 @@ changed:
     def process_and_slugify(data: str) -> str:
         normalized = normalizer(data)
         return slugifier(normalized)
-  garbage_auth_handler.py: |
-    GARBAGE_PY_AUTH_827364 = "authentication handler garbage"
-    UNRELATED_AUTH_MARKER_918273 = "unused oauth tokens"
+  text_cleaner.py: |
+    import re
+    from typing import Optional
 
-    class GarbageAuthHandler:
-        def garbage_authenticate(self, token):
-            return f"Garbage auth: {token}"
-  garbage_email_sender.py: |
-    GARBAGE_PY_EMAIL_918273 = "email sender garbage"
-    UNRELATED_EMAIL_MARKER_726381 = "unused smtp config"
+    class TextCleaner:
+        def __init__(self):
+            self._whitespace_re = re.compile(r'\s+')
+            self._special_re = re.compile(r'[^a-zA-Z0-9\s]')
 
-    class GarbageEmailSender:
-        def garbage_send_email(self, to, subject, body):
-            return f"Garbage email to: {to}"
+        def clean(self, text: str) -> str:
+            text = self._whitespace_re.sub(' ', text)
+            return text.strip()
+
+        def remove_special(self, text: str) -> str:
+            return self._special_re.sub('', text)
+
+        def normalize_whitespace(self, text: str) -> str:
+            return self._whitespace_re.sub(' ', text).strip()
+  string_utils.py: |
+    from typing import List, Optional
+
+    def truncate(text: str, max_length: int = 100, suffix: str = "...") -> str:
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - len(suffix)] + suffix
+
+    def capitalize_words(text: str) -> str:
+        return ' '.join(word.capitalize() for word in text.split())
+
+    def extract_words(text: str) -> List[str]:
+        return [w for w in text.split() if w.strip()]
+
+    def pad_string(text: str, width: int, fill_char: str = ' ') -> str:
+        return text.center(width, fill_char)
 must_include_files:
+- transforms.py
 - processor.py
-must_include_content:
-- from transforms import (
-- 'class TextProcessor:'
+must_include_content_from:
+  processor.py:
+  - 'from transforms import ('
+  - 'class TextProcessor:'
 must_not_include:
-- GARBAGE_PY_AUTH_827364
-- GARBAGE_PY_EMAIL_918273
-- garbage_auth_handler.py
-- garbage_email_sender.py
+- TextCleaner
+- normalize_whitespace
+- remove_special
+- truncate
+- capitalize_words
+- extract_words
+must_not_include_files:
+- text_cleaner.py
+- string_utils.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

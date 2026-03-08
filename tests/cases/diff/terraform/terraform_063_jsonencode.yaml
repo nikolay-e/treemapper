@@ -1,3 +1,12 @@
+# Scenario: Upgrading an ECS task definition - new image version, doubled resources,
+#   added log configuration, and production environment variables via jsonencode.
+# Reviewer questions:
+#   1. What ECS service runs this task? (service.tf)
+#   2. What log group receives the container logs? (logging.tf)
+# Traps:
+#   - scheduler/task.tf: another ECS task definition using jsonencode (same pattern, different service)
+#   - storage/backups.tf: S3 bucket (unrelated to ECS)
+
 initial:
   ecs.tf: |
     resource "aws_ecs_task_definition" "worker" {
@@ -13,12 +22,24 @@ initial:
         ]
       }])
     }
+  service.tf: |
+    resource "aws_ecs_service" "worker" {
+      name            = "worker-service"
+      cluster         = aws_ecs_cluster.main.id
+      task_definition = aws_ecs_task_definition.worker.arn
+      desired_count   = 2
 
-  # --- Tricky garbage: same resource type aws_ecs_task_definition but for scheduler ---
-  garbage_scheduler.tf: |
-    GARBAGE_TF_063_SCHED_MARKER_A = "scheduler-task"
-    GARBAGE_TF_063_SCHED_MARKER_B = "cron-runner"
-
+      network_configuration {
+        subnets         = var.private_subnet_ids
+        security_groups = [aws_security_group.worker.id]
+      }
+    }
+  logging.tf: |
+    resource "aws_cloudwatch_log_group" "ecs_worker" {
+      name              = "/ecs/worker"
+      retention_in_days = 14
+    }
+  scheduler/task.tf: |
     resource "aws_ecs_task_definition" "scheduler" {
       family = "scheduler"
       container_definitions = jsonencode([{
@@ -29,12 +50,7 @@ initial:
         essential = true
       }])
     }
-
-  # --- Plain garbage: no overlap ---
-  garbage_backup.tf: |
-    GARBAGE_TF_063_BACKUP_MARKER_C = "s3-backup"
-    GARBAGE_TF_063_BACKUP_MARKER_D = "retention-policy"
-
+  storage/backups.tf: |
     resource "aws_s3_bucket" "backups" {
       bucket = "app-backups-bucket"
     }
@@ -63,56 +79,33 @@ changed:
       }])
     }
 
-  # --- Tricky garbage: same resource type aws_ecs_task_definition but for scheduler ---
-  garbage_scheduler.tf: |
-    GARBAGE_TF_063_SCHED_MARKER_A = "scheduler-task"
-    GARBAGE_TF_063_SCHED_MARKER_B = "cron-runner"
-
-    resource "aws_ecs_task_definition" "scheduler" {
-      family = "scheduler"
-      container_definitions = jsonencode([{
-        name      = "scheduler"
-        image     = "scheduler:latest"
-        cpu       = 128
-        memory    = 256
-        essential = true
-      }])
-    }
-
-  # --- Plain garbage: no overlap ---
-  garbage_backup.tf: |
-    GARBAGE_TF_063_BACKUP_MARKER_C = "s3-backup"
-    GARBAGE_TF_063_BACKUP_MARKER_D = "retention-policy"
-
-    resource "aws_s3_bucket" "backups" {
-      bucket = "app-backups-bucket"
-    }
-
-# === Assertions ===
-
 must_include_files:
-- ecs.tf
+  - ecs.tf
+  - service.tf
+  - logging.tf
 
 must_include_content_from:
   ecs.tf:
     - image     = "worker:v2"
     - cpu       = 512
     - logDriver = "awslogs"
-    - 'resource "aws_ecs_task_definition" "worker"'
+  service.tf:
+    - resource "aws_ecs_service" "worker" {
+    - aws_ecs_task_definition.worker.arn
+  logging.tf:
+    - name              = "/ecs/worker"
 
 must_not_include:
-# Tricky garbage markers (sibling aws_ecs_task_definition resource)
-- GARBAGE_TF_063_SCHED_MARKER_A
-- GARBAGE_TF_063_SCHED_MARKER_B
-# Plain garbage markers
-- GARBAGE_TF_063_BACKUP_MARKER_C
-- GARBAGE_TF_063_BACKUP_MARKER_D
+  # Scheduler task - same resource type and jsonencode pattern but different service
+  - scheduler
+  # S3 backups - unrelated storage, no connection to ECS task changes
+  - app-backups-bucket
 
 must_not_include_files:
-- garbage_scheduler.tf
-- garbage_backup.tf
+  - scheduler/task.tf
+  - storage/backups.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

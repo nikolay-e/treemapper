@@ -1,38 +1,42 @@
+# Reviewer sees: ActionButton.tsx wraps createClickHandler in useCallback.
+# Q: "What does createClickHandler return — is memoization appropriate?"
+#    -> handlers.ts: factory that returns () => console.log('Clicked:', id).
+#       Reviewer understands the memoization wraps a factory invocation.
+#
+# Not needed:
+#   - event-analytics.ts: click event tracking. Same click domain
+#     but different concern (analytics vs handling).
+#   - ActionButton.styles.ts: button styling. Visual concern only.
+
 initial:
-  handlers.ts: |
+  src/handlers.ts: |
     export function createClickHandler(id: string) {
         return () => console.log('Clicked:', id);
     }
-  ActionButton.tsx: |
-    console.log('initial');
-  garbage_rate_limiting.ts: |
-    const GARBAGE_JS_066_RATELIMIT_MARKER_A = "ratelimit";
-    const GARBAGE_JS_066_WINDOW_MARKER_B = true;
-
-    class RateLimiter {
-        static GARBAGE_JS_066_LIMITER_CLASS_C = "limiter";
-
-        allow(clientId: string): boolean {
-            return true;
-        }
+  src/ActionButton.tsx: |
+    export function ActionButton({ id }: { id: string }) {
+        return <button>Action</button>;
     }
-  garbage_feature_flags.ts: |
-    const GARBAGE_JS_066_FLAG_MARKER_D = "feature_flags";
-    const GARBAGE_JS_066_TOGGLE_MARKER_E = 100;
-
-    class FeatureFlagService {
-        static GARBAGE_JS_066_FLAGSERVICE_CLASS_F = true;
-
-        isEnabled(flagName: string): boolean {
-            return false;
-        }
+  src/event-analytics.ts: |
+    export function trackClick(elementId: string, timestamp: number): void {
+        console.log(`Click tracked: ${elementId} at ${timestamp}`);
     }
+
+    export function trackHover(elementId: string, durationMs: number): void {
+        console.log(`Hover tracked: ${elementId} for ${durationMs}ms`);
+    }
+  src/ActionButton.styles.ts: |
+    export const buttonStyles = {
+        primary: { backgroundColor: '#007bff', color: 'white', padding: '8px 16px' },
+        secondary: { backgroundColor: '#6c757d', color: 'white', padding: '8px 16px' },
+        disabled: { backgroundColor: '#ccc', color: '#666', cursor: 'not-allowed' },
+    };
 changed:
-  handlers.ts: |
+  src/handlers.ts: |
     export function createClickHandler(id: string) {
         return () => console.log('Clicked:', id);
     }
-  ActionButton.tsx: |
+  src/ActionButton.tsx: |
     import { useCallback } from 'react';
     import { createClickHandler } from './handlers';
 
@@ -43,41 +47,39 @@ changed:
 
         return <button onClick={handleClick}>Action</button>;
     }
-  garbage_rate_limiting.ts: |
-    const GARBAGE_JS_066_RATELIMIT_MARKER_A = "ratelimit";
-    const GARBAGE_JS_066_WINDOW_MARKER_B = true;
-
-    class RateLimiter {
-        static GARBAGE_JS_066_LIMITER_CLASS_C = "limiter";
-
-        allow(clientId: string): boolean {
-            return true;
-        }
+  src/event-analytics.ts: |
+    export function trackClick(elementId: string, timestamp: number): void {
+        console.log(`Click tracked: ${elementId} at ${timestamp}`);
     }
-  garbage_feature_flags.ts: |
-    const GARBAGE_JS_066_FLAG_MARKER_D = "feature_flags";
-    const GARBAGE_JS_066_TOGGLE_MARKER_E = 100;
 
-    class FeatureFlagService {
-        static GARBAGE_JS_066_FLAGSERVICE_CLASS_F = true;
-
-        isEnabled(flagName: string): boolean {
-            return false;
-        }
+    export function trackHover(elementId: string, durationMs: number): void {
+        console.log(`Hover tracked: ${elementId} for ${durationMs}ms`);
     }
+  src/ActionButton.styles.ts: |
+    export const buttonStyles = {
+        primary: { backgroundColor: '#007bff', color: 'white', padding: '8px 16px' },
+        secondary: { backgroundColor: '#6c757d', color: 'white', padding: '8px 16px' },
+        disabled: { backgroundColor: '#ccc', color: '#666', cursor: 'not-allowed' },
+    };
 must_include_files:
-- ActionButton.tsx
-must_include_content:
-- import { useCallback } from 'react';
-- 'function ActionButton({ id }: { id: string }) {'
+  # Unchanged file — the import target. Reviewer needs to see
+  # what createClickHandler returns to evaluate the useCallback.
+  - src/handlers.ts
+must_include_content_from:
+  src/handlers.ts:
+    - "createClickHandler"
+    - "console.log"
 must_not_include:
-- GARBAGE_JS_066_FLAGSERVICE_CLASS_F
-- GARBAGE_JS_066_FLAG_MARKER_D
-- GARBAGE_JS_066_LIMITER_CLASS_C
-- GARBAGE_JS_066_RATELIMIT_MARKER_A
-- GARBAGE_JS_066_TOGGLE_MARKER_E
-- GARBAGE_JS_066_WINDOW_MARKER_B
-- garbage_feature_flags.ts
-- garbage_rate_limiting.ts
+  # event-analytics.ts: click tracking, different concern
+  - trackClick
+  - trackHover
+  # ActionButton.styles.ts: styling, not related to click handling
+  - buttonStyles
+  - backgroundColor
+must_not_include_files:
+  - src/event-analytics.ts
+  - src/ActionButton.styles.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

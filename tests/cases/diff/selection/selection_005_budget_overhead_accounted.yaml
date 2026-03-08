@@ -1,238 +1,290 @@
+# Scenario: rate_limiter.py changes its throttle algorithm. It imports
+# TokenBucket from token_bucket.py. The budget is tight, so the selector
+# must account for overhead (path headers, line numbers, YAML framing)
+# and still include the dependency.
+#
+# Diff: rate_limiter.py modifies check_rate to use sliding window logic
+# and adds reset_window.
+#
+# Reviewer questions:
+#   Q1: "What is the TokenBucket interface the limiter depends on?"
+#       -> token_bucket.py (UNCHANGED) defines TokenBucket with consume()
+#          and refill(). Reviewer needs to verify the limiter uses the
+#          bucket API correctly after the algorithm change.
+#   Q2: "Does the new sliding window logic correctly reset the bucket?"
+#       -> token_bucket.py shows refill() resets tokens to capacity.
+#          Reviewer verifies reset_window calls the right method.
+#
+# Not needed:
+#   - circuit_breaker.py: another resilience pattern. Same domain (request
+#     handling) but not imported by rate_limiter — independent mechanism.
+#   - retry_policy.py: retry logic with backoff. Plausibly related to rate
+#     limiting, but fully self-contained with no shared imports.
+#   - throttle_middleware.py: also imports TokenBucket and calls consume().
+#     DIRECT structural edge (same class, same method) but wraps HTTP
+#     requests — different consumer.
+#   - leaky_bucket.py: another rate-limiting algorithm. Same domain
+#     (rate limiting) and similar API (consume, refill) but independent.
+#   - metrics_collector.py: records rate-limiter metrics. References
+#     rate_limiter by name in metric labels but doesn't import it.
+
 initial:
-  overhead.py: |
-    def func():
-        original_marker = "func_original_state"
-        return original_marker
-  auxiliary_one.py: |
-    def aux_func_one():
-        return "aux_one_result"
+  rate_limiter.py: |
+    from token_bucket import TokenBucket
 
-    def aux_func_two():
-        return "aux_two_result"
-  auxiliary_two.py: |
-    def aux_func_three():
-        return "aux_three_result"
+    class RateLimiter:
+        def __init__(self, capacity, refill_rate):
+            self.bucket = TokenBucket(capacity, refill_rate)
+            self.window_start = 0
 
-    def aux_func_four():
-        return "aux_four_result"
-  garbage_sel_005_large_file.py: |
-    def GARBAGE_SEL_005_large_func_alpha():
-        result = []
-        for i in range(100):
-            result.append(f"GARBAGE_SEL_005_large_alpha_{i}")
-        return result
+        def check_rate(self, timestamp):
+            self.bucket.refill()
+            if self.bucket.consume(1):
+                return True
+            return False
+  token_bucket.py: |
+    class TokenBucket:
+        def __init__(self, capacity, refill_rate):
+            self.capacity = capacity
+            self.refill_rate = refill_rate
+            self.tokens = capacity
+            self.last_refill = 0
 
-    def GARBAGE_SEL_005_large_func_beta():
-        result = []
-        for i in range(100):
-            result.append(f"GARBAGE_SEL_005_large_beta_{i}")
-        return result
+        def consume(self, count):
+            if self.tokens >= count:
+                self.tokens -= count
+                return True
+            return False
 
-    def GARBAGE_SEL_005_large_func_gamma():
-        result = []
-        for i in range(100):
-            result.append(f"GARBAGE_SEL_005_large_gamma_{i}")
-        return result
+        def refill(self):
+            self.tokens = min(self.capacity, self.tokens + self.refill_rate)
 
-    class GARBAGE_SEL_005_LargeClass:
-        def method_one(self):
-            return "GARBAGE_SEL_005_large_class_one"
+        def available(self):
+            return self.tokens
 
-        def method_two(self):
-            return "GARBAGE_SEL_005_large_class_two"
+        def is_empty(self):
+            return self.tokens <= 0
+  circuit_breaker.py: |
+    class CircuitBreaker:
+        CLOSED = "closed"
+        OPEN = "open"
+        HALF_OPEN = "half_open"
 
-        def method_three(self):
-            return "GARBAGE_SEL_005_large_class_three"
-  garbage_sel_005_config.py: |
-    GARBAGE_SEL_005_BUDGET_CONFIG = {
-        "limit_one": "GARBAGE_SEL_005_limit_one_value",
-        "limit_two": "GARBAGE_SEL_005_limit_two_value",
-        "limit_three": "GARBAGE_SEL_005_limit_three_value",
-    }
+        def __init__(self, failure_threshold=5, recovery_timeout=30):
+            self.state = self.CLOSED
+            self.failure_count = 0
+            self.failure_threshold = failure_threshold
+            self.recovery_timeout = recovery_timeout
+            self.last_failure_time = None
 
-    GARBAGE_SEL_005_OVERHEAD_SETTINGS = [
-        "GARBAGE_SEL_005_setting_alpha",
-        "GARBAGE_SEL_005_setting_beta",
-        "GARBAGE_SEL_005_setting_gamma",
-    ]
+        def record_success(self):
+            self.failure_count = 0
+            self.state = self.CLOSED
 
-    def GARBAGE_SEL_005_get_config():
-        return "GARBAGE_SEL_005_config_result"
-  garbage_sel_005_extras.py: |
-    def GARBAGE_SEL_005_extra_one():
-        return "GARBAGE_SEL_005_extra_one_result"
+        def record_failure(self):
+            self.failure_count += 1
+            if self.failure_count >= self.failure_threshold:
+                self.state = self.OPEN
 
-    def GARBAGE_SEL_005_extra_two():
-        return "GARBAGE_SEL_005_extra_two_result"
+        def allow_request(self):
+            return self.state != self.OPEN
 
-    def GARBAGE_SEL_005_extra_three():
-        return "GARBAGE_SEL_005_extra_three_result"
-  # --- Tricky garbage: similar func pattern but fully suffixed ---
-  tricky_overhead_twin.py: |
-    GARBAGE_SEL_005_TWIN_OVERHEAD_A = "overhead_twin_module"
-    GARBAGE_SEL_005_TWIN_MARKER_B = True
+        def reset(self):
+            self.failure_count = 0
+            self.state = self.CLOSED
+            self.last_failure_time = None
+  retry_policy.py: |
+    import time
 
-    def twin_func_GARBAGE_SEL_005():
-        twin_marker = "twin_modified_state"
-        return twin_marker
+    class RetryPolicy:
+        def __init__(self, max_retries=3, base_delay=1.0, backoff_factor=2.0):
+            self.max_retries = max_retries
+            self.base_delay = base_delay
+            self.backoff_factor = backoff_factor
 
-    def twin_helper_GARBAGE_SEL_005():
-        prev_marker = "twin_previous_state"
-        return prev_marker
-  # --- Tricky garbage: cost estimation vocabulary ---
-  tricky_budget_calc.py: |
-    GARBAGE_SEL_005_BUDGET_CALC_C = "budget_calculator"
-    GARBAGE_SEL_005_BUDGET_LIMIT_D = 1000
+        def execute(self, func, *args, **kwargs):
+            last_error = None
+            for attempt in range(self.max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    last_error = exc
+                    delay = self.base_delay * (self.backoff_factor ** attempt)
+                    time.sleep(delay)
+            raise last_error
 
-    def estimate_cost_GARBAGE_SEL_005(quantity):
-        total = quantity * 0.2
-        return total
+        def compute_delay(self, attempt):
+            return self.base_delay * (self.backoff_factor ** attempt)
 
-    def project_spend_GARBAGE_SEL_005():
-        spend_label = "spend_estimate_copy"
-        return spend_label
+        def should_retry(self, error):
+            return not isinstance(error, (KeyboardInterrupt, SystemExit))
+  throttle_middleware.py: |
+    from token_bucket import TokenBucket
+
+    class ThrottleMiddleware:
+        def __init__(self, requests_per_second):
+            self.bucket = TokenBucket(requests_per_second, requests_per_second)
+            self.rejected_count = 0
+
+        def process_request(self, request):
+            self.bucket.refill()
+            if not self.bucket.consume(1):
+                self.rejected_count += 1
+                return {"status": 429, "message": "Too many requests"}
+            return None
+
+        def get_stats(self):
+            return {
+                "available_tokens": self.bucket.available(),
+                "rejected": self.rejected_count,
+            }
+
+        def reset_stats(self):
+            self.rejected_count = 0
+  leaky_bucket.py: |
+    import time
+
+    class LeakyBucket:
+        def __init__(self, capacity, leak_rate):
+            self.capacity = capacity
+            self.leak_rate = leak_rate
+            self.water = 0
+            self.last_leak = time.time()
+
+        def consume(self, amount=1):
+            self._leak()
+            if self.water + amount <= self.capacity:
+                self.water += amount
+                return True
+            return False
+
+        def refill(self):
+            self.water = 0
+            self.last_leak = time.time()
+
+        def available(self):
+            self._leak()
+            return self.capacity - self.water
+
+        def _leak(self):
+            now = time.time()
+            elapsed = now - self.last_leak
+            leaked = elapsed * self.leak_rate
+            self.water = max(0, self.water - leaked)
+            self.last_leak = now
+  metrics_collector.py: |
+    from collections import defaultdict
+
+    class MetricsCollector:
+        def __init__(self):
+            self.counters = defaultdict(int)
+            self.gauges = {}
+
+        def increment(self, name, value=1):
+            self.counters[name] += value
+
+        def set_gauge(self, name, value):
+            self.gauges[name] = value
+
+        def record_rate_limit(self, limiter_name, allowed):
+            label = f"rate_limiter.{limiter_name}"
+            if allowed:
+                self.increment(f"{label}.allowed")
+            else:
+                self.increment(f"{label}.rejected")
+
+        def get_all(self):
+            return {"counters": dict(self.counters), "gauges": dict(self.gauges)}
+
 changed:
-  overhead.py: |
-    def func():
-        modified_marker = "func_modified_state"
-        return modified_marker
-  auxiliary_one.py: |
-    def aux_func_one():
-        return "aux_one_result"
+  rate_limiter.py: |
+    from token_bucket import TokenBucket
 
-    def aux_func_two():
-        return "aux_two_result"
-  auxiliary_two.py: |
-    def aux_func_three():
-        return "aux_three_result"
+    class RateLimiter:
+        def __init__(self, capacity, refill_rate, window_seconds=60):
+            self.bucket = TokenBucket(capacity, refill_rate)
+            self.window_start = 0
+            self.window_seconds = window_seconds
+            self.request_count = 0
 
-    def aux_func_four():
-        return "aux_four_result"
-  garbage_sel_005_large_file.py: |
-    def GARBAGE_SEL_005_large_func_alpha():
-        result = []
-        for i in range(100):
-            result.append(f"GARBAGE_SEL_005_large_alpha_{i}")
-        return result
+        def check_rate(self, timestamp):
+            if timestamp - self.window_start > self.window_seconds:
+                self.reset_window(timestamp)
+            self.bucket.refill()
+            if self.bucket.consume(1):
+                self.request_count += 1
+                return True
+            return False
 
-    def GARBAGE_SEL_005_large_func_beta():
-        result = []
-        for i in range(100):
-            result.append(f"GARBAGE_SEL_005_large_beta_{i}")
-        return result
+        def reset_window(self, timestamp):
+            self.window_start = timestamp
+            self.request_count = 0
+            self.bucket.refill()
+  token_bucket.py: |
+    class TokenBucket:
+        def __init__(self, capacity, refill_rate):
+            self.capacity = capacity
+            self.refill_rate = refill_rate
+            self.tokens = capacity
+            self.last_refill = 0
 
-    def GARBAGE_SEL_005_large_func_gamma():
-        result = []
-        for i in range(100):
-            result.append(f"GARBAGE_SEL_005_large_gamma_{i}")
-        return result
+        def consume(self, count):
+            if self.tokens >= count:
+                self.tokens -= count
+                return True
+            return False
 
-    class GARBAGE_SEL_005_LargeClass:
-        def method_one(self):
-            return "GARBAGE_SEL_005_large_class_one"
+        def refill(self):
+            self.tokens = min(self.capacity, self.tokens + self.refill_rate)
 
-        def method_two(self):
-            return "GARBAGE_SEL_005_large_class_two"
+        def available(self):
+            return self.tokens
 
-        def method_three(self):
-            return "GARBAGE_SEL_005_large_class_three"
-  garbage_sel_005_config.py: |
-    GARBAGE_SEL_005_BUDGET_CONFIG = {
-        "limit_one": "GARBAGE_SEL_005_limit_one_value",
-        "limit_two": "GARBAGE_SEL_005_limit_two_value",
-        "limit_three": "GARBAGE_SEL_005_limit_three_value",
-    }
+        def is_empty(self):
+            return self.tokens <= 0
 
-    GARBAGE_SEL_005_OVERHEAD_SETTINGS = [
-        "GARBAGE_SEL_005_setting_alpha",
-        "GARBAGE_SEL_005_setting_beta",
-        "GARBAGE_SEL_005_setting_gamma",
-    ]
-
-    def GARBAGE_SEL_005_get_config():
-        return "GARBAGE_SEL_005_config_result"
-  garbage_sel_005_extras.py: |
-    def GARBAGE_SEL_005_extra_one():
-        return "GARBAGE_SEL_005_extra_one_result"
-
-    def GARBAGE_SEL_005_extra_two():
-        return "GARBAGE_SEL_005_extra_two_result"
-
-    def GARBAGE_SEL_005_extra_three():
-        return "GARBAGE_SEL_005_extra_three_result"
-  tricky_overhead_twin.py: |
-    GARBAGE_SEL_005_TWIN_OVERHEAD_A = "overhead_twin_module"
-    GARBAGE_SEL_005_TWIN_MARKER_B = True
-
-    def twin_func_GARBAGE_SEL_005():
-        twin_marker = "twin_modified_state"
-        return twin_marker
-
-    def twin_helper_GARBAGE_SEL_005():
-        prev_marker = "twin_previous_state"
-        return prev_marker
-  tricky_budget_calc.py: |
-    GARBAGE_SEL_005_BUDGET_CALC_C = "budget_calculator"
-    GARBAGE_SEL_005_BUDGET_LIMIT_D = 1000
-
-    def estimate_cost_GARBAGE_SEL_005(quantity):
-        total = quantity * 0.2
-        return total
-
-    def project_spend_GARBAGE_SEL_005():
-        spend_label = "spend_estimate_copy"
-        return spend_label
-
-# === Assertions ===
-
-must_include:
-- func
-- func_modified_state
-
+must_include_files:
+  # Q1+Q2: TokenBucket definition — reviewer verifies consume/refill usage
+  - token_bucket.py
 must_include_content_from:
-  overhead.py:
-    - 'def func():'
-    - modified_marker = "func_modified_state"
-    - return modified_marker
-
+  rate_limiter.py:
+    - "def check_rate(self, timestamp)"
+    - "def reset_window(self, timestamp)"
+  token_bucket.py:
+    - "def consume(self, count)"
+    - "def refill(self)"
 must_not_include:
-- func_original_state
-# Plain garbage markers
-- GARBAGE_SEL_005_large_func_alpha
-- GARBAGE_SEL_005_large_func_beta
-- GARBAGE_SEL_005_large_func_gamma
-- GARBAGE_SEL_005_large_alpha
-- GARBAGE_SEL_005_large_beta
-- GARBAGE_SEL_005_LargeClass
-- GARBAGE_SEL_005_large_class_one
-- GARBAGE_SEL_005_BUDGET_CONFIG
-- GARBAGE_SEL_005_limit_one_value
-- GARBAGE_SEL_005_OVERHEAD_SETTINGS
-- GARBAGE_SEL_005_setting_alpha
-- GARBAGE_SEL_005_get_config
-- GARBAGE_SEL_005_config_result
-- GARBAGE_SEL_005_extra_one
-- GARBAGE_SEL_005_extra_two
-- GARBAGE_SEL_005_extra_three
-- GARBAGE_SEL_005_extra_one_result
-- garbage_sel_005_large_file.py
-- garbage_sel_005_config.py
-- garbage_sel_005_extras.py
-# Tricky: similar func pattern
-- GARBAGE_SEL_005_TWIN_OVERHEAD_A
-- GARBAGE_SEL_005_TWIN_MARKER_B
-# Tricky: budget/overhead vocabulary
-- GARBAGE_SEL_005_BUDGET_CALC_C
-- GARBAGE_SEL_005_BUDGET_LIMIT_D
-
+  # circuit_breaker.py: independent resilience pattern, no shared import
+  - CircuitBreaker
+  - record_success
+  - record_failure
+  - allow_request
+  # retry_policy.py: retry with backoff, no import from rate_limiter
+  - RetryPolicy
+  - compute_delay
+  - backoff_factor
+  - should_retry
+  # throttle_middleware.py: HARDEST TRAP — imports TokenBucket, calls
+  # consume() and refill() — same class, same methods, different consumer
+  - ThrottleMiddleware
+  - process_request
+  - rejected_count
+  - get_stats
+  # leaky_bucket.py: similar API (consume, refill, available) — domain trap
+  - LeakyBucket
+  - leak_rate
+  - "_leak"
+  # metrics_collector.py: references rate_limiter by name in labels
+  - MetricsCollector
+  - record_rate_limit
+  - set_gauge
 must_not_include_files:
-- garbage_sel_005_large_file.py
-- garbage_sel_005_config.py
-- garbage_sel_005_extras.py
-- tricky_overhead_twin.py
-- tricky_budget_calc.py
-
-max_fragments: 4
-max_files: 2
+  - circuit_breaker.py
+  - retry_policy.py
+  - throttle_middleware.py
+  - leaky_bucket.py
+  - metrics_collector.py
+max_fragments: 10
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,9 @@
+# Scenario: Empty Endpoints object populated with three external API IPs,
+# labels, and port definition for a headless external service.
+# Reviewer asks: "Are the external endpoint addresses and ports correct?"
+# Trap rationale: endpointslice.yaml and service-mesh-entry.yaml share
+# endpoint/networking vocabulary but use different K8s APIs with no link.
+
 initial:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -81,42 +87,39 @@ initial:
       RETRY_ATTEMPTS: "3"
       TIMEOUT_MS: "5000"
       CIRCUIT_BREAKER: "enabled"
-  k8s/unrelated/servicemesh/envoy-filter.yaml: |
-    # GARBAGE_K8S_435_ENVOY_FILTER
-    apiVersion: networking.istio.io/v1alpha3
-    kind: EnvoyFilter
+  k8s/advanced/endpointslice.yaml: |
+    apiVersion: discovery.k8s.io/v1
+    kind: EndpointSlice
     metadata:
-      name: GARBAGE_K8S_435_FILTER_NAME
+      name: metrics-collector-endpoints
+      namespace: monitoring
+      labels:
+        kubernetes.io/service-name: metrics-collector
+    addressType: IPv4
+    endpoints:
+    - addresses:
+      - 10.0.1.50
+      conditions:
+        ready: true
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+  k8s/advanced/service-mesh-entry.yaml: |
+    apiVersion: networking.istio.io/v1beta1
+    kind: ServiceEntry
+    metadata:
+      name: payment-gateway-external
       namespace: istio-system
     spec:
-      workloadSelector:
-        labels:
-          app: GARBAGE_K8S_435_WORKLOAD_LABEL
-      configPatches:
-      - applyTo: GARBAGE_K8S_435_APPLY_TO
-        match:
-          context: GARBAGE_K8S_435_CONTEXT
-  k8s/unrelated/dns/coredns-config.yaml: |
-    # GARBAGE_K8S_435_COREDNS
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: GARBAGE_K8S_435_COREDNS_CM
-      namespace: kube-system
-    data:
-      Corefile: |
-        GARBAGE_K8S_435_COREFILE_CONTENT
-        forward . GARBAGE_K8S_435_FORWARD_DNS
-  k8s/unrelated/loadbalancer/metallb-config.yaml: |
-    # GARBAGE_K8S_435_METALLB
-    apiVersion: metallb.io/v1beta1
-    kind: IPAddressPool
-    metadata:
-      name: GARBAGE_K8S_435_IP_POOL
-      namespace: metallb-system
-    spec:
-      addresses:
-      - GARBAGE_K8S_435_IP_RANGE
+      hosts:
+      - payments.thirdparty.com
+      ports:
+      - number: 443
+        name: https
+        protocol: TLS
+      resolution: DNS
+      location: MESH_EXTERNAL
   ansible/playbook.yaml: |2
       tasks:
         kubernetes.core.k8s:
@@ -217,42 +220,39 @@ changed:
       RETRY_ATTEMPTS: "3"
       TIMEOUT_MS: "5000"
       CIRCUIT_BREAKER: "enabled"
-  k8s/unrelated/servicemesh/envoy-filter.yaml: |
-    # GARBAGE_K8S_435_ENVOY_FILTER
-    apiVersion: networking.istio.io/v1alpha3
-    kind: EnvoyFilter
+  k8s/advanced/endpointslice.yaml: |
+    apiVersion: discovery.k8s.io/v1
+    kind: EndpointSlice
     metadata:
-      name: GARBAGE_K8S_435_FILTER_NAME
+      name: metrics-collector-endpoints
+      namespace: monitoring
+      labels:
+        kubernetes.io/service-name: metrics-collector
+    addressType: IPv4
+    endpoints:
+    - addresses:
+      - 10.0.1.50
+      conditions:
+        ready: true
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+  k8s/advanced/service-mesh-entry.yaml: |
+    apiVersion: networking.istio.io/v1beta1
+    kind: ServiceEntry
+    metadata:
+      name: payment-gateway-external
       namespace: istio-system
     spec:
-      workloadSelector:
-        labels:
-          app: GARBAGE_K8S_435_WORKLOAD_LABEL
-      configPatches:
-      - applyTo: GARBAGE_K8S_435_APPLY_TO
-        match:
-          context: GARBAGE_K8S_435_CONTEXT
-  k8s/unrelated/dns/coredns-config.yaml: |
-    # GARBAGE_K8S_435_COREDNS
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: GARBAGE_K8S_435_COREDNS_CM
-      namespace: kube-system
-    data:
-      Corefile: |
-        GARBAGE_K8S_435_COREFILE_CONTENT
-        forward . GARBAGE_K8S_435_FORWARD_DNS
-  k8s/unrelated/loadbalancer/metallb-config.yaml: |
-    # GARBAGE_K8S_435_METALLB
-    apiVersion: metallb.io/v1beta1
-    kind: IPAddressPool
-    metadata:
-      name: GARBAGE_K8S_435_IP_POOL
-      namespace: metallb-system
-    spec:
-      addresses:
-      - GARBAGE_K8S_435_IP_RANGE
+      hosts:
+      - payments.thirdparty.com
+      ports:
+      - number: 443
+        name: https
+        protocol: TLS
+      resolution: DNS
+      location: MESH_EXTERNAL
   ansible/playbook.yaml: |2
       tasks:
         kubernetes.core.k8s:
@@ -261,16 +261,12 @@ must_include_files:
 must_include_content:
 - 'app: external-api'
 must_not_include:
-- GARBAGE_K8S_435_APPLY_TO
-- GARBAGE_K8S_435_CONTEXT
-- GARBAGE_K8S_435_COREDNS
-- GARBAGE_K8S_435_COREDNS_CM
-- GARBAGE_K8S_435_COREFILE_CONTENT
-- GARBAGE_K8S_435_ENVOY_FILTER
-- GARBAGE_K8S_435_FILTER_NAME
-- GARBAGE_K8S_435_FORWARD_DNS
-- GARBAGE_K8S_435_WORKLOAD_LABEL
-- coredns-config.yaml
-- envoy-filter.yaml
+- metrics-collector-endpoints
+- payment-gateway-external
+- endpointslice.yaml
+- service-mesh-entry.yaml
+must_not_include_files:
+- k8s/advanced/endpointslice.yaml
+- k8s/advanced/service-mesh-entry.yaml
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,48 @@
+# Scenario: Default-deny NetworkPolicy replaced with fine-grained ingress rules
+#   allowing only api-gateway, order-service pods, and monitoring namespace Prometheus
+#   to reach payment-service on ports 8080 and 8443.
+#
+# Diff shows:
+#   - name: default-deny-all with podSelector: {} and no rules
+#   + name: payment-service-ingress with specific podSelector, role-based from
+#     rules, cross-namespace selector for monitoring, and explicit port allowlists
+#
+# Reviewer questions:
+#   Q1: "Which pods does this policy target — does the selector match the deployment?"
+#       -> Needs k8s/base/deployment.yaml: the deployment has labels
+#          app: payment-service, tier: backend, security: high — the policy's
+#          podSelector uses app: payment-service, confirming the match.
+#
+#   Q2: "Are the allowed ports (8080, 8443) consistent with the container ports?"
+#       -> Same deployment file: container exposes containerPort 8080 (http) and
+#          8443 (https). The policy whitelists exactly those ports.
+#
+#   Q3: "Does the service route traffic to these same ports?"
+#       -> Needs k8s/base/service.yaml: targetPort 8080 and 8443, confirming
+#          the service aligns with the network policy port allowlist.
+#
+# Not needed for comprehension:
+#   - k8s/base/secret.yaml: Contains payment-secrets used by the deployment,
+#     but the network policy change doesn't touch secrets — understanding secret
+#     contents doesn't help review ingress rules.
+#
+#   - k8s/apps/order-service/deployment.yaml: The order-service is one of the
+#     ALLOWED sources in the policy (role: order-service). Direct structural edge.
+#     But the policy only checks labels, not order-service internals. Reviewer
+#     needs to verify label match, not order-service implementation.
+#
+#   - k8s/apps/gateway/deployment.yaml: The api-gateway is the other ALLOWED
+#     source. Same reasoning — the policy references role: api-gateway label,
+#     but understanding the gateway's config doesn't help verify the policy rules.
+#
+#   - k8s/monitoring/prometheus-deployment.yaml: Prometheus from monitoring
+#     namespace is allowed via namespaceSelector+podSelector. But the policy
+#     references labels, not the Prometheus deployment details.
+#
+#   - k8s/policies/global-deny.yaml: Cluster-wide default deny policy. Shares
+#     NetworkPolicy kind and "deny" vocabulary. But it's a separate baseline
+#     policy in a different scope — doesn't affect this namespace-scoped policy.
+
 initial:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -78,64 +123,116 @@ initial:
     type: Opaque
     data:
       encryption-key: base64encodedkey==
-  k8s/unrelated/database/postgresql-statefulset.yaml: |
-    # GARBAGE_K8S_429_POSTGRES_SS
+  k8s/apps/order-service/deployment.yaml: |
     apiVersion: apps/v1
-    kind: StatefulSet
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_429_POSTGRES_NAME
-      namespace: database
+      name: order-service
+      namespace: production
+      labels:
+        app: order-service
+        role: order-service
     spec:
-      serviceName: GARBAGE_K8S_429_POSTGRES_SVC
       replicas: 3
       selector:
         matchLabels:
-          app: GARBAGE_K8S_429_POSTGRES_LABEL
+          app: order-service
       template:
+        metadata:
+          labels:
+            app: order-service
+            role: order-service
         spec:
           containers:
-          - name: postgres
-            image: postgres:GARBAGE_K8S_429_POSTGRES_VERSION
+          - name: order
+            image: registry.example.com/order-service:v2.1.0
+            ports:
+            - containerPort: 8080
             env:
-            - name: POSTGRES_PASSWORD
-              value: GARBAGE_K8S_429_PG_PASSWORD
-  k8s/unrelated/cache/redis-cluster.yaml: |
-    # GARBAGE_K8S_429_REDIS_CLUSTER
+            - name: PAYMENT_URL
+              value: "http://payment-service.production.svc:80"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+  k8s/apps/gateway/deployment.yaml: |
     apiVersion: apps/v1
-    kind: StatefulSet
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_429_REDIS_SS
-      namespace: cache
+      name: api-gateway
+      namespace: production
+      labels:
+        app: api-gateway
+        role: api-gateway
     spec:
-      serviceName: GARBAGE_K8S_429_REDIS_SVC
-      replicas: 6
+      replicas: 2
       selector:
         matchLabels:
-          app: GARBAGE_K8S_429_REDIS_LABEL
+          app: api-gateway
       template:
+        metadata:
+          labels:
+            app: api-gateway
+            role: api-gateway
         spec:
           containers:
-          - name: redis
-            image: redis:GARBAGE_K8S_429_REDIS_VERSION
-            args:
-            - GARBAGE_K8S_429_REDIS_ARGS
-  k8s/unrelated/queue/kafka-cluster.yaml: |
-    # GARBAGE_K8S_429_KAFKA_CLUSTER
-    apiVersion: kafka.strimzi.io/v1beta2
-    kind: Kafka
+          - name: gateway
+            image: registry.example.com/api-gateway:v3.0.0
+            ports:
+            - containerPort: 8080
+            - containerPort: 8443
+            env:
+            - name: UPSTREAM_PAYMENT
+              value: "http://payment-service.production.svc:80"
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+  k8s/monitoring/prometheus-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_429_KAFKA_NAME
-      namespace: kafka
+      name: prometheus
+      namespace: monitoring
+      labels:
+        app: prometheus
     spec:
-      kafka:
-        replicas: GARBAGE_K8S_429_KAFKA_REPLICAS
-        listeners:
-        - name: GARBAGE_K8S_429_LISTENER_NAME
-          port: GARBAGE_K8S_429_LISTENER_PORT
-  terraform/main.tf: |
-    provider "aws" {
-    }
-    }
+      replicas: 1
+      selector:
+        matchLabels:
+          app: prometheus
+      template:
+        metadata:
+          labels:
+            app: prometheus
+        spec:
+          containers:
+          - name: prometheus
+            image: prom/prometheus:v2.48.0
+            ports:
+            - containerPort: 9090
+            args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.retention.time=15d
+  k8s/policies/global-deny.yaml: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: cluster-default-deny
+      namespace: kube-system
+    spec:
+      podSelector: {}
+      policyTypes:
+      - Ingress
+      - Egress
+      egress:
+      - to:
+        - namespaceSelector: {}
+        ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
 changed:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -239,86 +336,150 @@ changed:
     type: Opaque
     data:
       encryption-key: base64encodedkey==
-  k8s/unrelated/database/postgresql-statefulset.yaml: |
-    # GARBAGE_K8S_429_POSTGRES_SS
+  k8s/apps/order-service/deployment.yaml: |
     apiVersion: apps/v1
-    kind: StatefulSet
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_429_POSTGRES_NAME
-      namespace: database
+      name: order-service
+      namespace: production
+      labels:
+        app: order-service
+        role: order-service
     spec:
-      serviceName: GARBAGE_K8S_429_POSTGRES_SVC
       replicas: 3
       selector:
         matchLabels:
-          app: GARBAGE_K8S_429_POSTGRES_LABEL
+          app: order-service
       template:
+        metadata:
+          labels:
+            app: order-service
+            role: order-service
         spec:
           containers:
-          - name: postgres
-            image: postgres:GARBAGE_K8S_429_POSTGRES_VERSION
+          - name: order
+            image: registry.example.com/order-service:v2.1.0
+            ports:
+            - containerPort: 8080
             env:
-            - name: POSTGRES_PASSWORD
-              value: GARBAGE_K8S_429_PG_PASSWORD
-  k8s/unrelated/cache/redis-cluster.yaml: |
-    # GARBAGE_K8S_429_REDIS_CLUSTER
+            - name: PAYMENT_URL
+              value: "http://payment-service.production.svc:80"
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+  k8s/apps/gateway/deployment.yaml: |
     apiVersion: apps/v1
-    kind: StatefulSet
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_429_REDIS_SS
-      namespace: cache
+      name: api-gateway
+      namespace: production
+      labels:
+        app: api-gateway
+        role: api-gateway
     spec:
-      serviceName: GARBAGE_K8S_429_REDIS_SVC
-      replicas: 6
+      replicas: 2
       selector:
         matchLabels:
-          app: GARBAGE_K8S_429_REDIS_LABEL
+          app: api-gateway
       template:
+        metadata:
+          labels:
+            app: api-gateway
+            role: api-gateway
         spec:
           containers:
-          - name: redis
-            image: redis:GARBAGE_K8S_429_REDIS_VERSION
-            args:
-            - GARBAGE_K8S_429_REDIS_ARGS
-  k8s/unrelated/queue/kafka-cluster.yaml: |
-    # GARBAGE_K8S_429_KAFKA_CLUSTER
-    apiVersion: kafka.strimzi.io/v1beta2
-    kind: Kafka
+          - name: gateway
+            image: registry.example.com/api-gateway:v3.0.0
+            ports:
+            - containerPort: 8080
+            - containerPort: 8443
+            env:
+            - name: UPSTREAM_PAYMENT
+              value: "http://payment-service.production.svc:80"
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+  k8s/monitoring/prometheus-deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_429_KAFKA_NAME
-      namespace: kafka
+      name: prometheus
+      namespace: monitoring
+      labels:
+        app: prometheus
     spec:
-      kafka:
-        replicas: GARBAGE_K8S_429_KAFKA_REPLICAS
-        listeners:
-        - name: GARBAGE_K8S_429_LISTENER_NAME
-          port: GARBAGE_K8S_429_LISTENER_PORT
-  terraform/main.tf: |
-    provider "aws" {
-    }
-    }
+      replicas: 1
+      selector:
+        matchLabels:
+          app: prometheus
+      template:
+        metadata:
+          labels:
+            app: prometheus
+        spec:
+          containers:
+          - name: prometheus
+            image: prom/prometheus:v2.48.0
+            ports:
+            - containerPort: 9090
+            args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.retention.time=15d
+  k8s/policies/global-deny.yaml: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: cluster-default-deny
+      namespace: kube-system
+    spec:
+      podSelector: {}
+      policyTypes:
+      - Ingress
+      - Egress
+      egress:
+      - to:
+        - namespaceSelector: {}
+        ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
 must_include_files:
-- k8s/base/networkpolicy.yaml
-must_include_content:
-- 'name: payment-service-ingress'
+  - k8s/base/networkpolicy.yaml
+
+must_include_content_from:
+  k8s/base/networkpolicy.yaml:
+    - "name: payment-service-ingress"
+    - "role: api-gateway"
+    - "role: order-service"
+    - "port: 8080"
+
 must_not_include:
-- GARBAGE_K8S_429_KAFKA_CLUSTER
-- GARBAGE_K8S_429_KAFKA_NAME
-- GARBAGE_K8S_429_KAFKA_REPLICAS
-- GARBAGE_K8S_429_LISTENER_NAME
-- GARBAGE_K8S_429_LISTENER_PORT
-- GARBAGE_K8S_429_PG_PASSWORD
-- GARBAGE_K8S_429_POSTGRES_LABEL
-- GARBAGE_K8S_429_POSTGRES_NAME
-- GARBAGE_K8S_429_POSTGRES_SS
-- GARBAGE_K8S_429_POSTGRES_SVC
-- GARBAGE_K8S_429_REDIS_ARGS
-- GARBAGE_K8S_429_REDIS_CLUSTER
-- GARBAGE_K8S_429_REDIS_LABEL
-- GARBAGE_K8S_429_REDIS_SS
-- GARBAGE_K8S_429_REDIS_SVC
-- kafka-cluster.yaml
-- postgresql-statefulset.yaml
-- redis-cluster.yaml
+  # --- order-service deployment: allowed source, but policy only checks labels ---
+  - "order-service:v2.1.0"
+  - PAYMENT_URL
+  # --- gateway deployment: other allowed source, same reasoning ---
+  - "api-gateway:v3.0.0"
+  - UPSTREAM_PAYMENT
+  # --- prometheus deployment: monitoring source, policy checks labels only ---
+  - "prom/prometheus"
+  - "storage.tsdb.retention"
+  # --- global deny: separate cluster-wide policy in kube-system ---
+  - cluster-default-deny
+  # --- secret: deployment dependency, not network policy concern ---
+  - base64encodedkey
+
+must_not_include_files:
+  - k8s/apps/order-service/deployment.yaml
+  - k8s/apps/gateway/deployment.yaml
+  - k8s/monitoring/prometheus-deployment.yaml
+  - k8s/policies/global-deny.yaml
+  - k8s/base/secret.yaml
+
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

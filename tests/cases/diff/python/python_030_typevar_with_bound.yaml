@@ -1,3 +1,8 @@
+# Scenario: Repository uses bounded TypeVar to ensure type safety in generic methods
+# Changed: repository.py imports bounded TypeVar and uses it for type-safe CRUD operations
+# Reviewer questions: Is the TypeVar bound correct? Are return types properly constrained?
+# Trap 1: event_store.py — stores events with similar generic patterns but no dep on base
+# Trap 2: cache_store.py — caches entities, shares "store/repository" vocabulary but independent
 initial:
   base.py: |
     from abc import ABC, abstractmethod
@@ -35,37 +40,62 @@ initial:
   repository.py: |
     def save():
         pass
-  garbage_queue.py: |
-    GARBAGE_PY_030_QUEUE_A = "message queue marker"
-    GARBAGE_PY_030_BROKER_B = "broker connection marker"
+  event_store.py: |
+    from typing import List, Dict, Any, Optional, TypeVar, Generic
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class MessageQueue:
-        GARBAGE_PY_030_MQ_C = "mq instance marker"
+    @dataclass
+    class StoredEvent:
+        event_id: str
+        event_type: str
+        payload: Dict[str, Any]
+        timestamp: datetime
 
-        def __init__(self, broker_url: str):
-            self.broker_url = broker_url
-            self._messages = []
+    class EventStore:
+        def __init__(self):
+            self._events: List[StoredEvent] = []
 
-        def publish(self, topic: str, message: dict) -> bool:
-            self._messages.append({"topic": topic, "msg": message})
-            return True
+        def append(self, event_type: str, payload: Dict[str, Any]) -> StoredEvent:
+            event = StoredEvent(
+                event_id=f"evt_{len(self._events)}",
+                event_type=event_type,
+                payload=payload,
+                timestamp=datetime.now(),
+            )
+            self._events.append(event)
+            return event
 
-        def consume(self, topic: str) -> dict:
-            GARBAGE_PY_030_CONSUME_D = "consume marker"
-            return {}
-  garbage_templating.py: |
-    GARBAGE_PY_030_TEMPLATE_E = "template engine marker"
-    GARBAGE_PY_030_RENDER_F = "render pipeline marker"
+        def get_by_type(self, event_type: str) -> List[StoredEvent]:
+            return [e for e in self._events if e.event_type == event_type]
+  cache_store.py: |
+    from typing import Dict, Any, Optional, TypeVar, Generic
+    from datetime import datetime, timedelta
+    from dataclasses import dataclass
 
-    class TemplateEngine:
-        GARBAGE_PY_030_ENGINE_G = True
+    T = TypeVar('T')
 
-        def __init__(self, template_dir: str):
-            self.template_dir = template_dir
+    @dataclass
+    class CachedItem(Generic[T]):
+        value: T
+        expires_at: datetime
 
-        def render(self, template_name: str, context: dict) -> str:
-            GARBAGE_PY_030_OUTPUT_H = "output marker"
-            return f"<html>{context}</html>"
+    class CacheStore(Generic[T]):
+        def __init__(self, ttl_seconds: int = 300):
+            self._store: Dict[str, CachedItem[T]] = {}
+            self._ttl = ttl_seconds
+
+        def get(self, key: str) -> Optional[T]:
+            item = self._store.get(key)
+            if item and datetime.now() < item.expires_at:
+                return item.value
+            return None
+
+        def set(self, key: str, value: T) -> None:
+            self._store[key] = CachedItem(
+                value=value,
+                expires_at=datetime.now() + timedelta(seconds=self._ttl),
+            )
 changed:
   base.py: |
     from abc import ABC, abstractmethod
@@ -119,52 +149,79 @@ changed:
 
         def find_by_id(self, model_id: int) -> BaseModel | None:
             return self._store.get(model_id)
-  garbage_queue.py: |
-    GARBAGE_PY_030_QUEUE_A = "message queue marker"
-    GARBAGE_PY_030_BROKER_B = "broker connection marker"
+  event_store.py: |
+    from typing import List, Dict, Any, Optional, TypeVar, Generic
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class MessageQueue:
-        GARBAGE_PY_030_MQ_C = "mq instance marker"
+    @dataclass
+    class StoredEvent:
+        event_id: str
+        event_type: str
+        payload: Dict[str, Any]
+        timestamp: datetime
 
-        def __init__(self, broker_url: str):
-            self.broker_url = broker_url
-            self._messages = []
+    class EventStore:
+        def __init__(self):
+            self._events: List[StoredEvent] = []
 
-        def publish(self, topic: str, message: dict) -> bool:
-            self._messages.append({"topic": topic, "msg": message})
-            return True
+        def append(self, event_type: str, payload: Dict[str, Any]) -> StoredEvent:
+            event = StoredEvent(
+                event_id=f"evt_{len(self._events)}",
+                event_type=event_type,
+                payload=payload,
+                timestamp=datetime.now(),
+            )
+            self._events.append(event)
+            return event
 
-        def consume(self, topic: str) -> dict:
-            GARBAGE_PY_030_CONSUME_D = "consume marker"
-            return {}
-  garbage_templating.py: |
-    GARBAGE_PY_030_TEMPLATE_E = "template engine marker"
-    GARBAGE_PY_030_RENDER_F = "render pipeline marker"
+        def get_by_type(self, event_type: str) -> List[StoredEvent]:
+            return [e for e in self._events if e.event_type == event_type]
+  cache_store.py: |
+    from typing import Dict, Any, Optional, TypeVar, Generic
+    from datetime import datetime, timedelta
+    from dataclasses import dataclass
 
-    class TemplateEngine:
-        GARBAGE_PY_030_ENGINE_G = True
+    T = TypeVar('T')
 
-        def __init__(self, template_dir: str):
-            self.template_dir = template_dir
+    @dataclass
+    class CachedItem(Generic[T]):
+        value: T
+        expires_at: datetime
 
-        def render(self, template_name: str, context: dict) -> str:
-            GARBAGE_PY_030_OUTPUT_H = "output marker"
-            return f"<html>{context}</html>"
+    class CacheStore(Generic[T]):
+        def __init__(self, ttl_seconds: int = 300):
+            self._store: Dict[str, CachedItem[T]] = {}
+            self._ttl = ttl_seconds
+
+        def get(self, key: str) -> Optional[T]:
+            item = self._store.get(key)
+            if item and datetime.now() < item.expires_at:
+                return item.value
+            return None
+
+        def set(self, key: str, value: T) -> None:
+            self._store[key] = CachedItem(
+                value=value,
+                expires_at=datetime.now() + timedelta(seconds=self._ttl),
+            )
 must_include_files:
 - repository.py
-must_include_content:
-- from typing import TypeVar
-- 'def __init__(self):'
+- base.py
+must_include_content_from:
+  repository.py:
+  - 'from base import BaseModel'
+  - "T = TypeVar('T', bound=BaseModel)"
 must_not_include:
-- GARBAGE_PY_030_BROKER_B
-- GARBAGE_PY_030_CONSUME_D
-- GARBAGE_PY_030_ENGINE_G
-- GARBAGE_PY_030_MQ_C
-- GARBAGE_PY_030_OUTPUT_H
-- GARBAGE_PY_030_QUEUE_A
-- GARBAGE_PY_030_RENDER_F
-- GARBAGE_PY_030_TEMPLATE_E
-- garbage_queue.py
-- garbage_templating.py
+- EventStore
+- StoredEvent
+- append
+- CacheStore
+- CachedItem
+must_not_include_files:
+- event_store.py
+- cache_store.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

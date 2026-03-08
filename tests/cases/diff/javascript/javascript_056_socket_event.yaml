@@ -1,3 +1,21 @@
+# Scenario: socket.ts is rewritten to import CHAT_EVENT and ChatMessage from
+# events.ts and set up socket.io event handling.
+#
+# Diff: socket.ts adds `import { CHAT_EVENT, ChatMessage } from './events'` and
+# wires `socket.on(CHAT_EVENT, ...)` inside io.on('connection', ...).
+#
+# Reviewer questions:
+#   Q1: "What event name and message shape are used?"
+#       -> events.ts (UNCHANGED) defines CHAT_EVENT = 'chat:message' and ChatMessage
+#          with userId, text, timestamp. Reviewer verifies the handler correctly
+#          types the incoming message.
+#
+# Not needed:
+#   - room-events.ts: room join/leave events for socket.io (ROOM_JOIN, ROOM_LEAVE).
+#     Same event system but different event types, not imported by socket.ts.
+#   - socket-auth.ts: socket authentication middleware. Security concern,
+#     not related to chat message handling.
+
 initial:
   events.ts: |
     export interface ChatMessage {
@@ -9,27 +27,18 @@ initial:
     export const CHAT_EVENT = 'chat:message';
   socket.ts: |
     console.log('initial');
-  garbage_backup.ts: |
-    const GARBAGE_JS_056_BACKUP_MARKER_A = "backup";
-    const GARBAGE_JS_056_SNAPSHOT_MARKER_B = true;
+  room-events.ts: |
+    export const ROOM_JOIN = 'room:join';
+    export const ROOM_LEAVE = 'room:leave';
 
-    class SnapshotManager {
-        static GARBAGE_JS_056_BACKUP_CLASS_C = "snapshot";
-
-        createSnapshot(name: string): string {
-            return name;
-        }
+    export interface RoomEvent {
+        roomId: string;
+        userId: string;
     }
-  garbage_monitoring.ts: |
-    const GARBAGE_JS_056_MONITOR_MARKER_D = "monitoring";
-    const GARBAGE_JS_056_ALERT_MARKER_E = 500;
-
-    class AlertDispatcher {
-        static GARBAGE_JS_056_MONITOR_CLASS_F = true;
-
-        dispatch(severity: string, message: string): void {
-            // noop
-        }
+  socket-auth.ts: |
+    export function authenticateSocket(token: string): { userId: string } | null {
+        if (!token || token.length < 10) return null;
+        return { userId: 'user-' + token.slice(0, 8) };
     }
 changed:
   events.ts: |
@@ -51,40 +60,37 @@ changed:
             });
         });
     }
-  garbage_backup.ts: |
-    const GARBAGE_JS_056_BACKUP_MARKER_A = "backup";
-    const GARBAGE_JS_056_SNAPSHOT_MARKER_B = true;
+  room-events.ts: |
+    export const ROOM_JOIN = 'room:join';
+    export const ROOM_LEAVE = 'room:leave';
 
-    class SnapshotManager {
-        static GARBAGE_JS_056_BACKUP_CLASS_C = "snapshot";
-
-        createSnapshot(name: string): string {
-            return name;
-        }
+    export interface RoomEvent {
+        roomId: string;
+        userId: string;
     }
-  garbage_monitoring.ts: |
-    const GARBAGE_JS_056_MONITOR_MARKER_D = "monitoring";
-    const GARBAGE_JS_056_ALERT_MARKER_E = 500;
-
-    class AlertDispatcher {
-        static GARBAGE_JS_056_MONITOR_CLASS_F = true;
-
-        dispatch(severity: string, message: string): void {
-            // noop
-        }
+  socket-auth.ts: |
+    export function authenticateSocket(token: string): { userId: string } | null {
+        if (!token || token.length < 10) return null;
+        return { userId: 'user-' + token.slice(0, 8) };
     }
 must_include_files:
-- socket.ts
-must_include_content:
-- 'function setupSocket(io: Server) {'
+  # Q1: events.ts defines the event name and message type that socket.ts imports
+  - events.ts
+must_include_content_from:
+  events.ts:
+    - "interface ChatMessage {"
+    - "CHAT_EVENT = 'chat:message'"
 must_not_include:
-- GARBAGE_JS_056_ALERT_MARKER_E
-- GARBAGE_JS_056_BACKUP_CLASS_C
-- GARBAGE_JS_056_BACKUP_MARKER_A
-- GARBAGE_JS_056_MONITOR_CLASS_F
-- GARBAGE_JS_056_MONITOR_MARKER_D
-- GARBAGE_JS_056_SNAPSHOT_MARKER_B
-- garbage_backup.ts
-- garbage_monitoring.ts
+  # room-events.ts: room events, different socket.io event types
+  - ROOM_JOIN
+  - ROOM_LEAVE
+  - RoomEvent
+  # socket-auth.ts: socket authentication, not chat handling
+  - authenticateSocket
+must_not_include_files:
+  - room-events.ts
+  - socket-auth.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

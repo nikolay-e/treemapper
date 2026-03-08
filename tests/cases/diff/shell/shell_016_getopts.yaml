@@ -1,6 +1,26 @@
+# Scenario: cli.sh adds -o (output) and -n (count) options to its getopts
+# loop. After parsing, it sources processor.sh which defines run_processor()
+# that accepts file, output, and count arguments. The reviewer needs
+# processor.sh to verify the new options are correctly forwarded.
+#
+# Reviewer questions:
+#   1. What does run_processor() expect as arguments?
+#      -> processor.sh: run_processor(input, output, count). The new
+#         -o and -n flags map directly to output and count params.
+#   2. What are the default values if -o or -n are omitted?
+#      -> processor.sh: DEFAULT_OUTPUT="/dev/stdout", DEFAULT_COUNT=1.
+#         cli.sh uses these as fallback when flags aren't provided.
+#
+# Not needed:
+#   - scripts/completions.sh: generates bash completions for cli.sh flags.
+#     Aware of flag names but doesn't define processing logic.
+#   - scripts/manpage.sh: generates man page from cli.sh usage text.
+#     Documentation generator, not runtime logic.
+
 initial:
   cli.sh: |
     #!/bin/bash
+    source ./processor.sh
 
     usage() {
         echo "Usage: $0 [-f file] [-v] [-h]"
@@ -20,37 +40,41 @@ initial:
     done
 
     shift $((OPTIND - 1))
-  unrelated/garbage_k8s_drain.sh: |
+
+    [[ -n "$file" ]] && run_processor "$file"
+  processor.sh: |
     #!/bin/bash
-    # GARBAGE_SH_016_K8S_DRAIN_A
-    GARBAGE_SH_016_NODE_LABEL_B="role=worker"
+    DEFAULT_OUTPUT="/dev/stdout"
+    DEFAULT_COUNT=1
 
-    garbage_drain_node_016() {
-        local node=$1
-        echo "Draining $node"
+    run_processor() {
+        local input=$1
+        local output=${2:-$DEFAULT_OUTPUT}
+        local count=${3:-$DEFAULT_COUNT}
+        echo "Processing $input -> $output (count: $count)"
     }
-
-    garbage_uncordon_node_016() {
-        local node=$1
-        echo "Uncordoning $node"
-    }
-  unrelated/garbage_systemd.sh: |
+  scripts/completions.sh: |
     #!/bin/bash
-    # GARBAGE_SH_016_SYSTEMD_UNIT_C
-    GARBAGE_SH_016_UNIT_DIR_D="/etc/systemd/system"
-
-    garbage_enable_unit_016() {
-        local unit=$1
-        echo "Enabling $unit"
+    _cli_completions() {
+        local opts="-f -o -n -v -h"
+        COMPREPLY=($(compgen -W "$opts" -- "${COMP_WORDS[COMP_CWORD]}"))
     }
+    complete -F _cli_completions cli.sh
+  scripts/manpage.sh: |
+    #!/bin/bash
+    cat <<'MAN' > cli.1
+    .TH CLI 1 "2024-01-01"
+    .SH NAME
+    cli \- process files
+    .SH OPTIONS
+    -f file  Input file
+    -v       Verbose mode
+    MAN
 
-    garbage_journal_tail_016() {
-        local unit=$1
-        echo "Tailing journal for $unit"
-    }
 changed:
   cli.sh: |
     #!/bin/bash
+    source ./processor.sh
 
     usage() {
         echo "Usage: $0 [-f file] [-o output] [-n count] [-v] [-h]"
@@ -59,8 +83,8 @@ changed:
 
     verbose=false
     file=""
-    output=""
-    count=1
+    output="$DEFAULT_OUTPUT"
+    count="$DEFAULT_COUNT"
 
     while getopts "f:o:n:vh" opt; do
         case "$opt" in
@@ -77,56 +101,55 @@ changed:
 
     if [[ "$verbose" == true ]]; then
         echo "Verbose mode enabled"
+        echo "File: $file, Output: $output, Count: $count"
     fi
 
-    if [[ -n "$file" ]]; then
-        echo "Processing file: $file"
-    fi
-
-    if [[ -n "$output" ]]; then
-        echo "Output to: $output"
-    fi
-
-    echo "Count: $count"
-  unrelated/garbage_k8s_drain.sh: |
+    [[ -n "$file" ]] && run_processor "$file" "$output" "$count"
+  processor.sh: |
     #!/bin/bash
-    # GARBAGE_SH_016_K8S_DRAIN_A
-    GARBAGE_SH_016_NODE_LABEL_B="role=worker"
+    DEFAULT_OUTPUT="/dev/stdout"
+    DEFAULT_COUNT=1
 
-    garbage_drain_node_016() {
-        local node=$1
-        echo "Draining $node"
+    run_processor() {
+        local input=$1
+        local output=${2:-$DEFAULT_OUTPUT}
+        local count=${3:-$DEFAULT_COUNT}
+        echo "Processing $input -> $output (count: $count)"
     }
-
-    garbage_uncordon_node_016() {
-        local node=$1
-        echo "Uncordoning $node"
-    }
-  unrelated/garbage_systemd.sh: |
+  scripts/completions.sh: |
     #!/bin/bash
-    # GARBAGE_SH_016_SYSTEMD_UNIT_C
-    GARBAGE_SH_016_UNIT_DIR_D="/etc/systemd/system"
-
-    garbage_enable_unit_016() {
-        local unit=$1
-        echo "Enabling $unit"
+    _cli_completions() {
+        local opts="-f -o -n -v -h"
+        COMPREPLY=($(compgen -W "$opts" -- "${COMP_WORDS[COMP_CWORD]}"))
     }
+    complete -F _cli_completions cli.sh
+  scripts/manpage.sh: |
+    #!/bin/bash
+    cat <<'MAN' > cli.1
+    .TH CLI 1 "2024-01-01"
+    .SH NAME
+    cli \- process files
+    .SH OPTIONS
+    -f file  Input file
+    -v       Verbose mode
+    MAN
 
-    garbage_journal_tail_016() {
-        local unit=$1
-        echo "Tailing journal for $unit"
-    }
-must_include:
+must_include_files:
 - cli.sh
-- getopts
-must_not_include:
-- GARBAGE_SH_016_K8S_DRAIN_A
-- GARBAGE_SH_016_NODE_LABEL_B
-- garbage_drain_node_016
-- garbage_uncordon_node_016
-- GARBAGE_SH_016_SYSTEMD_UNIT_C
-- GARBAGE_SH_016_UNIT_DIR_D
-- garbage_enable_unit_016
-- garbage_journal_tail_016
+
+must_include_content_from:
+  processor.sh:
+    - run_processor()
+    - DEFAULT_OUTPUT="/dev/stdout"
+    - DEFAULT_COUNT=1
+
+must_not_include_files:
+  # completions.sh: bash completion definitions, not runtime processing
+- scripts/completions.sh
+  # manpage.sh: documentation generator, not sourced by cli.sh
+- scripts/manpage.sh
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

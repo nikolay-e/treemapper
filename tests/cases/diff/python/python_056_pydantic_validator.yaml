@@ -1,3 +1,16 @@
+# Scenario: api.py starts using Pydantic schemas UserCreate and UserUpdate
+#   from schemas.py for request validation in register() and update_profile().
+#
+# Reviewer questions:
+#   - Does UserCreate(**data) properly trigger the @validator decorators?
+#   - Is exclude_unset=True correct for partial updates in UserUpdate?
+#
+# Trap files:
+#   - services/geolocation.py: geocoding service with address/coordinate
+#     vocabulary but no connection to user schemas or API
+#   - services/payment_gateway.py: payment processing with amount/currency,
+#     mentions "user" implicitly through charges but no schema dependency
+
 initial:
   schemas.py: |
     from pydantic import BaseModel, validator
@@ -38,39 +51,45 @@ initial:
 
     def get_profile(user_id: int) -> dict[str, Any]:
         return {"id": user_id, "name": "Test", "email": "test@example.com"}
-  garbage_geo.py: |
-    GARBAGE_PY_056_GEO_A = "geolocation marker"
-    GARBAGE_PY_056_COORD_B = "coordinate system marker"
+  services/geolocation.py: |
+    from typing import Optional
 
-    class GeoLocator:
-        GARBAGE_PY_056_PROJ_C = "projection marker"
-
-        def __init__(self, api_key: str = ""):
+    class GeoLocationService:
+        def __init__(self, api_key: str = "", provider: str = "nominatim"):
             self.api_key = api_key
+            self.provider = provider
             self._cache: dict[str, tuple[float, float]] = {}
 
         def geocode(self, address: str) -> tuple[float, float]:
+            if address in self._cache:
+                return self._cache[address]
             return (0.0, 0.0)
 
         def reverse_geocode(self, lat: float, lon: float) -> str:
-            GARBAGE_PY_056_REVERSE_D = "reverse geocode marker"
             return f"Address at ({lat}, {lon})"
-  garbage_payment.py: |
-    GARBAGE_PY_056_PAY_E = "payment gateway marker"
-    GARBAGE_PY_056_STRIPE_F = "stripe integration marker"
 
-    class PaymentProcessor:
-        GARBAGE_PY_056_CHARGE_G = True
+        def calculate_distance(self, origin: tuple, dest: tuple) -> float:
+            return ((dest[0] - origin[0]) ** 2 + (dest[1] - origin[1]) ** 2) ** 0.5
+  services/payment_gateway.py: |
+    from typing import Optional
 
-        def __init__(self, api_key: str = ""):
+    class PaymentGateway:
+        def __init__(self, api_key: str = "", sandbox: bool = True):
             self.api_key = api_key
+            self.sandbox = sandbox
+            self._transactions: list[dict] = []
 
         def create_charge(self, amount: int, currency: str = "usd") -> dict:
-            return {"id": "ch_test", "amount": amount, "currency": currency}
+            txn = {"id": f"ch_{len(self._transactions)}", "amount": amount, "currency": currency}
+            self._transactions.append(txn)
+            return txn
 
         def refund(self, charge_id: str) -> dict:
-            GARBAGE_PY_056_REFUND_H = "refund process marker"
-            return {"id": "re_test", "charge": charge_id}
+            return {"id": f"re_{charge_id}", "status": "refunded"}
+
+        def get_balance(self) -> int:
+            return sum(t["amount"] for t in self._transactions)
+
 changed:
   schemas.py: |
     from pydantic import BaseModel, validator
@@ -115,54 +134,68 @@ changed:
 
     def get_profile(user_id: int) -> dict[str, Any]:
         return {"id": user_id, "name": "Test", "email": "test@example.com"}
-  garbage_geo.py: |
-    GARBAGE_PY_056_GEO_A = "geolocation marker"
-    GARBAGE_PY_056_COORD_B = "coordinate system marker"
+  services/geolocation.py: |
+    from typing import Optional
 
-    class GeoLocator:
-        GARBAGE_PY_056_PROJ_C = "projection marker"
-
-        def __init__(self, api_key: str = ""):
+    class GeoLocationService:
+        def __init__(self, api_key: str = "", provider: str = "nominatim"):
             self.api_key = api_key
+            self.provider = provider
             self._cache: dict[str, tuple[float, float]] = {}
 
         def geocode(self, address: str) -> tuple[float, float]:
+            if address in self._cache:
+                return self._cache[address]
             return (0.0, 0.0)
 
         def reverse_geocode(self, lat: float, lon: float) -> str:
-            GARBAGE_PY_056_REVERSE_D = "reverse geocode marker"
             return f"Address at ({lat}, {lon})"
-  garbage_payment.py: |
-    GARBAGE_PY_056_PAY_E = "payment gateway marker"
-    GARBAGE_PY_056_STRIPE_F = "stripe integration marker"
 
-    class PaymentProcessor:
-        GARBAGE_PY_056_CHARGE_G = True
+        def calculate_distance(self, origin: tuple, dest: tuple) -> float:
+            return ((dest[0] - origin[0]) ** 2 + (dest[1] - origin[1]) ** 2) ** 0.5
+  services/payment_gateway.py: |
+    from typing import Optional
 
-        def __init__(self, api_key: str = ""):
+    class PaymentGateway:
+        def __init__(self, api_key: str = "", sandbox: bool = True):
             self.api_key = api_key
+            self.sandbox = sandbox
+            self._transactions: list[dict] = []
 
         def create_charge(self, amount: int, currency: str = "usd") -> dict:
-            return {"id": "ch_test", "amount": amount, "currency": currency}
+            txn = {"id": f"ch_{len(self._transactions)}", "amount": amount, "currency": currency}
+            self._transactions.append(txn)
+            return txn
 
         def refund(self, charge_id: str) -> dict:
-            GARBAGE_PY_056_REFUND_H = "refund process marker"
-            return {"id": "re_test", "charge": charge_id}
+            return {"id": f"re_{charge_id}", "status": "refunded"}
+
+        def get_balance(self) -> int:
+            return sum(t["amount"] for t in self._transactions)
+
 must_include_files:
 - api.py
-must_include_content:
-- from schemas import UserCreate, UserUpdate
-- user = UserCreate(**data)
+must_include_content_from:
+  api.py:
+    - "from schemas import UserCreate, UserUpdate"
+    - "user = UserCreate(**data)"
+    - "update.dict(exclude_unset=True)"
+  schemas.py:
+    - "class UserCreate(BaseModel)"
+    - "@validator(\"email\")"
+    - "email_must_be_valid"
+    - "class UserUpdate(BaseModel)"
 must_not_include:
-- GARBAGE_PY_056_CHARGE_G
-- GARBAGE_PY_056_COORD_B
-- GARBAGE_PY_056_GEO_A
-- GARBAGE_PY_056_PAY_E
-- GARBAGE_PY_056_PROJ_C
-- GARBAGE_PY_056_REFUND_H
-- GARBAGE_PY_056_REVERSE_D
-- GARBAGE_PY_056_STRIPE_F
-- garbage_geo.py
-- garbage_payment.py
+- GeoLocationService
+- reverse_geocode
+- calculate_distance
+- PaymentGateway
+- create_charge
+- get_balance
+must_not_include_files:
+- services/geolocation.py
+- services/payment_gateway.py
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

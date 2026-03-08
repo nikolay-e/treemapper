@@ -1,3 +1,9 @@
+# Scenario: Deployment guide updated with new Helm version and extra steps
+# (consecutive text chunks changed in a plain-text doc).
+# Reviewer asks: "What deployment prerequisites and steps were added?"
+# Trap rationale: release_notes.txt and runbook.txt share deployment/ops
+# vocabulary but are separate documents with no structural link.
+
 initial:
   docs/deployment_guide.txt: |
     Deployment Guide for Production Services
@@ -35,69 +41,42 @@ initial:
     Verify metrics are flowing to Grafana.
     Confirm log aggregation is working.
     Run the production smoke tests.
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  docs/release_notes.txt: |
+    Release Notes v2.4.0
+    ====================
 
-    class TextSanitizer:
-        GARBAGE_MERGE_004_MARKER_A = "sanitizer_tag"
+    New Features:
+    - Added multi-region failover support
+    - Implemented request tracing with OpenTelemetry
+    - Added Prometheus metrics endpoint
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    Bug Fixes:
+    - Fixed connection pool exhaustion under high load
+    - Resolved race condition in session management
+    - Corrected timezone handling in audit logs
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+    Known Issues:
+    - Dashboard latency metrics may show spikes during deployments
+    - WebSocket reconnection takes up to 30s after pod restart
+  docs/runbook.txt: |
+    Incident Response Runbook
+    =========================
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_004_A_CLEAN: {cleaned}"
+    Severity Levels:
+    - SEV1: Complete service outage (response within 15 min)
+    - SEV2: Partial degradation (response within 30 min)
+    - SEV3: Minor issue (response within 2 hours)
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+    Escalation Path:
+    1. On-call engineer assesses impact
+    2. If SEV1, page team lead immediately
+    3. Open incident channel in Slack
+    4. Begin diagnostic using Grafana dashboards
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_004_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
-
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    class SystemMonitor:
-        GARBAGE_MERGE_004_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_004_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_004_B_VERSION"
+    Common Remediation Steps:
+    - Pod crash loop: check logs, increase memory limits
+    - High latency: scale horizontally, check database connections
+    - Certificate expiry: trigger cert-manager renewal
 changed:
   docs/deployment_guide.txt: |
     Deployment Guide for Production Services
@@ -138,77 +117,53 @@ changed:
     Confirm log aggregation is working.
     Run the production smoke tests.
     Notify the team via Slack webhook.
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  docs/release_notes.txt: |
+    Release Notes v2.4.0
+    ====================
 
-    class TextSanitizer:
-        GARBAGE_MERGE_004_MARKER_A = "sanitizer_tag"
+    New Features:
+    - Added multi-region failover support
+    - Implemented request tracing with OpenTelemetry
+    - Added Prometheus metrics endpoint
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    Bug Fixes:
+    - Fixed connection pool exhaustion under high load
+    - Resolved race condition in session management
+    - Corrected timezone handling in audit logs
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+    Known Issues:
+    - Dashboard latency metrics may show spikes during deployments
+    - WebSocket reconnection takes up to 30s after pod restart
+  docs/runbook.txt: |
+    Incident Response Runbook
+    =========================
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_004_A_CLEAN: {cleaned}"
+    Severity Levels:
+    - SEV1: Complete service outage (response within 15 min)
+    - SEV2: Partial degradation (response within 30 min)
+    - SEV3: Minor issue (response within 2 hours)
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+    Escalation Path:
+    1. On-call engineer assesses impact
+    2. If SEV1, page team lead immediately
+    3. Open incident channel in Slack
+    4. Begin diagnostic using Grafana dashboards
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_004_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
-
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    class SystemMonitor:
-        GARBAGE_MERGE_004_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_004_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_004_B_VERSION"
+    Common Remediation Steps:
+    - Pod crash loop: check logs, increase memory limits
+    - High latency: scale horizontally, check database connections
+    - Certificate expiry: trigger cert-manager renewal
 must_include_files:
 - docs/deployment_guide.txt
 must_include_content:
 - '- Helm 3.14 or later'
 must_not_include:
-- GARBAGE_MERGE_004_MARKER_A
-- GARBAGE_MERGE_004_MARKER_B
-- health_monitor.py
-- text_sanitizer.py
+- Release Notes v2.4.0
+- Incident Response Runbook
+- release_notes.txt
+- runbook.txt
+must_not_include_files:
+- docs/release_notes.txt
+- docs/runbook.txt
 add_garbage_files: false
 skip_garbage_check: true

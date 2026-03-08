@@ -1,3 +1,28 @@
+# Scenario: MessageChannelFactory introduced to create MessageChannel
+#   implementations (Email, SMS, Push, Slack, Webhook) from ChannelType enum.
+#   EmailChannel gains auth fields. New: factory, ChannelType, ChannelConfig,
+#   SmsChannel, PushNotificationChannel, SlackChannel, WebhookChannel.
+#
+# Diff shows:
+#   + MessageChannelFactory with registry pattern using Supplier<MessageChannel>
+#   + ChannelType enum with code, defaultPriority, requiresAuth
+#   + ChannelConfig @ConfigurationProperties for all channel settings
+#   + EmailChannel gains username, password, tlsEnabled
+#   + Four new channel implementations: SMS, Push, Slack, Webhook
+#   + UnsupportedChannelException for unknown channel types
+#
+# Reviewer questions:
+#   Q1: "Do the factory's create*Channel() methods match the channel constructors?"
+#       -> Needs all channel implementations to verify constructor parameters
+#         match what the factory passes from ChannelConfig.
+#
+#   Q2: "What is MessageChannel interface — do all channels implement it?"
+#       -> Needs MessageChannel.java: defines send, sendAsync, isAvailable,
+#         getChannelType, getPriority. All channels implement these.
+#
+# Not needed for comprehension:
+#   - MessageArchiver, DeliveryScheduler, BounceHandler: unrelated infrastructure.
+
 initial:
   src/main/java/com/messaging/core/MessageChannel.java: |
     package com.messaging.core;
@@ -883,28 +908,51 @@ changed:
         public int getPriority() { return 4; }
     }
 must_include_files:
-- src/main/java/com/messaging/channels/EmailChannel.java
-- src/main/java/com/messaging/channels/SlackChannel.java
-- src/main/java/com/messaging/channels/SmsChannel.java
-- src/main/java/com/messaging/channels/WebhookChannel.java
-- src/main/java/com/messaging/factory/ChannelConfig.java
-- src/main/java/com/messaging/factory/ChannelType.java
-- src/main/java/com/messaging/factory/MessageChannelFactory.java
-- src/main/java/com/messaging/factory/UnsupportedChannelException.java
-must_include_content:
-- System.out.println("Sending email via " + smtpHost + ":" + smtpPort + " to " + message.getRecipient());
-- package com.messaging.channels;
+  - src/main/java/com/messaging/channels/EmailChannel.java
+  - src/main/java/com/messaging/channels/SlackChannel.java
+  - src/main/java/com/messaging/channels/SmsChannel.java
+  - src/main/java/com/messaging/channels/WebhookChannel.java
+  - src/main/java/com/messaging/factory/ChannelConfig.java
+  - src/main/java/com/messaging/factory/ChannelType.java
+  - src/main/java/com/messaging/factory/MessageChannelFactory.java
+  - src/main/java/com/messaging/factory/UnsupportedChannelException.java
+
+must_include_content_from:
+  src/main/java/com/messaging/factory/MessageChannelFactory.java:
+    - "channelRegistry.put(ChannelType.EMAIL, this::createEmailChannel)"
+    - "public MessageChannel create(ChannelType type)"
+    - "public void registerChannel(ChannelType type"
+  src/main/java/com/messaging/factory/ChannelType.java:
+    - 'EMAIL("email", 5, true)'
+    - 'SMS("sms", 8, true)'
+  src/main/java/com/messaging/channels/EmailChannel.java:
+    - "private final boolean tlsEnabled"
+
 must_not_include:
-- GARBAGE_JAVA_ARCHIVE_F022A
-- GARBAGE_JAVA_BOUNCE_F022G
-- GARBAGE_JAVA_COMPRESS_F022B
-- GARBAGE_JAVA_CUTOFF_F022C
-- GARBAGE_JAVA_PROCESS_F022F
-- GARBAGE_JAVA_QUEUE_F022E
-- GARBAGE_JAVA_REASON_F022H
-- GARBAGE_JAVA_SCHED_F022D
-- BounceHandler.java
-- DeliveryScheduler.java
-- MessageArchiver.java
+  # --- MessageArchiver: unrelated message storage ---
+  - MessageArchiver
+  - archiveMessage
+  - compressOldArchives
+  - GARBAGE_JAVA_ARCHIVE_F022A
+  - GARBAGE_JAVA_COMPRESS_F022B
+  - GARBAGE_JAVA_CUTOFF_F022C
+  # --- DeliveryScheduler: unrelated scheduling ---
+  - DeliveryScheduler
+  - scheduleDelivery
+  - GARBAGE_JAVA_SCHED_F022D
+  - GARBAGE_JAVA_QUEUE_F022E
+  - GARBAGE_JAVA_PROCESS_F022F
+  # --- BounceHandler: unrelated bounce tracking ---
+  - BounceHandler
+  - recordBounce
+  - isBlacklisted
+  - GARBAGE_JAVA_BOUNCE_F022G
+  - GARBAGE_JAVA_REASON_F022H
+
+must_not_include_files:
+  - src/main/java/com/messaging/unrelated/MessageArchiver.java
+  - src/main/java/com/messaging/unrelated/DeliveryScheduler.java
+  - src/main/java/com/messaging/unrelated/BounceHandler.java
+
 add_garbage_files: false
 skip_garbage_check: true

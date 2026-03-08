@@ -1,5 +1,19 @@
+# Reviewer sees: Button.stories.tsx creates Storybook stories importing Button.
+# Q1: "What props does Button support — are argTypes correct?"
+#     -> Button.tsx: label, variant (primary/secondary), size
+#        (small/medium/large), onClick. Stories configure matching argTypes.
+# Q2: "Are the story args valid for the component?"
+#     -> Button.tsx: variant defaults to 'primary', size to 'medium'.
+#        Stories pass explicit variants — reviewer confirms validity.
+#
+# Not needed:
+#   - Icon.stories.tsx: stories for a different component. Same
+#     Storybook pattern but different subject.
+#   - Button.test.tsx: test file. Different testing approach than
+#     Storybook visual testing.
+
 initial:
-  Button.tsx: |
+  src/Button.tsx: |
     export interface ButtonProps {
         label: string;
         variant?: 'primary' | 'secondary';
@@ -14,32 +28,31 @@ initial:
             </button>
         );
     }
-  Button.stories.tsx: |
-    console.log('initial');
-  garbage_compression.ts: |
-    const GARBAGE_JS_068_COMPRESS_MARKER_A = "compression";
-    const GARBAGE_JS_068_RATIO_MARKER_B = true;
+  src/Button.stories.tsx: |
+    console.log('placeholder');
+  src/Icon.stories.tsx: |
+    import type { Meta, StoryObj } from '@storybook/react';
 
-    class CompressionEngine {
-        static GARBAGE_JS_068_ENGINE_CLASS_C = "engine";
+    const meta: Meta = {
+        title: 'Components/Icon',
+    };
 
-        compress(data: Uint8Array): Uint8Array {
-            return data;
-        }
-    }
-  garbage_serialization.ts: |
-    const GARBAGE_JS_068_SERIAL_MARKER_D = "serialization";
-    const GARBAGE_JS_068_FORMAT_MARKER_E = 128;
+    export default meta;
+    type Story = StoryObj;
 
-    class Serializer {
-        static GARBAGE_JS_068_SERIALIZER_CLASS_F = true;
+    export const Default: Story = {
+        args: { name: 'check', size: 24 },
+    };
+  src/Button.test.tsx: |
+    import { render, screen, fireEvent } from '@testing-library/react';
 
-        serialize(obj: Record<string, unknown>): string {
-            return JSON.stringify(obj);
-        }
-    }
+    describe('Button', () => {
+        it('renders label', () => {
+            expect(true).toBe(true);
+        });
+    });
 changed:
-  Button.tsx: |
+  src/Button.tsx: |
     export interface ButtonProps {
         label: string;
         variant?: 'primary' | 'secondary';
@@ -54,7 +67,7 @@ changed:
             </button>
         );
     }
-  Button.stories.tsx: |
+  src/Button.stories.tsx: |
     import type { Meta, StoryObj } from '@storybook/react';
     import { Button, ButtonProps } from './Button';
 
@@ -83,41 +96,42 @@ changed:
             variant: 'secondary',
         },
     };
-  garbage_compression.ts: |
-    const GARBAGE_JS_068_COMPRESS_MARKER_A = "compression";
-    const GARBAGE_JS_068_RATIO_MARKER_B = true;
+  src/Icon.stories.tsx: |
+    import type { Meta, StoryObj } from '@storybook/react';
 
-    class CompressionEngine {
-        static GARBAGE_JS_068_ENGINE_CLASS_C = "engine";
+    const meta: Meta = {
+        title: 'Components/Icon',
+    };
 
-        compress(data: Uint8Array): Uint8Array {
-            return data;
-        }
-    }
-  garbage_serialization.ts: |
-    const GARBAGE_JS_068_SERIAL_MARKER_D = "serialization";
-    const GARBAGE_JS_068_FORMAT_MARKER_E = 128;
+    export default meta;
+    type Story = StoryObj;
 
-    class Serializer {
-        static GARBAGE_JS_068_SERIALIZER_CLASS_F = true;
+    export const Default: Story = {
+        args: { name: 'check', size: 24 },
+    };
+  src/Button.test.tsx: |
+    import { render, screen, fireEvent } from '@testing-library/react';
 
-        serialize(obj: Record<string, unknown>): string {
-            return JSON.stringify(obj);
-        }
-    }
+    describe('Button', () => {
+        it('renders label', () => {
+            expect(true).toBe(true);
+        });
+    });
 must_include_files:
-- Button.stories.tsx
-must_include_content:
-- import type { Meta, StoryObj } from '@storybook/react';
-- 'meta: Meta<typeof Button> = {'
+  # Unchanged file — the component being storied. Reviewer needs
+  # to see ButtonProps to verify argTypes and story args are valid.
+  - src/Button.tsx
+must_include_content_from:
+  src/Button.tsx:
+    - "ButtonProps"
+    - "'primary' | 'secondary'"
 must_not_include:
-- GARBAGE_JS_068_COMPRESS_MARKER_A
-- GARBAGE_JS_068_ENGINE_CLASS_C
-- GARBAGE_JS_068_FORMAT_MARKER_E
-- GARBAGE_JS_068_RATIO_MARKER_B
-- GARBAGE_JS_068_SERIALIZER_CLASS_F
-- GARBAGE_JS_068_SERIAL_MARKER_D
-- garbage_compression.ts
-- garbage_serialization.ts
+  # Icon.stories.tsx: stories for different component
+  - Components/Icon
+  # Button.test.tsx: test approach, not visual stories
+  - renders label
+  - fireEvent
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

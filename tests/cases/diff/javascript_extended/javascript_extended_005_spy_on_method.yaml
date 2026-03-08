@@ -1,3 +1,18 @@
+# Reviewer sees: app.test.ts uses jest.spyOn on logger methods to verify
+# processData and handleError call correct logger methods.
+# Q1: "What does processData call on the logger?"
+#     -> src/app.ts: calls logger.log() on entry, logger.warn() when
+#        result is empty. Test spy assertions match these call sites.
+# Q2: "What are the method signatures on the logger object?"
+#     -> src/logger.ts: log(), error(), warn() all take a string.
+#        The spyOn calls target these exact methods.
+#
+# Not needed:
+#   - src/unrelated/metrics.ts: metric counters. Different observability
+#     concern (metrics vs logging). Not imported by app.ts.
+#   - src/unrelated/scheduler.ts: job scheduling. Infrastructure concern,
+#     no relationship to logging or data processing.
+
 initial:
   src/logger.ts: |
     export interface LogEntry {
@@ -40,11 +55,9 @@ initial:
         logger.error(`Unhandled error: ${error.message}`);
     }
   src/app.test.ts: |
-    console.log('initial');
+    console.log('placeholder');
   src/unrelated/metrics.ts: |
-    const GARBAGE_JSX_005_METRICS_COUNTER_A = 'metrics_garbage_marker';
-
-    export class GarbageMetricsCollector {
+    export class MetricsCollector {
         private counters: Map<string, number> = new Map();
 
         increment(name: string): void {
@@ -57,13 +70,16 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_005_REPORT_METRICS_B(): void {
-        console.log('GARBAGE_JSX_005_REPORT_OUTPUT_C');
+    export function reportMetrics(collector: MetricsCollector): void {
+        console.log('reporting metrics snapshot');
     }
   src/unrelated/scheduler.ts: |
-    const GARBAGE_JSX_005_SCHEDULER_CONFIG_D = { interval: 5000, maxJobs: 10 };
+    interface SchedulerConfig {
+        interval: number;
+        maxJobs: number;
+    }
 
-    export class GARBAGE_JSX_005_JOB_SCHEDULER_E {
+    export class JobScheduler {
         private jobs: Array<() => void> = [];
 
         schedule(job: () => void): void {
@@ -75,8 +91,8 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_005_CLEAR_SCHEDULE_F(): void {
-        console.log('clearing schedule');
+    export function clearSchedule(scheduler: JobScheduler): void {
+        console.log('clearing scheduled jobs');
     }
 changed:
   src/logger.ts: |
@@ -147,9 +163,7 @@ changed:
         });
     });
   src/unrelated/metrics.ts: |
-    const GARBAGE_JSX_005_METRICS_COUNTER_A = 'metrics_garbage_marker';
-
-    export class GarbageMetricsCollector {
+    export class MetricsCollector {
         private counters: Map<string, number> = new Map();
 
         increment(name: string): void {
@@ -162,13 +176,16 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_005_REPORT_METRICS_B(): void {
-        console.log('GARBAGE_JSX_005_REPORT_OUTPUT_C');
+    export function reportMetrics(collector: MetricsCollector): void {
+        console.log('reporting metrics snapshot');
     }
   src/unrelated/scheduler.ts: |
-    const GARBAGE_JSX_005_SCHEDULER_CONFIG_D = { interval: 5000, maxJobs: 10 };
+    interface SchedulerConfig {
+        interval: number;
+        maxJobs: number;
+    }
 
-    export class GARBAGE_JSX_005_JOB_SCHEDULER_E {
+    export class JobScheduler {
         private jobs: Array<() => void> = [];
 
         schedule(job: () => void): void {
@@ -180,20 +197,32 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_005_CLEAR_SCHEDULE_F(): void {
-        console.log('clearing schedule');
+    export function clearSchedule(scheduler: JobScheduler): void {
+        console.log('clearing scheduled jobs');
     }
 must_include_files:
-- src/app.test.ts
-must_include_content:
-- afterEach(() => {
+  # Unchanged — the module under test. Reviewer needs to see which
+  # logger methods processData and handleError actually call.
+  - src/app.ts
+  # Unchanged — the logger being spied on. Reviewer needs to see
+  # the method signatures to verify spy targets are correct.
+  - src/logger.ts
+must_include_content_from:
+  src/app.ts:
+    - "logger.log"
+    - "logger.warn"
+    - "logger.error"
+  src/logger.ts:
+    - "log(message: string)"
+    - "warn(message: string)"
 must_not_include:
-- GARBAGE_JSX_005_CLEAR_SCHEDULE_F
-- GARBAGE_JSX_005_JOB_SCHEDULER_E
-- GARBAGE_JSX_005_METRICS_COUNTER_A
-- GARBAGE_JSX_005_REPORT_METRICS_B
-- GARBAGE_JSX_005_SCHEDULER_CONFIG_D
-- metrics.ts
-- scheduler.ts
+  # metrics.ts: metric counters, different observability concern
+  - MetricsCollector
+  - reportMetrics
+  # scheduler.ts: job scheduling, unrelated infrastructure
+  - JobScheduler
+  - clearSchedule
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

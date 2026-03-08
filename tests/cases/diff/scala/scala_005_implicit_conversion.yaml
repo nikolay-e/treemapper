@@ -1,3 +1,21 @@
+# Scenario: UserProcessor imports implicit conversions and uses them —
+# String-to-User, Int-to-User, and User-to-UserProfile conversions.
+#
+# Diff: src/services/UserProcessor.scala imports Implicits._ and adds methods
+# that rely on implicit conversions: "John" becomes User, 42 becomes User,
+# user becomes UserProfile.
+#
+# Reviewer questions:
+#   Q1: "What implicit conversions exist?" -> src/conversions/Implicits.scala
+#        (UNCHANGED) defines stringToUser, intToUser, userToProfile.
+#   Q2: "What is UserProfile?" -> same file defines case class UserProfile.
+#
+# Trap files (plausible but no dependency on Implicits or UserProcessor):
+#   - src/conversions/JsonCodec.scala: implicit JSON encoders/decoders. Same
+#     "implicits" domain but for serialization, not type conversion.
+#   - src/services/ProfileRenderer.scala: renders UserProfile to strings.
+#     Shares "UserProfile" vocabulary but doesn't use implicit conversions.
+
 initial:
   src/conversions/Implicits.scala: |
     package conversions
@@ -21,22 +39,43 @@ initial:
     class UserProcessor {
       def greet(user: User): String = s"Hello, ${user.name}"
     }
-  unrelated/EmailSender.scala: |
-    package email
-    // GARBAGE_SCALA_005_MARKER_A
-    class EmailSender {
-      val GARBAGE_SCALA_005_SMTP = "GARBAGE_SCALA_005_MARKER_B"
-      def send(to: String, body: String): Unit =
-        println(s"GARBAGE_SCALA_005_MARKER_C sending to $to")
+  src/conversions/JsonCodec.scala: |
+    package conversions
+
+    trait JsonEncoder[T] {
+      def encode(value: T): String
     }
-  unrelated/RateLimiter.scala: |
-    package ratelimit
-    // GARBAGE_SCALA_005_MARKER_D
-    object RateLimiter {
-      val GARBAGE_SCALA_005_LIMIT = 100
-      def check(key: String): Boolean = { println("GARBAGE_SCALA_005_MARKER_E"); true }
-      def reset(): Unit = println("GARBAGE_SCALA_005_MARKER_F")
+
+    trait JsonDecoder[T] {
+      def decode(json: String): Option[T]
     }
+
+    object JsonCodec {
+      implicit val stringEncoder: JsonEncoder[String] = (value: String) =>
+        s""""$value""""
+
+      implicit val intEncoder: JsonEncoder[Int] = (value: Int) =>
+        value.toString
+
+      def toJson[T](value: T)(implicit encoder: JsonEncoder[T]): String =
+        encoder.encode(value)
+    }
+  src/services/ProfileRenderer.scala: |
+    package services
+
+    import conversions.UserProfile
+
+    class ProfileRenderer {
+      def render(profile: UserProfile): String = {
+        val status = if (profile.isMinor) "Minor" else "Adult"
+        s"${profile.displayName} ($status)"
+      }
+
+      def renderBadge(profile: UserProfile): String = {
+        s"[${profile.displayName}]"
+      }
+    }
+
 changed:
   src/conversions/Implicits.scala: |
     package conversions
@@ -77,32 +116,67 @@ changed:
         else s"${profile.displayName} is an adult"
       }
     }
-  unrelated/EmailSender.scala: |
-    package email
-    // GARBAGE_SCALA_005_MARKER_A
-    class EmailSender {
-      val GARBAGE_SCALA_005_SMTP = "GARBAGE_SCALA_005_MARKER_B"
-      def send(to: String, body: String): Unit =
-        println(s"GARBAGE_SCALA_005_MARKER_C sending to $to")
+  src/conversions/JsonCodec.scala: |
+    package conversions
+
+    trait JsonEncoder[T] {
+      def encode(value: T): String
     }
-  unrelated/RateLimiter.scala: |
-    package ratelimit
-    // GARBAGE_SCALA_005_MARKER_D
-    object RateLimiter {
-      val GARBAGE_SCALA_005_LIMIT = 100
-      def check(key: String): Boolean = { println("GARBAGE_SCALA_005_MARKER_E"); true }
-      def reset(): Unit = println("GARBAGE_SCALA_005_MARKER_F")
+
+    trait JsonDecoder[T] {
+      def decode(json: String): Option[T]
     }
+
+    object JsonCodec {
+      implicit val stringEncoder: JsonEncoder[String] = (value: String) =>
+        s""""$value""""
+
+      implicit val intEncoder: JsonEncoder[Int] = (value: Int) =>
+        value.toString
+
+      def toJson[T](value: T)(implicit encoder: JsonEncoder[T]): String =
+        encoder.encode(value)
+    }
+  src/services/ProfileRenderer.scala: |
+    package services
+
+    import conversions.UserProfile
+
+    class ProfileRenderer {
+      def render(profile: UserProfile): String = {
+        val status = if (profile.isMinor) "Minor" else "Adult"
+        s"${profile.displayName} ($status)"
+      }
+
+      def renderBadge(profile: UserProfile): String = {
+        s"[${profile.displayName}]"
+      }
+    }
+
 must_include_files:
-- src/services/UserProcessor.scala
-must_include_content:
-- import conversions.{User, Implicits}
+  # Changed: imports implicit conversions and uses them
+  - src/services/UserProcessor.scala
+  # Unchanged but essential: defines the implicit conversions used
+  - src/conversions/Implicits.scala
+must_include_content_from:
+  src/services/UserProcessor.scala:
+    - "import conversions.{User, Implicits}"
+    - "import Implicits._"
+  src/conversions/Implicits.scala:
+    - "implicit def stringToUser"
+    - "implicit def userToProfile"
 must_not_include:
-- GARBAGE_SCALA_005_LIMIT
-- GARBAGE_SCALA_005_MARKER_A
-- GARBAGE_SCALA_005_MARKER_D
-- GARBAGE_SCALA_005_SMTP
-- EmailSender.scala
-- RateLimiter.scala
+  # JsonCodec.scala: implicit encoders/decoders, not type conversions
+  - JsonEncoder
+  - JsonDecoder
+  - toJson
+  # ProfileRenderer.scala: renders UserProfile but no implicit conversion usage
+  - ProfileRenderer
+  - renderBadge
+must_not_include_files:
+  - src/conversions/JsonCodec.scala
+  - src/services/ProfileRenderer.scala
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,7 +1,14 @@
+# Scenario: Replacing unwrap() calls with proper Result/Error handling in a parser module
+# Changed: src/parser.rs — added ParseError enum, From impl, made parse/parse_multiple return Result, added try_parse_all
+# Reviewer questions: Is the From<ParseIntError> conversion correct? Does NumberParser::new validate radix?
+# Trap files:
+#   - src/validator.rs: Input validation with custom errors — "error handling" pattern overlap but no shared error types
+#   - src/decoder.rs: Binary format decoder with errors — "Result-returning parse" vocabulary but independent
 initial:
   src/lib.rs: |
     pub mod parser;
-    pub mod unrelated;
+    pub mod validator;
+    pub mod decoder;
   src/parser.rs: |
     use std::str::FromStr;
 
@@ -32,64 +39,70 @@ initial:
             Self::new(10)
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod image;
-    pub mod audio;
-  src/unrelated/image.rs: |
-    // GARBAGE_RUST_IMAGE_001
-    pub const GARBAGE_MAX_WIDTH_002: u32 = 4096;
-    pub const GARBAGE_MAX_HEIGHT_003: u32 = 4096;
-
-    pub struct GarbageImage004 {
-        width: u32,
-        height: u32,
-        pixels: Vec<u8>,
+  src/validator.rs: |
+    #[derive(Debug)]
+    pub enum ValidationError {
+        TooShort(usize),
+        TooLong(usize),
+        InvalidFormat(String),
     }
 
-    impl GarbageImage004 {
-        pub fn garbage_load_005(path: &str) -> Result<Self, String> {
-            Err("GARBAGE_LOAD_ERROR_006".to_string())
-        }
-
-        pub fn garbage_resize_007(&mut self, new_width: u32, new_height: u32) {
-            // GARBAGE_RESIZE_IMPL_008
-        }
-
-        pub fn garbage_save_009(&self, path: &str) -> Result<(), String> {
-            Err("GARBAGE_SAVE_ERROR_010".to_string())
-        }
+    pub struct InputValidator {
+        min_length: usize,
+        max_length: usize,
     }
 
-    pub trait GarbageImageFilter011 {
-        fn garbage_apply_012(&self, image: &mut GarbageImage004);
-    }
-  src/unrelated/audio.rs: |
-    // GARBAGE_RUST_AUDIO_013
-    pub const GARBAGE_SAMPLE_RATE_014: u32 = 44100;
-    pub const GARBAGE_BIT_DEPTH_015: u8 = 16;
-
-    pub struct GarbageAudioBuffer016 {
-        samples: Vec<f32>,
-        channels: u8,
-    }
-
-    impl GarbageAudioBuffer016 {
-        pub fn garbage_load_017(path: &str) -> Result<Self, String> {
-            Err("GARBAGE_AUDIO_LOAD_ERROR_018".to_string())
+    impl InputValidator {
+        pub fn new(min: usize, max: usize) -> Self {
+            Self { min_length: min, max_length: max }
         }
 
-        pub fn garbage_mix_019(&mut self, other: &Self) {
-            // GARBAGE_MIX_IMPL_020
+        pub fn validate(&self, input: &str) -> Result<(), ValidationError> {
+            if input.len() < self.min_length {
+                return Err(ValidationError::TooShort(self.min_length));
+            }
+            if input.len() > self.max_length {
+                return Err(ValidationError::TooLong(self.max_length));
+            }
+            Ok(())
+        }
+    }
+  src/decoder.rs: |
+    #[derive(Debug)]
+    pub enum DecodeError {
+        InvalidHeader,
+        UnexpectedEof,
+        ChecksumMismatch,
+    }
+
+    pub struct BinaryDecoder {
+        data: Vec<u8>,
+        position: usize,
+    }
+
+    impl BinaryDecoder {
+        pub fn new(data: Vec<u8>) -> Self {
+            Self { data, position: 0 }
         }
 
-        pub fn garbage_normalize_021(&mut self) {
-            // GARBAGE_NORMALIZE_IMPL_022
+        pub fn read_u32(&mut self) -> Result<u32, DecodeError> {
+            if self.position + 4 > self.data.len() {
+                return Err(DecodeError::UnexpectedEof);
+            }
+            let bytes = &self.data[self.position..self.position + 4];
+            self.position += 4;
+            Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+        }
+
+        pub fn remaining(&self) -> usize {
+            self.data.len() - self.position
         }
     }
 changed:
   src/lib.rs: |
     pub mod parser;
-    pub mod unrelated;
+    pub mod validator;
+    pub mod decoder;
   src/parser.rs: |
     use std::num::ParseIntError;
     use std::str::FromStr;
@@ -177,58 +190,63 @@ changed:
             Self { radix: 10 }
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod image;
-    pub mod audio;
-  src/unrelated/image.rs: |
-    // GARBAGE_RUST_IMAGE_001
-    pub const GARBAGE_MAX_WIDTH_002: u32 = 4096;
-    pub const GARBAGE_MAX_HEIGHT_003: u32 = 4096;
-
-    pub struct GarbageImage004 {
-        width: u32,
-        height: u32,
-        pixels: Vec<u8>,
+  src/validator.rs: |
+    #[derive(Debug)]
+    pub enum ValidationError {
+        TooShort(usize),
+        TooLong(usize),
+        InvalidFormat(String),
     }
 
-    impl GarbageImage004 {
-        pub fn garbage_load_005(path: &str) -> Result<Self, String> {
-            Err("GARBAGE_LOAD_ERROR_006".to_string())
-        }
-
-        pub fn garbage_resize_007(&mut self, new_width: u32, new_height: u32) {
-            // GARBAGE_RESIZE_IMPL_008
-        }
-
-        pub fn garbage_save_009(&self, path: &str) -> Result<(), String> {
-            Err("GARBAGE_SAVE_ERROR_010".to_string())
-        }
+    pub struct InputValidator {
+        min_length: usize,
+        max_length: usize,
     }
 
-    pub trait GarbageImageFilter011 {
-        fn garbage_apply_012(&self, image: &mut GarbageImage004);
-    }
-  src/unrelated/audio.rs: |
-    // GARBAGE_RUST_AUDIO_013
-    pub const GARBAGE_SAMPLE_RATE_014: u32 = 44100;
-    pub const GARBAGE_BIT_DEPTH_015: u8 = 16;
-
-    pub struct GarbageAudioBuffer016 {
-        samples: Vec<f32>,
-        channels: u8,
-    }
-
-    impl GarbageAudioBuffer016 {
-        pub fn garbage_load_017(path: &str) -> Result<Self, String> {
-            Err("GARBAGE_AUDIO_LOAD_ERROR_018".to_string())
+    impl InputValidator {
+        pub fn new(min: usize, max: usize) -> Self {
+            Self { min_length: min, max_length: max }
         }
 
-        pub fn garbage_mix_019(&mut self, other: &Self) {
-            // GARBAGE_MIX_IMPL_020
+        pub fn validate(&self, input: &str) -> Result<(), ValidationError> {
+            if input.len() < self.min_length {
+                return Err(ValidationError::TooShort(self.min_length));
+            }
+            if input.len() > self.max_length {
+                return Err(ValidationError::TooLong(self.max_length));
+            }
+            Ok(())
+        }
+    }
+  src/decoder.rs: |
+    #[derive(Debug)]
+    pub enum DecodeError {
+        InvalidHeader,
+        UnexpectedEof,
+        ChecksumMismatch,
+    }
+
+    pub struct BinaryDecoder {
+        data: Vec<u8>,
+        position: usize,
+    }
+
+    impl BinaryDecoder {
+        pub fn new(data: Vec<u8>) -> Self {
+            Self { data, position: 0 }
         }
 
-        pub fn garbage_normalize_021(&mut self) {
-            // GARBAGE_NORMALIZE_IMPL_022
+        pub fn read_u32(&mut self) -> Result<u32, DecodeError> {
+            if self.position + 4 > self.data.len() {
+                return Err(DecodeError::UnexpectedEof);
+            }
+            let bytes = &self.data[self.position..self.position + 4];
+            self.position += 4;
+            Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+        }
+
+        pub fn remaining(&self) -> usize {
+            self.data.len() - self.position
         }
     }
 must_include_files:
@@ -237,17 +255,14 @@ must_include_content:
 - use std::num::ParseIntError;
 - pub enum ParseError {
 must_not_include:
-- GARBAGE_BIT_DEPTH_015
-- GARBAGE_MAX_HEIGHT_003
-- GARBAGE_MAX_WIDTH_002
-- GARBAGE_MIX_IMPL_020
-- GARBAGE_NORMALIZE_IMPL_022
-- GARBAGE_RESIZE_IMPL_008
-- GARBAGE_RUST_AUDIO_013
-- GARBAGE_RUST_IMAGE_001
-- GARBAGE_SAMPLE_RATE_014
-- audio.rs
-- image.rs
-- mod.rs
+- ValidationError
+- DecodeError
+- BinaryDecoder
+- validator.rs
+- decoder.rs
+must_not_include_files:
+- src/validator.rs
+- src/decoder.rs
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

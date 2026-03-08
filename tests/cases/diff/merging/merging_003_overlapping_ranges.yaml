@@ -1,3 +1,9 @@
+# Scenario: UserService gains logging in find_by_id and update_email methods
+# (overlapping ranges in the same class).
+# Reviewer asks: "What logging was added and does it follow the right pattern?"
+# Trap rationale: role_manager.py and session_tracker.py share user/auth
+# vocabulary but are not imported by user_service.py.
+
 initial:
   src/user_service.py: |
     import logging
@@ -36,69 +42,52 @@ initial:
             self._db.execute("UPDATE users SET email = %s WHERE id = %s", new_email, user_id)
             user.email = new_email
             return True
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  src/role_manager.py: |
+    from typing import Dict, Set
 
-    class TextSanitizer:
-        GARBAGE_MERGE_003_MARKER_A = "sanitizer_tag"
+    ADMIN_ROLE = "admin"
+    VIEWER_ROLE = "viewer"
+    EDITOR_ROLE = "editor"
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    class RoleManager:
+        def __init__(self):
+            self._user_roles: Dict[str, Set[str]] = {}
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+        def assign_role(self, user_id: str, role: str) -> None:
+            if user_id not in self._user_roles:
+                self._user_roles[user_id] = set()
+            self._user_roles[user_id].add(role)
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_003_A_CLEAN: {cleaned}"
+        def has_role(self, user_id: str, role: str) -> bool:
+            return role in self._user_roles.get(user_id, set())
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+        def revoke_role(self, user_id: str, role: str) -> bool:
+            roles = self._user_roles.get(user_id, set())
+            if role in roles:
+                roles.discard(role)
+                return True
+            return False
+  src/session_tracker.py: |
+    from datetime import datetime, timedelta
+    from typing import Dict, Optional
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_003_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
+    SESSION_TTL = timedelta(hours=8)
 
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
+    class SessionTracker:
+        def __init__(self, ttl: timedelta = SESSION_TTL):
+            self.ttl = ttl
+            self._sessions: Dict[str, datetime] = {}
 
-    class SystemMonitor:
-        GARBAGE_MERGE_003_MARKER_B = "monitor_tag"
+        def create_session(self, user_id: str) -> str:
+            session_id = f"sess_{user_id}_{datetime.utcnow().timestamp()}"
+            self._sessions[session_id] = datetime.utcnow()
+            return session_id
 
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_003_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_003_B_VERSION"
+        def is_active(self, session_id: str) -> bool:
+            created = self._sessions.get(session_id)
+            if created is None:
+                return False
+            return datetime.utcnow() - created < self.ttl
 changed:
   src/user_service.py: |
     import logging
@@ -141,77 +130,65 @@ changed:
             user.email = new_email
             logger.info(f"Updated email for user {user_id}")
             return True
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  src/role_manager.py: |
+    from typing import Dict, Set
 
-    class TextSanitizer:
-        GARBAGE_MERGE_003_MARKER_A = "sanitizer_tag"
+    ADMIN_ROLE = "admin"
+    VIEWER_ROLE = "viewer"
+    EDITOR_ROLE = "editor"
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    class RoleManager:
+        def __init__(self):
+            self._user_roles: Dict[str, Set[str]] = {}
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+        def assign_role(self, user_id: str, role: str) -> None:
+            if user_id not in self._user_roles:
+                self._user_roles[user_id] = set()
+            self._user_roles[user_id].add(role)
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_003_A_CLEAN: {cleaned}"
+        def has_role(self, user_id: str, role: str) -> bool:
+            return role in self._user_roles.get(user_id, set())
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+        def revoke_role(self, user_id: str, role: str) -> bool:
+            roles = self._user_roles.get(user_id, set())
+            if role in roles:
+                roles.discard(role)
+                return True
+            return False
+  src/session_tracker.py: |
+    from datetime import datetime, timedelta
+    from typing import Dict, Optional
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_003_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
+    SESSION_TTL = timedelta(hours=8)
 
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
+    class SessionTracker:
+        def __init__(self, ttl: timedelta = SESSION_TTL):
+            self.ttl = ttl
+            self._sessions: Dict[str, datetime] = {}
 
-    class SystemMonitor:
-        GARBAGE_MERGE_003_MARKER_B = "monitor_tag"
+        def create_session(self, user_id: str) -> str:
+            session_id = f"sess_{user_id}_{datetime.utcnow().timestamp()}"
+            self._sessions[session_id] = datetime.utcnow()
+            return session_id
 
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_003_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_003_B_VERSION"
+        def is_active(self, session_id: str) -> bool:
+            created = self._sessions.get(session_id)
+            if created is None:
+                return False
+            return datetime.utcnow() - created < self.ttl
 must_include_files:
 - src/user_service.py
 must_include_content:
 - logger.debug(f"Cache hit for user {user_id}")
 must_not_include:
-- GARBAGE_MERGE_003_MARKER_A
-- GARBAGE_MERGE_003_MARKER_B
-- health_monitor.py
-- text_sanitizer.py
+- RoleManager
+- SessionTracker
+- ADMIN_ROLE
+- SESSION_TTL
+- role_manager.py
+- session_tracker.py
+must_not_include_files:
+- src/role_manager.py
+- src/session_tracker.py
 add_garbage_files: false
 skip_garbage_check: true

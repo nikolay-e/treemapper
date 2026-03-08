@@ -1,3 +1,9 @@
+# Scenario: User model gains association to Order model with order management methods
+# Changed: app/models/user.rb — added require_relative, orders accessor, add_order, total_spent, pending_orders methods
+# Reviewer questions: Does total_spent correctly filter by :completed status? Does add_order set user_id?
+# Trap files:
+#   - app/models/invoice.rb: Invoice generation — "order/total" vocabulary overlap but no User dependency
+#   - app/models/shipping.rb: Shipping calculator — "order fulfillment" domain but independent model
 initial:
   app/models/order.rb: |
     class Order
@@ -28,26 +34,65 @@ initial:
         @name = name
       end
     end
-  lib/garbage_file_sync.rb: |
-    GARBAGE_RUBY_016_SYNC_PROTOCOL_A = "rsync"
-    GARBAGE_RUBY_016_CHUNK_SIZE_B = "4MB"
+  app/models/invoice.rb: |
+    class Invoice
+      attr_accessor :id, :order_id, :amount, :due_date, :paid
 
-    class GarbageFileSyncAgent
-      GARBAGE_RUBY_016_MAX_RETRIES_C = 5
+      def initialize(order_id:, amount:, due_date:)
+        @id = rand(10000)
+        @order_id = order_id
+        @amount = amount
+        @due_date = due_date
+        @paid = false
+      end
 
-      def sync(source, target)
-        GARBAGE_RUBY_016_SYNC_PROTOCOL_A
+      def mark_paid
+        @paid = true
+      end
+
+      def overdue?
+        !@paid && @due_date < Time.now
+      end
+
+      def total_with_tax(rate: 0.1)
+        @amount * (1 + rate)
+      end
+
+      def formatted_amount
+        "$#{'%.2f' % @amount}"
       end
     end
-  lib/garbage_backup_mgr.rb: |
-    GARBAGE_RUBY_016_BACKUP_STRATEGY_D = "incremental"
-    GARBAGE_RUBY_016_RETENTION_DAYS_E = "90"
+  app/models/shipping.rb: |
+    class ShippingCalculator
+      RATES = {
+        standard: 5.99,
+        express: 12.99,
+        overnight: 24.99
+      }.freeze
 
-    class GarbageBackupManager
-      GARBAGE_RUBY_016_COMPRESS_LEVEL_F = 6
+      def initialize(weight:, destination:)
+        @weight = weight
+        @destination = destination
+      end
 
-      def create_backup(path)
-        GARBAGE_RUBY_016_BACKUP_STRATEGY_D
+      def calculate(method: :standard)
+        base = RATES.fetch(method, RATES[:standard])
+        base + weight_surcharge
+      end
+
+      def estimated_days(method: :standard)
+        case method
+        when :standard then 5..7
+        when :express then 2..3
+        when :overnight then 1..1
+        end
+      end
+
+      private
+
+      def weight_surcharge
+        return 0 if @weight <= 1.0
+        (@weight - 1.0).ceil * 1.50
       end
     end
 changed:
@@ -97,26 +142,65 @@ changed:
         @orders.select { |o| o.status == :pending }
       end
     end
-  lib/garbage_file_sync.rb: |
-    GARBAGE_RUBY_016_SYNC_PROTOCOL_A = "rsync"
-    GARBAGE_RUBY_016_CHUNK_SIZE_B = "4MB"
+  app/models/invoice.rb: |
+    class Invoice
+      attr_accessor :id, :order_id, :amount, :due_date, :paid
 
-    class GarbageFileSyncAgent
-      GARBAGE_RUBY_016_MAX_RETRIES_C = 5
+      def initialize(order_id:, amount:, due_date:)
+        @id = rand(10000)
+        @order_id = order_id
+        @amount = amount
+        @due_date = due_date
+        @paid = false
+      end
 
-      def sync(source, target)
-        GARBAGE_RUBY_016_SYNC_PROTOCOL_A
+      def mark_paid
+        @paid = true
+      end
+
+      def overdue?
+        !@paid && @due_date < Time.now
+      end
+
+      def total_with_tax(rate: 0.1)
+        @amount * (1 + rate)
+      end
+
+      def formatted_amount
+        "$#{'%.2f' % @amount}"
       end
     end
-  lib/garbage_backup_mgr.rb: |
-    GARBAGE_RUBY_016_BACKUP_STRATEGY_D = "incremental"
-    GARBAGE_RUBY_016_RETENTION_DAYS_E = "90"
+  app/models/shipping.rb: |
+    class ShippingCalculator
+      RATES = {
+        standard: 5.99,
+        express: 12.99,
+        overnight: 24.99
+      }.freeze
 
-    class GarbageBackupManager
-      GARBAGE_RUBY_016_COMPRESS_LEVEL_F = 6
+      def initialize(weight:, destination:)
+        @weight = weight
+        @destination = destination
+      end
 
-      def create_backup(path)
-        GARBAGE_RUBY_016_BACKUP_STRATEGY_D
+      def calculate(method: :standard)
+        base = RATES.fetch(method, RATES[:standard])
+        base + weight_surcharge
+      end
+
+      def estimated_days(method: :standard)
+        case method
+        when :standard then 5..7
+        when :express then 2..3
+        when :overnight then 1..1
+        end
+      end
+
+      private
+
+      def weight_surcharge
+        return 0 if @weight <= 1.0
+        (@weight - 1.0).ceil * 1.50
       end
     end
 must_include_files:
@@ -125,15 +209,15 @@ must_include_content:
 - |
   order.user_id = @id
 must_not_include:
-- GARBAGE_RUBY_016_SYNC_PROTOCOL_A
-- GARBAGE_RUBY_016_CHUNK_SIZE_B
-- GARBAGE_RUBY_016_MAX_RETRIES_C
-- GARBAGE_RUBY_016_BACKUP_STRATEGY_D
-- GARBAGE_RUBY_016_RETENTION_DAYS_E
-- GARBAGE_RUBY_016_COMPRESS_LEVEL_F
-- GarbageFileSyncAgent
-- GarbageBackupManager
-- garbage_file_sync.rb
-- garbage_backup_mgr.rb
+- Invoice
+- ShippingCalculator
+- mark_paid
+- weight_surcharge
+- invoice.rb
+- shipping.rb
+must_not_include_files:
+- app/models/invoice.rb
+- app/models/shipping.rb
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

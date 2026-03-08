@@ -1,3 +1,22 @@
+# Scenario: Scheduler config changes timezone and adds a weekly report job
+#
+# Diff: scheduler.yaml changes timezone UTC→America/New_York, shifts
+# cleanup cron to 2am, adds new weekly report job.
+#
+# Reviewer questions:
+#   Q1: "Is there a report_job handler?"
+#       → src/scheduler.py (UNCHANGED) has cleanup_job() but NO report_job().
+#         register_jobs() looks up handlers via globals()[f"{name}_job"],
+#         so adding a "report" job will cause a KeyError at runtime.
+#   Q2: "Does timezone get passed correctly?"
+#       → scheduler.py creates BackgroundScheduler(timezone=timezone),
+#         so America/New_York will work if the config is loaded.
+#
+# Not needed:
+#   - config/crontab.yaml: system-level cron entries (logrotate, certbot),
+#     not application scheduler jobs.
+#   - src/task_queue.py: async task queue (deque-based), not cron scheduling.
+
 initial:
   config/scheduler.yaml: |
     scheduler:
@@ -9,28 +28,56 @@ initial:
     from apscheduler.schedulers.background import BackgroundScheduler
 
     def create_scheduler(timezone: str = "UTC"):
-        return BackgroundScheduler(timezone=timezone)
+        scheduler = BackgroundScheduler(timezone=timezone)
+        return scheduler
 
     def cleanup_job():
         pass
-  garbage_captcha_validator.py: |
-    GARBAGE_YAML_014_CAPTCHA_MARKER_A = "captcha"
-    GARBAGE_YAML_014_VERIFY_MARKER_B = True
 
-    class CaptchaValidator:
-        GARBAGE_YAML_014_VALIDATOR_CLASS_C = "captcha"
+    def register_jobs(scheduler, jobs: list):
+        for job in jobs:
+            scheduler.add_job(
+                globals()[f"{job['name']}_job"],
+                "cron",
+                **parse_cron(job["cron"]),
+            )
 
-        def validate(self, token: str) -> bool:
-            return True
-  garbage_geo_locator.py: |
-    GARBAGE_YAML_014_GEO_MARKER_D = "geo"
-    GARBAGE_YAML_014_COORDS_MARKER_E = 42
+    def parse_cron(expression: str) -> dict:
+        parts = expression.split()
+        return {"minute": parts[0], "hour": parts[1]}
+  config/crontab.yaml: |
+    crontab:
+      entries:
+        - name: log_rotation
+          schedule: "0 0 * * *"
+          command: /usr/sbin/logrotate /etc/logrotate.conf
+        - name: cert_renewal
+          schedule: "0 3 1 * *"
+          command: certbot renew --quiet
+        - name: temp_cleanup
+          schedule: "*/30 * * * *"
+          command: find /tmp -mtime +7 -delete
+  src/task_queue.py: |
+    from collections import deque
+    from threading import Thread
 
-    class GeoLocator:
-        GARBAGE_YAML_014_LOCATOR_CLASS_F = True
+    class TaskQueue:
+        def __init__(self, max_workers: int = 4):
+            self.max_workers = max_workers
+            self._queue: deque = deque()
+            self._workers: list[Thread] = []
 
-        def locate(self, ip_address: str) -> tuple:
-            return (0.0, 0.0)
+        def enqueue(self, task_fn, *args, **kwargs):
+            self._queue.append((task_fn, args, kwargs))
+
+        def process(self):
+            while self._queue:
+                task_fn, args, kwargs = self._queue.popleft()
+                task_fn(*args, **kwargs)
+
+        def size(self) -> int:
+            return len(self._queue)
+
 changed:
   config/scheduler.yaml: |
     scheduler:
@@ -44,45 +91,79 @@ changed:
     from apscheduler.schedulers.background import BackgroundScheduler
 
     def create_scheduler(timezone: str = "UTC"):
-        return BackgroundScheduler(timezone=timezone)
+        scheduler = BackgroundScheduler(timezone=timezone)
+        return scheduler
 
     def cleanup_job():
         pass
-  garbage_captcha_validator.py: |
-    GARBAGE_YAML_014_CAPTCHA_MARKER_A = "captcha"
-    GARBAGE_YAML_014_VERIFY_MARKER_B = True
 
-    class CaptchaValidator:
-        GARBAGE_YAML_014_VALIDATOR_CLASS_C = "captcha"
+    def register_jobs(scheduler, jobs: list):
+        for job in jobs:
+            scheduler.add_job(
+                globals()[f"{job['name']}_job"],
+                "cron",
+                **parse_cron(job["cron"]),
+            )
 
-        def validate(self, token: str) -> bool:
-            return True
-  garbage_geo_locator.py: |
-    GARBAGE_YAML_014_GEO_MARKER_D = "geo"
-    GARBAGE_YAML_014_COORDS_MARKER_E = 42
+    def parse_cron(expression: str) -> dict:
+        parts = expression.split()
+        return {"minute": parts[0], "hour": parts[1]}
+  config/crontab.yaml: |
+    crontab:
+      entries:
+        - name: log_rotation
+          schedule: "0 0 * * *"
+          command: /usr/sbin/logrotate /etc/logrotate.conf
+        - name: cert_renewal
+          schedule: "0 3 1 * *"
+          command: certbot renew --quiet
+        - name: temp_cleanup
+          schedule: "*/30 * * * *"
+          command: find /tmp -mtime +7 -delete
+  src/task_queue.py: |
+    from collections import deque
+    from threading import Thread
 
-    class GeoLocator:
-        GARBAGE_YAML_014_LOCATOR_CLASS_F = True
+    class TaskQueue:
+        def __init__(self, max_workers: int = 4):
+            self.max_workers = max_workers
+            self._queue: deque = deque()
+            self._workers: list[Thread] = []
 
-        def locate(self, ip_address: str) -> tuple:
-            return (0.0, 0.0)
+        def enqueue(self, task_fn, *args, **kwargs):
+            self._queue.append((task_fn, args, kwargs))
+
+        def process(self):
+            while self._queue:
+                task_fn, args, kwargs = self._queue.popleft()
+                task_fn(*args, **kwargs)
+
+        def size(self) -> int:
+            return len(self._queue)
+
 must_include_files:
-- config/scheduler.yaml
-must_include_content:
-- |2
-        cron: "0 2 * * *"
-      - name: report
-        cron: "0 8 * * 1"
+  # Q1+Q2: The code resolves job names to functions via globals().
+  # Only cleanup_job exists — adding "report" will KeyError.
+  # Without scheduler.py, reviewer thinks the new job is ready to run.
+  - src/scheduler.py
+must_include_content_from:
+  src/scheduler.py:
+    # Dynamic lookup that will fail for "report" — no report_job exists
+    - "globals()[f\"{job['name']}_job\"]"
+    # Only handler defined — no report_job
+    - "def cleanup_job():"
 must_not_include:
-- GARBAGE_YAML_014_CAPTCHA_MARKER_A
-- GARBAGE_YAML_014_VERIFY_MARKER_B
-- GARBAGE_YAML_014_VALIDATOR_CLASS_C
-- GARBAGE_YAML_014_GEO_MARKER_D
-- GARBAGE_YAML_014_COORDS_MARKER_E
-- GARBAGE_YAML_014_LOCATOR_CLASS_F
-- CaptchaValidator
-- GeoLocator
-- garbage_captcha_validator.py
-- garbage_geo_locator.py
+  # crontab.yaml: system-level cron (logrotate, certbot), not app scheduler
+  - logrotate
+  - certbot
+  - temp_cleanup
+  # task_queue.py: async task queue, not cron-based scheduling
+  - TaskQueue
+  - enqueue
+must_not_include_files:
+  - config/crontab.yaml
+  - src/task_queue.py
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

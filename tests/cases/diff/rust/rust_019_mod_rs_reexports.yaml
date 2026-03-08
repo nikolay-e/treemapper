@@ -1,3 +1,9 @@
+# Scenario: Expanding module re-exports and adding new utility functions
+# Changed: src/lib/mod.rs — added re-exports for format_lower, sanitize, transform; src/lib/utils.rs — added format_lower, format_title, slugify, Formatter::with_suffix
+# Reviewer questions: Are all new pub use items actually defined? Does version bump to 1.1.0 match changes?
+# Trap files:
+#   - src/lib/hasher.rs: Hashing utility — "utils" adjacent but no import from mod.rs
+#   - src/lib/differ.rs: Text diff generator — "format/transform" vocabulary but independent
 initial:
   src/lib/mod.rs: |
     mod utils;
@@ -55,55 +61,58 @@ initial:
                 .collect()
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod rpc;
-    pub mod grpc;
-  src/unrelated/rpc.rs: |
-    // GARBAGE_RUST_RPC_001
-    use std::collections::HashMap;
+  src/lib/hasher.rs: |
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
-    pub const GARBAGE_RPC_PORT_002: u16 = 5000;
-    pub const GARBAGE_RPC_TIMEOUT_003: u64 = 10000;
-
-    pub struct GarbageRpcClient004 {
-        endpoint: String,
-        methods: HashMap<String, String>,
+    pub fn hash_string(s: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        s.hash(&mut hasher);
+        hasher.finish()
     }
 
-    impl GarbageRpcClient004 {
-        pub fn garbage_call_005(&self, method: &str, params: &str) -> Result<String, String> {
-            Err("GARBAGE_RPC_ERROR_006".to_string())
-        }
-
-        pub fn garbage_notify_007(&self, method: &str, params: &str) -> Result<(), String> {
-            Err("GARBAGE_NOTIFY_ERROR_008".to_string())
-        }
+    pub fn hash_bytes(data: &[u8]) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        data.hash(&mut hasher);
+        hasher.finish()
     }
 
-    pub trait GarbageRpcHandler009 {
-        fn garbage_handle_010(&self, method: &str, params: &str) -> String;
-    }
-  src/unrelated/grpc.rs: |
-    // GARBAGE_RUST_GRPC_011
-    pub const GARBAGE_GRPC_PORT_012: u16 = 50051;
-
-    pub struct GarbageGrpcChannel013 {
-        address: String,
-        secure: bool,
+    pub struct ContentHasher {
+        seed: u64,
     }
 
-    impl GarbageGrpcChannel013 {
-        pub fn garbage_connect_014(&mut self) -> Result<(), String> {
-            Err("GARBAGE_GRPC_CONNECT_ERROR_015".to_string())
+    impl ContentHasher {
+        pub fn new(seed: u64) -> Self {
+            Self { seed }
         }
 
-        pub fn garbage_call_016(&self, service: &str, method: &str) -> Result<Vec<u8>, String> {
-            Err("GARBAGE_GRPC_CALL_ERROR_017".to_string())
+        pub fn digest(&self, data: &[u8]) -> u64 {
+            let base = hash_bytes(data);
+            base.wrapping_add(self.seed)
         }
+    }
+  src/lib/differ.rs: |
+    pub enum DiffOp {
+        Insert(String),
+        Delete(String),
+        Equal(String),
+    }
 
-        pub fn garbage_stream_018(&self, service: &str, method: &str) -> Result<(), String> {
-            Err("GARBAGE_GRPC_STREAM_ERROR_019".to_string())
+    pub fn diff_lines(old: &str, new: &str) -> Vec<DiffOp> {
+        let old_lines: Vec<&str> = old.lines().collect();
+        let new_lines: Vec<&str> = new.lines().collect();
+        let mut ops = Vec::new();
+        for line in &old_lines {
+            if !new_lines.contains(line) {
+                ops.push(DiffOp::Delete(line.to_string()));
+            }
         }
+        for line in &new_lines {
+            if !old_lines.contains(line) {
+                ops.push(DiffOp::Insert(line.to_string()));
+            }
+        }
+        ops
     }
 changed:
   src/lib/mod.rs: |
@@ -208,55 +217,58 @@ changed:
                 .collect()
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod rpc;
-    pub mod grpc;
-  src/unrelated/rpc.rs: |
-    // GARBAGE_RUST_RPC_001
-    use std::collections::HashMap;
+  src/lib/hasher.rs: |
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
-    pub const GARBAGE_RPC_PORT_002: u16 = 5000;
-    pub const GARBAGE_RPC_TIMEOUT_003: u64 = 10000;
-
-    pub struct GarbageRpcClient004 {
-        endpoint: String,
-        methods: HashMap<String, String>,
+    pub fn hash_string(s: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        s.hash(&mut hasher);
+        hasher.finish()
     }
 
-    impl GarbageRpcClient004 {
-        pub fn garbage_call_005(&self, method: &str, params: &str) -> Result<String, String> {
-            Err("GARBAGE_RPC_ERROR_006".to_string())
-        }
-
-        pub fn garbage_notify_007(&self, method: &str, params: &str) -> Result<(), String> {
-            Err("GARBAGE_NOTIFY_ERROR_008".to_string())
-        }
+    pub fn hash_bytes(data: &[u8]) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        data.hash(&mut hasher);
+        hasher.finish()
     }
 
-    pub trait GarbageRpcHandler009 {
-        fn garbage_handle_010(&self, method: &str, params: &str) -> String;
-    }
-  src/unrelated/grpc.rs: |
-    // GARBAGE_RUST_GRPC_011
-    pub const GARBAGE_GRPC_PORT_012: u16 = 50051;
-
-    pub struct GarbageGrpcChannel013 {
-        address: String,
-        secure: bool,
+    pub struct ContentHasher {
+        seed: u64,
     }
 
-    impl GarbageGrpcChannel013 {
-        pub fn garbage_connect_014(&mut self) -> Result<(), String> {
-            Err("GARBAGE_GRPC_CONNECT_ERROR_015".to_string())
+    impl ContentHasher {
+        pub fn new(seed: u64) -> Self {
+            Self { seed }
         }
 
-        pub fn garbage_call_016(&self, service: &str, method: &str) -> Result<Vec<u8>, String> {
-            Err("GARBAGE_GRPC_CALL_ERROR_017".to_string())
+        pub fn digest(&self, data: &[u8]) -> u64 {
+            let base = hash_bytes(data);
+            base.wrapping_add(self.seed)
         }
+    }
+  src/lib/differ.rs: |
+    pub enum DiffOp {
+        Insert(String),
+        Delete(String),
+        Equal(String),
+    }
 
-        pub fn garbage_stream_018(&self, service: &str, method: &str) -> Result<(), String> {
-            Err("GARBAGE_GRPC_STREAM_ERROR_019".to_string())
+    pub fn diff_lines(old: &str, new: &str) -> Vec<DiffOp> {
+        let old_lines: Vec<&str> = old.lines().collect();
+        let new_lines: Vec<&str> = new.lines().collect();
+        let mut ops = Vec::new();
+        for line in &old_lines {
+            if !new_lines.contains(line) {
+                ops.push(DiffOp::Delete(line.to_string()));
+            }
         }
+        for line in &new_lines {
+            if !old_lines.contains(line) {
+                ops.push(DiffOp::Insert(line.to_string()));
+            }
+        }
+        ops
     }
 must_include_files:
 - src/lib/mod.rs
@@ -265,12 +277,14 @@ must_include_content:
 - pub use utils::format_lower;
 - pub fn info() -> String {
 must_not_include:
-- GARBAGE_GRPC_PORT_012
-- GARBAGE_RPC_PORT_002
-- GARBAGE_RPC_TIMEOUT_003
-- GARBAGE_RUST_GRPC_011
-- GARBAGE_RUST_RPC_001
-- grpc.rs
-- rpc.rs
+- ContentHasher
+- DiffOp
+- diff_lines
+- hasher.rs
+- differ.rs
+must_not_include_files:
+- src/lib/hasher.rs
+- src/lib/differ.rs
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

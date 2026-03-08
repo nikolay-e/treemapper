@@ -1,3 +1,22 @@
+# Test: app.rb uses DynamicStruct's method_missing for dynamic attribute access
+#
+# Scenario: app.rb is rewritten to require DynamicStruct and use dynamic
+# getter/setter/predicate methods (config.host, config.debug=, config.debug?).
+# DynamicStruct (UNCHANGED) implements method_missing and respond_to_missing?.
+#
+# Reviewer questions:
+#   Q1: "How does config.debug? work? What does the ? suffix do?"
+#       -> lib/dynamic_struct.rb (UNCHANGED) handles '?' suffix in method_missing
+#          by returning !!@data[key].
+#   Q2: "What happens if an undefined attribute is accessed?"
+#       -> method_missing falls through to super for unknown keys.
+#
+# Trap files (plausible but unrelated):
+#   - lib/config_loader.rb: loads configuration from YAML files — same domain
+#     (configuration) but DynamicStruct is a generic data structure.
+#   - lib/open_struct_ext.rb: extends OpenStruct — similar dynamic attribute
+#     concept but completely independent implementation.
+
 initial:
   lib/dynamic_struct.rb: |
     class DynamicStruct
@@ -29,26 +48,41 @@ initial:
     end
   app.rb: |
     puts 'Hello'
-  lib/garbage_queue_worker.rb: |
-    GARBAGE_RUBY_009_QUEUE_BACKEND_A = "sidekiq"
-    GARBAGE_RUBY_009_CONCURRENCY_B = "threaded"
+  lib/config_loader.rb: |
+    require 'yaml'
 
-    class GarbageQueueWorker
-      GARBAGE_RUBY_009_POLL_INTERVAL_C = 5
+    class ConfigLoader
+      def self.load(file_path)
+        raw = YAML.safe_load(File.read(file_path), permitted_classes: [Symbol])
+        raw.transform_keys(&:to_sym)
+      end
 
-      def perform(job_data)
-        GARBAGE_RUBY_009_QUEUE_BACKEND_A
+      def self.load_with_defaults(file_path, defaults)
+        config = load(file_path)
+        defaults.merge(config)
+      rescue Errno::ENOENT
+        defaults
+      end
+
+      def self.write(file_path, config)
+        File.write(file_path, YAML.dump(config.transform_keys(&:to_s)))
       end
     end
-  lib/garbage_template_engine.rb: |
-    GARBAGE_RUBY_009_TEMPLATE_LANG_D = "erb_extended"
-    GARBAGE_RUBY_009_ESCAPE_MODE_E = "html_safe"
+  lib/open_struct_ext.rb: |
+    require 'ostruct'
 
-    class GarbageTemplateEngine
-      GARBAGE_RUBY_009_CACHE_COMPILED_F = true
+    class OpenStructExt < OpenStruct
+      def to_hash
+        to_h.transform_keys(&:to_sym)
+      end
 
-      def render(template_name)
-        GARBAGE_RUBY_009_TEMPLATE_LANG_D
+      def freeze_deep
+        each_pair { |_, v| v.freeze if v.respond_to?(:freeze) }
+        freeze
+      end
+
+      def merge(other)
+        self.class.new(to_h.merge(other.to_h))
       end
     end
 changed:
@@ -92,43 +126,66 @@ changed:
 
     config.name = 'my_app'
     puts config.to_h.inspect
-  lib/garbage_queue_worker.rb: |
-    GARBAGE_RUBY_009_QUEUE_BACKEND_A = "sidekiq"
-    GARBAGE_RUBY_009_CONCURRENCY_B = "threaded"
+  lib/config_loader.rb: |
+    require 'yaml'
 
-    class GarbageQueueWorker
-      GARBAGE_RUBY_009_POLL_INTERVAL_C = 5
+    class ConfigLoader
+      def self.load(file_path)
+        raw = YAML.safe_load(File.read(file_path), permitted_classes: [Symbol])
+        raw.transform_keys(&:to_sym)
+      end
 
-      def perform(job_data)
-        GARBAGE_RUBY_009_QUEUE_BACKEND_A
+      def self.load_with_defaults(file_path, defaults)
+        config = load(file_path)
+        defaults.merge(config)
+      rescue Errno::ENOENT
+        defaults
+      end
+
+      def self.write(file_path, config)
+        File.write(file_path, YAML.dump(config.transform_keys(&:to_s)))
       end
     end
-  lib/garbage_template_engine.rb: |
-    GARBAGE_RUBY_009_TEMPLATE_LANG_D = "erb_extended"
-    GARBAGE_RUBY_009_ESCAPE_MODE_E = "html_safe"
+  lib/open_struct_ext.rb: |
+    require 'ostruct'
 
-    class GarbageTemplateEngine
-      GARBAGE_RUBY_009_CACHE_COMPILED_F = true
+    class OpenStructExt < OpenStruct
+      def to_hash
+        to_h.transform_keys(&:to_sym)
+      end
 
-      def render(template_name)
-        GARBAGE_RUBY_009_TEMPLATE_LANG_D
+      def freeze_deep
+        each_pair { |_, v| v.freeze if v.respond_to?(:freeze) }
+        freeze
+      end
+
+      def merge(other)
+        self.class.new(to_h.merge(other.to_h))
       end
     end
 must_include_files:
-- app.rb
-must_include_content:
-- |
-  config = DynamicStruct.new(host: 'localhost', port: 3000, debug: false)
+  - app.rb
+  # Q1/Q2: DynamicStruct implements method_missing that app.rb relies on
+  - lib/dynamic_struct.rb
+must_include_content_from:
+  app.rb:
+    - "config = DynamicStruct.new(host: 'localhost', port: 3000, debug: false)"
+    - "config.debug?"
+  lib/dynamic_struct.rb:
+    - "def method_missing(name, *args)"
+    - "def respond_to_missing?"
 must_not_include:
-- GARBAGE_RUBY_009_QUEUE_BACKEND_A
-- GARBAGE_RUBY_009_CONCURRENCY_B
-- GARBAGE_RUBY_009_POLL_INTERVAL_C
-- GARBAGE_RUBY_009_TEMPLATE_LANG_D
-- GARBAGE_RUBY_009_ESCAPE_MODE_E
-- GARBAGE_RUBY_009_CACHE_COMPILED_F
-- GarbageQueueWorker
-- GarbageTemplateEngine
-- garbage_queue_worker.rb
-- garbage_template_engine.rb
+  # lib/config_loader.rb: YAML config loading — not used by app.rb
+  - ConfigLoader
+  - load_with_defaults
+  - YAML.safe_load
+  # lib/open_struct_ext.rb: different dynamic struct implementation
+  - OpenStructExt
+  - freeze_deep
+must_not_include_files:
+  - lib/config_loader.rb
+  - lib/open_struct_ext.rb
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

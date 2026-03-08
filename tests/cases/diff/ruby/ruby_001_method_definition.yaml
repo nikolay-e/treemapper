@@ -1,3 +1,22 @@
+# Test: app.rb gains require_relative calls to Processor and Formatter, wiring them together
+#
+# Scenario: app.rb is rewritten from a trivial puts to a script that requires
+# Processor and Formatter, calls process/batch_process, and formats results.
+# Both lib/processor.rb and lib/formatter.rb are UNCHANGED.
+#
+# Reviewer questions:
+#   Q1: "What methods does Processor expose? What is batch_process's return type?"
+#       -> lib/processor.rb (UNCHANGED) defines process(data) and batch_process(items)
+#   Q2: "What template syntax does Formatter use?"
+#       -> lib/formatter.rb (UNCHANGED) defines format(values) with gsub-based interpolation
+#
+# Trap files (plausible but unrelated):
+#   - lib/csv_exporter.rb: exports data to CSV format. Same lib/ directory, deals
+#     with data transformation, but Processor and Formatter never reference it.
+#   - lib/logger_config.rb: configures application-level logging. Processor has a
+#     @logger field, making this seem related, but app.rb passes logger: nil and
+#     never touches logging config.
+
 initial:
   lib/processor.rb: |
     class Processor
@@ -36,34 +55,45 @@ initial:
         result
       end
     end
-  lib/garbage_statistics.rb: |
-    GARBAGE_RUBY_001_STATS_COLLECTOR_A = "statistics_module"
-    GARBAGE_RUBY_001_REPORT_GENERATOR_B = "report_output"
+  lib/csv_exporter.rb: |
+    require 'csv'
 
-    class GarbageStatisticsEngine
-      GARBAGE_RUBY_001_SAMPLE_RATE_C = 100
-
-      def initialize
-        @data = []
+    class CsvExporter
+      def initialize(headers)
+        @headers = headers
       end
 
-      def collect(value)
-        @data << value
+      def export(records, output_path)
+        CSV.open(output_path, 'w') do |csv|
+          csv << @headers
+          records.each { |record| csv << @headers.map { |h| record[h] } }
+        end
       end
 
-      def summarize
-        GARBAGE_RUBY_001_REPORT_GENERATOR_B
+      def export_to_string(records)
+        CSV.generate do |csv|
+          csv << @headers
+          records.each { |record| csv << @headers.map { |h| record[h] } }
+        end
       end
     end
-  lib/garbage_notification.rb: |
-    GARBAGE_RUBY_001_ALERT_CHANNEL_D = "notifications"
-    GARBAGE_RUBY_001_DISPATCH_QUEUE_E = "background"
+  lib/logger_config.rb: |
+    require 'logger'
 
-    class GarbageNotificationService
-      GARBAGE_RUBY_001_MAX_RETRIES_F = 5
+    class LoggerConfig
+      DEFAULT_LEVEL = Logger::INFO
 
-      def notify(recipient, message)
-        GARBAGE_RUBY_001_ALERT_CHANNEL_D
+      def self.create(output: $stdout, level: DEFAULT_LEVEL)
+        logger = Logger.new(output)
+        logger.level = level
+        logger.formatter = proc do |severity, datetime, _progname, msg|
+          "[#{severity}] #{datetime.strftime('%Y-%m-%d %H:%M:%S')} - #{msg}\n"
+        end
+        logger
+      end
+
+      def self.create_file_logger(path, level: DEFAULT_LEVEL)
+        create(output: path, level: level)
       end
     end
 changed:
@@ -115,52 +145,74 @@ changed:
         result
       end
     end
-  lib/garbage_statistics.rb: |
-    GARBAGE_RUBY_001_STATS_COLLECTOR_A = "statistics_module"
-    GARBAGE_RUBY_001_REPORT_GENERATOR_B = "report_output"
+  lib/csv_exporter.rb: |
+    require 'csv'
 
-    class GarbageStatisticsEngine
-      GARBAGE_RUBY_001_SAMPLE_RATE_C = 100
-
-      def initialize
-        @data = []
+    class CsvExporter
+      def initialize(headers)
+        @headers = headers
       end
 
-      def collect(value)
-        @data << value
+      def export(records, output_path)
+        CSV.open(output_path, 'w') do |csv|
+          csv << @headers
+          records.each { |record| csv << @headers.map { |h| record[h] } }
+        end
       end
 
-      def summarize
-        GARBAGE_RUBY_001_REPORT_GENERATOR_B
+      def export_to_string(records)
+        CSV.generate do |csv|
+          csv << @headers
+          records.each { |record| csv << @headers.map { |h| record[h] } }
+        end
       end
     end
-  lib/garbage_notification.rb: |
-    GARBAGE_RUBY_001_ALERT_CHANNEL_D = "notifications"
-    GARBAGE_RUBY_001_DISPATCH_QUEUE_E = "background"
+  lib/logger_config.rb: |
+    require 'logger'
 
-    class GarbageNotificationService
-      GARBAGE_RUBY_001_MAX_RETRIES_F = 5
+    class LoggerConfig
+      DEFAULT_LEVEL = Logger::INFO
 
-      def notify(recipient, message)
-        GARBAGE_RUBY_001_ALERT_CHANNEL_D
+      def self.create(output: $stdout, level: DEFAULT_LEVEL)
+        logger = Logger.new(output)
+        logger.level = level
+        logger.formatter = proc do |severity, datetime, _progname, msg|
+          "[#{severity}] #{datetime.strftime('%Y-%m-%d %H:%M:%S')} - #{msg}\n"
+        end
+        logger
+      end
+
+      def self.create_file_logger(path, level: DEFAULT_LEVEL)
+        create(output: path, level: level)
       end
     end
 must_include_files:
-- app.rb
-must_include_content:
-- |
-  processor = Processor.new(logger: nil)
-  result = processor.process("hello")
+  - app.rb
+  # Q1: Processor is required and called — reviewer needs its API
+  - lib/processor.rb
+  # Q2: Formatter is required and called — reviewer needs its API
+  - lib/formatter.rb
+must_include_content_from:
+  app.rb:
+    - "processor = Processor.new(logger: nil)"
+    - "processor.batch_process"
+  lib/processor.rb:
+    - "def process(data)"
+    - "def batch_process(items)"
+  lib/formatter.rb:
+    - "def format(values)"
 must_not_include:
-- GARBAGE_RUBY_001_STATS_COLLECTOR_A
-- GARBAGE_RUBY_001_REPORT_GENERATOR_B
-- GARBAGE_RUBY_001_SAMPLE_RATE_C
-- GARBAGE_RUBY_001_ALERT_CHANNEL_D
-- GARBAGE_RUBY_001_DISPATCH_QUEUE_E
-- GARBAGE_RUBY_001_MAX_RETRIES_F
-- GarbageStatisticsEngine
-- GarbageNotificationService
-- garbage_statistics.rb
-- garbage_notification.rb
+  # lib/csv_exporter.rb: CSV export — not imported or referenced
+  - CsvExporter
+  - export_to_string
+  # lib/logger_config.rb: logger factory — not used (logger: nil passed)
+  - LoggerConfig
+  - create_file_logger
+  - DEFAULT_LEVEL
+must_not_include_files:
+  - lib/csv_exporter.rb
+  - lib/logger_config.rb
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

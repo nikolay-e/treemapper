@@ -1,3 +1,17 @@
+# Reviewer sees: utils.ts changes fetchUser and fetchPosts signatures
+# to accept optional FetchOptions parameter.
+# Q: "Who calls these functions — will existing callers break?"
+#    -> src/consumer.ts: loadUserProfile() calls fetchUser(id) and
+#       fetchPosts(id) without options. New parameter is optional,
+#       so existing call sites still compile. Reviewer confirms
+#       backward compatibility.
+#
+# Not needed:
+#   - src/unrelated/theme.ts: UI theming manager. Different domain
+#     (visual appearance vs API fetching).
+#   - src/unrelated/clipboard.ts: clipboard operations. Browser API
+#     concern, unrelated to data fetching.
+
 initial:
   src/utils.ts: |
     export interface FetchOptions {
@@ -27,9 +41,7 @@ initial:
         return { user, posts };
     }
   src/unrelated/theme.ts: |
-    const GARBAGE_JSX_006_THEME_PROVIDER_A = 'theme_garbage_marker';
-
-    export class GarbageThemeManager {
+    export class ThemeManager {
         private current = 'light';
 
         toggle(): void {
@@ -41,19 +53,28 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_006_APPLY_THEME_B(): void {
-        console.log('GARBAGE_JSX_006_THEME_OUTPUT_C');
+    export function applyTheme(theme: string): void {
+        console.log('applying theme:', theme);
     }
   src/unrelated/clipboard.ts: |
-    const GARBAGE_JSX_006_CLIPBOARD_HANDLER_D = { enabled: true };
+    interface ClipboardEntry {
+        content: string;
+        timestamp: Date;
+    }
 
-    export class GARBAGE_JSX_006_CLIPBOARD_SERVICE_E {
+    export class ClipboardService {
+        private history: ClipboardEntry[] = [];
+
         copy(text: string): void {
-            console.log('copied:', text);
+            this.history.push({ content: text, timestamp: new Date() });
+        }
+
+        paste(): string | undefined {
+            return this.history[this.history.length - 1]?.content;
         }
     }
 
-    export function GARBAGE_JSX_006_READ_CLIPBOARD_F(): string {
+    export function readClipboard(): string {
         return 'clipboard content';
     }
 changed:
@@ -93,9 +114,7 @@ changed:
         return { user, posts };
     }
   src/unrelated/theme.ts: |
-    const GARBAGE_JSX_006_THEME_PROVIDER_A = 'theme_garbage_marker';
-
-    export class GarbageThemeManager {
+    export class ThemeManager {
         private current = 'light';
 
         toggle(): void {
@@ -107,33 +126,48 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_006_APPLY_THEME_B(): void {
-        console.log('GARBAGE_JSX_006_THEME_OUTPUT_C');
+    export function applyTheme(theme: string): void {
+        console.log('applying theme:', theme);
     }
   src/unrelated/clipboard.ts: |
-    const GARBAGE_JSX_006_CLIPBOARD_HANDLER_D = { enabled: true };
+    interface ClipboardEntry {
+        content: string;
+        timestamp: Date;
+    }
 
-    export class GARBAGE_JSX_006_CLIPBOARD_SERVICE_E {
+    export class ClipboardService {
+        private history: ClipboardEntry[] = [];
+
         copy(text: string): void {
-            console.log('copied:', text);
+            this.history.push({ content: text, timestamp: new Date() });
+        }
+
+        paste(): string | undefined {
+            return this.history[this.history.length - 1]?.content;
         }
     }
 
-    export function GARBAGE_JSX_006_READ_CLIPBOARD_F(): string {
+    export function readClipboard(): string {
         return 'clipboard content';
     }
 must_include_files:
-- src/utils.ts
-must_include_content:
-- interface FetchOptions {
-- 'function fetchUser(id: string, options?: FetchOptions) {'
+  # Unchanged — the caller that imports fetchUser and fetchPosts.
+  # Reviewer needs to verify existing call sites still compile
+  # after the signature change (new optional parameter).
+  - src/consumer.ts
+must_include_content_from:
+  src/consumer.ts:
+    - "loadUserProfile"
+    - "fetchUser(id)"
+    - "fetchPosts(id)"
 must_not_include:
-- GARBAGE_JSX_006_APPLY_THEME_B
-- GARBAGE_JSX_006_CLIPBOARD_HANDLER_D
-- GARBAGE_JSX_006_CLIPBOARD_SERVICE_E
-- GARBAGE_JSX_006_READ_CLIPBOARD_F
-- GARBAGE_JSX_006_THEME_PROVIDER_A
-- clipboard.ts
-- theme.ts
+  # theme.ts: UI theming, different domain
+  - ThemeManager
+  - applyTheme
+  # clipboard.ts: browser clipboard API, unrelated to fetching
+  - ClipboardService
+  - readClipboard
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

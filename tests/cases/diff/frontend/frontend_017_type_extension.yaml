@@ -1,3 +1,17 @@
+# Scenario: TypeScript file adds intersection types extending base types.
+#
+# Diff: extended.ts creates ExtendedUser, TimestampedUser, and FullUser
+# using intersection types with User and Timestamps from types.ts.
+#
+# Reviewer questions:
+#   Q1: "What fields does User have?" → src/types.ts (UNCHANGED) defines User.
+#   Q2: "What is Timestamps?" → src/types.ts defines createdAt/updatedAt.
+#
+# Not needed:
+#   - src/permissions.ts: type definitions in same directory but for RBAC,
+#     not user data shapes.
+#   - src/types/api.ts: more type definitions but for API response wrappers.
+
 initial:
   src/types.ts: |
     export type User = {
@@ -12,56 +26,45 @@ initial:
     };
   src/extended.ts: |
     console.log('initial');
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_017_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/permissions.ts: |
+    export type Role = 'admin' | 'editor' | 'viewer';
+
+    export type Permission = 'read' | 'write' | 'delete' | 'manage';
+
+    export type RolePermissions = {
+        [K in Role]: Permission[];
+    };
+
+    export const defaultPermissions: RolePermissions = {
+        admin: ['read', 'write', 'delete', 'manage'],
+        editor: ['read', 'write'],
+        viewer: ['read'],
+    };
+
+    export function hasPermission(role: Role, permission: Permission): boolean {
+        return defaultPermissions[role].includes(permission);
+    }
+  src/types/api.ts: |
+    export interface ApiResponse<T> {
+        data: T;
+        status: number;
+        message: string;
     }
 
-    // GARBAGE_FE_017_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export interface PaginatedResponse<T> {
+        items: T[];
+        total: number;
+        page: number;
+        pageSize: number;
+        hasMore: boolean;
     }
 
-    // GARBAGE_FE_017_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_017_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export interface ApiError {
+        code: string;
+        message: string;
+        details?: Record<string, string>;
     }
 
-    // GARBAGE_FE_017_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 changed:
   src/types.ts: |
     export type User = {
@@ -90,68 +93,68 @@ changed:
             notifications: boolean;
         };
     };
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_017_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/permissions.ts: |
+    export type Role = 'admin' | 'editor' | 'viewer';
+
+    export type Permission = 'read' | 'write' | 'delete' | 'manage';
+
+    export type RolePermissions = {
+        [K in Role]: Permission[];
+    };
+
+    export const defaultPermissions: RolePermissions = {
+        admin: ['read', 'write', 'delete', 'manage'],
+        editor: ['read', 'write'],
+        viewer: ['read'],
+    };
+
+    export function hasPermission(role: Role, permission: Permission): boolean {
+        return defaultPermissions[role].includes(permission);
+    }
+  src/types/api.ts: |
+    export interface ApiResponse<T> {
+        data: T;
+        status: number;
+        message: string;
     }
 
-    // GARBAGE_FE_017_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export interface PaginatedResponse<T> {
+        items: T[];
+        total: number;
+        page: number;
+        pageSize: number;
+        hasMore: boolean;
     }
 
-    // GARBAGE_FE_017_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_017_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export interface ApiError {
+        code: string;
+        message: string;
+        details?: Record<string, string>;
     }
 
-    // GARBAGE_FE_017_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 must_include_files:
-- src/extended.ts
-must_include_content:
-- import { User, Timestamps } from './types';
-- type ExtendedUser = User & {
+  - src/extended.ts
+
+must_include_content_from:
+  src/extended.ts:
+    - "import { User, Timestamps } from './types'"
+    - "type ExtendedUser = User & {"
+
 must_not_include:
-- GARBAGE_FE_017_COLOR_A
-- GARBAGE_FE_017_COLOR_B
-- GARBAGE_FE_017_CONTRAST_C
-- GARBAGE_FE_017_DEBOUNCE_D
-- GARBAGE_FE_017_THROTTLE_E
-- color_utils.ts
-- debounce_utils.ts
+  # permissions.ts: type definitions but for RBAC, not user data
+  - RolePermissions
+  - hasPermission
+  - defaultPermissions
+  # api.ts: type definitions but for API wrappers
+  - ApiResponse
+  - PaginatedResponse
+  - ApiError
+
+must_not_include_files:
+  - src/permissions.ts
+  - src/types/api.ts
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

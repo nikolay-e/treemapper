@@ -1,3 +1,18 @@
+# Scenario: DynamoDB module gets GSIs, TTL, encryption, and a sessions table
+#
+# Reviewer questions:
+#   1. What module instances consume these new GSI/TTL variables? (database.tf)
+#   2. How does the app code reference the table? (app.py uses table name)
+#   3. Are there other tables affected by this module change?
+#
+# The diff adds range_key, GSIs, TTL, KMS encryption, and a new sessions_table
+# to the users_table module call. A reviewer needs database.tf to see the
+# concrete parameter values flowing into the module.
+#
+# Traps: audit_table.tf and cache_table.tf use the same dynamodb module
+# but are not affected by this diff. redshift.tf and elasticache.tf are
+# different database services in the same infrastructure directory.
+
 initial:
   modules/dynamodb/main.tf: |
     resource "aws_dynamodb_table" "this" {
@@ -118,36 +133,9 @@ initial:
 
       tags = local.common_tags
     }
-  unrelated/redshift.tf: |
-    # GARBAGE_TF_REDSHIFT_446_001
-    resource "aws_redshift_cluster" "unrelated_cluster" {
-      cluster_identifier = "GARBAGE-REDSHIFT-446-002"
-      database_name      = "GARBAGE_DB_446_003"
-      master_username    = "admin"
-      master_password    = "GARBAGE_PASSWORD_446_004"
-      node_type          = "dc2.large"
-      cluster_type       = "single-node"
-    }
-  unrelated/neptune.tf: |
-    # GARBAGE_TF_NEPTUNE_446_005
-    resource "aws_neptune_cluster" "unrelated_neptune" {
-      cluster_identifier = "GARBAGE-NEPTUNE-446-006"
-      engine             = "neptune"
-      skip_final_snapshot = true
-    }
 
-    resource "aws_neptune_cluster_instance" "unrelated_instance" {
-      count              = 1
-      cluster_identifier = aws_neptune_cluster.unrelated_neptune.id
-      instance_class     = "db.t3.medium"
-      identifier         = "GARBAGE-NEPTUNE-INSTANCE-446-007"
-    }
-
-  # --- Tricky garbage: sibling module call to SAME ./modules/dynamodb with GSIs ---
+  # Trap: sibling module call to same dynamodb module (different table, unrelated)
   infrastructure/audit_table.tf: |
-    GARBAGE_TF_006_AUDIT_TABLE_G = "audit-table-config"
-    GARBAGE_TF_006_AUDIT_GSI_H = "audit-global-secondary-indexes"
-
     module "audit_table" {
       source     = "./modules/dynamodb"
       table_name = "audit-logs-${var.environment}"
@@ -186,11 +174,8 @@ initial:
       tags = local.common_tags
     }
 
-  # --- Tricky garbage: same resource type (dynamodb) for a different purpose ---
+  # Trap: another dynamodb module call (simple cache table, unrelated)
   infrastructure/cache_table.tf: |
-    GARBAGE_TF_006_CACHE_TABLE_I = "cache-table-config"
-    GARBAGE_TF_006_CACHE_TTL_J = "cache-ttl-settings"
-
     module "cache_table" {
       source     = "./modules/dynamodb"
       table_name = "cache-${var.environment}"
@@ -204,6 +189,27 @@ initial:
       ttl_attribute_name = "expires_at"
 
       tags = local.common_tags
+    }
+
+  # Trap: different database service entirely
+  infrastructure/redshift.tf: |
+    resource "aws_redshift_cluster" "analytics" {
+      cluster_identifier = "${var.environment}-analytics"
+      database_name      = "warehouse"
+      master_username    = "admin"
+      master_password    = var.redshift_password
+      node_type          = "dc2.large"
+      cluster_type       = "single-node"
+    }
+
+  # Trap: elasticache in same infra directory
+  infrastructure/elasticache.tf: |
+    resource "aws_elasticache_cluster" "sessions" {
+      cluster_id           = "${var.environment}-sessions"
+      engine               = "redis"
+      node_type            = "cache.t3.micro"
+      num_cache_nodes      = 1
+      parameter_group_name = "default.redis7"
     }
 
 changed:
@@ -367,36 +373,8 @@ changed:
 
       tags = local.common_tags
     }
-  unrelated/redshift.tf: |
-    # GARBAGE_TF_REDSHIFT_446_001
-    resource "aws_redshift_cluster" "unrelated_cluster" {
-      cluster_identifier = "GARBAGE-REDSHIFT-446-002"
-      database_name      = "GARBAGE_DB_446_003"
-      master_username    = "admin"
-      master_password    = "GARBAGE_PASSWORD_446_004"
-      node_type          = "dc2.large"
-      cluster_type       = "single-node"
-    }
-  unrelated/neptune.tf: |
-    # GARBAGE_TF_NEPTUNE_446_005
-    resource "aws_neptune_cluster" "unrelated_neptune" {
-      cluster_identifier = "GARBAGE-NEPTUNE-446-006"
-      engine             = "neptune"
-      skip_final_snapshot = true
-    }
 
-    resource "aws_neptune_cluster_instance" "unrelated_instance" {
-      count              = 1
-      cluster_identifier = aws_neptune_cluster.unrelated_neptune.id
-      instance_class     = "db.t3.medium"
-      identifier         = "GARBAGE-NEPTUNE-INSTANCE-446-007"
-    }
-
-  # --- Tricky garbage: sibling module call to SAME ./modules/dynamodb with GSIs ---
   infrastructure/audit_table.tf: |
-    GARBAGE_TF_006_AUDIT_TABLE_G = "audit-table-config"
-    GARBAGE_TF_006_AUDIT_GSI_H = "audit-global-secondary-indexes"
-
     module "audit_table" {
       source     = "./modules/dynamodb"
       table_name = "audit-logs-${var.environment}"
@@ -435,11 +413,7 @@ changed:
       tags = local.common_tags
     }
 
-  # --- Tricky garbage: same resource type (dynamodb) for a different purpose ---
   infrastructure/cache_table.tf: |
-    GARBAGE_TF_006_CACHE_TABLE_I = "cache-table-config"
-    GARBAGE_TF_006_CACHE_TTL_J = "cache-ttl-settings"
-
     module "cache_table" {
       source     = "./modules/dynamodb"
       table_name = "cache-${var.environment}"
@@ -453,6 +427,25 @@ changed:
       ttl_attribute_name = "expires_at"
 
       tags = local.common_tags
+    }
+
+  infrastructure/redshift.tf: |
+    resource "aws_redshift_cluster" "analytics" {
+      cluster_identifier = "${var.environment}-analytics"
+      database_name      = "warehouse"
+      master_username    = "admin"
+      master_password    = var.redshift_password
+      node_type          = "dc2.large"
+      cluster_type       = "single-node"
+    }
+
+  infrastructure/elasticache.tf: |
+    resource "aws_elasticache_cluster" "sessions" {
+      cluster_id           = "${var.environment}-sessions"
+      engine               = "redis"
+      node_type            = "cache.t3.micro"
+      num_cache_nodes      = 1
+      parameter_group_name = "default.redis7"
     }
 
 # === Assertions ===
@@ -474,25 +467,18 @@ must_include_content_from:
     - hash_key   = "session_id"
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_TF_REDSHIFT_446_001
-- GARBAGE_DB_446_003
-- GARBAGE_PASSWORD_446_004
-- GARBAGE_TF_NEPTUNE_446_005
-- GARBAGE-NEPTUNE-446-006
-- GARBAGE-NEPTUNE-INSTANCE-446-007
-# Tricky: sibling module call to same ./modules/dynamodb with GSIs
-- GARBAGE_TF_006_AUDIT_TABLE_G
-- GARBAGE_TF_006_AUDIT_GSI_H
-# Tricky: cache table using same module with TTL
-- GARBAGE_TF_006_CACHE_TABLE_I
-- GARBAGE_TF_006_CACHE_TTL_J
+# Sibling dynamodb module calls -- same module, different tables, not touched by diff
+- audit-logs  # audit_table.tf uses same module but is not changed
+- cache_key  # cache_table.tf uses same module but is not changed
+# Different database services entirely
+- aws_redshift_cluster  # redshift is a different service
+- aws_elasticache_cluster  # elasticache is a different service
 
 must_not_include_files:
-- unrelated/redshift.tf
-- unrelated/neptune.tf
-- infrastructure/audit_table.tf
-- infrastructure/cache_table.tf
+- infrastructure/redshift.tf  # different database service
+- infrastructure/elasticache.tf  # different database service
+- infrastructure/audit_table.tf  # same module, different table, not in diff
+- infrastructure/cache_table.tf  # same module, different table, not in diff
 
 max_fragments: 8
 max_files: 2

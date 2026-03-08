@@ -16,4 +16,6 @@ paths = [
     '''tests/cases/diff/fragments/fragments_020_config_json_top_level_keys\.yaml''',
     '''tests/cases/diff/helm/helm_025_template_secret\.yaml''',
     '''tests/cases/diff/kubernetes/kubernetes_002_replicas_change\.yaml''',
+    '''tests/cases/diff/kubernetes/kubernetes_026_ingress_rules\.yaml''',
+    '''tests/cases/diff/kubernetes/kubernetes_027_ingress_tls\.yaml''',
 ]

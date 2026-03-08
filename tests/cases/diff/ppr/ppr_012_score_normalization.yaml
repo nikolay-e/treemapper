@@ -1,3 +1,9 @@
+# Scenario: func0 at head of 10-function call chain gets return value — tests score normalization
+# Changed: test.py — func0() returns 1, connected via chain func0->func1->...->func9
+# Reviewer needs: test.py (changed, entire chain is in one file)
+# Trap: metrics.py — also has a func0/func1 naming pattern, similar numeric chain
+# Trap: aggregator.py — call chain structure similar to funcN chain, processes numbers
+
 initial:
   test.py: |
     def func0():
@@ -29,40 +35,33 @@ initial:
 
     def func9():
         func8()
-  # --- Tricky garbage: same function name "func0" in different module ---
-  garbage_func0_collision.py: |
-    GARBAGE_PPR_012_FUNC0_COLLISION_A = "func0_normalization_collision"
-    GARBAGE_PPR_012_FUNC0_COLLISION_B = True
-
+  metrics.py: |
     def func0():
-        return "different_func0_for_normalization"
+        return 3.14159
 
-    def func0_normalizer():
-        return func0() + "_normalized"
-  # --- Tricky garbage: same directory sibling with similar chain ---
-  garbage_score_sibling.py: |
-    GARBAGE_PPR_012_SCORE_SIBLING_C = "score_sibling"
-    GARBAGE_PPR_012_SCORE_SIBLING_D = 100
+    def func1():
+        return func0() * 2
 
-    def score_func0():
-        return 0
-
-    def score_func1():
-        return score_func0() + 1
-
-    def score_func2():
-        return score_func1() + 2
-  # --- Tricky garbage: consumer of func chain results ---
-  garbage_chain_consumer.py: |
-    GARBAGE_PPR_012_CHAIN_CONSUMER_E = "chain_consumer"
-    GARBAGE_PPR_012_CHAIN_CONSUMER_F = 50
-
-    class ChainResultConsumer:
-        def consume(self, chain_result):
-            return chain_result * 2
-
+    class MetricsCollector:
         def normalize_score(self, score):
             return score / 100.0
+
+        def collect(self):
+            return func0() + func1()
+  aggregator.py: |
+    def aggregate_step0():
+        return 0
+
+    def aggregate_step1():
+        return aggregate_step0() + 1
+
+    def aggregate_step2():
+        return aggregate_step1() + 2
+
+    class ChainAggregator:
+        def run_chain(self):
+            return aggregate_step2()
+
 changed:
   test.py: |
     def func0():
@@ -94,37 +93,32 @@ changed:
 
     def func9():
         func8()
-  garbage_func0_collision.py: |
-    GARBAGE_PPR_012_FUNC0_COLLISION_A = "func0_normalization_collision"
-    GARBAGE_PPR_012_FUNC0_COLLISION_B = True
-
+  metrics.py: |
     def func0():
-        return "different_func0_for_normalization"
+        return 3.14159
 
-    def func0_normalizer():
-        return func0() + "_normalized"
-  garbage_score_sibling.py: |
-    GARBAGE_PPR_012_SCORE_SIBLING_C = "score_sibling"
-    GARBAGE_PPR_012_SCORE_SIBLING_D = 100
+    def func1():
+        return func0() * 2
 
-    def score_func0():
-        return 0
-
-    def score_func1():
-        return score_func0() + 1
-
-    def score_func2():
-        return score_func1() + 2
-  garbage_chain_consumer.py: |
-    GARBAGE_PPR_012_CHAIN_CONSUMER_E = "chain_consumer"
-    GARBAGE_PPR_012_CHAIN_CONSUMER_F = 50
-
-    class ChainResultConsumer:
-        def consume(self, chain_result):
-            return chain_result * 2
-
+    class MetricsCollector:
         def normalize_score(self, score):
             return score / 100.0
+
+        def collect(self):
+            return func0() + func1()
+  aggregator.py: |
+    def aggregate_step0():
+        return 0
+
+    def aggregate_step1():
+        return aggregate_step0() + 1
+
+    def aggregate_step2():
+        return aggregate_step1() + 2
+
+    class ChainAggregator:
+        def run_chain(self):
+            return aggregate_step2()
 
 # === Assertions ===
 
@@ -137,20 +131,14 @@ must_include_content_from:
     - return 1
 
 must_not_include:
-# Tricky: name collision with func0
-- GARBAGE_PPR_012_FUNC0_COLLISION_A
-- GARBAGE_PPR_012_FUNC0_COLLISION_B
-# Tricky: same directory sibling with chain
-- GARBAGE_PPR_012_SCORE_SIBLING_C
-- GARBAGE_PPR_012_SCORE_SIBLING_D
-# Tricky: consumer of chain results
-- GARBAGE_PPR_012_CHAIN_CONSUMER_E
-- GARBAGE_PPR_012_CHAIN_CONSUMER_F
+- MetricsCollector
+- normalize_score
+- ChainAggregator
+- aggregate_step0
 
 must_not_include_files:
-- garbage_func0_collision.py
-- garbage_score_sibling.py
-- garbage_chain_consumer.py
+- metrics.py
+- aggregator.py
 
 max_fragments: 4
 max_files: 2

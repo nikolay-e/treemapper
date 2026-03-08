@@ -1,3 +1,20 @@
+# Scenario: Dog class adds a breed field and overrides both speak() and eat()
+# from the Animal abstract base class.
+#
+# Diff: Dog.java gains a breed field, modifies the constructor, changes speak()
+# to include breed, and adds an eat() override.
+#
+# Reviewer questions:
+#   Q1: "What methods does Dog override from Animal?"
+#       -> Animal.java (UNCHANGED) defines abstract speak() and concrete eat().
+#          Dog now overrides both — reviewer must see Animal to verify signatures.
+#
+# Not needed:
+#   - src/main/java/com/example/Kennel.java: manages a collection of Animals.
+#     Shares the Animal domain but has no import/dependency edge to Dog's override changes.
+#   - src/main/java/com/example/AnimalSound.java: enum of sound types.
+#     Domain-adjacent vocabulary (speak, sound) but not referenced by Dog.
+
 initial:
   src/main/java/com/example/Animal.java: |
     package com.example;
@@ -24,18 +41,48 @@ initial:
             return "Woof!";
         }
     }
-  GarbageTemplateMethod.java: |
-    public class GarbageTemplateMethod {
-        public static final String GARBAGE_JVM_037_TEMPLATE_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_037_HOOK_MARKER_B = "marker";
-        public void noop() {}
+  src/main/java/com/example/Kennel.java: |
+    package com.example;
+
+    import java.util.ArrayList;
+    import java.util.List;
+
+    public class Kennel {
+        private final List<Animal> animals = new ArrayList<>();
+
+        public void admit(Animal animal) {
+            animals.add(animal);
+        }
+
+        public void feedAll() {
+            for (Animal animal : animals) {
+                animal.eat();
+            }
+        }
+
+        public int getCount() {
+            return animals.size();
+        }
     }
-  GarbageCallbackHandler.java: |
-    public class GarbageCallbackHandler {
-        public static final String GARBAGE_JVM_037_CALLBACK_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_037_HANDLER_MARKER_D = "marker";
-        public void noop() {}
+  src/main/java/com/example/AnimalSound.java: |
+    package com.example;
+
+    public enum AnimalSound {
+        BARK("Woof"),
+        MEOW("Meow"),
+        CHIRP("Tweet");
+
+        private final String sound;
+
+        AnimalSound(String sound) {
+            this.sound = sound;
+        }
+
+        public String getSound() {
+            return sound;
+        }
     }
+
 changed:
   src/main/java/com/example/Animal.java: |
     package com.example;
@@ -70,28 +117,65 @@ changed:
             System.out.println(name + " the " + breed + " is eating");
         }
     }
-  GarbageTemplateMethod.java: |
-    public class GarbageTemplateMethod {
-        public static final String GARBAGE_JVM_037_TEMPLATE_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_037_HOOK_MARKER_B = "marker";
-        public void noop() {}
+  src/main/java/com/example/Kennel.java: |
+    package com.example;
+
+    import java.util.ArrayList;
+    import java.util.List;
+
+    public class Kennel {
+        private final List<Animal> animals = new ArrayList<>();
+
+        public void admit(Animal animal) {
+            animals.add(animal);
+        }
+
+        public void feedAll() {
+            for (Animal animal : animals) {
+                animal.eat();
+            }
+        }
+
+        public int getCount() {
+            return animals.size();
+        }
     }
-  GarbageCallbackHandler.java: |
-    public class GarbageCallbackHandler {
-        public static final String GARBAGE_JVM_037_CALLBACK_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_037_HANDLER_MARKER_D = "marker";
-        public void noop() {}
+  src/main/java/com/example/AnimalSound.java: |
+    package com.example;
+
+    public enum AnimalSound {
+        BARK("Woof"),
+        MEOW("Meow"),
+        CHIRP("Tweet");
+
+        private final String sound;
+
+        AnimalSound(String sound) {
+            this.sound = sound;
+        }
+
+        public String getSound() {
+            return sound;
+        }
     }
+
 must_include_files:
-- src/main/java/com/example/Dog.java
-must_include_content:
-- private String breed;
+  # Q1: Animal.java defines the abstract speak() and concrete eat() being overridden
+  - src/main/java/com/example/Dog.java
+must_include_content_from:
+  src/main/java/com/example/Dog.java:
+    - "private String breed;"
 must_not_include:
-- GARBAGE_JVM_037_CALLBACK_MARKER_C
-- GARBAGE_JVM_037_HANDLER_MARKER_D
-- GARBAGE_JVM_037_HOOK_MARKER_B
-- GARBAGE_JVM_037_TEMPLATE_MARKER_A
-- GarbageCallbackHandler.java
-- GarbageTemplateMethod.java
+  # Kennel.java: manages animals but has no dependency edge to Dog's new overrides
+  - Kennel
+  - feedAll
+  # AnimalSound.java: sound-related vocabulary but not referenced by Dog
+  - AnimalSound
+  - BARK
+must_not_include_files:
+  - src/main/java/com/example/Kennel.java
+  - src/main/java/com/example/AnimalSound.java
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

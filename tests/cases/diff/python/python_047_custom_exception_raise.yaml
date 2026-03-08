@@ -1,3 +1,14 @@
+# Scenario: service.py adds imports of custom exceptions and uses them for
+#   input validation and not-found handling.
+#
+# Reviewer questions:
+#   - Are ValidationError and NotFoundError the right exceptions for these cases?
+#   - Does the validation logic cover all required fields?
+#
+# Trap files:
+#   - audit/audit_logger.py: logging/event vocabulary, no dependency on exceptions or service
+#   - cache/lru_cache.py: caching with get/put, completely different domain
+
 initial:
   exceptions.py: |
     class ValidationError(Exception):
@@ -35,43 +46,46 @@ initial:
 
     def get_user_by_email(email: str) -> dict[str, Any]:
         return {"id": 1, "name": "Test", "email": email}
-  garbage_audit.py: |
-    GARBAGE_PY_047_AUDIT_A = "audit trail marker"
-    GARBAGE_PY_047_TRACE_B = "trace log marker"
+  audit/audit_logger.py: |
+    from datetime import datetime
+    from typing import Optional
 
     class AuditLogger:
-        GARBAGE_PY_047_FORMAT_C = "format marker"
-
         def __init__(self, log_path: str = "/var/log/audit.log"):
             self.log_path = log_path
             self._entries: list[dict] = []
 
-        def log_event(self, event_type: str, details: str) -> None:
-            self._entries.append({"type": event_type, "details": details})
+        def log_event(self, event_type: str, user_id: int, details: str) -> None:
+            self._entries.append({
+                "type": event_type,
+                "user_id": user_id,
+                "details": details,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
 
         def get_recent_events(self, count: int = 10) -> list[dict]:
-            GARBAGE_PY_047_FILTER_D = "filter marker"
             return self._entries[-count:]
-  garbage_cache.py: |
-    GARBAGE_PY_047_CACHE_E = "cache layer marker"
-    GARBAGE_PY_047_TTL_F = "ttl policy marker"
+  cache/lru_cache.py: |
+    from collections import OrderedDict
 
     class LRUCache:
-        GARBAGE_PY_047_BUCKET_G = True
-
         def __init__(self, max_size: int = 256):
             self.max_size = max_size
-            self._store: dict[str, object] = {}
+            self._store: OrderedDict[str, object] = OrderedDict()
 
         def get(self, key: str) -> object | None:
-            return self._store.get(key)
+            if key in self._store:
+                self._store.move_to_end(key)
+                return self._store[key]
+            return None
 
         def put(self, key: str, value: object) -> None:
-            GARBAGE_PY_047_EVICT_H = "eviction marker"
-            if len(self._store) >= self.max_size:
-                oldest = next(iter(self._store))
-                del self._store[oldest]
+            if key in self._store:
+                self._store.move_to_end(key)
             self._store[key] = value
+            if len(self._store) > self.max_size:
+                self._store.popitem(last=False)
+
 changed:
   exceptions.py: |
     class ValidationError(Exception):
@@ -119,58 +133,67 @@ changed:
         if user is None:
             raise NotFoundError("User", 0)
         return user
-  garbage_audit.py: |
-    GARBAGE_PY_047_AUDIT_A = "audit trail marker"
-    GARBAGE_PY_047_TRACE_B = "trace log marker"
+  audit/audit_logger.py: |
+    from datetime import datetime
+    from typing import Optional
 
     class AuditLogger:
-        GARBAGE_PY_047_FORMAT_C = "format marker"
-
         def __init__(self, log_path: str = "/var/log/audit.log"):
             self.log_path = log_path
             self._entries: list[dict] = []
 
-        def log_event(self, event_type: str, details: str) -> None:
-            self._entries.append({"type": event_type, "details": details})
+        def log_event(self, event_type: str, user_id: int, details: str) -> None:
+            self._entries.append({
+                "type": event_type,
+                "user_id": user_id,
+                "details": details,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
 
         def get_recent_events(self, count: int = 10) -> list[dict]:
-            GARBAGE_PY_047_FILTER_D = "filter marker"
             return self._entries[-count:]
-  garbage_cache.py: |
-    GARBAGE_PY_047_CACHE_E = "cache layer marker"
-    GARBAGE_PY_047_TTL_F = "ttl policy marker"
+  cache/lru_cache.py: |
+    from collections import OrderedDict
 
     class LRUCache:
-        GARBAGE_PY_047_BUCKET_G = True
-
         def __init__(self, max_size: int = 256):
             self.max_size = max_size
-            self._store: dict[str, object] = {}
+            self._store: OrderedDict[str, object] = OrderedDict()
 
         def get(self, key: str) -> object | None:
-            return self._store.get(key)
+            if key in self._store:
+                self._store.move_to_end(key)
+                return self._store[key]
+            return None
 
         def put(self, key: str, value: object) -> None:
-            GARBAGE_PY_047_EVICT_H = "eviction marker"
-            if len(self._store) >= self.max_size:
-                oldest = next(iter(self._store))
-                del self._store[oldest]
+            if key in self._store:
+                self._store.move_to_end(key)
             self._store[key] = value
+            if len(self._store) > self.max_size:
+                self._store.popitem(last=False)
+
 must_include_files:
 - service.py
-must_include_content:
-- from exceptions import ValidationError, NotFoundError
-- 'if not data.get("name"):'
+must_include_content_from:
+  service.py:
+    - "from exceptions import ValidationError, NotFoundError"
+    - 'if not data.get("name"):'
+    - "raise NotFoundError"
+  exceptions.py:
+    - "class ValidationError(Exception)"
+    - "class NotFoundError(Exception)"
+    - "def to_dict"
 must_not_include:
-- GARBAGE_PY_047_AUDIT_A
-- GARBAGE_PY_047_BUCKET_G
-- GARBAGE_PY_047_CACHE_E
-- GARBAGE_PY_047_EVICT_H
-- GARBAGE_PY_047_FILTER_D
-- GARBAGE_PY_047_FORMAT_C
-- GARBAGE_PY_047_TRACE_B
-- GARBAGE_PY_047_TTL_F
-- garbage_audit.py
-- garbage_cache.py
+- AuditLogger
+- log_event
+- get_recent_events
+- LRUCache
+- popitem
+must_not_include_files:
+- audit/audit_logger.py
+- cache/lru_cache.py
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

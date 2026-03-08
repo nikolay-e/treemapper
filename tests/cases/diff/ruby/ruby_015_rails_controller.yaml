@@ -1,3 +1,9 @@
+# Scenario: UsersController gains full CRUD actions that use User model methods
+# Changed: app/controllers/users_controller.rb — added require_relative, show/create/update/destroy actions, private user_params
+# Reviewer questions: Does controller correctly delegate to User model? Are all CRUD paths covered?
+# Trap files:
+#   - app/controllers/sessions_controller.rb: Authentication controller — "controller actions" pattern but no User model dependency
+#   - app/services/email_service.rb: Email sending service — "user notification" domain overlap but independent
 initial:
   app/models/user.rb: |
     class User
@@ -36,26 +42,81 @@ initial:
         "placeholder"
       end
     end
-  lib/garbage_geo_fence.rb: |
-    GARBAGE_RUBY_015_FENCE_RADIUS_A = "500m"
-    GARBAGE_RUBY_015_COORD_SYSTEM_B = "WGS84"
+  app/controllers/sessions_controller.rb: |
+    class SessionsController
+      def create
+        token = authenticate(params[:username], params[:password])
+        if token
+          session[:token] = token
+          redirect_to :dashboard
+        else
+          flash[:error] = "Invalid credentials"
+          render :login
+        end
+      end
 
-    class GarbageGeoFenceManager
-      GARBAGE_RUBY_015_MAX_FENCES_C = 100
+      def destroy
+        session.delete(:token)
+        redirect_to :login
+      end
 
-      def check_boundary(lat, lng)
-        GARBAGE_RUBY_015_FENCE_RADIUS_A
+      private
+
+      def authenticate(username, password)
+        return "fake-token" if username == "admin"
+        nil
+      end
+
+      def params
+        { username: 'admin', password: 'secret' }
+      end
+
+      def session
+        @session ||= {}
+      end
+
+      def redirect_to(target); end
+      def render(action); end
+      def flash
+        @flash ||= {}
       end
     end
-  lib/garbage_weather_api.rb: |
-    GARBAGE_RUBY_015_API_PROVIDER_D = "openweathermap"
-    GARBAGE_RUBY_015_UNITS_SYSTEM_E = "metric"
+  app/services/email_service.rb: |
+    class EmailService
+      SMTP_HOST = 'smtp.example.com'
+      SMTP_PORT = 587
 
-    class GarbageWeatherService
-      GARBAGE_RUBY_015_CACHE_MINUTES_F = 15
+      def initialize(from:)
+        @from = from
+        @queue = []
+      end
 
-      def forecast(city)
-        GARBAGE_RUBY_015_API_PROVIDER_D
+      def send_welcome(to:, name:)
+        @queue << {
+          to: to,
+          subject: "Welcome #{name}!",
+          body: "Thanks for signing up.",
+          from: @from
+        }
+        deliver_all
+      end
+
+      def send_reset_password(to:, token:)
+        @queue << {
+          to: to,
+          subject: "Password Reset",
+          body: "Reset token: #{token}",
+          from: @from
+        }
+        deliver_all
+      end
+
+      private
+
+      def deliver_all
+        count = @queue.size
+        @queue.clear
+        count
       end
     end
 changed:
@@ -139,26 +200,81 @@ changed:
       def redirect_to(target); end
       def render(action); end
     end
-  lib/garbage_geo_fence.rb: |
-    GARBAGE_RUBY_015_FENCE_RADIUS_A = "500m"
-    GARBAGE_RUBY_015_COORD_SYSTEM_B = "WGS84"
+  app/controllers/sessions_controller.rb: |
+    class SessionsController
+      def create
+        token = authenticate(params[:username], params[:password])
+        if token
+          session[:token] = token
+          redirect_to :dashboard
+        else
+          flash[:error] = "Invalid credentials"
+          render :login
+        end
+      end
 
-    class GarbageGeoFenceManager
-      GARBAGE_RUBY_015_MAX_FENCES_C = 100
+      def destroy
+        session.delete(:token)
+        redirect_to :login
+      end
 
-      def check_boundary(lat, lng)
-        GARBAGE_RUBY_015_FENCE_RADIUS_A
+      private
+
+      def authenticate(username, password)
+        return "fake-token" if username == "admin"
+        nil
+      end
+
+      def params
+        { username: 'admin', password: 'secret' }
+      end
+
+      def session
+        @session ||= {}
+      end
+
+      def redirect_to(target); end
+      def render(action); end
+      def flash
+        @flash ||= {}
       end
     end
-  lib/garbage_weather_api.rb: |
-    GARBAGE_RUBY_015_API_PROVIDER_D = "openweathermap"
-    GARBAGE_RUBY_015_UNITS_SYSTEM_E = "metric"
+  app/services/email_service.rb: |
+    class EmailService
+      SMTP_HOST = 'smtp.example.com'
+      SMTP_PORT = 587
 
-    class GarbageWeatherService
-      GARBAGE_RUBY_015_CACHE_MINUTES_F = 15
+      def initialize(from:)
+        @from = from
+        @queue = []
+      end
 
-      def forecast(city)
-        GARBAGE_RUBY_015_API_PROVIDER_D
+      def send_welcome(to:, name:)
+        @queue << {
+          to: to,
+          subject: "Welcome #{name}!",
+          body: "Thanks for signing up.",
+          from: @from
+        }
+        deliver_all
+      end
+
+      def send_reset_password(to:, token:)
+        @queue << {
+          to: to,
+          subject: "Password Reset",
+          body: "Reset token: #{token}",
+          from: @from
+        }
+        deliver_all
+      end
+
+      private
+
+      def deliver_all
+        count = @queue.size
+        @queue.clear
+        count
       end
     end
 must_include_files:
@@ -167,15 +283,15 @@ must_include_content:
 - |
   @user = User.find(params[:id])
 must_not_include:
-- GARBAGE_RUBY_015_FENCE_RADIUS_A
-- GARBAGE_RUBY_015_COORD_SYSTEM_B
-- GARBAGE_RUBY_015_MAX_FENCES_C
-- GARBAGE_RUBY_015_API_PROVIDER_D
-- GARBAGE_RUBY_015_UNITS_SYSTEM_E
-- GARBAGE_RUBY_015_CACHE_MINUTES_F
-- GarbageGeoFenceManager
-- GarbageWeatherService
-- garbage_geo_fence.rb
-- garbage_weather_api.rb
+- SessionsController
+- EmailService
+- authenticate
+- deliver_all
+- sessions_controller.rb
+- email_service.rb
+must_not_include_files:
+- app/controllers/sessions_controller.rb
+- app/services/email_service.rb
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

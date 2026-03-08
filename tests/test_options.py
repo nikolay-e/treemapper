@@ -227,15 +227,21 @@ def test_log_level_with_max_file_bytes(temp_project):
     assert "large" in result.stderr.lower() or "large" in result.stdout.lower()
 
 
-def test_max_file_bytes_zero_means_unlimited(temp_project):
-    """Test --max-file-bytes 0 disables file size limit."""
+def test_max_file_bytes_zero_is_error(temp_project):
+    result = run_treemapper_subprocess([str(temp_project), "--max-file-bytes", "0"])
+    assert result.returncode != 0
+    assert "ambiguous" in result.stderr.lower()
+    assert "--no-file-size-limit" in result.stderr
+
+
+def test_no_file_size_limit_includes_all(temp_project):
     large_file = temp_project / "large.txt"
     large_content = "x" * 10000
     large_file.write_text(large_content, encoding="utf-8")
 
     output_file = temp_project / "output.yaml"
 
-    result = run_treemapper_subprocess([str(temp_project), "-o", str(output_file), "--max-file-bytes", "0"])
+    result = run_treemapper_subprocess([str(temp_project), "-o", str(output_file), "--no-file-size-limit"])
 
     assert result.returncode == 0
 
@@ -282,10 +288,10 @@ def test_known_binary_extension_detected(temp_project):
 
 
 def test_output_file_without_argument_uses_default_name(temp_project):
-    """Test -o without filename creates tree.{format}."""
+    """Test --save creates tree.{format}."""
     (temp_project / "test.txt").write_text("content", encoding="utf-8")
 
-    result = run_treemapper_subprocess([str(temp_project), "-o"], cwd=temp_project)
+    result = run_treemapper_subprocess([str(temp_project), "--save"], cwd=temp_project)
     assert result.returncode == 0
 
     default_output = temp_project / "tree.yaml"
@@ -306,7 +312,7 @@ def test_output_file_without_argument_respects_format(temp_project):
         if expected_file.exists():
             expected_file.unlink()
 
-        result = run_treemapper_subprocess([str(temp_project), "-o", "-f", fmt], cwd=temp_project)
+        result = run_treemapper_subprocess([str(temp_project), "--save", "-f", fmt], cwd=temp_project)
         assert result.returncode == 0, f"Failed for format {fmt}: {result.stderr}"
         assert expected_file.exists(), f"Expected {expected_file} for format {fmt}"
 

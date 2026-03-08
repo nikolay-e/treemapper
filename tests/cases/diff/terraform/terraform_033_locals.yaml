@@ -1,3 +1,12 @@
+# Scenario: Extracting hardcoded tags into a locals block and using
+#   merge() to apply common_tags across resources.
+# Reviewer questions:
+#   1. What variable does Environment use? (var.environment -- not defined in this diff)
+#   2. What other resources could adopt common_tags? (only main.tf instance for now)
+# Traps:
+#   - monitoring/tags.tf: similar locals block but for monitoring resources (same pattern)
+#   - networking/vpc.tf: uses tags but for a different resource type (VPC, not instance)
+
 initial:
   main.tf: |
     resource "aws_instance" "web" {
@@ -6,33 +15,28 @@ initial:
         Environment = "prod"
       }
     }
-  # --- Tricky garbage: sibling .tf with same locals block pattern for a different stack ---
-  monitoring/tags_GARBAGE_TF_033_A.tf: |
-    # GARBAGE_TF_033_MON_TAGS_A - Monitoring common tags
+  monitoring/tags.tf: |
     locals {
-      monitoring_tags_GARBAGE_TF_033_A = {
+      monitoring_tags = {
         Project     = "monitoring"
         Environment = var.environment
         ManagedBy   = "terraform"
       }
     }
 
-    # GARBAGE_TF_033_MON_INSTANCE_B - Monitoring instance
-    resource "aws_instance" "grafana_GARBAGE_TF_033_B" {
+    resource "aws_instance" "grafana" {
       ami  = "ami-99999"
-      tags = local.monitoring_tags_GARBAGE_TF_033_A
+      tags = local.monitoring_tags
     }
-  # --- Plain garbage: unrelated networking config ---
-  networking/vpc_GARBAGE_TF_033_C.tf: |
-    # GARBAGE_TF_033_VPC_C - VPC configuration
-    resource "aws_vpc" "secondary_GARBAGE_TF_033_C" {
+  networking/vpc.tf: |
+    resource "aws_vpc" "secondary" {
       cidr_block           = "172.16.0.0/16"
       enable_dns_hostnames = true
       enable_dns_support   = true
 
       tags = {
-        Name = "secondary-vpc-GARBAGE_TF_033_C"
-        Team = "platform-GARBAGE_TF_033_VPC_D"
+        Name = "secondary-vpc"
+        Team = "platform"
       }
     }
 
@@ -51,52 +55,30 @@ changed:
         Name = "web-server"
       })
     }
-  monitoring/tags_GARBAGE_TF_033_A.tf: |
-    # GARBAGE_TF_033_MON_TAGS_A - Monitoring common tags
-    locals {
-      monitoring_tags_GARBAGE_TF_033_A = {
-        Project     = "monitoring"
-        Environment = var.environment
-        ManagedBy   = "terraform"
-      }
-    }
 
-    # GARBAGE_TF_033_MON_INSTANCE_B - Monitoring instance
-    resource "aws_instance" "grafana_GARBAGE_TF_033_B" {
-      ami  = "ami-99999"
-      tags = local.monitoring_tags_GARBAGE_TF_033_A
-    }
-  networking/vpc_GARBAGE_TF_033_C.tf: |
-    # GARBAGE_TF_033_VPC_C - VPC configuration
-    resource "aws_vpc" "secondary_GARBAGE_TF_033_C" {
-      cidr_block           = "172.16.0.0/16"
-      enable_dns_hostnames = true
-      enable_dns_support   = true
-
-      tags = {
-        Name = "secondary-vpc-GARBAGE_TF_033_C"
-        Team = "platform-GARBAGE_TF_033_VPC_D"
-      }
-    }
-
+# The diff is self-contained: main.tf introduces locals and updates the
+# instance to use merge(). No unchanged files are strictly required.
+# Assert on changed file content.
 must_include_files:
-- main.tf
+  - main.tf
 
-must_include_content_from:
-  main.tf:
-    - common_tags = {
-    - merge(local.common_tags, {
-    - ManagedBy   = "terraform"
+must_include_content:
+  - common_tags = {
+  - merge(local.common_tags, {
+  - ManagedBy   = "terraform"
 
 must_not_include:
-- GARBAGE_TF_033_MON_TAGS_A
-- GARBAGE_TF_033_B
-- GARBAGE_TF_033_VPC_C
-- GARBAGE_TF_033_VPC_D
+  # Monitoring locals have similar tag pattern but for monitoring stack
+  - monitoring_tags
+  - Project     = "monitoring"
+  - ami-99999
+  # VPC uses tags but is a different resource/concern
+  - secondary-vpc
+  - Team = "platform"
 
 must_not_include_files:
-- monitoring/tags_GARBAGE_TF_033_A.tf
-- networking/vpc_GARBAGE_TF_033_C.tf
+  - monitoring/tags.tf
+  - networking/vpc.tf
 
 max_fragments: 3
 max_files: 1

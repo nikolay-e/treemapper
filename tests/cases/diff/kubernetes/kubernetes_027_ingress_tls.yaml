@@ -1,3 +1,47 @@
+# Scenario: Ingress gains TLS termination with cert-manager, SSL redirect,
+#   force-ssl-redirect, and a second host rule for api-backup.example.com.
+#
+# Diff shows:
+#   + tls block referencing secretName: tls-cert with both hosts
+#   + ssl-redirect and force-ssl-redirect annotations
+#   + second rules entry for api-backup.example.com
+#
+# Reviewer questions:
+#   Q1: "Does the tls-cert secret already exist, and does it cover both hosts?"
+#       -> Needs k8s/base/certificate.yaml: Certificate with secretName: tls-cert
+#          and dnsNames including both api.example.com and api-backup.example.com.
+#          Confirms the secret will be created by cert-manager with matching hosts.
+#
+#   Q2: "Does the backend service secure-api exist with port 80?"
+#       -> Needs k8s/base/service.yaml: service named secure-api on port 80
+#          targeting 8080, confirming the ingress backend port is valid.
+#
+#   Q3: "Is the cert-manager issuer already configured?"
+#       -> The ingress annotation references cluster-issuer: letsencrypt-prod,
+#          and the Certificate references the same issuer. Cross-verification.
+#
+# Not needed for comprehension:
+#   - k8s/base/deployment.yaml: Runs the secure-api container. Direct structural
+#     edge (ingress -> service -> deployment). But the ingress change concerns
+#     TLS and host routing, not container configuration.
+#
+#   - k8s/infra/sealed-secret.yaml: SealedSecret for db-credentials in
+#     sealed-secrets namespace. Shares "secret" vocabulary and production
+#     namespace reference. But it's a completely different secret for a
+#     different purpose — database credentials, not TLS certs.
+#
+#   - k8s/infra/oauth2-proxy.yaml: OAuth2 proxy with upstream pointing to
+#     secure-api. Direct structural edge: it proxies to the same service.
+#     But the ingress TLS change doesn't require understanding OAuth2 flow.
+#
+#   - k8s/infra/cert-manager-issuer.yaml: The ClusterIssuer letsencrypt-prod
+#     referenced by both the ingress annotation and the Certificate. HARD TRAP:
+#     direct reference from the diff. But the issuer's ACME config and solver
+#     details don't help review the ingress TLS block — the reviewer only needs
+#     to verify the name matches.
+#
+#   - Makefile: Deployment script referencing k8s/base/. No TLS dependency.
+
 initial:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -83,50 +127,59 @@ initial:
                 name: secure-api
                 port:
                   number: 80
-  k8s/unrelated/vault/vault-injector.yaml: |
-    # GARBAGE_K8S_427_VAULT_INJECTOR
+  k8s/infra/sealed-secret.yaml: |
+    apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: db-credentials
+      namespace: sealed-secrets
+    spec:
+      encryptedData:
+        username: AgBz7K8mNpQrVwXyZ1234567890abcdefg
+        password: AgCx9M2oRsTuWxYz0987654321hijklmn
+      template:
+        metadata:
+          name: db-credentials
+          namespace: production
+  k8s/infra/oauth2-proxy.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: GARBAGE_K8S_427_VAULT_AGENT
-      namespace: vault
+      name: oauth2-proxy
+      namespace: auth
     spec:
       replicas: 2
       selector:
         matchLabels:
-          app: GARBAGE_K8S_427_VAULT_LABEL
+          app: oauth2-proxy
       template:
         spec:
           containers:
-          - name: vault-agent
-            image: hashicorp/vault:GARBAGE_K8S_427_VAULT_VERSION
-            env:
-            - name: VAULT_ADDR
-              value: GARBAGE_K8S_427_VAULT_ADDR
-  k8s/unrelated/backup/velero-schedule.yaml: |
-    # GARBAGE_K8S_427_VELERO_BACKUP
-    apiVersion: velero.io/v1
-    kind: Schedule
+          - name: oauth2-proxy
+            image: quay.io/oauth2-proxy/oauth2-proxy:v7.5.1
+            args:
+            - --provider=oidc
+            - --cookie-secure=true
+            - --upstream=http://secure-api.production.svc:80
+            ports:
+            - containerPort: 4180
+  k8s/infra/cert-manager-issuer.yaml: |
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
     metadata:
-      name: GARBAGE_K8S_427_BACKUP_SCHEDULE
-      namespace: velero
+      name: letsencrypt-prod
     spec:
-      schedule: GARBAGE_K8S_427_CRON_EXPR
-      template:
-        includedNamespaces:
-        - GARBAGE_K8S_427_BACKUP_NS
-        storageLocation: GARBAGE_K8S_427_STORAGE_LOC
-  k8s/unrelated/cost/kubecost.yaml: |
-    # GARBAGE_K8S_427_KUBECOST_CONFIG
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: GARBAGE_K8S_427_KUBECOST_CM
-      namespace: kubecost
-    data:
-      prometheus-url: GARBAGE_K8S_427_PROM_URL
-      cluster-id: GARBAGE_K8S_427_CLUSTER_ID
+      acme:
+        email: admin@example.com
+        server: https://acme-v02.api.letsencrypt.org/directory
+        privateKeySecretRef:
+          name: letsencrypt-prod-key
+        solvers:
+        - http01:
+            ingress:
+              class: nginx
   Makefile: "deploy:\n\tkubectl apply -f k8s/base/\n"
+
 changed:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -229,70 +282,93 @@ changed:
                 name: secure-api
                 port:
                   number: 80
-  k8s/unrelated/vault/vault-injector.yaml: |
-    # GARBAGE_K8S_427_VAULT_INJECTOR
+  k8s/infra/sealed-secret.yaml: |
+    apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    metadata:
+      name: db-credentials
+      namespace: sealed-secrets
+    spec:
+      encryptedData:
+        username: AgBz7K8mNpQrVwXyZ1234567890abcdefg
+        password: AgCx9M2oRsTuWxYz0987654321hijklmn
+      template:
+        metadata:
+          name: db-credentials
+          namespace: production
+  k8s/infra/oauth2-proxy.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: GARBAGE_K8S_427_VAULT_AGENT
-      namespace: vault
+      name: oauth2-proxy
+      namespace: auth
     spec:
       replicas: 2
       selector:
         matchLabels:
-          app: GARBAGE_K8S_427_VAULT_LABEL
+          app: oauth2-proxy
       template:
         spec:
           containers:
-          - name: vault-agent
-            image: hashicorp/vault:GARBAGE_K8S_427_VAULT_VERSION
-            env:
-            - name: VAULT_ADDR
-              value: GARBAGE_K8S_427_VAULT_ADDR
-  k8s/unrelated/backup/velero-schedule.yaml: |
-    # GARBAGE_K8S_427_VELERO_BACKUP
-    apiVersion: velero.io/v1
-    kind: Schedule
+          - name: oauth2-proxy
+            image: quay.io/oauth2-proxy/oauth2-proxy:v7.5.1
+            args:
+            - --provider=oidc
+            - --cookie-secure=true
+            - --upstream=http://secure-api.production.svc:80
+            ports:
+            - containerPort: 4180
+  k8s/infra/cert-manager-issuer.yaml: |
+    apiVersion: cert-manager.io/v1
+    kind: ClusterIssuer
     metadata:
-      name: GARBAGE_K8S_427_BACKUP_SCHEDULE
-      namespace: velero
+      name: letsencrypt-prod
     spec:
-      schedule: GARBAGE_K8S_427_CRON_EXPR
-      template:
-        includedNamespaces:
-        - GARBAGE_K8S_427_BACKUP_NS
-        storageLocation: GARBAGE_K8S_427_STORAGE_LOC
-  k8s/unrelated/cost/kubecost.yaml: |
-    # GARBAGE_K8S_427_KUBECOST_CONFIG
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: GARBAGE_K8S_427_KUBECOST_CM
-      namespace: kubecost
-    data:
-      prometheus-url: GARBAGE_K8S_427_PROM_URL
-      cluster-id: GARBAGE_K8S_427_CLUSTER_ID
+      acme:
+        email: admin@example.com
+        server: https://acme-v02.api.letsencrypt.org/directory
+        privateKeySecretRef:
+          name: letsencrypt-prod-key
+        solvers:
+        - http01:
+            ingress:
+              class: nginx
   Makefile: "deploy:\n\tkubectl apply -f k8s/base/\n"
+
 must_include_files:
-- k8s/base/ingress.yaml
-must_include_content:
-- 'nginx.ingress.kubernetes.io/ssl-redirect: "true"'
+  - k8s/base/ingress.yaml
+
+must_include_content_from:
+  k8s/base/ingress.yaml:
+    - 'nginx.ingress.kubernetes.io/ssl-redirect: "true"'
+    - "secretName: tls-cert"
+    - "host: api-backup.example.com"
+
 must_not_include:
-- GARBAGE_K8S_427_BACKUP_NS
-- GARBAGE_K8S_427_BACKUP_SCHEDULE
-- GARBAGE_K8S_427_CLUSTER_ID
-- GARBAGE_K8S_427_CRON_EXPR
-- GARBAGE_K8S_427_KUBECOST_CM
-- GARBAGE_K8S_427_KUBECOST_CONFIG
-- GARBAGE_K8S_427_PROM_URL
-- GARBAGE_K8S_427_STORAGE_LOC
-- GARBAGE_K8S_427_VAULT_ADDR
-- GARBAGE_K8S_427_VAULT_AGENT
-- GARBAGE_K8S_427_VAULT_INJECTOR
-- GARBAGE_K8S_427_VAULT_LABEL
-- GARBAGE_K8S_427_VELERO_BACKUP
-- kubecost.yaml
-- vault-injector.yaml
-- velero-schedule.yaml
+  # --- sealed-secret: different secret type, different namespace ---
+  - SealedSecret
+  - db-credentials
+  - encryptedData
+  # --- oauth2-proxy: proxies to secure-api, but auth flow not needed ---
+  - oauth2-proxy
+  - "--provider=oidc"
+  - "--cookie-secure=true"
+  # --- cert-manager issuer: HARD TRAP — referenced by name in the diff,
+  #     but ACME solver details don't help review ingress TLS block ---
+  - "acme-v02.api.letsencrypt.org"
+  - privateKeySecretRef
+  - "admin@example.com"
+  # --- deployment: container details not needed for ingress TLS review ---
+  - TLS_ENABLED
+  - "secure-api:v2.1.0"
+
+must_not_include_files:
+  - k8s/infra/sealed-secret.yaml
+  - k8s/infra/oauth2-proxy.yaml
+  - k8s/infra/cert-manager-issuer.yaml
+  - k8s/base/deployment.yaml
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

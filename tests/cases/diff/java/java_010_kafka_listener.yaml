@@ -1,3 +1,29 @@
+# Scenario: OrderEventConsumer goes from simple @KafkaListener to full-featured
+#   consumer with multiple topics, retry, batch processing, dead letter queue.
+#
+# Diff shows:
+#   + Multiple @KafkaListener methods (orders, payments, inventory, priority)
+#   + @Retryable with backoff for EventProcessingException
+#   + Manual Acknowledgment, MDC logging, ConsumerRecordMetadata
+#   + Batch processing for inventory events
+#   + OrderProcessingService dependency injection
+#   + PaymentEvent, InventoryEvent model records
+#   + EventProcessingException custom exception
+#
+# Reviewer questions:
+#   Q1: "What is OrderEvent — does it have orderId(), status(), totalAmount()?"
+#       -> Needs OrderEvent.java: record with orderId, customerId, totalAmount,
+#         status, timestamp. The diff calls event.orderId(), event.status(),
+#         event.totalAmount() — reviewer must verify these exist.
+#
+#   Q2: "What is EventProcessingException used in @Retryable?"
+#       -> Needs EventProcessingException.java: extends RuntimeException with
+#         two constructors. The diff throws it and uses it in @Retryable value.
+#
+# Not needed for comprehension:
+#   - WebSocketHandler.java, CacheManager.java: unrelated infrastructure.
+#     No structural edges to Kafka or order processing.
+
 initial:
   src/main/java/com/eventbus/consumer/OrderEventConsumer.java: |
     package com.eventbus.consumer;
@@ -394,19 +420,36 @@ changed:
         }
     }
 must_include_files:
-- src/main/java/com/eventbus/consumer/OrderEventConsumer.java
-- src/main/java/com/eventbus/exception/EventProcessingException.java
-- src/main/java/com/eventbus/model/InventoryEvent.java
-- src/main/java/com/eventbus/model/PaymentEvent.java
-must_include_content:
-- import com.eventbus.model.OrderEvent;
-- '@KafkaListener('
+  - src/main/java/com/eventbus/consumer/OrderEventConsumer.java
+  - src/main/java/com/eventbus/exception/EventProcessingException.java
+  - src/main/java/com/eventbus/model/InventoryEvent.java
+  - src/main/java/com/eventbus/model/PaymentEvent.java
+
+must_include_content_from:
+  src/main/java/com/eventbus/consumer/OrderEventConsumer.java:
+    - "import com.eventbus.model.OrderEvent"
+    - '@KafkaListener('
+    - "acknowledgment.acknowledge()"
+    - "orderProcessingService.processOrderEvent(event)"
+  src/main/java/com/eventbus/exception/EventProcessingException.java:
+    - "class EventProcessingException extends RuntimeException"
+  src/main/java/com/eventbus/model/PaymentEvent.java:
+    - "String transactionId"
+
 must_not_include:
-- GARBAGE_JAVA_CACHE_903
-- GARBAGE_JAVA_SESSION_902
-- GARBAGE_JAVA_TTL_904
-- GARBAGE_JAVA_WEBSOCKET_901
-- CacheManager.java
-- WebSocketHandler.java
+  # --- WebSocketHandler.java: unrelated infrastructure ---
+  - WebSocketHandler
+  - activeSessions
+  - GARBAGE_JAVA_WEBSOCKET_901
+  - GARBAGE_JAVA_SESSION_902
+  # --- CacheManager.java: unrelated infrastructure ---
+  - CacheManager
+  - GARBAGE_JAVA_CACHE_903
+  - GARBAGE_JAVA_TTL_904
+
+must_not_include_files:
+  - src/main/java/com/eventbus/unrelated/WebSocketHandler.java
+  - src/main/java/com/eventbus/unrelated/CacheManager.java
+
 add_garbage_files: false
 skip_garbage_check: true

@@ -13,9 +13,10 @@ from ..ignore import get_ignore_specs, get_whitelist_spec, is_whitelisted, shoul
 from ..tokens import count_tokens
 from ..tree import KNOWN_BINARY_EXTENSIONS
 from .config import LIMITS
-from .config.extensions import CODE_EXTENSIONS, CONFIG_EXTENSIONS, DOC_EXTENSIONS
+from .config.extensions import CODE_EXTENSIONS
 from .edges import discover_all_related_files
-from .fragments import enclosing_fragment, fragment_file  # type: ignore[attr-defined]
+from .file_importance import compute_file_importance
+from .fragments import fragment_file  # type: ignore[attr-defined]
 from .git import (
     GitError,
     get_changed_files,
@@ -29,12 +30,14 @@ from .git import (
     split_diff_range,
 )
 from .graph import Graph, build_graph
-from .languages import FILENAME_TO_LANGUAGE
+from .languages import get_language_for_file
 from .ppr import personalized_pagerank
-from .render import build_partial_tree
+from .render import build_diff_context_output
 from .select import SelectionResult, lazy_greedy_select
 from .types import DiffHunk, Fragment, FragmentId, extract_identifiers
 from .utility import concepts_from_diff_text, needs_from_diff
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["GitError", "build_diff_context"]
 
@@ -87,7 +90,7 @@ def _read_file_content(
     try:
         rel = abs_path.relative_to(root_dir.resolve())
     except ValueError:
-        logging.debug("diffctx: path %s not under root %s", abs_path, root_dir)
+        logger.debug("diffctx: path %s not under root %s", abs_path, root_dir)
         return None
 
     for rev in preferred_revs:
@@ -182,7 +185,7 @@ def _is_generated_file(path: Path, content: str) -> bool:
         if part.lower() in _GENERATED_PATH_SEGMENTS:
             return True
 
-    header_lower = "\n".join(content[:2000].splitlines()[:5]).lower()
+    header_lower = "\n".join(content.splitlines()[:5]).lower()
     for marker in _GENERATED_CONTENT_MARKERS:
         if marker in header_lower:
             return True
@@ -210,7 +213,7 @@ def _process_files_for_fragments(
         if len(file_frags) > cap:
             file_frags.sort(key=lambda f: f.line_count, reverse=True)
             file_frags = file_frags[:cap]
-            logging.debug(
+            logger.debug(
                 "diffctx: capped %s to %d fragments%s",
                 file_path.name,
                 cap,
@@ -262,11 +265,6 @@ def _find_core_for_hunk(
             core.add(f.id)
         return core
 
-    enc = enclosing_fragment(frags, h_start)
-    if enc is not None:
-        core.add(enc.id)
-        return core
-
     before = [f for f in frags if f.end_line < h_start]
     after = [f for f in frags if f.start_line > h_end]
     if before:
@@ -287,7 +285,7 @@ def _select_full_mode(
     return selected
 
 
-_SAME_FILE_FLOOR = 0.10
+_SAME_FILE_FLOOR = 0.01
 
 
 def _apply_same_file_floor(
@@ -310,6 +308,7 @@ def _find_hub_noise_paths(
     changed_paths: set[Path],
 ) -> set[Path]:
     reverse_deps: dict[Path, set[Path]] = defaultdict(set)
+    direct_edge_paths: set[Path] = set()
     for (src, dst), category in graph.edge_categories.items():
         if category != "semantic":
             continue
@@ -326,12 +325,15 @@ def _find_hub_noise_paths(
 
         if rev_w > fwd_w:
             reverse_deps[changed_frag.path].add(other_frag.path)
+        else:
+            direct_edge_paths.add(other_frag.path)
 
-    noise: set[Path] = set()
+    noise_counts: dict[Path, int] = {}
     for deps in reverse_deps.values():
         if len(deps) > _HUB_REVERSE_THRESHOLD:
-            noise.update(deps)
-    return noise
+            for dep in deps:
+                noise_counts[dep] = noise_counts.get(dep, 0) + 1
+    return {p for p, count in noise_counts.items() if count >= 3 and p not in direct_edge_paths}
 
 
 def _find_config_generic_code_files(
@@ -340,6 +342,8 @@ def _find_config_generic_code_files(
 ) -> set[Path]:
     has_real_edge: set[Path] = set()
     has_generic_config: set[Path] = set()
+    generic_edge_count: dict[Path, int] = {}
+    config_stems: set[str] = {p.stem.lower() for p in changed_paths}
     for (src, dst), category in graph.edge_categories.items():
         src_changed = src.path in changed_paths
         dst_changed = dst.path in changed_paths
@@ -348,11 +352,16 @@ def _find_config_generic_code_files(
         other_path = (dst if src_changed else src).path
         if category == "config_generic":
             has_generic_config.add(other_path)
+            generic_edge_count[other_path] = generic_edge_count.get(other_path, 0) + 1
         elif category in ("semantic", "config"):
             has_real_edge.add(other_path)
 
     generic_only = has_generic_config - has_real_edge
-    return {p for p in generic_only if p.suffix.lower() in CODE_EXTENSIONS}
+    return {
+        p
+        for p in generic_only
+        if p.suffix.lower() in CODE_EXTENSIONS and generic_edge_count.get(p, 0) <= 1 and p.stem.lower() not in config_stems
+    }
 
 
 def _filter_unrelated_fragments(
@@ -372,7 +381,7 @@ def _filter_unrelated_fragments(
     kept = [f for f in fragments if f.path not in paths_to_remove]
     removed_count = len(fragments) - len(kept)
     if removed_count:
-        logging.debug(
+        logger.debug(
             "diffctx: filtered %d fragments from %d unrelated files",
             removed_count,
             len(paths_to_remove),
@@ -405,7 +414,7 @@ def _cap_context_fragments(
         else:
             file_frags.sort(key=lambda f: rel.get(f.id, 0.0), reverse=True)
             result.extend(file_frags[:_MAX_CONTEXT_FRAGMENTS_PER_FILE])
-            logging.debug(
+            logger.debug(
                 "diffctx: capped %s from %d to %d fragments",
                 path,
                 len(file_frags),
@@ -427,7 +436,7 @@ def _filter_low_relevance_fragments(
     kept = [f for f in fragments if f.path in changed_paths or rel.get(f.id, 0.0) >= _LOW_RELEVANCE_THRESHOLD]
     removed = len(fragments) - len(kept)
     if removed:
-        logging.debug("diffctx: filtered %d low-relevance fragments (threshold=%.4f)", removed, _LOW_RELEVANCE_THRESHOLD)
+        logger.debug("diffctx: filtered %d low-relevance fragments (threshold=%.4f)", removed, _LOW_RELEVANCE_THRESHOLD)
     return kept
 
 
@@ -461,7 +470,14 @@ def _ensure_changed_files_represented(
         if not candidates:
             content = _read_file_content(path, root_dir, preferred_revs)
             if content and content.strip():
-                lines = content.splitlines()
+                if _is_generated_file(path, content):
+                    lines = content.splitlines()
+                    if len(lines) > _MAX_GENERATED_LINES:
+                        remaining = len(lines) - _MAX_GENERATED_LINES
+                        content = "\n".join(lines[:_MAX_GENERATED_LINES]) + f"\n# ... [{remaining} more lines]"
+                    lines = content.splitlines()
+                else:
+                    lines = content.splitlines()
                 frag = Fragment(
                     id=FragmentId(path=path, start_line=1, end_line=len(lines)),
                     kind="chunk",
@@ -473,16 +489,21 @@ def _ensure_changed_files_represented(
 
         if not candidates:
             continue
-        best = max(candidates, key=lambda f: f.token_count if f.token_count > 0 else 0)
-        if best.token_count <= 0 or best.id in selected_ids:
-            continue
-        if best.token_count <= budget_left:
-            added.append(best)
-            selected_ids.add(best.id)
-            budget_left -= best.token_count
+        ranked = sorted(candidates, key=lambda f: f.token_count)
+        picked = None
+        for cand in ranked:
+            if cand.token_count <= 0 or cand.id in selected_ids:
+                continue
+            if cand.token_count <= budget_left:
+                picked = cand
+                break
+        if picked is not None:
+            added.append(picked)
+            selected_ids.add(picked.id)
+            budget_left -= picked.token_count
 
     if added:
-        logging.debug("diffctx: injected %d fragments to cover %d missing changed files", len(added), len(missing_paths))
+        logger.debug("diffctx: injected %d fragments to cover %d missing changed files", len(added), len(missing_paths))
 
     return selected + added
 
@@ -507,6 +528,8 @@ def _select_with_ppr(
 
     needs = needs_from_diff(filtered_fragments, core_ids, graph, diff_text)
 
+    file_importance = compute_file_importance(filtered_fragments)
+
     effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
 
     result = lazy_greedy_select(
@@ -516,6 +539,7 @@ def _select_with_ppr(
         needs=needs,
         budget_tokens=effective_budget,
         tau=tau,
+        file_importance=file_importance,
     )
 
     selected = _coherence_post_pass(result, filtered_fragments, graph, effective_budget)
@@ -577,7 +601,7 @@ def build_diff_context(
 
     edge_discovered = discover_all_related_files(changed_files, all_candidate_files, root_dir)
     if len(edge_discovered) > _MAX_DISCOVERED_FILES:
-        logging.debug(
+        logger.debug(
             "diffctx: capping edge-discovered files from %d to %d",
             len(edge_discovered),
             _MAX_DISCOVERED_FILES,
@@ -593,7 +617,7 @@ def build_diff_context(
         expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
         all_fragments.extend(_process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids))
     else:
-        logging.debug("diffctx: skipping rare-identifier expansion for large repo")
+        logger.debug("diffctx: skipping rare-identifier expansion for large repo")
 
     for frag in all_fragments:
         frag.token_count = count_tokens(frag.content).count + _OVERHEAD_PER_FRAGMENT
@@ -629,7 +653,7 @@ def build_diff_context(
         for frag in selected:
             frag.content = ""
 
-    return build_partial_tree(root_dir, selected)
+    return build_diff_context_output(root_dir, selected)
 
 
 def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: int | None) -> None:
@@ -640,7 +664,7 @@ def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: in
     if tau < 0.0:
         raise ValueError(f"tau must be >= 0, got {tau}")
     if tau < 1e-15:
-        logging.warning("tau≈0 disables adaptive stopping; budget will be fully consumed")
+        logger.warning("tau≈0 disables adaptive stopping; budget will be fully consumed")
     if budget_tokens is not None and budget_tokens <= 0:
         raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
@@ -700,11 +724,15 @@ def _coherence_post_pass(
     if not added:
         return result
 
+    new_selected = result.selected + added
+    new_used = result.used_tokens + sum(f.token_count for f in added)
+    new_utility = result.utility
+
     return SelectionResult(
-        selected=result.selected + added,
+        selected=new_selected,
         reason=result.reason,
-        used_tokens=result.used_tokens + sum(f.token_count for f in added),
-        utility=result.utility,
+        used_tokens=new_used,
+        utility=new_utility,
     )
 
 
@@ -724,12 +752,47 @@ def _compute_seed_weights(
                 frag_hunk_lines[frag.id] = frag_hunk_lines.get(frag.id, 0) + hunk_size
     if not frag_hunk_lines:
         return {}
+
+    for frag in all_fragments:
+        if frag.id not in core_ids or frag.id in frag_hunk_lines:
+            continue
+        if frag.kind in _CONTAINER_FRAGMENT_KINDS:
+            contained_weight = sum(
+                w
+                for fid, w in frag_hunk_lines.items()
+                if fid.path == frag.path and frag.start_line <= fid.start_line and fid.end_line <= frag.end_line
+            )
+            if contained_weight > 0:
+                frag_hunk_lines[frag.id] = contained_weight
+
+    for fid in core_ids:
+        if fid not in frag_hunk_lines:
+            best_hunk_size = 0
+            for h in hunks:
+                if h.path == fid.path:
+                    h_start, h_end = h.core_selection_range
+                    best_hunk_size = max(best_hunk_size, h_end - h_start + 1)
+            if best_hunk_size > 0:
+                frag_hunk_lines[fid] = best_hunk_size
+
     return frag_hunk_lines
 
 
 _CONTAINER_FRAGMENT_KINDS = frozenset({"class", "interface", "struct"})
 _SIGNATURE_ELIGIBLE_KINDS = frozenset({"function", "class", "method", "struct", "interface", "enum"})
 _MIN_LINES_FOR_SIGNATURE = 5
+
+
+def _find_signature_end(lines: list[str]) -> int:
+    depth = 0
+    for i, line in enumerate(lines):
+        depth += line.count("(") - line.count(")")
+        if depth <= 0 and i > 0:
+            return i + 1
+        depth += line.count("{") - line.count("}")
+        if depth > 0:
+            return i + 1
+    return min(2, len(lines))
 
 
 def _generate_signature_variants(fragments: list[Fragment]) -> list[Fragment]:
@@ -741,7 +804,7 @@ def _generate_signature_variants(fragments: list[Fragment]) -> list[Fragment]:
         if frag.line_count < _MIN_LINES_FOR_SIGNATURE:
             continue
         lines = frag.content.splitlines()
-        sig_end = min(2, len(lines))
+        sig_end = _find_signature_end(lines)
         sig_content = "\n".join(lines[:sig_end])
         sig_id = FragmentId(frag.path, frag.start_line, frag.start_line + sig_end - 1)
         if sig_id in seen:
@@ -792,14 +855,14 @@ def _add_container_headers(core_ids: set[FragmentId], frags_by_path: dict[Path, 
 def _log_full_mode(selected: list[Fragment]) -> None:
     try:
         used = sum(f.token_count for f in selected)
-        logging.info(
+        logger.info(
             "diffctx: full mode selected=%d from changed files used=%d tokens",
             len(selected),
             used,
         )
     except (TypeError, AttributeError) as e:
         # nosemgrep: python-logger-credential-disclosure
-        logging.debug("diffctx: failed to compute token count: %s", e)
+        logger.debug("diffctx: failed to compute token count: %s", e)
 
 
 def _log_ppr_mode(
@@ -813,7 +876,7 @@ def _log_ppr_mode(
     try:
         used = sum(f.token_count for f in selected)
         budget_str = str(budget_tokens) if budget_tokens is not None else "unlimited"
-        logging.info(
+        logger.info(
             "diffctx: selected=%d core=%d used=%d/%s reason=%s utility=%.4f alpha=%.3f tau=%.3f",
             len(selected),
             len(core_ids),
@@ -826,20 +889,14 @@ def _log_ppr_mode(
         )
     except (TypeError, AttributeError) as e:
         # nosemgrep: python-logger-credential-disclosure
-        logging.debug("diffctx: failed to compute token count: %s", e)
+        logger.debug("diffctx: failed to compute token count: %s", e)
 
 
 _MAX_FILE_SIZE = LIMITS.max_file_size
 
-_ALLOWED_SUFFIXES = CODE_EXTENSIONS | CONFIG_EXTENSIONS | DOC_EXTENSIONS | frozenset({".env"})
-_ALLOWED_FILENAMES = frozenset(k.lower() for k in FILENAME_TO_LANGUAGE.keys())
-
 
 def _is_allowed_file(path: Path) -> bool:
-    suffix = path.suffix.lower()
-    if suffix in _ALLOWED_SUFFIXES:
-        return True
-    return path.name.lower() in _ALLOWED_FILENAMES
+    return get_language_for_file(str(path)) is not None
 
 
 def _normalize_path(path: Path, root_dir: Path) -> Path:
@@ -913,7 +970,7 @@ def _collect_candidate_files(
             candidates = [f for f in files if _is_candidate_file(f, root_dir, included_set, combined_spec)]
             is_large_repo = len(candidates) > _MAX_CANDIDATE_FILES
             if is_large_repo:
-                logging.debug(
+                logger.debug(
                     "diffctx: %d candidates exceed cap %d, prioritizing by proximity",
                     len(candidates),
                     _MAX_CANDIDATE_FILES,
@@ -922,11 +979,11 @@ def _collect_candidate_files(
             return candidates, is_large_repo
     except (subprocess.SubprocessError, OSError):
         pass
-    logging.warning("diffctx: git ls-files failed, falling back to rglob (limit %d files)", _FALLBACK_MAX_FILES)
+    logger.warning("diffctx: git ls-files failed, falling back to rglob (limit %d files)", _FALLBACK_MAX_FILES)
     fallback: list[Path] = []
     for f in root_dir.rglob("*"):
         if len(fallback) >= _FALLBACK_MAX_FILES:
-            logging.warning("diffctx: fallback scan hit limit, results may be incomplete")
+            logger.warning("diffctx: fallback scan hit limit, results may be incomplete")
             break
         if _is_candidate_file(f, root_dir, included_set, combined_spec):
             fallback.append(f)
@@ -949,6 +1006,66 @@ def _build_ident_index(files: list[Path], concepts: frozenset[str]) -> dict[str,
 
 _MIN_CONCEPT_LENGTH = 4
 
+_BUILD_SYSTEM_NAMES = frozenset(
+    {
+        "cmakelists.txt",
+        "makefile",
+        "gnumakefile",
+        "meson.build",
+        "build.gradle",
+        "build.gradle.kts",
+        "pom.xml",
+        "build.xml",
+        "premake5.lua",
+        "justfile",
+        "taskfile.yml",
+        "taskfile.yaml",
+        "rakefile",
+    }
+)
+
+_BUILD_SYSTEM_EXTENSIONS = frozenset(
+    {
+        ".mk",
+        ".mak",
+        ".make",
+        ".cmake",
+        ".bzl",
+        ".ninja",
+    }
+)
+
+_PACKAGE_MANIFEST_NAMES = frozenset(
+    {
+        "package.json",
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "cargo.toml",
+        "cargo.lock",
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "go.mod",
+        "go.sum",
+        "gemfile",
+        "gemfile.lock",
+        "composer.json",
+        "composer.lock",
+        "pubspec.yaml",
+        "pubspec.lock",
+    }
+)
+
+
+def _is_build_or_manifest(path: Path) -> bool:
+    name_lower = path.name.lower()
+    return (
+        name_lower in _BUILD_SYSTEM_NAMES
+        or name_lower in _PACKAGE_MANIFEST_NAMES
+        or path.suffix.lower() in _BUILD_SYSTEM_EXTENSIONS
+    )
+
 
 def _collect_expansion_files(
     inverted_index: dict[str, list[Path]], concepts: frozenset[str], included_set: set[Path]
@@ -960,7 +1077,7 @@ def _collect_expansion_files(
 
     for concept in rare_concepts:
         for file_path in inverted_index.get(concept, []):
-            if file_path not in included_set:
+            if file_path not in included_set and not _is_build_or_manifest(file_path):
                 expansion_files.add(file_path)
                 if len(expansion_files) >= _MAX_EXPANSION_FILES:
                     return list(expansion_files)

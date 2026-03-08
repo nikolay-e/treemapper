@@ -1,3 +1,21 @@
+# Test: app.rb calls Service.process which chains private validate/normalize/transform
+#
+# Scenario: app.rb is rewritten to require Service and call process() with edge
+# cases (whitespace, nil). Service (UNCHANGED) has a public process() method that
+# chains three private methods: validate, normalize, transform.
+#
+# Reviewer questions:
+#   Q1: "What happens when process(nil) is called? What does validate raise?"
+#       -> lib/service.rb (UNCHANGED) — validate raises ArgumentError for nil/empty.
+#   Q2: "What's the full transformation pipeline?"
+#       -> validate -> normalize (strip+downcase) -> transform (upcase).
+#
+# Trap files (plausible but unrelated):
+#   - lib/data_pipeline.rb: multi-step data pipeline — similar chaining concept
+#     but completely independent from Service.
+#   - lib/string_utils.rb: string manipulation utilities — similar to normalize/
+#     transform but Service has its own private methods.
+
 initial:
   lib/service.rb: |
     class Service
@@ -25,26 +43,43 @@ initial:
     end
   app.rb: |
     puts 'Hello'
-  lib/garbage_image_processor.rb: |
-    GARBAGE_RUBY_008_RESIZE_MODE_A = "bicubic"
-    GARBAGE_RUBY_008_OUTPUT_FORMAT_B = "webp"
+  lib/data_pipeline.rb: |
+    class DataPipeline
+      def initialize
+        @steps = []
+      end
 
-    class GarbageImageProcessor
-      GARBAGE_RUBY_008_MAX_DIMENSION_C = 2048
+      def add_step(name, &block)
+        @steps << { name: name, transform: block }
+      end
 
-      def process(image_path)
-        GARBAGE_RUBY_008_RESIZE_MODE_A
+      def execute(input)
+        @steps.reduce(input) do |data, step|
+          step[:transform].call(data)
+        end
+      end
+
+      def step_count
+        @steps.size
       end
     end
-  lib/garbage_search_index.rb: |
-    GARBAGE_RUBY_008_INDEX_TYPE_D = "inverted"
-    GARBAGE_RUBY_008_ANALYZER_MODE_E = "standard"
+  lib/string_utils.rb: |
+    module StringUtils
+      def self.titleize(str)
+        str.split(/[\s_-]/).map(&:capitalize).join(' ')
+      end
 
-    class GarbageSearchIndexer
-      GARBAGE_RUBY_008_SHARD_COUNT_F = 5
+      def self.truncate(str, length: 50, omission: '...')
+        return str if str.length <= length
+        str[0, length - omission.length] + omission
+      end
 
-      def index(document)
-        GARBAGE_RUBY_008_INDEX_TYPE_D
+      def self.parameterize(str)
+        str.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/(^-|-$)/, '')
+      end
+
+      def self.camelize(str)
+        str.split('_').map(&:capitalize).join
       end
     end
 changed:
@@ -84,44 +119,69 @@ changed:
     rescue ArgumentError => e
       puts "Error: #{e.message}"
     end
-  lib/garbage_image_processor.rb: |
-    GARBAGE_RUBY_008_RESIZE_MODE_A = "bicubic"
-    GARBAGE_RUBY_008_OUTPUT_FORMAT_B = "webp"
+  lib/data_pipeline.rb: |
+    class DataPipeline
+      def initialize
+        @steps = []
+      end
 
-    class GarbageImageProcessor
-      GARBAGE_RUBY_008_MAX_DIMENSION_C = 2048
+      def add_step(name, &block)
+        @steps << { name: name, transform: block }
+      end
 
-      def process(image_path)
-        GARBAGE_RUBY_008_RESIZE_MODE_A
+      def execute(input)
+        @steps.reduce(input) do |data, step|
+          step[:transform].call(data)
+        end
+      end
+
+      def step_count
+        @steps.size
       end
     end
-  lib/garbage_search_index.rb: |
-    GARBAGE_RUBY_008_INDEX_TYPE_D = "inverted"
-    GARBAGE_RUBY_008_ANALYZER_MODE_E = "standard"
+  lib/string_utils.rb: |
+    module StringUtils
+      def self.titleize(str)
+        str.split(/[\s_-]/).map(&:capitalize).join(' ')
+      end
 
-    class GarbageSearchIndexer
-      GARBAGE_RUBY_008_SHARD_COUNT_F = 5
+      def self.truncate(str, length: 50, omission: '...')
+        return str if str.length <= length
+        str[0, length - omission.length] + omission
+      end
 
-      def index(document)
-        GARBAGE_RUBY_008_INDEX_TYPE_D
+      def self.parameterize(str)
+        str.downcase.gsub(/[^a-z0-9]+/, '-').gsub(/(^-|-$)/, '')
+      end
+
+      def self.camelize(str)
+        str.split('_').map(&:capitalize).join
       end
     end
 must_include_files:
-- app.rb
-must_include_content:
-- |
-  service = Service.new
-  result = service.process("  Hello World  ")
+  - app.rb
+  # Q1/Q2: Service defines process() and private methods app.rb exercises
+  - lib/service.rb
+must_include_content_from:
+  app.rb:
+    - 'service = Service.new'
+    - 'service.process("  Hello World  ")'
+  lib/service.rb:
+    - "def validate(data)"
+    - "def normalize(data)"
 must_not_include:
-- GARBAGE_RUBY_008_RESIZE_MODE_A
-- GARBAGE_RUBY_008_OUTPUT_FORMAT_B
-- GARBAGE_RUBY_008_MAX_DIMENSION_C
-- GARBAGE_RUBY_008_INDEX_TYPE_D
-- GARBAGE_RUBY_008_ANALYZER_MODE_E
-- GARBAGE_RUBY_008_SHARD_COUNT_F
-- GarbageImageProcessor
-- GarbageSearchIndexer
-- garbage_image_processor.rb
-- garbage_search_index.rb
+  # lib/data_pipeline.rb: generic pipeline — not used by Service
+  - DataPipeline
+  - add_step
+  - step_count
+  # lib/string_utils.rb: string utilities — Service has its own private methods
+  - StringUtils
+  - titleize
+  - parameterize
+must_not_include_files:
+  - lib/data_pipeline.rb
+  - lib/string_utils.rb
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

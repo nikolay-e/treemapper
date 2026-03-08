@@ -1,3 +1,39 @@
+# Scenario: Calculator class gains multiply, subtract, divide methods
+#   and a MathContext-based constructor. Only Calculator.java is changed.
+#
+# Diff shows:
+#   - Added MathContext field and constructor
+#   - Added multiply(BigDecimal, BigDecimal), subtract, divide methods
+#   - Added divide-by-zero guard
+#   - Existing add() now uses mathContext parameter
+#
+# Reviewer questions:
+#   Q1: "Does the existing add() call site in Main.java still work?"
+#       -> Yes — Main calls calc.add(BigDecimal, BigDecimal) which still
+#         exists. But Main does NOT need to be in context: the method
+#         signature is unchanged, so call-site compatibility is visible
+#         from the diff alone.
+#
+#   Q2: "Are the new methods consistent with existing add() behavior?"
+#       -> Yes — all use mathContext and setScale. The diff is self-contained
+#         for this question since all methods are in Calculator.java.
+#
+# Not needed for comprehension:
+#   - Main.java: Calls calc.add() — direct structural edge as a consumer
+#     of the changed class. But the add() signature is unchanged, so the
+#     call site doesn't help review the new methods. Including it would
+#     add noise without aiding comprehension.
+#
+#   - StatisticsService.java: Spring @Service that @Autowires Calculator
+#     and calls add(), multiply(). HARD TRAP: direct dependency on the
+#     changed class via Spring DI. But it's a consumer — reviewing it
+#     doesn't help verify Calculator's correctness.
+#
+#   - ScientificCalculator.java: Extends Calculator, overrides add().
+#     HARDEST TRAP: subclass relationship with the changed class.
+#     But understanding the subclass doesn't help review whether the
+#     new methods in Calculator are correct.
+
 initial:
   src/main/java/com/mathengine/core/Calculator.java: |
     package com.mathengine.core;
@@ -41,6 +77,7 @@ initial:
             return scale;
         }
     }
+
   src/main/java/com/mathengine/Main.java: |
     package com.mathengine;
 
@@ -54,70 +91,115 @@ initial:
             System.out.println("Result: " + result);
         }
     }
-  src/main/java/com/mathengine/unrelated/ReportGenerator.java: |
-    package com.mathengine.unrelated;
 
-    import java.time.LocalDateTime;
-    import java.util.UUID;
+  src/main/java/com/mathengine/core/ScientificCalculator.java: |
+    package com.mathengine.core;
 
-    public class ReportGenerator {
-        public static final String GARBAGE_JAVA_REPORT_001 = "unrelated_report_marker";
-        private static final String GARBAGE_JAVA_INTERNAL_002 = "internal_marker";
+    import java.math.BigDecimal;
+    import java.math.MathContext;
+    import java.math.RoundingMode;
 
-        private final String reportId;
-        private final LocalDateTime createdAt;
+    public class ScientificCalculator extends Calculator {
+        private final MathContext context;
 
-        public ReportGenerator() {
-            this.reportId = UUID.randomUUID().toString();
-            this.createdAt = LocalDateTime.now();
-            initializeGarbageData();
+        public ScientificCalculator(int scale, MathContext context) {
+            super(scale);
+            this.context = context;
         }
 
-        private void initializeGarbageData() {
-            String marker = GARBAGE_JAVA_REPORT_001 + GARBAGE_JAVA_INTERNAL_002;
-            System.out.println(marker);
+        @Override
+        public BigDecimal add(BigDecimal a, BigDecimal b) {
+            return a.add(b, context).setScale(getScale(), RoundingMode.HALF_UP);
         }
 
-        public String generateSummary() {
-            return String.format("Report %s created at %s", reportId, createdAt);
+        public BigDecimal power(BigDecimal base, int exponent) {
+            return base.pow(exponent, context).setScale(getScale(), RoundingMode.HALF_UP);
         }
 
-        public void processUnrelatedData() {
-            String GARBAGE_JAVA_LOCAL_003 = "local_marker";
-            System.out.println(GARBAGE_JAVA_LOCAL_003);
+        public BigDecimal sqrt(BigDecimal value) {
+            return value.sqrt(context).setScale(getScale(), RoundingMode.HALF_UP);
         }
     }
-  src/main/java/com/mathengine/unrelated/StatisticsCollector.java: |
-    package com.mathengine.unrelated;
 
-    import java.util.ArrayList;
+  src/main/java/com/mathengine/service/StatisticsService.java: |
+    package com.mathengine.service;
+
+    import com.mathengine.core.Calculator;
+    import org.springframework.stereotype.Service;
+    import java.math.BigDecimal;
     import java.util.List;
 
-    public class StatisticsCollector {
-        public static final String GARBAGE_JAVA_STATS_004 = "stats_collector_marker";
+    @Service
+    public class StatisticsService {
+        private final Calculator calculator;
 
-        private final List<Double> samples = new ArrayList<>();
-
-        public void addSample(double value) {
-            samples.add(value);
+        public StatisticsService(Calculator calculator) {
+            this.calculator = calculator;
         }
 
-        public double calculateMean() {
-            if (samples.isEmpty()) {
-                return 0.0;
+        public BigDecimal computeSum(List<BigDecimal> values) {
+            BigDecimal sum = BigDecimal.ZERO;
+            for (BigDecimal v : values) {
+                sum = calculator.add(sum, v);
             }
-            return samples.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+            return sum;
         }
 
-        public void clearSamples() {
-            samples.clear();
-            logGarbageMarker();
+        public BigDecimal computeAverage(List<BigDecimal> values) {
+            if (values.isEmpty()) {
+                throw new ArithmeticException("Cannot compute average of empty list");
+            }
+            BigDecimal sum = computeSum(values);
+            return calculator.divide(sum, BigDecimal.valueOf(values.size()));
         }
 
-        private void logGarbageMarker() {
-            System.out.println(GARBAGE_JAVA_STATS_004);
+        public BigDecimal computeVariance(List<BigDecimal> values) {
+            BigDecimal avg = computeAverage(values);
+            BigDecimal sumSquaredDiff = BigDecimal.ZERO;
+            for (BigDecimal v : values) {
+                BigDecimal diff = calculator.subtract(v, avg);
+                sumSquaredDiff = calculator.add(sumSquaredDiff, calculator.multiply(diff, diff));
+            }
+            return calculator.divide(sumSquaredDiff, BigDecimal.valueOf(values.size()));
         }
     }
+
+  src/test/java/com/mathengine/core/CalculatorTest.java: |
+    package com.mathengine.core;
+
+    import org.junit.jupiter.api.Test;
+    import java.math.BigDecimal;
+    import java.math.MathContext;
+    import static org.junit.jupiter.api.Assertions.*;
+
+    class CalculatorTest {
+        private final Calculator calculator = new Calculator();
+
+        @Test
+        void testAddTwoPositiveNumbers() {
+            BigDecimal result = calculator.add(BigDecimal.valueOf(1.5), BigDecimal.valueOf(2.5));
+            assertEquals(new BigDecimal("4.0000000000"), result);
+        }
+
+        @Test
+        void testAddWithNullThrows() {
+            assertThrows(IllegalArgumentException.class,
+                () -> calculator.add(null, BigDecimal.ONE));
+        }
+
+        @Test
+        void testDivideByZeroThrows() {
+            assertThrows(ArithmeticException.class,
+                () -> calculator.divide(BigDecimal.ONE, BigDecimal.ZERO));
+        }
+
+        @Test
+        void testMultiply() {
+            BigDecimal result = calculator.multiply(BigDecimal.valueOf(3), BigDecimal.valueOf(4));
+            assertEquals(new BigDecimal("12.0000000000"), result);
+        }
+    }
+
 changed:
   src/main/java/com/mathengine/core/Calculator.java: |
     package com.mathengine.core;
@@ -208,6 +290,7 @@ changed:
             return mathContext;
         }
     }
+
   src/main/java/com/mathengine/Main.java: |
     package com.mathengine;
 
@@ -221,80 +304,158 @@ changed:
             System.out.println("Result: " + result);
         }
     }
-  src/main/java/com/mathengine/unrelated/ReportGenerator.java: |
-    package com.mathengine.unrelated;
 
-    import java.time.LocalDateTime;
-    import java.util.UUID;
+  src/main/java/com/mathengine/core/ScientificCalculator.java: |
+    package com.mathengine.core;
 
-    public class ReportGenerator {
-        public static final String GARBAGE_JAVA_REPORT_001 = "unrelated_report_marker";
-        private static final String GARBAGE_JAVA_INTERNAL_002 = "internal_marker";
+    import java.math.BigDecimal;
+    import java.math.MathContext;
+    import java.math.RoundingMode;
 
-        private final String reportId;
-        private final LocalDateTime createdAt;
+    public class ScientificCalculator extends Calculator {
+        private final MathContext context;
 
-        public ReportGenerator() {
-            this.reportId = UUID.randomUUID().toString();
-            this.createdAt = LocalDateTime.now();
-            initializeGarbageData();
+        public ScientificCalculator(int scale, MathContext context) {
+            super(scale);
+            this.context = context;
         }
 
-        private void initializeGarbageData() {
-            String marker = GARBAGE_JAVA_REPORT_001 + GARBAGE_JAVA_INTERNAL_002;
-            System.out.println(marker);
+        @Override
+        public BigDecimal add(BigDecimal a, BigDecimal b) {
+            return a.add(b, context).setScale(getScale(), RoundingMode.HALF_UP);
         }
 
-        public String generateSummary() {
-            return String.format("Report %s created at %s", reportId, createdAt);
+        public BigDecimal power(BigDecimal base, int exponent) {
+            return base.pow(exponent, context).setScale(getScale(), RoundingMode.HALF_UP);
         }
 
-        public void processUnrelatedData() {
-            String GARBAGE_JAVA_LOCAL_003 = "local_marker";
-            System.out.println(GARBAGE_JAVA_LOCAL_003);
+        public BigDecimal sqrt(BigDecimal value) {
+            return value.sqrt(context).setScale(getScale(), RoundingMode.HALF_UP);
         }
     }
-  src/main/java/com/mathengine/unrelated/StatisticsCollector.java: |
-    package com.mathengine.unrelated;
 
-    import java.util.ArrayList;
+  src/main/java/com/mathengine/service/StatisticsService.java: |
+    package com.mathengine.service;
+
+    import com.mathengine.core.Calculator;
+    import org.springframework.stereotype.Service;
+    import java.math.BigDecimal;
     import java.util.List;
 
-    public class StatisticsCollector {
-        public static final String GARBAGE_JAVA_STATS_004 = "stats_collector_marker";
+    @Service
+    public class StatisticsService {
+        private final Calculator calculator;
 
-        private final List<Double> samples = new ArrayList<>();
-
-        public void addSample(double value) {
-            samples.add(value);
+        public StatisticsService(Calculator calculator) {
+            this.calculator = calculator;
         }
 
-        public double calculateMean() {
-            if (samples.isEmpty()) {
-                return 0.0;
+        public BigDecimal computeSum(List<BigDecimal> values) {
+            BigDecimal sum = BigDecimal.ZERO;
+            for (BigDecimal v : values) {
+                sum = calculator.add(sum, v);
             }
-            return samples.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+            return sum;
         }
 
-        public void clearSamples() {
-            samples.clear();
-            logGarbageMarker();
+        public BigDecimal computeAverage(List<BigDecimal> values) {
+            if (values.isEmpty()) {
+                throw new ArithmeticException("Cannot compute average of empty list");
+            }
+            BigDecimal sum = computeSum(values);
+            return calculator.divide(sum, BigDecimal.valueOf(values.size()));
         }
 
-        private void logGarbageMarker() {
-            System.out.println(GARBAGE_JAVA_STATS_004);
+        public BigDecimal computeVariance(List<BigDecimal> values) {
+            BigDecimal avg = computeAverage(values);
+            BigDecimal sumSquaredDiff = BigDecimal.ZERO;
+            for (BigDecimal v : values) {
+                BigDecimal diff = calculator.subtract(v, avg);
+                sumSquaredDiff = calculator.add(sumSquaredDiff, calculator.multiply(diff, diff));
+            }
+            return calculator.divide(sumSquaredDiff, BigDecimal.valueOf(values.size()));
         }
     }
+
+  src/test/java/com/mathengine/core/CalculatorTest.java: |
+    package com.mathengine.core;
+
+    import org.junit.jupiter.api.Test;
+    import java.math.BigDecimal;
+    import java.math.MathContext;
+    import static org.junit.jupiter.api.Assertions.*;
+
+    class CalculatorTest {
+        private final Calculator calculator = new Calculator();
+
+        @Test
+        void testAddTwoPositiveNumbers() {
+            BigDecimal result = calculator.add(BigDecimal.valueOf(1.5), BigDecimal.valueOf(2.5));
+            assertEquals(new BigDecimal("4.0000000000"), result);
+        }
+
+        @Test
+        void testAddWithNullThrows() {
+            assertThrows(IllegalArgumentException.class,
+                () -> calculator.add(null, BigDecimal.ONE));
+        }
+
+        @Test
+        void testDivideByZeroThrows() {
+            assertThrows(ArithmeticException.class,
+                () -> calculator.divide(BigDecimal.ONE, BigDecimal.ZERO));
+        }
+
+        @Test
+        void testMultiply() {
+            BigDecimal result = calculator.multiply(BigDecimal.valueOf(3), BigDecimal.valueOf(4));
+            assertEquals(new BigDecimal("12.0000000000"), result);
+        }
+    }
+
 must_include_files:
-- src/main/java/com/mathengine/core/Calculator.java
-must_include_content:
-- private static final MathContext DEFAULT_CONTEXT = MathContext.DECIMAL128;
+  - src/main/java/com/mathengine/core/Calculator.java
+
+must_include_content_from:
+  src/main/java/com/mathengine/core/Calculator.java:
+    - "private static final MathContext DEFAULT_CONTEXT = MathContext.DECIMAL128"
+    - "public BigDecimal multiply(BigDecimal a, BigDecimal b)"
+    - "public BigDecimal divide(BigDecimal a, BigDecimal b)"
+    - 'throw new ArithmeticException("Division by zero")'
+
 must_not_include:
-- GARBAGE_JAVA_INTERNAL_002
-- GARBAGE_JAVA_LOCAL_003
-- GARBAGE_JAVA_REPORT_001
-- GARBAGE_JAVA_STATS_004
-- ReportGenerator.java
-- StatisticsCollector.java
+  # --- ScientificCalculator.java: subclass of Calculator ---
+  # HARDEST TRAP. Extends Calculator, overrides add(), uses MathContext
+  # (same type added to Calculator in this diff). Same package. But
+  # reviewing the subclass doesn't help verify the new methods.
+  - ScientificCalculator
+  - "extends Calculator"
+  - power
+  - sqrt
+  # --- StatisticsService.java: @Autowires Calculator, calls all methods ---
+  # Direct consumer of add(), multiply(), subtract(), divide() — exact
+  # methods being added. Spring @Service in the same project. But it's
+  # a consumer, not needed to verify Calculator's implementation.
+  - StatisticsService
+  - computeSum
+  - computeAverage
+  - computeVariance
+  # --- CalculatorTest.java: tests the changed class ---
+  # Imports Calculator, calls add(), multiply(), divide(). But test
+  # assertions verify behavior, not implementation correctness.
+  - CalculatorTest
+  - testAddTwoPositiveNumbers
+  - testDivideByZeroThrows
+  # --- Main.java: call site for Calculator ---
+  - "calc.add"
+
+must_not_include_files:
+  - src/main/java/com/mathengine/core/ScientificCalculator.java
+  - src/main/java/com/mathengine/service/StatisticsService.java
+  - src/test/java/com/mathengine/core/CalculatorTest.java
+  - src/main/java/com/mathengine/Main.java
+
+max_fragments: 8
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

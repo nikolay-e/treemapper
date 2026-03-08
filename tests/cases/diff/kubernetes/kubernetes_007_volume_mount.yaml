@@ -1,3 +1,35 @@
+# Scenario: Deployment adds three volume mounts — config ConfigMap, secrets
+#   Secret, and tmp emptyDir. Only k8s/deployment.yaml is changed.
+#
+# Diff shows:
+#   - volumeMounts: []  ->  + config (/app/config, readOnly), secrets
+#     (/app/secrets, readOnly), tmp (/tmp)
+#   - volumes: []  ->  + configMap: app-config, secret: app-secrets, emptyDir
+#
+# Reviewer questions:
+#   Q1: "Does the app-config ConfigMap exist with the right data?"
+#       -> Needs k8s/configmap.yaml: ConfigMap named app-config with
+#          server.yaml containing server port/host and logging config.
+#          The deployment mounts this at /app/config. Without this,
+#          the reviewer cannot verify the ConfigMap name and data match.
+#
+#   Q2: "Does app-secrets Secret exist?"
+#       -> No Secret manifest in the test files — potential review finding.
+#          The deployment references secretName: app-secrets but no
+#          corresponding Secret is defined.
+#
+# Not needed for comprehension:
+#   - k8s/storage/nfs-provisioner.yaml: NFS storage provisioner with its
+#     own volumeMounts and volumes. Shares "volume", "volumeMounts" vocabulary
+#     directly. HARDEST TRAP: identical YAML structure (volumeMounts with
+#     name/mountPath, volumes with name). But NFS provisioner is cluster
+#     infrastructure — its volume config doesn't help review whether the
+#     app's ConfigMap and Secret volume names are correct.
+#
+#   - k8s/apps/elasticsearch/data-volume.yaml: PVC with 100Gi storage.
+#     Shares "volume" domain and storage vocabulary (accessModes,
+#     storageClassName). But a PVC for elasticsearch has no relation
+#     to ConfigMap/Secret volume mounts in a different deployment.
 initial:
   config/server.yaml: |
     server:
@@ -71,31 +103,43 @@ initial:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/elastic/elasticsearch.yaml: |
-    # GARBAGE_K8S_407_ELASTICSEARCH
-    apiVersion: elasticsearch.k8s.elastic.co/v1
-    kind: Elasticsearch
+  k8s/storage/nfs-provisioner.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_407_ES_CLUSTER
+      name: nfs-client-provisioner
+      namespace: kube-system
     spec:
-      version: GARBAGE_K8S_407_ES_VERSION
-      nodeSets:
-      - name: GARBAGE_K8S_407_ES_NODESET
-        count: 3
-        config:
-          node.store.allow_mmap: GARBAGE_K8S_407_MMAP_VALUE
-  k8s/unrelated/kafka/kafka-cluster.yaml: |
-    # GARBAGE_K8S_407_KAFKA_CLUSTER
-    apiVersion: kafka.strimzi.io/v1beta2
-    kind: Kafka
+      replicas: 1
+      selector:
+        matchLabels:
+          app: nfs-client-provisioner
+      template:
+        spec:
+          containers:
+          - name: nfs-provisioner
+            image: registry.k8s.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+            volumeMounts:
+            - name: nfs-root
+              mountPath: /persistentvolumes
+          volumes:
+          - name: nfs-root
+            nfs:
+              server: 10.0.0.50
+              path: /exports
+  k8s/apps/elasticsearch/data-volume.yaml: |
+    apiVersion: v1
+    kind: PersistentVolumeClaim
     metadata:
-      name: GARBAGE_K8S_407_KAFKA_NAME
+      name: elasticsearch-data
+      namespace: logging
     spec:
-      kafka:
-        version: GARBAGE_K8S_407_KAFKA_VERSION
-        replicas: 3
-        config:
-          offsets.topic.replication.factor: GARBAGE_K8S_407_KAFKA_RF
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: gp3-encrypted
+      resources:
+        requests:
+          storage: 100Gi
 changed:
   config/server.yaml: |
     server:
@@ -185,46 +229,62 @@ changed:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/elastic/elasticsearch.yaml: |
-    # GARBAGE_K8S_407_ELASTICSEARCH
-    apiVersion: elasticsearch.k8s.elastic.co/v1
-    kind: Elasticsearch
+  k8s/storage/nfs-provisioner.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_407_ES_CLUSTER
+      name: nfs-client-provisioner
+      namespace: kube-system
     spec:
-      version: GARBAGE_K8S_407_ES_VERSION
-      nodeSets:
-      - name: GARBAGE_K8S_407_ES_NODESET
-        count: 3
-        config:
-          node.store.allow_mmap: GARBAGE_K8S_407_MMAP_VALUE
-  k8s/unrelated/kafka/kafka-cluster.yaml: |
-    # GARBAGE_K8S_407_KAFKA_CLUSTER
-    apiVersion: kafka.strimzi.io/v1beta2
-    kind: Kafka
+      replicas: 1
+      selector:
+        matchLabels:
+          app: nfs-client-provisioner
+      template:
+        spec:
+          containers:
+          - name: nfs-provisioner
+            image: registry.k8s.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+            volumeMounts:
+            - name: nfs-root
+              mountPath: /persistentvolumes
+          volumes:
+          - name: nfs-root
+            nfs:
+              server: 10.0.0.50
+              path: /exports
+  k8s/apps/elasticsearch/data-volume.yaml: |
+    apiVersion: v1
+    kind: PersistentVolumeClaim
     metadata:
-      name: GARBAGE_K8S_407_KAFKA_NAME
+      name: elasticsearch-data
+      namespace: logging
     spec:
-      kafka:
-        version: GARBAGE_K8S_407_KAFKA_VERSION
-        replicas: 3
-        config:
-          offsets.topic.replication.factor: GARBAGE_K8S_407_KAFKA_RF
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: gp3-encrypted
+      resources:
+        requests:
+          storage: 100Gi
 must_include_files:
 - k8s/deployment.yaml
-must_include_content:
-- 'volumeMounts:'
+must_include_content_from:
+  k8s/deployment.yaml:
+  - 'volumeMounts:'
+  - 'mountPath: /app/config'
 must_not_include:
-- GARBAGE_K8S_407_ELASTICSEARCH
-- GARBAGE_K8S_407_ES_CLUSTER
-- GARBAGE_K8S_407_ES_NODESET
-- GARBAGE_K8S_407_ES_VERSION
-- GARBAGE_K8S_407_KAFKA_CLUSTER
-- GARBAGE_K8S_407_KAFKA_NAME
-- GARBAGE_K8S_407_KAFKA_RF
-- GARBAGE_K8S_407_KAFKA_VERSION
-- GARBAGE_K8S_407_MMAP_VALUE
-- elasticsearch.yaml
-- kafka-cluster.yaml
+  # --- nfs-provisioner.yaml: identical volume YAML structure, different purpose ---
+  - nfs-client-provisioner
+  - nfs-subdir-external-provisioner
+  - "/persistentvolumes"
+  # --- data-volume.yaml: storage vocabulary, different app ---
+  - elasticsearch-data
+  - gp3-encrypted
+  - "storage: 100Gi"
+must_not_include_files:
+  - k8s/storage/nfs-provisioner.yaml
+  - k8s/apps/elasticsearch/data-volume.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

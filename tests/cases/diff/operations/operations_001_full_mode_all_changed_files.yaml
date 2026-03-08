@@ -1,3 +1,8 @@
+# Scenario: Task model gains priority field; service and API propagate it.
+# Reviewer asks: "Does priority flow correctly through all three layers?"
+# Trap rationale: notification_dispatcher.py and report_generator.py share
+# task/data vocabulary but have no import edge to models/service/api.
+
 initial:
   models.py: |
     from dataclasses import dataclass
@@ -55,38 +60,50 @@ initial:
     def handle_pending() -> dict:
         pending = get_pending_tasks()
         return {"pending": [t.summary() for t in pending], "count": len(pending)}
-  garbage_export.py: |
-    GARBAGE_OPS_001_EXPORT_A = "export handler marker"
-    GARBAGE_OPS_001_CSV_B = "csv formatter marker"
+  utils/notification_dispatcher.py: |
+    from dataclasses import dataclass
+    from typing import Callable
 
-    class DataExporter:
-        GARBAGE_OPS_001_FORMAT_C = "format selector marker"
+    CHANNEL_EMAIL = "email"
+    CHANNEL_SMS = "sms"
 
-        def __init__(self, output_dir: str = "/tmp/exports"):
+    @dataclass
+    class Notification:
+        recipient: str
+        channel: str
+        subject: str
+        body: str
+
+    class NotificationDispatcher:
+        def __init__(self):
+            self._handlers: dict[str, Callable] = {}
+
+        def register_channel(self, channel: str, handler: Callable) -> None:
+            self._handlers[channel] = handler
+
+        def dispatch(self, notification: Notification) -> bool:
+            handler = self._handlers.get(notification.channel)
+            if handler is None:
+                return False
+            handler(notification)
+            return True
+  utils/report_generator.py: |
+    from datetime import date
+    from typing import Any
+
+    REPORT_FORMAT_CSV = "csv"
+    REPORT_FORMAT_PDF = "pdf"
+
+    class ReportGenerator:
+        def __init__(self, output_dir: str = "/tmp/reports"):
             self.output_dir = output_dir
 
-        def export_csv(self, data: list[dict], filename: str) -> str:
-            return f"{self.output_dir}/{filename}.csv"
+        def generate(self, title: str, rows: list[dict[str, Any]]) -> str:
+            filename = f"{title}_{date.today().isoformat()}.csv"
+            return f"{self.output_dir}/{filename}"
 
-        def export_json(self, data: list[dict], filename: str) -> str:
-            GARBAGE_OPS_001_STREAM_D = "stream writer marker"
-            return f"{self.output_dir}/{filename}.json"
-  garbage_importer.py: |
-    GARBAGE_OPS_001_IMPORT_E = "import handler marker"
-    GARBAGE_OPS_001_PARSE_F = "parser config marker"
-
-    class DataImporter:
-        GARBAGE_OPS_001_VALIDATE_G = True
-
-        def __init__(self, source_dir: str = "/tmp/imports"):
-            self.source_dir = source_dir
-
-        def import_csv(self, filename: str) -> list[dict]:
-            return []
-
-        def import_json(self, filename: str) -> list[dict]:
-            GARBAGE_OPS_001_TRANSFORM_H = "transform marker"
-            return []
+        def schedule(self, title: str, cron: str) -> dict:
+            return {"title": title, "cron": cron, "active": True}
 changed:
   models.py: |
     from dataclasses import dataclass, field
@@ -148,54 +165,69 @@ changed:
     def handle_pending() -> dict:
         pending = get_pending_tasks()
         return {"pending": [t.summary() for t in pending], "count": len(pending)}
-  garbage_export.py: |
-    GARBAGE_OPS_001_EXPORT_A = "export handler marker"
-    GARBAGE_OPS_001_CSV_B = "csv formatter marker"
+  utils/notification_dispatcher.py: |
+    from dataclasses import dataclass
+    from typing import Callable
 
-    class DataExporter:
-        GARBAGE_OPS_001_FORMAT_C = "format selector marker"
+    CHANNEL_EMAIL = "email"
+    CHANNEL_SMS = "sms"
 
-        def __init__(self, output_dir: str = "/tmp/exports"):
+    @dataclass
+    class Notification:
+        recipient: str
+        channel: str
+        subject: str
+        body: str
+
+    class NotificationDispatcher:
+        def __init__(self):
+            self._handlers: dict[str, Callable] = {}
+
+        def register_channel(self, channel: str, handler: Callable) -> None:
+            self._handlers[channel] = handler
+
+        def dispatch(self, notification: Notification) -> bool:
+            handler = self._handlers.get(notification.channel)
+            if handler is None:
+                return False
+            handler(notification)
+            return True
+  utils/report_generator.py: |
+    from datetime import date
+    from typing import Any
+
+    REPORT_FORMAT_CSV = "csv"
+    REPORT_FORMAT_PDF = "pdf"
+
+    class ReportGenerator:
+        def __init__(self, output_dir: str = "/tmp/reports"):
             self.output_dir = output_dir
 
-        def export_csv(self, data: list[dict], filename: str) -> str:
-            return f"{self.output_dir}/{filename}.csv"
+        def generate(self, title: str, rows: list[dict[str, Any]]) -> str:
+            filename = f"{title}_{date.today().isoformat()}.csv"
+            return f"{self.output_dir}/{filename}"
 
-        def export_json(self, data: list[dict], filename: str) -> str:
-            GARBAGE_OPS_001_STREAM_D = "stream writer marker"
-            return f"{self.output_dir}/{filename}.json"
-  garbage_importer.py: |
-    GARBAGE_OPS_001_IMPORT_E = "import handler marker"
-    GARBAGE_OPS_001_PARSE_F = "parser config marker"
-
-    class DataImporter:
-        GARBAGE_OPS_001_VALIDATE_G = True
-
-        def __init__(self, source_dir: str = "/tmp/imports"):
-            self.source_dir = source_dir
-
-        def import_csv(self, filename: str) -> list[dict]:
-            return []
-
-        def import_json(self, filename: str) -> list[dict]:
-            GARBAGE_OPS_001_TRANSFORM_H = "transform marker"
-            return []
-must_include:
+        def schedule(self, title: str, cron: str) -> dict:
+            return {"title": title, "cron": cron, "active": True}
+must_include_files:
 - models.py
 - service.py
 - api.py
+must_include_content_from:
+  models.py:
+  - "priority: int = 0"
+  service.py:
+  - "priority: int = 0"
 must_not_include:
-- GARBAGE_OPS_001_EXPORT_A
-- GARBAGE_OPS_001_CSV_B
-- GARBAGE_OPS_001_FORMAT_C
-- GARBAGE_OPS_001_STREAM_D
-- GARBAGE_OPS_001_IMPORT_E
-- GARBAGE_OPS_001_PARSE_F
-- GARBAGE_OPS_001_VALIDATE_G
-- GARBAGE_OPS_001_TRANSFORM_H
-- DataExporter
-- DataImporter
-- garbage_export.py
-- garbage_importer.py
+- NotificationDispatcher
+- ReportGenerator
+- CHANNEL_EMAIL
+- REPORT_FORMAT_CSV
+- notification_dispatcher.py
+- report_generator.py
+must_not_include_files:
+- utils/notification_dispatcher.py
+- utils/report_generator.py
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,6 +1,16 @@
+# Scenario: Adding a lookup-based volume size map alongside the existing instance
+#   type map, and upgrading the prod instance type.
+# Reviewer questions:
+#   1. What variable defines the environment selection? (main.tf has var.environment)
+#   2. How are these locals consumed by the instance? (main.tf shows the resource)
+# Traps:
+#   - monitoring/instances.tf: another aws_instance using lookup (same pattern, different role)
+#   - certificates/acm.tf: ACM certificate (unrelated to instance sizing)
+
 initial:
   main.tf: |
     variable "environment" {
+      type    = string
       default = "dev"
     }
 
@@ -19,12 +29,7 @@ initial:
         Name = "app-${var.environment}"
       }
     }
-
-  # --- Tricky garbage: same resource type aws_instance but for monitoring ---
-  garbage_monitoring_instance.tf: |
-    GARBAGE_TF_066_MON_MARKER_A = "monitoring-instance"
-    GARBAGE_TF_066_MON_MARKER_B = "grafana-host"
-
+  monitoring/instances.tf: |
     resource "aws_instance" "monitoring" {
       ami           = "ami-99887766"
       instance_type = lookup(local.monitoring_types, var.environment, "t3.micro")
@@ -32,12 +37,7 @@ initial:
         Name = "monitoring-${var.environment}"
       }
     }
-
-  # --- Plain garbage: no overlap ---
-  garbage_certificate.tf: |
-    GARBAGE_TF_066_CERT_MARKER_C = "acm-certificate"
-    GARBAGE_TF_066_CERT_MARKER_D = "ssl-domain"
-
+  certificates/acm.tf: |
     resource "aws_acm_certificate" "main" {
       domain_name       = "example.com"
       validation_method = "DNS"
@@ -46,6 +46,7 @@ initial:
 changed:
   main.tf: |
     variable "environment" {
+      type    = string
       default = "dev"
     }
 
@@ -74,33 +75,8 @@ changed:
       }
     }
 
-  # --- Tricky garbage: same resource type aws_instance but for monitoring ---
-  garbage_monitoring_instance.tf: |
-    GARBAGE_TF_066_MON_MARKER_A = "monitoring-instance"
-    GARBAGE_TF_066_MON_MARKER_B = "grafana-host"
-
-    resource "aws_instance" "monitoring" {
-      ami           = "ami-99887766"
-      instance_type = lookup(local.monitoring_types, var.environment, "t3.micro")
-      tags = {
-        Name = "monitoring-${var.environment}"
-      }
-    }
-
-  # --- Plain garbage: no overlap ---
-  garbage_certificate.tf: |
-    GARBAGE_TF_066_CERT_MARKER_C = "acm-certificate"
-    GARBAGE_TF_066_CERT_MARKER_D = "ssl-domain"
-
-    resource "aws_acm_certificate" "main" {
-      domain_name       = "example.com"
-      validation_method = "DNS"
-    }
-
-# === Assertions ===
-
 must_include_files:
-- main.tf
+  - main.tf
 
 must_include_content_from:
   main.tf:
@@ -110,16 +86,15 @@ must_include_content_from:
     - 'resource "aws_instance" "app"'
 
 must_not_include:
-# Tricky garbage markers (sibling aws_instance resource)
-- GARBAGE_TF_066_MON_MARKER_A
-- GARBAGE_TF_066_MON_MARKER_B
-# Plain garbage markers
-- GARBAGE_TF_066_CERT_MARKER_C
-- GARBAGE_TF_066_CERT_MARKER_D
+  # Monitoring instance - also uses lookup() but for a different instance role
+  - monitoring_types
+  - monitoring-${var.environment}
+  # ACM certificate - SSL cert unrelated to instance sizing
+  - aws_acm_certificate
 
 must_not_include_files:
-- garbage_monitoring_instance.tf
-- garbage_certificate.tf
+  - monitoring/instances.tf
+  - certificates/acm.tf
 
 max_fragments: 3
 max_files: 1

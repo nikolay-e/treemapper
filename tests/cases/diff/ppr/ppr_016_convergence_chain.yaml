@@ -1,3 +1,26 @@
+# Scenario: func_a() changes return value from 1 to 42. b.py imports func_a,
+#   c.py imports func_b — a three-file dependency chain. Only a.py is changed.
+#
+# Diff shows:
+#   - return 1
+#   + return 42
+#
+# Reviewer questions:
+#   Q1: "Does func_b() use func_a()'s return value or just call for side effects?"
+#       -> func_b() calls func_a() but ignores the return value. The change
+#         from 1 to 42 doesn't affect func_b()'s behavior.
+#
+# Not needed for comprehension:
+#   - alt_a.py: Defines its own func_a() returning a string. Name collision.
+#     Also has AWrapper that calls func_a(). But different module — not the
+#     func_a that b.py imports.
+#
+#   - chain_utils.py: Parallel chain structure (func_x -> func_y -> func_z).
+#     HARD TRAP: structurally identical chain pattern, similar naming. But
+#     completely independent functions with no import relationship.
+#
+#   - task_runner.py: Unrelated infrastructure module.
+
 initial:
   a.py: |
     def func_a():
@@ -14,26 +37,14 @@ initial:
     def func_c():
         func_b()
         return 3
-
-  # --- Tricky garbage: also defines func_a but no import from a.py ---
-  garbage_alt_a.py: |
-    GARBAGE_PPR_016_ALT_A_FUNC_A = "alternate_a"
-    GARBAGE_PPR_016_ALT_A_RET_B = 1
-
+  alt_a.py: |
     def func_a():
         return "different_implementation"
 
     class AWrapper:
-        GARBAGE_PPR_016_ALT_A_CLASS_C = True
-
         def call_a(self):
             return func_a()
-
-  # --- Tricky garbage: similar chain import pattern x->y->z ---
-  garbage_chain_xyz.py: |
-    GARBAGE_PPR_016_XYZ_START_D = "chain_xyz"
-    GARBAGE_PPR_016_XYZ_DEPTH_E = 3
-
+  chain_utils.py: |
     def func_x():
         return 10
 
@@ -43,18 +54,14 @@ initial:
     def func_z():
         return func_y() + 1
 
-    class XYZChain:
-        GARBAGE_PPR_016_XYZ_CLASS_F = True
-
+    class ChainProcessor:
         def run(self):
             return func_z()
+  task_runner.py: |
+    INTERVAL = 60
+    IS_ACTIVE = True
 
-  # --- Plain garbage: no overlap ---
-  garbage_scheduler.py: |
-    GARBAGE_PPR_016_SCHED_INTERVAL_G = 60
-    GARBAGE_PPR_016_SCHED_ACTIVE_H = True
-
-    class Scheduler:
+    class TaskRunner:
         def schedule(self, task):
             pass
 
@@ -74,24 +81,14 @@ changed:
     def func_c():
         func_b()
         return 3
-
-  garbage_alt_a.py: |
-    GARBAGE_PPR_016_ALT_A_FUNC_A = "alternate_a"
-    GARBAGE_PPR_016_ALT_A_RET_B = 1
-
+  alt_a.py: |
     def func_a():
         return "different_implementation"
 
     class AWrapper:
-        GARBAGE_PPR_016_ALT_A_CLASS_C = True
-
         def call_a(self):
             return func_a()
-
-  garbage_chain_xyz.py: |
-    GARBAGE_PPR_016_XYZ_START_D = "chain_xyz"
-    GARBAGE_PPR_016_XYZ_DEPTH_E = 3
-
+  chain_utils.py: |
     def func_x():
         return 10
 
@@ -101,51 +98,46 @@ changed:
     def func_z():
         return func_y() + 1
 
-    class XYZChain:
-        GARBAGE_PPR_016_XYZ_CLASS_F = True
-
+    class ChainProcessor:
         def run(self):
             return func_z()
+  task_runner.py: |
+    INTERVAL = 60
+    IS_ACTIVE = True
 
-  garbage_scheduler.py: |
-    GARBAGE_PPR_016_SCHED_INTERVAL_G = 60
-    GARBAGE_PPR_016_SCHED_ACTIVE_H = True
-
-    class Scheduler:
+    class TaskRunner:
         def schedule(self, task):
             pass
 
-# === Assertions ===
-
 must_include:
-- func_a
-- return 42
+  - func_a
+  - return 42
 
 must_include_files:
-- a.py
+  - a.py
 
 must_include_content_from:
   a.py:
-    - 'def func_a():'
-    - return 42
+    - "def func_a():"
+    - "return 42"
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_PPR_016_SCHED_INTERVAL_G
-- GARBAGE_PPR_016_SCHED_ACTIVE_H
-# Tricky: also defines func_a but different module
-- GARBAGE_PPR_016_ALT_A_FUNC_A
-- GARBAGE_PPR_016_ALT_A_RET_B
-- GARBAGE_PPR_016_ALT_A_CLASS_C
-# Tricky: similar chain pattern
-- GARBAGE_PPR_016_XYZ_START_D
-- GARBAGE_PPR_016_XYZ_DEPTH_E
-- GARBAGE_PPR_016_XYZ_CLASS_F
+  # --- alt_a.py: defines func_a() — name collision ---
+  - AWrapper
+  - different_implementation
+  # --- chain_utils.py: parallel chain structure, same pattern ---
+  - ChainProcessor
+  - func_x
+  - func_y
+  - func_z
+  # --- task_runner.py: unrelated ---
+  - TaskRunner
+  - INTERVAL
 
 must_not_include_files:
-- garbage_alt_a.py
-- garbage_chain_xyz.py
-- garbage_scheduler.py
+  - alt_a.py
+  - chain_utils.py
+  - task_runner.py
 
 max_fragments: 6
 max_files: 3

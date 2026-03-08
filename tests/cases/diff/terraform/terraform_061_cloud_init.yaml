@@ -1,3 +1,12 @@
+# Scenario: Adding a cloud-config part and resizing the web instance
+#   in a cloudinit_config data source.
+# Reviewer questions:
+#   1. What existing shell script is already included as the first part? (scripts/setup.sh)
+#   2. What instance consumes this cloud-init config? (cloud_init.tf has the instance inline)
+# Traps:
+#   - bastion.tf: another aws_instance in the same directory (same resource type, unrelated host)
+#   - monitoring/logging.tf: CloudWatch log group (shares infra directory, unrelated concern)
+
 initial:
   cloud_init.tf: |
     data "cloudinit_config" "web" {
@@ -15,12 +24,12 @@ initial:
       instance_type = "t3.micro"
       user_data     = data.cloudinit_config.web.rendered
     }
-
-  # --- Tricky garbage: same resource type aws_instance but for unrelated bastion ---
-  garbage_bastion.tf: |
-    GARBAGE_TF_061_BASTION_MARKER_A = "bastion-host"
-    GARBAGE_TF_061_BASTION_MARKER_B = "ssh-jumpbox"
-
+  scripts/setup.sh: |
+    #!/bin/bash
+    yum update -y
+    yum install -y amazon-cloudwatch-agent
+    systemctl start amazon-cloudwatch-agent
+  bastion.tf: |
     resource "aws_instance" "bastion" {
       ami           = "ami-99887766"
       instance_type = "t3.nano"
@@ -29,12 +38,7 @@ initial:
         Role = "jumpbox"
       }
     }
-
-  # --- Plain garbage: no overlap ---
-  garbage_monitoring.tf: |
-    GARBAGE_TF_061_MONITOR_MARKER_C = "cloudwatch-agent"
-    GARBAGE_TF_061_MONITOR_MARKER_D = "metrics-export"
-
+  monitoring/logging.tf: |
     resource "aws_cloudwatch_log_group" "app_logs" {
       name              = "/app/logs"
       retention_in_days = 30
@@ -66,55 +70,27 @@ changed:
       user_data     = data.cloudinit_config.web.rendered
     }
 
-  # --- Tricky garbage: same resource type aws_instance but for unrelated bastion ---
-  garbage_bastion.tf: |
-    GARBAGE_TF_061_BASTION_MARKER_A = "bastion-host"
-    GARBAGE_TF_061_BASTION_MARKER_B = "ssh-jumpbox"
-
-    resource "aws_instance" "bastion" {
-      ami           = "ami-99887766"
-      instance_type = "t3.nano"
-      tags = {
-        Name = "bastion-host"
-        Role = "jumpbox"
-      }
-    }
-
-  # --- Plain garbage: no overlap ---
-  garbage_monitoring.tf: |
-    GARBAGE_TF_061_MONITOR_MARKER_C = "cloudwatch-agent"
-    GARBAGE_TF_061_MONITOR_MARKER_D = "metrics-export"
-
-    resource "aws_cloudwatch_log_group" "app_logs" {
-      name              = "/app/logs"
-      retention_in_days = 30
-    }
-
-# === Assertions ===
-
+# scripts/setup.sh is unchanged but a reviewer needs it to understand what
+# the existing first part does and whether the new cloud-config part overlaps
 must_include_files:
-- cloud_init.tf
+  - scripts/setup.sh
 
 must_include_content_from:
-  cloud_init.tf:
-    - content_type = "text/cloud-config"
-    - 'packages = ["nginx", "docker.io"]'
-    - instance_type = "t3.small"
-    - 'data "cloudinit_config" "web"'
+  scripts/setup.sh:
+    - amazon-cloudwatch-agent
 
 must_not_include:
-# Tricky garbage markers (sibling aws_instance resource)
-- GARBAGE_TF_061_BASTION_MARKER_A
-- GARBAGE_TF_061_BASTION_MARKER_B
-# Plain garbage markers
-- GARBAGE_TF_061_MONITOR_MARKER_C
-- GARBAGE_TF_061_MONITOR_MARKER_D
+  # Bastion instance - same aws_instance type but different host, no cloud-init dependency
+  - bastion-host
+  - jumpbox
+  # CloudWatch logging - unrelated monitoring config, not part of cloud-init
+  - retention_in_days
 
 must_not_include_files:
-- garbage_bastion.tf
-- garbage_monitoring.tf
+  - bastion.tf
+  - monitoring/logging.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

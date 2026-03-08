@@ -1,3 +1,8 @@
+# Scenario: ConfigLoader starts using Config classmethods (from_json, from_file, from_env)
+# Changed: loader.py imports Config and calls Config.from_json(), Config.from_file(), Config.from_env()
+# Reviewer questions: Is ConfigValidationError raised properly? Does merge() preserve source?
+# Trap 1: yaml_parser.py — parses YAML config files, shares "config/parse" vocabulary but independent
+# Trap 2: config_watcher.py — watches for config changes, shares "config" domain but no dep
 initial:
   models/config.py: |
     import json
@@ -115,44 +120,62 @@ initial:
 
         def load(self) -> Dict[str, Any]:
             return {}
-  garbage_parser.py: |
-    GARBAGE_MARKER_PARSER_001 = "parser garbage"
-    UNRELATED_PARSE_MODE_002 = "strict"
+  yaml_parser.py: |
+    from typing import Dict, Any, Optional
+    from pathlib import Path
+
+    class YamlParseError(Exception):
+        pass
 
     class YamlParser:
-        GARBAGE_YAML_CLASS_003 = "yaml class marker"
+        def __init__(self, strict_mode: bool = True):
+            self._strict = strict_mode
 
-        def parse(self, content: str) -> dict:
-            return {}
+        def parse(self, content: str) -> Dict[str, Any]:
+            lines = content.strip().split("\n")
+            result = {}
+            for line in lines:
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    result[key.strip()] = value.strip()
+            return result
 
-        def dump(self, data: dict) -> str:
-            return ""
+        def parse_file(self, path: str) -> Dict[str, Any]:
+            file_path = Path(path)
+            if not file_path.exists():
+                raise YamlParseError(f"File not found: {path}")
+            return self.parse(file_path.read_text())
+  config_watcher.py: |
+    import time
+    from typing import Callable, Optional, Dict
+    from dataclasses import dataclass
+    from pathlib import Path
 
-    class TomlParser:
-        GARBAGE_TOML_MARKER_004 = "toml marker"
+    @dataclass
+    class WatcherConfig:
+        config_path: str
+        poll_interval: float = 5.0
+        auto_reload: bool = True
 
-        def parse(self, content: str) -> dict:
-            return {}
-  garbage_watcher.py: |
-    GARBAGE_MARKER_WATCHER_005 = "watcher garbage"
-    UNRELATED_POLL_INTERVAL_006 = 5
+    class ConfigFileWatcher:
+        def __init__(self, config: WatcherConfig):
+            self._config = config
+            self._last_modified: Optional[float] = None
+            self._callbacks: list[Callable] = []
 
-    class FileWatcher:
-        GARBAGE_WATCHER_CLASS_007 = True
-
-        def __init__(self, path: str):
-            self.path = path
-            self._callbacks: List[callable] = []
-
-        def watch(self) -> None:
-            pass
-
-        def on_change(self, callback: callable) -> None:
+        def register_callback(self, callback: Callable) -> None:
             self._callbacks.append(callback)
 
-    def format_watch_event(event_type: str, path: str) -> str:
-        GARBAGE_FORMAT_WATCH_008 = "format watch marker"
-        return f"{event_type}: {path}"
+        def check_for_changes(self) -> bool:
+            path = Path(self._config.config_path)
+            if not path.exists():
+                return False
+            mtime = path.stat().st_mtime
+            if self._last_modified and mtime > self._last_modified:
+                self._last_modified = mtime
+                return True
+            self._last_modified = mtime
+            return False
 changed:
   models/config.py: |
     import json
@@ -292,57 +315,80 @@ changed:
             errors = config.validate()
             if errors:
                 raise ConfigValidationError(errors)
-  garbage_parser.py: |
-    GARBAGE_MARKER_PARSER_001 = "parser garbage"
-    UNRELATED_PARSE_MODE_002 = "strict"
+  yaml_parser.py: |
+    from typing import Dict, Any, Optional
+    from pathlib import Path
+
+    class YamlParseError(Exception):
+        pass
 
     class YamlParser:
-        GARBAGE_YAML_CLASS_003 = "yaml class marker"
+        def __init__(self, strict_mode: bool = True):
+            self._strict = strict_mode
 
-        def parse(self, content: str) -> dict:
-            return {}
+        def parse(self, content: str) -> Dict[str, Any]:
+            lines = content.strip().split("\n")
+            result = {}
+            for line in lines:
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    result[key.strip()] = value.strip()
+            return result
 
-        def dump(self, data: dict) -> str:
-            return ""
+        def parse_file(self, path: str) -> Dict[str, Any]:
+            file_path = Path(path)
+            if not file_path.exists():
+                raise YamlParseError(f"File not found: {path}")
+            return self.parse(file_path.read_text())
+  config_watcher.py: |
+    import time
+    from typing import Callable, Optional, Dict
+    from dataclasses import dataclass
+    from pathlib import Path
 
-    class TomlParser:
-        GARBAGE_TOML_MARKER_004 = "toml marker"
+    @dataclass
+    class WatcherConfig:
+        config_path: str
+        poll_interval: float = 5.0
+        auto_reload: bool = True
 
-        def parse(self, content: str) -> dict:
-            return {}
-  garbage_watcher.py: |
-    GARBAGE_MARKER_WATCHER_005 = "watcher garbage"
-    UNRELATED_POLL_INTERVAL_006 = 5
+    class ConfigFileWatcher:
+        def __init__(self, config: WatcherConfig):
+            self._config = config
+            self._last_modified: Optional[float] = None
+            self._callbacks: list[Callable] = []
 
-    class FileWatcher:
-        GARBAGE_WATCHER_CLASS_007 = True
-
-        def __init__(self, path: str):
-            self.path = path
-            self._callbacks: List[callable] = []
-
-        def watch(self) -> None:
-            pass
-
-        def on_change(self, callback: callable) -> None:
+        def register_callback(self, callback: Callable) -> None:
             self._callbacks.append(callback)
 
-    def format_watch_event(event_type: str, path: str) -> str:
-        GARBAGE_FORMAT_WATCH_008 = "format watch marker"
-        return f"{event_type}: {path}"
+        def check_for_changes(self) -> bool:
+            path = Path(self._config.config_path)
+            if not path.exists():
+                return False
+            mtime = path.stat().st_mtime
+            if self._last_modified and mtime > self._last_modified:
+                self._last_modified = mtime
+                return True
+            self._last_modified = mtime
+            return False
 must_include_files:
+- models/config.py
 - loader.py
-must_include_content:
-- from typing import Optional, Dict, Any, List
-- 'env_prefix: str = "APP_"'
+must_include_content_from:
+  loader.py:
+  - 'from models.config import Config, ConfigError, ConfigValidationError, ConfigFormat'
+  - 'env_prefix: str = "APP_"'
 must_not_include:
-- GARBAGE_FORMAT_WATCH_008
-- GARBAGE_MARKER_PARSER_001
-- GARBAGE_MARKER_WATCHER_005
-- GARBAGE_TOML_MARKER_004
-- GARBAGE_WATCHER_CLASS_007
-- GARBAGE_YAML_CLASS_003
-- garbage_parser.py
-- garbage_watcher.py
+- YamlParser
+- YamlParseError
+- parse_file
+- ConfigFileWatcher
+- WatcherConfig
+- check_for_changes
+must_not_include_files:
+- yaml_parser.py
+- config_watcher.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

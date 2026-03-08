@@ -1,3 +1,16 @@
+# Scenario: Redis cache config changes host to cluster and adds password.
+#
+# Diff: cache.yaml changes redis host, db number, and adds password field.
+#
+# Reviewer questions:
+#   Q1: "Does the code pass password to Redis?" → src/cache.py (UNCHANGED) creates
+#        Redis client with hardcoded host/port/db — no password parameter.
+#   Q2: "Will the password field actually be used?" → cache.py doesn't load from config.
+#
+# Not needed:
+#   - config/session.yaml: another config but for session storage, not cache.
+#   - src/pubsub.py: uses Redis but for pub/sub, not caching.
+
 initial:
   config/cache.yaml: |
     redis:
@@ -9,24 +22,32 @@ initial:
 
     def get_redis_client():
         return redis.Redis(host="localhost", port=6379, db=0)
-  garbage_health_checker.py: |
-    GARBAGE_YAML_004_HEALTH_MARKER_A = "health"
-    GARBAGE_YAML_004_PING_MARKER_B = True
+  config/session.yaml: |
+    session:
+      backend: redis
+      ttl: 3600
+      prefix: "sess:"
+      secure: true
+      http_only: true
+  src/pubsub.py: |
+    import redis
 
-    class HealthChecker:
-        GARBAGE_YAML_004_CHECKER_CLASS_C = "checker"
+    class PubSubManager:
+        def __init__(self, redis_url: str = "redis://localhost:6379"):
+            self.client = redis.from_url(redis_url)
+            self.pubsub = self.client.pubsub()
 
-        def check_liveness(self) -> bool:
-            return True
-  garbage_feature_toggle.py: |
-    GARBAGE_YAML_004_TOGGLE_MARKER_D = "toggle"
-    GARBAGE_YAML_004_FLAG_MARKER_E = 42
+        def subscribe(self, channel: str, callback):
+            self.pubsub.subscribe(**{channel: callback})
 
-    class FeatureToggle:
-        GARBAGE_YAML_004_TOGGLE_CLASS_F = True
+        def publish(self, channel: str, message: str):
+            self.client.publish(channel, message)
 
-        def is_enabled(self, feature_name: str) -> bool:
-            return False
+        def listen(self):
+            for message in self.pubsub.listen():
+                if message["type"] == "message":
+                    yield message["data"]
+
 changed:
   config/cache.yaml: |
     redis:
@@ -39,40 +60,54 @@ changed:
 
     def get_redis_client():
         return redis.Redis(host="localhost", port=6379, db=0)
-  garbage_health_checker.py: |
-    GARBAGE_YAML_004_HEALTH_MARKER_A = "health"
-    GARBAGE_YAML_004_PING_MARKER_B = True
+  config/session.yaml: |
+    session:
+      backend: redis
+      ttl: 3600
+      prefix: "sess:"
+      secure: true
+      http_only: true
+  src/pubsub.py: |
+    import redis
 
-    class HealthChecker:
-        GARBAGE_YAML_004_CHECKER_CLASS_C = "checker"
+    class PubSubManager:
+        def __init__(self, redis_url: str = "redis://localhost:6379"):
+            self.client = redis.from_url(redis_url)
+            self.pubsub = self.client.pubsub()
 
-        def check_liveness(self) -> bool:
-            return True
-  garbage_feature_toggle.py: |
-    GARBAGE_YAML_004_TOGGLE_MARKER_D = "toggle"
-    GARBAGE_YAML_004_FLAG_MARKER_E = 42
+        def subscribe(self, channel: str, callback):
+            self.pubsub.subscribe(**{channel: callback})
 
-    class FeatureToggle:
-        GARBAGE_YAML_004_TOGGLE_CLASS_F = True
+        def publish(self, channel: str, message: str):
+            self.client.publish(channel, message)
 
-        def is_enabled(self, feature_name: str) -> bool:
-            return False
+        def listen(self):
+            for message in self.pubsub.listen():
+                if message["type"] == "message":
+                    yield message["data"]
+
 must_include_files:
-- config/cache.yaml
-must_include_content:
-- |2
-    db: 1
-    password: secret
+  - config/cache.yaml
+
+must_include_content_from:
+  config/cache.yaml:
+    - "db: 1"
+    - "password: secret"
+
 must_not_include:
-- GARBAGE_YAML_004_HEALTH_MARKER_A
-- GARBAGE_YAML_004_PING_MARKER_B
-- GARBAGE_YAML_004_CHECKER_CLASS_C
-- GARBAGE_YAML_004_TOGGLE_MARKER_D
-- GARBAGE_YAML_004_FLAG_MARKER_E
-- GARBAGE_YAML_004_TOGGLE_CLASS_F
-- HealthChecker
-- FeatureToggle
-- garbage_health_checker.py
-- garbage_feature_toggle.py
+  # session.yaml: Redis-adjacent but for session storage, not cache
+  - "sess:"
+  - http_only
+  # pubsub.py: uses Redis but for pub/sub messaging, different concern
+  - PubSubManager
+  - subscribe
+  - listen
+
+must_not_include_files:
+  - config/session.yaml
+  - src/pubsub.py
+
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

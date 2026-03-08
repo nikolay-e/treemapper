@@ -1,3 +1,19 @@
+# Scenario: React component starts consuming a context via useContext.
+#
+# Diff: ThemedButton.tsx changes from empty to using useContext(ThemeContext)
+# to read theme colors and toggle function.
+#
+# Reviewer questions:
+#   Q1: "What does ThemeContext provide?" → ThemeContext.tsx (UNCHANGED) defines
+#        ThemeContextValue with theme object and toggleTheme function.
+#   Q2: "What are the possible theme values?" → ThemeContext.tsx shows light/dark
+#        color schemes based on isDark state.
+#
+# Not needed:
+#   - src/contexts/AuthContext.tsx: another context provider but for auth state.
+#   - src/components/ThemeToggle.tsx: uses theme in its name but it's a settings
+#     panel component, not the actual context definition.
+
 initial:
   src/ThemeContext.tsx: |
     import React, { createContext, useState, ReactNode } from 'react';
@@ -34,52 +50,71 @@ initial:
     import React from 'react';
 
     export function ThemedButton() {
-        return <button>Initial</button>;
+        return <button>TODO</button>;
     }
-  src/unrelated/storage_service.ts: |
-    // GARBAGE_FE_008_STORAGE_A
-    export class StorageService {
-        // GARBAGE_FE_008_STORAGE_B
-        get(key: string): string | null {
-            return localStorage.getItem(key);
-        }
-        set(key: string, value: string): void {
-            localStorage.setItem(key, value);
-        }
-        remove(key: string): void {
-            localStorage.removeItem(key);
-        }
-        clear(): void {
-            // GARBAGE_FE_008_CLEAR_C
-            localStorage.clear();
-        }
+  src/contexts/AuthContext.tsx: |
+    import React, { createContext, useState, ReactNode } from 'react';
+
+    export interface AuthState {
+        user: { id: string; email: string } | null;
+        token: string | null;
+        isAuthenticated: boolean;
     }
 
-    export const storageService = new StorageService();
-  src/unrelated/validation_rules.ts: |
-    // GARBAGE_FE_008_VALIDATION_D
-    export type ValidationRule = (value: string) => string | null;
+    export interface AuthContextValue {
+        auth: AuthState;
+        login: (email: string, password: string) => Promise<void>;
+        logout: () => void;
+    }
 
-    // GARBAGE_FE_008_VALIDATION_E
-    export const required: ValidationRule = (value) =>
-        value.trim() ? null : 'Required field';
+    export const AuthContext = createContext<AuthContextValue | null>(null);
 
-    export const minLength = (min: number): ValidationRule => (value) =>
-        value.length >= min ? null : `Minimum ${min} characters`;
+    export function AuthProvider({ children }: { children: ReactNode }) {
+        const [auth, setAuth] = useState<AuthState>({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+        });
 
-    export const emailPattern: ValidationRule = (value) =>
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Invalid email';
-
-    // GARBAGE_FE_008_COMPOSE_F
-    export function composeValidators(...rules: ValidationRule[]): ValidationRule {
-        return (value) => {
-            for (const rule of rules) {
-                const error = rule(value);
-                if (error) return error;
-            }
-            return null;
+        const login = async (email: string, password: string) => {
+            setAuth({ user: { id: '1', email }, token: 'fake-token', isAuthenticated: true });
         };
+
+        const logout = () => {
+            setAuth({ user: null, token: null, isAuthenticated: false });
+        };
+
+        return (
+            <AuthContext.Provider value={{ auth, login, logout }}>
+                {children}
+            </AuthContext.Provider>
+        );
     }
+  src/components/ThemeToggle.tsx: |
+    import React from 'react';
+
+    interface ThemeToggleProps {
+        themes: string[];
+        currentTheme: string;
+        onSelect: (theme: string) => void;
+    }
+
+    export function ThemeToggle({ themes, currentTheme, onSelect }: ThemeToggleProps) {
+        return (
+            <div className="theme-selector">
+                {themes.map(t => (
+                    <button
+                        key={t}
+                        className={t === currentTheme ? 'active' : ''}
+                        onClick={() => onSelect(t)}
+                    >
+                        {t}
+                    </button>
+                ))}
+            </div>
+        );
+    }
+
 changed:
   src/ThemeContext.tsx: |
     import React, { createContext, useState, ReactNode } from 'react';
@@ -134,63 +169,96 @@ changed:
             </button>
         );
     }
-  src/unrelated/storage_service.ts: |
-    // GARBAGE_FE_008_STORAGE_A
-    export class StorageService {
-        // GARBAGE_FE_008_STORAGE_B
-        get(key: string): string | null {
-            return localStorage.getItem(key);
-        }
-        set(key: string, value: string): void {
-            localStorage.setItem(key, value);
-        }
-        remove(key: string): void {
-            localStorage.removeItem(key);
-        }
-        clear(): void {
-            // GARBAGE_FE_008_CLEAR_C
-            localStorage.clear();
-        }
+  src/contexts/AuthContext.tsx: |
+    import React, { createContext, useState, ReactNode } from 'react';
+
+    export interface AuthState {
+        user: { id: string; email: string } | null;
+        token: string | null;
+        isAuthenticated: boolean;
     }
 
-    export const storageService = new StorageService();
-  src/unrelated/validation_rules.ts: |
-    // GARBAGE_FE_008_VALIDATION_D
-    export type ValidationRule = (value: string) => string | null;
+    export interface AuthContextValue {
+        auth: AuthState;
+        login: (email: string, password: string) => Promise<void>;
+        logout: () => void;
+    }
 
-    // GARBAGE_FE_008_VALIDATION_E
-    export const required: ValidationRule = (value) =>
-        value.trim() ? null : 'Required field';
+    export const AuthContext = createContext<AuthContextValue | null>(null);
 
-    export const minLength = (min: number): ValidationRule => (value) =>
-        value.length >= min ? null : `Minimum ${min} characters`;
+    export function AuthProvider({ children }: { children: ReactNode }) {
+        const [auth, setAuth] = useState<AuthState>({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+        });
 
-    export const emailPattern: ValidationRule = (value) =>
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Invalid email';
-
-    // GARBAGE_FE_008_COMPOSE_F
-    export function composeValidators(...rules: ValidationRule[]): ValidationRule {
-        return (value) => {
-            for (const rule of rules) {
-                const error = rule(value);
-                if (error) return error;
-            }
-            return null;
+        const login = async (email: string, password: string) => {
+            setAuth({ user: { id: '1', email }, token: 'fake-token', isAuthenticated: true });
         };
+
+        const logout = () => {
+            setAuth({ user: null, token: null, isAuthenticated: false });
+        };
+
+        return (
+            <AuthContext.Provider value={{ auth, login, logout }}>
+                {children}
+            </AuthContext.Provider>
+        );
     }
+  src/components/ThemeToggle.tsx: |
+    import React from 'react';
+
+    interface ThemeToggleProps {
+        themes: string[];
+        currentTheme: string;
+        onSelect: (theme: string) => void;
+    }
+
+    export function ThemeToggle({ themes, currentTheme, onSelect }: ThemeToggleProps) {
+        return (
+            <div className="theme-selector">
+                {themes.map(t => (
+                    <button
+                        key={t}
+                        className={t === currentTheme ? 'active' : ''}
+                        onClick={() => onSelect(t)}
+                    >
+                        {t}
+                    </button>
+                ))}
+            </div>
+        );
+    }
+
+# === Assertions ===
+
 must_include_files:
-- src/ThemedButton.tsx
-must_include_content:
-- import React, { useContext } from 'react';
-- themeContext = useContext(ThemeContext)
+  - src/ThemedButton.tsx
+
+must_include_content_from:
+  # Reviewer needs to see what ThemeContext provides to understand useContext usage
+  src/ThemeContext.tsx:
+    - "interface ThemeContextValue {"
+    - "theme: Theme;"
+    - "toggleTheme: () => void;"
+
 must_not_include:
-- GARBAGE_FE_008_CLEAR_C
-- GARBAGE_FE_008_COMPOSE_F
-- GARBAGE_FE_008_STORAGE_A
-- GARBAGE_FE_008_STORAGE_B
-- GARBAGE_FE_008_VALIDATION_D
-- GARBAGE_FE_008_VALIDATION_E
-- storage_service.ts
-- validation_rules.ts
+  # AuthContext.tsx: another context provider but for auth, not theming
+  - AuthContext
+  - AuthProvider
+  - isAuthenticated
+  # ThemeToggle.tsx: "theme" in name but it's a settings selector, not a context consumer
+  - ThemeToggle
+  - ThemeToggleProps
+  - theme-selector
+
+must_not_include_files:
+  - src/contexts/AuthContext.tsx
+  - src/components/ThemeToggle.tsx
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

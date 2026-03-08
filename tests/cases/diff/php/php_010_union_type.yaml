@@ -1,3 +1,22 @@
+# Test 010: Parser adds union-typed methods using Data DTO
+#           — reviewer needs Data class to understand value wrapping semantics
+#
+# Scenario: Parser gains parse(string|array) returning Data, and
+# normalize(int|float|string) returning string. Both use PHP 8.0 union types.
+# parse() wraps decoded JSON or raw input in a Data DTO.
+#
+# Reviewer questions:
+#   Q1: "What does new Data($value) store — is mixed ok?"
+#       -> Data constructor accepts mixed, stores in public $value, tracks type.
+#   Q2: "Does Data have methods Parser might chain?"
+#       -> isNumeric(), toString(), getType() — but Parser doesn't chain them.
+#
+# Trap files (plausible but unrelated):
+#   - src/DTO/Config.php: sibling DTO in same namespace with similar structure,
+#     but not used by Parser.
+#   - src/Services/Formatter.php: shares text-processing domain, has normalize()
+#     method with similar name, but is not imported by Parser.
+
 initial:
   src/DTO/Data.php: |
     <?php
@@ -33,31 +52,46 @@ initial:
             return json_decode($input, true) ?? [];
         }
     }
-  src/garbage_bloom_filter.php: |
+  src/DTO/Config.php: |
     <?php
-    GARBAGE_PHP_010_SIZE_A = 1000;
-    GARBAGE_PHP_010_HASH_COUNT_B = 7;
+    namespace App\DTO;
 
-    class GarbageBloomFilter {
-        GARBAGE_PHP_010_FALSE_RATE_C = 0.01;
+    class Config {
+        public string $key;
+        public mixed $value;
+        public string $environment;
 
-        public function add(string $item): void {
-            GARBAGE_PHP_010_BITS_D = 0;
+        public function __construct(string $key, mixed $value, string $environment = 'production') {
+            $this->key = $key;
+            $this->value = $value;
+            $this->environment = $environment;
+        }
+
+        public function isProduction(): bool {
+            return $this->environment === 'production';
         }
     }
-  src/garbage_lru_cache.php: |
+  src/Services/Formatter.php: |
     <?php
-    GARBAGE_PHP_010_CAPACITY_E = 256;
-    GARBAGE_PHP_010_EVICTION_F = "lru";
+    namespace App\Services;
 
-    class GarbageLruCache {
-        GARBAGE_PHP_010_STATS_G = true;
+    class Formatter {
+        public function normalize(string $text): string {
+            return trim(strtolower($text));
+        }
 
-        public function get(string $key): mixed {
-            GARBAGE_PHP_010_HIT_RATIO_H = 0.0;
-            return null;
+        public function truncate(string $text, int $maxLength = 100): string {
+            if (strlen($text) <= $maxLength) {
+                return $text;
+            }
+            return substr($text, 0, $maxLength) . '...';
+        }
+
+        public function slugify(string $text): string {
+            return strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $text));
         }
     }
+
 changed:
   src/DTO/Data.php: |
     <?php
@@ -107,48 +141,73 @@ changed:
             return json_decode($input, true) ?? [];
         }
     }
-  src/garbage_bloom_filter.php: |
+  src/DTO/Config.php: |
     <?php
-    GARBAGE_PHP_010_SIZE_A = 1000;
-    GARBAGE_PHP_010_HASH_COUNT_B = 7;
+    namespace App\DTO;
 
-    class GarbageBloomFilter {
-        GARBAGE_PHP_010_FALSE_RATE_C = 0.01;
+    class Config {
+        public string $key;
+        public mixed $value;
+        public string $environment;
 
-        public function add(string $item): void {
-            GARBAGE_PHP_010_BITS_D = 0;
+        public function __construct(string $key, mixed $value, string $environment = 'production') {
+            $this->key = $key;
+            $this->value = $value;
+            $this->environment = $environment;
+        }
+
+        public function isProduction(): bool {
+            return $this->environment === 'production';
         }
     }
-  src/garbage_lru_cache.php: |
+  src/Services/Formatter.php: |
     <?php
-    GARBAGE_PHP_010_CAPACITY_E = 256;
-    GARBAGE_PHP_010_EVICTION_F = "lru";
+    namespace App\Services;
 
-    class GarbageLruCache {
-        GARBAGE_PHP_010_STATS_G = true;
+    class Formatter {
+        public function normalize(string $text): string {
+            return trim(strtolower($text));
+        }
 
-        public function get(string $key): mixed {
-            GARBAGE_PHP_010_HIT_RATIO_H = 0.0;
-            return null;
+        public function truncate(string $text, int $maxLength = 100): string {
+            if (strlen($text) <= $maxLength) {
+                return $text;
+            }
+            return substr($text, 0, $maxLength) . '...';
+        }
+
+        public function slugify(string $text): string {
+            return strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $text));
         }
     }
+
 must_include_files:
-- src/Services/Parser.php
-must_include_content:
-- |
-  public function parse(string|array $input): Data
+  - src/Services/Parser.php
+  # Q1: Reviewer needs Data DTO to understand what parse() wraps values in
+  - src/DTO/Data.php
+
+must_include_content_from:
+  src/Services/Parser.php:
+    - "public function parse(string|array $input): Data"
+    - "return new Data($decoded ?? $input)"
+  src/DTO/Data.php:
+    - "public function __construct(mixed $value)"
+    - "public mixed $value"
+
 must_not_include:
-- GARBAGE_PHP_010_SIZE_A
-- GARBAGE_PHP_010_HASH_COUNT_B
-- GARBAGE_PHP_010_FALSE_RATE_C
-- GARBAGE_PHP_010_BITS_D
-- GARBAGE_PHP_010_CAPACITY_E
-- GARBAGE_PHP_010_EVICTION_F
-- GARBAGE_PHP_010_STATS_G
-- GARBAGE_PHP_010_HIT_RATIO_H
-- GarbageBloomFilter
-- GarbageLruCache
-- garbage_bloom_filter.php
-- garbage_lru_cache.php
+  # --- Config.php: sibling DTO, similar mixed $value but not referenced ---
+  - "class Config"
+  - "isProduction"
+  # --- Formatter.php: has normalize() method too but is independent service ---
+  - "class Formatter"
+  - "slugify"
+  - "truncate"
+
+must_not_include_files:
+  - src/DTO/Config.php
+  - src/Services/Formatter.php
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

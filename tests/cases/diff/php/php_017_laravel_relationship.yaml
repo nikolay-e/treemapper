@@ -1,3 +1,10 @@
+# Scenario: User model gains hasMany relationship to Post (posts(), addPost(), latestPost())
+# Changed: User now imports and references Post class for relationship methods
+# Reviewer needs: User (changed) + Post (unchanged, defines Post shape used by User)
+# Trap: Comment model — also has post_id field and belongs to Post, but User doesn't touch it
+# Trap: Tag model — similar model structure with id/name, but no relationship to User
+# Trap: Category — has similar getPostCount()-like method, same domain vocabulary
+
 initial:
   app/Models/Post.php: |
     <?php
@@ -43,39 +50,42 @@ initial:
         public int $id;
         public int $post_id;
         public string $content;
+        public int $user_id;
 
-        public function __construct(int $id, int $post_id, string $content) {
+        public function __construct(int $id, int $post_id, int $user_id, string $content) {
             $this->id = $id;
             $this->post_id = $post_id;
+            $this->user_id = $user_id;
             $this->content = $content;
         }
-    }
-  src/garbage_webhook_sender.php: |
-    <?php
-    GARBAGE_PHP_017_TIMEOUT_A = 30;
-    GARBAGE_PHP_017_RETRIES_B = 3;
 
-    class GarbageWebhookSender {
-        GARBAGE_PHP_017_CONTENT_TYPE_C = "application/json";
-
-        public function send(string $url, array $payload): bool {
-            GARBAGE_PHP_017_SIGNATURE_ALG_D = "sha256";
-            return true;
+        public function belongsToPost(Post $post): bool {
+            return $this->post_id === $post->id;
         }
     }
-  src/garbage_zip_archiver.php: |
+  app/Models/Tag.php: |
     <?php
-    GARBAGE_PHP_017_COMPRESSION_LEVEL_E = 6;
-    GARBAGE_PHP_017_MAX_FILE_SIZE_F = 104857600;
+    namespace App\Models;
 
-    class GarbageZipArchiver {
-        GARBAGE_PHP_017_ENCRYPT_G = false;
+    class Tag {
+        public int $id;
+        public string $name;
+        private array $posts = [];
 
-        public function compress(array $files, string $output): bool {
-            GARBAGE_PHP_017_BUFFER_SIZE_H = 8192;
-            return true;
+        public function __construct(int $id, string $name) {
+            $this->id = $id;
+            $this->name = $name;
+        }
+
+        public function addPost(Post $post): void {
+            $this->posts[] = $post;
+        }
+
+        public function getPostCount(): int {
+            return count($this->posts);
         }
     }
+
 changed:
   app/Models/Post.php: |
     <?php
@@ -138,56 +148,63 @@ changed:
         public int $id;
         public int $post_id;
         public string $content;
+        public int $user_id;
 
-        public function __construct(int $id, int $post_id, string $content) {
+        public function __construct(int $id, int $post_id, int $user_id, string $content) {
             $this->id = $id;
             $this->post_id = $post_id;
+            $this->user_id = $user_id;
             $this->content = $content;
         }
-    }
-  src/garbage_webhook_sender.php: |
-    <?php
-    GARBAGE_PHP_017_TIMEOUT_A = 30;
-    GARBAGE_PHP_017_RETRIES_B = 3;
 
-    class GarbageWebhookSender {
-        GARBAGE_PHP_017_CONTENT_TYPE_C = "application/json";
-
-        public function send(string $url, array $payload): bool {
-            GARBAGE_PHP_017_SIGNATURE_ALG_D = "sha256";
-            return true;
+        public function belongsToPost(Post $post): bool {
+            return $this->post_id === $post->id;
         }
     }
-  src/garbage_zip_archiver.php: |
+  app/Models/Tag.php: |
     <?php
-    GARBAGE_PHP_017_COMPRESSION_LEVEL_E = 6;
-    GARBAGE_PHP_017_MAX_FILE_SIZE_F = 104857600;
+    namespace App\Models;
 
-    class GarbageZipArchiver {
-        GARBAGE_PHP_017_ENCRYPT_G = false;
+    class Tag {
+        public int $id;
+        public string $name;
+        private array $posts = [];
 
-        public function compress(array $files, string $output): bool {
-            GARBAGE_PHP_017_BUFFER_SIZE_H = 8192;
-            return true;
+        public function __construct(int $id, string $name) {
+            $this->id = $id;
+            $this->name = $name;
+        }
+
+        public function addPost(Post $post): void {
+            $this->posts[] = $post;
+        }
+
+        public function getPostCount(): int {
+            return count($this->posts);
         }
     }
+
 must_include_files:
 - app/Models/User.php
-must_include_content:
-- |
-  public function addPost(Post $post): void
+- app/Models/Post.php
+
+must_include_content_from:
+  app/Models/User.php:
+    - 'public function addPost(Post $post): void'
+    - 'public function latestPost(): ?Post'
+  app/Models/Post.php:
+    - 'class Post'
+
 must_not_include:
-- GARBAGE_PHP_017_TIMEOUT_A
-- GARBAGE_PHP_017_RETRIES_B
-- GARBAGE_PHP_017_CONTENT_TYPE_C
-- GARBAGE_PHP_017_SIGNATURE_ALG_D
-- GARBAGE_PHP_017_COMPRESSION_LEVEL_E
-- GARBAGE_PHP_017_MAX_FILE_SIZE_F
-- GARBAGE_PHP_017_ENCRYPT_G
-- GARBAGE_PHP_017_BUFFER_SIZE_H
-- GarbageWebhookSender
-- GarbageZipArchiver
-- garbage_webhook_sender.php
-- garbage_zip_archiver.php
+- 'class Comment'
+- 'class Tag'
+- belongsToPost
+
+must_not_include_files:
+- app/Models/Comment.php
+- app/Models/Tag.php
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

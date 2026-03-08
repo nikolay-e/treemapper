@@ -4,6 +4,13 @@ import subprocess
 from pathlib import Path
 
 from tests.conftest import GARBAGE_FILES, GARBAGE_MARKERS
+from tests.framework.scoring import (
+    ScoreBreakdown,
+    check_diff_coverage,
+    compute_context_token_count,
+    compute_diff_lines,
+    compute_diff_token_count,
+)
 from tests.framework.types import YamlTestCase
 
 
@@ -81,77 +88,115 @@ class YamlTestRunner:
 
         return context
 
-    def verify_assertions(self, context: dict, case: YamlTestCase) -> None:
-        fragments = context.get("fragments", [])
+    def score_test_case(self, context: dict, case: YamlTestCase) -> ScoreBreakdown:  # noqa: C901
         fragment_paths = self._extract_fragment_paths(context)
         all_content = self._extract_all_content(context)
         content_by_file = self._extract_content_by_file(context)
-        unique_files = sorted(set(fragment_paths))
 
-        def diag():
-            return f"Selected fragments:\n{_format_fragment_summary(context)}"
+        expected_files = set(case.must_include_files) | set(case.must_include_content_from.keys())
+        excluded_files = set(case.must_not_include_files) | set(case.must_not_include)
+        diff_lines = compute_diff_lines(
+            case.initial_files,
+            case.changed_files,
+            expected_files=expected_files if expected_files else None,
+            excluded_files=excluded_files,
+        )
+        diff_covered, uncovered = check_diff_coverage(all_content, diff_lines)
+
+        expected_details: list[tuple[str, bool]] = []
 
         for pattern in case.must_include:
-            assert pattern in all_content, (
-                f"[{case.name}] Expected pattern not found in context.\n" f"Pattern: '{pattern}'\n" f"{diag()}"
-            )
+            hit = pattern in all_content
+            expected_details.append((f"pattern: {pattern[:80]}", hit))
 
         for file_path in case.must_include_files:
-            assert any(_match_path(p, file_path) for p in fragment_paths), (
-                f"[{case.name}] Expected file '{file_path}' in fragments.\n" f"{diag()}"
-            )
+            hit = any(_match_path(p, file_path) for p in fragment_paths)
+            expected_details.append((f"file: {file_path}", hit))
 
         for content_block in case.must_include_content:
-            normalized_block = content_block.rstrip("\n")
-            assert normalized_block in all_content, (
-                f"[{case.name}] Expected content block not found.\n" f"Expected:\n  {normalized_block[:300]}\n" f"{diag()}"
-            )
+            normalized = content_block.rstrip("\n")
+            hit = normalized in all_content
+            expected_details.append((f"content: {normalized[:80]}", hit))
 
-        self._verify_content_from(case, content_by_file, diag)
-
-        for pattern in case.must_not_include:
-            assert pattern not in all_content, f"[{case.name}] Unwanted pattern found in context: '{pattern}'\n" f"{diag()}"
-
-        for file_path in case.must_not_include_files:
-            assert not any(_match_path(p, file_path) for p in fragment_paths), (
-                f"[{case.name}] File '{file_path}' should NOT be in fragments.\n" f"{diag()}"
-            )
-
-        if case.max_fragments is not None:
-            assert len(fragments) <= case.max_fragments, (
-                f"[{case.name}] Too many fragments: {len(fragments)} > {case.max_fragments}\n" f"{diag()}"
-            )
-
-        if case.max_files is not None:
-            assert len(unique_files) <= case.max_files, (
-                f"[{case.name}] Too many files: {len(unique_files)} > {case.max_files}\n" f"{diag()}"
-            )
-
-        if case.add_garbage_files and not case.skip_garbage_check:
-            for marker in GARBAGE_MARKERS:
-                assert marker not in all_content, f"[{case.name}] Garbage marker '{marker}' leaked into context.\n" f"{diag()}"
-
-    def _verify_content_from(self, case: YamlTestCase, content_by_file: dict[str, str], diag) -> None:
         for file_path, snippets in case.must_include_content_from.items():
-            file_content = None
-            for p, c in content_by_file.items():
-                if _match_path(p, file_path):
-                    file_content = c
-                    break
-            if file_content is None:
-                raise AssertionError(
-                    f"[{case.name}] File '{file_path}' not in selected fragments "
-                    f"(needed for must_include_content_from).\n"
-                    f"{diag()}"
-                )
+            file_content = self._find_file_content(content_by_file, file_path)
             for snippet in snippets:
                 normalized = snippet.rstrip("\n")
-                assert normalized in file_content, (
-                    f"[{case.name}] Content from '{file_path}' missing expected snippet.\n"
-                    f"Expected:\n  {normalized[:300]}\n"
-                    f"File content (first 500 chars):\n  {file_content[:500]}\n"
-                    f"{diag()}"
-                )
+                if file_content is not None:
+                    hit = normalized in file_content
+                else:
+                    hit = False
+                expected_details.append((f"from {file_path}: {normalized[:60]}", hit))
+
+        noise_details: list[tuple[str, bool]] = []
+
+        for pattern in case.must_not_include:
+            leaked = pattern in all_content
+            noise_details.append((f"noise: {pattern[:80]}", leaked))
+
+        for file_path in case.must_not_include_files:
+            leaked = any(_match_path(p, file_path) for p in fragment_paths)
+            noise_details.append((f"noise_file: {file_path}", leaked))
+
+        garbage_hits = 0
+        garbage_total = 0
+        if case.add_garbage_files and not case.skip_garbage_check:
+            for marker in GARBAGE_MARKERS:
+                garbage_total += 1
+                if marker in all_content:
+                    garbage_hits += 1
+
+        if case.max_fragments is not None:
+            frag_count = len(context.get("fragments", []))
+            if frag_count > case.max_fragments:
+                noise_details.append((f"excess_fragments: {frag_count}/{case.max_fragments}", True))
+
+        if case.max_files is not None:
+            unique_files = len(set(fragment_paths))
+            if unique_files > case.max_files:
+                noise_details.append((f"excess_files: {unique_files}/{case.max_files}", True))
+
+        diff_tokens = compute_diff_token_count(case.initial_files, case.changed_files)
+        context_tokens = compute_context_token_count(context)
+
+        return ScoreBreakdown(
+            diff_covered=diff_covered,
+            uncovered_lines=uncovered,
+            expected_hits=sum(1 for _, hit in expected_details if hit),
+            expected_total=len(expected_details),
+            expected_details=expected_details,
+            noise_hits=sum(1 for _, leaked in noise_details if leaked),
+            noise_total=len(noise_details),
+            noise_details=noise_details,
+            garbage_hits=garbage_hits,
+            garbage_total=garbage_total,
+            diff_tokens=diff_tokens,
+            context_tokens=context_tokens,
+        )
+
+    def verify_assertions(self, context: dict, case: YamlTestCase) -> None:
+        breakdown = self.score_test_case(context, case)
+        diag = f"Score: {breakdown.score}%\nSelected fragments:\n{_format_fragment_summary(context)}"
+
+        assert breakdown.diff_covered, (
+            f"[{case.name}] Changed code missing from context.\n"
+            f"Uncovered lines:\n" + "\n".join(f"  {line}" for line in breakdown.uncovered_lines[:10]) + f"\n{diag}"
+        )
+
+        for desc, hit in breakdown.expected_details:
+            assert hit, f"[{case.name}] Expected not found: {desc}\n{diag}"
+
+        for desc, leaked in breakdown.noise_details:
+            assert not leaked, f"[{case.name}] Unwanted found: {desc}\n{diag}"
+
+        if case.add_garbage_files and not case.skip_garbage_check:
+            assert breakdown.garbage_hits == 0, f"[{case.name}] {breakdown.garbage_hits} garbage markers leaked.\n{diag}"
+
+    def _find_file_content(self, content_by_file: dict[str, str], target: str) -> str | None:
+        for path, content in content_by_file.items():
+            if _match_path(path, target):
+                return content
+        return None
 
     def _extract_all_content(self, context: dict) -> str:
         parts = []

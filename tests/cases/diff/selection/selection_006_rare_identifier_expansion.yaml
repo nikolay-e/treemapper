@@ -1,9 +1,30 @@
+# Scenario: core.py modifies main() which calls unique_helper() imported
+# from rare_module.py. The identifier "unique_helper" is rare — it only
+# appears in these two files. The selector should expand via the rare
+# identifier edge to include rare_module.py.
+#
+# Diff: core.py changes main() body — new return expression using unique_helper().
+#
+# Reviewer questions:
+#   Q1: "What does unique_helper return?"
+#       -> rare_module.py (UNCHANGED) defines unique_helper returning 42.
+#          Reviewer verifies that `result * 2` in the new code is correct
+#          given the helper's actual return value.
+#   Q2: "Are there side effects in unique_helper?"
+#       -> rare_module.py shows a pure function. Reviewer confirms the
+#          multiplication in main() is safe.
+#
+# Not needed:
+#   - string_utils.py: general-purpose string manipulation. No import from
+#     core.py and no shared identifiers with the diff.
+#   - math_helpers.py: arithmetic utilities. Plausibly related (core.py does
+#     multiplication) but no import edge and no shared rare identifiers.
+
 initial:
   core.py: |
     from rare_module import unique_helper
 
     def main():
-        main_marker = "main_function_original"
         return unique_helper()
 
     def secondary_function():
@@ -13,7 +34,6 @@ initial:
         return "tertiary_result"
   rare_module.py: |
     def unique_helper():
-        unique_marker = "unique_helper_implementation"
         return 42
 
     def rare_helper_alpha():
@@ -21,76 +41,37 @@ initial:
 
     def rare_helper_beta():
         return "rare_beta_result"
-  common_utils.py: |
-    def common_util_one():
-        return "common_one_result"
+  string_utils.py: |
+    def capitalize_words(text):
+        return " ".join(word.capitalize() for word in text.split())
 
-    def common_util_two():
-        return "common_two_result"
+    def truncate(text, max_length=100):
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + "..."
 
-    def common_util_three():
-        return "common_three_result"
-  garbage_sel_006_importable.py: |
-    def GARBAGE_SEL_006_importable_func():
-        return "GARBAGE_SEL_006_importable_result"
+    def slugify(text):
+        return text.lower().replace(" ", "-").replace("_", "-")
+  math_helpers.py: |
+    def clamp(value, minimum, maximum):
+        return max(minimum, min(value, maximum))
 
-    def GARBAGE_SEL_006_another_import():
-        return "GARBAGE_SEL_006_another_import_result"
+    def lerp(start, end, factor):
+        return start + (end - start) * factor
 
-    class GARBAGE_SEL_006_ImportClass:
-        def import_method(self):
-            return "GARBAGE_SEL_006_import_method_result"
-  garbage_sel_006_identifiers.py: |
-    GARBAGE_SEL_006_RARE_ID_ONE = "garbage_sel_006_rare_id_one_value"
-    GARBAGE_SEL_006_RARE_ID_TWO = "garbage_sel_006_rare_id_two_value"
-    GARBAGE_SEL_006_RARE_ID_THREE = "garbage_sel_006_rare_id_three_value"
-
-    def GARBAGE_SEL_006_identify():
-        return "GARBAGE_SEL_006_identify_result"
-
-    def GARBAGE_SEL_006_expand():
-        return "GARBAGE_SEL_006_expand_result"
-  garbage_sel_006_dependencies.py: |
-    class GARBAGE_SEL_006_DependencyAlpha:
-        def resolve(self):
-            return "GARBAGE_SEL_006_resolve_alpha"
-
-    class GARBAGE_SEL_006_DependencyBeta:
-        def resolve(self):
-            return "GARBAGE_SEL_006_resolve_beta"
-
-    def GARBAGE_SEL_006_inject_dependency():
-        return "GARBAGE_SEL_006_injected"
-  # --- Tricky garbage: self-contained with rare vocabulary ---
-  tricky_rare_consumer.py: |
-    GARBAGE_SEL_006_RARE_CONSUMER_A = "rare_consumer_module"
-    GARBAGE_SEL_006_RARE_USAGE_B = True
-
-    def consume_rare_GARBAGE_SEL_006():
-        result = fetch_rare_GARBAGE_SEL_006()
-        return result * 3
-
-    def fetch_rare_GARBAGE_SEL_006():
-        return 42
-  # --- Tricky garbage: self-contained helper copy ---
-  tricky_unique_helper_copy.py: |
-    GARBAGE_SEL_006_HELPER_COPY_C = "unique_helper_copy"
-    GARBAGE_SEL_006_HELPER_IMPL_D = 42
-
-    def special_helper_GARBAGE_SEL_006():
-        special_marker = "special_helper_implementation"
-        return 42
-
-    def invoke_special_GARBAGE_SEL_006():
-        marker = "invoke_special_modified"
-        result = special_helper_GARBAGE_SEL_006()
-        return result * 2
+    def moving_average(values, window=3):
+        if len(values) < window:
+            return values
+        result = []
+        for i in range(len(values) - window + 1):
+            avg = sum(values[i:i + window]) / window
+            result.append(avg)
+        return result
 changed:
   core.py: |
     from rare_module import unique_helper
 
     def main():
-        main_marker = "main_function_modified"
         result = unique_helper()
         return result * 2
 
@@ -101,7 +82,6 @@ changed:
         return "tertiary_result"
   rare_module.py: |
     def unique_helper():
-        unique_marker = "unique_helper_implementation"
         return 42
 
     def rare_helper_alpha():
@@ -109,118 +89,53 @@ changed:
 
     def rare_helper_beta():
         return "rare_beta_result"
-  common_utils.py: |
-    def common_util_one():
-        return "common_one_result"
+  string_utils.py: |
+    def capitalize_words(text):
+        return " ".join(word.capitalize() for word in text.split())
 
-    def common_util_two():
-        return "common_two_result"
+    def truncate(text, max_length=100):
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + "..."
 
-    def common_util_three():
-        return "common_three_result"
-  garbage_sel_006_importable.py: |
-    def GARBAGE_SEL_006_importable_func():
-        return "GARBAGE_SEL_006_importable_result"
+    def slugify(text):
+        return text.lower().replace(" ", "-").replace("_", "-")
+  math_helpers.py: |
+    def clamp(value, minimum, maximum):
+        return max(minimum, min(value, maximum))
 
-    def GARBAGE_SEL_006_another_import():
-        return "GARBAGE_SEL_006_another_import_result"
+    def lerp(start, end, factor):
+        return start + (end - start) * factor
 
-    class GARBAGE_SEL_006_ImportClass:
-        def import_method(self):
-            return "GARBAGE_SEL_006_import_method_result"
-  garbage_sel_006_identifiers.py: |
-    GARBAGE_SEL_006_RARE_ID_ONE = "garbage_sel_006_rare_id_one_value"
-    GARBAGE_SEL_006_RARE_ID_TWO = "garbage_sel_006_rare_id_two_value"
-    GARBAGE_SEL_006_RARE_ID_THREE = "garbage_sel_006_rare_id_three_value"
-
-    def GARBAGE_SEL_006_identify():
-        return "GARBAGE_SEL_006_identify_result"
-
-    def GARBAGE_SEL_006_expand():
-        return "GARBAGE_SEL_006_expand_result"
-  garbage_sel_006_dependencies.py: |
-    class GARBAGE_SEL_006_DependencyAlpha:
-        def resolve(self):
-            return "GARBAGE_SEL_006_resolve_alpha"
-
-    class GARBAGE_SEL_006_DependencyBeta:
-        def resolve(self):
-            return "GARBAGE_SEL_006_resolve_beta"
-
-    def GARBAGE_SEL_006_inject_dependency():
-        return "GARBAGE_SEL_006_injected"
-  tricky_rare_consumer.py: |
-    GARBAGE_SEL_006_RARE_CONSUMER_A = "rare_consumer_module"
-    GARBAGE_SEL_006_RARE_USAGE_B = True
-
-    def consume_rare_GARBAGE_SEL_006():
-        result = fetch_rare_GARBAGE_SEL_006()
-        return result * 3
-
-    def fetch_rare_GARBAGE_SEL_006():
-        return 42
-  tricky_unique_helper_copy.py: |
-    GARBAGE_SEL_006_HELPER_COPY_C = "unique_helper_copy"
-    GARBAGE_SEL_006_HELPER_IMPL_D = 42
-
-    def special_helper_GARBAGE_SEL_006():
-        special_marker = "special_helper_implementation"
-        return 42
-
-    def invoke_special_GARBAGE_SEL_006():
-        marker = "invoke_special_modified"
-        result = special_helper_GARBAGE_SEL_006()
-        return result * 2
-
-# === Assertions ===
-
-must_include:
-- core.py
-- main
-- main_function_modified
-
+    def moving_average(values, window=3):
+        if len(values) < window:
+            return values
+        result = []
+        for i in range(len(values) - window + 1):
+            avg = sum(values[i:i + window]) / window
+            result.append(avg)
+        return result
+must_include_files:
+  # Q1+Q2: rare_module defines unique_helper — rare identifier edge
+  - rare_module.py
 must_include_content_from:
   core.py:
-    - 'def main():'
-    - main_marker = "main_function_modified"
-    - result = unique_helper()
-
+    - "from rare_module import unique_helper"
+    - "result = unique_helper()"
+  rare_module.py:
+    - "def unique_helper()"
 must_not_include:
-- main_function_original
-# Plain garbage markers
-- GARBAGE_SEL_006_importable_func
-- GARBAGE_SEL_006_importable_result
-- GARBAGE_SEL_006_another_import
-- GARBAGE_SEL_006_ImportClass
-- GARBAGE_SEL_006_import_method_result
-- GARBAGE_SEL_006_RARE_ID_ONE
-- GARBAGE_SEL_006_RARE_ID_TWO
-- garbage_sel_006_rare_id_one_value
-- GARBAGE_SEL_006_identify
-- GARBAGE_SEL_006_expand
-- GARBAGE_SEL_006_DependencyAlpha
-- GARBAGE_SEL_006_DependencyBeta
-- GARBAGE_SEL_006_resolve_alpha
-- GARBAGE_SEL_006_resolve_beta
-- GARBAGE_SEL_006_inject_dependency
-- GARBAGE_SEL_006_injected
-- garbage_sel_006_importable.py
-- garbage_sel_006_identifiers.py
-- garbage_sel_006_dependencies.py
-# Tricky: self-contained with rare vocabulary
-- GARBAGE_SEL_006_RARE_CONSUMER_A
-- GARBAGE_SEL_006_RARE_USAGE_B
-# Tricky: self-contained helper copy
-- GARBAGE_SEL_006_HELPER_COPY_C
-- GARBAGE_SEL_006_HELPER_IMPL_D
-
+  # string_utils.py: general text utilities, no import edge
+  - capitalize_words
+  - truncate
+  - slugify
+  # math_helpers.py: arithmetic utilities, no import edge
+  - clamp
+  - lerp
+  - moving_average
 must_not_include_files:
-- garbage_sel_006_importable.py
-- garbage_sel_006_identifiers.py
-- garbage_sel_006_dependencies.py
-- tricky_rare_consumer.py
-- tricky_unique_helper_copy.py
-
+  - string_utils.py
+  - math_helpers.py
 max_fragments: 5
 max_files: 3
 add_garbage_files: false

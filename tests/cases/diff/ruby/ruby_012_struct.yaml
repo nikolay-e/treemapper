@@ -1,3 +1,22 @@
+# Test: Geometry module uses Struct-based types (Point, Rectangle, Circle)
+#
+# Scenario: lib/geometry.rb is rewritten to require types and construct
+# Point, Rectangle, Circle instances. The Struct definitions (UNCHANGED) in
+# lib/types.rb include custom methods (distance_from_origin, area, perimeter).
+#
+# Reviewer questions:
+#   Q1: "What fields does Point have? Does it have custom methods?"
+#       -> lib/types.rb (UNCHANGED) — Point = Struct.new(:x, :y) with
+#          distance_from_origin and to_s.
+#   Q2: "What does bounding_box return? A Rectangle?"
+#       -> Geometry.bounding_box constructs Rectangle.new from min/max of points.
+#
+# Trap files (plausible but unrelated):
+#   - lib/vector_math.rb: vector operations — similar math domain but Geometry
+#     uses Struct types directly, not vectors.
+#   - lib/shape_renderer.rb: renders shapes to SVG — same shape domain but
+#     Geometry is a factory module, not a renderer.
+
 initial:
   lib/types.rb: |
     Point = Struct.new(:x, :y) do
@@ -35,26 +54,67 @@ initial:
         "geometry"
       end
     end
-  lib/garbage_inventory.rb: |
-    GARBAGE_RUBY_012_WAREHOUSE_CODE_A = "WH-EAST-01"
-    GARBAGE_RUBY_012_STOCK_POLICY_B = "fifo"
+  lib/vector_math.rb: |
+    class Vector2D
+      attr_reader :x, :y
 
-    class GarbageInventoryTracker
-      GARBAGE_RUBY_012_REORDER_POINT_C = 50
+      def initialize(x, y)
+        @x = x
+        @y = y
+      end
 
-      def check_stock(item_id)
-        GARBAGE_RUBY_012_WAREHOUSE_CODE_A
+      def magnitude
+        Math.sqrt(@x**2 + @y**2)
+      end
+
+      def dot(other)
+        @x * other.x + @y * other.y
+      end
+
+      def add(other)
+        Vector2D.new(@x + other.x, @y + other.y)
+      end
+
+      def scale(factor)
+        Vector2D.new(@x * factor, @y * factor)
+      end
+
+      def normalize
+        mag = magnitude
+        return Vector2D.new(0, 0) if mag.zero?
+        Vector2D.new(@x / mag, @y / mag)
       end
     end
-  lib/garbage_shipment.rb: |
-    GARBAGE_RUBY_012_CARRIER_NAME_D = "FastFreight"
-    GARBAGE_RUBY_012_TRACKING_PREFIX_E = "FF"
+  lib/shape_renderer.rb: |
+    class ShapeRenderer
+      def initialize(canvas_width, canvas_height)
+        @width = canvas_width
+        @height = canvas_height
+        @shapes = []
+      end
 
-    class GarbageShipmentManager
-      GARBAGE_RUBY_012_MAX_WEIGHT_KG_F = 30000
+      def add_circle(cx, cy, radius, color: 'black')
+        @shapes << { type: :circle, cx: cx, cy: cy, r: radius, color: color }
+      end
 
-      def create_shipment(order_id)
-        GARBAGE_RUBY_012_CARRIER_NAME_D
+      def add_rectangle(x, y, width, height, color: 'black')
+        @shapes << { type: :rect, x: x, y: y, w: width, h: height, color: color }
+      end
+
+      def to_svg
+        elements = @shapes.map { |s| render_shape(s) }.join("\n  ")
+        "<svg width=\"#{@width}\" height=\"#{@height}\">\n  #{elements}\n</svg>"
+      end
+
+      private
+
+      def render_shape(shape)
+        case shape[:type]
+        when :circle
+          "<circle cx=\"#{shape[:cx]}\" cy=\"#{shape[:cy]}\" r=\"#{shape[:r]}\" fill=\"#{shape[:color]}\" />"
+        when :rect
+          "<rect x=\"#{shape[:x]}\" y=\"#{shape[:y]}\" width=\"#{shape[:w]}\" height=\"#{shape[:h]}\" fill=\"#{shape[:color]}\" />"
+        end
       end
     end
 changed:
@@ -110,43 +170,93 @@ changed:
         Circle.new(d / 2.0)
       end
     end
-  lib/garbage_inventory.rb: |
-    GARBAGE_RUBY_012_WAREHOUSE_CODE_A = "WH-EAST-01"
-    GARBAGE_RUBY_012_STOCK_POLICY_B = "fifo"
+  lib/vector_math.rb: |
+    class Vector2D
+      attr_reader :x, :y
 
-    class GarbageInventoryTracker
-      GARBAGE_RUBY_012_REORDER_POINT_C = 50
+      def initialize(x, y)
+        @x = x
+        @y = y
+      end
 
-      def check_stock(item_id)
-        GARBAGE_RUBY_012_WAREHOUSE_CODE_A
+      def magnitude
+        Math.sqrt(@x**2 + @y**2)
+      end
+
+      def dot(other)
+        @x * other.x + @y * other.y
+      end
+
+      def add(other)
+        Vector2D.new(@x + other.x, @y + other.y)
+      end
+
+      def scale(factor)
+        Vector2D.new(@x * factor, @y * factor)
+      end
+
+      def normalize
+        mag = magnitude
+        return Vector2D.new(0, 0) if mag.zero?
+        Vector2D.new(@x / mag, @y / mag)
       end
     end
-  lib/garbage_shipment.rb: |
-    GARBAGE_RUBY_012_CARRIER_NAME_D = "FastFreight"
-    GARBAGE_RUBY_012_TRACKING_PREFIX_E = "FF"
+  lib/shape_renderer.rb: |
+    class ShapeRenderer
+      def initialize(canvas_width, canvas_height)
+        @width = canvas_width
+        @height = canvas_height
+        @shapes = []
+      end
 
-    class GarbageShipmentManager
-      GARBAGE_RUBY_012_MAX_WEIGHT_KG_F = 30000
+      def add_circle(cx, cy, radius, color: 'black')
+        @shapes << { type: :circle, cx: cx, cy: cy, r: radius, color: color }
+      end
 
-      def create_shipment(order_id)
-        GARBAGE_RUBY_012_CARRIER_NAME_D
+      def add_rectangle(x, y, width, height, color: 'black')
+        @shapes << { type: :rect, x: x, y: y, w: width, h: height, color: color }
+      end
+
+      def to_svg
+        elements = @shapes.map { |s| render_shape(s) }.join("\n  ")
+        "<svg width=\"#{@width}\" height=\"#{@height}\">\n  #{elements}\n</svg>"
+      end
+
+      private
+
+      def render_shape(shape)
+        case shape[:type]
+        when :circle
+          "<circle cx=\"#{shape[:cx]}\" cy=\"#{shape[:cy]}\" r=\"#{shape[:r]}\" fill=\"#{shape[:color]}\" />"
+        when :rect
+          "<rect x=\"#{shape[:x]}\" y=\"#{shape[:y]}\" width=\"#{shape[:w]}\" height=\"#{shape[:h]}\" fill=\"#{shape[:color]}\" />"
+        end
       end
     end
 must_include_files:
-- lib/geometry.rb
-must_include_content:
-- |
-  Point.new(x, y)
+  - lib/geometry.rb
+  # Q1/Q2: types.rb defines Point/Rectangle/Circle structs Geometry uses
+  - lib/types.rb
+must_include_content_from:
+  lib/geometry.rb:
+    - "Point.new(x, y)"
+    - "Rectangle.new(xs.max - xs.min, ys.max - ys.min)"
+  lib/types.rb:
+    - "Point = Struct.new(:x, :y)"
+    - "Rectangle = Struct.new(:width, :height)"
 must_not_include:
-- GARBAGE_RUBY_012_WAREHOUSE_CODE_A
-- GARBAGE_RUBY_012_STOCK_POLICY_B
-- GARBAGE_RUBY_012_REORDER_POINT_C
-- GARBAGE_RUBY_012_CARRIER_NAME_D
-- GARBAGE_RUBY_012_TRACKING_PREFIX_E
-- GARBAGE_RUBY_012_MAX_WEIGHT_KG_F
-- GarbageInventoryTracker
-- GarbageShipmentManager
-- garbage_inventory.rb
-- garbage_shipment.rb
+  # lib/vector_math.rb: vector operations — Geometry uses Structs, not vectors
+  - Vector2D
+  - magnitude
+  - dot
+  # lib/shape_renderer.rb: SVG rendering — Geometry is a factory, not renderer
+  - ShapeRenderer
+  - to_svg
+  - render_shape
+must_not_include_files:
+  - lib/vector_math.rb
+  - lib/shape_renderer.rb
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

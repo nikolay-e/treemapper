@@ -1,3 +1,30 @@
+# Scenario: main.ts is rewritten to import MyClass from user.ts, construct
+#   an instance with new MyClass(42), and call getValue(). Only main.ts changed.
+#
+# Diff shows:
+#   - console.log('initial');
+#   + import { MyClass } from './user';
+#   + function createInstance() { const instance = new MyClass(42); return instance.getValue(); }
+#
+# Reviewer questions:
+#   Q1: "What does MyClass(42) do — is the constructor parameter valid?"
+#       -> user.ts (UNCHANGED) constructor takes value: number. 42 is valid.
+#          Reviewer must see the constructor to verify.
+#
+#   Q2: "What does getValue() return for value=42?"
+#       -> Same file: getValue() returns this.value. For 42, returns 42.
+#          Reviewer needs the method body to verify.
+#
+# Not needed for comprehension:
+#   - my-class.test.ts: Test file that constructs MyClass instances and
+#     asserts on getValue(). DIRECT STRUCTURAL EDGE: imports MyClass,
+#     calls new MyClass() and getValue(). But test expectations don't help
+#     review main.ts's usage — reviewer needs the class definition.
+#
+#   - my-class-builder.ts: Builder pattern that creates MyClass instances.
+#     Direct reference to MyClass. But builder chaining doesn't help
+#     review the simple constructor call in main.ts.
+
 initial:
   user.ts: |
     export class MyClass {
@@ -13,28 +40,45 @@ initial:
     }
   main.ts: |
     console.log('initial');
-  garbage_notifications.ts: |
-    const GARBAGE_JS_020_NOTIFY_MARKER_A = "notify";
-    const GARBAGE_JS_020_PUSH_MARKER_B = true;
+  my-class.test.ts: |
+    import { MyClass } from './user';
 
-    class PushNotifier {
-        static GARBAGE_JS_020_PUSH_CLASS_C = "push";
+    describe('MyClass', () => {
+        it('should store value from constructor', () => {
+            const instance = new MyClass(42);
+            expect(instance.getValue()).toBe(42);
+        });
 
-        send(token: string, message: string): void {
-            // noop
+        it('should accept zero', () => {
+            const instance = new MyClass(0);
+            expect(instance.getValue()).toBe(0);
+        });
+
+        it('should accept negative values', () => {
+            const instance = new MyClass(-10);
+            expect(instance.getValue()).toBe(-10);
+        });
+    });
+  my-class-builder.ts: |
+    import { MyClass } from './user';
+
+    export class MyClassBuilder {
+        private value: number = 0;
+
+        withValue(value: number): MyClassBuilder {
+            this.value = value;
+            return this;
+        }
+
+        build(): MyClass {
+            return new MyClass(this.value);
         }
     }
-  garbage_analytics.ts: |
-    const GARBAGE_JS_020_ANALYTICS_MARKER_D = "analytics";
-    const GARBAGE_JS_020_TRACKER_MARKER_E = 42;
 
-    class AnalyticsTracker {
-        static GARBAGE_JS_020_TRACKER_CLASS_F = true;
-
-        track(event: string, data: unknown): void {
-            // noop
-        }
+    export function createDefault(): MyClass {
+        return new MyClassBuilder().withValue(1).build();
     }
+
 changed:
   user.ts: |
     export class MyClass {
@@ -57,41 +101,79 @@ changed:
     }
 
     console.log(createInstance());
-  garbage_notifications.ts: |
-    const GARBAGE_JS_020_NOTIFY_MARKER_A = "notify";
-    const GARBAGE_JS_020_PUSH_MARKER_B = true;
+  my-class.test.ts: |
+    import { MyClass } from './user';
 
-    class PushNotifier {
-        static GARBAGE_JS_020_PUSH_CLASS_C = "push";
+    describe('MyClass', () => {
+        it('should store value from constructor', () => {
+            const instance = new MyClass(42);
+            expect(instance.getValue()).toBe(42);
+        });
 
-        send(token: string, message: string): void {
-            // noop
+        it('should accept zero', () => {
+            const instance = new MyClass(0);
+            expect(instance.getValue()).toBe(0);
+        });
+
+        it('should accept negative values', () => {
+            const instance = new MyClass(-10);
+            expect(instance.getValue()).toBe(-10);
+        });
+    });
+  my-class-builder.ts: |
+    import { MyClass } from './user';
+
+    export class MyClassBuilder {
+        private value: number = 0;
+
+        withValue(value: number): MyClassBuilder {
+            this.value = value;
+            return this;
+        }
+
+        build(): MyClass {
+            return new MyClass(this.value);
         }
     }
-  garbage_analytics.ts: |
-    const GARBAGE_JS_020_ANALYTICS_MARKER_D = "analytics";
-    const GARBAGE_JS_020_TRACKER_MARKER_E = 42;
 
-    class AnalyticsTracker {
-        static GARBAGE_JS_020_TRACKER_CLASS_F = true;
-
-        track(event: string, data: unknown): void {
-            // noop
-        }
+    export function createDefault(): MyClass {
+        return new MyClassBuilder().withValue(1).build();
     }
+
 must_include_files:
-- main.ts
-must_include_content:
-- import { MyClass } from './user';
-- function createInstance() {
+  - main.ts
+  # Q1+Q2: MyClass constructor and getValue() define what main.ts uses
+  - user.ts
+
+must_include_content_from:
+  main.ts:
+    - "import { MyClass } from './user'"
+    - "new MyClass(42)"
+    - "instance.getValue()"
+  user.ts:
+    - "class MyClass"
+    - "constructor(value: number)"
+    - "getValue(): number"
+
 must_not_include:
-- GARBAGE_JS_020_ANALYTICS_MARKER_D
-- GARBAGE_JS_020_NOTIFY_MARKER_A
-- GARBAGE_JS_020_PUSH_CLASS_C
-- GARBAGE_JS_020_PUSH_MARKER_B
-- GARBAGE_JS_020_TRACKER_CLASS_F
-- GARBAGE_JS_020_TRACKER_MARKER_E
-- garbage_analytics.ts
-- garbage_notifications.ts
+  # --- my-class.test.ts: tests for MyClass ---
+  # DIRECT EDGE: imports MyClass, calls new MyClass() and getValue().
+  # But test assertions verify behavior, not help review main.ts usage.
+  - "describe('MyClass'"
+  - "expect(instance.getValue()).toBe"
+  - "should store value"
+  # --- my-class-builder.ts: builder creating MyClass instances ---
+  # Direct reference to MyClass. But builder pattern doesn't help
+  # review the simple constructor call.
+  - MyClassBuilder
+  - withValue
+  - createDefault
+
+must_not_include_files:
+  - my-class.test.ts
+  - my-class-builder.ts
+
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,38 +1,49 @@
+# Reviewer sees: Stats.tsx now imports and memoizes expensiveComputation.
+# Q: "What does expensiveComputation do — is memoization justified?"
+#    -> compute.ts: reduces array to sum of squares (O(n) reduce).
+#       Reviewer understands the memoization rationale.
+#
+# Not needed:
+#   - statistics.ts: mean/median functions. Same math domain but
+#     not imported by Stats — no connection to this change.
+#   - StatsChart.tsx: chart component. Sibling component not
+#     referenced by the diff.
+
 initial:
-  compute.ts: |
+  src/compute.ts: |
     export function expensiveComputation(items: number[]): number {
         return items.reduce((sum, n) => sum + n * n, 0);
     }
-  Stats.tsx: |
-    console.log('initial');
-  garbage_auth.ts: |
-    const GARBAGE_JS_062_AUTH_MARKER_A = "authentication";
-    const GARBAGE_JS_062_TOKEN_MARKER_B = true;
-
-    class AuthProvider {
-        static GARBAGE_JS_062_PROVIDER_CLASS_C = "provider";
-
-        validate(token: string): boolean {
-            return false;
-        }
+  src/Stats.tsx: |
+    export function Stats() {
+        return <div>Placeholder</div>;
     }
-  garbage_payments.ts: |
-    const GARBAGE_JS_062_PAYMENT_MARKER_D = "payments";
-    const GARBAGE_JS_062_AMOUNT_MARKER_E = 9999;
+  src/statistics.ts: |
+    export function mean(values: number[]): number {
+        return values.reduce((a, b) => a + b, 0) / values.length;
+    }
 
-    class PaymentGateway {
-        static GARBAGE_JS_062_GATEWAY_CLASS_F = true;
+    export function median(values: number[]): number {
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+  src/StatsChart.tsx: |
+    interface StatsChartProps {
+        data: number[];
+        width: number;
+        height: number;
+    }
 
-        charge(amount: number, currency: string): boolean {
-            return false;
-        }
+    export function StatsChart({ data, width, height }: StatsChartProps) {
+        return <canvas width={width} height={height} />;
     }
 changed:
-  compute.ts: |
+  src/compute.ts: |
     export function expensiveComputation(items: number[]): number {
         return items.reduce((sum, n) => sum + n * n, 0);
     }
-  Stats.tsx: |
+  src/Stats.tsx: |
     import { useMemo } from 'react';
     import { expensiveComputation } from './compute';
 
@@ -40,41 +51,45 @@ changed:
         const result = useMemo(() => expensiveComputation(items), [items]);
         return <div>Result: {result}</div>;
     }
-  garbage_auth.ts: |
-    const GARBAGE_JS_062_AUTH_MARKER_A = "authentication";
-    const GARBAGE_JS_062_TOKEN_MARKER_B = true;
-
-    class AuthProvider {
-        static GARBAGE_JS_062_PROVIDER_CLASS_C = "provider";
-
-        validate(token: string): boolean {
-            return false;
-        }
+  src/statistics.ts: |
+    export function mean(values: number[]): number {
+        return values.reduce((a, b) => a + b, 0) / values.length;
     }
-  garbage_payments.ts: |
-    const GARBAGE_JS_062_PAYMENT_MARKER_D = "payments";
-    const GARBAGE_JS_062_AMOUNT_MARKER_E = 9999;
 
-    class PaymentGateway {
-        static GARBAGE_JS_062_GATEWAY_CLASS_F = true;
+    export function median(values: number[]): number {
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+  src/StatsChart.tsx: |
+    interface StatsChartProps {
+        data: number[];
+        width: number;
+        height: number;
+    }
 
-        charge(amount: number, currency: string): boolean {
-            return false;
-        }
+    export function StatsChart({ data, width, height }: StatsChartProps) {
+        return <canvas width={width} height={height} />;
     }
 must_include_files:
-- Stats.tsx
-must_include_content:
-- import { useMemo } from 'react';
-- 'function Stats({ items }: { items: number[] }) {'
+  # Unchanged file — the import target. Reviewer needs to see the
+  # computation logic to judge whether memoization is worthwhile.
+  - src/compute.ts
+must_include_content_from:
+  src/compute.ts:
+    - "expensiveComputation"
+    - "items.reduce"
 must_not_include:
-- GARBAGE_JS_062_AMOUNT_MARKER_E
-- GARBAGE_JS_062_AUTH_MARKER_A
-- GARBAGE_JS_062_GATEWAY_CLASS_F
-- GARBAGE_JS_062_PAYMENT_MARKER_D
-- GARBAGE_JS_062_PROVIDER_CLASS_C
-- GARBAGE_JS_062_TOKEN_MARKER_B
-- garbage_auth.ts
-- garbage_payments.ts
+  # statistics.ts: mean/median not imported by Stats
+  - mean
+  - median
+  # StatsChart.tsx: sibling component, not part of this change
+  - StatsChartProps
+  - canvas
+must_not_include_files:
+  - src/statistics.ts
+  - src/StatsChart.tsx
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

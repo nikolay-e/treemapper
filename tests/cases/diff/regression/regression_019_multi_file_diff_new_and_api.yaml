@@ -1,3 +1,25 @@
+# Test: Multi-file API diff — routes add pagination, auth adds validation, new pagination module
+#
+# Scenario: src/api/routes.py adds pagination import and POST /users endpoint.
+# src/api/auth.py adds validate_token() and uses it in require_auth.
+# A new file src/api/pagination.py provides the paginate() function.
+# src/api/middleware.py is UNCHANGED.
+#
+# Reviewer questions:
+#   Q1: "How does the new pagination work?"
+#       -> src/api/pagination.py (NEW) slices list by page/per_page, returns
+#          items with metadata.
+#   Q2: "What token validation was added?"
+#       -> src/api/auth.py adds validate_token() checking Bearer prefix + length.
+#
+# Trap files (plausible but unrelated):
+#   - src/api/middleware.py: request logging middleware — same api/ package but
+#     unchanged and not imported by the changed files.
+#   - tests/conftest.py: test fixtures — same project but testing infrastructure,
+#     not runtime code.
+#   - src/api/serializers.py: response serialization — same api/ package but
+#     not imported by routes or auth.
+
 initial:
   src/api/routes.py: |
     from flask import Flask, jsonify, request
@@ -39,16 +61,44 @@ initial:
         def log_response(response):
             logging.info("Response: %s", response.status_code)
             return response
-  tests/GARBAGE_REG019_test_utils.py: |
-    GARBAGE_REG019_TEST_MARKER = "test_utils_garbage"
-    def GARBAGE_REG019_create_fixture():
-        return "GARBAGE_REG019_FIXTURE_RESULT"
-  docs/GARBAGE_REG019_api_spec.md: |
-    GARBAGE_REG019_SPEC_MARKER garbage spec content
-  lib/GARBAGE_REG019_common.py: |
-    GARBAGE_REG019_COMMON_MARKER = "common_garbage"
-    def GARBAGE_REG019_shared_helper():
-        return "GARBAGE_REG019_COMMON_RESULT"
+  tests/conftest.py: |
+    import pytest
+    from flask import Flask
+
+    @pytest.fixture
+    def app():
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        return app
+
+    @pytest.fixture
+    def client(app):
+        return app.test_client()
+
+    @pytest.fixture
+    def auth_headers():
+        return {"Authorization": "Bearer test-token-12345"}
+
+    @pytest.fixture
+    def sample_user():
+        return {"name": "Test User", "email": "test@example.com"}
+  src/api/serializers.py: |
+    from typing import Dict, List, Any
+    from datetime import datetime
+
+    def serialize_user(user: Dict) -> Dict:
+        return {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "created_at": user.get("created_at", datetime.utcnow()).isoformat(),
+        }
+
+    def serialize_users(users: List[Dict]) -> List[Dict]:
+        return [serialize_user(u) for u in users]
+
+    def serialize_error(message: str, code: int) -> Dict:
+        return {"error": {"message": message, "code": code}}
 changed:
   src/api/routes.py: |
     from flask import Flask, jsonify, request
@@ -119,29 +169,73 @@ changed:
         def log_response(response):
             logging.info("Response: %s", response.status_code)
             return response
-  tests/GARBAGE_REG019_test_utils.py: |
-    GARBAGE_REG019_TEST_MARKER = "test_utils_garbage"
-    def GARBAGE_REG019_create_fixture():
-        return "GARBAGE_REG019_FIXTURE_RESULT"
-  docs/GARBAGE_REG019_api_spec.md: |
-    GARBAGE_REG019_SPEC_MARKER garbage spec content
-  lib/GARBAGE_REG019_common.py: |
-    GARBAGE_REG019_COMMON_MARKER = "common_garbage"
-    def GARBAGE_REG019_shared_helper():
-        return "GARBAGE_REG019_COMMON_RESULT"
+  tests/conftest.py: |
+    import pytest
+    from flask import Flask
+
+    @pytest.fixture
+    def app():
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        return app
+
+    @pytest.fixture
+    def client(app):
+        return app.test_client()
+
+    @pytest.fixture
+    def auth_headers():
+        return {"Authorization": "Bearer test-token-12345"}
+
+    @pytest.fixture
+    def sample_user():
+        return {"name": "Test User", "email": "test@example.com"}
+  src/api/serializers.py: |
+    from typing import Dict, List, Any
+    from datetime import datetime
+
+    def serialize_user(user: Dict) -> Dict:
+        return {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "created_at": user.get("created_at", datetime.utcnow()).isoformat(),
+        }
+
+    def serialize_users(users: List[Dict]) -> List[Dict]:
+        return [serialize_user(u) for u in users]
+
+    def serialize_error(message: str, code: int) -> Dict:
+        return {"error": {"message": message, "code": code}}
 must_include_files:
-- src/api/pagination.py
-- src/api/routes.py
-- src/api/auth.py
-must_include_content:
-- def paginate
-- def create_user
-- def validate_token
+  - src/api/routes.py
+  - src/api/auth.py
+  # Q1: pagination.py is the new file that routes.py imports
+  - src/api/pagination.py
+must_include_content_from:
+  src/api/routes.py:
+    - "from src.api.pagination import paginate"
+    - "def create_user"
+  src/api/auth.py:
+    - "def validate_token"
+  src/api/pagination.py:
+    - "def paginate"
 must_not_include:
-- GARBAGE_REG019_TEST_MARKER
-- GARBAGE_REG019_FIXTURE_RESULT
-- GARBAGE_REG019_SPEC_MARKER
-- GARBAGE_REG019_COMMON_MARKER
-- GARBAGE_REG019_COMMON_RESULT
+  # src/api/middleware.py: request logging — unchanged, not imported by changed files
+  - request_logger
+  - log_request
+  - log_response
+  # tests/conftest.py: test fixtures — testing infrastructure, not runtime
+  - auth_headers
+  - sample_user
+  # src/api/serializers.py: response serialization — same package but not imported
+  - serialize_user
+  - serialize_error
+must_not_include_files:
+  - src/api/middleware.py
+  - tests/conftest.py
+  - src/api/serializers.py
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

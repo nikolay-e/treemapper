@@ -1,3 +1,21 @@
+# Scenario: routes.ts adds POST and DELETE routes to userRouter.
+# middleware.ts imports userRouter and mounts it at /users.
+#
+# Diff: routes.ts adds `userRouter.post('/', ...)` and `userRouter.delete('/:id', ...)`
+# alongside the existing GET /:id route.
+#
+# Reviewer questions:
+#   Q1: "Where is userRouter mounted — what are the full URL paths?"
+#       -> middleware.ts (UNCHANGED) has app.use('/users', userRouter). So the new
+#          POST / becomes POST /users/ and DELETE /:id becomes DELETE /users/:id.
+#          Without seeing the mount point, reviewer cannot determine the full paths.
+#
+# Not needed:
+#   - auth-middleware.ts: authentication middleware (requireAuth, requireAdmin).
+#     Applied globally, not specific to these user routes. Not imported by routes.ts.
+#   - user-validator.ts: request body validation for user endpoints. Validation logic
+#     not imported by routes.ts in this change.
+
 initial:
   routes.ts: |
     import { Router } from 'express';
@@ -13,27 +31,28 @@ initial:
     export function setupRoutes(app: any) {
         app.use('/users', userRouter);
     }
-  garbage_healthcheck.ts: |
-    const GARBAGE_JS_045_HEALTH_MARKER_A = "healthcheck";
-    const GARBAGE_JS_045_PING_MARKER_B = true;
+  auth-middleware.ts: |
+    import { Request, Response, NextFunction } from 'express';
 
-    class HealthChecker {
-        static GARBAGE_JS_045_CHECKER_CLASS_C = "checker";
-
-        ping(url: string): Promise<boolean> {
-            return Promise.resolve(true);
-        }
+    export function requireAuth(req: Request, res: Response, next: NextFunction) {
+        const token = req.headers.authorization;
+        if (!token) return res.status(401).json({ error: 'Unauthorized' });
+        next();
     }
-  garbage_notifications.ts: |
-    const GARBAGE_JS_045_NOTIFY_MARKER_D = "notifications";
-    const GARBAGE_JS_045_PUSH_MARKER_E = 50;
 
-    class NotificationSender {
-        static GARBAGE_JS_045_SENDER_CLASS_F = true;
-
-        send(userId: string, message: string): void {
-            // noop
-        }
+    export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+        const role = (req as any).user?.role;
+        if (role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+        next();
+    }
+  user-validator.ts: |
+    export function validateUserBody(body: unknown): { valid: boolean; errors: string[] } {
+        const errors: string[] = [];
+        if (!body || typeof body !== 'object') return { valid: false, errors: ['Body required'] };
+        const obj = body as Record<string, unknown>;
+        if (!obj.name) errors.push('Name required');
+        if (!obj.email) errors.push('Email required');
+        return { valid: errors.length === 0, errors };
     }
 changed:
   routes.ts: |
@@ -58,41 +77,46 @@ changed:
     export function setupRoutes(app: any) {
         app.use('/users', userRouter);
     }
-  garbage_healthcheck.ts: |
-    const GARBAGE_JS_045_HEALTH_MARKER_A = "healthcheck";
-    const GARBAGE_JS_045_PING_MARKER_B = true;
+  auth-middleware.ts: |
+    import { Request, Response, NextFunction } from 'express';
 
-    class HealthChecker {
-        static GARBAGE_JS_045_CHECKER_CLASS_C = "checker";
-
-        ping(url: string): Promise<boolean> {
-            return Promise.resolve(true);
-        }
+    export function requireAuth(req: Request, res: Response, next: NextFunction) {
+        const token = req.headers.authorization;
+        if (!token) return res.status(401).json({ error: 'Unauthorized' });
+        next();
     }
-  garbage_notifications.ts: |
-    const GARBAGE_JS_045_NOTIFY_MARKER_D = "notifications";
-    const GARBAGE_JS_045_PUSH_MARKER_E = 50;
 
-    class NotificationSender {
-        static GARBAGE_JS_045_SENDER_CLASS_F = true;
-
-        send(userId: string, message: string): void {
-            // noop
-        }
+    export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+        const role = (req as any).user?.role;
+        if (role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+        next();
+    }
+  user-validator.ts: |
+    export function validateUserBody(body: unknown): { valid: boolean; errors: string[] } {
+        const errors: string[] = [];
+        if (!body || typeof body !== 'object') return { valid: false, errors: ['Body required'] };
+        const obj = body as Record<string, unknown>;
+        if (!obj.name) errors.push('Name required');
+        if (!obj.email) errors.push('Email required');
+        return { valid: errors.length === 0, errors };
     }
 must_include_files:
-- routes.ts
-must_include_content:
-- userRouter = Router()
-- (req, res) => {
+  # Q1: middleware.ts imports userRouter — shows the mount point /users
+  - middleware.ts
+must_include_content_from:
+  middleware.ts:
+    - "import { userRouter } from './routes'"
+    - "app.use('/users', userRouter)"
 must_not_include:
-- GARBAGE_JS_045_CHECKER_CLASS_C
-- GARBAGE_JS_045_HEALTH_MARKER_A
-- GARBAGE_JS_045_NOTIFY_MARKER_D
-- GARBAGE_JS_045_PING_MARKER_B
-- GARBAGE_JS_045_PUSH_MARKER_E
-- GARBAGE_JS_045_SENDER_CLASS_F
-- garbage_healthcheck.ts
-- garbage_notifications.ts
+  # auth-middleware.ts: global auth, not imported by routes.ts
+  - requireAuth
+  - requireAdmin
+  # user-validator.ts: validation not imported by routes.ts
+  - validateUserBody
+must_not_include_files:
+  - auth-middleware.ts
+  - user-validator.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

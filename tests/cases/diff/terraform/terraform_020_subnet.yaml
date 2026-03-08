@@ -1,14 +1,31 @@
+# Scenario: Add private subnets referencing existing VPC
+#
+# Reviewer questions:
+#   1. What VPC CIDR do the subnets carve from? (variables.tf defines vpc_cidr)
+#   2. Are there other subnets that might have CIDR overlap? (db_network.tf)
+#
+# The diff adds aws_subnet "private" to network.tf using cidrsubnet from
+# the VPC CIDR. variables.tf (unchanged) defines the vpc_cidr variable that
+# controls the address space.
+#
+# Traps: db_network.tf has same aws_subnet type but for the database tier.
+
 initial:
   network.tf: |
     resource "aws_vpc" "main" {
-      cidr_block = "10.0.0.0/16"
+      cidr_block = var.vpc_cidr
+    }
+  variables.tf: |
+    variable "vpc_cidr" {
+      type    = string
+      default = "10.0.0.0/16"
     }
 
-  # --- Tricky garbage: same resource type aws_subnet but for database tier ---
+    variable "environment" {
+      type    = string
+      default = "dev"
+    }
   db_network.tf: |
-    GARBAGE_TF_020_DB_SUBNET_A = "database-tier"
-    GARBAGE_TF_020_DB_CIDR_B = "10.0.200.0/24"
-
     resource "aws_subnet" "database" {
       count             = 2
       vpc_id            = aws_vpc.main.id
@@ -21,17 +38,10 @@ initial:
       }
     }
 
-  # --- Plain garbage ---
-  garbage_notification_handler.go: |
-    // GARBAGE_TF_020_NOTIFY_HANDLER_C
-    // GARBAGE_TF_020_NOTIFY_CHANNEL_D
-    package notify
-    func SendAlert(msg string) error { return nil }
-
 changed:
   network.tf: |
     resource "aws_vpc" "main" {
-      cidr_block = "10.0.0.0/16"
+      cidr_block = var.vpc_cidr
     }
 
     resource "aws_subnet" "private" {
@@ -44,11 +54,17 @@ changed:
         Name = "private-subnet-${count.index}"
       }
     }
+  variables.tf: |
+    variable "vpc_cidr" {
+      type    = string
+      default = "10.0.0.0/16"
+    }
 
+    variable "environment" {
+      type    = string
+      default = "dev"
+    }
   db_network.tf: |
-    GARBAGE_TF_020_DB_SUBNET_A = "database-tier"
-    GARBAGE_TF_020_DB_CIDR_B = "10.0.200.0/24"
-
     resource "aws_subnet" "database" {
       count             = 2
       vpc_id            = aws_vpc.main.id
@@ -61,31 +77,25 @@ changed:
       }
     }
 
-  garbage_notification_handler.go: |
-    // GARBAGE_TF_020_NOTIFY_HANDLER_C
-    // GARBAGE_TF_020_NOTIFY_CHANNEL_D
-    package notify
-    func SendAlert(msg string) error { return nil }
-
 must_include_files:
-- network.tf
+# Unchanged variables file that defines the VPC CIDR used by cidrsubnet
+- variables.tf
 
 must_include_content_from:
-  network.tf:
-    - resource "aws_subnet" "private" {
-    - aws_vpc.main.cidr_block
+  variables.tf:
+    # Reviewer needs the VPC CIDR default to understand the address space
+    - variable "vpc_cidr" {
+    - default = "10.0.0.0/16"
 
 must_not_include:
-- GARBAGE_TF_020_DB_SUBNET_A
-- GARBAGE_TF_020_DB_CIDR_B
-- GARBAGE_TF_020_NOTIFY_HANDLER_C
-- GARBAGE_TF_020_NOTIFY_CHANNEL_D
+# Database subnets are same type but different tier, not affected
+- database-subnet
+- Tier = "database"
 
 must_not_include_files:
-- db_network.tf
-- garbage_notification_handler.go
+- db_network.tf  # same resource type, different tier (database)
 
-max_fragments: 3
-max_files: 1
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

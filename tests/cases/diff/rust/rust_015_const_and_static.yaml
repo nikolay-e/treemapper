@@ -1,7 +1,41 @@
+# Scenario: Adding constants, statics, atomic instance counting, and a Config
+#   struct with validation to src/config.rs. Only src/config.rs is changed.
+#
+# Diff shows:
+#   + pub const MIN_SIZE, DEFAULT_NAME, VERSION
+#   + pub static INSTANCE_COUNT: AtomicUsize
+#   + static mut GLOBAL_CONFIG: Option<Config>
+#   + get_instance_count(), increment_instance_count()
+#   + Config struct with new(), with_defaults(), is_valid()
+#   ~ Settings updated to use MIN_SIZE, DEFAULT_NAME
+#
+# Reviewer questions:
+#   Q1: "Is the AtomicUsize Ordering correct (SeqCst for load and fetch_add)?"
+#       -> Same file: INSTANCE_COUNT.load(Ordering::SeqCst) and
+#          fetch_add(1, Ordering::SeqCst). Reviewer verifies ordering
+#          consistency across both operations.
+#
+#   Q2: "Is the unsafe static GLOBAL_CONFIG safe?"
+#       -> Same file: static mut GLOBAL_CONFIG: Option<Config> = None.
+#          No accessor functions are provided yet — reviewer can flag
+#          this as a potential unsafe access issue.
+#
+# Not needed for comprehension:
+#   - src/env.rs: Environment struct with HashMap<String, String> for
+#     get/set/get_or_default. HARDEST TRAP: "config" vocabulary overlap
+#     — Environment stores configuration-like key-value pairs. Same
+#     crate, same module pattern. But reads runtime env vars, not
+#     compile-time constants. No import of Config or the new constants.
+#
+#   - src/defaults.rs: DEFAULT_WINDOW_WIDTH, DEFAULT_FONT_SIZE and
+#     UiDefaults struct. Same "pub const" pattern as the diff. Same
+#     Default trait impl. But UI-specific constants (window dimensions,
+#     font sizes) with no relationship to Config or AtomicUsize counting.
 initial:
   src/lib.rs: |
     pub mod config;
-    pub mod unrelated;
+    pub mod env;
+    pub mod defaults;
   src/config.rs: |
     pub const MAX_SIZE: usize = 100;
 
@@ -24,72 +58,62 @@ initial:
             Self { size: MAX_SIZE }
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod benchmark;
-    pub mod profiler;
-  src/unrelated/benchmark.rs: |
-    // GARBAGE_RUST_BENCH_001
-    use std::time::{Duration, Instant};
-
-    pub const GARBAGE_WARMUP_ITERATIONS_002: u32 = 100;
-    pub const GARBAGE_BENCH_ITERATIONS_003: u32 = 1000;
-
-    pub struct GarbageBenchmark004 {
-        name: String,
-        iterations: u32,
-    }
-
-    impl GarbageBenchmark004 {
-        pub fn garbage_run_005<F>(&self, f: F) -> Duration
-        where
-            F: Fn(),
-        {
-            let start = Instant::now();
-            for _ in 0..self.iterations {
-                f();
-            }
-            start.elapsed()
-        }
-
-        pub fn garbage_compare_006<F, G>(&self, f: F, g: G) -> (Duration, Duration)
-        where
-            F: Fn(),
-            G: Fn(),
-        {
-            (self.garbage_run_005(f), self.garbage_run_005(g))
-        }
-    }
-
-    pub trait GarbageBenchmarkable007 {
-        fn garbage_benchmark_008(&self) -> Duration;
-    }
-  src/unrelated/profiler.rs: |
-    // GARBAGE_RUST_PROFILER_009
+  src/env.rs: |
     use std::collections::HashMap;
 
-    pub const GARBAGE_PROFILE_DEPTH_010: usize = 32;
-
-    pub struct GarbageProfiler011 {
-        traces: HashMap<String, Vec<u64>>,
+    pub struct Environment {
+        vars: HashMap<String, String>,
     }
 
-    impl GarbageProfiler011 {
-        pub fn garbage_start_012(&mut self, name: &str) {
-            // GARBAGE_PROFILE_START_013
+    impl Environment {
+        pub fn new() -> Self {
+            Self { vars: HashMap::new() }
         }
 
-        pub fn garbage_stop_014(&mut self, name: &str) {
-            // GARBAGE_PROFILE_STOP_015
+        pub fn get(&self, key: &str) -> Option<&String> {
+            self.vars.get(key)
         }
 
-        pub fn garbage_report_016(&self) -> String {
-            "GARBAGE_PROFILE_REPORT_017".to_string()
+        pub fn set(&mut self, key: &str, value: &str) {
+            self.vars.insert(key.to_string(), value.to_string());
+        }
+
+        pub fn get_or_default(&self, key: &str, default: &str) -> String {
+            self.vars.get(key).cloned().unwrap_or_else(|| default.to_string())
+        }
+
+        pub fn contains(&self, key: &str) -> bool {
+            self.vars.contains_key(key)
+        }
+    }
+  src/defaults.rs: |
+    pub const DEFAULT_WINDOW_WIDTH: u32 = 1024;
+    pub const DEFAULT_WINDOW_HEIGHT: u32 = 768;
+    pub const DEFAULT_FONT_SIZE: u8 = 14;
+    pub const DEFAULT_THEME: &str = "dark";
+
+    pub struct UiDefaults {
+        pub width: u32,
+        pub height: u32,
+        pub font_size: u8,
+        pub theme: String,
+    }
+
+    impl Default for UiDefaults {
+        fn default() -> Self {
+            Self {
+                width: DEFAULT_WINDOW_WIDTH,
+                height: DEFAULT_WINDOW_HEIGHT,
+                font_size: DEFAULT_FONT_SIZE,
+                theme: DEFAULT_THEME.to_string(),
+            }
         }
     }
 changed:
   src/lib.rs: |
     pub mod config;
-    pub mod unrelated;
+    pub mod env;
+    pub mod defaults;
   src/config.rs: |
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -176,83 +200,87 @@ changed:
             Self::new(MAX_SIZE)
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod benchmark;
-    pub mod profiler;
-  src/unrelated/benchmark.rs: |
-    // GARBAGE_RUST_BENCH_001
-    use std::time::{Duration, Instant};
-
-    pub const GARBAGE_WARMUP_ITERATIONS_002: u32 = 100;
-    pub const GARBAGE_BENCH_ITERATIONS_003: u32 = 1000;
-
-    pub struct GarbageBenchmark004 {
-        name: String,
-        iterations: u32,
-    }
-
-    impl GarbageBenchmark004 {
-        pub fn garbage_run_005<F>(&self, f: F) -> Duration
-        where
-            F: Fn(),
-        {
-            let start = Instant::now();
-            for _ in 0..self.iterations {
-                f();
-            }
-            start.elapsed()
-        }
-
-        pub fn garbage_compare_006<F, G>(&self, f: F, g: G) -> (Duration, Duration)
-        where
-            F: Fn(),
-            G: Fn(),
-        {
-            (self.garbage_run_005(f), self.garbage_run_005(g))
-        }
-    }
-
-    pub trait GarbageBenchmarkable007 {
-        fn garbage_benchmark_008(&self) -> Duration;
-    }
-  src/unrelated/profiler.rs: |
-    // GARBAGE_RUST_PROFILER_009
+  src/env.rs: |
     use std::collections::HashMap;
 
-    pub const GARBAGE_PROFILE_DEPTH_010: usize = 32;
-
-    pub struct GarbageProfiler011 {
-        traces: HashMap<String, Vec<u64>>,
+    pub struct Environment {
+        vars: HashMap<String, String>,
     }
 
-    impl GarbageProfiler011 {
-        pub fn garbage_start_012(&mut self, name: &str) {
-            // GARBAGE_PROFILE_START_013
+    impl Environment {
+        pub fn new() -> Self {
+            Self { vars: HashMap::new() }
         }
 
-        pub fn garbage_stop_014(&mut self, name: &str) {
-            // GARBAGE_PROFILE_STOP_015
+        pub fn get(&self, key: &str) -> Option<&String> {
+            self.vars.get(key)
         }
 
-        pub fn garbage_report_016(&self) -> String {
-            "GARBAGE_PROFILE_REPORT_017".to_string()
+        pub fn set(&mut self, key: &str, value: &str) {
+            self.vars.insert(key.to_string(), value.to_string());
+        }
+
+        pub fn get_or_default(&self, key: &str, default: &str) -> String {
+            self.vars.get(key).cloned().unwrap_or_else(|| default.to_string())
+        }
+
+        pub fn contains(&self, key: &str) -> bool {
+            self.vars.contains_key(key)
+        }
+    }
+  src/defaults.rs: |
+    pub const DEFAULT_WINDOW_WIDTH: u32 = 1024;
+    pub const DEFAULT_WINDOW_HEIGHT: u32 = 768;
+    pub const DEFAULT_FONT_SIZE: u8 = 14;
+    pub const DEFAULT_THEME: &str = "dark";
+
+    pub struct UiDefaults {
+        pub width: u32,
+        pub height: u32,
+        pub font_size: u8,
+        pub theme: String,
+    }
+
+    impl Default for UiDefaults {
+        fn default() -> Self {
+            Self {
+                width: DEFAULT_WINDOW_WIDTH,
+                height: DEFAULT_WINDOW_HEIGHT,
+                font_size: DEFAULT_FONT_SIZE,
+                theme: DEFAULT_THEME.to_string(),
+            }
         }
     }
 must_include_files:
-- src/config.rs
-must_include_content:
-- use std::sync::atomic::{AtomicUsize, Ordering};
-- pub fn get_instance_count() -> usize {
+  - src/config.rs
+
+must_include_content_from:
+  src/config.rs:
+    - "use std::sync::atomic::{AtomicUsize, Ordering};"
+    - "pub fn get_instance_count() -> usize {"
+    - "pub const MIN_SIZE: usize = 10;"
+    - "pub static INSTANCE_COUNT: AtomicUsize"
+    - "static mut GLOBAL_CONFIG: Option<Config>"
+
 must_not_include:
-- GARBAGE_BENCH_ITERATIONS_003
-- GARBAGE_PROFILE_DEPTH_010
-- GARBAGE_PROFILE_START_013
-- GARBAGE_PROFILE_STOP_015
-- GARBAGE_RUST_BENCH_001
-- GARBAGE_RUST_PROFILER_009
-- GARBAGE_WARMUP_ITERATIONS_002
-- benchmark.rs
-- mod.rs
-- profiler.rs
+  # --- src/env.rs: "config" vocabulary overlap, key-value store ---
+  # Environment with get/set/get_or_default — config-like key-value
+  # pairs. Same crate. But runtime env vars, not compile-time constants.
+  - Environment
+  - get_or_default
+  - contains
+  # --- src/defaults.rs: same "pub const" + Default pattern ---
+  # DEFAULT_WINDOW_WIDTH and UiDefaults with Default impl — identical
+  # pattern to the diff's constants and Config::default(). But UI domain.
+  - UiDefaults
+  - DEFAULT_WINDOW_WIDTH
+  - DEFAULT_FONT_SIZE
+  - DEFAULT_THEME
+
+must_not_include_files:
+  - src/env.rs
+  - src/defaults.rs
+
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

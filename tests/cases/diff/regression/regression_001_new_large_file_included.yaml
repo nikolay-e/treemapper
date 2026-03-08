@@ -1,3 +1,22 @@
+# Scenario: src/service.py imports new AdvancedAnalytics from src/advanced.py,
+#   which itself imports from src/stats.py and src/date_utils.py. The new file
+#   is large with trend detection, volatility, anomalies, and period comparison.
+#
+# Reviewer questions:
+#   - Does AdvancedAnalytics correctly chain stats functions?
+#   - Is _weekly_breakdown using calculate_std safely for small chunks?
+#
+# Trap files:
+#   - frontend/src/components/CaloriesChart.tsx: React chart component for
+#     health data visualization, uses "data" vocabulary but is a frontend
+#     component with no Python import dependency
+#   - frontend/src/components/SleepChart.tsx: another React chart, uses
+#     "hours" and "data" but completely different tech stack
+#   - frontend/src/components/LoginPage.tsx: authentication UI component,
+#     unrelated to analytics backend
+#   - frontend/src/components/DashboardLayout.tsx: layout wrapper component,
+#     no connection to Python analytics
+
 initial:
   src/service.py: |
     from src.stats import pearson_correlation
@@ -66,50 +85,75 @@ initial:
     import React from 'react';
     interface CaloriesChartProps {
       data: number[];
-      GARBAGE_REG001_CALORIES_MARKER: string;
+      label: string;
     }
-    export const CaloriesChart: React.FC<CaloriesChartProps> = ({ data }) => {
-      const GARBAGE_REG001_CHART_RENDER = "calories";
-      return <div className="calories-chart">{data.map(d => <span>{d}</span>)}</div>;
+    export const CaloriesChart: React.FC<CaloriesChartProps> = ({ data, label }) => {
+      const maxValue = Math.max(...data);
+      return (
+        <div className="calories-chart">
+          <h3>{label}</h3>
+          {data.map((d, i) => (
+            <div key={i} style={{ width: `${(d / maxValue) * 100}%` }}>{d}</div>
+          ))}
+        </div>
+      );
     };
   frontend/src/components/SleepChart.tsx: |
     import React from 'react';
     interface SleepChartProps {
       hours: number[];
-      GARBAGE_REG001_SLEEP_MARKER: string;
+      targetHours: number;
     }
-    export const SleepChart: React.FC<SleepChartProps> = ({ hours }) => {
-      const GARBAGE_REG001_SLEEP_RENDER = "sleep";
-      return <div className="sleep-chart">{hours.map(h => <span>{h}</span>)}</div>;
+    export const SleepChart: React.FC<SleepChartProps> = ({ hours, targetHours }) => {
+      const avgHours = hours.reduce((a, b) => a + b, 0) / hours.length;
+      return (
+        <div className="sleep-chart">
+          <p>Average: {avgHours.toFixed(1)}h / Target: {targetHours}h</p>
+          {hours.map((h, i) => (
+            <span key={i} className={h >= targetHours ? 'good' : 'low'}>{h}</span>
+          ))}
+        </div>
+      );
     };
   frontend/src/components/LoginPage.tsx: |
     import React, { useState } from 'react';
     export const LoginPage: React.FC = () => {
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
-      const GARBAGE_REG001_LOGIN_MARKER = "login";
-      const handleSubmit = () => {
-        const GARBAGE_REG001_SUBMIT_MARKER = "submit";
-        console.log(email, password);
+      const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        console.log('Login attempt:', email);
       };
       return (
         <form onSubmit={handleSubmit}>
-          <input value={email} onChange={e => setEmail(e.target.value)} />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} />
+          <button type="submit">Login</button>
         </form>
       );
     };
   frontend/src/components/DashboardLayout.tsx: |
     import React from 'react';
-    export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-      const GARBAGE_REG001_LAYOUT_MARKER = "layout";
+    interface DashboardLayoutProps {
+      children: React.ReactNode;
+      title: string;
+    }
+    export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, title }) => {
       return (
         <div className="dashboard">
-          <nav className="sidebar">Menu</nav>
+          <nav className="sidebar">
+            <h2>{title}</h2>
+            <ul>
+              <li>Overview</li>
+              <li>Analytics</li>
+              <li>Settings</li>
+            </ul>
+          </nav>
           <main>{children}</main>
         </div>
       );
     };
+
 changed:
   src/service.py: |
     from src.stats import pearson_correlation
@@ -277,68 +321,104 @@ changed:
     import React from 'react';
     interface CaloriesChartProps {
       data: number[];
-      GARBAGE_REG001_CALORIES_MARKER: string;
+      label: string;
     }
-    export const CaloriesChart: React.FC<CaloriesChartProps> = ({ data }) => {
-      const GARBAGE_REG001_CHART_RENDER = "calories";
-      return <div className="calories-chart">{data.map(d => <span>{d}</span>)}</div>;
+    export const CaloriesChart: React.FC<CaloriesChartProps> = ({ data, label }) => {
+      const maxValue = Math.max(...data);
+      return (
+        <div className="calories-chart">
+          <h3>{label}</h3>
+          {data.map((d, i) => (
+            <div key={i} style={{ width: `${(d / maxValue) * 100}%` }}>{d}</div>
+          ))}
+        </div>
+      );
     };
   frontend/src/components/SleepChart.tsx: |
     import React from 'react';
     interface SleepChartProps {
       hours: number[];
-      GARBAGE_REG001_SLEEP_MARKER: string;
+      targetHours: number;
     }
-    export const SleepChart: React.FC<SleepChartProps> = ({ hours }) => {
-      const GARBAGE_REG001_SLEEP_RENDER = "sleep";
-      return <div className="sleep-chart">{hours.map(h => <span>{h}</span>)}</div>;
+    export const SleepChart: React.FC<SleepChartProps> = ({ hours, targetHours }) => {
+      const avgHours = hours.reduce((a, b) => a + b, 0) / hours.length;
+      return (
+        <div className="sleep-chart">
+          <p>Average: {avgHours.toFixed(1)}h / Target: {targetHours}h</p>
+          {hours.map((h, i) => (
+            <span key={i} className={h >= targetHours ? 'good' : 'low'}>{h}</span>
+          ))}
+        </div>
+      );
     };
   frontend/src/components/LoginPage.tsx: |
     import React, { useState } from 'react';
     export const LoginPage: React.FC = () => {
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
-      const GARBAGE_REG001_LOGIN_MARKER = "login";
-      const handleSubmit = () => {
-        const GARBAGE_REG001_SUBMIT_MARKER = "submit";
-        console.log(email, password);
+      const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        console.log('Login attempt:', email);
       };
       return (
         <form onSubmit={handleSubmit}>
-          <input value={email} onChange={e => setEmail(e.target.value)} />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} />
+          <button type="submit">Login</button>
         </form>
       );
     };
   frontend/src/components/DashboardLayout.tsx: |
     import React from 'react';
-    export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-      const GARBAGE_REG001_LAYOUT_MARKER = "layout";
+    interface DashboardLayoutProps {
+      children: React.ReactNode;
+      title: string;
+    }
+    export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, title }) => {
       return (
         <div className="dashboard">
-          <nav className="sidebar">Menu</nav>
+          <nav className="sidebar">
+            <h2>{title}</h2>
+            <ul>
+              <li>Overview</li>
+              <li>Analytics</li>
+              <li>Settings</li>
+            </ul>
+          </nav>
           <main>{children}</main>
         </div>
       );
     };
+
 must_include_files:
 - src/advanced.py
 - src/service.py
-must_include_content:
-- class AdvancedAnalytics
-- def compute_full_analysis
-- def _detect_trend
-- def _compute_volatility
-- def _find_anomalies
-- def _weekly_breakdown
-- def get_advanced_insights
+must_include_content_from:
+  src/advanced.py:
+    - "class AdvancedAnalytics"
+    - "def compute_full_analysis"
+    - "def _detect_trend"
+    - "def _compute_volatility"
+    - "def _find_anomalies"
+    - "def _weekly_breakdown"
+  src/service.py:
+    - "def get_advanced_insights"
+    - "from src.advanced import AdvancedAnalytics"
+max_fragments: 10
+max_files: 5
 must_not_include:
-- GARBAGE_REG001_CALORIES_MARKER
-- GARBAGE_REG001_CHART_RENDER
-- GARBAGE_REG001_SLEEP_MARKER
-- GARBAGE_REG001_SLEEP_RENDER
-- GARBAGE_REG001_LOGIN_MARKER
-- GARBAGE_REG001_SUBMIT_MARKER
-- GARBAGE_REG001_LAYOUT_MARKER
+- CaloriesChart
+- CaloriesChartProps
+- SleepChart
+- SleepChartProps
+- LoginPage
+- handleSubmit
+- DashboardLayout
+- DashboardLayoutProps
+must_not_include_files:
+- frontend/src/components/CaloriesChart.tsx
+- frontend/src/components/SleepChart.tsx
+- frontend/src/components/LoginPage.tsx
+- frontend/src/components/DashboardLayout.tsx
 add_garbage_files: false
 skip_garbage_check: true

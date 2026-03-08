@@ -1,49 +1,40 @@
+# Scenario: Single isolated function only() is modified to return 1
+# Changed: single.py — the only function in the repo gets a return value
+# Reviewer needs: single.py (changed, the entire file IS the context)
+# Trap: utils.py — also defines a single standalone function, same module shape
+# Trap: constants.py — standalone file with single return value, shares "only" vocabulary
+
 initial:
   single.py: |
     def only():
         pass
-  # --- Tricky garbage: same function name "only" in different module ---
-  garbage_only_collision.py: |
-    GARBAGE_PPR_008_ONLY_COLLISION_A = "only_collision"
-    GARBAGE_PPR_008_ONLY_COLLISION_B = False
-
-    def only():
-        return "completely_different_only"
-
-    def only_wrapper():
-        return only() + "_wrapped"
-  # --- Tricky garbage: same directory sibling with single function ---
-  garbage_single_sibling.py: |
-    GARBAGE_PPR_008_SINGLE_SIBLING_C = "single_sibling"
-    GARBAGE_PPR_008_SINGLE_SIBLING_D = 77
-
-    def standalone_func():
+  utils.py: |
+    def standalone_helper():
         return "standalone_result"
 
-    def standalone_helper():
-        return standalone_func() + "_helped"
+    def format_output(value):
+        return str(value)
+  constants.py: |
+    ONLY_VALUE = None
+
+    def get_only_default():
+        return ONLY_VALUE
+
 changed:
   single.py: |
     def only():
         return 1
-  garbage_only_collision.py: |
-    GARBAGE_PPR_008_ONLY_COLLISION_A = "only_collision"
-    GARBAGE_PPR_008_ONLY_COLLISION_B = False
-
-    def only():
-        return "completely_different_only"
-
-    def only_wrapper():
-        return only() + "_wrapped"
-  garbage_single_sibling.py: |
-    GARBAGE_PPR_008_SINGLE_SIBLING_C = "single_sibling"
-    GARBAGE_PPR_008_SINGLE_SIBLING_D = 77
-
-    def standalone_func():
+  utils.py: |
+    def standalone_helper():
         return "standalone_result"
 
-    def standalone_helper():
-        return standalone_func() + "_helped"
+    def format_output(value):
+        return str(value)
+  constants.py: |
+    ONLY_VALUE = None
+
+    def get_only_default():
+        return ONLY_VALUE
 
 # === Assertions ===
 
@@ -56,16 +47,14 @@ must_include_content_from:
     - return 1
 
 must_not_include:
-# Tricky: name collision with only()
-- GARBAGE_PPR_008_ONLY_COLLISION_A
-- GARBAGE_PPR_008_ONLY_COLLISION_B
-# Tricky: same directory sibling
-- GARBAGE_PPR_008_SINGLE_SIBLING_C
-- GARBAGE_PPR_008_SINGLE_SIBLING_D
+- standalone_helper
+- format_output
+- ONLY_VALUE
+- get_only_default
 
 must_not_include_files:
-- garbage_only_collision.py
-- garbage_single_sibling.py
+- utils.py
+- constants.py
 
 max_fragments: 3
 max_files: 2

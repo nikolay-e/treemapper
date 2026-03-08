@@ -1,3 +1,9 @@
+# Scenario: Cache service gains topology-aware routing with annotation and
+# topologyKeys for hostname/zone/region preference.
+# Reviewer asks: "Is topology-aware routing configured correctly for the cache?"
+# Trap rationale: pod-topology-spread.yaml and node-affinity.yaml share
+# topology vocabulary but define scheduling constraints, not service routing.
+
 initial:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -83,37 +89,31 @@ initial:
       endpoints:
       - port: metrics
         interval: 15s
-  k8s/unrelated/topology/node-labels.yaml: |
-    # GARBAGE_K8S_438_NODE_LABELS
+  k8s/scheduling/pod-topology-spread.yaml: |
     apiVersion: v1
-    kind: Node
+    kind: ConfigMap
     metadata:
-      name: GARBAGE_K8S_438_NODE_NAME
-      labels:
-        topology.kubernetes.io/zone: GARBAGE_K8S_438_ZONE
-        topology.kubernetes.io/region: GARBAGE_K8S_438_REGION
-        node.kubernetes.io/instance-type: GARBAGE_K8S_438_INSTANCE
-  k8s/unrelated/scheduling/priority-class.yaml: |
-    # GARBAGE_K8S_438_PRIORITY
-    apiVersion: scheduling.k8s.io/v1
-    kind: PriorityClass
-    metadata:
-      name: GARBAGE_K8S_438_PRIORITY_NAME
-    value: GARBAGE_K8S_438_PRIORITY_VALUE
-    globalDefault: GARBAGE_K8S_438_GLOBAL_DEFAULT
-    preemptionPolicy: GARBAGE_K8S_438_PREEMPTION
-  k8s/unrelated/quota/resourcequota.yaml: |
-    # GARBAGE_K8S_438_QUOTA
+      name: default-topology-constraints
+      namespace: kube-system
+    data:
+      constraints: |
+        defaultConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+  k8s/scheduling/node-affinity.yaml: |
     apiVersion: v1
-    kind: ResourceQuota
+    kind: ConfigMap
     metadata:
-      name: GARBAGE_K8S_438_QUOTA_NAME
-      namespace: quota
-    spec:
-      hard:
-        requests.cpu: GARBAGE_K8S_438_CPU_REQUEST
-        requests.memory: GARBAGE_K8S_438_MEM_REQUEST
-        limits.cpu: GARBAGE_K8S_438_CPU_LIMIT
+      name: node-affinity-defaults
+      namespace: kube-system
+    data:
+      preferred-zones: us-east-1a,us-east-1b,us-east-1c
+      required-instance-types: m5.xlarge,m5.2xlarge,r5.xlarge
+      anti-affinity-label: topology.kubernetes.io/zone
   cdk8s/main.ts: |
     import { App } from 'cdk8s';
     const app = new App();
@@ -209,37 +209,31 @@ changed:
       endpoints:
       - port: metrics
         interval: 15s
-  k8s/unrelated/topology/node-labels.yaml: |
-    # GARBAGE_K8S_438_NODE_LABELS
+  k8s/scheduling/pod-topology-spread.yaml: |
     apiVersion: v1
-    kind: Node
+    kind: ConfigMap
     metadata:
-      name: GARBAGE_K8S_438_NODE_NAME
-      labels:
-        topology.kubernetes.io/zone: GARBAGE_K8S_438_ZONE
-        topology.kubernetes.io/region: GARBAGE_K8S_438_REGION
-        node.kubernetes.io/instance-type: GARBAGE_K8S_438_INSTANCE
-  k8s/unrelated/scheduling/priority-class.yaml: |
-    # GARBAGE_K8S_438_PRIORITY
-    apiVersion: scheduling.k8s.io/v1
-    kind: PriorityClass
-    metadata:
-      name: GARBAGE_K8S_438_PRIORITY_NAME
-    value: GARBAGE_K8S_438_PRIORITY_VALUE
-    globalDefault: GARBAGE_K8S_438_GLOBAL_DEFAULT
-    preemptionPolicy: GARBAGE_K8S_438_PREEMPTION
-  k8s/unrelated/quota/resourcequota.yaml: |
-    # GARBAGE_K8S_438_QUOTA
+      name: default-topology-constraints
+      namespace: kube-system
+    data:
+      constraints: |
+        defaultConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+  k8s/scheduling/node-affinity.yaml: |
     apiVersion: v1
-    kind: ResourceQuota
+    kind: ConfigMap
     metadata:
-      name: GARBAGE_K8S_438_QUOTA_NAME
-      namespace: quota
-    spec:
-      hard:
-        requests.cpu: GARBAGE_K8S_438_CPU_REQUEST
-        requests.memory: GARBAGE_K8S_438_MEM_REQUEST
-        limits.cpu: GARBAGE_K8S_438_CPU_LIMIT
+      name: node-affinity-defaults
+      namespace: kube-system
+    data:
+      preferred-zones: us-east-1a,us-east-1b,us-east-1c
+      required-instance-types: m5.xlarge,m5.2xlarge,r5.xlarge
+      anti-affinity-label: topology.kubernetes.io/zone
   cdk8s/main.ts: |
     import { App } from 'cdk8s';
     const app = new App();
@@ -248,17 +242,12 @@ must_include_files:
 must_include_content:
 - 'service.kubernetes.io/topology-aware-hints: "auto"'
 must_not_include:
-- GARBAGE_K8S_438_CPU_LIMIT
-- GARBAGE_K8S_438_CPU_REQUEST
-- GARBAGE_K8S_438_GLOBAL_DEFAULT
-- GARBAGE_K8S_438_MEM_REQUEST
-- GARBAGE_K8S_438_PREEMPTION
-- GARBAGE_K8S_438_PRIORITY
-- GARBAGE_K8S_438_PRIORITY_NAME
-- GARBAGE_K8S_438_PRIORITY_VALUE
-- GARBAGE_K8S_438_QUOTA
-- GARBAGE_K8S_438_QUOTA_NAME
-- priority-class.yaml
-- resourcequota.yaml
+- default-topology-constraints
+- node-affinity-defaults
+- pod-topology-spread.yaml
+- node-affinity.yaml
+must_not_include_files:
+- k8s/scheduling/pod-topology-spread.yaml
+- k8s/scheduling/node-affinity.yaml
 add_garbage_files: false
 skip_garbage_check: true

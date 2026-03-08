@@ -1,3 +1,43 @@
+# Scenario: UserRegistrationService is refactored to use custom validation
+#   annotations instead of inline regex checks. UserData gains @NotBlank, @Email,
+#   @MinLength, @Pattern annotations. New annotation framework created:
+#   @Constraint, ConstraintValidator, and concrete validators. ValidationService
+#   added to process annotations reflectively.
+#
+# Diff shows:
+#   UserRegistrationService.java: regex patterns removed, ValidationService injected,
+#     validate() called before registration
+#   UserData.java: + @NotBlank, @Email, @MinLength, @Pattern on fields
+#   + NotBlank.java, Email.java, MinLength.java, Pattern.java annotations
+#   + Constraint.java meta-annotation, ConstraintValidator.java interface
+#   + NotBlankValidator.java, EmailValidator.java, MinLengthValidator.java,
+#     PatternValidator.java implementations
+#   + ValidationService.java reflective validator
+#
+# Reviewer questions:
+#   Q1: "Do the annotation validators match the old regex validation behavior?"
+#       -> EmailValidator.java uses a different regex than the old inline pattern.
+#          PatternValidator.java uses the Pattern annotation's regexp field.
+#          Reviewer must compare old and new validation logic.
+#
+#   Q2: "Does ValidationService correctly discover and execute validators?"
+#       -> Constraint.java defines validatedBy class. ValidationService uses
+#          reflection to find @Constraint on each annotation, instantiate the
+#          validator, and check isValid. Reviewer needs the full chain.
+#
+# Not needed for comprehension:
+#   - EmailTemplateEngine.java: Email template rendering. KEYWORD OVERLAP:
+#     "email" appears in class name and the diff has @Email annotation.
+#     But template rendering has nothing to do with validation.
+#
+#   - NotificationDispatcher.java: Sends emails/SMS. KEYWORD OVERLAP:
+#     uses email addresses like validation does. But dispatch logic
+#     doesn't help review annotation-based validation.
+#
+#   - CaptchaVerifier.java: Verification component with @Component annotation.
+#     STRUCTURAL TRAP: Spring component like ValidationService. But captcha
+#     verification doesn't help review custom annotation framework.
+
 initial:
   src/main/java/com/validation/service/UserRegistrationService.java: |
     package com.validation.service;
@@ -71,9 +111,6 @@ initial:
 
     @Service
     public class EmailTemplateEngine {
-        public static final String GARBAGE_JAVA_TEMPLATE_A033A = "template_engine_marker_alpha";
-        private static final String GARBAGE_JAVA_RENDER_A033B = "render_marker_beta";
-
         private final Map<String, String> templates = new HashMap<>();
 
         public EmailTemplateEngine() {
@@ -87,7 +124,6 @@ initial:
             if (template == null) {
                 throw new IllegalArgumentException("Template not found: " + templateName);
             }
-            logGarbageMarkers();
             String result = template;
             for (Map.Entry<String, String> entry : variables.entrySet()) {
                 result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
@@ -97,12 +133,6 @@ initial:
 
         public void registerTemplate(String name, String content) {
             templates.put(name, content);
-            String GARBAGE_JAVA_CUSTOM_A033C = "custom_template_marker_gamma";
-            System.out.println(GARBAGE_JAVA_CUSTOM_A033C);
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_TEMPLATE_A033A + GARBAGE_JAVA_RENDER_A033B);
         }
     }
   src/main/java/com/validation/unrelated/NotificationDispatcher.java: |
@@ -115,13 +145,9 @@ initial:
 
     @Service
     public class NotificationDispatcher {
-        public static final String GARBAGE_JAVA_NOTIFY_A033D = "notification_dispatcher_marker_delta";
-        private static final String GARBAGE_JAVA_QUEUE_A033E = "queue_marker_epsilon";
-
         private final List<NotificationRecord> sentNotifications = new ArrayList<>();
 
         public CompletableFuture<Boolean> sendEmail(String to, String subject, String body) {
-            logGarbageMarkers();
             return CompletableFuture.supplyAsync(() -> {
                 sentNotifications.add(new NotificationRecord("EMAIL", to, subject));
                 return true;
@@ -129,8 +155,6 @@ initial:
         }
 
         public CompletableFuture<Boolean> sendSms(String to, String message) {
-            String GARBAGE_JAVA_SMS_A033F = "sms_marker_zeta";
-            System.out.println(GARBAGE_JAVA_SMS_A033F);
             return CompletableFuture.supplyAsync(() -> {
                 sentNotifications.add(new NotificationRecord("SMS", to, message));
                 return true;
@@ -139,10 +163,6 @@ initial:
 
         public List<NotificationRecord> getSentNotifications() {
             return new ArrayList<>(sentNotifications);
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_NOTIFY_A033D + GARBAGE_JAVA_QUEUE_A033E);
         }
 
         public record NotificationRecord(String type, String recipient, String content) {}
@@ -157,15 +177,11 @@ initial:
 
     @Component
     public class CaptchaVerifier {
-        public static final String GARBAGE_JAVA_CAPTCHA_A033G = "captcha_verifier_marker_eta";
-
         private final Map<String, CaptchaSession> sessions = new ConcurrentHashMap<>();
 
         public String generateChallenge(String sessionId) {
             String challenge = "challenge_" + System.currentTimeMillis();
             sessions.put(sessionId, new CaptchaSession(challenge, Instant.now()));
-            String GARBAGE_JAVA_CHALLENGE_A033H = "challenge_marker_theta";
-            System.out.println(GARBAGE_JAVA_CAPTCHA_A033G + GARBAGE_JAVA_CHALLENGE_A033H);
             return challenge;
         }
 
@@ -179,6 +195,7 @@ initial:
 
         public record CaptchaSession(String challenge, Instant createdAt) {}
     }
+
 changed:
   src/main/java/com/validation/service/UserRegistrationService.java: |
     package com.validation.service;
@@ -250,123 +267,6 @@ changed:
         public String getPassword() { return password; }
         public String getPhone() { return phone; }
         public Instant getRegisteredAt() { return registeredAt; }
-    }
-  src/main/java/com/validation/unrelated/EmailTemplateEngine.java: |
-    package com.validation.unrelated;
-
-    import org.springframework.stereotype.Service;
-    import java.util.HashMap;
-    import java.util.Map;
-
-    @Service
-    public class EmailTemplateEngine {
-        public static final String GARBAGE_JAVA_TEMPLATE_A033A = "template_engine_marker_alpha";
-        private static final String GARBAGE_JAVA_RENDER_A033B = "render_marker_beta";
-
-        private final Map<String, String> templates = new HashMap<>();
-
-        public EmailTemplateEngine() {
-            templates.put("welcome", "Welcome, {{name}}! Your account has been created.");
-            templates.put("reset", "Click here to reset your password: {{link}}");
-            templates.put("confirm", "Please confirm your email: {{link}}");
-        }
-
-        public String render(String templateName, Map<String, String> variables) {
-            String template = templates.get(templateName);
-            if (template == null) {
-                throw new IllegalArgumentException("Template not found: " + templateName);
-            }
-            logGarbageMarkers();
-            String result = template;
-            for (Map.Entry<String, String> entry : variables.entrySet()) {
-                result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
-            }
-            return result;
-        }
-
-        public void registerTemplate(String name, String content) {
-            templates.put(name, content);
-            String GARBAGE_JAVA_CUSTOM_A033C = "custom_template_marker_gamma";
-            System.out.println(GARBAGE_JAVA_CUSTOM_A033C);
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_TEMPLATE_A033A + GARBAGE_JAVA_RENDER_A033B);
-        }
-    }
-  src/main/java/com/validation/unrelated/NotificationDispatcher.java: |
-    package com.validation.unrelated;
-
-    import org.springframework.stereotype.Service;
-    import java.util.ArrayList;
-    import java.util.List;
-    import java.util.concurrent.CompletableFuture;
-
-    @Service
-    public class NotificationDispatcher {
-        public static final String GARBAGE_JAVA_NOTIFY_A033D = "notification_dispatcher_marker_delta";
-        private static final String GARBAGE_JAVA_QUEUE_A033E = "queue_marker_epsilon";
-
-        private final List<NotificationRecord> sentNotifications = new ArrayList<>();
-
-        public CompletableFuture<Boolean> sendEmail(String to, String subject, String body) {
-            logGarbageMarkers();
-            return CompletableFuture.supplyAsync(() -> {
-                sentNotifications.add(new NotificationRecord("EMAIL", to, subject));
-                return true;
-            });
-        }
-
-        public CompletableFuture<Boolean> sendSms(String to, String message) {
-            String GARBAGE_JAVA_SMS_A033F = "sms_marker_zeta";
-            System.out.println(GARBAGE_JAVA_SMS_A033F);
-            return CompletableFuture.supplyAsync(() -> {
-                sentNotifications.add(new NotificationRecord("SMS", to, message));
-                return true;
-            });
-        }
-
-        public List<NotificationRecord> getSentNotifications() {
-            return new ArrayList<>(sentNotifications);
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_NOTIFY_A033D + GARBAGE_JAVA_QUEUE_A033E);
-        }
-
-        public record NotificationRecord(String type, String recipient, String content) {}
-    }
-  src/main/java/com/validation/unrelated/CaptchaVerifier.java: |
-    package com.validation.unrelated;
-
-    import org.springframework.stereotype.Component;
-    import java.time.Instant;
-    import java.util.Map;
-    import java.util.concurrent.ConcurrentHashMap;
-
-    @Component
-    public class CaptchaVerifier {
-        public static final String GARBAGE_JAVA_CAPTCHA_A033G = "captcha_verifier_marker_eta";
-
-        private final Map<String, CaptchaSession> sessions = new ConcurrentHashMap<>();
-
-        public String generateChallenge(String sessionId) {
-            String challenge = "challenge_" + System.currentTimeMillis();
-            sessions.put(sessionId, new CaptchaSession(challenge, Instant.now()));
-            String GARBAGE_JAVA_CHALLENGE_A033H = "challenge_marker_theta";
-            System.out.println(GARBAGE_JAVA_CAPTCHA_A033G + GARBAGE_JAVA_CHALLENGE_A033H);
-            return challenge;
-        }
-
-        public boolean verifyResponse(String sessionId, String response) {
-            CaptchaSession session = sessions.remove(sessionId);
-            if (session == null) {
-                return false;
-            }
-            return response != null && response.equals(session.challenge());
-        }
-
-        public record CaptchaSession(String challenge, Instant createdAt) {}
     }
   src/main/java/com/validation/annotation/NotBlank.java: |
     package com.validation.annotation;
@@ -597,28 +497,147 @@ changed:
             return null;
         }
     }
+  src/main/java/com/validation/unrelated/EmailTemplateEngine.java: |
+    package com.validation.unrelated;
+
+    import org.springframework.stereotype.Service;
+    import java.util.HashMap;
+    import java.util.Map;
+
+    @Service
+    public class EmailTemplateEngine {
+        private final Map<String, String> templates = new HashMap<>();
+
+        public EmailTemplateEngine() {
+            templates.put("welcome", "Welcome, {{name}}! Your account has been created.");
+            templates.put("reset", "Click here to reset your password: {{link}}");
+            templates.put("confirm", "Please confirm your email: {{link}}");
+        }
+
+        public String render(String templateName, Map<String, String> variables) {
+            String template = templates.get(templateName);
+            if (template == null) {
+                throw new IllegalArgumentException("Template not found: " + templateName);
+            }
+            String result = template;
+            for (Map.Entry<String, String> entry : variables.entrySet()) {
+                result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
+            }
+            return result;
+        }
+
+        public void registerTemplate(String name, String content) {
+            templates.put(name, content);
+        }
+    }
+  src/main/java/com/validation/unrelated/NotificationDispatcher.java: |
+    package com.validation.unrelated;
+
+    import org.springframework.stereotype.Service;
+    import java.util.ArrayList;
+    import java.util.List;
+    import java.util.concurrent.CompletableFuture;
+
+    @Service
+    public class NotificationDispatcher {
+        private final List<NotificationRecord> sentNotifications = new ArrayList<>();
+
+        public CompletableFuture<Boolean> sendEmail(String to, String subject, String body) {
+            return CompletableFuture.supplyAsync(() -> {
+                sentNotifications.add(new NotificationRecord("EMAIL", to, subject));
+                return true;
+            });
+        }
+
+        public CompletableFuture<Boolean> sendSms(String to, String message) {
+            return CompletableFuture.supplyAsync(() -> {
+                sentNotifications.add(new NotificationRecord("SMS", to, message));
+                return true;
+            });
+        }
+
+        public List<NotificationRecord> getSentNotifications() {
+            return new ArrayList<>(sentNotifications);
+        }
+
+        public record NotificationRecord(String type, String recipient, String content) {}
+    }
+  src/main/java/com/validation/unrelated/CaptchaVerifier.java: |
+    package com.validation.unrelated;
+
+    import org.springframework.stereotype.Component;
+    import java.time.Instant;
+    import java.util.Map;
+    import java.util.concurrent.ConcurrentHashMap;
+
+    @Component
+    public class CaptchaVerifier {
+        private final Map<String, CaptchaSession> sessions = new ConcurrentHashMap<>();
+
+        public String generateChallenge(String sessionId) {
+            String challenge = "challenge_" + System.currentTimeMillis();
+            sessions.put(sessionId, new CaptchaSession(challenge, Instant.now()));
+            return challenge;
+        }
+
+        public boolean verifyResponse(String sessionId, String response) {
+            CaptchaSession session = sessions.remove(sessionId);
+            if (session == null) {
+                return false;
+            }
+            return response != null && response.equals(session.challenge());
+        }
+
+        public record CaptchaSession(String challenge, Instant createdAt) {}
+    }
+
 must_include_files:
-- src/main/java/com/validation/annotation/Constraint.java
-- src/main/java/com/validation/annotation/Email.java
-- src/main/java/com/validation/annotation/EmailValidator.java
-- src/main/java/com/validation/annotation/MinLength.java
-- src/main/java/com/validation/annotation/NotBlank.java
-- src/main/java/com/validation/annotation/Pattern.java
-- src/main/java/com/validation/annotation/PatternValidator.java
-- src/main/java/com/validation/service/UserRegistrationService.java
-- src/main/java/com/validation/service/ValidationService.java
-must_include_content:
-- package com.validation.annotation;
+  - src/main/java/com/validation/annotation/Constraint.java
+  - src/main/java/com/validation/annotation/Email.java
+  - src/main/java/com/validation/annotation/EmailValidator.java
+  - src/main/java/com/validation/annotation/MinLength.java
+  - src/main/java/com/validation/annotation/NotBlank.java
+  - src/main/java/com/validation/annotation/Pattern.java
+  - src/main/java/com/validation/annotation/PatternValidator.java
+  - src/main/java/com/validation/service/UserRegistrationService.java
+  - src/main/java/com/validation/service/ValidationService.java
+
+must_include_content_from:
+  src/main/java/com/validation/service/UserRegistrationService.java:
+    - "validationService.validate(user)"
+    - "ValidationService validationService"
+  src/main/java/com/validation/annotation/Email.java:
+    - "package com.validation.annotation"
+    - "@Constraint(validatedBy = EmailValidator.class)"
+
 must_not_include:
-- GARBAGE_JAVA_CAPTCHA_A033G
-- GARBAGE_JAVA_CHALLENGE_A033H
-- GARBAGE_JAVA_CUSTOM_A033C
-- GARBAGE_JAVA_NOTIFY_A033D
-- GARBAGE_JAVA_QUEUE_A033E
-- GARBAGE_JAVA_RENDER_A033B
-- GARBAGE_JAVA_SMS_A033F
-- GARBAGE_JAVA_TEMPLATE_A033A
-- CaptchaVerifier.java
-- NotificationDispatcher.java
+  # --- EmailTemplateEngine.java: email template rendering ---
+  # KEYWORD OVERLAP: "email" in class name matches @Email annotation.
+  # But template rendering has nothing to do with validation.
+  - EmailTemplateEngine
+  - "Welcome, {{name}}"
+  - registerTemplate
+  # --- NotificationDispatcher.java: sends notifications ---
+  # KEYWORD OVERLAP: uses email addresses. But dispatch logic
+  # doesn't help review validation annotations.
+  - NotificationDispatcher
+  - sendEmail
+  - sendSms
+  - NotificationRecord
+  # --- CaptchaVerifier.java: Spring @Component ---
+  # STRUCTURAL TRAP: Spring component like ValidationService.
+  # But captcha is unrelated to validation annotations.
+  - CaptchaVerifier
+  - generateChallenge
+  - verifyResponse
+  - CaptchaSession
+
+must_not_include_files:
+  - src/main/java/com/validation/unrelated/EmailTemplateEngine.java
+  - src/main/java/com/validation/unrelated/NotificationDispatcher.java
+  - src/main/java/com/validation/unrelated/CaptchaVerifier.java
+
+max_fragments: 20
+max_files: 15
 add_garbage_files: false
 skip_garbage_check: true

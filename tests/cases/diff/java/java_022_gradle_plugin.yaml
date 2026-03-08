@@ -1,3 +1,33 @@
+# Scenario: build.gradle gains dependency-management plugin, jacoco plugin,
+#   actuator + test dependencies, and jacocoTestReport task. Only build.gradle changed.
+#
+# Diff shows:
+#   + id 'io.spring.dependency-management' version '1.1.4'
+#   + id 'jacoco'
+#   + spring-boot-starter-actuator, spring-boot-starter-test dependencies
+#   + test { finalizedBy jacocoTestReport }
+#   + jacoco { toolVersion = "0.8.11" }, jacocoTestReport { ... }
+#
+# Reviewer questions:
+#   Q1: "Do existing source files use actuator endpoints or test annotations?"
+#       -> WebApplication.java (UNCHANGED) is @SpringBootApplication.
+#          IndexController.java has @RestController. Neither uses actuator
+#          or test APIs yet. Reviewer needs to see existing code to assess
+#          whether the new dependencies are actually consumed.
+#
+# Not needed for comprehension:
+#   - WebApplication.java: Standard Spring Boot main class. Not changed.
+#     Does not reference actuator, jacoco, or test dependencies.
+#
+#   - IndexController.java: Simple REST controller. Not changed.
+#     Uses @RestController but doesn't use actuator endpoints.
+#
+#   - HealthIndicator.java: Custom actuator health indicator. KEYWORD OVERLAP:
+#     directly related to spring-boot-starter-actuator dependency being added.
+#     HARDEST TRAP. But the file exists already (if it exists) — the build.gradle
+#     change just adds the dependency. The file itself doesn't help review
+#     whether the Gradle config is correct.
+
 initial:
   build.gradle: |
     plugins {
@@ -49,56 +79,23 @@ initial:
             return "Welcome to the web application";
         }
     }
-  src/main/java/com/example/webapp/unrelated/MetricsExporter.java: |
-    package com.example.webapp.unrelated;
+  src/main/java/com/example/webapp/health/HealthIndicator.java: |
+    package com.example.webapp.health;
 
-    import java.util.concurrent.ConcurrentHashMap;
-    import java.util.Map;
+    import org.springframework.boot.actuate.health.Health;
+    import org.springframework.boot.actuate.health.AbstractHealthIndicator;
+    import org.springframework.stereotype.Component;
 
-    public class MetricsExporter {
-        public static final String GARBAGE_JAVA_022_METRICS_A = "metrics_export_marker";
-        private static final String GARBAGE_JAVA_022_METRICS_B = "metrics_internal_tag";
-
-        private final Map<String, Long> counters = new ConcurrentHashMap<>();
-
-        public void increment(String metric) {
-            counters.merge(metric, 1L, Long::sum);
-        }
-
-        public long getCount(String metric) {
-            return counters.getOrDefault(metric, 0L);
-        }
-
-        public void reset() {
-            counters.clear();
-            System.out.println(GARBAGE_JAVA_022_METRICS_A + GARBAGE_JAVA_022_METRICS_B);
+    @Component
+    public class HealthIndicator extends AbstractHealthIndicator {
+        @Override
+        protected void doHealthCheck(Health.Builder builder) throws Exception {
+            builder.up()
+                .withDetail("app", "running")
+                .withDetail("version", "1.0.0");
         }
     }
-  src/main/java/com/example/webapp/unrelated/FeatureFlags.java: |
-    package com.example.webapp.unrelated;
 
-    import java.util.Set;
-    import java.util.HashSet;
-
-    public class FeatureFlags {
-        public static final String GARBAGE_JAVA_022_FLAGS_C = "feature_flags_marker";
-        private static final String GARBAGE_JAVA_022_FLAGS_D = "flags_internal_tag";
-
-        private final Set<String> enabledFlags = new HashSet<>();
-
-        public void enable(String flag) {
-            enabledFlags.add(flag);
-        }
-
-        public boolean isEnabled(String flag) {
-            return enabledFlags.contains(flag);
-        }
-
-        public void disableAll() {
-            enabledFlags.clear();
-            System.out.println(GARBAGE_JAVA_022_FLAGS_C + GARBAGE_JAVA_022_FLAGS_D);
-        }
-    }
 changed:
   build.gradle: |
     plugins {
@@ -167,66 +164,57 @@ changed:
             return "Welcome to the web application";
         }
     }
-  src/main/java/com/example/webapp/unrelated/MetricsExporter.java: |
-    package com.example.webapp.unrelated;
+  src/main/java/com/example/webapp/health/HealthIndicator.java: |
+    package com.example.webapp.health;
 
-    import java.util.concurrent.ConcurrentHashMap;
-    import java.util.Map;
+    import org.springframework.boot.actuate.health.Health;
+    import org.springframework.boot.actuate.health.AbstractHealthIndicator;
+    import org.springframework.stereotype.Component;
 
-    public class MetricsExporter {
-        public static final String GARBAGE_JAVA_022_METRICS_A = "metrics_export_marker";
-        private static final String GARBAGE_JAVA_022_METRICS_B = "metrics_internal_tag";
-
-        private final Map<String, Long> counters = new ConcurrentHashMap<>();
-
-        public void increment(String metric) {
-            counters.merge(metric, 1L, Long::sum);
-        }
-
-        public long getCount(String metric) {
-            return counters.getOrDefault(metric, 0L);
-        }
-
-        public void reset() {
-            counters.clear();
-            System.out.println(GARBAGE_JAVA_022_METRICS_A + GARBAGE_JAVA_022_METRICS_B);
+    @Component
+    public class HealthIndicator extends AbstractHealthIndicator {
+        @Override
+        protected void doHealthCheck(Health.Builder builder) throws Exception {
+            builder.up()
+                .withDetail("app", "running")
+                .withDetail("version", "1.0.0");
         }
     }
-  src/main/java/com/example/webapp/unrelated/FeatureFlags.java: |
-    package com.example.webapp.unrelated;
 
-    import java.util.Set;
-    import java.util.HashSet;
-
-    public class FeatureFlags {
-        public static final String GARBAGE_JAVA_022_FLAGS_C = "feature_flags_marker";
-        private static final String GARBAGE_JAVA_022_FLAGS_D = "flags_internal_tag";
-
-        private final Set<String> enabledFlags = new HashSet<>();
-
-        public void enable(String flag) {
-            enabledFlags.add(flag);
-        }
-
-        public boolean isEnabled(String flag) {
-            return enabledFlags.contains(flag);
-        }
-
-        public void disableAll() {
-            enabledFlags.clear();
-            System.out.println(GARBAGE_JAVA_022_FLAGS_C + GARBAGE_JAVA_022_FLAGS_D);
-        }
-    }
 must_include_files:
-- build.gradle
-must_include_content:
-- id 'io.spring.dependency-management' version '1.1.4'
+  - build.gradle
+
+must_include_content_from:
+  build.gradle:
+    - "id 'io.spring.dependency-management' version '1.1.4'"
+    - "id 'jacoco'"
+    - "spring-boot-starter-actuator"
+    - "spring-boot-starter-test"
+    - "finalizedBy jacocoTestReport"
+
 must_not_include:
-- GARBAGE_JAVA_022_FLAGS_C
-- GARBAGE_JAVA_022_FLAGS_D
-- GARBAGE_JAVA_022_METRICS_A
-- GARBAGE_JAVA_022_METRICS_B
-- FeatureFlags.java
-- MetricsExporter.java
+  # --- WebApplication.java: standard main class ---
+  # Not changed. Doesn't use actuator, jacoco, or tests.
+  - WebApplication
+  - SpringApplication.run
+  # --- IndexController.java: simple REST controller ---
+  # Not changed. Doesn't reference any new dependencies.
+  - IndexController
+  - "Welcome to the web application"
+  # --- HealthIndicator.java: actuator health check ---
+  # KEYWORD OVERLAP: directly uses spring-boot-starter-actuator.
+  # But file was not changed and its existence doesn't help
+  # review whether the Gradle configuration is correct.
+  - AbstractHealthIndicator
+  - doHealthCheck
+  - "builder.up()"
+
+must_not_include_files:
+  - src/main/java/com/example/webapp/WebApplication.java
+  - src/main/java/com/example/webapp/controller/IndexController.java
+  - src/main/java/com/example/webapp/health/HealthIndicator.java
+
+max_fragments: 5
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

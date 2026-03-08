@@ -1,3 +1,8 @@
+# Scenario: Ingress gains host-based routing rules for api.example.com and api-v2.example.com with proxy-body-size annotation
+# Changed: k8s/base/ingress.yaml adds two host rules pointing to api-gateway service and proxy-body-size annotation
+# Reviewer questions: Does api-gateway service exist on port 80? Is 50m proxy-body-size appropriate for API payloads?
+# Trap 1: k8s/base/tls-secret.yaml — TLS certificate secret, shares ingress domain but no dep on routing rules
+# Trap 2: k8s/monitoring/ingress-metrics.yaml — ingress controller metrics exporter, shares "ingress" vocabulary but no dep
 initial:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -72,52 +77,36 @@ initial:
       LOG_LEVEL: info
       API_TIMEOUT: "30"
       RATE_LIMIT: "1000"
-  k8s/unrelated/logging/fluentd-daemonset.yaml: |
-    # GARBAGE_K8S_426_FLUENTD_LOGGING
-    apiVersion: apps/v1
-    kind: DaemonSet
+  k8s/base/tls-secret.yaml: |
+    apiVersion: v1
+    kind: Secret
     metadata:
-      name: GARBAGE_K8S_426_FLUENTD_DS
-      namespace: logging
+      name: api-tls-cert
+      namespace: production
+    type: kubernetes.io/tls
+    data:
+      tls.crt: LS0tLS1CRUdJTi...
+      tls.key: LS0tLS1CRUdJTi...
+  k8s/monitoring/ingress-metrics.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ingress-nginx-metrics
+      namespace: ingress-nginx
     spec:
+      replicas: 1
       selector:
         matchLabels:
-          app: GARBAGE_K8S_426_FLUENTD_LABEL
+          app: ingress-metrics-exporter
       template:
         spec:
           containers:
-          - name: fluentd
-            image: fluent/fluentd:GARBAGE_K8S_426_FLUENTD_VERSION
-            env:
-            - name: FLUENT_CONF
-              value: GARBAGE_K8S_426_FLUENT_CONFIG
-  k8s/unrelated/monitoring/prometheus-operator.yaml: |
-    # GARBAGE_K8S_426_PROMETHEUS_OPERATOR
-    apiVersion: monitoring.coreos.com/v1
-    kind: ServiceMonitor
-    metadata:
-      name: GARBAGE_K8S_426_SERVICEMONITOR
-      namespace: monitoring
-    spec:
-      selector:
-        matchLabels:
-          team: GARBAGE_K8S_426_PROMETHEUS_TEAM
-      endpoints:
-      - port: GARBAGE_K8S_426_METRICS_PORT
-  k8s/unrelated/security/network-policies.yaml: |
-    # GARBAGE_K8S_426_SECURITY_POLICIES
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: GARBAGE_K8S_426_DEFAULT_DENY
-      namespace: security
-    spec:
-      podSelector:
-        matchLabels:
-          security: GARBAGE_K8S_426_SECURITY_LABEL
-      policyTypes:
-      - Ingress
-      - Egress
+          - name: exporter
+            image: nginx/nginx-prometheus-exporter:0.11
+            args:
+            - -nginx.scrape-uri=http://localhost:8080/stub_status
+            ports:
+            - containerPort: 9113
   scripts/deploy.sh: |
     #!/bin/bash
     kubectl apply -f k8s/base/
@@ -216,73 +205,55 @@ changed:
       LOG_LEVEL: info
       API_TIMEOUT: "30"
       RATE_LIMIT: "1000"
-  k8s/unrelated/logging/fluentd-daemonset.yaml: |
-    # GARBAGE_K8S_426_FLUENTD_LOGGING
-    apiVersion: apps/v1
-    kind: DaemonSet
+  k8s/base/tls-secret.yaml: |
+    apiVersion: v1
+    kind: Secret
     metadata:
-      name: GARBAGE_K8S_426_FLUENTD_DS
-      namespace: logging
+      name: api-tls-cert
+      namespace: production
+    type: kubernetes.io/tls
+    data:
+      tls.crt: LS0tLS1CRUdJTi...
+      tls.key: LS0tLS1CRUdJTi...
+  k8s/monitoring/ingress-metrics.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ingress-nginx-metrics
+      namespace: ingress-nginx
     spec:
+      replicas: 1
       selector:
         matchLabels:
-          app: GARBAGE_K8S_426_FLUENTD_LABEL
+          app: ingress-metrics-exporter
       template:
         spec:
           containers:
-          - name: fluentd
-            image: fluent/fluentd:GARBAGE_K8S_426_FLUENTD_VERSION
-            env:
-            - name: FLUENT_CONF
-              value: GARBAGE_K8S_426_FLUENT_CONFIG
-  k8s/unrelated/monitoring/prometheus-operator.yaml: |
-    # GARBAGE_K8S_426_PROMETHEUS_OPERATOR
-    apiVersion: monitoring.coreos.com/v1
-    kind: ServiceMonitor
-    metadata:
-      name: GARBAGE_K8S_426_SERVICEMONITOR
-      namespace: monitoring
-    spec:
-      selector:
-        matchLabels:
-          team: GARBAGE_K8S_426_PROMETHEUS_TEAM
-      endpoints:
-      - port: GARBAGE_K8S_426_METRICS_PORT
-  k8s/unrelated/security/network-policies.yaml: |
-    # GARBAGE_K8S_426_SECURITY_POLICIES
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: GARBAGE_K8S_426_DEFAULT_DENY
-      namespace: security
-    spec:
-      podSelector:
-        matchLabels:
-          security: GARBAGE_K8S_426_SECURITY_LABEL
-      policyTypes:
-      - Ingress
-      - Egress
+          - name: exporter
+            image: nginx/nginx-prometheus-exporter:0.11
+            args:
+            - -nginx.scrape-uri=http://localhost:8080/stub_status
+            ports:
+            - containerPort: 9113
   scripts/deploy.sh: |
     #!/bin/bash
     kubectl apply -f k8s/base/
 must_include_files:
 - k8s/base/ingress.yaml
-must_include_content:
-- 'nginx.ingress.kubernetes.io/proxy-body-size: "50m"'
+must_include_content_from:
+  k8s/base/ingress.yaml:
+  - 'nginx.ingress.kubernetes.io/proxy-body-size: "50m"'
+  - 'host: api.example.com'
 must_not_include:
-- GARBAGE_K8S_426_DEFAULT_DENY
-- GARBAGE_K8S_426_FLUENTD_DS
-- GARBAGE_K8S_426_FLUENTD_LABEL
-- GARBAGE_K8S_426_FLUENTD_LOGGING
-- GARBAGE_K8S_426_FLUENT_CONFIG
-- GARBAGE_K8S_426_METRICS_PORT
-- GARBAGE_K8S_426_PROMETHEUS_OPERATOR
-- GARBAGE_K8S_426_PROMETHEUS_TEAM
-- GARBAGE_K8S_426_SECURITY_LABEL
-- GARBAGE_K8S_426_SECURITY_POLICIES
-- GARBAGE_K8S_426_SERVICEMONITOR
-- fluentd-daemonset.yaml
-- network-policies.yaml
-- prometheus-operator.yaml
+- api-tls-cert
+- kubernetes.io/tls
+- ingress-nginx-metrics
+- ingress-metrics-exporter
+- nginx-prometheus-exporter
+must_not_include_files:
+- k8s/base/tls-secret.yaml
+- k8s/monitoring/ingress-metrics.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

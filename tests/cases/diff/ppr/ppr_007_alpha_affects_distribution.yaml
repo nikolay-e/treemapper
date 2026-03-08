@@ -1,3 +1,10 @@
+# Scenario: func0 in a 5-function chain gets return value — tests alpha effect on score distribution
+# Changed: test.py — func0() returns 1, chain func0->func1->...->func4
+# Reviewer needs: test.py (changed, entire chain is in one file)
+# Trap: alt_chain.py — defines func0() with different implementation, name collision
+# Trap: result_consumer.py — consumes function outputs with similar naming pattern
+# Trap: parallel_chain.py — sibling chain structure (sibling_func0->sibling_func1->sibling_func2)
+
 initial:
   test.py: |
     def func0():
@@ -14,32 +21,27 @@ initial:
 
     def func4():
         func3()
-  # --- Tricky garbage: same function name "func0" in different module ---
-  garbage_func0_collision.py: |
-    GARBAGE_PPR_007_FUNC0_COLLISION_A = "func0_collision"
-    GARBAGE_PPR_007_FUNC0_COLLISION_B = True
-
+  alt_chain.py: |
     def func0():
         return "totally_different_func0"
 
     def func0_extended():
         return func0() + "_extended"
-  # --- Tricky garbage: imports func0 pattern (same-import consumer) ---
-  garbage_func_consumer.py: |
-    GARBAGE_PPR_007_FUNC_CONSUMER_C = "func_consumer"
-    GARBAGE_PPR_007_FUNC_CONSUMER_D = 42
 
+    class AltChainRunner:
+        def execute(self):
+            return func0_extended()
+  result_consumer.py: |
     def consume_func_output(result):
         return result + "_consumed"
 
     class FuncResultProcessor:
         def process(self, data):
             return len(data)
-  # --- Tricky garbage: same directory sibling with similar chain structure ---
-  garbage_chain_sibling.py: |
-    GARBAGE_PPR_007_CHAIN_SIBLING_E = "chain_sibling"
-    GARBAGE_PPR_007_CHAIN_SIBLING_F = 99
 
+        def summarize(self, results):
+            return {"count": len(results), "processed": True}
+  parallel_chain.py: |
     def sibling_func0():
         return "sibling_base"
 
@@ -48,6 +50,11 @@ initial:
 
     def sibling_func2():
         return sibling_func1()
+
+    class ParallelChainRunner:
+        def run(self):
+            return sibling_func2()
+
 changed:
   test.py: |
     def func0():
@@ -64,29 +71,27 @@ changed:
 
     def func4():
         func3()
-  garbage_func0_collision.py: |
-    GARBAGE_PPR_007_FUNC0_COLLISION_A = "func0_collision"
-    GARBAGE_PPR_007_FUNC0_COLLISION_B = True
-
+  alt_chain.py: |
     def func0():
         return "totally_different_func0"
 
     def func0_extended():
         return func0() + "_extended"
-  garbage_func_consumer.py: |
-    GARBAGE_PPR_007_FUNC_CONSUMER_C = "func_consumer"
-    GARBAGE_PPR_007_FUNC_CONSUMER_D = 42
 
+    class AltChainRunner:
+        def execute(self):
+            return func0_extended()
+  result_consumer.py: |
     def consume_func_output(result):
         return result + "_consumed"
 
     class FuncResultProcessor:
         def process(self, data):
             return len(data)
-  garbage_chain_sibling.py: |
-    GARBAGE_PPR_007_CHAIN_SIBLING_E = "chain_sibling"
-    GARBAGE_PPR_007_CHAIN_SIBLING_F = 99
 
+        def summarize(self, results):
+            return {"count": len(results), "processed": True}
+  parallel_chain.py: |
     def sibling_func0():
         return "sibling_base"
 
@@ -95,6 +100,10 @@ changed:
 
     def sibling_func2():
         return sibling_func1()
+
+    class ParallelChainRunner:
+        def run(self):
+            return sibling_func2()
 
 # === Assertions ===
 
@@ -107,20 +116,18 @@ must_include_content_from:
     - return 1
 
 must_not_include:
-# Tricky: name collision with func0
-- GARBAGE_PPR_007_FUNC0_COLLISION_A
-- GARBAGE_PPR_007_FUNC0_COLLISION_B
-# Tricky: consumer pattern
-- GARBAGE_PPR_007_FUNC_CONSUMER_C
-- GARBAGE_PPR_007_FUNC_CONSUMER_D
-# Tricky: same directory sibling with chain structure
-- GARBAGE_PPR_007_CHAIN_SIBLING_E
-- GARBAGE_PPR_007_CHAIN_SIBLING_F
+- AltChainRunner
+- totally_different_func0
+- func0_extended
+- FuncResultProcessor
+- consume_func_output
+- ParallelChainRunner
+- sibling_func0
 
 must_not_include_files:
-- garbage_func0_collision.py
-- garbage_func_consumer.py
-- garbage_chain_sibling.py
+- alt_chain.py
+- result_consumer.py
+- parallel_chain.py
 
 max_fragments: 4
 max_files: 2

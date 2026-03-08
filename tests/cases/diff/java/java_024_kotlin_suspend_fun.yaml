@@ -1,3 +1,30 @@
+# Scenario: UserService gains getUserWithRetry (suspend with delay/retry) and
+#   deleteUser (calling repository.deleteById). Only UserService.kt is changed.
+#
+# Diff shows:
+#   + import kotlinx.coroutines.delay
+#   + suspend fun getUserWithRetry(id, retries) with repeat/try/delay
+#   + suspend fun deleteUser(id) calling repository.deleteById(id)
+#
+# Reviewer questions:
+#   Q1: "Does repository.findById and repository.deleteById exist as suspend funs?"
+#       -> UserRepository.kt (UNCHANGED) defines both as suspend funs.
+#          Reviewer must verify signatures match the service calls.
+#
+#   Q2: "Does UserController need updating for the new service methods?"
+#       -> UserController.kt (UNCHANGED) only calls getUser/getAllUsers.
+#          It does NOT call getUserWithRetry or deleteUser. Reviewer needs
+#          the controller to assess whether consumer needs updating.
+#
+# Not needed for comprehension:
+#   - SessionManager.kt: Manages user sessions with coroutine scope.
+#     Same kotlinx.coroutines usage. But session management doesn't
+#     help review retry logic or repository calls.
+#
+#   - PasswordHasher.kt: Hashes passwords for user creation.
+#     Same user domain. But password hashing doesn't help review
+#     the new suspend functions.
+
 initial:
   src/main/kotlin/com/example/users/service/UserService.kt: |
     package com.example.users.service
@@ -46,49 +73,66 @@ initial:
             service.getAllUsers()
         }
     }
-  src/main/kotlin/com/example/users/unrelated/TokenGenerator.kt: |
-    package com.example.users.unrelated
+  src/main/kotlin/com/example/users/session/SessionManager.kt: |
+    package com.example.users.session
 
+    import kotlinx.coroutines.CoroutineScope
+    import kotlinx.coroutines.Dispatchers
+    import kotlinx.coroutines.delay
+    import kotlinx.coroutines.launch
+
+    class SessionManager {
+        private val scope = CoroutineScope(Dispatchers.Default)
+        private val sessions = mutableMapOf<String, Long>()
+
+        fun createSession(userId: String, ttlMs: Long = 3600_000) {
+            sessions[userId] = System.currentTimeMillis() + ttlMs
+            scope.launch {
+                delay(ttlMs)
+                sessions.remove(userId)
+            }
+        }
+
+        fun isActive(userId: String): Boolean {
+            val expiry = sessions[userId] ?: return false
+            return System.currentTimeMillis() < expiry
+        }
+
+        fun invalidate(userId: String) {
+            sessions.remove(userId)
+        }
+    }
+  src/main/kotlin/com/example/users/security/PasswordHasher.kt: |
+    package com.example.users.security
+
+    import java.security.MessageDigest
     import java.security.SecureRandom
     import java.util.Base64
 
-    class TokenGenerator {
-        companion object {
-            const val GARBAGE_JAVA_024_TOKEN_A = "token_gen_marker"
-            private const val GARBAGE_JAVA_024_TOKEN_B = "token_internal_tag"
-        }
-
+    class PasswordHasher {
         private val random = SecureRandom()
 
-        fun generateToken(length: Int = 32): String {
-            val bytes = ByteArray(length)
-            random.nextBytes(bytes)
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+        fun hash(password: String): String {
+            val salt = ByteArray(16)
+            random.nextBytes(salt)
+            val digest = MessageDigest.getInstance("SHA-256")
+            digest.update(salt)
+            val hash = digest.digest(password.toByteArray())
+            val saltB64 = Base64.getEncoder().encodeToString(salt)
+            val hashB64 = Base64.getEncoder().encodeToString(hash)
+            return "$saltB64:$hashB64"
         }
 
-        fun invalidateAll() {
-            println(GARBAGE_JAVA_024_TOKEN_A + GARBAGE_JAVA_024_TOKEN_B)
+        fun verify(password: String, stored: String): Boolean {
+            val parts = stored.split(":")
+            val salt = Base64.getDecoder().decode(parts[0])
+            val digest = MessageDigest.getInstance("SHA-256")
+            digest.update(salt)
+            val hash = digest.digest(password.toByteArray())
+            return Base64.getEncoder().encodeToString(hash) == parts[1]
         }
     }
-  src/main/kotlin/com/example/users/unrelated/EmailValidator.kt: |
-    package com.example.users.unrelated
 
-    class EmailValidator {
-        companion object {
-            const val GARBAGE_JAVA_024_EMAIL_C = "email_validator_marker"
-            private const val GARBAGE_JAVA_024_EMAIL_D = "email_internal_tag"
-            private val EMAIL_REGEX = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")
-        }
-
-        fun isValid(email: String): Boolean {
-            return EMAIL_REGEX.matches(email)
-        }
-
-        fun sanitize(email: String): String {
-            println(GARBAGE_JAVA_024_EMAIL_C + GARBAGE_JAVA_024_EMAIL_D)
-            return email.trim().lowercase()
-        }
-    }
 changed:
   src/main/kotlin/com/example/users/service/UserService.kt: |
     package com.example.users.service
@@ -154,59 +198,105 @@ changed:
             service.getAllUsers()
         }
     }
-  src/main/kotlin/com/example/users/unrelated/TokenGenerator.kt: |
-    package com.example.users.unrelated
+  src/main/kotlin/com/example/users/session/SessionManager.kt: |
+    package com.example.users.session
 
+    import kotlinx.coroutines.CoroutineScope
+    import kotlinx.coroutines.Dispatchers
+    import kotlinx.coroutines.delay
+    import kotlinx.coroutines.launch
+
+    class SessionManager {
+        private val scope = CoroutineScope(Dispatchers.Default)
+        private val sessions = mutableMapOf<String, Long>()
+
+        fun createSession(userId: String, ttlMs: Long = 3600_000) {
+            sessions[userId] = System.currentTimeMillis() + ttlMs
+            scope.launch {
+                delay(ttlMs)
+                sessions.remove(userId)
+            }
+        }
+
+        fun isActive(userId: String): Boolean {
+            val expiry = sessions[userId] ?: return false
+            return System.currentTimeMillis() < expiry
+        }
+
+        fun invalidate(userId: String) {
+            sessions.remove(userId)
+        }
+    }
+  src/main/kotlin/com/example/users/security/PasswordHasher.kt: |
+    package com.example.users.security
+
+    import java.security.MessageDigest
     import java.security.SecureRandom
     import java.util.Base64
 
-    class TokenGenerator {
-        companion object {
-            const val GARBAGE_JAVA_024_TOKEN_A = "token_gen_marker"
-            private const val GARBAGE_JAVA_024_TOKEN_B = "token_internal_tag"
-        }
-
+    class PasswordHasher {
         private val random = SecureRandom()
 
-        fun generateToken(length: Int = 32): String {
-            val bytes = ByteArray(length)
-            random.nextBytes(bytes)
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+        fun hash(password: String): String {
+            val salt = ByteArray(16)
+            random.nextBytes(salt)
+            val digest = MessageDigest.getInstance("SHA-256")
+            digest.update(salt)
+            val hash = digest.digest(password.toByteArray())
+            val saltB64 = Base64.getEncoder().encodeToString(salt)
+            val hashB64 = Base64.getEncoder().encodeToString(hash)
+            return "$saltB64:$hashB64"
         }
 
-        fun invalidateAll() {
-            println(GARBAGE_JAVA_024_TOKEN_A + GARBAGE_JAVA_024_TOKEN_B)
+        fun verify(password: String, stored: String): Boolean {
+            val parts = stored.split(":")
+            val salt = Base64.getDecoder().decode(parts[0])
+            val digest = MessageDigest.getInstance("SHA-256")
+            digest.update(salt)
+            val hash = digest.digest(password.toByteArray())
+            return Base64.getEncoder().encodeToString(hash) == parts[1]
         }
     }
-  src/main/kotlin/com/example/users/unrelated/EmailValidator.kt: |
-    package com.example.users.unrelated
 
-    class EmailValidator {
-        companion object {
-            const val GARBAGE_JAVA_024_EMAIL_C = "email_validator_marker"
-            private const val GARBAGE_JAVA_024_EMAIL_D = "email_internal_tag"
-            private val EMAIL_REGEX = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")
-        }
-
-        fun isValid(email: String): Boolean {
-            return EMAIL_REGEX.matches(email)
-        }
-
-        fun sanitize(email: String): String {
-            println(GARBAGE_JAVA_024_EMAIL_C + GARBAGE_JAVA_024_EMAIL_D)
-            return email.trim().lowercase()
-        }
-    }
 must_include_files:
-- src/main/kotlin/com/example/users/service/UserService.kt
-must_include_content:
-- import kotlinx.coroutines.delay
+  - src/main/kotlin/com/example/users/service/UserService.kt
+  # Q1: UserRepository defines the suspend funs UserService calls
+  - src/main/kotlin/com/example/users/repository/UserRepository.kt
+
+must_include_content_from:
+  src/main/kotlin/com/example/users/service/UserService.kt:
+    - "import kotlinx.coroutines.delay"
+    - "suspend fun getUserWithRetry"
+    - "repository.findById(id)"
+    - "delay(1000L * (attempt + 1))"
+    - "suspend fun deleteUser"
+    - "repository.deleteById(id)"
+  src/main/kotlin/com/example/users/repository/UserRepository.kt:
+    - "suspend fun findById(id: Long): User?"
+    - "suspend fun deleteById(id: Long)"
+
 must_not_include:
-- GARBAGE_JAVA_024_EMAIL_C
-- GARBAGE_JAVA_024_EMAIL_D
-- GARBAGE_JAVA_024_TOKEN_A
-- GARBAGE_JAVA_024_TOKEN_B
-- EmailValidator.kt
-- TokenGenerator.kt
+  # --- UserController.kt: consumer of UserService ---
+  # Q2 mentions it, but it WASN'T changed and doesn't call new methods.
+  # Including it is noise for reviewing the service implementation.
+  - UserController
+  - runBlocking
+  # --- SessionManager.kt: coroutine-based session management ---
+  # KEYWORD OVERLAP: uses delay from kotlinx.coroutines like the diff.
+  # Same coroutine patterns. But unrelated to user repository calls.
+  - SessionManager
+  - createSession
+  - CoroutineScope
+  # --- PasswordHasher.kt: password security in user domain ---
+  - PasswordHasher
+  - MessageDigest
+
+must_not_include_files:
+  - src/main/kotlin/com/example/users/controller/UserController.kt
+  - src/main/kotlin/com/example/users/session/SessionManager.kt
+  - src/main/kotlin/com/example/users/security/PasswordHasher.kt
+
+max_fragments: 8
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

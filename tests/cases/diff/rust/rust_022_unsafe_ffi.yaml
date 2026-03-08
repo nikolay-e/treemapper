@@ -1,7 +1,14 @@
+# Scenario: Adding a new extern "C" function and safe wrapper for string FFI
+# Changed: src/ffi.rs — added another_external() FFI declaration, safe_string_wrapper(), process_string_external()
+# Reviewer questions: Is CString null-termination correct? Is the pointer lifetime safe?
+# Trap files:
+#   - src/bindings.rs: Auto-generated C bindings — "FFI/extern" vocabulary but different external library
+#   - src/wasm_bridge.rs: WASM interop layer — "unsafe boundary" pattern overlap but no shared types
 initial:
   src/lib.rs: |
     pub mod ffi;
-    pub mod unrelated;
+    pub mod bindings;
+    pub mod wasm_bridge;
   src/ffi.rs: |
     use std::ffi::CStr;
     use std::os::raw::{c_char, c_int};
@@ -24,51 +31,54 @@ initial:
         }
         Ok(safe_wrapper(x))
     }
-  src/unrelated/mod.rs: |
-    pub mod logger;
-    pub mod cache;
-  src/unrelated/logger.rs: |
-    // GARBAGE_RUST_022_LOGGER_A
-    pub const GARBAGE_RUST_022_LOG_LEVEL_B: &str = "debug";
+  src/bindings.rs: |
+    use std::os::raw::{c_int, c_void, c_double};
 
-    pub struct GarbageLogWriter022 {
-        path: String,
-        max_lines: usize,
+    extern "C" {
+        fn lib_init() -> c_int;
+        fn lib_shutdown();
+        fn lib_process(data: *const c_void, len: usize) -> c_double;
     }
 
-    impl GarbageLogWriter022 {
-        pub fn garbage_write_log_022(&self, msg: &str) {
-            println!("[{}] {}: {}", self.path, self.max_lines, msg);
-        }
-
-        pub fn garbage_rotate_022(&mut self) {
-            self.max_lines = 0;
-        }
-    }
-  src/unrelated/cache.rs: |
-    // GARBAGE_RUST_022_CACHE_C
-    use std::collections::HashMap;
-
-    pub struct GarbageLruCache022 {
-        items: HashMap<String, String>,
-        capacity: usize,
+    pub fn initialize() -> Result<(), String> {
+        let result = unsafe { lib_init() };
+        if result == 0 { Ok(()) } else { Err("Init failed".to_string()) }
     }
 
-    impl GarbageLruCache022 {
-        pub fn garbage_get_022(&self, key: &str) -> Option<&String> {
-            self.items.get(key)
-        }
+    pub fn shutdown() {
+        unsafe { lib_shutdown(); }
+    }
 
-        pub fn garbage_evict_022(&mut self) {
-            if self.items.len() > self.capacity {
-                self.items.clear();
+    pub fn process_data(data: &[u8]) -> f64 {
+        unsafe { lib_process(data.as_ptr() as *const c_void, data.len()) }
+    }
+  src/wasm_bridge.rs: |
+    pub struct WasmModule {
+        name: String,
+        memory_pages: u32,
+    }
+
+    impl WasmModule {
+        pub fn new(name: &str, pages: u32) -> Self {
+            Self {
+                name: name.to_string(),
+                memory_pages: pages,
             }
+        }
+
+        pub fn call_export(&self, func_name: &str, args: &[i32]) -> Result<i32, String> {
+            Err(format!("WASM function {} not found in {}", func_name, self.name))
+        }
+
+        pub fn memory_size(&self) -> usize {
+            self.memory_pages as usize * 65536
         }
     }
 changed:
   src/lib.rs: |
     pub mod ffi;
-    pub mod unrelated;
+    pub mod bindings;
+    pub mod wasm_bridge;
   src/ffi.rs: |
     use std::ffi::CStr;
     use std::os::raw::{c_char, c_int};
@@ -104,45 +114,47 @@ changed:
         }
         Ok(safe_string_wrapper(s))
     }
-  src/unrelated/mod.rs: |
-    pub mod logger;
-    pub mod cache;
-  src/unrelated/logger.rs: |
-    // GARBAGE_RUST_022_LOGGER_A
-    pub const GARBAGE_RUST_022_LOG_LEVEL_B: &str = "debug";
+  src/bindings.rs: |
+    use std::os::raw::{c_int, c_void, c_double};
 
-    pub struct GarbageLogWriter022 {
-        path: String,
-        max_lines: usize,
+    extern "C" {
+        fn lib_init() -> c_int;
+        fn lib_shutdown();
+        fn lib_process(data: *const c_void, len: usize) -> c_double;
     }
 
-    impl GarbageLogWriter022 {
-        pub fn garbage_write_log_022(&self, msg: &str) {
-            println!("[{}] {}: {}", self.path, self.max_lines, msg);
-        }
-
-        pub fn garbage_rotate_022(&mut self) {
-            self.max_lines = 0;
-        }
-    }
-  src/unrelated/cache.rs: |
-    // GARBAGE_RUST_022_CACHE_C
-    use std::collections::HashMap;
-
-    pub struct GarbageLruCache022 {
-        items: HashMap<String, String>,
-        capacity: usize,
+    pub fn initialize() -> Result<(), String> {
+        let result = unsafe { lib_init() };
+        if result == 0 { Ok(()) } else { Err("Init failed".to_string()) }
     }
 
-    impl GarbageLruCache022 {
-        pub fn garbage_get_022(&self, key: &str) -> Option<&String> {
-            self.items.get(key)
-        }
+    pub fn shutdown() {
+        unsafe { lib_shutdown(); }
+    }
 
-        pub fn garbage_evict_022(&mut self) {
-            if self.items.len() > self.capacity {
-                self.items.clear();
+    pub fn process_data(data: &[u8]) -> f64 {
+        unsafe { lib_process(data.as_ptr() as *const c_void, data.len()) }
+    }
+  src/wasm_bridge.rs: |
+    pub struct WasmModule {
+        name: String,
+        memory_pages: u32,
+    }
+
+    impl WasmModule {
+        pub fn new(name: &str, pages: u32) -> Self {
+            Self {
+                name: name.to_string(),
+                memory_pages: pages,
             }
+        }
+
+        pub fn call_export(&self, func_name: &str, args: &[i32]) -> Result<i32, String> {
+            Err(format!("WASM function {} not found in {}", func_name, self.name))
+        }
+
+        pub fn memory_size(&self) -> usize {
+            self.memory_pages as usize * 65536
         }
     }
 must_include_files:
@@ -151,11 +163,14 @@ must_include_content:
 - 'fn another_external(s: *const c_char, len: usize) -> c_int;'
 - 'pub fn safe_string_wrapper(s: &str) -> i32 {'
 must_not_include:
-- GARBAGE_RUST_022_CACHE_C
-- GARBAGE_RUST_022_LOGGER_A
-- GARBAGE_RUST_022_LOG_LEVEL_B
-- cache.rs
-- logger.rs
-- mod.rs
+- lib_init
+- WasmModule
+- process_data
+- bindings.rs
+- wasm_bridge.rs
+must_not_include_files:
+- src/bindings.rs
+- src/wasm_bridge.rs
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

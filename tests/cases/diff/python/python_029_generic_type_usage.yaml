@@ -1,3 +1,44 @@
+# Scenario: Service goes from empty stub to full implementation using generic
+#   Cache[K, V] from containers module. Only service.py is changed.
+#
+# Diff shows:
+#   - def run(): pass
+#   + from containers import Cache
+#   + session_cache: Cache[str, dict] = Cache(max_size=500)
+#   + def run(session_id, payload) with .get()/.set() calls on the cache
+#
+# Reviewer questions:
+#   Q1: "What does Cache.get(key) return when the key is missing — None or raise?"
+#       -> Returns None (Optional[V]). The diff checks `if cached is not None`,
+#         so reviewer must verify Cache.get returns None on miss, not KeyError.
+#
+#   Q2: "Does Cache.set() enforce max_size eviction? Is max_size=500 safe?"
+#       -> Yes, set() checks len >= max_size and calls _evict_least_used().
+#         Reviewer must verify the eviction policy exists and is LFU-based.
+#
+#   Q3: "What are the type parameters K, V — is Cache[str, dict] valid?"
+#       -> Cache is Generic[K, V] with K=TypeVar, V=TypeVar. str and dict
+#         are valid concrete type arguments.
+#
+# Not needed for comprehension:
+#   - test_service.py: Test file that imports Cache and service.run, calls
+#     run() with test data and asserts results. Direct structural edge:
+#     imports the exact module being changed. But test expectations don't
+#     help verify whether Cache.get/set contracts are correct.
+#
+#   - cache_warmer.py: Imports Cache from containers and calls .set() in a
+#     loop to pre-populate caches. Direct structural edge: same import,
+#     same .set() method calls. But HOW the warmer uses Cache doesn't help
+#     review whether service.py uses it correctly.
+#
+#   - nullable.py: Another Generic[T] container in the same codebase with
+#     similar patterns (get/is_present/or_else). HARD TRAP: shares Generic
+#     import, TypeVar pattern, and "container with get" semantics. But
+#     service.py imports Cache, not Nullable.
+#
+#   - type_coercion.py: Type manipulation utilities sharing "typing" imports
+#     but no dependency on containers module.
+
 initial:
   containers.py: |
     from typing import Generic, TypeVar, Optional
@@ -35,39 +76,84 @@ initial:
   service.py: |
     def run():
         pass
-  garbage_scheduler.py: |
-    GARBAGE_PY_029_SCHEDULER_A = "scheduler module marker"
-    GARBAGE_PY_029_CRON_B = "cron expression marker"
+  test_service.py: |
+    from containers import Cache
+    from service import run
 
-    class TaskScheduler:
-        GARBAGE_PY_029_TASK_C = "task scheduler marker"
+    class TestSessionService:
+        def setup(self):
+            self.cache = Cache[str, dict](max_size=10)
 
-        def __init__(self):
-            self._tasks = []
+        def test_run_caches_result(self):
+            result = run("sess_1", {"key": "value"})
+            assert result["session"] == "sess_1"
+            second = run("sess_1", {"key": "other"})
+            assert second == result
 
-        def schedule(self, task_name: str, interval: int) -> None:
-            self._tasks.append({"name": task_name, "interval": interval})
+        def test_run_different_sessions(self):
+            r1 = run("sess_a", {"x": 1})
+            r2 = run("sess_b", {"x": 2})
+            assert r1 != r2
+  cache_warmer.py: |
+    from containers import Cache
 
-        def cancel(self, task_name: str) -> bool:
-            GARBAGE_PY_029_CANCEL_D = "cancel marker"
-            self._tasks = [t for t in self._tasks if t["name"] != task_name]
-            return True
-  garbage_audit.py: |
-    GARBAGE_PY_029_AUDIT_E = "audit log marker"
-    GARBAGE_PY_029_TRAIL_F = "audit trail marker"
+    class CacheWarmer:
+        def __init__(self, cache: Cache[str, dict]):
+            self._cache = cache
 
-    class AuditLogger:
-        GARBAGE_PY_029_LOGGER_G = True
+        def warm(self, entries: list[tuple[str, dict]]) -> int:
+            count = 0
+            for key, value in entries:
+                self._cache.set(key, value)
+                count += 1
+            return count
 
-        def __init__(self):
-            self._entries = []
+        def is_warm(self, key: str) -> bool:
+            return self._cache.get(key) is not None
+  type_coercion.py: |
+    from typing import Any, Type, Optional, Union
 
-        def log_action(self, user: str, action: str) -> None:
-            self._entries.append({"user": user, "action": action})
+    class CoercionError(Exception):
+        pass
 
-        def get_recent(self, count: int = 10) -> list:
-            GARBAGE_PY_029_RECENT_H = "recent marker"
-            return self._entries[-count:]
+    def coerce(value: Any, target_type: Type) -> Any:
+        try:
+            if target_type == bool:
+                if isinstance(value, str):
+                    return value.lower() in ('true', '1', 'yes')
+            return target_type(value)
+        except (ValueError, TypeError) as e:
+            raise CoercionError(f"Cannot coerce {type(value).__name__} to {target_type.__name__}") from e
+
+    def safe_coerce(value: Any, target_type: Type, default: Any = None) -> Any:
+        try:
+            return coerce(value, target_type)
+        except CoercionError:
+            return default
+  nullable.py: |
+    from typing import TypeVar, Generic, Optional, Callable
+
+    T = TypeVar('T')
+
+    class Nullable(Generic[T]):
+        def __init__(self, value: Optional[T] = None):
+            self._value = value
+
+        def is_present(self) -> bool:
+            return self._value is not None
+
+        def get(self) -> T:
+            if self._value is None:
+                raise ValueError("Value is not present")
+            return self._value
+
+        def or_else(self, default: T) -> T:
+            return self._value if self._value is not None else default
+
+        def map(self, func: Callable[[T], T]) -> 'Nullable[T]':
+            if self._value is not None:
+                return Nullable(func(self._value))
+            return Nullable()
 changed:
   containers.py: |
     from typing import Generic, TypeVar, Optional
@@ -114,54 +200,133 @@ changed:
         result = {"session": session_id, "data": payload}
         session_cache.set(session_id, result)
         return result
-  garbage_scheduler.py: |
-    GARBAGE_PY_029_SCHEDULER_A = "scheduler module marker"
-    GARBAGE_PY_029_CRON_B = "cron expression marker"
+  test_service.py: |
+    from containers import Cache
+    from service import run
 
-    class TaskScheduler:
-        GARBAGE_PY_029_TASK_C = "task scheduler marker"
+    class TestSessionService:
+        def setup(self):
+            self.cache = Cache[str, dict](max_size=10)
 
-        def __init__(self):
-            self._tasks = []
+        def test_run_caches_result(self):
+            result = run("sess_1", {"key": "value"})
+            assert result["session"] == "sess_1"
+            second = run("sess_1", {"key": "other"})
+            assert second == result
 
-        def schedule(self, task_name: str, interval: int) -> None:
-            self._tasks.append({"name": task_name, "interval": interval})
+        def test_run_different_sessions(self):
+            r1 = run("sess_a", {"x": 1})
+            r2 = run("sess_b", {"x": 2})
+            assert r1 != r2
+  cache_warmer.py: |
+    from containers import Cache
 
-        def cancel(self, task_name: str) -> bool:
-            GARBAGE_PY_029_CANCEL_D = "cancel marker"
-            self._tasks = [t for t in self._tasks if t["name"] != task_name]
-            return True
-  garbage_audit.py: |
-    GARBAGE_PY_029_AUDIT_E = "audit log marker"
-    GARBAGE_PY_029_TRAIL_F = "audit trail marker"
+    class CacheWarmer:
+        def __init__(self, cache: Cache[str, dict]):
+            self._cache = cache
 
-    class AuditLogger:
-        GARBAGE_PY_029_LOGGER_G = True
+        def warm(self, entries: list[tuple[str, dict]]) -> int:
+            count = 0
+            for key, value in entries:
+                self._cache.set(key, value)
+                count += 1
+            return count
 
-        def __init__(self):
-            self._entries = []
+        def is_warm(self, key: str) -> bool:
+            return self._cache.get(key) is not None
+  type_coercion.py: |
+    from typing import Any, Type, Optional, Union
 
-        def log_action(self, user: str, action: str) -> None:
-            self._entries.append({"user": user, "action": action})
+    class CoercionError(Exception):
+        pass
 
-        def get_recent(self, count: int = 10) -> list:
-            GARBAGE_PY_029_RECENT_H = "recent marker"
-            return self._entries[-count:]
+    def coerce(value: Any, target_type: Type) -> Any:
+        try:
+            if target_type == bool:
+                if isinstance(value, str):
+                    return value.lower() in ('true', '1', 'yes')
+            return target_type(value)
+        except (ValueError, TypeError) as e:
+            raise CoercionError(f"Cannot coerce {type(value).__name__} to {target_type.__name__}") from e
+
+    def safe_coerce(value: Any, target_type: Type, default: Any = None) -> Any:
+        try:
+            return coerce(value, target_type)
+        except CoercionError:
+            return default
+  nullable.py: |
+    from typing import TypeVar, Generic, Optional, Callable
+
+    T = TypeVar('T')
+
+    class Nullable(Generic[T]):
+        def __init__(self, value: Optional[T] = None):
+            self._value = value
+
+        def is_present(self) -> bool:
+            return self._value is not None
+
+        def get(self) -> T:
+            if self._value is None:
+                raise ValueError("Value is not present")
+            return self._value
+
+        def or_else(self, default: T) -> T:
+            return self._value if self._value is not None else default
+
+        def map(self, func: Callable[[T], T]) -> 'Nullable[T]':
+            if self._value is not None:
+                return Nullable(func(self._value))
+            return Nullable()
+
 must_include_files:
-- service.py
-must_include_content:
-- from containers import Cache
-- 'def run(session_id: str, payload: dict) -> dict:'
+  - service.py
+  # Q1+Q2+Q3: service.py calls Cache.get() and Cache.set(), instantiates
+  # Cache[str, dict](max_size=500). Reviewer must see Cache class to verify
+  # get() returns None on miss, set() enforces max_size, and Generic[K,V]
+  # accepts str/dict as type args.
+  - containers.py
+
+must_include_content_from:
+  service.py:
+    - "from containers import Cache"
+    - "session_cache: Cache[str, dict] = Cache(max_size=500)"
+    - "session_cache.get(session_id)"
+    - "session_cache.set(session_id, result)"
+  containers.py:
+    - "class Cache(Generic[K, V]):"
+    - "def get(self, key: K) -> Optional[V]:"
+    - "def set(self, key: K, value: V) -> None:"
+    - "_evict_least_used"
+
 must_not_include:
-- GARBAGE_PY_029_AUDIT_E
-- GARBAGE_PY_029_CANCEL_D
-- GARBAGE_PY_029_CRON_B
-- GARBAGE_PY_029_LOGGER_G
-- GARBAGE_PY_029_RECENT_H
-- GARBAGE_PY_029_SCHEDULER_A
-- GARBAGE_PY_029_TASK_C
-- GARBAGE_PY_029_TRAIL_F
-- garbage_audit.py
-- garbage_scheduler.py
+  # --- test_service.py: imports Cache AND service.run, calls run() ---
+  # Direct structural edge: imports the changed module. Uses same Cache
+  # type. But test assertions don't help verify Cache.get/set contracts.
+  - TestSessionService
+  - test_run_caches_result
+  - test_run_different_sessions
+  # --- cache_warmer.py: imports Cache, calls .get() and .set() ---
+  # Direct structural edge: same import, same methods. But how the warmer
+  # pre-populates doesn't help review service.py's caching logic.
+  - CacheWarmer
+  - is_warm
+  # --- nullable.py: Generic[T] container with get(), similar pattern ---
+  - Nullable
+  - is_present
+  - or_else
+  # --- type_coercion.py: typing imports but no container dependency ---
+  - CoercionError
+  - coerce
+  - safe_coerce
+
+must_not_include_files:
+  - test_service.py
+  - cache_warmer.py
+  - type_coercion.py
+  - nullable.py
+
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

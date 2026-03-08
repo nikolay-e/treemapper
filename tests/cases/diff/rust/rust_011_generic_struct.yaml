@@ -1,7 +1,40 @@
+# Scenario: Expanding generic Container<T> with accessors, map, replace,
+#   and adding TypedContainer<T, Tag> with PhantomData. Only src/container.rs
+#   is changed.
+#
+# Diff shows:
+#   + use std::marker::PhantomData
+#   + get(), get_mut(), into_inner(), map(), replace() on Container<T>
+#   + duplicate() on Container<T: Clone>
+#   + TypedContainer<T, Tag> struct with PhantomData<Tag>
+#   + TypedContainer::new(), TypedContainer::get()
+#
+# Reviewer questions:
+#   Q1: "Does map() preserve the label when transforming the value?"
+#       -> Same file: map() returns Container { value: f(self.value),
+#          label: self.label }. Reviewer verifies label is carried over.
+#
+#   Q2: "Is PhantomData usage correct for TypedContainer?"
+#       -> Same file: _marker: PhantomData<Tag> on the struct, initialized
+#          with PhantomData in new(). Tag is a type parameter used only
+#          for phantom typing. Reviewer verifies the pattern is correct.
+#
+# Not needed for comprehension:
+#   - src/registry.rs: TypeRegistry using Box<dyn Any> with register/get.
+#     HARDEST TRAP: "generic container" vocabulary — register<T: 'static>,
+#     get<T: 'static> are generic methods that store and retrieve typed
+#     values. Same concept as Container<T>. But TypeRegistry uses type
+#     erasure (Box<dyn Any>), not parametric types. No import of Container.
+#
+#   - src/pool.rs: ObjectPool<T> with acquire/release. Same <T> generic
+#     pattern, same crate module structure. But ObjectPool manages a
+#     Vec<T> pool with size limits — different semantics, no Container
+#     dependency.
 initial:
   src/lib.rs: |
     pub mod container;
-    pub mod unrelated;
+    pub mod registry;
+    pub mod pool;
   src/container.rs: |
     use std::fmt::Debug;
 
@@ -38,70 +71,64 @@ initial:
             }
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod storage;
-    pub mod indexing;
-  src/unrelated/storage.rs: |
-    // GARBAGE_RUST_STORAGE_001
+  src/registry.rs: |
+    use std::any::Any;
     use std::collections::HashMap;
 
-    pub const GARBAGE_STORAGE_LIMIT_002: usize = 1000000;
-    pub const GARBAGE_BLOCK_SIZE_003: usize = 4096;
-
-    pub struct GarbageStorageEngine004<K, V> {
-        data: HashMap<K, V>,
-        capacity: usize,
+    pub struct TypeRegistry {
+        entries: HashMap<String, Box<dyn Any>>,
     }
 
-    impl<K: std::hash::Hash + Eq, V> GarbageStorageEngine004<K, V> {
-        pub fn garbage_store_005(&mut self, key: K, value: V) -> Result<(), String> {
-            if self.data.len() >= self.capacity {
-                return Err("GARBAGE_STORAGE_FULL_006".to_string());
+    impl TypeRegistry {
+        pub fn new() -> Self {
+            Self { entries: HashMap::new() }
+        }
+
+        pub fn register<T: 'static>(&mut self, name: &str, value: T) {
+            self.entries.insert(name.to_string(), Box::new(value));
+        }
+
+        pub fn get<T: 'static>(&self, name: &str) -> Option<&T> {
+            self.entries.get(name)?.downcast_ref()
+        }
+
+        pub fn contains(&self, name: &str) -> bool {
+            self.entries.contains_key(name)
+        }
+    }
+  src/pool.rs: |
+    pub struct ObjectPool<T> {
+        available: Vec<T>,
+        max_size: usize,
+    }
+
+    impl<T> ObjectPool<T> {
+        pub fn new(max_size: usize) -> Self {
+            Self {
+                available: Vec::with_capacity(max_size),
+                max_size,
             }
-            self.data.insert(key, value);
-            Ok(())
         }
 
-        pub fn garbage_retrieve_007(&self, key: &K) -> Option<&V> {
-            self.data.get(key)
+        pub fn acquire(&mut self) -> Option<T> {
+            self.available.pop()
         }
 
-        pub fn garbage_remove_008(&mut self, key: &K) -> Option<V> {
-            self.data.remove(key)
-        }
-    }
-
-    pub trait GarbageStorable009 {
-        fn garbage_serialize_010(&self) -> Vec<u8>;
-        fn garbage_deserialize_011(data: &[u8]) -> Self where Self: Sized;
-    }
-  src/unrelated/indexing.rs: |
-    // GARBAGE_RUST_INDEX_012
-    use std::collections::BTreeMap;
-
-    pub const GARBAGE_INDEX_FACTOR_013: usize = 16;
-
-    pub struct GarbageIndex014<K: Ord, V> {
-        tree: BTreeMap<K, V>,
-    }
-
-    impl<K: Ord, V> GarbageIndex014<K, V> {
-        pub fn garbage_insert_015(&mut self, key: K, value: V) {
-            self.tree.insert(key, value);
+        pub fn release(&mut self, item: T) {
+            if self.available.len() < self.max_size {
+                self.available.push(item);
+            }
         }
 
-        pub fn garbage_search_016(&self, key: &K) -> Option<&V> {
-            self.tree.get(key)
-        }
-
-        pub fn garbage_range_017(&self, start: &K, end: &K) -> Vec<(&K, &V)> {
-            self.tree.range(start..end).collect()
+        pub fn available_count(&self) -> usize {
+            self.available.len()
         }
     }
 changed:
   src/lib.rs: |
     pub mod container;
-    pub mod unrelated;
+    pub mod registry;
+    pub mod pool;
   src/container.rs: |
     use std::fmt::Debug;
     use std::marker::PhantomData;
@@ -191,79 +218,89 @@ changed:
             self.inner.get()
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod storage;
-    pub mod indexing;
-  src/unrelated/storage.rs: |
-    // GARBAGE_RUST_STORAGE_001
+  src/registry.rs: |
+    use std::any::Any;
     use std::collections::HashMap;
 
-    pub const GARBAGE_STORAGE_LIMIT_002: usize = 1000000;
-    pub const GARBAGE_BLOCK_SIZE_003: usize = 4096;
-
-    pub struct GarbageStorageEngine004<K, V> {
-        data: HashMap<K, V>,
-        capacity: usize,
+    pub struct TypeRegistry {
+        entries: HashMap<String, Box<dyn Any>>,
     }
 
-    impl<K: std::hash::Hash + Eq, V> GarbageStorageEngine004<K, V> {
-        pub fn garbage_store_005(&mut self, key: K, value: V) -> Result<(), String> {
-            if self.data.len() >= self.capacity {
-                return Err("GARBAGE_STORAGE_FULL_006".to_string());
+    impl TypeRegistry {
+        pub fn new() -> Self {
+            Self { entries: HashMap::new() }
+        }
+
+        pub fn register<T: 'static>(&mut self, name: &str, value: T) {
+            self.entries.insert(name.to_string(), Box::new(value));
+        }
+
+        pub fn get<T: 'static>(&self, name: &str) -> Option<&T> {
+            self.entries.get(name)?.downcast_ref()
+        }
+
+        pub fn contains(&self, name: &str) -> bool {
+            self.entries.contains_key(name)
+        }
+    }
+  src/pool.rs: |
+    pub struct ObjectPool<T> {
+        available: Vec<T>,
+        max_size: usize,
+    }
+
+    impl<T> ObjectPool<T> {
+        pub fn new(max_size: usize) -> Self {
+            Self {
+                available: Vec::with_capacity(max_size),
+                max_size,
             }
-            self.data.insert(key, value);
-            Ok(())
         }
 
-        pub fn garbage_retrieve_007(&self, key: &K) -> Option<&V> {
-            self.data.get(key)
+        pub fn acquire(&mut self) -> Option<T> {
+            self.available.pop()
         }
 
-        pub fn garbage_remove_008(&mut self, key: &K) -> Option<V> {
-            self.data.remove(key)
-        }
-    }
-
-    pub trait GarbageStorable009 {
-        fn garbage_serialize_010(&self) -> Vec<u8>;
-        fn garbage_deserialize_011(data: &[u8]) -> Self where Self: Sized;
-    }
-  src/unrelated/indexing.rs: |
-    // GARBAGE_RUST_INDEX_012
-    use std::collections::BTreeMap;
-
-    pub const GARBAGE_INDEX_FACTOR_013: usize = 16;
-
-    pub struct GarbageIndex014<K: Ord, V> {
-        tree: BTreeMap<K, V>,
-    }
-
-    impl<K: Ord, V> GarbageIndex014<K, V> {
-        pub fn garbage_insert_015(&mut self, key: K, value: V) {
-            self.tree.insert(key, value);
+        pub fn release(&mut self, item: T) {
+            if self.available.len() < self.max_size {
+                self.available.push(item);
+            }
         }
 
-        pub fn garbage_search_016(&self, key: &K) -> Option<&V> {
-            self.tree.get(key)
-        }
-
-        pub fn garbage_range_017(&self, start: &K, end: &K) -> Vec<(&K, &V)> {
-            self.tree.range(start..end).collect()
+        pub fn available_count(&self) -> usize {
+            self.available.len()
         }
     }
 must_include_files:
-- src/container.rs
-must_include_content:
-- use std::marker::PhantomData;
-- pub fn get_mut(&mut self) -> &mut T {
+  - src/container.rs
+
+must_include_content_from:
+  src/container.rs:
+    - "use std::marker::PhantomData;"
+    - "pub fn get_mut(&mut self) -> &mut T {"
+    - "pub fn map<U, F>(self, f: F) -> Container<U>"
+    - "pub struct TypedContainer<T, Tag>"
+    - "_marker: PhantomData<Tag>"
+
 must_not_include:
-- GARBAGE_BLOCK_SIZE_003
-- GARBAGE_INDEX_FACTOR_013
-- GARBAGE_RUST_INDEX_012
-- GARBAGE_RUST_STORAGE_001
-- GARBAGE_STORAGE_LIMIT_002
-- indexing.rs
-- mod.rs
-- storage.rs
+  # --- src/registry.rs: generic container vocabulary, type erasure ---
+  # register<T: 'static> and get<T: 'static> — generic methods storing
+  # typed values. Same "container of T" concept. But uses Box<dyn Any>
+  # type erasure, not parametric Container<T>. No import edge.
+  - TypeRegistry
+  - "dyn Any"
+  - downcast_ref
+  # --- src/pool.rs: ObjectPool<T>, same <T> generic pattern ---
+  # Generic struct with acquire/release. Same crate module structure.
+  # But pool semantics, not container semantics. No dependency.
+  - ObjectPool
+  - acquire
+  - "with_capacity"
+
+must_not_include_files:
+  - src/registry.rs
+  - src/pool.rs
+
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

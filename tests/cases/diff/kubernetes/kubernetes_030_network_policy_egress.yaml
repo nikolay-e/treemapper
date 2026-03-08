@@ -1,3 +1,9 @@
+# Scenario: Default-deny egress NetworkPolicy replaced with granular rules
+# allowing only postgres, redis, kafka, and kube-dns.
+# Reviewer asks: "Are egress rules correctly scoped to required backends?"
+# Trap rationale: cilium-netpol.yaml and calico-globalnetpol.yaml share
+# network policy vocabulary but use different CNI APIs with no reference.
+
 initial:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -72,48 +78,40 @@ initial:
       podSelector: {}
       policyTypes:
       - Egress
-  k8s/unrelated/observability/grafana-dashboard.yaml: |
-    # GARBAGE_K8S_430_GRAFANA_DASHBOARD
-    apiVersion: integreatly.org/v1alpha1
-    kind: GrafanaDashboard
+  k8s/cni/cilium-netpol.yaml: |
+    apiVersion: cilium.io/v2
+    kind: CiliumNetworkPolicy
     metadata:
-      name: GARBAGE_K8S_430_DASHBOARD_NAME
-      namespace: monitoring
+      name: allow-dns-egress
+      namespace: kube-system
     spec:
-      json: GARBAGE_K8S_430_DASHBOARD_JSON
-      datasources:
-      - inputName: GARBAGE_K8S_430_DS_INPUT
-        datasourceName: GARBAGE_K8S_430_DS_NAME
-  k8s/unrelated/alerting/alertmanager-config.yaml: |
-    # GARBAGE_K8S_430_ALERTMANAGER
-    apiVersion: monitoring.coreos.com/v1alpha1
-    kind: AlertmanagerConfig
+      endpointSelector:
+        matchLabels:
+          k8s-app: kube-dns
+      egress:
+      - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+        toPorts:
+        - ports:
+          - port: "53"
+            protocol: UDP
+  k8s/cni/calico-globalnetpol.yaml: |
+    apiVersion: projectcalico.org/v3
+    kind: GlobalNetworkPolicy
     metadata:
-      name: GARBAGE_K8S_430_AM_CONFIG
-      namespace: monitoring
+      name: default-deny-all
     spec:
-      route:
-        receiver: GARBAGE_K8S_430_AM_RECEIVER
-        groupBy:
-        - GARBAGE_K8S_430_GROUP_BY
-      receivers:
-      - name: GARBAGE_K8S_430_RECEIVER_NAME
-        slackConfigs:
-        - channel: GARBAGE_K8S_430_SLACK_CHANNEL
-  k8s/unrelated/scheduler/keda-scaledobject.yaml: |
-    # GARBAGE_K8S_430_KEDA_SCALED
-    apiVersion: keda.sh/v1alpha1
-    kind: ScaledObject
-    metadata:
-      name: GARBAGE_K8S_430_SCALED_OBJ
-      namespace: keda
-    spec:
-      scaleTargetRef:
-        name: GARBAGE_K8S_430_TARGET_NAME
-      triggers:
-      - type: GARBAGE_K8S_430_TRIGGER_TYPE
-        metadata:
-          queueName: GARBAGE_K8S_430_QUEUE_NAME
+      selector: all()
+      types:
+      - Ingress
+      - Egress
+      egress:
+      - action: Allow
+        protocol: UDP
+        destination:
+          ports:
+          - 53
   helm/values.yaml: |
     image:
 changed:
@@ -230,48 +228,40 @@ changed:
         ports:
         - protocol: UDP
           port: 53
-  k8s/unrelated/observability/grafana-dashboard.yaml: |
-    # GARBAGE_K8S_430_GRAFANA_DASHBOARD
-    apiVersion: integreatly.org/v1alpha1
-    kind: GrafanaDashboard
+  k8s/cni/cilium-netpol.yaml: |
+    apiVersion: cilium.io/v2
+    kind: CiliumNetworkPolicy
     metadata:
-      name: GARBAGE_K8S_430_DASHBOARD_NAME
-      namespace: monitoring
+      name: allow-dns-egress
+      namespace: kube-system
     spec:
-      json: GARBAGE_K8S_430_DASHBOARD_JSON
-      datasources:
-      - inputName: GARBAGE_K8S_430_DS_INPUT
-        datasourceName: GARBAGE_K8S_430_DS_NAME
-  k8s/unrelated/alerting/alertmanager-config.yaml: |
-    # GARBAGE_K8S_430_ALERTMANAGER
-    apiVersion: monitoring.coreos.com/v1alpha1
-    kind: AlertmanagerConfig
+      endpointSelector:
+        matchLabels:
+          k8s-app: kube-dns
+      egress:
+      - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+        toPorts:
+        - ports:
+          - port: "53"
+            protocol: UDP
+  k8s/cni/calico-globalnetpol.yaml: |
+    apiVersion: projectcalico.org/v3
+    kind: GlobalNetworkPolicy
     metadata:
-      name: GARBAGE_K8S_430_AM_CONFIG
-      namespace: monitoring
+      name: default-deny-all
     spec:
-      route:
-        receiver: GARBAGE_K8S_430_AM_RECEIVER
-        groupBy:
-        - GARBAGE_K8S_430_GROUP_BY
-      receivers:
-      - name: GARBAGE_K8S_430_RECEIVER_NAME
-        slackConfigs:
-        - channel: GARBAGE_K8S_430_SLACK_CHANNEL
-  k8s/unrelated/scheduler/keda-scaledobject.yaml: |
-    # GARBAGE_K8S_430_KEDA_SCALED
-    apiVersion: keda.sh/v1alpha1
-    kind: ScaledObject
-    metadata:
-      name: GARBAGE_K8S_430_SCALED_OBJ
-      namespace: keda
-    spec:
-      scaleTargetRef:
-        name: GARBAGE_K8S_430_TARGET_NAME
-      triggers:
-      - type: GARBAGE_K8S_430_TRIGGER_TYPE
-        metadata:
-          queueName: GARBAGE_K8S_430_QUEUE_NAME
+      selector: all()
+      types:
+      - Ingress
+      - Egress
+      egress:
+      - action: Allow
+        protocol: UDP
+        destination:
+          ports:
+          - 53
   helm/values.yaml: |
     image:
 must_include_files:
@@ -279,24 +269,12 @@ must_include_files:
 must_include_content:
 - 'name: order-processor-egress'
 must_not_include:
-- GARBAGE_K8S_430_ALERTMANAGER
-- GARBAGE_K8S_430_AM_CONFIG
-- GARBAGE_K8S_430_AM_RECEIVER
-- GARBAGE_K8S_430_DASHBOARD_JSON
-- GARBAGE_K8S_430_DASHBOARD_NAME
-- GARBAGE_K8S_430_DS_INPUT
-- GARBAGE_K8S_430_DS_NAME
-- GARBAGE_K8S_430_GRAFANA_DASHBOARD
-- GARBAGE_K8S_430_GROUP_BY
-- GARBAGE_K8S_430_KEDA_SCALED
-- GARBAGE_K8S_430_QUEUE_NAME
-- GARBAGE_K8S_430_RECEIVER_NAME
-- GARBAGE_K8S_430_SCALED_OBJ
-- GARBAGE_K8S_430_SLACK_CHANNEL
-- GARBAGE_K8S_430_TARGET_NAME
-- GARBAGE_K8S_430_TRIGGER_TYPE
-- alertmanager-config.yaml
-- grafana-dashboard.yaml
-- keda-scaledobject.yaml
+- CiliumNetworkPolicy
+- GlobalNetworkPolicy
+- cilium-netpol.yaml
+- calico-globalnetpol.yaml
+must_not_include_files:
+- k8s/cni/cilium-netpol.yaml
+- k8s/cni/calico-globalnetpol.yaml
 add_garbage_files: false
 skip_garbage_check: true

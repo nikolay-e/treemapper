@@ -1,3 +1,8 @@
+# Scenario: UserController uses optional binding to safely unwrap User from UserRepository
+# Changed: UserController.swift gains if-let binding, references UserRepository.fetchUser
+# Reviewer questions: What happens if repository is empty? Should showUser return an Optional<String> instead?
+# Trap 1: ErrorFormatter.swift — handles error display strings, shares "user not found" vocabulary but no dep
+# Trap 2: CacheManager.swift — caches data by String keys, similar Optional return patterns but unrelated
 initial:
   UserRepository.swift: |
     struct User {
@@ -17,19 +22,45 @@ initial:
         }
     }
   UserController.swift: |
-    // Initial
     class UserController {}
-  GarbageUnwrapper.swift: |
-    class GarbageUnwrapper {
-        static let GARBAGE_JVM_068_UNWRAP_MARKER_A = "marker"
-        static let GARBAGE_JVM_068_COALESCE_MARKER_B = "marker"
-        func noop() {}
+  ErrorFormatter.swift: |
+    import Foundation
+
+    struct ErrorFormatter {
+        static func formatNotFound(entity: String, id: String) -> String {
+            return "\(entity) with id '\(id)' was not found"
+        }
+
+        static func formatValidation(field: String, reason: String) -> String {
+            return "Validation failed for \(field): \(reason)"
+        }
+
+        static func formatServerError(code: Int) -> String {
+            return "Internal server error (code: \(code))"
+        }
     }
-  GarbageNilCoalescer.swift: |
-    class GarbageNilCoalescer {
-        static let GARBAGE_JVM_068_NIL_MARKER_C = "marker"
-        static let GARBAGE_JVM_068_MAYBE_MARKER_D = "marker"
-        func noop() {}
+  CacheManager.swift: |
+    import Foundation
+
+    class CacheManager<T> {
+        private var storage: [String: (value: T, expiry: Date)] = [:]
+        private let defaultTTL: TimeInterval
+
+        init(defaultTTL: TimeInterval = 300) {
+            self.defaultTTL = defaultTTL
+        }
+
+        func get(key: String) -> T? {
+            guard let entry = storage[key], entry.expiry > Date() else {
+                storage.removeValue(forKey: key)
+                return nil
+            }
+            return entry.value
+        }
+
+        func set(key: String, value: T) {
+            storage[key] = (value, Date().addingTimeInterval(defaultTTL))
+        }
     }
 changed:
   UserRepository.swift: |
@@ -61,28 +92,61 @@ changed:
             }
         }
     }
-  GarbageUnwrapper.swift: |
-    class GarbageUnwrapper {
-        static let GARBAGE_JVM_068_UNWRAP_MARKER_A = "marker"
-        static let GARBAGE_JVM_068_COALESCE_MARKER_B = "marker"
-        func noop() {}
+  ErrorFormatter.swift: |
+    import Foundation
+
+    struct ErrorFormatter {
+        static func formatNotFound(entity: String, id: String) -> String {
+            return "\(entity) with id '\(id)' was not found"
+        }
+
+        static func formatValidation(field: String, reason: String) -> String {
+            return "Validation failed for \(field): \(reason)"
+        }
+
+        static func formatServerError(code: Int) -> String {
+            return "Internal server error (code: \(code))"
+        }
     }
-  GarbageNilCoalescer.swift: |
-    class GarbageNilCoalescer {
-        static let GARBAGE_JVM_068_NIL_MARKER_C = "marker"
-        static let GARBAGE_JVM_068_MAYBE_MARKER_D = "marker"
-        func noop() {}
+  CacheManager.swift: |
+    import Foundation
+
+    class CacheManager<T> {
+        private var storage: [String: (value: T, expiry: Date)] = [:]
+        private let defaultTTL: TimeInterval
+
+        init(defaultTTL: TimeInterval = 300) {
+            self.defaultTTL = defaultTTL
+        }
+
+        func get(key: String) -> T? {
+            guard let entry = storage[key], entry.expiry > Date() else {
+                storage.removeValue(forKey: key)
+                return nil
+            }
+            return entry.value
+        }
+
+        func set(key: String, value: T) {
+            storage[key] = (value, Date().addingTimeInterval(defaultTTL))
+        }
     }
 must_include_files:
 - UserController.swift
-must_include_content:
-- class UserController {
+must_include_content_from:
+  UserController.swift:
+  - 'if let user = repository.fetchUser(id: id)'
+  - 'class UserController {'
 must_not_include:
-- GARBAGE_JVM_068_COALESCE_MARKER_B
-- GARBAGE_JVM_068_MAYBE_MARKER_D
-- GARBAGE_JVM_068_NIL_MARKER_C
-- GARBAGE_JVM_068_UNWRAP_MARKER_A
-- GarbageNilCoalescer.swift
-- GarbageUnwrapper.swift
+- ErrorFormatter
+- formatNotFound
+- formatValidation
+- CacheManager
+- defaultTTL
+must_not_include_files:
+- ErrorFormatter.swift
+- CacheManager.swift
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 4

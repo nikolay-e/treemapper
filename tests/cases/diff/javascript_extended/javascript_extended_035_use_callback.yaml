@@ -1,3 +1,23 @@
+# Reviewer sees: ActionButton.tsx is rewritten to import createClickHandler and
+# createDeleteHandler from ./handlers, and wraps the branching logic in
+# useCallback with [id, variant] dependency.
+#
+# Q1: "What do createClickHandler and createDeleteHandler return?"
+#     -> src/handlers.ts: both are factory functions returning closures.
+#        createClickHandler(id) returns () => console.log('Clicked:', id).
+#        createDeleteHandler(resourceId) returns () => console.log('Deleting...').
+#        The component calls the returned closure immediately: handler()().
+# Q2: "Is createSubmitHandler also exported — why isn't it used?"
+#     -> handlers.ts exports createSubmitHandler too, but ActionButton only
+#        handles 'click' and 'delete' variants. Reviewer sees the full API
+#        and confirms the component uses the right subset.
+#
+# Not needed:
+#   - src/db/migrations.ts: database migration runner. Backend infrastructure,
+#     no relationship to UI click handlers.
+#   - src/config/routes.ts: URL route definitions. Routing concern, unrelated
+#     to action button event handling.
+
 initial:
   src/handlers.ts: |
     export function createClickHandler(id: string) {
@@ -15,35 +35,50 @@ initial:
             console.log(`Deleting resource: ${resourceId}`);
         };
     }
-  src/ActionButton.tsx: |
+  src/components/ActionButton.tsx: |
     console.log('initial');
-  src/unrelated/badge.tsx: |
-    const GARBAGE_JSX_035_BADGE_CONFIG_A = 'badge_garbage_marker';
-
-    export interface GarbageBadgeProps {
-        count: number;
-        color: string;
+  # --- Not needed: database migrations, backend concern ---
+  src/db/migrations.ts: |
+    interface Migration {
+        version: number;
+        up: () => Promise<void>;
+        down: () => Promise<void>;
     }
 
-    export function GarbageBadge({ count, color }: GarbageBadgeProps) {
-        return <span style={{ backgroundColor: color }}>{count}</span>;
+    const migrations: Migration[] = [];
+
+    export function registerMigration(migration: Migration): void {
+        migrations.push(migration);
     }
 
-    export function GARBAGE_JSX_035_ANIMATE_BADGE_B(): void {
-        console.log('GARBAGE_JSX_035_BADGE_OUTPUT_C');
-    }
-  src/unrelated/divider.tsx: |
-    const GARBAGE_JSX_035_DIVIDER_CONFIG_D = { thickness: 1, color: '#ccc' };
-
-    export class GARBAGE_JSX_035_DIVIDER_FACTORY_E {
-        create(orientation: string): string {
-            return `divider-${orientation}`;
+    export async function runMigrations(): Promise<void> {
+        for (const m of migrations) {
+            await m.up();
         }
     }
 
-    export function GARBAGE_JSX_035_RENDER_DIVIDER_F(): void {
-        console.log('rendering divider');
+    export async function rollbackMigration(): Promise<void> {
+        const last = migrations.pop();
+        if (last) await last.down();
     }
+  # --- Not needed: URL routing, different concern ---
+  src/config/routes.ts: |
+    interface RouteConfig {
+        path: string;
+        component: string;
+        exact?: boolean;
+    }
+
+    export const routes: RouteConfig[] = [
+        { path: '/', component: 'Home', exact: true },
+        { path: '/about', component: 'About' },
+        { path: '/contact', component: 'Contact' },
+    ];
+
+    export function findRoute(path: string): RouteConfig | undefined {
+        return routes.find(r => r.exact ? r.path === path : path.startsWith(r.path));
+    }
+
 changed:
   src/handlers.ts: |
     export function createClickHandler(id: string) {
@@ -61,9 +96,9 @@ changed:
             console.log(`Deleting resource: ${resourceId}`);
         };
     }
-  src/ActionButton.tsx: |
+  src/components/ActionButton.tsx: |
     import { useCallback } from 'react';
-    import { createClickHandler, createDeleteHandler } from './handlers';
+    import { createClickHandler, createDeleteHandler } from '../handlers';
 
     interface ActionButtonProps {
         id: string;
@@ -82,45 +117,67 @@ changed:
 
         return <button onClick={handleClick}>{label}</button>;
     }
-  src/unrelated/badge.tsx: |
-    const GARBAGE_JSX_035_BADGE_CONFIG_A = 'badge_garbage_marker';
-
-    export interface GarbageBadgeProps {
-        count: number;
-        color: string;
+  src/db/migrations.ts: |
+    interface Migration {
+        version: number;
+        up: () => Promise<void>;
+        down: () => Promise<void>;
     }
 
-    export function GarbageBadge({ count, color }: GarbageBadgeProps) {
-        return <span style={{ backgroundColor: color }}>{count}</span>;
+    const migrations: Migration[] = [];
+
+    export function registerMigration(migration: Migration): void {
+        migrations.push(migration);
     }
 
-    export function GARBAGE_JSX_035_ANIMATE_BADGE_B(): void {
-        console.log('GARBAGE_JSX_035_BADGE_OUTPUT_C');
-    }
-  src/unrelated/divider.tsx: |
-    const GARBAGE_JSX_035_DIVIDER_CONFIG_D = { thickness: 1, color: '#ccc' };
-
-    export class GARBAGE_JSX_035_DIVIDER_FACTORY_E {
-        create(orientation: string): string {
-            return `divider-${orientation}`;
+    export async function runMigrations(): Promise<void> {
+        for (const m of migrations) {
+            await m.up();
         }
     }
 
-    export function GARBAGE_JSX_035_RENDER_DIVIDER_F(): void {
-        console.log('rendering divider');
+    export async function rollbackMigration(): Promise<void> {
+        const last = migrations.pop();
+        if (last) await last.down();
     }
+  src/config/routes.ts: |
+    interface RouteConfig {
+        path: string;
+        component: string;
+        exact?: boolean;
+    }
+
+    export const routes: RouteConfig[] = [
+        { path: '/', component: 'Home', exact: true },
+        { path: '/about', component: 'About' },
+        { path: '/contact', component: 'Contact' },
+    ];
+
+    export function findRoute(path: string): RouteConfig | undefined {
+        return routes.find(r => r.exact ? r.path === path : path.startsWith(r.path));
+    }
+
 must_include_files:
-- src/ActionButton.tsx
-must_include_content:
-- import { useCallback } from 'react';
-- interface ActionButtonProps {
+  # Unchanged — factory functions the component imports and calls.
+  # Reviewer needs to see what createClickHandler/createDeleteHandler
+  # return (closures) to understand the handler()() invocation pattern.
+  - src/handlers.ts
+must_include_content_from:
+  src/handlers.ts:
+    - "createClickHandler"
+    - "createDeleteHandler"
 must_not_include:
-- GARBAGE_JSX_035_ANIMATE_BADGE_B
-- GARBAGE_JSX_035_BADGE_CONFIG_A
-- GARBAGE_JSX_035_DIVIDER_CONFIG_D
-- GARBAGE_JSX_035_DIVIDER_FACTORY_E
-- GARBAGE_JSX_035_RENDER_DIVIDER_F
-- badge.tsx
-- divider.tsx
+  # migrations.ts: database backend, no frontend relationship
+  - registerMigration
+  - runMigrations
+  - rollbackMigration
+  # routes.ts: URL routing config, unrelated to click handlers
+  - RouteConfig
+  - findRoute
+must_not_include_files:
+  - src/db/migrations.ts
+  - src/config/routes.ts
+max_fragments: 12
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

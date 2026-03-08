@@ -1,3 +1,8 @@
+# Scenario: RequestHandler starts calling async fetcher functions for user data
+# Changed: handlers.py imports fetch_user_data, fetch_multiple_users and uses them in handlers
+# Reviewer questions: Is FetchError properly caught? Does handle_batch scale with many user_ids?
+# Trap 1: grpc_client.py — async gRPC client, shares "async request" vocabulary but no dep on fetcher
+# Trap 2: event_dispatcher.py — async event dispatch, shares "async handler" domain but independent
 initial:
   fetcher.py: |
     import asyncio
@@ -52,17 +57,11 @@ initial:
 
     async def fetch_user_data(user_id: int, client: Optional[AsyncHttpClient] = None) -> UserData:
         http_client = client or AsyncHttpClient("https://api.example.com")
-        logger.info(f"Fetching user {user_id}")
         response = await http_client.get(f"/users/{user_id}")
         if response.status_code != 200:
             raise FetchError(response.status_code, "Failed to fetch user")
         body = response.body
-        return UserData(
-            id=body.get("id", user_id),
-            name=body.get("name", ""),
-            email=body.get("email", ""),
-            active=body.get("active", True)
-        )
+        return UserData(id=body.get("id", user_id), name=body.get("name", ""), email=body.get("email", ""))
 
     async def fetch_multiple_users(user_ids: List[int]) -> List[UserData]:
         tasks = [fetch_user_data(uid) for uid in user_ids]
@@ -74,7 +73,6 @@ initial:
             try:
                 return await fetch_user_data(user_id)
             except FetchError as e:
-                logger.warning(f"Attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(0.5 * (attempt + 1))
         return None
@@ -97,46 +95,67 @@ initial:
 
         def register_handler(self, path: str, handler: callable) -> None:
             self._handlers[path] = handler
-  garbage_websocket_handler.py: |
-    GARBAGE_MARKER_WS_001 = "websocket handler garbage"
-    UNRELATED_WS_BUFFER_002 = 4096
+  grpc_client.py: |
+    import asyncio
+    from typing import Dict, Any, Optional, List
+    from dataclasses import dataclass
 
-    class WebSocketManager:
-        GARBAGE_WS_CLASS_003 = "ws class marker"
+    @dataclass
+    class GrpcResponse:
+        status_code: int
+        data: Dict[str, Any]
+        metadata: Dict[str, str]
 
-        def __init__(self):
-            self._connections: Dict[str, Any] = {}
-
-        async def connect(self, client_id: str) -> None:
-            pass
-
-        async def broadcast(self, message: str) -> None:
-            pass
-
-    class WebSocketMessage:
-        GARBAGE_WS_MSG_MARKER_004 = "ws message marker"
-
-        def __init__(self, data: str):
-            self.data = data
-  garbage_sse.py: |
-    GARBAGE_MARKER_SSE_005 = "sse garbage"
-    UNRELATED_SSE_RETRY_006 = 3000
-
-    class SSEClient:
-        GARBAGE_SSE_CLASS_007 = True
-
-        def __init__(self, url: str):
-            self.url = url
+    class AsyncGrpcClient:
+        def __init__(self, host: str, port: int = 50051):
+            self._host = host
+            self._port = port
+            self._connected = False
 
         async def connect(self) -> None:
-            pass
+            self._connected = True
 
-        async def listen(self):
-            yield ""
+        async def call(self, service: str, method: str, request: Dict[str, Any]) -> GrpcResponse:
+            if not self._connected:
+                raise RuntimeError("Not connected")
+            await asyncio.sleep(0.01)
+            return GrpcResponse(status_code=0, data={}, metadata={})
 
-    def format_sse_event(event: str, data: str) -> str:
-        GARBAGE_FORMAT_SSE_008 = "format sse marker"
-        return f"event: {event}\ndata: {data}\n\n"
+        async def close(self) -> None:
+            self._connected = False
+
+    async def fetch_user_via_grpc(user_id: int, client: AsyncGrpcClient) -> Dict[str, Any]:
+        response = await client.call("UserService", "GetUser", {"id": user_id})
+        return response.data
+  event_dispatcher.py: |
+    import asyncio
+    from typing import Dict, Any, Callable, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
+
+    @dataclass
+    class Event:
+        name: str
+        data: Dict[str, Any]
+        timestamp: datetime
+
+    class AsyncEventDispatcher:
+        def __init__(self):
+            self._handlers: Dict[str, List[Callable]] = {}
+
+        def on(self, event_name: str, handler: Callable) -> None:
+            if event_name not in self._handlers:
+                self._handlers[event_name] = []
+            self._handlers[event_name].append(handler)
+
+        async def dispatch(self, event: Event) -> None:
+            handlers = self._handlers.get(event.name, [])
+            tasks = [handler(event) for handler in handlers]
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        async def dispatch_and_wait(self, event: Event) -> List[Any]:
+            handlers = self._handlers.get(event.name, [])
+            return await asyncio.gather(*[h(event) for h in handlers])
 changed:
   fetcher.py: |
     import asyncio
@@ -191,17 +210,11 @@ changed:
 
     async def fetch_user_data(user_id: int, client: Optional[AsyncHttpClient] = None) -> UserData:
         http_client = client or AsyncHttpClient("https://api.example.com")
-        logger.info(f"Fetching user {user_id}")
         response = await http_client.get(f"/users/{user_id}")
         if response.status_code != 200:
             raise FetchError(response.status_code, "Failed to fetch user")
         body = response.body
-        return UserData(
-            id=body.get("id", user_id),
-            name=body.get("name", ""),
-            email=body.get("email", ""),
-            active=body.get("active", True)
-        )
+        return UserData(id=body.get("id", user_id), name=body.get("name", ""), email=body.get("email", ""))
 
     async def fetch_multiple_users(user_ids: List[int]) -> List[UserData]:
         tasks = [fetch_user_data(uid) for uid in user_ids]
@@ -213,7 +226,6 @@ changed:
             try:
                 return await fetch_user_data(user_id)
             except FetchError as e:
-                logger.warning(f"Attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
                     await asyncio.sleep(0.5 * (attempt + 1))
         return None
@@ -237,11 +249,7 @@ changed:
                 data = await fetch_user_data(user_id)
                 return {
                     "status": "success",
-                    "user": {
-                        "id": data.id,
-                        "name": data.name,
-                        "email": data.email
-                    }
+                    "user": {"id": data.id, "name": data.name, "email": data.email}
                 }
             except FetchError as e:
                 return {"status": "error", "code": e.status_code, "message": e.message}
@@ -256,59 +264,84 @@ changed:
 
         def register_handler(self, path: str, handler: callable) -> None:
             self._handlers[path] = handler
-  garbage_websocket_handler.py: |
-    GARBAGE_MARKER_WS_001 = "websocket handler garbage"
-    UNRELATED_WS_BUFFER_002 = 4096
+  grpc_client.py: |
+    import asyncio
+    from typing import Dict, Any, Optional, List
+    from dataclasses import dataclass
 
-    class WebSocketManager:
-        GARBAGE_WS_CLASS_003 = "ws class marker"
+    @dataclass
+    class GrpcResponse:
+        status_code: int
+        data: Dict[str, Any]
+        metadata: Dict[str, str]
 
-        def __init__(self):
-            self._connections: Dict[str, Any] = {}
-
-        async def connect(self, client_id: str) -> None:
-            pass
-
-        async def broadcast(self, message: str) -> None:
-            pass
-
-    class WebSocketMessage:
-        GARBAGE_WS_MSG_MARKER_004 = "ws message marker"
-
-        def __init__(self, data: str):
-            self.data = data
-  garbage_sse.py: |
-    GARBAGE_MARKER_SSE_005 = "sse garbage"
-    UNRELATED_SSE_RETRY_006 = 3000
-
-    class SSEClient:
-        GARBAGE_SSE_CLASS_007 = True
-
-        def __init__(self, url: str):
-            self.url = url
+    class AsyncGrpcClient:
+        def __init__(self, host: str, port: int = 50051):
+            self._host = host
+            self._port = port
+            self._connected = False
 
         async def connect(self) -> None:
-            pass
+            self._connected = True
 
-        async def listen(self):
-            yield ""
+        async def call(self, service: str, method: str, request: Dict[str, Any]) -> GrpcResponse:
+            if not self._connected:
+                raise RuntimeError("Not connected")
+            await asyncio.sleep(0.01)
+            return GrpcResponse(status_code=0, data={}, metadata={})
 
-    def format_sse_event(event: str, data: str) -> str:
-        GARBAGE_FORMAT_SSE_008 = "format sse marker"
-        return f"event: {event}\ndata: {data}\n\n"
+        async def close(self) -> None:
+            self._connected = False
+
+    async def fetch_user_via_grpc(user_id: int, client: AsyncGrpcClient) -> Dict[str, Any]:
+        response = await client.call("UserService", "GetUser", {"id": user_id})
+        return response.data
+  event_dispatcher.py: |
+    import asyncio
+    from typing import Dict, Any, Callable, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
+
+    @dataclass
+    class Event:
+        name: str
+        data: Dict[str, Any]
+        timestamp: datetime
+
+    class AsyncEventDispatcher:
+        def __init__(self):
+            self._handlers: Dict[str, List[Callable]] = {}
+
+        def on(self, event_name: str, handler: Callable) -> None:
+            if event_name not in self._handlers:
+                self._handlers[event_name] = []
+            self._handlers[event_name].append(handler)
+
+        async def dispatch(self, event: Event) -> None:
+            handlers = self._handlers.get(event.name, [])
+            tasks = [handler(event) for handler in handlers]
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        async def dispatch_and_wait(self, event: Event) -> List[Any]:
+            handlers = self._handlers.get(event.name, [])
+            return await asyncio.gather(*[h(event) for h in handlers])
 must_include_files:
 - handlers.py
-must_include_content:
-- from fetcher import fetch_user_data, fetch_multiple_users, UserData, FetchError
-- 'async def handle_request(self, user_id: int) -> Dict[str, Any]:'
+- fetcher.py
+must_include_content_from:
+  handlers.py:
+  - from fetcher import fetch_user_data, fetch_multiple_users, UserData, FetchError
+  - 'async def handle_request(self, user_id: int) -> Dict[str, Any]:'
 must_not_include:
-- GARBAGE_FORMAT_SSE_008
-- GARBAGE_MARKER_SSE_005
-- GARBAGE_MARKER_WS_001
-- GARBAGE_SSE_CLASS_007
-- GARBAGE_WS_CLASS_003
-- GARBAGE_WS_MSG_MARKER_004
-- garbage_sse.py
-- garbage_websocket_handler.py
+- AsyncGrpcClient
+- GrpcResponse
+- fetch_user_via_grpc
+- AsyncEventDispatcher
+- dispatch_and_wait
+must_not_include_files:
+- grpc_client.py
+- event_dispatcher.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

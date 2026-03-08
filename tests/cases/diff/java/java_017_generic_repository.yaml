@@ -1,3 +1,40 @@
+# Scenario: ProductRepository refactored from standalone to extending
+#   InMemoryRepository<Product, String>. New generic repository hierarchy:
+#   BaseEntity interface, GenericRepository interface, InMemoryRepository
+#   abstract class. Product implements BaseEntity<String>.
+#
+# Diff shows:
+#   + BaseEntity<ID> interface: getId, setId, getCreatedAt, setCreatedAt,
+#     getUpdatedAt, setUpdatedAt
+#   + GenericRepository<T, ID> interface: CRUD + findAll(Predicate), saveAll
+#   + InMemoryRepository abstract class: ConcurrentHashMap store, auto-generate
+#     IDs, auto-set timestamps, Predicate-based filtering
+#   + ProductRepository extends InMemoryRepository, overrides generateId()
+#   + Product implements BaseEntity<String>, gains @Override annotations,
+#     sku, active fields
+#   + Domain-specific queries: findByCategory, findByNameContaining,
+#     findByPriceRange, findInStock, findLowStock, findOutOfStock,
+#     findTopByPrice, findRecentlyUpdated
+#
+# Reviewer questions:
+#   Q1: "What is BaseEntity<ID> — what contract does Product now fulfill?"
+#       -> Needs BaseEntity.java: interface with getId/setId, getCreatedAt/
+#         setCreatedAt, getUpdatedAt/setUpdatedAt. Product's @Override
+#         annotations must match these methods.
+#
+#   Q2: "What does InMemoryRepository provide that ProductRepository inherits?"
+#       -> Needs InMemoryRepository.java: save() auto-sets IDs and timestamps,
+#         findAll(Predicate) for filtering, ConcurrentHashMap for thread safety.
+#         ProductRepository's findByCategory uses findAll(p -> ...) from parent.
+#
+#   Q3: "What does GenericRepository interface define?"
+#       -> Needs GenericRepository.java: full CRUD contract with save, findById,
+#         findAll, existsById, count, delete, deleteAll.
+#
+# Not needed for comprehension:
+#   - SoundWaveAnalyzer, RgbConverter, UnitConverter: completely unrelated
+#     utility classes in different packages.
+
 initial:
   src/main/java/com/inventory/repository/ProductRepository.java: |
     package com.inventory.repository;
@@ -480,25 +517,54 @@ changed:
         protected abstract ID generateId();
     }
 must_include_files:
-- src/main/java/com/inventory/model/Product.java
-- src/main/java/com/inventory/repository/BaseEntity.java
-- src/main/java/com/inventory/repository/GenericRepository.java
-- src/main/java/com/inventory/repository/InMemoryRepository.java
-- src/main/java/com/inventory/repository/ProductRepository.java
-must_include_content:
-- public String getSku() { return sku; }
-- public void setSku(String sku) { this.sku = sku; }
+  - src/main/java/com/inventory/model/Product.java
+  - src/main/java/com/inventory/repository/BaseEntity.java
+  - src/main/java/com/inventory/repository/GenericRepository.java
+  - src/main/java/com/inventory/repository/InMemoryRepository.java
+  - src/main/java/com/inventory/repository/ProductRepository.java
+
+must_include_content_from:
+  src/main/java/com/inventory/model/Product.java:
+    - "public class Product implements BaseEntity<String>"
+    - "public String getSku() { return sku; }"
+  src/main/java/com/inventory/repository/BaseEntity.java:
+    - "public interface BaseEntity<ID>"
+    - "ID getId()"
+  src/main/java/com/inventory/repository/GenericRepository.java:
+    - "public interface GenericRepository<T extends BaseEntity<ID>, ID>"
+    - "List<T> findAll(Predicate<T> filter)"
+  src/main/java/com/inventory/repository/InMemoryRepository.java:
+    - "protected final Map<ID, T> store = new ConcurrentHashMap<>()"
+    - "protected abstract ID generateId()"
+  src/main/java/com/inventory/repository/ProductRepository.java:
+    - "extends InMemoryRepository<Product, String>"
+    - "public List<Product> findByCategory(String category)"
+
 must_not_include:
-- GARBAGE_JAVA_ALERT_R032D
-- GARBAGE_JAVA_DISCOUNT_R032C
-- GARBAGE_JAVA_LOW_R032F
-- GARBAGE_JAVA_MARGIN_R032B
-- GARBAGE_JAVA_PRICING_R032A
-- GARBAGE_JAVA_REGISTER_R032H
-- GARBAGE_JAVA_SUPPLIER_R032G
-- GARBAGE_JAVA_THRESHOLD_R032E
-- RgbConverter.java
-- SoundWaveAnalyzer.java
-- UnitConverter.java
+  # --- SoundWaveAnalyzer: unrelated audio processing ---
+  - SoundWaveAnalyzer
+  - calculateFrequency
+  - calculateAmplitude
+  - GARBAGE_JAVA_PRICING_R032A
+  - GARBAGE_JAVA_MARGIN_R032B
+  - GARBAGE_JAVA_DISCOUNT_R032C
+  # --- RgbConverter: unrelated color conversion ---
+  - RgbConverter
+  - rgbToHex
+  - hexToRgb
+  - GARBAGE_JAVA_ALERT_R032D
+  - GARBAGE_JAVA_THRESHOLD_R032E
+  - GARBAGE_JAVA_LOW_R032F
+  # --- UnitConverter: unrelated distance conversion ---
+  - UnitConverter
+  - milesToKilometers
+  - GARBAGE_JAVA_SUPPLIER_R032G
+  - GARBAGE_JAVA_REGISTER_R032H
+
+must_not_include_files:
+  - src/main/java/com/unrelated/audio/SoundWaveAnalyzer.java
+  - src/main/java/com/unrelated/color/RgbConverter.java
+  - src/main/java/com/unrelated/distance/UnitConverter.java
+
 add_garbage_files: false
 skip_garbage_check: true

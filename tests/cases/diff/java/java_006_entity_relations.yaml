@@ -1,3 +1,46 @@
+# Scenario: Order entity gains JPA indexes, @NamedQueries, new fields
+#   (totalAmount, taxAmount, shippingAmount, status, addresses, version),
+#   lifecycle callbacks (@PreUpdate), recalculateTotal(), getGrandTotal().
+#   Only Order.java is changed.
+#
+# Diff shows:
+#   + @Table indexes, @NamedQueries for findByCustomerAndStatus, findRecentOrders
+#   + totalAmount, taxAmount, shippingAmount, status (OrderStatus enum),
+#     shippingAddress, billingAddress (Address), notes, version, updatedAt,
+#     shippedAt, deliveredAt
+#   + recalculateTotal() uses OrderItem::getSubtotal
+#   + getGrandTotal() sums total + tax + shipping
+#   + @PreUpdate onUpdate() callback
+#   + equals/hashCode on orderNumber
+#
+# Reviewer questions:
+#   Q1: "What is OrderStatus — what values does it have?"
+#       -> Needs OrderStatus.java: enum with PENDING, CONFIRMED, PROCESSING,
+#         SHIPPED, DELIVERED, CANCELLED, REFUNDED. The diff sets status =
+#         OrderStatus.PENDING in @PrePersist. Reviewer must verify PENDING exists.
+#
+#   Q2: "What is Address — does it have the right structure for shipping/billing?"
+#       -> Needs Address.java: JPA entity with street, city, state, postalCode,
+#         country. The diff references Address via @ManyToOne.
+#
+#   Q3: "Does OrderItem have getSubtotal() used in recalculateTotal()?"
+#       -> Needs OrderItem.java: has getSubtotal() method. recalculateTotal()
+#         calls OrderItem::getSubtotal via stream().
+#
+# Not needed for comprehension:
+#   - OrderRepository.java: Spring Data JPA repository extending
+#     JpaRepository<Order, Long>. Has methods findByCustomerAndStatus(),
+#     findRecentOrders() that correspond to the @NamedQueries. HARD TRAP:
+#     direct structural overlap with the named queries. But repository
+#     method signatures don't help verify the query HQL syntax.
+#
+#   - OrderService.java: @Service that creates orders, calls
+#     recalculateTotal(), sets status transitions. Direct consumer of
+#     the new fields and methods. But doesn't help verify Order's logic.
+#
+#   - OrderIntegrationTest.java: Tests Order creation with the new fields.
+#     Direct structural edge. Tests don't help review implementation.
+
 initial:
   src/main/java/com/ordersystem/model/Order.java: |
     package com.ordersystem.model;
@@ -52,6 +95,7 @@ initial:
             item.setOrder(null);
         }
     }
+
   src/main/java/com/ordersystem/model/Customer.java: |
     package com.ordersystem.model;
 
@@ -83,6 +127,7 @@ initial:
         public void setEmail(String email) { this.email = email; }
         public List<Order> getOrders() { return orders; }
     }
+
   src/main/java/com/ordersystem/model/OrderItem.java: |
     package com.ordersystem.model;
 
@@ -119,7 +164,12 @@ initial:
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
         public BigDecimal getUnitPrice() { return unitPrice; }
         public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+
+        public BigDecimal getSubtotal() {
+            return unitPrice.multiply(BigDecimal.valueOf(quantity));
+        }
     }
+
   src/main/java/com/ordersystem/model/Product.java: |
     package com.ordersystem.model;
 
@@ -150,59 +200,83 @@ initial:
         public Integer getStockQuantity() { return stockQuantity; }
         public void setStockQuantity(Integer stockQuantity) { this.stockQuantity = stockQuantity; }
     }
-  src/main/java/com/ordersystem/unrelated/PromotionEngine.java: |
-    package com.ordersystem.unrelated;
 
+  src/main/java/com/ordersystem/repository/OrderRepository.java: |
+    package com.ordersystem.repository;
+
+    import com.ordersystem.model.Order;
+    import com.ordersystem.model.OrderStatus;
+    import org.springframework.data.jpa.repository.JpaRepository;
+    import org.springframework.data.jpa.repository.Query;
+    import org.springframework.stereotype.Repository;
+    import java.time.LocalDateTime;
+    import java.util.List;
+    import java.util.Optional;
+
+    @Repository
+    public interface OrderRepository extends JpaRepository<Order, Long> {
+        Optional<Order> findByOrderNumber(String orderNumber);
+
+        List<Order> findByCustomerIdAndStatus(Long customerId, OrderStatus status);
+
+        @Query("SELECT o FROM Order o WHERE o.createdAt > :since ORDER BY o.createdAt DESC")
+        List<Order> findRecentOrders(LocalDateTime since);
+
+        @Query("SELECT o FROM Order o WHERE o.status = :status AND o.shippedAt IS NULL")
+        List<Order> findUnshippedByStatus(OrderStatus status);
+
+        long countByStatus(OrderStatus status);
+    }
+
+  src/main/java/com/ordersystem/service/OrderService.java: |
+    package com.ordersystem.service;
+
+    import com.ordersystem.model.Order;
+    import com.ordersystem.model.OrderItem;
+    import com.ordersystem.model.OrderStatus;
+    import com.ordersystem.repository.OrderRepository;
+    import org.springframework.stereotype.Service;
+    import org.springframework.transaction.annotation.Transactional;
     import java.math.BigDecimal;
-    import java.time.LocalDate;
-    import java.util.HashMap;
-    import java.util.Map;
+    import java.time.LocalDateTime;
 
-    public class PromotionEngine {
-        public static final String GARBAGE_JAVA_PROMO_501 = "promotion_marker_pi";
-        private static final String GARBAGE_JAVA_DISCOUNT_502 = "discount_marker_rho";
+    @Service
+    public class OrderService {
+        private final OrderRepository orderRepository;
 
-        private final Map<String, BigDecimal> activePromotions = new HashMap<>();
+        public OrderService(OrderRepository orderRepository) {
+            this.orderRepository = orderRepository;
+        }
 
-        public void addPromotion(String code, BigDecimal discountPercent, LocalDate expiryDate) {
-            if (expiryDate.isAfter(LocalDate.now())) {
-                activePromotions.put(code, discountPercent);
+        @Transactional
+        public Order createOrder(Order order) {
+            order.recalculateTotal();
+            return orderRepository.save(order);
+        }
+
+        @Transactional
+        public Order addItemToOrder(Long orderId, OrderItem item) {
+            Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+            order.addItem(item);
+            order.recalculateTotal();
+            return orderRepository.save(order);
+        }
+
+        @Transactional
+        public Order updateStatus(Long orderId, OrderStatus newStatus) {
+            Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+            order.setStatus(newStatus);
+            if (newStatus == OrderStatus.SHIPPED) {
+                order.setShippedAt(LocalDateTime.now());
+            } else if (newStatus == OrderStatus.DELIVERED) {
+                order.setDeliveredAt(LocalDateTime.now());
             }
-            logGarbageMarkers();
-        }
-
-        public BigDecimal applyPromotion(String code, BigDecimal orderTotal) {
-            BigDecimal discount = activePromotions.getOrDefault(code, BigDecimal.ZERO);
-            return orderTotal.multiply(BigDecimal.ONE.subtract(discount.divide(new BigDecimal("100"))));
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_PROMO_501 + GARBAGE_JAVA_DISCOUNT_502);
+            return orderRepository.save(order);
         }
     }
-  src/main/java/com/ordersystem/unrelated/TaxCalculator.java: |
-    package com.ordersystem.unrelated;
 
-    import java.math.BigDecimal;
-    import java.math.RoundingMode;
-    import java.util.Map;
-
-    public class TaxCalculator {
-        public static final String GARBAGE_JAVA_TAX_503 = "tax_marker_sigma";
-
-        private static final Map<String, BigDecimal> TAX_RATES = Map.of(
-            "US-CA", new BigDecimal("0.0725"),
-            "US-NY", new BigDecimal("0.08"),
-            "US-TX", new BigDecimal("0.0625")
-        );
-
-        public BigDecimal calculateTax(BigDecimal amount, String region) {
-            BigDecimal rate = TAX_RATES.getOrDefault(region, BigDecimal.ZERO);
-            String GARBAGE_JAVA_RATE_504 = "rate_marker_tau";
-            System.out.println(GARBAGE_JAVA_TAX_503 + GARBAGE_JAVA_RATE_504);
-            return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-        }
-    }
 changed:
   src/main/java/com/ordersystem/model/Order.java: |
     package com.ordersystem.model;
@@ -357,6 +431,7 @@ changed:
             return Objects.hash(orderNumber);
         }
     }
+
   src/main/java/com/ordersystem/model/Customer.java: |
     package com.ordersystem.model;
 
@@ -388,6 +463,7 @@ changed:
         public void setEmail(String email) { this.email = email; }
         public List<Order> getOrders() { return orders; }
     }
+
   src/main/java/com/ordersystem/model/OrderItem.java: |
     package com.ordersystem.model;
 
@@ -424,7 +500,12 @@ changed:
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
         public BigDecimal getUnitPrice() { return unitPrice; }
         public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+
+        public BigDecimal getSubtotal() {
+            return unitPrice.multiply(BigDecimal.valueOf(quantity));
+        }
     }
+
   src/main/java/com/ordersystem/model/Product.java: |
     package com.ordersystem.model;
 
@@ -455,59 +536,7 @@ changed:
         public Integer getStockQuantity() { return stockQuantity; }
         public void setStockQuantity(Integer stockQuantity) { this.stockQuantity = stockQuantity; }
     }
-  src/main/java/com/ordersystem/unrelated/PromotionEngine.java: |
-    package com.ordersystem.unrelated;
 
-    import java.math.BigDecimal;
-    import java.time.LocalDate;
-    import java.util.HashMap;
-    import java.util.Map;
-
-    public class PromotionEngine {
-        public static final String GARBAGE_JAVA_PROMO_501 = "promotion_marker_pi";
-        private static final String GARBAGE_JAVA_DISCOUNT_502 = "discount_marker_rho";
-
-        private final Map<String, BigDecimal> activePromotions = new HashMap<>();
-
-        public void addPromotion(String code, BigDecimal discountPercent, LocalDate expiryDate) {
-            if (expiryDate.isAfter(LocalDate.now())) {
-                activePromotions.put(code, discountPercent);
-            }
-            logGarbageMarkers();
-        }
-
-        public BigDecimal applyPromotion(String code, BigDecimal orderTotal) {
-            BigDecimal discount = activePromotions.getOrDefault(code, BigDecimal.ZERO);
-            return orderTotal.multiply(BigDecimal.ONE.subtract(discount.divide(new BigDecimal("100"))));
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_PROMO_501 + GARBAGE_JAVA_DISCOUNT_502);
-        }
-    }
-  src/main/java/com/ordersystem/unrelated/TaxCalculator.java: |
-    package com.ordersystem.unrelated;
-
-    import java.math.BigDecimal;
-    import java.math.RoundingMode;
-    import java.util.Map;
-
-    public class TaxCalculator {
-        public static final String GARBAGE_JAVA_TAX_503 = "tax_marker_sigma";
-
-        private static final Map<String, BigDecimal> TAX_RATES = Map.of(
-            "US-CA", new BigDecimal("0.0725"),
-            "US-NY", new BigDecimal("0.08"),
-            "US-TX", new BigDecimal("0.0625")
-        );
-
-        public BigDecimal calculateTax(BigDecimal amount, String region) {
-            BigDecimal rate = TAX_RATES.getOrDefault(region, BigDecimal.ZERO);
-            String GARBAGE_JAVA_RATE_504 = "rate_marker_tau";
-            System.out.println(GARBAGE_JAVA_TAX_503 + GARBAGE_JAVA_RATE_504);
-            return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-        }
-    }
   src/main/java/com/ordersystem/model/OrderStatus.java: |
     package com.ordersystem.model;
 
@@ -520,6 +549,7 @@ changed:
         CANCELLED,
         REFUNDED
     }
+
   src/main/java/com/ordersystem/model/Address.java: |
     package com.ordersystem.model;
 
@@ -560,16 +590,127 @@ changed:
         public String getCountry() { return country; }
         public void setCountry(String country) { this.country = country; }
     }
+
+  src/main/java/com/ordersystem/repository/OrderRepository.java: |
+    package com.ordersystem.repository;
+
+    import com.ordersystem.model.Order;
+    import com.ordersystem.model.OrderStatus;
+    import org.springframework.data.jpa.repository.JpaRepository;
+    import org.springframework.data.jpa.repository.Query;
+    import org.springframework.stereotype.Repository;
+    import java.time.LocalDateTime;
+    import java.util.List;
+    import java.util.Optional;
+
+    @Repository
+    public interface OrderRepository extends JpaRepository<Order, Long> {
+        Optional<Order> findByOrderNumber(String orderNumber);
+
+        List<Order> findByCustomerIdAndStatus(Long customerId, OrderStatus status);
+
+        @Query("SELECT o FROM Order o WHERE o.createdAt > :since ORDER BY o.createdAt DESC")
+        List<Order> findRecentOrders(LocalDateTime since);
+
+        @Query("SELECT o FROM Order o WHERE o.status = :status AND o.shippedAt IS NULL")
+        List<Order> findUnshippedByStatus(OrderStatus status);
+
+        long countByStatus(OrderStatus status);
+    }
+
+  src/main/java/com/ordersystem/service/OrderService.java: |
+    package com.ordersystem.service;
+
+    import com.ordersystem.model.Order;
+    import com.ordersystem.model.OrderItem;
+    import com.ordersystem.model.OrderStatus;
+    import com.ordersystem.repository.OrderRepository;
+    import org.springframework.stereotype.Service;
+    import org.springframework.transaction.annotation.Transactional;
+    import java.math.BigDecimal;
+    import java.time.LocalDateTime;
+
+    @Service
+    public class OrderService {
+        private final OrderRepository orderRepository;
+
+        public OrderService(OrderRepository orderRepository) {
+            this.orderRepository = orderRepository;
+        }
+
+        @Transactional
+        public Order createOrder(Order order) {
+            order.recalculateTotal();
+            return orderRepository.save(order);
+        }
+
+        @Transactional
+        public Order addItemToOrder(Long orderId, OrderItem item) {
+            Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+            order.addItem(item);
+            order.recalculateTotal();
+            return orderRepository.save(order);
+        }
+
+        @Transactional
+        public Order updateStatus(Long orderId, OrderStatus newStatus) {
+            Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+            order.setStatus(newStatus);
+            if (newStatus == OrderStatus.SHIPPED) {
+                order.setShippedAt(LocalDateTime.now());
+            } else if (newStatus == OrderStatus.DELIVERED) {
+                order.setDeliveredAt(LocalDateTime.now());
+            }
+            return orderRepository.save(order);
+        }
+    }
+
 must_include_files:
-- src/main/java/com/ordersystem/model/Order.java
-must_include_content:
-- '@Table(name = "orders", indexes = {'
+  - src/main/java/com/ordersystem/model/Order.java
+  # Q1: Reviewer needs OrderStatus to verify PENDING exists
+  - src/main/java/com/ordersystem/model/OrderStatus.java
+  # Q2: Reviewer needs Address to verify @ManyToOne target
+  - src/main/java/com/ordersystem/model/Address.java
+
+must_include_content_from:
+  src/main/java/com/ordersystem/model/Order.java:
+    - '@Table(name = "orders", indexes = {'
+    - "private OrderStatus status"
+    - "private Address shippingAddress"
+    - "public void recalculateTotal()"
+    - "public BigDecimal getGrandTotal()"
+  src/main/java/com/ordersystem/model/OrderStatus.java:
+    - "PENDING"
+    - "SHIPPED"
+  src/main/java/com/ordersystem/model/Address.java:
+    - "public class Address"
+    - "private String postalCode"
+
 must_not_include:
-- GARBAGE_JAVA_DISCOUNT_502
-- GARBAGE_JAVA_PROMO_501
-- GARBAGE_JAVA_RATE_504
-- GARBAGE_JAVA_TAX_503
-- PromotionEngine.java
-- TaxCalculator.java
+  # --- OrderRepository.java: JPA repository with overlapping query names ---
+  # HARDEST TRAP: findByCustomerIdAndStatus and findRecentOrders mirror
+  # the @NamedQueries added in the diff. Direct structural overlap.
+  # But repository method signatures don't verify the HQL is correct.
+  - OrderRepository
+  - JpaRepository
+  - findByOrderNumber
+  - findUnshippedByStatus
+  - countByStatus
+  # --- OrderService.java: calls recalculateTotal(), setStatus(), setShippedAt() ---
+  # Direct consumer of the new methods. Spring @Service with @Transactional.
+  # But HOW the service orchestrates Order doesn't help review Order's logic.
+  - OrderService
+  - createOrder
+  - addItemToOrder
+  - updateStatus
+
+must_not_include_files:
+  - src/main/java/com/ordersystem/repository/OrderRepository.java
+  - src/main/java/com/ordersystem/service/OrderService.java
+
+max_fragments: 10
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,21 @@
+# Scenario: cache() decorator now enforces TTL expiration with time.time() checks.
+#
+# Diff: decorators.py adds time import, cache_times dict, and TTL-based invalidation
+# to the cache decorator.
+#
+# Reviewer questions:
+#   Q1: "Which functions use @cache and will now see TTL enforcement?"
+#       -> services.py (UNCHANGED) applies @cache(ttl=300) to expensive_computation
+#          and @cache(ttl=60) to quick_lookup. Both now expire.
+#   Q2: "Is the validate_args decorator affected?"
+#       -> No, validate_args is unchanged in the same file.
+#
+# Not needed:
+#   - utils/lru_eviction.py: standalone LRU eviction policy for generic caches.
+#     Shares caching vocabulary but doesn't import or use the cache decorator.
+#   - utils/ttl_config.py: stores default TTL values for different cache tiers.
+#     Uses "ttl" and "cache" terms but no dependency on decorators.py.
+
 initial:
   decorators.py: |
     import functools
@@ -41,20 +59,41 @@ initial:
 
     def uncached_operation(data):
         return sorted(data)
-  utils/garbage_profiler.py: |
-    # GARBAGE_PAT_005_PROFILER_A
-    GARBAGE_PAT_005_SAMPLE_RATE_B = 0.01
+  utils/lru_eviction.py: |
+    from collections import OrderedDict
 
-    class GarbageProfiler:
-        def start(self):
-            pass
-  utils/garbage_tracer.py: |
-    # GARBAGE_PAT_005_TRACER_A
-    GARBAGE_PAT_005_SPAN_NAME_B = "default"
+    MAX_LRU_SIZE = 256
 
-    class GarbageTracer:
-        def trace(self, name):
-            pass
+    class LRUEvictionPolicy:
+        def __init__(self, max_size: int = MAX_LRU_SIZE):
+            self._store: OrderedDict = OrderedDict()
+            self._max_size = max_size
+
+        def get(self, key: str):
+            if key in self._store:
+                self._store.move_to_end(key)
+                return self._store[key]
+            return None
+
+        def put(self, key: str, value) -> None:
+            if key in self._store:
+                self._store.move_to_end(key)
+            self._store[key] = value
+            if len(self._store) > self._max_size:
+                self._store.popitem(last=False)
+  utils/ttl_config.py: |
+    DEFAULT_CACHE_TTL = 300
+    SHORT_CACHE_TTL = 60
+    LONG_CACHE_TTL = 3600
+
+    CACHE_TIER_CONFIG = {
+        "hot": SHORT_CACHE_TTL,
+        "warm": DEFAULT_CACHE_TTL,
+        "cold": LONG_CACHE_TTL,
+    }
+
+    def get_ttl_for_tier(tier: str) -> int:
+        return CACHE_TIER_CONFIG.get(tier, DEFAULT_CACHE_TTL)
 changed:
   decorators.py: |
     import functools
@@ -103,30 +142,59 @@ changed:
 
     def uncached_operation(data):
         return sorted(data)
-  utils/garbage_profiler.py: |
-    # GARBAGE_PAT_005_PROFILER_A
-    GARBAGE_PAT_005_SAMPLE_RATE_B = 0.01
+  utils/lru_eviction.py: |
+    from collections import OrderedDict
 
-    class GarbageProfiler:
-        def start(self):
-            pass
-  utils/garbage_tracer.py: |
-    # GARBAGE_PAT_005_TRACER_A
-    GARBAGE_PAT_005_SPAN_NAME_B = "default"
+    MAX_LRU_SIZE = 256
 
-    class GarbageTracer:
-        def trace(self, name):
-            pass
+    class LRUEvictionPolicy:
+        def __init__(self, max_size: int = MAX_LRU_SIZE):
+            self._store: OrderedDict = OrderedDict()
+            self._max_size = max_size
+
+        def get(self, key: str):
+            if key in self._store:
+                self._store.move_to_end(key)
+                return self._store[key]
+            return None
+
+        def put(self, key: str, value) -> None:
+            if key in self._store:
+                self._store.move_to_end(key)
+            self._store[key] = value
+            if len(self._store) > self._max_size:
+                self._store.popitem(last=False)
+  utils/ttl_config.py: |
+    DEFAULT_CACHE_TTL = 300
+    SHORT_CACHE_TTL = 60
+    LONG_CACHE_TTL = 3600
+
+    CACHE_TIER_CONFIG = {
+        "hot": SHORT_CACHE_TTL,
+        "warm": DEFAULT_CACHE_TTL,
+        "cold": LONG_CACHE_TTL,
+    }
+
+    def get_ttl_for_tier(tier: str) -> int:
+        return CACHE_TIER_CONFIG.get(tier, DEFAULT_CACHE_TTL)
 must_include_files:
-- decorators.py
-must_include_content:
-- now = time.time()
+  - decorators.py
+must_include_content_from:
+  decorators.py:
+    - "now = time.time()"
 must_not_include:
-- GARBAGE_PAT_005_PROFILER_A
-- GARBAGE_PAT_005_SAMPLE_RATE_B
-- GARBAGE_PAT_005_SPAN_NAME_B
-- GARBAGE_PAT_005_TRACER_A
-- garbage_profiler.py
-- garbage_tracer.py
+  # utils/lru_eviction.py: standalone LRU eviction, no import of cache decorator
+  - LRUEvictionPolicy
+  - MAX_LRU_SIZE
+  - popitem
+  # utils/ttl_config.py: TTL constants for cache tiers, no dependency on decorators.py
+  - CACHE_TIER_CONFIG
+  - DEFAULT_CACHE_TTL
+  - get_ttl_for_tier
+must_not_include_files:
+  - utils/lru_eviction.py
+  - utils/ttl_config.py
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

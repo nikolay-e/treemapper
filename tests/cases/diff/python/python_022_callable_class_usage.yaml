@@ -1,3 +1,8 @@
+# Scenario: RequestHandler uses callable class instances from processor module
+# Changed: handler.py imports callable Processor classes and invokes them as functions
+# Reviewer questions: Is __call__ protocol used correctly? Are processors stateful?
+# Trap 1: task_queue.py — queues callable tasks, shares "callable/process" vocabulary but independent
+# Trap 2: middleware_chain.py — chains middleware callables, shares "handler" domain but no dep
 initial:
   processor.py: |
     from typing import Callable, Generic, TypeVar, Any, Optional
@@ -55,20 +60,50 @@ initial:
   handler.py: |
     def handle():
         pass
-  garbage_queue_manager.py: |
-    GARBAGE_PY_QUEUE_827364 = "queue management garbage"
-    UNRELATED_QUEUE_MARKER_918273 = "unused rabbitmq config"
+  task_queue.py: |
+    from typing import Callable, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class GarbageQueueManager:
-        def garbage_publish(self, message):
-            return f"Garbage published: {message}"
-  garbage_scheduler.py: |
-    GARBAGE_PY_SCHED_918273 = "scheduler garbage"
-    UNRELATED_SCHED_MARKER_827163 = "unused cron config"
+    @dataclass
+    class QueuedTask:
+        name: str
+        callable: Callable
+        args: tuple = ()
+        created_at: datetime = None
 
-    class GarbageScheduler:
-        def garbage_schedule_job(self, func, cron_expr):
-            return f"Garbage scheduled: {cron_expr}"
+    class TaskQueue:
+        def __init__(self, max_size: int = 100):
+            self._queue: List[QueuedTask] = []
+            self._max_size = max_size
+
+        def enqueue(self, name: str, task: Callable, *args: Any) -> bool:
+            if len(self._queue) >= self._max_size:
+                return False
+            self._queue.append(QueuedTask(name=name, callable=task, args=args))
+            return True
+
+        def process_next(self) -> Optional[Any]:
+            if not self._queue:
+                return None
+            task = self._queue.pop(0)
+            return task.callable(*task.args)
+  middleware_chain.py: |
+    from typing import Callable, Any, List
+
+    class MiddlewareChain:
+        def __init__(self):
+            self._middlewares: List[Callable] = []
+
+        def use(self, middleware: Callable) -> None:
+            self._middlewares.append(middleware)
+
+        def execute(self, request: dict, handler: Callable) -> Any:
+            chain = handler
+            for mw in reversed(self._middlewares):
+                prev = chain
+                chain = lambda req, h=prev, m=mw: m(req, h)
+            return chain(request)
 changed:
   processor.py: |
     from typing import Callable, Generic, TypeVar, Any, Optional
@@ -148,29 +183,67 @@ changed:
 
     def create_pipeline(*processors) -> CompositeProcessor:
         return CompositeProcessor(list(processors))
-  garbage_queue_manager.py: |
-    GARBAGE_PY_QUEUE_827364 = "queue management garbage"
-    UNRELATED_QUEUE_MARKER_918273 = "unused rabbitmq config"
+  task_queue.py: |
+    from typing import Callable, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class GarbageQueueManager:
-        def garbage_publish(self, message):
-            return f"Garbage published: {message}"
-  garbage_scheduler.py: |
-    GARBAGE_PY_SCHED_918273 = "scheduler garbage"
-    UNRELATED_SCHED_MARKER_827163 = "unused cron config"
+    @dataclass
+    class QueuedTask:
+        name: str
+        callable: Callable
+        args: tuple = ()
+        created_at: datetime = None
 
-    class GarbageScheduler:
-        def garbage_schedule_job(self, func, cron_expr):
-            return f"Garbage scheduled: {cron_expr}"
+    class TaskQueue:
+        def __init__(self, max_size: int = 100):
+            self._queue: List[QueuedTask] = []
+            self._max_size = max_size
+
+        def enqueue(self, name: str, task: Callable, *args: Any) -> bool:
+            if len(self._queue) >= self._max_size:
+                return False
+            self._queue.append(QueuedTask(name=name, callable=task, args=args))
+            return True
+
+        def process_next(self) -> Optional[Any]:
+            if not self._queue:
+                return None
+            task = self._queue.pop(0)
+            return task.callable(*task.args)
+  middleware_chain.py: |
+    from typing import Callable, Any, List
+
+    class MiddlewareChain:
+        def __init__(self):
+            self._middlewares: List[Callable] = []
+
+        def use(self, middleware: Callable) -> None:
+            self._middlewares.append(middleware)
+
+        def execute(self, request: dict, handler: Callable) -> Any:
+            chain = handler
+            for mw in reversed(self._middlewares):
+                prev = chain
+                chain = lambda req, h=prev, m=mw: m(req, h)
+            return chain(request)
 must_include_files:
 - handler.py
-must_include_content:
-- from processor import (
-- 'def handle_text(self, text: str) -> ProcessingResult[str]:'
+- processor.py
+must_include_content_from:
+  handler.py:
+  - 'from processor import ('
+  - 'def handle_text(self, text: str) -> ProcessingResult[str]:'
 must_not_include:
-- GARBAGE_PY_QUEUE_827364
-- GARBAGE_PY_SCHED_918273
-- garbage_queue_manager.py
-- garbage_scheduler.py
+- TaskQueue
+- QueuedTask
+- enqueue
+- MiddlewareChain
+- middleware_chain
+must_not_include_files:
+- task_queue.py
+- middleware_chain.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

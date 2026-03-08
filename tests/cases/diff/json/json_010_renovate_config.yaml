@@ -1,3 +1,29 @@
+# Scenario: renovate.json enables automerge and adds packageRules for
+#   auto-merging devDependencies.
+#
+# Reviewer questions:
+#   Q1: "Is automerge: true safe for all dependencies?"
+#       -> renovate.json: automerge changed from false to true globally.
+#          This means production deps (lodash, express, axios) will auto-merge.
+#          Potential risk. packageRules also enables devDeps automerge separately.
+#
+#   Q2: "What dependencies are affected by the automerge?"
+#       -> package.json: production deps (lodash, express, axios) and devDeps
+#          (jest, eslint, typescript). Reviewer needs package.json to evaluate
+#          the risk of auto-merging each.
+#
+# Not needed:
+#   - .github/workflows/ci.yml: CI pipeline that runs tests. Related to
+#     automerge safety (tests must pass). But CI config doesn't help
+#     review whether the renovate rules are correct.
+#
+#   - yarn.lock / package-lock.json: Lock files affected by updates.
+#     Same dependency domain. But lock file contents don't help review
+#     the renovate configuration.
+#
+#   - src/app.js: Application code using the dependencies. Could show
+#     which APIs are used. But code doesn't help review renovate rules.
+
 initial:
   renovate.json: |
     {
@@ -8,6 +34,7 @@ initial:
       "prHourlyLimit": 5,
       "prConcurrentLimit": 10
     }
+
   package.json: |
     {
       "name": "webapp",
@@ -23,6 +50,7 @@ initial:
         "typescript": "^5.2.0"
       }
     }
+
   src/app.js: |
     const express = require('express');
     const axios = require('axios');
@@ -47,70 +75,34 @@ initial:
     }
 
     module.exports = { app, startServer };
-  unrelated/patcher.js: |
-    const GARBAGE_JSON_010_PATCH_VERSION_A = '0.0.1';
 
-    class GARBAGE_JSON_010_JSON_PATCHER_B {
-        constructor(version) {
-            this.version = version || GARBAGE_JSON_010_PATCH_VERSION_A;
-            this.operations = [];
-        }
+  .github/workflows/ci.yml: |
+    name: CI
+    on: [push, pull_request]
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-node@v4
+            with:
+              node-version: 18
+          - run: npm ci
+          - run: npm test
+          - run: npm run lint
 
-        add(path, value) {
-            this.operations.push({ op: 'add', path, value });
-        }
+  tests/app.test.js: |
+    const request = require('supertest');
+    const { app } = require('../src/app');
 
-        remove(path) {
-            this.operations.push({ op: 'remove', path });
-        }
+    describe('API endpoints', () => {
+        it('GET /api/health returns ok', async () => {
+            const res = await request(app).get('/api/health');
+            expect(res.status).toBe(200);
+            expect(res.body.status).toBe('ok');
+        });
+    });
 
-        apply(target) {
-            let result = JSON.parse(JSON.stringify(target));
-            for (const op of this.operations) {
-                if (op.op === 'add') result[op.path] = op.value;
-                if (op.op === 'remove') delete result[op.path];
-            }
-            return result;
-        }
-    }
-
-    function GARBAGE_JSON_010_APPLY_PATCHES_C(target, ops) {
-        const patcher = new GARBAGE_JSON_010_JSON_PATCHER_B();
-        ops.forEach(o => patcher[o.op](o.path, o.value));
-        return patcher.apply(target);
-    }
-
-    module.exports = { GARBAGE_JSON_010_JSON_PATCHER_B, GARBAGE_JSON_010_APPLY_PATCHES_C };
-  unrelated/archiver.js: |
-    const GARBAGE_JSON_010_ARCHIVE_FORMAT_D = 'tar.gz';
-
-    class GARBAGE_JSON_010_FILE_ARCHIVER_E {
-        constructor(format) {
-            this.format = format || GARBAGE_JSON_010_ARCHIVE_FORMAT_D;
-            this.files = [];
-        }
-
-        addFile(name, content) {
-            this.files.push({ name, content, size: content.length });
-        }
-
-        getManifest() {
-            return {
-                format: this.format,
-                fileCount: this.files.length,
-                totalSize: this.files.reduce((sum, f) => sum + f.size, 0),
-                files: this.files.map(f => f.name),
-            };
-        }
-    }
-
-    function GARBAGE_JSON_010_CREATE_ARCHIVE_F(fileMap) {
-        const archiver = new GARBAGE_JSON_010_FILE_ARCHIVER_E();
-        Object.entries(fileMap).forEach(([name, content]) => archiver.addFile(name, content));
-        return archiver.getManifest();
-    }
-
-    module.exports = { GARBAGE_JSON_010_FILE_ARCHIVER_E, GARBAGE_JSON_010_CREATE_ARCHIVE_F };
 changed:
   renovate.json: |
     {
@@ -125,124 +117,34 @@ changed:
         {"matchDepTypes": ["devDependencies"], "automerge": true}
       ]
     }
-  package.json: |
-    {
-      "name": "webapp",
-      "version": "3.0.0",
-      "dependencies": {
-        "lodash": "^4.17.0",
-        "express": "^4.18.0",
-        "axios": "^1.4.0"
-      },
-      "devDependencies": {
-        "jest": "^29.6.0",
-        "eslint": "^8.45.0",
-        "typescript": "^5.2.0"
-      }
-    }
-  src/app.js: |
-    const express = require('express');
-    const axios = require('axios');
-    const _ = require('lodash');
 
-    const app = express();
-
-    app.get('/api/data', async (req, res) => {
-        const response = await axios.get('https://api.example.com/data');
-        const filtered = _.pick(response.data, ['id', 'name', 'status']);
-        res.json(filtered);
-    });
-
-    app.get('/api/health', (req, res) => {
-        res.json({ status: 'ok', version: '3.0.0' });
-    });
-
-    function startServer(port) {
-        return app.listen(port, () => {
-            console.log(`Server started on port ${port}`);
-        });
-    }
-
-    module.exports = { app, startServer };
-  unrelated/patcher.js: |
-    const GARBAGE_JSON_010_PATCH_VERSION_A = '0.0.1';
-
-    class GARBAGE_JSON_010_JSON_PATCHER_B {
-        constructor(version) {
-            this.version = version || GARBAGE_JSON_010_PATCH_VERSION_A;
-            this.operations = [];
-        }
-
-        add(path, value) {
-            this.operations.push({ op: 'add', path, value });
-        }
-
-        remove(path) {
-            this.operations.push({ op: 'remove', path });
-        }
-
-        apply(target) {
-            let result = JSON.parse(JSON.stringify(target));
-            for (const op of this.operations) {
-                if (op.op === 'add') result[op.path] = op.value;
-                if (op.op === 'remove') delete result[op.path];
-            }
-            return result;
-        }
-    }
-
-    function GARBAGE_JSON_010_APPLY_PATCHES_C(target, ops) {
-        const patcher = new GARBAGE_JSON_010_JSON_PATCHER_B();
-        ops.forEach(o => patcher[o.op](o.path, o.value));
-        return patcher.apply(target);
-    }
-
-    module.exports = { GARBAGE_JSON_010_JSON_PATCHER_B, GARBAGE_JSON_010_APPLY_PATCHES_C };
-  unrelated/archiver.js: |
-    const GARBAGE_JSON_010_ARCHIVE_FORMAT_D = 'tar.gz';
-
-    class GARBAGE_JSON_010_FILE_ARCHIVER_E {
-        constructor(format) {
-            this.format = format || GARBAGE_JSON_010_ARCHIVE_FORMAT_D;
-            this.files = [];
-        }
-
-        addFile(name, content) {
-            this.files.push({ name, content, size: content.length });
-        }
-
-        getManifest() {
-            return {
-                format: this.format,
-                fileCount: this.files.length,
-                totalSize: this.files.reduce((sum, f) => sum + f.size, 0),
-                files: this.files.map(f => f.name),
-            };
-        }
-    }
-
-    function GARBAGE_JSON_010_CREATE_ARCHIVE_F(fileMap) {
-        const archiver = new GARBAGE_JSON_010_FILE_ARCHIVER_E();
-        Object.entries(fileMap).forEach(([name, content]) => archiver.addFile(name, content));
-        return archiver.getManifest();
-    }
-
-    module.exports = { GARBAGE_JSON_010_FILE_ARCHIVER_E, GARBAGE_JSON_010_CREATE_ARCHIVE_F };
 must_include_files:
-- renovate.json
-must_include_content:
-- '"automerge": true,'
-- '"prConcurrentLimit": 10,'
+  - renovate.json
+
+must_include_content_from:
+  renovate.json:
+    - '"automerge": true'
+    - '"matchDepTypes": ["devDependencies"]'
+
 must_not_include:
-- GARBAGE_JSON_010_APPLY_PATCHES_C
-- GARBAGE_JSON_010_APPLY_PATCHES_C(target
-- GARBAGE_JSON_010_ARCHIVE_FORMAT_D
-- GARBAGE_JSON_010_CREATE_ARCHIVE_F
-- GARBAGE_JSON_010_CREATE_ARCHIVE_F(fileMap
-- GARBAGE_JSON_010_FILE_ARCHIVER_E
-- GARBAGE_JSON_010_JSON_PATCHER_B
-- GARBAGE_JSON_010_PATCH_VERSION_A
-- archiver.js
-- patcher.js
+  # --- src/app.js: application code, not dependency config ---
+  - "_.pick"
+  - startServer
+  - "api.example.com"
+  # --- CI workflow: runs tests, but doesn't help review automerge rules ---
+  - "actions/checkout"
+  - "actions/setup-node"
+  - "npm run lint"
+  # --- tests: test code, not dependency management ---
+  - supertest
+  - "GET /api/health"
+
+must_not_include_files:
+  - .github/workflows/ci.yml
+  - tests/app.test.js
+  - src/app.js
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,47 @@
+# Scenario: PersonView goes from empty stub to full implementation that renders
+#   HTML using Person properties (full_name, age, is_adult, display_info).
+#   Only views.py is changed.
+#
+# Diff shows:
+#   - def render(self) -> str: return ""
+#   + from models.person import Person, Address, Gender
+#   + def render(self, person: Person) -> str: accesses person.full_name,
+#     person.age, person.is_adult, person.display_info
+#   + def render_list(self, people: List[Person]) -> str: accesses p.full_name
+#
+# Reviewer questions:
+#   Q1: "What does person.full_name return? Is it a property or method?"
+#       -> Property returning f"{self._first} {self._last}". Reviewer must
+#         verify it's safe to embed in HTML without escaping.
+#
+#   Q2: "Can person.age be None? Does the template handle that?"
+#       -> Yes, age returns None if birth_date is None. The diff checks
+#         `if person.age is not None` before rendering. Reviewer must verify
+#         the age property's Optional[int] return type.
+#
+#   Q3: "What does person.is_adult check — just age >= 18?"
+#       -> Returns `age is not None and age >= 18`. Reviewer must verify
+#         this handles the None case safely (no badge for unknown age).
+#
+# Not needed for comprehension:
+#   - test_views.py: Tests PersonView.render() by creating Person instances
+#     and asserting HTML output. Direct structural edge: imports Person and
+#     PersonView, calls render(). But test assertions don't help verify
+#     whether properties like full_name/age/is_adult behave correctly.
+#
+#   - person_api.py: REST endpoint that imports Person and serializes it
+#     using person.full_name, person.age, person.email. Direct structural
+#     edge: accesses the SAME properties as the diff. HARDEST TRAP:
+#     identical property access pattern. But how the API serializes Person
+#     doesn't help review whether the view renders correctly.
+#
+#   - formatters.py: PersonFormatter that formats person data for CSV/JSON
+#     export. Has "name", "email", "age" field names matching Person
+#     properties. Domain overlap but no import from models.person.
+#
+#   - search_index.py: PersonSearchIndex that indexes person records.
+#     Has "person_id", "name" fields. Same domain but independent module.
+
 initial:
   models/person.py: |
     from typing import Optional, List
@@ -115,47 +159,100 @@ initial:
 
         def clear_cache(self) -> None:
             self._cache.clear()
-  garbage_templates.py: |
-    GARBAGE_MARKER_TEMPLATE_001 = "template garbage"
-    UNRELATED_TEMPLATE_EXT_002 = ".html"
+  test_views.py: |
+    from models.person import Person
+    from views import PersonView, ViewConfig
 
-    class TemplateEngine:
-        GARBAGE_TEMPLATE_CLASS_003 = "template class marker"
+    class TestPersonView:
+        def setup(self):
+            self.view = PersonView(ViewConfig(cache_enabled=False))
 
-        def __init__(self, template_dir: str = "templates"):
-            self.template_dir = template_dir
+        def test_render_shows_full_name(self):
+            person = Person("Alice", "Smith")
+            html = self.view.render(person)
+            assert "Alice Smith" in html
 
-        def render(self, template_name: str, context: dict) -> str:
-            return ""
+        def test_render_shows_age(self):
+            from datetime import date
+            person = Person("Bob", "Jones", date(1990, 1, 1))
+            html = self.view.render(person)
+            assert "Age:" in html
 
-        def compile(self, template_str: str) -> callable:
-            return lambda ctx: template_str
+        def test_render_list(self):
+            people = [Person("A", "B"), Person("C", "D")]
+            html = self.view.render_list(people)
+            assert "<li>" in html
+  person_api.py: |
+    from models.person import Person
+    from typing import Dict, Any
 
-    class TemplateCache:
-        GARBAGE_CACHE_MARKER_004 = "cache marker"
+    class PersonAPI:
+        def serialize(self, person: Person) -> Dict[str, Any]:
+            return {
+                "full_name": person.full_name,
+                "age": person.age,
+                "email": person.email,
+                "is_adult": person.is_adult,
+            }
 
-        def get(self, key: str) -> Optional[str]:
-            return None
-  garbage_localization.py: |
-    GARBAGE_MARKER_LOCALE_005 = "localization garbage"
-    UNRELATED_DEFAULT_LANG_006 = "en"
+        def serialize_list(self, people: list[Person]) -> list[Dict[str, Any]]:
+            return [self.serialize(p) for p in people]
 
-    class Localizer:
-        GARBAGE_LOCALE_CLASS_007 = True
+        def handle_get(self, person: Person) -> Dict[str, Any]:
+            data = self.serialize(person)
+            data["display"] = person.display_info
+            return data
+  formatters.py: |
+    from typing import Dict, Any, List, Optional
 
-        def __init__(self, default_language: str = "en"):
-            self.default_language = default_language
-            self._translations: Dict[str, Dict[str, str]] = {}
+    class PersonFormatter:
+        def __init__(self, date_format: str = "%Y-%m-%d"):
+            self._date_format = date_format
 
-        def translate(self, key: str, language: Optional[str] = None) -> str:
-            return key
+        def format_csv_row(self, name: str, email: str, age: int) -> str:
+            return f"{name},{email},{age}"
 
-        def load_translations(self, language: str, translations: Dict[str, str]) -> None:
-            self._translations[language] = translations
+        def format_csv_header(self) -> str:
+            return "name,email,age"
 
-    def format_locale_key(key: str) -> str:
-        GARBAGE_FORMAT_LOCALE_008 = "format locale marker"
-        return f"locale.{key}"
+        def format_json(self, name: str, email: str) -> Dict[str, str]:
+            return {"name": name, "email": email}
+
+    class ExportFormatter:
+        def __init__(self, output_format: str = "csv"):
+            self._format = output_format
+
+        def format_record(self, record: Dict[str, Any]) -> str:
+            if self._format == "csv":
+                return ",".join(str(v) for v in record.values())
+            return str(record)
+  search_index.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+
+    @dataclass
+    class SearchResult:
+        person_id: str
+        name: str
+        score: float
+
+    class PersonSearchIndex:
+        def __init__(self):
+            self._index: Dict[str, Dict[str, Any]] = {}
+
+        def index_person(self, person_id: str, name: str, email: str) -> None:
+            self._index[person_id] = {"name": name.lower(), "email": email.lower()}
+
+        def search(self, query: str, limit: int = 10) -> List[SearchResult]:
+            results = []
+            query_lower = query.lower()
+            for pid, data in self._index.items():
+                if query_lower in data["name"]:
+                    results.append(SearchResult(person_id=pid, name=data["name"], score=1.0))
+            return results[:limit]
+
+        def remove(self, person_id: str) -> bool:
+            return self._index.pop(person_id, None) is not None
 changed:
   models/person.py: |
     from typing import Optional, List
@@ -273,22 +370,16 @@ changed:
             cache_key = f"person_{id(person)}"
             if self.config.cache_enabled and cache_key in self._cache:
                 return self._cache[cache_key]
-
             name = person.full_name
             html = f"<div class='person-card'><h1>{name}</h1>"
-
             if person.age is not None:
                 html += f"<p class='age'>Age: {person.age}</p>"
-
             if person.is_adult:
                 html += "<span class='badge adult'>Adult</span>"
-
             html += f"<p class='info'>{person.display_info}</p>"
             html += "</div>"
-
             if self.config.cache_enabled:
                 self._cache[cache_key] = html
-
             return html
 
         def render_list(self, people: List[Person]) -> str:
@@ -297,60 +388,155 @@ changed:
 
         def clear_cache(self) -> None:
             self._cache.clear()
-  garbage_templates.py: |
-    GARBAGE_MARKER_TEMPLATE_001 = "template garbage"
-    UNRELATED_TEMPLATE_EXT_002 = ".html"
+  test_views.py: |
+    from models.person import Person
+    from views import PersonView, ViewConfig
 
-    class TemplateEngine:
-        GARBAGE_TEMPLATE_CLASS_003 = "template class marker"
+    class TestPersonView:
+        def setup(self):
+            self.view = PersonView(ViewConfig(cache_enabled=False))
 
-        def __init__(self, template_dir: str = "templates"):
-            self.template_dir = template_dir
+        def test_render_shows_full_name(self):
+            person = Person("Alice", "Smith")
+            html = self.view.render(person)
+            assert "Alice Smith" in html
 
-        def render(self, template_name: str, context: dict) -> str:
-            return ""
+        def test_render_shows_age(self):
+            from datetime import date
+            person = Person("Bob", "Jones", date(1990, 1, 1))
+            html = self.view.render(person)
+            assert "Age:" in html
 
-        def compile(self, template_str: str) -> callable:
-            return lambda ctx: template_str
+        def test_render_list(self):
+            people = [Person("A", "B"), Person("C", "D")]
+            html = self.view.render_list(people)
+            assert "<li>" in html
+  person_api.py: |
+    from models.person import Person
+    from typing import Dict, Any
 
-    class TemplateCache:
-        GARBAGE_CACHE_MARKER_004 = "cache marker"
+    class PersonAPI:
+        def serialize(self, person: Person) -> Dict[str, Any]:
+            return {
+                "full_name": person.full_name,
+                "age": person.age,
+                "email": person.email,
+                "is_adult": person.is_adult,
+            }
 
-        def get(self, key: str) -> Optional[str]:
-            return None
-  garbage_localization.py: |
-    GARBAGE_MARKER_LOCALE_005 = "localization garbage"
-    UNRELATED_DEFAULT_LANG_006 = "en"
+        def serialize_list(self, people: list[Person]) -> list[Dict[str, Any]]:
+            return [self.serialize(p) for p in people]
 
-    class Localizer:
-        GARBAGE_LOCALE_CLASS_007 = True
+        def handle_get(self, person: Person) -> Dict[str, Any]:
+            data = self.serialize(person)
+            data["display"] = person.display_info
+            return data
+  formatters.py: |
+    from typing import Dict, Any, List, Optional
 
-        def __init__(self, default_language: str = "en"):
-            self.default_language = default_language
-            self._translations: Dict[str, Dict[str, str]] = {}
+    class PersonFormatter:
+        def __init__(self, date_format: str = "%Y-%m-%d"):
+            self._date_format = date_format
 
-        def translate(self, key: str, language: Optional[str] = None) -> str:
-            return key
+        def format_csv_row(self, name: str, email: str, age: int) -> str:
+            return f"{name},{email},{age}"
 
-        def load_translations(self, language: str, translations: Dict[str, str]) -> None:
-            self._translations[language] = translations
+        def format_csv_header(self) -> str:
+            return "name,email,age"
 
-    def format_locale_key(key: str) -> str:
-        GARBAGE_FORMAT_LOCALE_008 = "format locale marker"
-        return f"locale.{key}"
+        def format_json(self, name: str, email: str) -> Dict[str, str]:
+            return {"name": name, "email": email}
+
+    class ExportFormatter:
+        def __init__(self, output_format: str = "csv"):
+            self._format = output_format
+
+        def format_record(self, record: Dict[str, Any]) -> str:
+            if self._format == "csv":
+                return ",".join(str(v) for v in record.values())
+            return str(record)
+  search_index.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+
+    @dataclass
+    class SearchResult:
+        person_id: str
+        name: str
+        score: float
+
+    class PersonSearchIndex:
+        def __init__(self):
+            self._index: Dict[str, Dict[str, Any]] = {}
+
+        def index_person(self, person_id: str, name: str, email: str) -> None:
+            self._index[person_id] = {"name": name.lower(), "email": email.lower()}
+
+        def search(self, query: str, limit: int = 10) -> List[SearchResult]:
+            results = []
+            query_lower = query.lower()
+            for pid, data in self._index.items():
+                if query_lower in data["name"]:
+                    results.append(SearchResult(person_id=pid, name=data["name"], score=1.0))
+            return results[:limit]
+
+        def remove(self, person_id: str) -> bool:
+            return self._index.pop(person_id, None) is not None
+
 must_include_files:
-- views.py
-must_include_content:
-- from models.person import Person, Address, Gender
-- 'def render(self, person: Person) -> str:'
+  - views.py
+  # Q1+Q2+Q3: render() accesses person.full_name, person.age, person.is_adult,
+  # person.display_info. All are @property definitions in Person class.
+  # Reviewer must see their implementations to verify None handling and
+  # return types.
+  - models/person.py
+
+must_include_content_from:
+  views.py:
+    - "from models.person import Person, Address, Gender"
+    - "def render(self, person: Person) -> str:"
+    - "person.full_name"
+    - "person.age is not None"
+    - "person.is_adult"
+    - "person.display_info"
+  models/person.py:
+    - "def full_name(self) -> str:"
+    - "def age(self) -> Optional[int]:"
+    - "def is_adult(self) -> bool:"
+    - "def display_info(self) -> str:"
+
 must_not_include:
-- GARBAGE_CACHE_MARKER_004
-- GARBAGE_FORMAT_LOCALE_008
-- GARBAGE_LOCALE_CLASS_007
-- GARBAGE_MARKER_LOCALE_005
-- GARBAGE_MARKER_TEMPLATE_001
-- GARBAGE_TEMPLATE_CLASS_003
-- garbage_localization.py
-- garbage_templates.py
+  # --- test_views.py: imports Person + PersonView, calls render() ---
+  # Direct structural edge: imports both changed module and dependency,
+  # constructs Person, calls render(). But test assertions verify behavior
+  # output, not property implementations.
+  - TestPersonView
+  - test_render_shows_full_name
+  - test_render_shows_age
+  - test_render_list
+  # --- person_api.py: imports Person, accesses SAME properties ---
+  # HARDEST TRAP: person.full_name, person.age, person.is_adult,
+  # person.display_info — identical property accesses as the diff.
+  # But how the API serializes doesn't help review the view rendering.
+  - PersonAPI
+  - serialize
+  - handle_get
+  # --- formatters.py: person-domain, "name"/"email"/"age" field names ---
+  - PersonFormatter
+  - ExportFormatter
+  - format_csv_row
+  # --- search_index.py: person-domain with "name" fields ---
+  - PersonSearchIndex
+  - SearchResult
+  - index_person
+
+must_not_include_files:
+  - test_views.py
+  - person_api.py
+  - formatters.py
+  - search_index.py
+
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

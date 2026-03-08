@@ -1,20 +1,94 @@
+# Scenario: Build out ALB with listeners, target groups, and routing rules
+#
+# Reviewer questions:
+#   1. What security group protects the ALB? (security.tf aws_security_group.alb)
+#   2. What subnets host the ALB? (network.tf defines public subnets)
+#
+# The diff replaces placeholder lb.tf with a complete ALB setup including
+# HTTPS listener, target groups, and routing rules. security.tf defines the
+# ALB security group (unchanged) that the ALB references via security_groups.
+#
+# Traps: nlb.tf is a different load balancer type. cdn.tf references the ALB
+# but for CloudFront origin, not load balancing.
+
 initial:
   lb.tf: |
     # Load balancer resources placeholder
   security.tf: |
-    # Security resources placeholder
-  unrelated_project/billing/cost_report_GARBAGE_TF_alb463a.py: |
-    # GARBAGE_TF_alb463a - Billing cost report generator
-    class CostReportGenerator_GARBAGE_TF_alb463a:
-        def generate_monthly_report(self):
-            print("Generating billing report GARBAGE_TF_alb463a")
-            return {"total": 12345.67, "services": ["storage", "compute"]}
-  unrelated_project/analytics/visitor_tracker_GARBAGE_TF_alb463b.js: |
-    // GARBAGE_TF_alb463b - Visitor tracking analytics
-    const trackVisitor_GARBAGE_TF_alb463b = (userId) => {
-      console.log("Tracking visitor GARBAGE_TF_alb463b", userId);
-      return { timestamp: Date.now(), userId };
-    };
+    resource "aws_security_group" "alb" {
+      name        = "${var.environment}-alb-sg"
+      description = "Security group for Application Load Balancer"
+      vpc_id      = var.vpc_id
+
+      lifecycle {
+        create_before_destroy = true
+      }
+    }
+
+    resource "aws_security_group_rule" "alb_https_ingress" {
+      type              = "ingress"
+      from_port         = 443
+      to_port           = 443
+      protocol          = "tcp"
+      cidr_blocks       = ["0.0.0.0/0"]
+      security_group_id = aws_security_group.alb.id
+    }
+  nlb.tf: |
+    resource "aws_lb" "network" {
+      name               = "${var.environment}-nlb"
+      internal           = true
+      load_balancer_type = "network"
+      subnets            = var.private_subnet_ids
+    }
+
+    resource "aws_lb_target_group" "tcp" {
+      name     = "${var.environment}-tcp-tg"
+      port     = 9000
+      protocol = "TCP"
+      vpc_id   = var.vpc_id
+    }
+  cdn.tf: |
+    resource "aws_cloudfront_distribution" "main" {
+      enabled = true
+
+      origin {
+        domain_name = aws_lb.main.dns_name
+        origin_id   = "ALB"
+
+        custom_origin_config {
+          http_port              = 80
+          https_port             = 443
+          origin_protocol_policy = "https-only"
+          origin_ssl_protocols   = ["TLSv1.2"]
+        }
+      }
+
+      default_cache_behavior {
+        target_origin_id       = "ALB"
+        viewer_protocol_policy = "redirect-to-https"
+        allowed_methods        = ["GET", "HEAD"]
+        cached_methods         = ["GET", "HEAD"]
+
+        forwarded_values {
+          query_string = false
+          cookies {
+            forward = "none"
+          }
+        }
+      }
+
+      restrictions {
+        geo_restriction {
+          restriction_type = "none"
+        }
+      }
+
+      viewer_certificate {
+        acm_certificate_arn = var.certificate_arn
+        ssl_support_method  = "sni-only"
+      }
+    }
+
 changed:
   lb.tf: |
     resource "aws_lb" "main" {
@@ -23,38 +97,7 @@ changed:
       load_balancer_type = "application"
       security_groups    = [aws_security_group.alb.id]
       subnets            = var.public_subnet_ids
-
-      enable_deletion_protection = var.environment == "prod"
-      enable_http2               = true
-      idle_timeout               = 60
-      drop_invalid_header_fields = true
-
-      access_logs {
-        bucket  = var.alb_logs_bucket
-        prefix  = "${var.environment}-alb"
-        enabled = true
-      }
-
-      tags = merge(var.common_tags, {
-        Name = "${var.environment}-alb"
-      })
-    }
-
-    resource "aws_lb_listener" "http" {
-      load_balancer_arn = aws_lb.main.arn
-      port              = 80
-      protocol          = "HTTP"
-
-      default_action {
-        type = "redirect"
-        redirect {
-          port        = "443"
-          protocol    = "HTTPS"
-          status_code = "HTTP_301"
-        }
-      }
-
-      tags = var.common_tags
+      enable_http2       = true
     }
 
     resource "aws_lb_listener" "https" {
@@ -72,74 +115,19 @@ changed:
           status_code  = "404"
         }
       }
-
-      tags = var.common_tags
-    }
-
-    resource "aws_lb_listener_certificate" "additional" {
-      count           = length(var.additional_certificate_arns)
-      listener_arn    = aws_lb_listener.https.arn
-      certificate_arn = var.additional_certificate_arns[count.index]
     }
 
     resource "aws_lb_target_group" "app" {
-      name                 = "${var.environment}-app-tg"
-      port                 = var.app_port
-      protocol             = "HTTP"
-      vpc_id               = var.vpc_id
-      target_type          = var.target_type
-      deregistration_delay = 30
+      name     = "${var.environment}-app-tg"
+      port     = var.app_port
+      protocol = "HTTP"
+      vpc_id   = var.vpc_id
 
       health_check {
-        enabled             = true
-        healthy_threshold   = 2
-        unhealthy_threshold = 3
-        timeout             = 5
-        interval            = 30
-        path                = var.health_check_path
-        port                = "traffic-port"
-        protocol            = "HTTP"
-        matcher             = "200-299"
+        path     = var.health_check_path
+        matcher  = "200-299"
+        interval = 30
       }
-
-      stickiness {
-        type            = "lb_cookie"
-        cookie_duration = 86400
-        enabled         = var.enable_stickiness
-      }
-
-      tags = merge(var.common_tags, {
-        Name = "${var.environment}-app-tg"
-      })
-
-      lifecycle {
-        create_before_destroy = true
-      }
-    }
-
-    resource "aws_lb_target_group" "api" {
-      name                 = "${var.environment}-api-tg"
-      port                 = var.api_port
-      protocol             = "HTTP"
-      vpc_id               = var.vpc_id
-      target_type          = var.target_type
-      deregistration_delay = 30
-
-      health_check {
-        enabled             = true
-        healthy_threshold   = 2
-        unhealthy_threshold = 3
-        timeout             = 5
-        interval            = 30
-        path                = "/health"
-        port                = "traffic-port"
-        protocol            = "HTTP"
-        matcher             = "200"
-      }
-
-      tags = merge(var.common_tags, {
-        Name = "${var.environment}-api-tg"
-      })
 
       lifecycle {
         create_before_destroy = true
@@ -160,55 +148,6 @@ changed:
           values = var.app_host_headers
         }
       }
-
-      tags = var.common_tags
-    }
-
-    resource "aws_lb_listener_rule" "api" {
-      listener_arn = aws_lb_listener.https.arn
-      priority     = 200
-
-      action {
-        type             = "forward"
-        target_group_arn = aws_lb_target_group.api.arn
-      }
-
-      condition {
-        path_pattern {
-          values = ["/api/*", "/v1/*", "/v2/*"]
-        }
-      }
-
-      tags = var.common_tags
-    }
-
-    resource "aws_lb_listener_rule" "maintenance" {
-      count        = var.maintenance_mode ? 1 : 0
-      listener_arn = aws_lb_listener.https.arn
-      priority     = 1
-
-      action {
-        type = "fixed-response"
-        fixed_response {
-          content_type = "text/html"
-          message_body = file("${path.module}/maintenance.html")
-          status_code  = "503"
-        }
-      }
-
-      condition {
-        path_pattern {
-          values = ["/*"]
-        }
-      }
-
-      tags = var.common_tags
-    }
-
-    resource "aws_wafv2_web_acl_association" "main" {
-      count        = var.waf_acl_arn != "" ? 1 : 0
-      resource_arn = aws_lb.main.arn
-      web_acl_arn  = var.waf_acl_arn
     }
   security.tf: |
     resource "aws_security_group" "alb" {
@@ -216,23 +155,9 @@ changed:
       description = "Security group for Application Load Balancer"
       vpc_id      = var.vpc_id
 
-      tags = merge(var.common_tags, {
-        Name = "${var.environment}-alb-sg"
-      })
-
       lifecycle {
         create_before_destroy = true
       }
-    }
-
-    resource "aws_security_group_rule" "alb_http_ingress" {
-      type              = "ingress"
-      from_port         = 80
-      to_port           = 80
-      protocol          = "tcp"
-      cidr_blocks       = ["0.0.0.0/0"]
-      security_group_id = aws_security_group.alb.id
-      description       = "HTTP from anywhere"
     }
 
     resource "aws_security_group_rule" "alb_https_ingress" {
@@ -242,40 +167,86 @@ changed:
       protocol          = "tcp"
       cidr_blocks       = ["0.0.0.0/0"]
       security_group_id = aws_security_group.alb.id
-      description       = "HTTPS from anywhere"
+    }
+  nlb.tf: |
+    resource "aws_lb" "network" {
+      name               = "${var.environment}-nlb"
+      internal           = true
+      load_balancer_type = "network"
+      subnets            = var.private_subnet_ids
     }
 
-    resource "aws_security_group_rule" "alb_egress" {
-      type              = "egress"
-      from_port         = 0
-      to_port           = 0
-      protocol          = "-1"
-      cidr_blocks       = ["0.0.0.0/0"]
-      security_group_id = aws_security_group.alb.id
-      description       = "Allow all outbound"
+    resource "aws_lb_target_group" "tcp" {
+      name     = "${var.environment}-tcp-tg"
+      port     = 9000
+      protocol = "TCP"
+      vpc_id   = var.vpc_id
     }
-  unrelated_project/billing/cost_report_GARBAGE_TF_alb463a.py: |
-    # GARBAGE_TF_alb463a - Billing cost report generator
-    class CostReportGenerator_GARBAGE_TF_alb463a:
-        def generate_monthly_report(self):
-            print("Generating billing report GARBAGE_TF_alb463a")
-            return {"total": 12345.67, "services": ["storage", "compute"]}
-  unrelated_project/analytics/visitor_tracker_GARBAGE_TF_alb463b.js: |
-    // GARBAGE_TF_alb463b - Visitor tracking analytics
-    const trackVisitor_GARBAGE_TF_alb463b = (userId) => {
-      console.log("Tracking visitor GARBAGE_TF_alb463b", userId);
-      return { timestamp: Date.now(), userId };
-    };
+  cdn.tf: |
+    resource "aws_cloudfront_distribution" "main" {
+      enabled = true
+
+      origin {
+        domain_name = aws_lb.main.dns_name
+        origin_id   = "ALB"
+
+        custom_origin_config {
+          http_port              = 80
+          https_port             = 443
+          origin_protocol_policy = "https-only"
+          origin_ssl_protocols   = ["TLSv1.2"]
+        }
+      }
+
+      default_cache_behavior {
+        target_origin_id       = "ALB"
+        viewer_protocol_policy = "redirect-to-https"
+        allowed_methods        = ["GET", "HEAD"]
+        cached_methods         = ["GET", "HEAD"]
+
+        forwarded_values {
+          query_string = false
+          cookies {
+            forward = "none"
+          }
+        }
+      }
+
+      restrictions {
+        geo_restriction {
+          restriction_type = "none"
+        }
+      }
+
+      viewer_certificate {
+        acm_certificate_arn = var.certificate_arn
+        ssl_support_method  = "sni-only"
+      }
+    }
+
 must_include_files:
-- lb.tf
+# Unchanged SG file that the ALB references via security_groups
 - security.tf
-must_include_content:
-- resource "aws_lb" "main" {
-- resource "aws_security_group" "alb" {
+
+must_include_content_from:
+  security.tf:
+    # Reviewer needs the SG definition to verify what traffic the ALB allows
+    - resource "aws_security_group" "alb" {
+    - from_port         = 443
+
 must_not_include:
-- GARBAGE_TF_alb463a
-- GARBAGE_TF_alb463b
-- cost_report_GARBAGE_TF_alb463a.py
-- visitor_tracker_GARBAGE_TF_alb463b.js
+# NLB is a different load balancer type entirely
+- load_balancer_type = "network"
+- protocol = "TCP"
+# CDN references ALB but is about caching, not LB configuration
+- aws_cloudfront_distribution
+- origin_protocol_policy
+
+must_not_include_files:
+- nlb.tf  # different LB type (network vs application)
+- cdn.tf  # references ALB but different concern (CDN/caching)
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

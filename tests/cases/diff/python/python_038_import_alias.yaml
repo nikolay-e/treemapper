@@ -1,3 +1,18 @@
+# Scenario: Expanding data_utils.py with DataTransformer.clear(), filter_by_date_range(),
+#   additional statistics keys, and DataPipeline.step_count(). analysis.py imports from it.
+#
+# Reviewer questions:
+#   - Does analysis.py need changes for the new utilities?
+#   - Are the new filter_by_date_range parameters consistent with DataFrame APIs?
+#
+# Trap files:
+#   - etl/data_normalizer.py: uses DataTransformer-like vocabulary (normalize, transform)
+#     but has no import edge to data_utils.py
+#   - reports/chart_builder.py: works with data and statistics (mean, std) but is
+#     completely independent
+#   - pipelines/batch_processor.py: pipeline/step vocabulary overlaps with DataPipeline
+#     but has no dependency
+
 initial:
   data_utils.py: |
     from typing import List, Dict, Any, Optional, Tuple
@@ -66,36 +81,43 @@ initial:
 
     def analyze():
         pass
-  unrelated/ml_pipeline.py: |
-    GARBAGE_PYTHON_038_001 = "ml pipeline marker"
-    GARBAGE_PYTHON_038_002 = "ml model constant"
+  etl/data_normalizer.py: |
+    from typing import Any
 
-    class ModelTrainer:
-        GARBAGE_PYTHON_038_003 = "trainer class marker"
+    class DataNormalizer:
+        def __init__(self, strategy: str = "min_max"):
+            self.strategy = strategy
 
-        def __init__(self, model_type: str):
-            self.model_type = model_type
+        def normalize(self, values: list[float]) -> list[float]:
+            if not values:
+                return []
+            min_val = min(values)
+            max_val = max(values)
+            if max_val == min_val:
+                return [0.5] * len(values)
+            return [(v - min_val) / (max_val - min_val) for v in values]
 
-        def train(self, X: Any, y: Any) -> None:
-            pass
-  unrelated/report_builder.py: |
-    GARBAGE_PYTHON_038_004 = "report builder marker"
-    GARBAGE_PYTHON_038_005 = "report format constant"
+        def transform_columns(self, data: dict[str, list]) -> dict[str, list]:
+            return {col: self.normalize(vals) for col, vals in data.items()}
+  reports/chart_builder.py: |
+    from typing import Any
 
-    class ReportSection:
-        GARBAGE_PYTHON_038_006 = "section class marker"
+    class ChartBuilder:
+        def __init__(self, chart_type: str = "line"):
+            self.chart_type = chart_type
+            self._data_series: list[dict] = []
 
-        def __init__(self, title: str):
-            self.title = title
-  unrelated/data_export.py: |
-    GARBAGE_PYTHON_038_007 = "data export marker"
-    GARBAGE_PYTHON_038_008 = "export format constant"
+        def add_series(self, name: str, values: list[float]) -> None:
+            self._data_series.append({"name": name, "values": values})
 
-    class DataExporter:
-        GARBAGE_PYTHON_038_009 = "exporter class marker"
+        def compute_summary(self) -> dict[str, float]:
+            all_values = [v for s in self._data_series for v in s["values"]]
+            if not all_values:
+                return {"mean": 0, "std": 0, "count": 0}
+            mean = sum(all_values) / len(all_values)
+            variance = sum((v - mean) ** 2 for v in all_values) / len(all_values)
+            return {"mean": mean, "std": variance ** 0.5, "count": len(all_values)}
 
-        def __init__(self, format: str = "csv"):
-            self.format = format
 changed:
   data_utils.py: |
     from typing import List, Dict, Any, Optional, Tuple
@@ -182,53 +204,58 @@ changed:
 
     def analyze():
         pass
-  unrelated/ml_pipeline.py: |
-    GARBAGE_PYTHON_038_001 = "ml pipeline marker"
-    GARBAGE_PYTHON_038_002 = "ml model constant"
+  etl/data_normalizer.py: |
+    from typing import Any
 
-    class ModelTrainer:
-        GARBAGE_PYTHON_038_003 = "trainer class marker"
+    class DataNormalizer:
+        def __init__(self, strategy: str = "min_max"):
+            self.strategy = strategy
 
-        def __init__(self, model_type: str):
-            self.model_type = model_type
+        def normalize(self, values: list[float]) -> list[float]:
+            if not values:
+                return []
+            min_val = min(values)
+            max_val = max(values)
+            if max_val == min_val:
+                return [0.5] * len(values)
+            return [(v - min_val) / (max_val - min_val) for v in values]
 
-        def train(self, X: Any, y: Any) -> None:
-            pass
-  unrelated/report_builder.py: |
-    GARBAGE_PYTHON_038_004 = "report builder marker"
-    GARBAGE_PYTHON_038_005 = "report format constant"
+        def transform_columns(self, data: dict[str, list]) -> dict[str, list]:
+            return {col: self.normalize(vals) for col, vals in data.items()}
+  reports/chart_builder.py: |
+    from typing import Any
 
-    class ReportSection:
-        GARBAGE_PYTHON_038_006 = "section class marker"
+    class ChartBuilder:
+        def __init__(self, chart_type: str = "line"):
+            self.chart_type = chart_type
+            self._data_series: list[dict] = []
 
-        def __init__(self, title: str):
-            self.title = title
-  unrelated/data_export.py: |
-    GARBAGE_PYTHON_038_007 = "data export marker"
-    GARBAGE_PYTHON_038_008 = "export format constant"
+        def add_series(self, name: str, values: list[float]) -> None:
+            self._data_series.append({"name": name, "values": values})
 
-    class DataExporter:
-        GARBAGE_PYTHON_038_009 = "exporter class marker"
+        def compute_summary(self) -> dict[str, float]:
+            all_values = [v for s in self._data_series for v in s["values"]]
+            if not all_values:
+                return {"mean": 0, "std": 0, "count": 0}
+            mean = sum(all_values) / len(all_values)
+            variance = sum((v - mean) ** 2 for v in all_values) / len(all_values)
+            return {"mean": mean, "std": variance ** 0.5, "count": len(all_values)}
 
-        def __init__(self, format: str = "csv"):
-            self.format = format
 must_include_files:
 - data_utils.py
 must_include_content:
 - 'def clear(self) -> None:'
 - def filter_by_date_range(
 must_not_include:
-- GARBAGE_PYTHON_038_001
-- GARBAGE_PYTHON_038_002
-- GARBAGE_PYTHON_038_003
-- GARBAGE_PYTHON_038_004
-- GARBAGE_PYTHON_038_005
-- GARBAGE_PYTHON_038_006
-- GARBAGE_PYTHON_038_007
-- GARBAGE_PYTHON_038_008
-- GARBAGE_PYTHON_038_009
-- data_export.py
-- ml_pipeline.py
-- report_builder.py
+- DataNormalizer
+- ChartBuilder
+- transform_columns
+- compute_summary
+- add_series
+must_not_include_files:
+- etl/data_normalizer.py
+- reports/chart_builder.py
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

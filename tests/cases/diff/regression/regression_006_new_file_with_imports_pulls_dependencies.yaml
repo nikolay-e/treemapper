@@ -1,3 +1,24 @@
+# Test: New ReportGenerator file imports from loader, transform, and settings
+#
+# Scenario: src/reporting/generator.py is a NEW file that imports load_dataset
+# and validate_schema from loader, normalize_values and apply_filters from
+# transform, and REPORT_FORMAT/MAX_ROWS from settings. All three dependencies
+# are UNCHANGED. The diff should pull the new file plus its imports.
+#
+# Reviewer questions:
+#   Q1: "What does load_dataset return? What format is the data?"
+#       -> src/data/loader.py (UNCHANGED) returns list[dict[str, Any]] from CSV.
+#   Q2: "What does normalize_values do to the data?"
+#       -> src/data/transform.py (UNCHANGED) normalizes a column to [0,1] range.
+#   Q3: "What are the default settings?"
+#       -> src/config/settings.py (UNCHANGED) has REPORT_FORMAT="pdf", MAX_ROWS=10000.
+#
+# Trap files (plausible but unrelated):
+#   - src/auth/middleware.py: authentication middleware — same src/ tree but
+#     ReportGenerator doesn't import or reference auth.
+#   - src/cache/redis_client.py: caching layer — same src/ tree, generator
+#     might use caching eventually but doesn't import it now.
+
 initial:
   src/data/loader.py: |
     from pathlib import Path
@@ -102,68 +123,53 @@ initial:
   src/auth/middleware.py: |
     from typing import Any
 
-    GARBAGE_REG006_AUTH_SESSION_TIMEOUT = 3600
-    GARBAGE_REG006_AUTH_MAX_RETRIES = 5
-
 
     class AuthMiddleware:
         def __init__(self, secret_key: str):
             self.secret_key = secret_key
-            self.GARBAGE_REG006_AUTH_CACHE_ENABLED = True
 
         def authenticate_request(self, request: dict[str, Any]) -> bool:
             token = request.get("authorization", "")
             if not token.startswith("Bearer "):
                 return False
-            GARBAGE_REG006_AUTH_TOKEN_PREFIX = "Bearer "
             payload = token[len("Bearer "):]
             return self._verify_token(payload)
 
         def _verify_token(self, token: str) -> bool:
-            GARBAGE_REG006_AUTH_VERIFY_FLAG = True
             if len(token) < 16:
                 return False
             return token.startswith(self.secret_key[:8])
 
         def refresh_session(self, session_id: str) -> dict[str, Any]:
-            GARBAGE_REG006_AUTH_REFRESH_MARKER = session_id
             return {
                 "session_id": session_id,
                 "renewed": True,
-                "timeout": GARBAGE_REG006_AUTH_SESSION_TIMEOUT,
+                "timeout": 3600,
             }
   src/cache/redis_client.py: |
     from typing import Any
-
-    GARBAGE_REG006_CACHE_DEFAULT_TTL = 300
-    GARBAGE_REG006_CACHE_MAX_CONNECTIONS = 10
 
 
     class RedisClient:
         def __init__(self, host: str = "localhost", port: int = 6379):
             self.host = host
             self.port = port
-            self.GARBAGE_REG006_CACHE_CONNECTED = False
+            self.connected = False
 
         def connect(self) -> None:
-            GARBAGE_REG006_CACHE_CONNECT_MARKER = True
-            self.GARBAGE_REG006_CACHE_CONNECTED = True
+            self.connected = True
 
         def get(self, key: str) -> Any:
-            GARBAGE_REG006_CACHE_GET_MARKER = key
             return None
 
         def set(self, key: str, value: Any, ttl: int = 300) -> bool:
-            GARBAGE_REG006_CACHE_SET_MARKER = f"{key}:{value}"
             return True
 
         def delete(self, key: str) -> bool:
-            GARBAGE_REG006_CACHE_DELETE_MARKER = key
             return True
 
         def flush_all(self) -> None:
-            GARBAGE_REG006_CACHE_FLUSH_MARKER = "flushed"
-            self.GARBAGE_REG006_CACHE_CONNECTED = False
+            self.connected = False
 changed:
   src/data/loader.py: |
     from pathlib import Path
@@ -323,89 +329,73 @@ changed:
   src/auth/middleware.py: |
     from typing import Any
 
-    GARBAGE_REG006_AUTH_SESSION_TIMEOUT = 3600
-    GARBAGE_REG006_AUTH_MAX_RETRIES = 5
-
 
     class AuthMiddleware:
         def __init__(self, secret_key: str):
             self.secret_key = secret_key
-            self.GARBAGE_REG006_AUTH_CACHE_ENABLED = True
 
         def authenticate_request(self, request: dict[str, Any]) -> bool:
             token = request.get("authorization", "")
             if not token.startswith("Bearer "):
                 return False
-            GARBAGE_REG006_AUTH_TOKEN_PREFIX = "Bearer "
             payload = token[len("Bearer "):]
             return self._verify_token(payload)
 
         def _verify_token(self, token: str) -> bool:
-            GARBAGE_REG006_AUTH_VERIFY_FLAG = True
             if len(token) < 16:
                 return False
             return token.startswith(self.secret_key[:8])
 
         def refresh_session(self, session_id: str) -> dict[str, Any]:
-            GARBAGE_REG006_AUTH_REFRESH_MARKER = session_id
             return {
                 "session_id": session_id,
                 "renewed": True,
-                "timeout": GARBAGE_REG006_AUTH_SESSION_TIMEOUT,
+                "timeout": 3600,
             }
   src/cache/redis_client.py: |
     from typing import Any
-
-    GARBAGE_REG006_CACHE_DEFAULT_TTL = 300
-    GARBAGE_REG006_CACHE_MAX_CONNECTIONS = 10
 
 
     class RedisClient:
         def __init__(self, host: str = "localhost", port: int = 6379):
             self.host = host
             self.port = port
-            self.GARBAGE_REG006_CACHE_CONNECTED = False
+            self.connected = False
 
         def connect(self) -> None:
-            GARBAGE_REG006_CACHE_CONNECT_MARKER = True
-            self.GARBAGE_REG006_CACHE_CONNECTED = True
+            self.connected = True
 
         def get(self, key: str) -> Any:
-            GARBAGE_REG006_CACHE_GET_MARKER = key
             return None
 
         def set(self, key: str, value: Any, ttl: int = 300) -> bool:
-            GARBAGE_REG006_CACHE_SET_MARKER = f"{key}:{value}"
             return True
 
         def delete(self, key: str) -> bool:
-            GARBAGE_REG006_CACHE_DELETE_MARKER = key
             return True
 
         def flush_all(self) -> None:
-            GARBAGE_REG006_CACHE_FLUSH_MARKER = "flushed"
-            self.GARBAGE_REG006_CACHE_CONNECTED = False
+            self.connected = False
 must_include_files:
-- src/reporting/generator.py
+  - src/reporting/generator.py
 must_include_content:
-- class ReportGenerator
-- def generate_summary
-- load_dataset
-- normalize_values
+  - class ReportGenerator
+  - def generate_summary
+  - load_dataset
+  - normalize_values
 must_not_include:
-- GARBAGE_REG006_AUTH_SESSION_TIMEOUT
-- GARBAGE_REG006_AUTH_MAX_RETRIES
-- GARBAGE_REG006_AUTH_CACHE_ENABLED
-- GARBAGE_REG006_AUTH_TOKEN_PREFIX
-- GARBAGE_REG006_AUTH_VERIFY_FLAG
-- GARBAGE_REG006_AUTH_REFRESH_MARKER
-- GARBAGE_REG006_CACHE_DEFAULT_TTL
-- GARBAGE_REG006_CACHE_MAX_CONNECTIONS
-- GARBAGE_REG006_CACHE_CONNECTED
-- GARBAGE_REG006_CACHE_CONNECT_MARKER
-- GARBAGE_REG006_CACHE_GET_MARKER
-- GARBAGE_REG006_CACHE_SET_MARKER
-- GARBAGE_REG006_CACHE_DELETE_MARKER
-- GARBAGE_REG006_CACHE_FLUSH_MARKER
+  # src/auth/middleware.py: auth — no dependency from generator
+  - AuthMiddleware
+  - authenticate_request
+  - _verify_token
+  - refresh_session
+  # src/cache/redis_client.py: caching — no dependency from generator
+  - RedisClient
+  - flush_all
+must_not_include_files:
+  - src/auth/middleware.py
+  - src/cache/redis_client.py
+max_fragments: 8
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

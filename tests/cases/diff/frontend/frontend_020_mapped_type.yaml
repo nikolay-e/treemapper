@@ -1,3 +1,16 @@
+# Scenario: TypeScript file adds mapped types transforming model interfaces.
+#
+# Diff: mapped.ts creates ReadonlyDeep, Mutable, Optional, Nullable mapped types
+# and applies them to UserModel and ProductModel from models.ts.
+#
+# Reviewer questions:
+#   Q1: "What fields do UserModel and ProductModel have?" → models.ts (UNCHANGED).
+#   Q2: "What does ReadonlyUser look like?" → mapped.ts applies ReadonlyDeep<UserModel>.
+#
+# Not needed:
+#   - src/types/form.ts: type transformations but for form state (touched, dirty).
+#   - src/models/order.ts: another model but not referenced by any mapped type.
+
 initial:
   src/models.ts: |
     export interface UserModel {
@@ -15,56 +28,46 @@ initial:
     }
   src/mapped.ts: |
     console.log('initial');
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_020_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/types/form.ts: |
+    export type TouchedFields<T> = {
+        [K in keyof T]?: boolean;
+    };
+
+    export type DirtyFields<T> = {
+        [K in keyof T]?: boolean;
+    };
+
+    export type FormErrors<T> = {
+        [K in keyof T]?: string;
+    };
+
+    export interface FormState<T> {
+        values: T;
+        touched: TouchedFields<T>;
+        dirty: DirtyFields<T>;
+        errors: FormErrors<T>;
+        isSubmitting: boolean;
+    }
+  src/models/order.ts: |
+    export interface OrderItem {
+        productId: string;
+        quantity: number;
+        unitPrice: number;
     }
 
-    // GARBAGE_FE_020_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export interface Order {
+        id: string;
+        customerId: string;
+        items: OrderItem[];
+        total: number;
+        status: 'pending' | 'confirmed' | 'shipped' | 'delivered';
+        createdAt: Date;
     }
 
-    // GARBAGE_FE_020_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_020_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export function calculateTotal(items: OrderItem[]): number {
+        return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     }
 
-    // GARBAGE_FE_020_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 changed:
   src/models.ts: |
     export interface UserModel {
@@ -102,68 +105,68 @@ changed:
     export type ReadonlyUser = ReadonlyDeep<UserModel>;
     export type OptionalProduct = Optional<ProductModel>;
     export type NullableUser = Nullable<UserModel>;
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_020_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/types/form.ts: |
+    export type TouchedFields<T> = {
+        [K in keyof T]?: boolean;
+    };
+
+    export type DirtyFields<T> = {
+        [K in keyof T]?: boolean;
+    };
+
+    export type FormErrors<T> = {
+        [K in keyof T]?: string;
+    };
+
+    export interface FormState<T> {
+        values: T;
+        touched: TouchedFields<T>;
+        dirty: DirtyFields<T>;
+        errors: FormErrors<T>;
+        isSubmitting: boolean;
+    }
+  src/models/order.ts: |
+    export interface OrderItem {
+        productId: string;
+        quantity: number;
+        unitPrice: number;
     }
 
-    // GARBAGE_FE_020_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export interface Order {
+        id: string;
+        customerId: string;
+        items: OrderItem[];
+        total: number;
+        status: 'pending' | 'confirmed' | 'shipped' | 'delivered';
+        createdAt: Date;
     }
 
-    // GARBAGE_FE_020_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_020_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export function calculateTotal(items: OrderItem[]): number {
+        return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     }
 
-    // GARBAGE_FE_020_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 must_include_files:
-- src/mapped.ts
-must_include_content:
-- type Optional<T> = {
-- type ReadonlyUser = ReadonlyDeep<UserModel>;
+  - src/mapped.ts
+
+must_include_content_from:
+  src/mapped.ts:
+    - "type Optional<T> = {"
+    - "type ReadonlyUser = ReadonlyDeep<UserModel>"
+
 must_not_include:
-- GARBAGE_FE_020_COLOR_A
-- GARBAGE_FE_020_COLOR_B
-- GARBAGE_FE_020_CONTRAST_C
-- GARBAGE_FE_020_DEBOUNCE_D
-- GARBAGE_FE_020_THROTTLE_E
-- color_utils.ts
-- debounce_utils.ts
+  # form.ts: mapped types but for form state management, different concern
+  - TouchedFields
+  - DirtyFields
+  - FormState
+  # order.ts: model but not referenced by any mapped type in the diff
+  - OrderItem
+  - calculateTotal
+
+must_not_include_files:
+  - src/types/form.ts
+  - src/models/order.ts
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

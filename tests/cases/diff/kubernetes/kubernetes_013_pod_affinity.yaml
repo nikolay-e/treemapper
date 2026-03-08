@@ -1,3 +1,8 @@
+# Scenario: Web-app deployment adds podAffinity to co-locate with cache and podAntiAffinity to spread across zones
+# Changed: k8s/apps/web/deployment.yaml adds affinity block with required podAffinity and preferred podAntiAffinity
+# Reviewer questions: Is requiredDuringScheduling too strict — will pods fail if no cache is co-located? Is zone topology correct?
+# Trap 1: k8s/apps/cache/service.yaml — cache service definition, shares "cache" label but no dep on web affinity
+# Trap 2: k8s/infra/node-labels.yaml — node labeling job, shares topology vocabulary but no dep
 initial:
   k8s/apps/web/deployment.yaml: |
     apiVersion: apps/v1
@@ -59,30 +64,36 @@ initial:
             image: redis:7-alpine
             ports:
             - containerPort: 6379
-  k8s/unrelated/velero/backup.yaml: |
-    # GARBAGE_K8S_413_VELERO_BACKUP
-    apiVersion: velero.io/v1
-    kind: Backup
+  k8s/apps/cache/service.yaml: |
+    apiVersion: v1
+    kind: Service
     metadata:
-      name: GARBAGE_K8S_413_BACKUP_NAME
+      name: cache
+      namespace: production
     spec:
-      includedNamespaces:
-      - GARBAGE_K8S_413_NAMESPACE
-      storageLocation: GARBAGE_K8S_413_STORAGE_LOC
-      ttl: GARBAGE_K8S_413_TTL
-  k8s/unrelated/kubevirt/vm.yaml: |
-    # GARBAGE_K8S_413_KUBEVIRT_VM
-    apiVersion: kubevirt.io/v1
-    kind: VirtualMachine
+      selector:
+        app: cache
+      ports:
+      - port: 6379
+        targetPort: 6379
+  k8s/infra/node-labels.yaml: |
+    apiVersion: batch/v1
+    kind: Job
     metadata:
-      name: GARBAGE_K8S_413_VM_NAME
+      name: label-gpu-nodes
+      namespace: kube-system
     spec:
-      running: GARBAGE_K8S_413_RUNNING
       template:
         spec:
-          domain:
-            cpu:
-              cores: GARBAGE_K8S_413_CPU_CORES
+          serviceAccountName: node-labeler
+          containers:
+          - name: labeler
+            image: bitnami/kubectl:1.28
+            command:
+            - /bin/sh
+            - -c
+            - kubectl label nodes --selector=node.kubernetes.io/instance-type=p3.2xlarge accelerator=nvidia-v100 --overwrite
+          restartPolicy: Never
 changed:
   k8s/apps/web/deployment.yaml: |
     apiVersion: apps/v1
@@ -159,45 +170,50 @@ changed:
             image: redis:7-alpine
             ports:
             - containerPort: 6379
-  k8s/unrelated/velero/backup.yaml: |
-    # GARBAGE_K8S_413_VELERO_BACKUP
-    apiVersion: velero.io/v1
-    kind: Backup
+  k8s/apps/cache/service.yaml: |
+    apiVersion: v1
+    kind: Service
     metadata:
-      name: GARBAGE_K8S_413_BACKUP_NAME
+      name: cache
+      namespace: production
     spec:
-      includedNamespaces:
-      - GARBAGE_K8S_413_NAMESPACE
-      storageLocation: GARBAGE_K8S_413_STORAGE_LOC
-      ttl: GARBAGE_K8S_413_TTL
-  k8s/unrelated/kubevirt/vm.yaml: |
-    # GARBAGE_K8S_413_KUBEVIRT_VM
-    apiVersion: kubevirt.io/v1
-    kind: VirtualMachine
+      selector:
+        app: cache
+      ports:
+      - port: 6379
+        targetPort: 6379
+  k8s/infra/node-labels.yaml: |
+    apiVersion: batch/v1
+    kind: Job
     metadata:
-      name: GARBAGE_K8S_413_VM_NAME
+      name: label-gpu-nodes
+      namespace: kube-system
     spec:
-      running: GARBAGE_K8S_413_RUNNING
       template:
         spec:
-          domain:
-            cpu:
-              cores: GARBAGE_K8S_413_CPU_CORES
+          serviceAccountName: node-labeler
+          containers:
+          - name: labeler
+            image: bitnami/kubectl:1.28
+            command:
+            - /bin/sh
+            - -c
+            - kubectl label nodes --selector=node.kubernetes.io/instance-type=p3.2xlarge accelerator=nvidia-v100 --overwrite
+          restartPolicy: Never
 must_include_files:
 - k8s/apps/web/deployment.yaml
-must_include_content:
-- 'requiredDuringSchedulingIgnoredDuringExecution:'
+must_include_content_from:
+  k8s/apps/web/deployment.yaml:
+  - 'requiredDuringSchedulingIgnoredDuringExecution:'
+  - 'topologyKey: kubernetes.io/hostname'
 must_not_include:
-- GARBAGE_K8S_413_BACKUP_NAME
-- GARBAGE_K8S_413_CPU_CORES
-- GARBAGE_K8S_413_KUBEVIRT_VM
-- GARBAGE_K8S_413_NAMESPACE
-- GARBAGE_K8S_413_RUNNING
-- GARBAGE_K8S_413_STORAGE_LOC
-- GARBAGE_K8S_413_TTL
-- GARBAGE_K8S_413_VELERO_BACKUP
-- GARBAGE_K8S_413_VM_NAME
-- backup.yaml
-- vm.yaml
+- label-gpu-nodes
+- node-labeler
+- nvidia-v100
+must_not_include_files:
+- k8s/apps/cache/service.yaml
+- k8s/infra/node-labels.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

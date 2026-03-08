@@ -1,3 +1,36 @@
+# Scenario: Deployment adds postStart and preStop lifecycle hooks with
+#   increased terminationGracePeriodSeconds. Only k8s/apps/deployment.yaml
+#   is changed.
+#
+# Diff shows:
+#   - terminationGracePeriodSeconds: 30  ->  + 60
+#   + postStart exec: curl -X POST http://localhost:8080/admin/register
+#   + preStop httpGet: path /admin/drain, port 8080
+#
+# Reviewer questions:
+#   Q1: "Does /admin/register and /admin/drain exist in the application?"
+#       -> Needs scripts/graceful-shutdown.sh: references /admin/drain
+#          endpoint (curl -X POST http://localhost:8080/admin/drain).
+#          Confirms the drain endpoint exists. But /admin/register is not
+#          referenced anywhere else — potential review finding.
+#
+#   Q2: "Will preStop httpGet complete within the 60s grace period?"
+#       -> Pure config review: preStop httpGet to /admin/drain fires on
+#          SIGTERM. The pod has 60s total before SIGKILL. The drain must
+#          complete within that window.
+#
+# Not needed for comprehension:
+#   - k8s/apps/health-check-config.yaml: ConfigMap with health check
+#     endpoint paths (/health/live, /health/ready, /health/startup).
+#     Shares /admin-adjacent path vocabulary and same "health endpoint"
+#     concern. But health checks are different from lifecycle hooks —
+#     the ConfigMap configures readiness/liveness probes, not postStart/preStop.
+#
+#   - k8s/infra/pod-lifecycle-events.yaml: Deployment of a lifecycle event
+#     logger watching production namespace. Shares "lifecycle" vocabulary
+#     directly. HARDEST TRAP: same word "lifecycle" in the resource name.
+#     But this is an observability tool that watches pod events, not a
+#     dependency of the lifecycle hooks being configured.
 initial:
   scripts/graceful-shutdown.sh: |
     #!/bin/bash
@@ -57,36 +90,46 @@ initial:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/prometheus-adapter/deployment.yaml: |
-    # GARBAGE_K8S_419_PROM_ADAPTER
+  k8s/apps/health-check-config.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: health-check-config
+      namespace: production
+    data:
+      config.json: |
+        {
+          "endpoints": {
+            "liveness": "/health/live",
+            "readiness": "/health/ready",
+            "startup": "/health/startup"
+          },
+          "timeouts": {
+            "liveness": 5,
+            "readiness": 3
+          }
+        }
+  k8s/infra/pod-lifecycle-events.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: GARBAGE_K8S_419_ADAPTER_NAME
+      name: lifecycle-event-logger
+      namespace: kube-system
     spec:
       replicas: 1
       selector:
         matchLabels:
-          app: GARBAGE_K8S_419_ADAPTER_LABEL
+          app: lifecycle-logger
       template:
         spec:
           containers:
-          - name: adapter
-            image: registry.k8s.io/prometheus-adapter/prometheus-adapter:GARBAGE_K8S_419_ADAPTER_VERSION
-  k8s/unrelated/metrics-server/deployment.yaml: |
-    # GARBAGE_K8S_419_METRICS_SERVER
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: GARBAGE_K8S_419_METRICS_NAME
-    spec:
-      template:
-        spec:
-          containers:
-          - name: metrics-server
-            image: registry.k8s.io/metrics-server/metrics-server:GARBAGE_K8S_419_METRICS_VERSION
-            args:
-            - --kubelet-preferred-address-types=GARBAGE_K8S_419_ADDRESS_TYPES
+          - name: logger
+            image: event-logger:v1.0
+            env:
+            - name: WATCH_NAMESPACE
+              value: "production"
+            - name: EVENT_TYPES
+              value: "Normal,Warning"
 changed:
   scripts/graceful-shutdown.sh: |
     #!/bin/bash
@@ -160,45 +203,69 @@ changed:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/prometheus-adapter/deployment.yaml: |
-    # GARBAGE_K8S_419_PROM_ADAPTER
+  k8s/apps/health-check-config.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: health-check-config
+      namespace: production
+    data:
+      config.json: |
+        {
+          "endpoints": {
+            "liveness": "/health/live",
+            "readiness": "/health/ready",
+            "startup": "/health/startup"
+          },
+          "timeouts": {
+            "liveness": 5,
+            "readiness": 3
+          }
+        }
+  k8s/infra/pod-lifecycle-events.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: GARBAGE_K8S_419_ADAPTER_NAME
+      name: lifecycle-event-logger
+      namespace: kube-system
     spec:
       replicas: 1
       selector:
         matchLabels:
-          app: GARBAGE_K8S_419_ADAPTER_LABEL
+          app: lifecycle-logger
       template:
         spec:
           containers:
-          - name: adapter
-            image: registry.k8s.io/prometheus-adapter/prometheus-adapter:GARBAGE_K8S_419_ADAPTER_VERSION
-  k8s/unrelated/metrics-server/deployment.yaml: |
-    # GARBAGE_K8S_419_METRICS_SERVER
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: GARBAGE_K8S_419_METRICS_NAME
-    spec:
-      template:
-        spec:
-          containers:
-          - name: metrics-server
-            image: registry.k8s.io/metrics-server/metrics-server:GARBAGE_K8S_419_METRICS_VERSION
-            args:
-            - --kubelet-preferred-address-types=GARBAGE_K8S_419_ADDRESS_TYPES
+          - name: logger
+            image: event-logger:v1.0
+            env:
+            - name: WATCH_NAMESPACE
+              value: "production"
+            - name: EVENT_TYPES
+              value: "Normal,Warning"
 must_include_files:
 - k8s/apps/deployment.yaml
-must_include_content:
-- 'terminationGracePeriodSeconds: 60'
+must_include_content_from:
+  k8s/apps/deployment.yaml:
+    - 'terminationGracePeriodSeconds: 60'
+    - 'path: /admin/drain'
+    - '/admin/register'
+    - 'postStart:'
+    - 'preStop:'
 must_not_include:
-- GARBAGE_K8S_419_ADAPTER_LABEL
-- GARBAGE_K8S_419_ADAPTER_NAME
-- GARBAGE_K8S_419_METRICS_NAME
-- GARBAGE_K8S_419_METRICS_SERVER
-- GARBAGE_K8S_419_PROM_ADAPTER
+  # --- health-check-config.yaml: shares /admin path vocabulary ---
+  - health-check-config
+  - "/health/live"
+  - "/health/ready"
+  # --- pod-lifecycle-events.yaml: shares "lifecycle" vocabulary ---
+  - lifecycle-event-logger
+  - lifecycle-logger
+  - WATCH_NAMESPACE
+  - EVENT_TYPES
+must_not_include_files:
+  - k8s/apps/health-check-config.yaml
+  - k8s/infra/pod-lifecycle-events.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

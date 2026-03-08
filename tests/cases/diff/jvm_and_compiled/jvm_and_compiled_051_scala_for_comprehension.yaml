@@ -1,3 +1,20 @@
+# Scenario: OrderService uses Scala for-comprehensions to compose
+# Option-returning Repository calls for getUserOrders and getTotalForUser.
+#
+# Diff: OrderService.scala goes from empty class to methods using
+# for/yield over repo.getUser() and repo.getOrders().
+#
+# Reviewer questions:
+#   Q1: "What do the repository methods return?"
+#       -> Repository.scala (UNCHANGED) defines getUser -> Option[User]
+#          and getOrders -> Option[List[Order]], plus case classes.
+#
+# Not needed:
+#   - OrderValidator.scala: validates order fields before saving.
+#     Order-adjacent but no dependency from OrderService for-comprehensions.
+#   - OrderFormatter.scala: formats orders for display.
+#     Same domain vocabulary but not referenced by OrderService.
+
 initial:
   Repository.scala: |
     case class User(id: String, name: String)
@@ -10,18 +27,31 @@ initial:
   OrderService.scala: |
     // Initial
     class OrderService {}
-  GarbageMonadOps.scala: |
-    object GarbageMonadOps {
-      val GARBAGE_JVM_051_MONAD_MARKER_A = "marker"
-      val GARBAGE_JVM_051_FLATMAP_MARKER_B = "marker"
-      def noop(): Unit = {}
+  OrderValidator.scala: |
+    object OrderValidator {
+      def validateOrder(userId: String, total: Double): Either[String, Unit] = {
+        if (userId.isEmpty) Left("User ID is required")
+        else if (total <= 0) Left("Total must be positive")
+        else Right(())
+      }
+
+      def validateItems(items: List[String]): Either[String, Unit] = {
+        if (items.isEmpty) Left("At least one item is required")
+        else Right(())
+      }
     }
-  GarbageBindHelper.scala: |
-    object GarbageBindHelper {
-      val GARBAGE_JVM_051_BIND_MARKER_C = "marker"
-      val GARBAGE_JVM_051_CHAIN_MARKER_D = "marker"
-      def noop(): Unit = {}
+  OrderFormatter.scala: |
+    object OrderFormatter {
+      def formatOrder(order: Order): String = {
+        s"Order ${order.id}: $$${order.total} for user ${order.userId}"
+      }
+
+      def formatSummary(orders: List[Order]): String = {
+        val total = orders.map(_.total).sum
+        s"${orders.size} orders, total: $$$total"
+      }
     }
+
 changed:
   Repository.scala: |
     case class User(id: String, name: String)
@@ -48,28 +78,49 @@ changed:
         } yield total
       }
     }
-  GarbageMonadOps.scala: |
-    object GarbageMonadOps {
-      val GARBAGE_JVM_051_MONAD_MARKER_A = "marker"
-      val GARBAGE_JVM_051_FLATMAP_MARKER_B = "marker"
-      def noop(): Unit = {}
+  OrderValidator.scala: |
+    object OrderValidator {
+      def validateOrder(userId: String, total: Double): Either[String, Unit] = {
+        if (userId.isEmpty) Left("User ID is required")
+        else if (total <= 0) Left("Total must be positive")
+        else Right(())
+      }
+
+      def validateItems(items: List[String]): Either[String, Unit] = {
+        if (items.isEmpty) Left("At least one item is required")
+        else Right(())
+      }
     }
-  GarbageBindHelper.scala: |
-    object GarbageBindHelper {
-      val GARBAGE_JVM_051_BIND_MARKER_C = "marker"
-      val GARBAGE_JVM_051_CHAIN_MARKER_D = "marker"
-      def noop(): Unit = {}
+  OrderFormatter.scala: |
+    object OrderFormatter {
+      def formatOrder(order: Order): String = {
+        s"Order ${order.id}: $$${order.total} for user ${order.userId}"
+      }
+
+      def formatSummary(orders: List[Order]): String = {
+        val total = orders.map(_.total).sum
+        s"${orders.size} orders, total: $$$total"
+      }
     }
+
 must_include_files:
-- OrderService.scala
-must_include_content:
-- 'class OrderService(repo: Repository) {'
+  - OrderService.scala
+must_include_content_from:
+  OrderService.scala:
+    - "class OrderService(repo: Repository) {"
 must_not_include:
-- GARBAGE_JVM_051_BIND_MARKER_C
-- GARBAGE_JVM_051_CHAIN_MARKER_D
-- GARBAGE_JVM_051_FLATMAP_MARKER_B
-- GARBAGE_JVM_051_MONAD_MARKER_A
-- GarbageBindHelper.scala
-- GarbageMonadOps.scala
+  # OrderValidator.scala: validation logic, not used in for-comprehension code
+  - OrderValidator
+  - validateOrder
+  - validateItems
+  # OrderFormatter.scala: display formatting, no dependency from OrderService
+  - OrderFormatter
+  - formatOrder
+  - formatSummary
+must_not_include_files:
+  - OrderValidator.scala
+  - OrderFormatter.scala
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

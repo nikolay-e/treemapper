@@ -1,3 +1,8 @@
+# Scenario: Architecture doc updated -- "three" -> "four" services, fraud scoring added.
+# Reviewer asks: "What architectural changes were documented?"
+# Trap rationale: api_reference.md and onboarding_guide.md share the same project
+# domain vocabulary (payment, services) but are separate docs with no link.
+
 initial:
   docs/architecture.md: |
     # System Architecture
@@ -31,69 +36,52 @@ initial:
 
     All inter-service communication uses mTLS with certificate rotation.
     PCI DSS compliance is maintained through network segmentation.
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  docs/api_reference.md: |
+    # API Reference
 
-    class TextSanitizer:
-        GARBAGE_MERGE_005_MARKER_A = "sanitizer_tag"
+    ## Authentication
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    All API requests require a Bearer token in the Authorization header.
+    Tokens are issued via the /auth/token endpoint using client credentials.
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+    ## Endpoints
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_005_A_CLEAN: {cleaned}"
+    ### POST /payments
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+    Create a new payment request.
+    - **merchant_id** (required): Unique merchant identifier
+    - **amount** (required): Payment amount in minor units
+    - **currency** (required): ISO 4217 currency code
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_005_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
+    ### GET /payments/{id}
 
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
+    Retrieve payment status by transaction ID.
+    Returns the current state and processing history.
 
-    class SystemMonitor:
-        GARBAGE_MERGE_005_MARKER_B = "monitor_tag"
+    ### POST /refunds
 
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
+    Initiate a refund for a completed payment.
+    Partial refunds are supported up to the original amount.
+  docs/onboarding_guide.md: |
+    # Developer Onboarding Guide
 
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
+    ## Prerequisites
 
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
+    - Access to the private container registry
+    - VPN credentials for internal services
+    - GitHub organization membership
 
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_005_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
+    ## Local Development Setup
 
-    MONITOR_VERSION = "GARBAGE_MERGE_005_B_VERSION"
+    1. Clone the repository
+    2. Install dependencies using the provided Makefile
+    3. Start local services with docker-compose
+    4. Run the integration test suite
+
+    ## Code Review Process
+
+    All changes require at least two approvals from senior engineers.
+    Security-sensitive changes need an additional review from the security team.
 changed:
   docs/architecture.md: |
     # System Architecture
@@ -128,77 +116,63 @@ changed:
 
     All inter-service communication uses mTLS with certificate rotation.
     PCI DSS compliance is maintained through network segmentation.
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  docs/api_reference.md: |
+    # API Reference
 
-    class TextSanitizer:
-        GARBAGE_MERGE_005_MARKER_A = "sanitizer_tag"
+    ## Authentication
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    All API requests require a Bearer token in the Authorization header.
+    Tokens are issued via the /auth/token endpoint using client credentials.
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+    ## Endpoints
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_005_A_CLEAN: {cleaned}"
+    ### POST /payments
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+    Create a new payment request.
+    - **merchant_id** (required): Unique merchant identifier
+    - **amount** (required): Payment amount in minor units
+    - **currency** (required): ISO 4217 currency code
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_005_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
+    ### GET /payments/{id}
 
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
+    Retrieve payment status by transaction ID.
+    Returns the current state and processing history.
 
-    class SystemMonitor:
-        GARBAGE_MERGE_005_MARKER_B = "monitor_tag"
+    ### POST /refunds
 
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
+    Initiate a refund for a completed payment.
+    Partial refunds are supported up to the original amount.
+  docs/onboarding_guide.md: |
+    # Developer Onboarding Guide
 
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
+    ## Prerequisites
 
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
+    - Access to the private container registry
+    - VPN credentials for internal services
+    - GitHub organization membership
 
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_005_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
+    ## Local Development Setup
 
-    MONITOR_VERSION = "GARBAGE_MERGE_005_B_VERSION"
+    1. Clone the repository
+    2. Install dependencies using the provided Makefile
+    3. Start local services with docker-compose
+    4. Run the integration test suite
+
+    ## Code Review Process
+
+    All changes require at least two approvals from senior engineers.
+    Security-sensitive changes need an additional review from the security team.
 must_include_files:
 - docs/architecture.md
 must_include_content:
 - The platform consists of four main services that communicate via message queues.
 must_not_include:
-- GARBAGE_MERGE_005_MARKER_A
-- GARBAGE_MERGE_005_MARKER_B
-- health_monitor.py
-- text_sanitizer.py
+- API Reference
+- Developer Onboarding Guide
+- api_reference.md
+- onboarding_guide.md
+must_not_include_files:
+- docs/api_reference.md
+- docs/onboarding_guide.md
 add_garbage_files: false
 skip_garbage_check: true

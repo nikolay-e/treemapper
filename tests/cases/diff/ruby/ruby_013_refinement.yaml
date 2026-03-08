@@ -1,3 +1,9 @@
+# Scenario: Formatter class starts using StringExtensions refinement for titlecase, truncate, word_count
+# Changed: lib/formatter.rb — added require_relative, using StringExtensions, format_title, format_summary, analyze methods
+# Reviewer questions: Does `using` scope apply correctly? Are refinement methods available in all Formatter methods?
+# Trap files:
+#   - lib/text_stats.rb: Word/character statistics — "word_count" vocabulary overlap but no refinement usage
+#   - lib/markdown_renderer.rb: Markdown to HTML — "text formatting" domain but independent module
 initial:
   lib/string_ext.rb: |
     module StringExtensions
@@ -22,26 +28,50 @@ initial:
         text.to_s
       end
     end
-  lib/garbage_barcode.rb: |
-    GARBAGE_RUBY_013_BARCODE_FORMAT_A = "EAN-13"
-    GARBAGE_RUBY_013_CHECK_DIGIT_B = "modulo10"
+  lib/text_stats.rb: |
+    class TextStatistics
+      def initialize(text)
+        @text = text
+      end
 
-    class GarbageBarcodeGenerator
-      GARBAGE_RUBY_013_PREFIX_LENGTH_C = 3
+      def word_count
+        @text.split(/\s+/).size
+      end
 
-      def generate(product_id)
-        GARBAGE_RUBY_013_BARCODE_FORMAT_A
+      def char_count
+        @text.length
+      end
+
+      def avg_word_length
+        words = @text.split(/\s+/)
+        return 0.0 if words.empty?
+        words.sum(&:length).to_f / words.size
+      end
+
+      def sentence_count
+        @text.scan(/[.!?]+/).size
       end
     end
-  lib/garbage_label_printer.rb: |
-    GARBAGE_RUBY_013_PRINTER_MODEL_D = "ZebraTLP2844"
-    GARBAGE_RUBY_013_LABEL_SIZE_E = "4x6"
+  lib/markdown_renderer.rb: |
+    class MarkdownRenderer
+      def render(markdown)
+        lines = markdown.split("\n")
+        lines.map { |line| render_line(line) }.join("\n")
+      end
 
-    class GarbageLabelPrinter
-      GARBAGE_RUBY_013_DPI_SETTING_F = 203
+      private
 
-      def print_label(content)
-        GARBAGE_RUBY_013_PRINTER_MODEL_D
+      def render_line(line)
+        case line
+        when /^# (.+)/
+          "<h1>#{$1}</h1>"
+        when /^## (.+)/
+          "<h2>#{$1}</h2>"
+        when /^\* (.+)/
+          "<li>#{$1}</li>"
+        else
+          "<p>#{line}</p>"
+        end
       end
     end
 changed:
@@ -80,26 +110,50 @@ changed:
         { words: text.word_count, title: text.titlecase }
       end
     end
-  lib/garbage_barcode.rb: |
-    GARBAGE_RUBY_013_BARCODE_FORMAT_A = "EAN-13"
-    GARBAGE_RUBY_013_CHECK_DIGIT_B = "modulo10"
+  lib/text_stats.rb: |
+    class TextStatistics
+      def initialize(text)
+        @text = text
+      end
 
-    class GarbageBarcodeGenerator
-      GARBAGE_RUBY_013_PREFIX_LENGTH_C = 3
+      def word_count
+        @text.split(/\s+/).size
+      end
 
-      def generate(product_id)
-        GARBAGE_RUBY_013_BARCODE_FORMAT_A
+      def char_count
+        @text.length
+      end
+
+      def avg_word_length
+        words = @text.split(/\s+/)
+        return 0.0 if words.empty?
+        words.sum(&:length).to_f / words.size
+      end
+
+      def sentence_count
+        @text.scan(/[.!?]+/).size
       end
     end
-  lib/garbage_label_printer.rb: |
-    GARBAGE_RUBY_013_PRINTER_MODEL_D = "ZebraTLP2844"
-    GARBAGE_RUBY_013_LABEL_SIZE_E = "4x6"
+  lib/markdown_renderer.rb: |
+    class MarkdownRenderer
+      def render(markdown)
+        lines = markdown.split("\n")
+        lines.map { |line| render_line(line) }.join("\n")
+      end
 
-    class GarbageLabelPrinter
-      GARBAGE_RUBY_013_DPI_SETTING_F = 203
+      private
 
-      def print_label(content)
-        GARBAGE_RUBY_013_PRINTER_MODEL_D
+      def render_line(line)
+        case line
+        when /^# (.+)/
+          "<h1>#{$1}</h1>"
+        when /^## (.+)/
+          "<h2>#{$1}</h2>"
+        when /^\* (.+)/
+          "<li>#{$1}</li>"
+        else
+          "<p>#{line}</p>"
+        end
       end
     end
 must_include_files:
@@ -108,15 +162,15 @@ must_include_content:
 - |
   using StringExtensions
 must_not_include:
-- GARBAGE_RUBY_013_BARCODE_FORMAT_A
-- GARBAGE_RUBY_013_CHECK_DIGIT_B
-- GARBAGE_RUBY_013_PREFIX_LENGTH_C
-- GARBAGE_RUBY_013_PRINTER_MODEL_D
-- GARBAGE_RUBY_013_LABEL_SIZE_E
-- GARBAGE_RUBY_013_DPI_SETTING_F
-- GarbageBarcodeGenerator
-- GarbageLabelPrinter
-- garbage_barcode.rb
-- garbage_label_printer.rb
+- TextStatistics
+- MarkdownRenderer
+- avg_word_length
+- render_line
+- text_stats.rb
+- markdown_renderer.rb
+must_not_include_files:
+- lib/text_stats.rb
+- lib/markdown_renderer.rb
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

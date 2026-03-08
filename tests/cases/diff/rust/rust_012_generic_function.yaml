@@ -1,7 +1,14 @@
+# Scenario: Generalizing identity from i32 to generic, adding compose/curry/min_by/max_by
+# Changed: src/utils.rs — identity<T>, swap<T>, compare<T>, min_by, max_by, compose, curry, Transformer::transform
+# Reviewer questions: Are the higher-order function signatures correct? Does curry clone correctly?
+# Trap files:
+#   - src/iterator_ext.rs: Iterator extension methods — similar generic/FnOnce patterns but no import
+#   - src/predicate.rs: Predicate combinators — "function composition" domain overlap but independent
 initial:
   src/lib.rs: |
     pub mod utils;
-    pub mod unrelated;
+    pub mod iterator_ext;
+    pub mod predicate;
   src/utils.rs: |
     use std::fmt::Display;
 
@@ -29,73 +36,68 @@ initial:
             Self { value }
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod sorting;
-    pub mod filtering;
-  src/unrelated/sorting.rs: |
-    // GARBAGE_RUST_SORT_001
-    pub const GARBAGE_SORT_THRESHOLD_002: usize = 16;
-
-    pub fn garbage_quicksort_003<T: Ord>(arr: &mut [T]) {
-        // GARBAGE_QUICKSORT_IMPL_004
-    }
-
-    pub fn garbage_mergesort_005<T: Ord + Clone>(arr: &mut [T]) {
-        // GARBAGE_MERGESORT_IMPL_006
-    }
-
-    pub fn garbage_heapsort_007<T: Ord>(arr: &mut [T]) {
-        // GARBAGE_HEAPSORT_IMPL_008
-    }
-
-    pub trait GarbageSortable009 {
-        fn garbage_sort_010(&mut self);
-        fn garbage_is_sorted_011(&self) -> bool;
-    }
-
-    pub struct GarbageSorter012<T> {
-        data: Vec<T>,
-    }
-
-    impl<T: Ord> GarbageSorter012<T> {
-        pub fn garbage_sort_ascending_013(&mut self) {
-            self.data.sort();
+  src/iterator_ext.rs: |
+    pub trait IteratorExt: Iterator {
+        fn take_while_inclusive<P>(self, predicate: P) -> TakeWhileInclusive<Self, P>
+        where
+            Self: Sized,
+            P: FnMut(&Self::Item) -> bool,
+        {
+            TakeWhileInclusive { iter: self, predicate, done: false }
         }
     }
-  src/unrelated/filtering.rs: |
-    // GARBAGE_RUST_FILTER_014
-    pub const GARBAGE_FILTER_CAPACITY_015: usize = 1000;
 
-    pub fn garbage_filter_016<T, F>(items: &[T], predicate: F) -> Vec<&T>
-    where
-        F: Fn(&T) -> bool,
-    {
-        items.iter().filter(|item| predicate(item)).collect()
+    impl<I: Iterator> IteratorExt for I {}
+
+    pub struct TakeWhileInclusive<I, P> {
+        iter: I,
+        predicate: P,
+        done: bool,
     }
 
-    pub fn garbage_partition_017<T, F>(items: Vec<T>, predicate: F) -> (Vec<T>, Vec<T>)
-    where
-        F: Fn(&T) -> bool,
-    {
-        items.into_iter().partition(predicate)
+    impl<I: Iterator, P: FnMut(&I::Item) -> bool> Iterator for TakeWhileInclusive<I, P> {
+        type Item = I::Item;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.done { return None; }
+            let item = self.iter.next()?;
+            if !(self.predicate)(&item) {
+                self.done = true;
+            }
+            Some(item)
+        }
+    }
+  src/predicate.rs: |
+    pub struct Predicate<T> {
+        f: Box<dyn Fn(&T) -> bool>,
     }
 
-    pub struct GarbageFilterChain018<T> {
-        data: Vec<T>,
-    }
+    impl<T: 'static> Predicate<T> {
+        pub fn new<F: Fn(&T) -> bool + 'static>(f: F) -> Self {
+            Self { f: Box::new(f) }
+        }
 
-    impl<T: Clone> GarbageFilterChain018<T> {
-        pub fn garbage_apply_019<F>(&self, f: F) -> Vec<T>
-        where
-            F: Fn(&T) -> bool,
-        {
-            self.data.iter().filter(|x| f(x)).cloned().collect()
+        pub fn test(&self, value: &T) -> bool {
+            (self.f)(value)
+        }
+
+        pub fn and(self, other: Self) -> Self {
+            Self::new(move |v| (self.f)(v) && (other.f)(v))
+        }
+
+        pub fn or(self, other: Self) -> Self {
+            Self::new(move |v| (self.f)(v) || (other.f)(v))
+        }
+
+        pub fn negate(self) -> Self {
+            Self::new(move |v| !(self.f)(v))
         }
     }
 changed:
   src/lib.rs: |
     pub mod utils;
-    pub mod unrelated;
+    pub mod iterator_ext;
+    pub mod predicate;
   src/utils.rs: |
     use std::cmp::Ordering;
     use std::fmt::Display;
@@ -179,67 +181,61 @@ changed:
             self.value
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod sorting;
-    pub mod filtering;
-  src/unrelated/sorting.rs: |
-    // GARBAGE_RUST_SORT_001
-    pub const GARBAGE_SORT_THRESHOLD_002: usize = 16;
-
-    pub fn garbage_quicksort_003<T: Ord>(arr: &mut [T]) {
-        // GARBAGE_QUICKSORT_IMPL_004
-    }
-
-    pub fn garbage_mergesort_005<T: Ord + Clone>(arr: &mut [T]) {
-        // GARBAGE_MERGESORT_IMPL_006
-    }
-
-    pub fn garbage_heapsort_007<T: Ord>(arr: &mut [T]) {
-        // GARBAGE_HEAPSORT_IMPL_008
-    }
-
-    pub trait GarbageSortable009 {
-        fn garbage_sort_010(&mut self);
-        fn garbage_is_sorted_011(&self) -> bool;
-    }
-
-    pub struct GarbageSorter012<T> {
-        data: Vec<T>,
-    }
-
-    impl<T: Ord> GarbageSorter012<T> {
-        pub fn garbage_sort_ascending_013(&mut self) {
-            self.data.sort();
+  src/iterator_ext.rs: |
+    pub trait IteratorExt: Iterator {
+        fn take_while_inclusive<P>(self, predicate: P) -> TakeWhileInclusive<Self, P>
+        where
+            Self: Sized,
+            P: FnMut(&Self::Item) -> bool,
+        {
+            TakeWhileInclusive { iter: self, predicate, done: false }
         }
     }
-  src/unrelated/filtering.rs: |
-    // GARBAGE_RUST_FILTER_014
-    pub const GARBAGE_FILTER_CAPACITY_015: usize = 1000;
 
-    pub fn garbage_filter_016<T, F>(items: &[T], predicate: F) -> Vec<&T>
-    where
-        F: Fn(&T) -> bool,
-    {
-        items.iter().filter(|item| predicate(item)).collect()
+    impl<I: Iterator> IteratorExt for I {}
+
+    pub struct TakeWhileInclusive<I, P> {
+        iter: I,
+        predicate: P,
+        done: bool,
     }
 
-    pub fn garbage_partition_017<T, F>(items: Vec<T>, predicate: F) -> (Vec<T>, Vec<T>)
-    where
-        F: Fn(&T) -> bool,
-    {
-        items.into_iter().partition(predicate)
+    impl<I: Iterator, P: FnMut(&I::Item) -> bool> Iterator for TakeWhileInclusive<I, P> {
+        type Item = I::Item;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.done { return None; }
+            let item = self.iter.next()?;
+            if !(self.predicate)(&item) {
+                self.done = true;
+            }
+            Some(item)
+        }
+    }
+  src/predicate.rs: |
+    pub struct Predicate<T> {
+        f: Box<dyn Fn(&T) -> bool>,
     }
 
-    pub struct GarbageFilterChain018<T> {
-        data: Vec<T>,
-    }
+    impl<T: 'static> Predicate<T> {
+        pub fn new<F: Fn(&T) -> bool + 'static>(f: F) -> Self {
+            Self { f: Box::new(f) }
+        }
 
-    impl<T: Clone> GarbageFilterChain018<T> {
-        pub fn garbage_apply_019<F>(&self, f: F) -> Vec<T>
-        where
-            F: Fn(&T) -> bool,
-        {
-            self.data.iter().filter(|x| f(x)).cloned().collect()
+        pub fn test(&self, value: &T) -> bool {
+            (self.f)(value)
+        }
+
+        pub fn and(self, other: Self) -> Self {
+            Self::new(move |v| (self.f)(v) && (other.f)(v))
+        }
+
+        pub fn or(self, other: Self) -> Self {
+            Self::new(move |v| (self.f)(v) || (other.f)(v))
+        }
+
+        pub fn negate(self) -> Self {
+            Self::new(move |v| !(self.f)(v))
         }
     }
 must_include_files:
@@ -248,15 +244,14 @@ must_include_content:
 - use std::cmp::Ordering;
 - 'pub fn identity<T>(x: T) -> T {'
 must_not_include:
-- GARBAGE_FILTER_CAPACITY_015
-- GARBAGE_HEAPSORT_IMPL_008
-- GARBAGE_MERGESORT_IMPL_006
-- GARBAGE_QUICKSORT_IMPL_004
-- GARBAGE_RUST_FILTER_014
-- GARBAGE_RUST_SORT_001
-- GARBAGE_SORT_THRESHOLD_002
-- filtering.rs
-- mod.rs
-- sorting.rs
+- IteratorExt
+- TakeWhileInclusive
+- Predicate
+- iterator_ext.rs
+- predicate.rs
+must_not_include_files:
+- src/iterator_ext.rs
+- src/predicate.rs
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,30 @@
+# Scenario: DataProcessor is refactored from imperative loops to Java Streams API.
+#   New methods added (filterByPredicate, calculateAverage, findMax/Min, groupBy*,
+#   countByStatus, topN, recent, summarizeByMerchant, anyMatch, allMatch, partition,
+#   join). New TransactionSummary record added.
+#
+# Diff shows:
+#   DataProcessor.java: filterByStatus/calculateTotal/getCustomerIds rewritten
+#     to streams. Many new stream-based methods added. New import of TransactionSummary.
+#   TransactionSummary.java: NEW record with count, total, max, min, average().
+#
+# Reviewer questions:
+#   Q1: "Does summarizeByMerchant correctly build TransactionSummary records?"
+#       -> TransactionSummary.java defines the record with count/total/max/min.
+#          Reviewer must verify the Collectors.collectingAndThen lambda matches.
+#
+#   Q2: "Do the stream operations correctly access Transaction fields?"
+#       -> Transaction.java (UNCHANGED) defines getAmount, getCustomerId,
+#          getMerchantId, getStatus, getCategory, getTimestamp. Reviewer must
+#          verify all method references (Transaction::getAmount, etc.) are valid.
+#
+# Not needed for comprehension:
+#   - RecipeScaler.java: Cooking utility, completely unrelated domain.
+#
+#   - MoonPhaseCalculator.java: Astronomy utility, completely unrelated domain.
+#
+#   - BoardNotation.java: Chess notation, completely unrelated domain.
+
 initial:
   src/main/java/com/analytics/processor/DataProcessor.java: |
     package com.analytics.processor;
@@ -78,33 +105,19 @@ initial:
     package com.unrelated.cooking;
 
     public class RecipeScaler {
-        public static final String GARBAGE_JAVA_REPORT_S034A = "recipe_marker_alpha";
-        private static final String GARBAGE_JAVA_FORMAT_S034B = "scale_marker_beta";
-
         public double scaleIngredient(double originalAmount, int originalServings, int newServings) {
-            logGarbageMarkers();
             return originalAmount * newServings / originalServings;
         }
 
         public int calculateCookingTime(int baseTime, double scaleFactor) {
-            String GARBAGE_JAVA_MONTHLY_S034C = "cooking_time_marker_gamma";
-            System.out.println(GARBAGE_JAVA_MONTHLY_S034C);
             return (int) (baseTime * Math.sqrt(scaleFactor));
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_REPORT_S034A + GARBAGE_JAVA_FORMAT_S034B);
         }
     }
   src/main/java/com/unrelated/astro/MoonPhaseCalculator.java: |
     package com.unrelated.astro;
 
     public class MoonPhaseCalculator {
-        public static final String GARBAGE_JAVA_THRESH_S034D = "moon_marker_delta";
-        private static final String GARBAGE_JAVA_LIMIT_S034E = "phase_marker_epsilon";
-
         public String getCurrentPhase(int dayOfMonth) {
-            logGarbageMarkers();
             if (dayOfMonth <= 7) return "New Moon";
             if (dayOfMonth <= 14) return "First Quarter";
             if (dayOfMonth <= 21) return "Full Moon";
@@ -112,24 +125,14 @@ initial:
         }
 
         public double getIllumination(int dayOfMonth) {
-            String GARBAGE_JAVA_CHECK_S034F = "illumination_marker_zeta";
-            System.out.println(GARBAGE_JAVA_CHECK_S034F);
             return Math.abs(Math.sin(dayOfMonth * Math.PI / 14.5));
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_THRESH_S034D + GARBAGE_JAVA_LIMIT_S034E);
         }
     }
   src/main/java/com/unrelated/chess/BoardNotation.java: |
     package com.unrelated.chess;
 
     public class BoardNotation {
-        public static final String GARBAGE_JAVA_EXPORT_S034G = "chess_marker_eta";
-
         public String toAlgebraic(int row, int col) {
-            String GARBAGE_JAVA_CSV_S034H = "notation_marker_theta";
-            System.out.println(GARBAGE_JAVA_EXPORT_S034G + GARBAGE_JAVA_CSV_S034H);
             char file = (char) ('a' + col);
             int rank = row + 1;
             return "" + file + rank;
@@ -141,6 +144,7 @@ initial:
             return new int[] { rank - 1, file - 'a' };
         }
     }
+
 changed:
   src/main/java/com/analytics/processor/DataProcessor.java: |
     package com.analytics.processor;
@@ -321,73 +325,6 @@ changed:
         public String getCategory() { return category; }
         public LocalDateTime getTimestamp() { return timestamp; }
     }
-  src/main/java/com/unrelated/cooking/RecipeScaler.java: |
-    package com.unrelated.cooking;
-
-    public class RecipeScaler {
-        public static final String GARBAGE_JAVA_REPORT_S034A = "recipe_marker_alpha";
-        private static final String GARBAGE_JAVA_FORMAT_S034B = "scale_marker_beta";
-
-        public double scaleIngredient(double originalAmount, int originalServings, int newServings) {
-            logGarbageMarkers();
-            return originalAmount * newServings / originalServings;
-        }
-
-        public int calculateCookingTime(int baseTime, double scaleFactor) {
-            String GARBAGE_JAVA_MONTHLY_S034C = "cooking_time_marker_gamma";
-            System.out.println(GARBAGE_JAVA_MONTHLY_S034C);
-            return (int) (baseTime * Math.sqrt(scaleFactor));
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_REPORT_S034A + GARBAGE_JAVA_FORMAT_S034B);
-        }
-    }
-  src/main/java/com/unrelated/astro/MoonPhaseCalculator.java: |
-    package com.unrelated.astro;
-
-    public class MoonPhaseCalculator {
-        public static final String GARBAGE_JAVA_THRESH_S034D = "moon_marker_delta";
-        private static final String GARBAGE_JAVA_LIMIT_S034E = "phase_marker_epsilon";
-
-        public String getCurrentPhase(int dayOfMonth) {
-            logGarbageMarkers();
-            if (dayOfMonth <= 7) return "New Moon";
-            if (dayOfMonth <= 14) return "First Quarter";
-            if (dayOfMonth <= 21) return "Full Moon";
-            return "Last Quarter";
-        }
-
-        public double getIllumination(int dayOfMonth) {
-            String GARBAGE_JAVA_CHECK_S034F = "illumination_marker_zeta";
-            System.out.println(GARBAGE_JAVA_CHECK_S034F);
-            return Math.abs(Math.sin(dayOfMonth * Math.PI / 14.5));
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_THRESH_S034D + GARBAGE_JAVA_LIMIT_S034E);
-        }
-    }
-  src/main/java/com/unrelated/chess/BoardNotation.java: |
-    package com.unrelated.chess;
-
-    public class BoardNotation {
-        public static final String GARBAGE_JAVA_EXPORT_S034G = "chess_marker_eta";
-
-        public String toAlgebraic(int row, int col) {
-            String GARBAGE_JAVA_CSV_S034H = "notation_marker_theta";
-            System.out.println(GARBAGE_JAVA_EXPORT_S034G + GARBAGE_JAVA_CSV_S034H);
-            char file = (char) ('a' + col);
-            int rank = row + 1;
-            return "" + file + rank;
-        }
-
-        public int[] fromAlgebraic(String notation) {
-            char file = notation.charAt(0);
-            int rank = Character.getNumericValue(notation.charAt(1));
-            return new int[] { rank - 1, file - 'a' };
-        }
-    }
   src/main/java/com/analytics/model/TransactionSummary.java: |
     package com.analytics.model;
 
@@ -404,23 +341,84 @@ changed:
             return total.divide(BigDecimal.valueOf(count), 2, java.math.RoundingMode.HALF_UP);
         }
     }
+  src/main/java/com/unrelated/cooking/RecipeScaler.java: |
+    package com.unrelated.cooking;
+
+    public class RecipeScaler {
+        public double scaleIngredient(double originalAmount, int originalServings, int newServings) {
+            return originalAmount * newServings / originalServings;
+        }
+
+        public int calculateCookingTime(int baseTime, double scaleFactor) {
+            return (int) (baseTime * Math.sqrt(scaleFactor));
+        }
+    }
+  src/main/java/com/unrelated/astro/MoonPhaseCalculator.java: |
+    package com.unrelated.astro;
+
+    public class MoonPhaseCalculator {
+        public String getCurrentPhase(int dayOfMonth) {
+            if (dayOfMonth <= 7) return "New Moon";
+            if (dayOfMonth <= 14) return "First Quarter";
+            if (dayOfMonth <= 21) return "Full Moon";
+            return "Last Quarter";
+        }
+
+        public double getIllumination(int dayOfMonth) {
+            return Math.abs(Math.sin(dayOfMonth * Math.PI / 14.5));
+        }
+    }
+  src/main/java/com/unrelated/chess/BoardNotation.java: |
+    package com.unrelated.chess;
+
+    public class BoardNotation {
+        public String toAlgebraic(int row, int col) {
+            char file = (char) ('a' + col);
+            int rank = row + 1;
+            return "" + file + rank;
+        }
+
+        public int[] fromAlgebraic(String notation) {
+            char file = notation.charAt(0);
+            int rank = Character.getNumericValue(notation.charAt(1));
+            return new int[] { rank - 1, file - 'a' };
+        }
+    }
+
 must_include_files:
-- src/main/java/com/analytics/model/TransactionSummary.java
-- src/main/java/com/analytics/processor/DataProcessor.java
-must_include_content:
-- public BigDecimal average() {
-- import com.analytics.model.TransactionSummary;
+  - src/main/java/com/analytics/model/TransactionSummary.java
+  - src/main/java/com/analytics/processor/DataProcessor.java
+
+must_include_content_from:
+  src/main/java/com/analytics/processor/DataProcessor.java:
+    - "import com.analytics.model.TransactionSummary"
+    - "Transaction::getAmount"
+    - "Transaction::getCustomerId"
+    - "Collectors.groupingBy"
+  src/main/java/com/analytics/model/TransactionSummary.java:
+    - "public BigDecimal average()"
+    - "record TransactionSummary"
+
 must_not_include:
-- GARBAGE_JAVA_CHECK_S034F
-- GARBAGE_JAVA_CSV_S034H
-- GARBAGE_JAVA_EXPORT_S034G
-- GARBAGE_JAVA_FORMAT_S034B
-- GARBAGE_JAVA_LIMIT_S034E
-- GARBAGE_JAVA_MONTHLY_S034C
-- GARBAGE_JAVA_REPORT_S034A
-- GARBAGE_JAVA_THRESH_S034D
-- BoardNotation.java
-- MoonPhaseCalculator.java
-- RecipeScaler.java
+  # --- RecipeScaler.java: cooking utility, unrelated ---
+  - RecipeScaler
+  - scaleIngredient
+  - calculateCookingTime
+  # --- MoonPhaseCalculator.java: astronomy, unrelated ---
+  - MoonPhaseCalculator
+  - getCurrentPhase
+  - getIllumination
+  # --- BoardNotation.java: chess notation, unrelated ---
+  - BoardNotation
+  - toAlgebraic
+  - fromAlgebraic
+
+must_not_include_files:
+  - src/main/java/com/unrelated/cooking/RecipeScaler.java
+  - src/main/java/com/unrelated/astro/MoonPhaseCalculator.java
+  - src/main/java/com/unrelated/chess/BoardNotation.java
+
+max_fragments: 10
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

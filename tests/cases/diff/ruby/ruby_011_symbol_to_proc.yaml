@@ -1,3 +1,21 @@
+# Test: Report uses Symbol#to_proc (.map(&:name)) to transform User collections
+#
+# Scenario: lib/report.rb is rewritten to require User and use &:name, &:email,
+# &:age, &:active, &:adult?, &:to_s symbol-to-proc patterns. User (UNCHANGED)
+# defines these attributes and methods.
+#
+# Reviewer questions:
+#   Q1: "What does &:adult? call? What's the age threshold?"
+#       -> lib/user.rb (UNCHANGED) defines adult? as @age >= 18.
+#   Q2: "What does &:active return? Is it a boolean method or attribute?"
+#       -> User has attr_reader :active, initialized with default true.
+#
+# Trap files (plausible but unrelated):
+#   - lib/csv_report.rb: CSV export for reports — same "report" domain but
+#     Report doesn't use CSV formatting.
+#   - lib/user_stats.rb: computes aggregate user statistics — similar data
+#     processing but no dependency from Report.
+
 initial:
   lib/user.rb: |
     class User
@@ -24,26 +42,46 @@ initial:
         "empty"
       end
     end
-  lib/garbage_dns_resolver.rb: |
-    GARBAGE_RUBY_011_RESOLVER_TYPE_A = "recursive"
-    GARBAGE_RUBY_011_CACHE_POLICY_B = "ttl_based"
+  lib/csv_report.rb: |
+    require 'csv'
 
-    class GarbageDnsResolver
-      GARBAGE_RUBY_011_TIMEOUT_SEC_C = 5
+    class CsvReport
+      def initialize(headers, rows)
+        @headers = headers
+        @rows = rows
+      end
 
-      def resolve(hostname)
-        GARBAGE_RUBY_011_RESOLVER_TYPE_A
+      def generate
+        CSV.generate do |csv|
+          csv << @headers
+          @rows.each { |row| csv << row }
+        end
+      end
+
+      def save(file_path)
+        File.write(file_path, generate)
       end
     end
-  lib/garbage_session_store.rb: |
-    GARBAGE_RUBY_011_STORE_BACKEND_D = "memcached"
-    GARBAGE_RUBY_011_EXPIRY_HOURS_E = "24"
+  lib/user_stats.rb: |
+    class UserStats
+      def initialize(users)
+        @users = users
+      end
 
-    class GarbageSessionStore
-      GARBAGE_RUBY_011_MAX_SESSIONS_F = 10000
+      def average_age
+        return 0 if @users.empty?
+        @users.sum { |u| u.age } / @users.size.to_f
+      end
 
-      def get(session_id)
-        GARBAGE_RUBY_011_STORE_BACKEND_D
+      def active_percentage
+        return 0 if @users.empty?
+        active_count = @users.count { |u| u.active }
+        (active_count.to_f / @users.size * 100).round(1)
+      end
+
+      def age_distribution
+        @users.group_by { |u| (u.age / 10) * 10 }
+              .transform_values(&:size)
       end
     end
 changed:
@@ -94,43 +132,71 @@ changed:
         @users.map(&:to_s).join(", ")
       end
     end
-  lib/garbage_dns_resolver.rb: |
-    GARBAGE_RUBY_011_RESOLVER_TYPE_A = "recursive"
-    GARBAGE_RUBY_011_CACHE_POLICY_B = "ttl_based"
+  lib/csv_report.rb: |
+    require 'csv'
 
-    class GarbageDnsResolver
-      GARBAGE_RUBY_011_TIMEOUT_SEC_C = 5
+    class CsvReport
+      def initialize(headers, rows)
+        @headers = headers
+        @rows = rows
+      end
 
-      def resolve(hostname)
-        GARBAGE_RUBY_011_RESOLVER_TYPE_A
+      def generate
+        CSV.generate do |csv|
+          csv << @headers
+          @rows.each { |row| csv << row }
+        end
+      end
+
+      def save(file_path)
+        File.write(file_path, generate)
       end
     end
-  lib/garbage_session_store.rb: |
-    GARBAGE_RUBY_011_STORE_BACKEND_D = "memcached"
-    GARBAGE_RUBY_011_EXPIRY_HOURS_E = "24"
+  lib/user_stats.rb: |
+    class UserStats
+      def initialize(users)
+        @users = users
+      end
 
-    class GarbageSessionStore
-      GARBAGE_RUBY_011_MAX_SESSIONS_F = 10000
+      def average_age
+        return 0 if @users.empty?
+        @users.sum { |u| u.age } / @users.size.to_f
+      end
 
-      def get(session_id)
-        GARBAGE_RUBY_011_STORE_BACKEND_D
+      def active_percentage
+        return 0 if @users.empty?
+        active_count = @users.count { |u| u.active }
+        (active_count.to_f / @users.size * 100).round(1)
+      end
+
+      def age_distribution
+        @users.group_by { |u| (u.age / 10) * 10 }
+              .transform_values(&:size)
       end
     end
 must_include_files:
-- lib/report.rb
-must_include_content:
-- |
-  @users.map(&:name)
+  - lib/report.rb
+  # Q1/Q2: User defines the attributes and methods Report's &: patterns call
+  - lib/user.rb
+must_include_content_from:
+  lib/report.rb:
+    - "@users.map(&:name)"
+    - "@users.select(&:active).select(&:adult?)"
+  lib/user.rb:
+    - "attr_reader :name, :email, :age, :active"
+    - "def adult?"
 must_not_include:
-- GARBAGE_RUBY_011_RESOLVER_TYPE_A
-- GARBAGE_RUBY_011_CACHE_POLICY_B
-- GARBAGE_RUBY_011_TIMEOUT_SEC_C
-- GARBAGE_RUBY_011_STORE_BACKEND_D
-- GARBAGE_RUBY_011_EXPIRY_HOURS_E
-- GARBAGE_RUBY_011_MAX_SESSIONS_F
-- GarbageDnsResolver
-- GarbageSessionStore
-- garbage_dns_resolver.rb
-- garbage_session_store.rb
+  # lib/csv_report.rb: CSV formatting — Report doesn't export CSV
+  - CsvReport
+  - CSV.generate
+  # lib/user_stats.rb: aggregate stats — independent from Report
+  - UserStats
+  - average_age
+  - age_distribution
+must_not_include_files:
+  - lib/csv_report.rb
+  - lib/user_stats.rb
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,8 @@
+# Scenario: Deployment adds initContainers for DB readiness check and migration before main container starts
+# Changed: k8s/apps/api/deployment.yaml adds wait-for-db and run-migrations init containers
+# Reviewer questions: Does pg_isready image match the production postgres version? Should migration failures block startup?
+# Trap 1: k8s/database/postgres-statefulset.yaml — PostgreSQL StatefulSet, shares DB vocabulary but no dep on init containers
+# Trap 2: k8s/jobs/seed-data.yaml — data seeding job, shares migration/DB vocabulary but no dep
 initial:
   scripts/wait-for-db.sh: |
     #!/bin/bash
@@ -59,29 +64,51 @@ initial:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/keda/scaledobject.yaml: |
-    # GARBAGE_K8S_411_KEDA_SCALER
-    apiVersion: keda.sh/v1alpha1
-    kind: ScaledObject
+  k8s/database/postgres-statefulset.yaml: |
+    apiVersion: apps/v1
+    kind: StatefulSet
     metadata:
-      name: GARBAGE_K8S_411_SCALED_OBJECT
+      name: postgres
+      namespace: database
     spec:
-      scaleTargetRef:
-        name: GARBAGE_K8S_411_TARGET_NAME
-      pollingInterval: GARBAGE_K8S_411_INTERVAL
-      cooldownPeriod: GARBAGE_K8S_411_COOLDOWN
-      triggers:
-      - type: GARBAGE_K8S_411_TRIGGER_TYPE
-  k8s/unrelated/crossplane/composition.yaml: |
-    # GARBAGE_K8S_411_CROSSPLANE_COMP
-    apiVersion: apiextensions.crossplane.io/v1
-    kind: Composition
+      serviceName: postgres
+      replicas: 3
+      selector:
+        matchLabels:
+          app: postgres
+      template:
+        spec:
+          containers:
+          - name: postgres
+            image: postgres:15-alpine
+            ports:
+            - containerPort: 5432
+            env:
+            - name: POSTGRES_DB
+              value: production
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+  k8s/jobs/seed-data.yaml: |
+    apiVersion: batch/v1
+    kind: Job
     metadata:
-      name: GARBAGE_K8S_411_COMP_NAME
+      name: seed-initial-data
+      namespace: production
     spec:
-      compositeTypeRef:
-        apiVersion: GARBAGE_K8S_411_API_VERSION
-        kind: GARBAGE_K8S_411_COMP_KIND
+      backoffLimit: 2
+      template:
+        spec:
+          containers:
+          - name: seed
+            image: api-server:v1.0.0
+            command: ["python", "manage.py", "seed"]
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: url
+          restartPolicy: Never
 changed:
   scripts/wait-for-db.sh: |
     #!/bin/bash
@@ -161,45 +188,65 @@ changed:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/keda/scaledobject.yaml: |
-    # GARBAGE_K8S_411_KEDA_SCALER
-    apiVersion: keda.sh/v1alpha1
-    kind: ScaledObject
+  k8s/database/postgres-statefulset.yaml: |
+    apiVersion: apps/v1
+    kind: StatefulSet
     metadata:
-      name: GARBAGE_K8S_411_SCALED_OBJECT
+      name: postgres
+      namespace: database
     spec:
-      scaleTargetRef:
-        name: GARBAGE_K8S_411_TARGET_NAME
-      pollingInterval: GARBAGE_K8S_411_INTERVAL
-      cooldownPeriod: GARBAGE_K8S_411_COOLDOWN
-      triggers:
-      - type: GARBAGE_K8S_411_TRIGGER_TYPE
-  k8s/unrelated/crossplane/composition.yaml: |
-    # GARBAGE_K8S_411_CROSSPLANE_COMP
-    apiVersion: apiextensions.crossplane.io/v1
-    kind: Composition
+      serviceName: postgres
+      replicas: 3
+      selector:
+        matchLabels:
+          app: postgres
+      template:
+        spec:
+          containers:
+          - name: postgres
+            image: postgres:15-alpine
+            ports:
+            - containerPort: 5432
+            env:
+            - name: POSTGRES_DB
+              value: production
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+  k8s/jobs/seed-data.yaml: |
+    apiVersion: batch/v1
+    kind: Job
     metadata:
-      name: GARBAGE_K8S_411_COMP_NAME
+      name: seed-initial-data
+      namespace: production
     spec:
-      compositeTypeRef:
-        apiVersion: GARBAGE_K8S_411_API_VERSION
-        kind: GARBAGE_K8S_411_COMP_KIND
+      backoffLimit: 2
+      template:
+        spec:
+          containers:
+          - name: seed
+            image: api-server:v1.0.0
+            command: ["python", "manage.py", "seed"]
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: url
+          restartPolicy: Never
 must_include_files:
 - k8s/apps/api/deployment.yaml
-must_include_content:
-- 'initContainers:'
+must_include_content_from:
+  k8s/apps/api/deployment.yaml:
+  - 'initContainers:'
+  - 'name: wait-for-db'
 must_not_include:
-- GARBAGE_K8S_411_API_VERSION
-- GARBAGE_K8S_411_COMP_KIND
-- GARBAGE_K8S_411_COMP_NAME
-- GARBAGE_K8S_411_COOLDOWN
-- GARBAGE_K8S_411_CROSSPLANE_COMP
-- GARBAGE_K8S_411_INTERVAL
-- GARBAGE_K8S_411_KEDA_SCALER
-- GARBAGE_K8S_411_SCALED_OBJECT
-- GARBAGE_K8S_411_TARGET_NAME
-- GARBAGE_K8S_411_TRIGGER_TYPE
-- composition.yaml
-- scaledobject.yaml
+- seed-initial-data
+- manage.py", "seed
+- PGDATA
+must_not_include_files:
+- k8s/database/postgres-statefulset.yaml
+- k8s/jobs/seed-data.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

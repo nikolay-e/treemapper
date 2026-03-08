@@ -1,3 +1,8 @@
+# Scenario: DataService starts using DatabaseConnection as context manager for queries/transactions
+# Changed: service.py imports DatabaseConnection and uses `with` blocks for queries and transactions
+# Reviewer questions: Does run_transaction properly handle rollback on QueryError? Is timeout passed?
+# Trap 1: db_migration.py — manages database schema migrations, shares "database" vocabulary but independent
+# Trap 2: connection_pool.py — manages pooled connections, shares "connection" domain but no dep on db.py
 initial:
   db.py: |
     from typing import Optional, Any, Dict, List
@@ -63,7 +68,6 @@ initial:
         def execute(self, query: str, params: Optional[Dict[str, Any]] = None) -> QueryResult:
             if not self.conn or not self.conn.get("connected"):
                 raise ConnectionError("Not connected to database")
-
             start_time = time.time()
             try:
                 self._stats.queries_executed += 1
@@ -76,15 +80,12 @@ initial:
 
         def begin_transaction(self) -> None:
             self._in_transaction = True
-            logger.debug("Transaction started")
 
         def commit(self) -> None:
             self._in_transaction = False
-            logger.debug("Transaction committed")
 
         def rollback(self) -> None:
             self._in_transaction = False
-            logger.debug("Transaction rolled back")
 
         def set_isolation_level(self, level: str) -> None:
             valid_levels = ["READ UNCOMMITTED", "READ COMMITTED", "REPEATABLE READ", "SERIALIZABLE"]
@@ -109,47 +110,76 @@ initial:
 
         def run_query(self) -> List[Dict[str, Any]]:
             return []
-  garbage_pooling.py: |
-    GARBAGE_MARKER_POOL_001 = "pooling garbage"
-    UNRELATED_POOL_SIZE_002 = 10
+  db_migration.py: |
+    from typing import List, Optional, Dict
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class ConnectionPool:
-        GARBAGE_POOL_CLASS_003 = "pool class marker"
-
-        def __init__(self, size: int = 5):
-            self.size = size
-            self._connections: List = []
-
-        def acquire(self) -> Any:
-            return None
-
-        def release(self, conn: Any) -> None:
-            pass
-
-    class PooledConnection:
-        GARBAGE_POOLED_MARKER_004 = "pooled marker"
-
-        def __init__(self, pool: "ConnectionPool"):
-            self.pool = pool
-  garbage_migration.py: |
-    GARBAGE_MARKER_MIGRATE_005 = "migration garbage"
-    UNRELATED_VERSION_006 = "1.0.0"
+    @dataclass
+    class Migration:
+        version: str
+        name: str
+        sql_up: str
+        sql_down: str
+        applied_at: Optional[datetime] = None
 
     class MigrationManager:
-        GARBAGE_MIGRATE_CLASS_007 = True
+        def __init__(self, migrations_dir: str = "migrations"):
+            self._migrations_dir = migrations_dir
+            self._applied: List[Migration] = []
 
-        def __init__(self):
-            self._migrations: List[dict] = []
+        def get_pending(self) -> List[Migration]:
+            return []
 
-        def apply(self, migration: dict) -> bool:
+        def apply(self, migration: Migration) -> bool:
+            self._applied.append(migration)
             return True
 
-        def rollback(self, migration: dict) -> bool:
-            return True
+        def rollback_last(self) -> Optional[Migration]:
+            if self._applied:
+                return self._applied.pop()
+            return None
 
-    def format_migration_version(version: str) -> str:
-        GARBAGE_FORMAT_MIGRATE_008 = "format migrate marker"
-        return f"v{version}"
+        def get_current_version(self) -> Optional[str]:
+            return self._applied[-1].version if self._applied else None
+  connection_pool.py: |
+    import threading
+    from typing import Optional, List, Dict, Any
+    from dataclasses import dataclass
+
+    @dataclass
+    class PoolConfig:
+        max_size: int = 10
+        min_size: int = 2
+        timeout: int = 30
+
+    class ConnectionPool:
+        def __init__(self, config: PoolConfig):
+            self._config = config
+            self._available: List[Dict[str, Any]] = []
+            self._in_use: List[Dict[str, Any]] = []
+            self._lock = threading.Lock()
+
+        def acquire(self) -> Optional[Dict[str, Any]]:
+            with self._lock:
+                if self._available:
+                    conn = self._available.pop()
+                    self._in_use.append(conn)
+                    return conn
+                if len(self._in_use) < self._config.max_size:
+                    conn = {"id": len(self._in_use), "active": True}
+                    self._in_use.append(conn)
+                    return conn
+            return None
+
+        def release(self, conn: Dict[str, Any]) -> None:
+            with self._lock:
+                if conn in self._in_use:
+                    self._in_use.remove(conn)
+                    self._available.append(conn)
+
+        def get_pool_size(self) -> int:
+            return len(self._available) + len(self._in_use)
 changed:
   db.py: |
     from typing import Optional, Any, Dict, List
@@ -215,7 +245,6 @@ changed:
         def execute(self, query: str, params: Optional[Dict[str, Any]] = None) -> QueryResult:
             if not self.conn or not self.conn.get("connected"):
                 raise ConnectionError("Not connected to database")
-
             start_time = time.time()
             try:
                 self._stats.queries_executed += 1
@@ -228,15 +257,12 @@ changed:
 
         def begin_transaction(self) -> None:
             self._in_transaction = True
-            logger.debug("Transaction started")
 
         def commit(self) -> None:
             self._in_transaction = False
-            logger.debug("Transaction committed")
 
         def rollback(self) -> None:
             self._in_transaction = False
-            logger.debug("Transaction rolled back")
 
         def set_isolation_level(self, level: str) -> None:
             valid_levels = ["READ UNCOMMITTED", "READ COMMITTED", "REPEATABLE READ", "SERIALIZABLE"]
@@ -278,60 +304,94 @@ changed:
                     db.rollback()
                     raise
             return total_affected
-  garbage_pooling.py: |
-    GARBAGE_MARKER_POOL_001 = "pooling garbage"
-    UNRELATED_POOL_SIZE_002 = 10
+  db_migration.py: |
+    from typing import List, Optional, Dict
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class ConnectionPool:
-        GARBAGE_POOL_CLASS_003 = "pool class marker"
-
-        def __init__(self, size: int = 5):
-            self.size = size
-            self._connections: List = []
-
-        def acquire(self) -> Any:
-            return None
-
-        def release(self, conn: Any) -> None:
-            pass
-
-    class PooledConnection:
-        GARBAGE_POOLED_MARKER_004 = "pooled marker"
-
-        def __init__(self, pool: "ConnectionPool"):
-            self.pool = pool
-  garbage_migration.py: |
-    GARBAGE_MARKER_MIGRATE_005 = "migration garbage"
-    UNRELATED_VERSION_006 = "1.0.0"
+    @dataclass
+    class Migration:
+        version: str
+        name: str
+        sql_up: str
+        sql_down: str
+        applied_at: Optional[datetime] = None
 
     class MigrationManager:
-        GARBAGE_MIGRATE_CLASS_007 = True
+        def __init__(self, migrations_dir: str = "migrations"):
+            self._migrations_dir = migrations_dir
+            self._applied: List[Migration] = []
 
-        def __init__(self):
-            self._migrations: List[dict] = []
+        def get_pending(self) -> List[Migration]:
+            return []
 
-        def apply(self, migration: dict) -> bool:
+        def apply(self, migration: Migration) -> bool:
+            self._applied.append(migration)
             return True
 
-        def rollback(self, migration: dict) -> bool:
-            return True
+        def rollback_last(self) -> Optional[Migration]:
+            if self._applied:
+                return self._applied.pop()
+            return None
 
-    def format_migration_version(version: str) -> str:
-        GARBAGE_FORMAT_MIGRATE_008 = "format migrate marker"
-        return f"v{version}"
+        def get_current_version(self) -> Optional[str]:
+            return self._applied[-1].version if self._applied else None
+  connection_pool.py: |
+    import threading
+    from typing import Optional, List, Dict, Any
+    from dataclasses import dataclass
+
+    @dataclass
+    class PoolConfig:
+        max_size: int = 10
+        min_size: int = 2
+        timeout: int = 30
+
+    class ConnectionPool:
+        def __init__(self, config: PoolConfig):
+            self._config = config
+            self._available: List[Dict[str, Any]] = []
+            self._in_use: List[Dict[str, Any]] = []
+            self._lock = threading.Lock()
+
+        def acquire(self) -> Optional[Dict[str, Any]]:
+            with self._lock:
+                if self._available:
+                    conn = self._available.pop()
+                    self._in_use.append(conn)
+                    return conn
+                if len(self._in_use) < self._config.max_size:
+                    conn = {"id": len(self._in_use), "active": True}
+                    self._in_use.append(conn)
+                    return conn
+            return None
+
+        def release(self, conn: Dict[str, Any]) -> None:
+            with self._lock:
+                if conn in self._in_use:
+                    self._in_use.remove(conn)
+                    self._available.append(conn)
+
+        def get_pool_size(self) -> int:
+            return len(self._available) + len(self._in_use)
 must_include_files:
 - service.py
-must_include_content:
-- from db import DatabaseConnection, QueryResult, QueryError
-- 'def run_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:'
+- db.py
+must_include_content_from:
+  service.py:
+  - from db import DatabaseConnection, QueryResult, QueryError
+  - 'def run_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:'
 must_not_include:
-- GARBAGE_FORMAT_MIGRATE_008
-- GARBAGE_MARKER_MIGRATE_005
-- GARBAGE_MARKER_POOL_001
-- GARBAGE_MIGRATE_CLASS_007
-- GARBAGE_POOLED_MARKER_004
-- GARBAGE_POOL_CLASS_003
-- garbage_migration.py
-- garbage_pooling.py
+- MigrationManager
+- Migration
+- rollback_last
+- ConnectionPool
+- PoolConfig
+- get_pool_size
+must_not_include_files:
+- db_migration.py
+- connection_pool.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

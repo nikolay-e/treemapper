@@ -1,3 +1,24 @@
+# Test 017: TypeScript Dockerfile rewritten to proper 2-stage multi-stage
+#           — reviewer needs tsconfig and package.json to verify build paths
+#
+# Scenario: TypeScript API Dockerfile rewritten from single-stage (npm install + build
+# in one layer) to proper 2-stage multi-stage. Production deps separated via cp -R trick.
+# HEALTHCHECK added using Node http module against /health endpoint.
+#
+# Reviewer questions:
+#   Q1: "Does tsconfig.json set outDir=./dist matching COPY --from=builder /app/dist?"
+#       -> tsconfig.json has `"outDir": "./dist"`. Reviewer needs this to verify
+#       the build output path matches what the Dockerfile copies.
+#   Q2: "Does package.json define 'build' script for RUN npm run build?"
+#       -> package.json has `"build": "tsc"`. Reviewer verifies the command exists.
+#   Q3: "Does src/index.ts expose GET /health for the HEALTHCHECK?"
+#       -> src/index.ts has `app.get('/health', ...)`. Confirms endpoint exists.
+#
+# Not needed:
+#   - scripts/deploy.sh: pushes docker image, does not inform build structure.
+#   - tests/api.test.ts: shares /health reference but is test infrastructure.
+#   - migrations/001_init.sql: database schema, completely unrelated to Docker build.
+
 initial:
   package.json: |
     {
@@ -43,13 +64,17 @@ initial:
     #!/bin/bash
     docker push myregistry/api:latest
   tests/api.test.ts: |
+    import request from 'supertest';
     describe('API', () => {
-      it('should return health', () => {});
+      it('should return health', async () => {
+        const res = await request(app).get('/health');
+        expect(res.statusCode).toBe(200);
+      });
     });
-  docs/architecture.md: |
-    # Architecture
   migrations/001_init.sql: |
-    CREATE TABLE users (id SERIAL PRIMARY KEY);
+    CREATE TABLE users (id SERIAL PRIMARY KEY, name VARCHAR(100));
+    CREATE TABLE sessions (id SERIAL PRIMARY KEY, user_id INT REFERENCES users(id));
+
 changed:
   package.json: |
     {
@@ -125,16 +150,50 @@ changed:
     #!/bin/bash
     docker push myregistry/api:latest
   tests/api.test.ts: |
+    import request from 'supertest';
     describe('API', () => {
-      it('should return health', () => {});
+      it('should return health', async () => {
+        const res = await request(app).get('/health');
+        expect(res.statusCode).toBe(200);
+      });
     });
-  docs/architecture.md: |
-    # Architecture
   migrations/001_init.sql: |
-    CREATE TABLE users (id SERIAL PRIMARY KEY);
+    CREATE TABLE users (id SERIAL PRIMARY KEY, name VARCHAR(100));
+    CREATE TABLE sessions (id SERIAL PRIMARY KEY, user_id INT REFERENCES users(id));
+
 must_include_files:
-- Dockerfile
-must_include_content:
-- COPY package*.json ./
+  - Dockerfile
+  # Q1: Does outDir match the COPY path from builder stage?
+  - tsconfig.json
+  # Q2: Does "build" script exist for RUN npm run build?
+  - package.json
+
+must_include_content_from:
+  Dockerfile:
+    - COPY package*.json ./
+    - COPY tsconfig.json ./
+    - RUN npm run build
+    - CMD ["node", "dist/index.js"]
+  tsconfig.json:
+    - '"outDir": "./dist"'
+  package.json:
+    - '"build": "tsc"'
+
+must_not_include:
+  # --- deploy.sh: pushes image, doesn't inform build stage review ---
+  - docker push myregistry
+  # --- tests: test infrastructure, mentions /health but not build-relevant ---
+  - supertest
+  - "should return health"
+  # --- migrations: database schema, unrelated to Docker build ---
+  - CREATE TABLE users
+  - CREATE TABLE sessions
+must_not_include_files:
+  - scripts/deploy.sh
+  - tests/api.test.ts
+  - migrations/001_init.sql
+
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

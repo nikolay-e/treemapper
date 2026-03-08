@@ -1,3 +1,23 @@
+# Scenario: main() adds a return value while still calling do_work() from
+#   helper module. Only main.py is changed.
+#
+# Diff shows:
+#   + return 1   (added after do_work() call)
+#
+# Reviewer questions:
+#   Q1: "What does do_work() do — does it return something main should use?"
+#       -> do_work() returns None (pass). The diff ignores its return value
+#         and returns 1 separately. Reviewer should verify do_work() is
+#         called for side effects only.
+#
+# Not needed for comprehension:
+#   - scheduler.py: Also imports do_work from helper. HARDEST TRAP: same
+#     `from helper import do_work` statement. But how the scheduler uses
+#     do_work() doesn't help review main.py's change.
+#
+#   - cli.py: Defines its own main() function. Name collision trap. But
+#     different module, no import relationship to helper.
+
 initial:
   main.py: |
     from helper import do_work
@@ -7,38 +27,22 @@ initial:
   helper.py: |
     def do_work():
         pass
-  # --- Tricky garbage: same import "from helper import do_work" ---
-  garbage_helper_consumer.py: |
+  scheduler.py: |
     from helper import do_work
-    GARBAGE_PPR_009_HELPER_IMPORT_A = "helper_import_consumer"
-    GARBAGE_PPR_009_HELPER_IMPORT_B = True
 
-    class HelperConsumer:
-        def run(self):
+    class TaskScheduler:
+        def run_scheduled(self):
             return do_work()
 
-        def report(self):
-            return "helper_consumed"
-  # --- Tricky garbage: same function name "main" in different module ---
-  garbage_main_collision.py: |
-    GARBAGE_PPR_009_MAIN_COLLISION_C = "main_collision"
-    GARBAGE_PPR_009_MAIN_COLLISION_D = 55
-
+        def schedule(self, task_name):
+            return f"scheduled: {task_name}"
+  cli.py: |
     def main():
-        return "completely_different_main"
+        return "cli_entry_point"
 
-    def main_wrapper():
-        return main() + "_wrapped"
-  # --- Tricky garbage: same directory sibling with import pattern ---
-  garbage_import_sibling.py: |
-    GARBAGE_PPR_009_IMPORT_SIBLING_E = "import_sibling"
-    GARBAGE_PPR_009_IMPORT_SIBLING_F = 33
+    def parse_args(argv):
+        return {"verbose": False}
 
-    def sibling_work():
-        return "sibling_result"
-
-    def sibling_caller():
-        return sibling_work() + "_called"
 changed:
   main.py: |
     from helper import do_work
@@ -49,62 +53,43 @@ changed:
   helper.py: |
     def do_work():
         pass
-  garbage_helper_consumer.py: |
+  scheduler.py: |
     from helper import do_work
-    GARBAGE_PPR_009_HELPER_IMPORT_A = "helper_import_consumer"
-    GARBAGE_PPR_009_HELPER_IMPORT_B = True
 
-    class HelperConsumer:
-        def run(self):
+    class TaskScheduler:
+        def run_scheduled(self):
             return do_work()
 
-        def report(self):
-            return "helper_consumed"
-  garbage_main_collision.py: |
-    GARBAGE_PPR_009_MAIN_COLLISION_C = "main_collision"
-    GARBAGE_PPR_009_MAIN_COLLISION_D = 55
-
+        def schedule(self, task_name):
+            return f"scheduled: {task_name}"
+  cli.py: |
     def main():
-        return "completely_different_main"
+        return "cli_entry_point"
 
-    def main_wrapper():
-        return main() + "_wrapped"
-  garbage_import_sibling.py: |
-    GARBAGE_PPR_009_IMPORT_SIBLING_E = "import_sibling"
-    GARBAGE_PPR_009_IMPORT_SIBLING_F = 33
-
-    def sibling_work():
-        return "sibling_result"
-
-    def sibling_caller():
-        return sibling_work() + "_called"
-
-# === Assertions ===
+    def parse_args(argv):
+        return {"verbose": False}
 
 must_include_files:
-- main.py
+  - main.py
 
 must_include_content_from:
   main.py:
-    - 'def main():'
-    - do_work()
-    - return 1
+    - "def main():"
+    - "do_work()"
+    - "return 1"
 
 must_not_include:
-# Tricky: same import from helper
-- GARBAGE_PPR_009_HELPER_IMPORT_A
-- GARBAGE_PPR_009_HELPER_IMPORT_B
-# Tricky: name collision with main()
-- GARBAGE_PPR_009_MAIN_COLLISION_C
-- GARBAGE_PPR_009_MAIN_COLLISION_D
-# Tricky: same directory sibling
-- GARBAGE_PPR_009_IMPORT_SIBLING_E
-- GARBAGE_PPR_009_IMPORT_SIBLING_F
+  # --- scheduler.py: same `from helper import do_work` import ---
+  - TaskScheduler
+  - run_scheduled
+  - "schedule"
+  # --- cli.py: defines main() — name collision ---
+  - cli_entry_point
+  - parse_args
 
 must_not_include_files:
-- garbage_helper_consumer.py
-- garbage_main_collision.py
-- garbage_import_sibling.py
+  - scheduler.py
+  - cli.py
 
 max_fragments: 4
 max_files: 2

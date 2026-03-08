@@ -1,3 +1,32 @@
+# Scenario: loader.py replaces a stub with real importlib-based plugin
+#   loading. It dynamically imports from plugins/ directory and calls
+#   module.execute(data). Plugins (plugin_csv, plugin_json) are unchanged.
+#
+# Diff shows:
+#   + import importlib
+#   + def load(plugin_name: str): importlib.import_module(f"plugins.plugin_{plugin_name}")
+#   + def execute_plugin(plugin_name: str, data): module.execute(data)
+#
+# Reviewer questions:
+#   Q1: "Is importlib.import_module the right approach for plugin loading?"
+#       -> loader.py constructs module path as f"plugins.plugin_{plugin_name}".
+#          Reviewer verifies this matches the actual file naming convention.
+#
+#   Q2: "Do the existing plugins have the expected execute() interface?"
+#       -> plugins/plugin_csv.py (UNCHANGED) defines execute(data: list[dict]) -> str.
+#          plugins/plugin_json.py (UNCHANGED) also defines execute(data) -> str.
+#          Reviewer verifies both match what loader.py calls: module.execute(data).
+#
+# Not needed for comprehension:
+#   - extensions/notification_dispatcher.py: register/dispatch pattern with
+#     handlers dict. HARDEST TRAP: plugin-like dispatch pattern — register()
+#     adds handlers, dispatch() calls them by name. Same "load and execute
+#     by name" concept. But doesn't use importlib, doesn't load from
+#     plugins/ directory, no dependency on loader.py.
+#
+#   - telemetry/metrics_collector.py: MetricsCollector with increment/get.
+#     Unrelated domain (telemetry), no connection to plugin loading.
+
 initial:
   plugins/plugin_csv.py: |
     def execute(data: list[dict]) -> str:
@@ -23,38 +52,41 @@ initial:
 
     def list_available_plugins() -> list[str]:
         return ["csv", "json"]
-  garbage_notifications.py: |
-    GARBAGE_PY_042_NOTIFY_A = "notification dispatch marker"
-    GARBAGE_PY_042_EMAIL_B = "email notification marker"
+  extensions/notification_dispatcher.py: |
+    from typing import Callable
 
     class NotificationDispatcher:
-        GARBAGE_PY_042_DISPATCH_C = "dispatcher marker"
-
         def __init__(self):
-            self._handlers = {}
+            self._handlers: dict[str, Callable] = {}
 
-        def register(self, channel: str, handler) -> None:
+        def register(self, channel: str, handler: Callable) -> None:
             self._handlers[channel] = handler
 
         def dispatch(self, channel: str, message: str) -> bool:
-            GARBAGE_PY_042_SEND_D = "send marker"
-            return channel in self._handlers
-  garbage_metrics.py: |
-    GARBAGE_PY_042_METRICS_E = "metrics collection marker"
-    GARBAGE_PY_042_COUNTER_F = "counter metric marker"
+            handler = self._handlers.get(channel)
+            if handler:
+                handler(message)
+                return True
+            return False
+
+        def list_channels(self) -> list[str]:
+            return list(self._handlers.keys())
+  telemetry/metrics_collector.py: |
+    from typing import Optional
 
     class MetricsCollector:
-        GARBAGE_PY_042_COLLECTOR_G = True
-
-        def __init__(self):
-            self._counters = {}
+        def __init__(self, prefix: str = "app"):
+            self.prefix = prefix
+            self._counters: dict[str, int] = {}
 
         def increment(self, metric_name: str, value: int = 1) -> None:
-            self._counters[metric_name] = self._counters.get(metric_name, 0) + value
+            key = f"{self.prefix}.{metric_name}"
+            self._counters[key] = self._counters.get(key, 0) + value
 
         def get_value(self, metric_name: str) -> int:
-            GARBAGE_PY_042_VALUE_H = "value marker"
-            return self._counters.get(metric_name, 0)
+            key = f"{self.prefix}.{metric_name}"
+            return self._counters.get(key, 0)
+
 changed:
   plugins/plugin_csv.py: |
     def execute(data: list[dict]) -> str:
@@ -87,53 +119,72 @@ changed:
 
     def list_available_plugins() -> list[str]:
         return ["csv", "json"]
-  garbage_notifications.py: |
-    GARBAGE_PY_042_NOTIFY_A = "notification dispatch marker"
-    GARBAGE_PY_042_EMAIL_B = "email notification marker"
+  extensions/notification_dispatcher.py: |
+    from typing import Callable
 
     class NotificationDispatcher:
-        GARBAGE_PY_042_DISPATCH_C = "dispatcher marker"
-
         def __init__(self):
-            self._handlers = {}
+            self._handlers: dict[str, Callable] = {}
 
-        def register(self, channel: str, handler) -> None:
+        def register(self, channel: str, handler: Callable) -> None:
             self._handlers[channel] = handler
 
         def dispatch(self, channel: str, message: str) -> bool:
-            GARBAGE_PY_042_SEND_D = "send marker"
-            return channel in self._handlers
-  garbage_metrics.py: |
-    GARBAGE_PY_042_METRICS_E = "metrics collection marker"
-    GARBAGE_PY_042_COUNTER_F = "counter metric marker"
+            handler = self._handlers.get(channel)
+            if handler:
+                handler(message)
+                return True
+            return False
+
+        def list_channels(self) -> list[str]:
+            return list(self._handlers.keys())
+  telemetry/metrics_collector.py: |
+    from typing import Optional
 
     class MetricsCollector:
-        GARBAGE_PY_042_COLLECTOR_G = True
-
-        def __init__(self):
-            self._counters = {}
+        def __init__(self, prefix: str = "app"):
+            self.prefix = prefix
+            self._counters: dict[str, int] = {}
 
         def increment(self, metric_name: str, value: int = 1) -> None:
-            self._counters[metric_name] = self._counters.get(metric_name, 0) + value
+            key = f"{self.prefix}.{metric_name}"
+            self._counters[key] = self._counters.get(key, 0) + value
 
         def get_value(self, metric_name: str) -> int:
-            GARBAGE_PY_042_VALUE_H = "value marker"
-            return self._counters.get(metric_name, 0)
+            key = f"{self.prefix}.{metric_name}"
+            return self._counters.get(key, 0)
+
 must_include_files:
-- loader.py
-must_include_content:
-- import importlib
-- 'def load(plugin_name: str):'
+  - loader.py
+  # Q2: plugin_csv.py defines execute() interface that loader.py calls
+  - plugins/plugin_csv.py
+
+must_include_content_from:
+  loader.py:
+    - "import importlib"
+    - 'def load(plugin_name: str):'
+    - 'importlib.import_module(f"plugins.plugin_{plugin_name}")'
+    - "module.execute(data)"
+  plugins/plugin_csv.py:
+    - "def execute(data: list[dict]) -> str:"
+
 must_not_include:
-- GARBAGE_PY_042_COLLECTOR_G
-- GARBAGE_PY_042_COUNTER_F
-- GARBAGE_PY_042_DISPATCH_C
-- GARBAGE_PY_042_EMAIL_B
-- GARBAGE_PY_042_METRICS_E
-- GARBAGE_PY_042_NOTIFY_A
-- GARBAGE_PY_042_SEND_D
-- GARBAGE_PY_042_VALUE_H
-- garbage_metrics.py
-- garbage_notifications.py
+  # --- notification_dispatcher.py: plugin-like dispatch pattern ---
+  # register/dispatch by name — same concept as load/execute. But
+  # uses callback handlers, not importlib. No dependency on loader.py.
+  - NotificationDispatcher
+  - list_channels
+  - dispatch
+  # --- metrics_collector.py: unrelated telemetry domain ---
+  - MetricsCollector
+  - increment
+  - get_value
+
+must_not_include_files:
+  - extensions/notification_dispatcher.py
+  - telemetry/metrics_collector.py
+
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

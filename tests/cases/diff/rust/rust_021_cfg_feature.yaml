@@ -1,7 +1,40 @@
+# Scenario: Adding a #[cfg(feature = "yaml")] conditional impl block for
+#   YAML serialization and a version field to Config. Only src/config.rs
+#   is changed.
+#
+# Diff shows:
+#   + #[cfg(feature = "yaml")] use serde_yaml;
+#   + pub version: String field on Config
+#   + version: "1.0.0".to_string() in Config::new()
+#   + #[cfg(feature = "yaml")] impl Config { from_yaml, to_yaml }
+#
+# Reviewer questions:
+#   Q1: "Is the yaml feature properly gated — does it mirror the json pattern?"
+#       -> Same file: #[cfg(feature = "json")] impl already exists with
+#          from_json/to_json. The new yaml block follows the same pattern.
+#          Reviewer verifies consistency of the cfg guards.
+#
+#   Q2: "Does the version field addition affect the existing json impl?"
+#       -> Same file: the json impl uses serde_json::from_str(s).unwrap()
+#          which deserializes into Config. Adding version field means JSON
+#          input must now include "version". Reviewer must check this.
+#
+# Not needed for comprehension:
+#   - src/toml_loader.rs: TomlConfig with HashMap<String, HashMap<...>>.
+#     HARDEST TRAP: "config format loader" domain overlap — TOML is another
+#     serialization format like YAML. Same crate, same concept of loading
+#     config from a format. But TomlConfig is a separate struct, not Config.
+#     No shared types, no import of Config or serde_yaml.
+#
+#   - src/schema.rs: SchemaField with SchemaType enum for validation.
+#     "Config" vocabulary overlap — schema validation is conceptually
+#     related to config structure. But independent module with no
+#     dependency on Config struct or feature flags.
 initial:
   src/lib.rs: |
     pub mod config;
-    pub mod unrelated;
+    pub mod toml_loader;
+    pub mod schema;
   src/config.rs: |
     use std::collections::HashMap;
 
@@ -40,49 +73,70 @@ initial:
             serde_json::to_string(self).unwrap()
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod telemetry;
-    pub mod scheduler;
-  src/unrelated/telemetry.rs: |
-    // GARBAGE_RUST_021_TELEMETRY_A
-    pub const GARBAGE_RUST_021_TEL_CONST_B: &str = "unrelated_telemetry";
+  src/toml_loader.rs: |
+    use std::collections::HashMap;
 
-    pub struct GarbageTelemetryEmitter021 {
-        endpoint: String,
-        buffer_size: usize,
+    pub struct TomlConfig {
+        sections: HashMap<String, HashMap<String, String>>,
     }
 
-    impl GarbageTelemetryEmitter021 {
-        pub fn garbage_emit_021(&self, event: &str) {
-            println!("Emitting to {}: {}", self.endpoint, event);
+    impl TomlConfig {
+        pub fn new() -> Self {
+            Self { sections: HashMap::new() }
         }
 
-        pub fn garbage_flush_021(&mut self) {
-            println!("Flushing {} items", self.buffer_size);
-            self.buffer_size = 0;
+        pub fn get_section(&self, name: &str) -> Option<&HashMap<String, String>> {
+            self.sections.get(name)
+        }
+
+        pub fn set_value(&mut self, section: &str, key: &str, value: &str) {
+            self.sections
+                .entry(section.to_string())
+                .or_insert_with(HashMap::new)
+                .insert(key.to_string(), value.to_string());
+        }
+
+        pub fn sections(&self) -> Vec<&String> {
+            self.sections.keys().collect()
         }
     }
-  src/unrelated/scheduler.rs: |
-    // GARBAGE_RUST_021_SCHEDULER_C
-    pub const GARBAGE_RUST_021_INTERVAL_D: u64 = 30000;
-
-    pub struct GarbageTaskScheduler021 {
-        tasks: Vec<String>,
+  src/schema.rs: |
+    #[derive(Debug)]
+    pub enum SchemaType {
+        String,
+        Integer,
+        Boolean,
+        Array(Box<SchemaType>),
     }
 
-    impl GarbageTaskScheduler021 {
-        pub fn garbage_schedule_021(&mut self, task: &str) {
-            self.tasks.push(task.to_string());
+    pub struct SchemaField {
+        name: String,
+        field_type: SchemaType,
+        required: bool,
+    }
+
+    impl SchemaField {
+        pub fn new(name: &str, field_type: SchemaType, required: bool) -> Self {
+            Self {
+                name: name.to_string(),
+                field_type,
+                required,
+            }
         }
 
-        pub fn garbage_run_pending_021(&self) -> usize {
-            self.tasks.len()
+        pub fn is_required(&self) -> bool {
+            self.required
+        }
+
+        pub fn name(&self) -> &str {
+            &self.name
         }
     }
 changed:
   src/lib.rs: |
     pub mod config;
-    pub mod unrelated;
+    pub mod toml_loader;
+    pub mod schema;
   src/config.rs: |
     use std::collections::HashMap;
 
@@ -137,57 +191,93 @@ changed:
             serde_yaml::to_string(self).unwrap()
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod telemetry;
-    pub mod scheduler;
-  src/unrelated/telemetry.rs: |
-    // GARBAGE_RUST_021_TELEMETRY_A
-    pub const GARBAGE_RUST_021_TEL_CONST_B: &str = "unrelated_telemetry";
+  src/toml_loader.rs: |
+    use std::collections::HashMap;
 
-    pub struct GarbageTelemetryEmitter021 {
-        endpoint: String,
-        buffer_size: usize,
+    pub struct TomlConfig {
+        sections: HashMap<String, HashMap<String, String>>,
     }
 
-    impl GarbageTelemetryEmitter021 {
-        pub fn garbage_emit_021(&self, event: &str) {
-            println!("Emitting to {}: {}", self.endpoint, event);
+    impl TomlConfig {
+        pub fn new() -> Self {
+            Self { sections: HashMap::new() }
         }
 
-        pub fn garbage_flush_021(&mut self) {
-            println!("Flushing {} items", self.buffer_size);
-            self.buffer_size = 0;
+        pub fn get_section(&self, name: &str) -> Option<&HashMap<String, String>> {
+            self.sections.get(name)
+        }
+
+        pub fn set_value(&mut self, section: &str, key: &str, value: &str) {
+            self.sections
+                .entry(section.to_string())
+                .or_insert_with(HashMap::new)
+                .insert(key.to_string(), value.to_string());
+        }
+
+        pub fn sections(&self) -> Vec<&String> {
+            self.sections.keys().collect()
         }
     }
-  src/unrelated/scheduler.rs: |
-    // GARBAGE_RUST_021_SCHEDULER_C
-    pub const GARBAGE_RUST_021_INTERVAL_D: u64 = 30000;
-
-    pub struct GarbageTaskScheduler021 {
-        tasks: Vec<String>,
+  src/schema.rs: |
+    #[derive(Debug)]
+    pub enum SchemaType {
+        String,
+        Integer,
+        Boolean,
+        Array(Box<SchemaType>),
     }
 
-    impl GarbageTaskScheduler021 {
-        pub fn garbage_schedule_021(&mut self, task: &str) {
-            self.tasks.push(task.to_string());
+    pub struct SchemaField {
+        name: String,
+        field_type: SchemaType,
+        required: bool,
+    }
+
+    impl SchemaField {
+        pub fn new(name: &str, field_type: SchemaType, required: bool) -> Self {
+            Self {
+                name: name.to_string(),
+                field_type,
+                required,
+            }
         }
 
-        pub fn garbage_run_pending_021(&self) -> usize {
-            self.tasks.len()
+        pub fn is_required(&self) -> bool {
+            self.required
+        }
+
+        pub fn name(&self) -> &str {
+            &self.name
         }
     }
 must_include_files:
-- src/config.rs
-must_include_content:
-- use serde_yaml;
-- 'pub fn from_yaml(s: &str) -> Self {'
+  - src/config.rs
+
+must_include_content_from:
+  src/config.rs:
+    - "use serde_yaml;"
+    - '#[cfg(feature = "yaml")]'
+    - 'pub fn from_yaml(s: &str) -> Self {'
+    - "pub version: String"
+
 must_not_include:
-- GARBAGE_RUST_021_INTERVAL_D
-- GARBAGE_RUST_021_SCHEDULER_C
-- GARBAGE_RUST_021_TELEMETRY_A
-- GARBAGE_RUST_021_TEL_CONST_B
-- mod.rs
-- scheduler.rs
-- telemetry.rs
+  # --- src/toml_loader.rs: config format loader, domain overlap ---
+  # TomlConfig loads from another serialization format — same concept
+  # as the new YAML impl. Same crate. But separate struct, no import.
+  - TomlConfig
+  - get_section
+  - set_value
+  # --- src/schema.rs: config validation, "config" vocabulary ---
+  # SchemaField and SchemaType enum — validation conceptually related
+  # to config structure. But independent module, no Config dependency.
+  - SchemaType
+  - SchemaField
+  - is_required
+
+must_not_include_files:
+  - src/toml_loader.rs
+  - src/schema.rs
+
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

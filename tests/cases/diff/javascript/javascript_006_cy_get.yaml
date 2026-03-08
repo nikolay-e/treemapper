@@ -1,3 +1,20 @@
+# Scenario: Cypress test imports selector constants for cy.get() calls.
+#
+# Diff: form.cy.ts is written from scratch importing FORM_SELECTORS from form.ts
+# and using them in cy.get(FORM_SELECTORS.nameInput), etc.
+#
+# Reviewer questions:
+#   Q1: "What data-testid values do these selectors map to?"
+#       -> form.ts (UNCHANGED) exports FORM_SELECTORS with nameInput,
+#          emailInput, submitButton mapped to data-testid attributes.
+#          The reviewer must verify the selectors match actual DOM elements.
+#
+# Not needed:
+#   - form.validators.ts: validates form input values (email format, name length).
+#     The Cypress test fills inputs and clicks submit — doesn't call validators.
+#   - api-client.ts: HTTP client for submitting form data to backend.
+#     The Cypress test checks UI behavior, not API implementation.
+
 initial:
   form.ts: |
     export const FORM_SELECTORS = {
@@ -7,28 +24,24 @@ initial:
     };
   form.cy.ts: |
     console.log('initial');
-  garbage_auditing.ts: |
-    const GARBAGE_JS_006_AUDIT_MARKER_A = "auditing";
-    const GARBAGE_JS_006_TRAIL_MARKER_B = true;
-
-    class AuditTrailWriter {
-        static GARBAGE_JS_006_WRITER_CLASS_C = "writer";
-
-        record(action: string): void {
-            // noop
-        }
+  form.validators.ts: |
+    export function isValidEmail(email: string): boolean {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     }
-  garbage_encryption.ts: |
-    const GARBAGE_JS_006_CIPHER_MARKER_D = "encryption";
-    const GARBAGE_JS_006_KEY_MARKER_E = 42;
 
-    class CipherEngine {
-        static GARBAGE_JS_006_ENGINE_CLASS_F = true;
-
-        encrypt(data: string): string {
-            return data;
-        }
+    export function isValidName(name: string): boolean {
+        return name.trim().length >= 2;
     }
+  api-client.ts: |
+    export async function submitForm(data: { name: string; email: string }) {
+        const response = await fetch('/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return response.json();
+    }
+
 changed:
   form.ts: |
     export const FORM_SELECTORS = {
@@ -48,41 +61,42 @@ changed:
             cy.contains('Thank you').should('be.visible');
         });
     });
-  garbage_auditing.ts: |
-    const GARBAGE_JS_006_AUDIT_MARKER_A = "auditing";
-    const GARBAGE_JS_006_TRAIL_MARKER_B = true;
-
-    class AuditTrailWriter {
-        static GARBAGE_JS_006_WRITER_CLASS_C = "writer";
-
-        record(action: string): void {
-            // noop
-        }
+  form.validators.ts: |
+    export function isValidEmail(email: string): boolean {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     }
-  garbage_encryption.ts: |
-    const GARBAGE_JS_006_CIPHER_MARKER_D = "encryption";
-    const GARBAGE_JS_006_KEY_MARKER_E = 42;
 
-    class CipherEngine {
-        static GARBAGE_JS_006_ENGINE_CLASS_F = true;
-
-        encrypt(data: string): string {
-            return data;
-        }
+    export function isValidName(name: string): boolean {
+        return name.trim().length >= 2;
     }
+  api-client.ts: |
+    export async function submitForm(data: { name: string; email: string }) {
+        const response = await fetch('/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return response.json();
+    }
+
 must_include_files:
-- form.cy.ts
-must_include_content:
-- import { FORM_SELECTORS } from './form';
-- cy.visit('/contact');
+  # Q1: form.ts defines the selectors used by cy.get() calls
+  - form.ts
+must_include_content_from:
+  form.ts:
+    - "FORM_SELECTORS"
+    - "data-testid=name-input"
+    - "data-testid=submit-btn"
 must_not_include:
-- GARBAGE_JS_006_AUDIT_MARKER_A
-- GARBAGE_JS_006_CIPHER_MARKER_D
-- GARBAGE_JS_006_ENGINE_CLASS_F
-- GARBAGE_JS_006_KEY_MARKER_E
-- GARBAGE_JS_006_TRAIL_MARKER_B
-- GARBAGE_JS_006_WRITER_CLASS_C
-- garbage_auditing.ts
-- garbage_encryption.ts
+  # form.validators.ts: validation logic not invoked by Cypress test
+  - isValidEmail
+  - isValidName
+  # api-client.ts: backend submission, Cypress tests UI not API
+  - submitForm
+must_not_include_files:
+  - form.validators.ts
+  - api-client.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

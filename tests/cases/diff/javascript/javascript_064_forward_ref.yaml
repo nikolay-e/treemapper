@@ -1,5 +1,19 @@
+# Reviewer sees: Form.tsx creates a ref and passes it to Input component.
+# Q1: "Can Input accept a ref — is it forwardRef-wrapped?"
+#     -> Input.tsx: uses forwardRef<HTMLInputElement, InputProps>.
+#        Yes, ref forwarding is supported. Form's useRef type matches.
+# Q2: "What props does Input accept besides ref?"
+#     -> Input.tsx: label (required), type (optional, defaults to 'text').
+#        Form passes label="Email" type="email" — valid usage.
+#
+# Not needed:
+#   - TextArea.tsx: another forwardRef component. Same pattern but
+#     different HTML element, not used by Form.
+#   - form-validation.ts: validation logic. Different concern,
+#     unrelated to ref forwarding.
+
 initial:
-  Input.tsx: |
+  src/Input.tsx: |
     import { forwardRef } from 'react';
 
     interface InputProps {
@@ -15,32 +29,36 @@ initial:
             </div>
         )
     );
-  Form.tsx: |
-    console.log('initial');
-  garbage_metrics.ts: |
-    const GARBAGE_JS_064_METRIC_MARKER_A = "metrics";
-    const GARBAGE_JS_064_COUNTER_MARKER_B = 42;
-
-    class MetricsCollector {
-        static GARBAGE_JS_064_COLLECTOR_CLASS_C = "collector";
-
-        record(name: string, value: number): void {
-            // noop
-        }
+  src/Form.tsx: |
+    export function Form() {
+        return <form>Placeholder</form>;
     }
-  garbage_notifications.ts: |
-    const GARBAGE_JS_064_NOTIFY_MARKER_D = "notifications";
-    const GARBAGE_JS_064_PUSH_MARKER_E = true;
+  src/TextArea.tsx: |
+    import { forwardRef } from 'react';
 
-    class NotificationBroadcaster {
-        static GARBAGE_JS_064_BROADCASTER_CLASS_F = true;
+    interface TextAreaProps {
+        label: string;
+        rows?: number;
+    }
 
-        broadcast(channel: string, message: string): void {
-            // noop
-        }
+    export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
+        ({ label, rows = 3 }, ref) => (
+            <div>
+                <label>{label}</label>
+                <textarea ref={ref} rows={rows} />
+            </div>
+        )
+    );
+  src/form-validation.ts: |
+    export function validateRequired(value: string): string | null {
+        return value.trim().length === 0 ? 'This field is required' : null;
+    }
+
+    export function validateEmail(value: string): string | null {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Invalid email';
     }
 changed:
-  Input.tsx: |
+  src/Input.tsx: |
     import { forwardRef } from 'react';
 
     interface InputProps {
@@ -56,7 +74,7 @@ changed:
             </div>
         )
     );
-  Form.tsx: |
+  src/Form.tsx: |
     import { useRef } from 'react';
     import { Input } from './Input';
 
@@ -73,41 +91,46 @@ changed:
             </form>
         );
     }
-  garbage_metrics.ts: |
-    const GARBAGE_JS_064_METRIC_MARKER_A = "metrics";
-    const GARBAGE_JS_064_COUNTER_MARKER_B = 42;
+  src/TextArea.tsx: |
+    import { forwardRef } from 'react';
 
-    class MetricsCollector {
-        static GARBAGE_JS_064_COLLECTOR_CLASS_C = "collector";
-
-        record(name: string, value: number): void {
-            // noop
-        }
+    interface TextAreaProps {
+        label: string;
+        rows?: number;
     }
-  garbage_notifications.ts: |
-    const GARBAGE_JS_064_NOTIFY_MARKER_D = "notifications";
-    const GARBAGE_JS_064_PUSH_MARKER_E = true;
 
-    class NotificationBroadcaster {
-        static GARBAGE_JS_064_BROADCASTER_CLASS_F = true;
+    export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
+        ({ label, rows = 3 }, ref) => (
+            <div>
+                <label>{label}</label>
+                <textarea ref={ref} rows={rows} />
+            </div>
+        )
+    );
+  src/form-validation.ts: |
+    export function validateRequired(value: string): string | null {
+        return value.trim().length === 0 ? 'This field is required' : null;
+    }
 
-        broadcast(channel: string, message: string): void {
-            // noop
-        }
+    export function validateEmail(value: string): string | null {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Invalid email';
     }
 must_include_files:
-- Form.tsx
-must_include_content:
-- import { useRef } from 'react';
-- emailRef = useRef<HTMLInputElement>(null)
+  # Unchanged file — the import target. Reviewer needs to confirm
+  # Input uses forwardRef and its props match what Form passes.
+  - src/Input.tsx
+must_include_content_from:
+  src/Input.tsx:
+    - "forwardRef<HTMLInputElement, InputProps>"
+    - "InputProps"
 must_not_include:
-- GARBAGE_JS_064_BROADCASTER_CLASS_F
-- GARBAGE_JS_064_COLLECTOR_CLASS_C
-- GARBAGE_JS_064_COUNTER_MARKER_B
-- GARBAGE_JS_064_METRIC_MARKER_A
-- GARBAGE_JS_064_NOTIFY_MARKER_D
-- GARBAGE_JS_064_PUSH_MARKER_E
-- garbage_metrics.ts
-- garbage_notifications.ts
+  # TextArea.tsx: different forwardRef component, not used by Form
+  - TextAreaProps
+  - textarea
+  # form-validation.ts: validation logic, unrelated to ref forwarding
+  - validateRequired
+  - validateEmail
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,21 @@
+# Scenario: New file creates infer-based utility types operating on imported functions.
+#
+# Diff: infer_types.ts imports createUser, fetchData, EventHandler from functions.ts
+# and applies ReturnTypeOf, PromiseType, ExtractEventType to extract types from them.
+#
+# Reviewer questions:
+#   Q1: "What does ReturnTypeOf<typeof createUser> resolve to?" -> functions.ts
+#        (UNCHANGED) shows createUser returns { id: string; name: string; age: number }.
+#        The reviewer must see the signature to understand what infer extracts.
+#   Q2: "What is EventHandler<T>?" -> functions.ts defines (event: T) => void.
+#        ExtractEventType uses infer to pull T out of this generic.
+#
+# Not needed:
+#   - src/types/extract.ts: also uses `infer R` but for class method extraction.
+#     Same keyword, different pattern, no import edge from infer_types.ts.
+#   - src/utils/promise.ts: runtime promise utilities (delay, timeout, retry).
+#     Lexical overlap with "Promise" but no type-level dependency.
+
 initial:
   src/functions.ts: |
     export function createUser(name: string, age: number): { id: string; name: string; age: number } {
@@ -12,56 +30,25 @@ initial:
     export type EventHandler<T> = (event: T) => void;
   src/infer_types.ts: |
     console.log('initial');
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_025_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/types/extract.ts: |
+    type MethodNames<T> = {
+        [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
+    }[keyof T];
+
+    type MethodReturnType<T, K extends keyof T> =
+        T[K] extends (...args: any[]) => infer R ? R : never;
+  src/utils/promise.ts: |
+    export function delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // GARBAGE_FE_025_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function timeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+        return Promise.race([
+            promise,
+            delay(ms).then(() => { throw new Error(`Timeout after ${ms}ms`); }),
+        ]);
     }
 
-    // GARBAGE_FE_025_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_025_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
-    }
-
-    // GARBAGE_FE_025_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 changed:
   src/functions.ts: |
     export function createUser(name: string, age: number): { id: string; name: string; age: number } {
@@ -83,83 +70,46 @@ changed:
 
     export type FirstArgument<T> = T extends (first: infer F, ...args: any[]) => any ? F : never;
 
-    export type AllArguments<T> = T extends (...args: infer A) => any ? A : never;
-
-    export type ArrayElement<T> = T extends (infer U)[] ? U : never;
-
     export type ExtractEventType<T> = T extends EventHandler<infer E> ? E : never;
 
     export type UserReturn = ReturnTypeOf<typeof createUser>;
+  src/types/extract.ts: |
+    type MethodNames<T> = {
+        [K in keyof T]: T[K] extends (...args: any[]) => any ? K : never;
+    }[keyof T];
 
-    type UnpackPromise<T> = T extends Promise<infer U>
-        ? U extends Promise<infer V>
-            ? UnpackPromise<V>
-            : U
-        : T;
-
-    export type DeepPromise = UnpackPromise<Promise<Promise<Promise<string>>>>;
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_025_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+    type MethodReturnType<T, K extends keyof T> =
+        T[K] extends (...args: any[]) => infer R ? R : never;
+  src/utils/promise.ts: |
+    export function delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // GARBAGE_FE_025_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function timeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+        return Promise.race([
+            promise,
+            delay(ms).then(() => { throw new Error(`Timeout after ${ms}ms`); }),
+        ]);
     }
 
-    // GARBAGE_FE_025_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_025_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
-    }
-
-    // GARBAGE_FE_025_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 must_include_files:
-- src/infer_types.ts
-must_include_content:
-- import { createUser, fetchData, EventHandler } from './functions';
-- 'type ReturnTypeOf<T> = T extends (...args: any[]) => infer R ? R : never;'
+  # Q1+Q2: functions.ts defines the function signatures that infer operates on
+  - src/functions.ts
+must_include_content_from:
+  src/functions.ts:
+    - "function createUser(name: string, age: number)"
+    - "type EventHandler<T> = (event: T) => void"
 must_not_include:
-- GARBAGE_FE_025_COLOR_A
-- GARBAGE_FE_025_COLOR_B
-- GARBAGE_FE_025_CONTRAST_C
-- GARBAGE_FE_025_DEBOUNCE_D
-- GARBAGE_FE_025_THROTTLE_E
-- color_utils.ts
-- debounce_utils.ts
+  # extract.ts: uses infer but for class method extraction, no import edge
+  - MethodNames
+  - MethodReturnType
+  # promise.ts: runtime promise utilities, no type-level dependency
+  - delay
+  - timeout
+must_not_include_files:
+  - src/types/extract.ts
+  - src/utils/promise.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

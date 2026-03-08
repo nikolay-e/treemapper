@@ -221,7 +221,7 @@ def test_unreadable_ignore_file(temp_project, run_mapper, set_perms, caplog):
     ignore_file.write_text(".git/\n")
     set_perms(ignore_file, 0o000)
 
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, logger="treemapper"):
         assert run_mapper([".", "-o", "directory_tree.yaml", "--log-level", "warning"])
 
     assert any(
@@ -239,7 +239,7 @@ def test_bad_encoding_ignore_file(temp_project, run_mapper, caplog):
     except LookupError:
         pytest.skip("CP1251 codec not found")
 
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, logger="treemapper"):
         assert run_mapper([".", "-o", "directory_tree.yaml", "--log-level", "warning"])
 
     assert any(

@@ -1,3 +1,10 @@
+# Scenario: mod0 and mod2 change return values (100, 200); mod1/mod3/mod4 unchanged — normalization test
+# Changed: mod0.py returns 100, mod2.py returns 200 (both changed)
+# Reviewer needs: mod0.py (changed) + mod2.py (changed)
+# Trap: func_registry.py — defines func0/func2 with same names, name collision
+# Trap: numeric_processor.py — returns 100/200 like the changed values, value overlap
+# Trap: mod_validator.py — structural sibling matching modN naming convention
+
 initial:
   mod0.py: |
     def func0():
@@ -14,12 +21,7 @@ initial:
   mod4.py: |
     def func4():
         return 4
-
-  # --- Tricky garbage: same function naming pattern funcN ---
-  garbage_func_utils.py: |
-    GARBAGE_PPR026_FUNCUTIL_A = "utils"
-    GARBAGE_PPR026_FUNCUTIL_B = True
-
+  func_registry.py: |
     def func0():
         return "unrelated_zero"
 
@@ -27,16 +29,9 @@ initial:
         return "unrelated_two"
 
     class FuncRegistry:
-        GARBAGE_PPR026_REGISTRY_C = 999
-
         def get_func(self, n):
             return n
-
-  # --- Tricky garbage: returns numeric values like the diff ---
-  garbage_numeric_ops.py: |
-    GARBAGE_PPR026_NUMOPS_D = 100
-    GARBAGE_PPR026_NUMOPS_E = 200
-
+  numeric_processor.py: |
     def compute_hundred():
         return 100
 
@@ -44,16 +39,9 @@ initial:
         return 200
 
     class NumericProcessor:
-        GARBAGE_PPR026_PROCESSOR_F = "numeric"
-
         def process(self, value):
             return value * 100
-
-  # --- Tricky garbage: same directory, modN.py sibling pattern ---
-  garbage_mod_helper.py: |
-    GARBAGE_PPR026_MODHELP_G = "helper"
-    GARBAGE_PPR026_MODHELP_H = 42
-
+  mod_validator.py: |
     def mod_helper():
         return 0
 
@@ -76,10 +64,7 @@ changed:
   mod4.py: |
     def func4():
         return 4
-  garbage_func_utils.py: |
-    GARBAGE_PPR026_FUNCUTIL_A = "utils"
-    GARBAGE_PPR026_FUNCUTIL_B = True
-
+  func_registry.py: |
     def func0():
         return "unrelated_zero"
 
@@ -87,14 +72,9 @@ changed:
         return "unrelated_two"
 
     class FuncRegistry:
-        GARBAGE_PPR026_REGISTRY_C = 999
-
         def get_func(self, n):
             return n
-  garbage_numeric_ops.py: |
-    GARBAGE_PPR026_NUMOPS_D = 100
-    GARBAGE_PPR026_NUMOPS_E = 200
-
+  numeric_processor.py: |
     def compute_hundred():
         return 100
 
@@ -102,14 +82,9 @@ changed:
         return 200
 
     class NumericProcessor:
-        GARBAGE_PPR026_PROCESSOR_F = "numeric"
-
         def process(self, value):
             return value * 100
-  garbage_mod_helper.py: |
-    GARBAGE_PPR026_MODHELP_G = "helper"
-    GARBAGE_PPR026_MODHELP_H = 42
-
+  mod_validator.py: |
     def mod_helper():
         return 0
 
@@ -131,22 +106,17 @@ must_include_content_from:
     - return 200
 
 must_not_include:
-# Tricky: same func0/func2 names
-- GARBAGE_PPR026_FUNCUTIL_A
-- GARBAGE_PPR026_FUNCUTIL_B
-- GARBAGE_PPR026_REGISTRY_C
-# Tricky: same numeric values 100/200
-- GARBAGE_PPR026_NUMOPS_D
-- GARBAGE_PPR026_NUMOPS_E
-- GARBAGE_PPR026_PROCESSOR_F
-# Tricky: structural sibling mod_helper
-- GARBAGE_PPR026_MODHELP_G
-- GARBAGE_PPR026_MODHELP_H
+- FuncRegistry
+- unrelated_zero
+- NumericProcessor
+- compute_hundred
+- mod_helper
+- mod_validator
 
 must_not_include_files:
-- garbage_func_utils.py
-- garbage_numeric_ops.py
-- garbage_mod_helper.py
+- func_registry.py
+- numeric_processor.py
+- mod_validator.py
 
 max_fragments: 6
 max_files: 3

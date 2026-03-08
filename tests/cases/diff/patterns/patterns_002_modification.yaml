@@ -1,3 +1,20 @@
+# Scenario: conftest.py fixture for UserService refactored to add teardown and admin_user fixture.
+#
+# Diff: tests/conftest.py changes user_service fixture (yield + clear) and adds admin_user fixture.
+#
+# Reviewer questions:
+#   Q1: "Does the teardown (service.users.clear()) affect existing tests?"
+#       -> tests/conftest.py (CHANGED) shows the fixture now yields and clears.
+#          tests/test_user_service.py (UNCHANGED) uses user_service and sample_user.
+#   Q2: "What is admin_user used for?"
+#       -> The new admin_user fixture creates a user with is_admin=True.
+#
+# Not needed:
+#   - utils/password_hasher.py: hashes and verifies passwords with bcrypt-like logic.
+#     Shares "user" vocabulary but no import or fixture dependency on UserService.
+#   - utils/session_store.py: in-memory session token storage.
+#     Related to authentication but has no dependency on conftest or UserService.
+
 initial:
   src/user_service.py: |
     from typing import Optional
@@ -42,20 +59,44 @@ initial:
     def test_get_user(user_service, sample_user):
         retrieved = user_service.get_user(sample_user.id)
         assert retrieved.name == "Test"
-  utils/garbage_email_validator.py: |
-    # GARBAGE_PAT_002_EMAIL_VALIDATOR_A
-    GARBAGE_PAT_002_EMAIL_REGEX_B = r"^[\w.-]+@[\w.-]+\.\w+$"
+  utils/password_hasher.py: |
+    import hashlib
+    import os
 
-    class GarbageEmailValidator:
-        def validate(self, email):
-            return "@" in email
-  utils/garbage_id_generator.py: |
-    # GARBAGE_PAT_002_ID_GENERATOR_A
-    GARBAGE_PAT_002_COUNTER_SEED_B = 100000
+    HASH_ALGORITHM = "sha256"
+    SALT_LENGTH = 16
 
-    class GarbageIdGenerator:
-        def next_id(self):
-            return 0
+    class PasswordHasher:
+        def hash_password(self, password: str) -> str:
+            salt = os.urandom(SALT_LENGTH).hex()
+            hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+            return f"{salt}:{hashed}"
+
+        def verify_password(self, password: str, stored_hash: str) -> bool:
+            salt, expected = stored_hash.split(":")
+            actual = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+            return actual == expected
+  utils/session_store.py: |
+    import time
+
+    SESSION_TTL = 3600
+    MAX_SESSIONS_PER_USER = 5
+
+    class SessionStore:
+        def __init__(self):
+            self._sessions: dict[str, dict] = {}
+
+        def create_session(self, user_id: str, token: str) -> None:
+            self._sessions[token] = {
+                "user_id": user_id,
+                "created_at": time.time(),
+            }
+
+        def get_session(self, token: str) -> dict | None:
+            session = self._sessions.get(token)
+            if session and time.time() - session["created_at"] < SESSION_TTL:
+                return session
+            return None
 changed:
   src/user_service.py: |
     from typing import Optional
@@ -108,31 +149,63 @@ changed:
     def test_get_user(user_service, sample_user):
         retrieved = user_service.get_user(sample_user.id)
         assert retrieved.name == "Test"
-  utils/garbage_email_validator.py: |
-    # GARBAGE_PAT_002_EMAIL_VALIDATOR_A
-    GARBAGE_PAT_002_EMAIL_REGEX_B = r"^[\w.-]+@[\w.-]+\.\w+$"
+  utils/password_hasher.py: |
+    import hashlib
+    import os
 
-    class GarbageEmailValidator:
-        def validate(self, email):
-            return "@" in email
-  utils/garbage_id_generator.py: |
-    # GARBAGE_PAT_002_ID_GENERATOR_A
-    GARBAGE_PAT_002_COUNTER_SEED_B = 100000
+    HASH_ALGORITHM = "sha256"
+    SALT_LENGTH = 16
 
-    class GarbageIdGenerator:
-        def next_id(self):
-            return 0
+    class PasswordHasher:
+        def hash_password(self, password: str) -> str:
+            salt = os.urandom(SALT_LENGTH).hex()
+            hashed = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+            return f"{salt}:{hashed}"
+
+        def verify_password(self, password: str, stored_hash: str) -> bool:
+            salt, expected = stored_hash.split(":")
+            actual = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
+            return actual == expected
+  utils/session_store.py: |
+    import time
+
+    SESSION_TTL = 3600
+    MAX_SESSIONS_PER_USER = 5
+
+    class SessionStore:
+        def __init__(self):
+            self._sessions: dict[str, dict] = {}
+
+        def create_session(self, user_id: str, token: str) -> None:
+            self._sessions[token] = {
+                "user_id": user_id,
+                "created_at": time.time(),
+            }
+
+        def get_session(self, token: str) -> dict | None:
+            session = self._sessions.get(token)
+            if session and time.time() - session["created_at"] < SESSION_TTL:
+                return session
+            return None
 must_include_files:
-- tests/conftest.py
-must_include_content:
-- service = UserService()
-- 'def admin_user(user_service):'
+  - tests/conftest.py
+must_include_content_from:
+  tests/conftest.py:
+    - "service = UserService()"
+    - "def admin_user(user_service):"
 must_not_include:
-- GARBAGE_PAT_002_COUNTER_SEED_B
-- GARBAGE_PAT_002_EMAIL_REGEX_B
-- GARBAGE_PAT_002_EMAIL_VALIDATOR_A
-- GARBAGE_PAT_002_ID_GENERATOR_A
-- garbage_email_validator.py
-- garbage_id_generator.py
+  # utils/password_hasher.py: password hashing, no import edge to UserService or conftest
+  - PasswordHasher
+  - HASH_ALGORITHM
+  - hash_password
+  # utils/session_store.py: session token storage, no dependency on conftest
+  - SessionStore
+  - SESSION_TTL
+  - create_session
+must_not_include_files:
+  - utils/password_hasher.py
+  - utils/session_store.py
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,56 +1,93 @@
-initial:
-  cleanup.sh: |
-    #!/bin/bash
+# Scenario: worker.sh adds INT/TERM and ERR trap handlers. Sources cleanup.sh.
+#
+# Reviewer questions:
+#   Q1: "What does cleanup() actually do?"
+#       -> cleanup.sh: removes /tmp/lockfile and /tmp/workdir.
+#   Q2: "Is LOCK_FILE consistent across both files?"
+#       -> cleanup.sh: LOCK_FILE="/tmp/lockfile", WORK_DIR="/tmp/workdir".
+#
+# Not needed:
+#   - scripts/watchdog.sh: monitors worker.sh via PID file.
+#     Doesn't define cleanup or traps.
+#   - scripts/cron_entry.sh: schedules worker.sh via crontab.
+#     Invocation wrapper, not signal handling.
+#   - scripts/supervisor.sh: HARDEST TRAP — sources cleanup.sh,
+#     installs its own trap for cleanup(), monitors worker.sh.
+#     Same source edge, same cleanup call. But supervision logic.
+#   - scripts/health_check.sh: checks LOCK_FILE existence.
+#     References same file path but for monitoring.
+#   - lib/signal_utils.sh: generic signal handling utilities.
+#     Related trap concern but not sourced by worker.sh.
 
-    cleanup() {
-        echo "Cleaning up..."
-        rm -f /tmp/lockfile
-        rm -rf /tmp/workdir
-    }
+initial:
   worker.sh: |
     #!/bin/bash
     source ./cleanup.sh
 
     trap cleanup EXIT
 
-    mkdir -p /tmp/workdir
-    touch /tmp/lockfile
+    mkdir -p "$WORK_DIR"
+    touch "$LOCK_FILE"
     echo "Working..."
-  unrelated/garbage_iptables.sh: |
-    #!/bin/bash
-    # GARBAGE_SH_015_IPTABLES_RULES_A
-    GARBAGE_SH_015_DEFAULT_POLICY_B="DROP"
-
-    garbage_list_rules_015() {
-        echo "Chain INPUT (policy ACCEPT)"
-    }
-
-    garbage_flush_rules_015() {
-        echo "Flushing all rules"
-    }
-  unrelated/garbage_selinux.sh: |
-    #!/bin/bash
-    # GARBAGE_SH_015_SELINUX_CONTEXT_C
-    GARBAGE_SH_015_ENFORCE_MODE_D="enforcing"
-
-    garbage_get_context_015() {
-        local path=$1
-        echo "Context for $path: system_u"
-    }
-
-    garbage_set_boolean_015() {
-        local name=$1
-        echo "Boolean $name: on"
-    }
-changed:
   cleanup.sh: |
     #!/bin/bash
+    LOCK_FILE="/tmp/lockfile"
+    WORK_DIR="/tmp/workdir"
 
     cleanup() {
         echo "Cleaning up..."
-        rm -f /tmp/lockfile
-        rm -rf /tmp/workdir
+        rm -f "$LOCK_FILE"
+        rm -rf "$WORK_DIR"
     }
+  scripts/watchdog.sh: |
+    #!/bin/bash
+    PID_FILE="/var/run/worker.pid"
+    if [[ -f "$PID_FILE" ]]; then
+        pid=$(cat "$PID_FILE")
+        kill -0 "$pid" 2>/dev/null || echo "Worker is dead"
+    fi
+  scripts/cron_entry.sh: |
+    #!/bin/bash
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    flock -n /tmp/worker.lock "$SCRIPT_DIR/../worker.sh" >> /var/log/worker.log 2>&1
+  scripts/supervisor.sh: |
+    #!/bin/bash
+    source ./cleanup.sh
+
+    trap cleanup EXIT
+
+    while true; do
+        if [[ ! -f "$LOCK_FILE" ]]; then
+            echo "Worker not running, starting..."
+            ./worker.sh &
+            WORKER_PID=$!
+        fi
+        sleep 10
+        if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+            echo "Worker died, restarting..."
+        fi
+    done
+  scripts/health_check.sh: |
+    #!/bin/bash
+    LOCK_FILE="/tmp/lockfile"
+    WORK_DIR="/tmp/workdir"
+    if [[ -f "$LOCK_FILE" ]] && [[ -d "$WORK_DIR" ]]; then
+        echo "Worker: HEALTHY"
+    else
+        echo "Worker: NOT RUNNING"
+    fi
+  lib/signal_utils.sh: |
+    #!/bin/bash
+    install_signal_handlers() {
+        local handler=$1
+        trap "$handler" INT TERM HUP
+    }
+
+    reset_signal_handlers() {
+        trap - INT TERM HUP ERR
+    }
+
+changed:
   worker.sh: |
     #!/bin/bash
     source ./cleanup.sh
@@ -59,49 +96,109 @@ changed:
     trap 'echo "Interrupted"; cleanup; exit 1' INT TERM
     trap 'echo "Error on line $LINENO"; cleanup; exit 1' ERR
 
-    mkdir -p /tmp/workdir
-    touch /tmp/lockfile
+    mkdir -p "$WORK_DIR"
+    touch "$LOCK_FILE"
 
     echo "Working..."
     sleep 60
     echo "Done"
-  unrelated/garbage_iptables.sh: |
+  cleanup.sh: |
     #!/bin/bash
-    # GARBAGE_SH_015_IPTABLES_RULES_A
-    GARBAGE_SH_015_DEFAULT_POLICY_B="DROP"
+    LOCK_FILE="/tmp/lockfile"
+    WORK_DIR="/tmp/workdir"
 
-    garbage_list_rules_015() {
-        echo "Chain INPUT (policy ACCEPT)"
+    cleanup() {
+        echo "Cleaning up..."
+        rm -f "$LOCK_FILE"
+        rm -rf "$WORK_DIR"
     }
-
-    garbage_flush_rules_015() {
-        echo "Flushing all rules"
-    }
-  unrelated/garbage_selinux.sh: |
+  scripts/watchdog.sh: |
     #!/bin/bash
-    # GARBAGE_SH_015_SELINUX_CONTEXT_C
-    GARBAGE_SH_015_ENFORCE_MODE_D="enforcing"
+    PID_FILE="/var/run/worker.pid"
+    if [[ -f "$PID_FILE" ]]; then
+        pid=$(cat "$PID_FILE")
+        kill -0 "$pid" 2>/dev/null || echo "Worker is dead"
+    fi
+  scripts/cron_entry.sh: |
+    #!/bin/bash
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    flock -n /tmp/worker.lock "$SCRIPT_DIR/../worker.sh" >> /var/log/worker.log 2>&1
+  scripts/supervisor.sh: |
+    #!/bin/bash
+    source ./cleanup.sh
 
-    garbage_get_context_015() {
-        local path=$1
-        echo "Context for $path: system_u"
+    trap cleanup EXIT
+
+    while true; do
+        if [[ ! -f "$LOCK_FILE" ]]; then
+            echo "Worker not running, starting..."
+            ./worker.sh &
+            WORKER_PID=$!
+        fi
+        sleep 10
+        if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+            echo "Worker died, restarting..."
+        fi
+    done
+  scripts/health_check.sh: |
+    #!/bin/bash
+    LOCK_FILE="/tmp/lockfile"
+    WORK_DIR="/tmp/workdir"
+    if [[ -f "$LOCK_FILE" ]] && [[ -d "$WORK_DIR" ]]; then
+        echo "Worker: HEALTHY"
+    else
+        echo "Worker: NOT RUNNING"
+    fi
+  lib/signal_utils.sh: |
+    #!/bin/bash
+    install_signal_handlers() {
+        local handler=$1
+        trap "$handler" INT TERM HUP
     }
 
-    garbage_set_boolean_015() {
-        local name=$1
-        echo "Boolean $name: on"
+    reset_signal_handlers() {
+        trap - INT TERM HUP ERR
     }
-must_include:
-- worker.sh
-- cleanup
+
+must_include_files:
+  - worker.sh
+  - cleanup.sh
+
+must_include_content_from:
+  cleanup.sh:
+    - cleanup()
+    - LOCK_FILE="/tmp/lockfile"
+    - WORK_DIR="/tmp/workdir"
+  worker.sh:
+    - "trap cleanup EXIT"
+    - "Error on line $LINENO"
+
 must_not_include:
-- GARBAGE_SH_015_IPTABLES_RULES_A
-- GARBAGE_SH_015_DEFAULT_POLICY_B
-- garbage_list_rules_015
-- garbage_flush_rules_015
-- GARBAGE_SH_015_SELINUX_CONTEXT_C
-- GARBAGE_SH_015_ENFORCE_MODE_D
-- garbage_get_context_015
-- garbage_set_boolean_015
+  # --- watchdog.sh: PID monitoring ---
+  - PID_FILE
+  - "Worker is dead"
+  # --- cron_entry.sh: scheduling ---
+  - "flock -n"
+  - "worker.lock"
+  # --- supervisor.sh: HARDEST TRAP, sources cleanup.sh ---
+  - "Worker not running"
+  - "Worker died"
+  - WORKER_PID
+  # --- health_check.sh: checks LOCK_FILE ---
+  - "Worker: HEALTHY"
+  - "Worker: NOT RUNNING"
+  # --- signal_utils.sh: generic signal handling ---
+  - install_signal_handlers
+  - reset_signal_handlers
+
+must_not_include_files:
+  - scripts/watchdog.sh
+  - scripts/cron_entry.sh
+  - scripts/supervisor.sh
+  - scripts/health_check.sh
+  - lib/signal_utils.sh
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

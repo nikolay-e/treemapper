@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NoReturn
 
 from .version import __version__
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
-def _exit_error(message: str) -> None:
+def _exit_error(message: str) -> NoReturn:
     print(f"Error: {message}", file=sys.stderr)
     sys.exit(1)
 
@@ -22,10 +26,14 @@ def _validate_max_depth(max_depth: int | None) -> None:
         print("Warning: --max-depth 0 produces empty tree (root only, no children)", file=sys.stderr)
 
 
-def _validate_max_file_bytes(max_file_bytes: int) -> int | None:
+def _validate_max_file_bytes(max_file_bytes: int, no_file_size_limit: bool) -> int | None:
+    if no_file_size_limit:
+        return None
     if max_file_bytes < 0:
         _exit_error(f"--max-file-bytes must be non-negative, got {max_file_bytes}")
-    return max_file_bytes if max_file_bytes > 0 else None
+    if max_file_bytes == 0:
+        _exit_error("--max-file-bytes 0 is ambiguous. Use --no-file-size-limit to include all files regardless of size")
+    return max_file_bytes
 
 
 def _validate_budget(budget: int | None) -> None:
@@ -47,28 +55,30 @@ def _resolve_root_dir(directory: str) -> Path:
     try:
         root_dir = Path(directory).resolve(strict=True)
         if not root_dir.is_dir():
-            _exit_error(f"'{root_dir}' is not a directory.")
+            _exit_error(f"'{root_dir}' is not a directory")
         return root_dir
     except FileNotFoundError:
-        _exit_error(f"Directory '{directory}' does not exist.")
+        _exit_error(f"Directory '{directory}' does not exist")
     except OSError as e:
         _exit_error(f"Cannot access '{directory}': {e}")
-    raise RuntimeError("unreachable")
 
 
-def _resolve_output_file(output_file_arg: str | None, output_format: str) -> tuple[Path | None, bool]:
+def _resolve_output_file(output_file_arg: str | None, save: bool, output_format: str) -> tuple[Path | None, bool]:
+    if save and output_file_arg is not None:
+        _exit_error("--save and -o/--output-file are mutually exclusive")
+
+    if save:
+        ext = "yaml" if output_format == "yaml" else output_format
+        return Path(f"tree.{ext}").resolve(), False
+
     if output_file_arg is None:
         return None, False
     if output_file_arg == "-":
         return None, True
 
-    if output_file_arg == "":
-        ext = "yaml" if output_format == "yaml" else output_format
-        return Path(f"tree.{ext}").resolve(), False
-
     output_file = Path(output_file_arg).resolve()
     if output_file.is_dir():
-        _exit_error(f"'{output_file_arg}' is a directory, not a file.")
+        _exit_error(f"'{output_file_arg}' is a directory, not a file")
     return output_file, False
 
 
@@ -77,7 +87,7 @@ def _resolve_ignore_file(ignore_file_arg: str | None) -> Path | None:
         return None
     ignore_file = Path(ignore_file_arg).resolve()
     if not ignore_file.is_file():
-        _exit_error(f"Ignore file '{ignore_file_arg}' does not exist.")
+        _exit_error(f"Ignore file '{ignore_file_arg}' does not exist")
     return ignore_file
 
 
@@ -86,8 +96,25 @@ def _resolve_whitelist_file(whitelist_file_arg: str | None) -> Path | None:
         return None
     whitelist_file = Path(whitelist_file_arg).resolve()
     if not whitelist_file.is_file():
-        _exit_error(f"Whitelist file '{whitelist_file_arg}' does not exist.")
+        _exit_error(f"Whitelist file '{whitelist_file_arg}' does not exist")
     return whitelist_file
+
+
+def _warn_diff_only_flags(args: argparse.Namespace) -> None:
+    if args.diff_range:
+        return
+    used = []
+    if args.budget is not None:
+        used.append("--budget")
+    if args.alpha != 0.60:
+        used.append("--alpha/--context-precision")
+    if args.tau != 0.08:
+        used.append("--tau/--min-relevance")
+    if args.full:
+        used.append("--full")
+    if used:
+        flags = ", ".join(used)
+        logger.warning("Diff-mode flags ignored without --diff: %s", flags)
 
 
 @dataclass
@@ -104,6 +131,7 @@ class ParsedArgs:
     max_file_bytes: int | None
     copy: bool
     force_stdout: bool
+    quiet: bool = False
     diff_range: str | None = None
     budget: int | None = None
     alpha: float = 0.60
@@ -112,7 +140,8 @@ class ParsedArgs:
 
 
 DEFAULT_IGNORES_HELP = """
-Default ignored patterns (use --no-default-ignores to include all):
+Default ignored patterns (use --no-default-ignores to disable built-in patterns;
+project-level .gitignore and .treemapper/ignore still apply):
   .git/, .svn/, .hg/    Version control directories
   __pycache__/, *.py[cod], *.so, venv/, .venv/, .tox/, .nox/  Python
   node_modules/, .npm/  JavaScript/Node
@@ -133,13 +162,32 @@ Ignore files (hierarchical, like git):
 Whitelist files (auto-discovered):
   .treemapper/whitelist  Include-only filter (preferred)
   .treemapperwhitelist   Include-only filter (legacy)
+
+Examples:
+  treemapper .                    Map current directory to YAML
+  treemapper /path/to/project     Map a specific directory
+  treemapper . -f json            Output as JSON
+  treemapper . -f md --save       Save as tree.md
+  treemapper . --diff HEAD~1      Show context for last commit
+  treemapper . -c                 Copy output to clipboard
+  treemapper . --no-content       Structure only, no file contents
+
+Output routing:
+  Default:      stdout
+  -o FILE:      write to FILE
+  --save:       write to tree.{ext} (e.g., tree.yaml)
+  -c:           copy to clipboard, suppress stdout
+  -c -o FILE:   copy to clipboard AND write to FILE
 """
 
 
 def parse_args() -> ParsedArgs:
     parser = argparse.ArgumentParser(
         prog="treemapper",
-        description="Generate a structured representation of a directory tree (YAML, JSON, or text).",
+        description=(
+            "Generate a structured representation of a directory tree (YAML, JSON, text, or Markdown). "
+            "Supports diff context mode (--diff) for intelligent code change analysis."
+        ),
         epilog=DEFAULT_IGNORES_HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -151,10 +199,13 @@ def parse_args() -> ParsedArgs:
     parser.add_argument(
         "-o",
         "--output-file",
-        nargs="?",
-        const="",
         default=None,
-        help="Output file (default: stdout, use '-' for stdout, omit filename for tree.{ext})",
+        help="Write output to FILE",
+    )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Save output to tree.{ext} (e.g., tree.yaml, tree.json)",
     )
     parser.add_argument(
         "-f",
@@ -163,7 +214,11 @@ def parse_args() -> ParsedArgs:
         default="yaml",
         help="Output format (default: yaml)",
     )
-    parser.add_argument("--no-default-ignores", action="store_true", help="Disable all default ignores")
+    parser.add_argument(
+        "--no-default-ignores",
+        action="store_true",
+        help="Disable built-in ignore patterns (project .gitignore and .treemapper/ignore still apply)",
+    )
     parser.add_argument("--max-depth", type=int, default=None, metavar="N", help="Maximum traversal depth")
     parser.add_argument("--no-content", action="store_true", help="Skip file contents (structure only)")
     parser.add_argument(
@@ -171,9 +226,20 @@ def parse_args() -> ParsedArgs:
         type=int,
         default=DEFAULT_MAX_FILE_BYTES,
         metavar="N",
-        help=f"Skip files larger than N bytes (default: {DEFAULT_MAX_FILE_BYTES // 1024 // 1024} MB, use 0 for unlimited)",
+        help=f"Skip files larger than N bytes (default: {DEFAULT_MAX_FILE_BYTES // 1024 // 1024} MB)",
+    )
+    parser.add_argument(
+        "--no-file-size-limit",
+        action="store_true",
+        help="Include all files regardless of size",
     )
     parser.add_argument("-c", "--copy", action="store_true", help="Copy to clipboard (suppresses stdout unless -o is used)")
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress all non-error output (token summary, status messages)",
+    )
     parser.add_argument(
         "--log-level",
         choices=["error", "warning", "info", "debug"],
@@ -193,21 +259,23 @@ def parse_args() -> ParsedArgs:
         type=int,
         default=None,
         metavar="N",
-        help="Token budget for diff context (default: algorithm convergence via τ-stopping)",
+        help="Token budget for context selection (default: automatic via relevance threshold)",
     )
     diff_group.add_argument(
         "--alpha",
+        "--context-precision",
         type=float,
         default=0.60,
         metavar="F",
-        help="PPR damping factor (default: 0.60)",
+        help="How tightly context clusters around changes, 0-1 (default: 0.60, higher = more focused)",
     )
     diff_group.add_argument(
         "--tau",
+        "--min-relevance",
         type=float,
         default=0.08,
         metavar="F",
-        help="Stopping threshold for marginal utility (default: 0.08)",
+        help="Minimum relevance to include a fragment (default: 0.08, lower = more context)",
     )
     diff_group.add_argument(
         "--full",
@@ -218,19 +286,23 @@ def parse_args() -> ParsedArgs:
     args = parser.parse_args()
 
     _validate_max_depth(args.max_depth)
-    max_file_bytes = _validate_max_file_bytes(args.max_file_bytes)
+    max_file_bytes = _validate_max_file_bytes(args.max_file_bytes, args.no_file_size_limit)
     _validate_budget(args.budget)
     _validate_alpha(args.alpha)
     _validate_tau(args.tau)
+    _warn_diff_only_flags(args)
 
     root_dir = _resolve_root_dir(args.directory)
     output_format = "yaml" if args.format == "yml" else args.format
-    output_file, force_stdout = _resolve_output_file(args.output_file, output_format)
+    output_file, force_stdout = _resolve_output_file(args.output_file, args.save, output_format)
     ignore_file = _resolve_ignore_file(args.ignore_file)
     whitelist_file = _resolve_whitelist_file(args.whitelist_file)
 
     log_level_map = {"error": 0, "warning": 1, "info": 2, "debug": 3}
     verbosity = log_level_map[args.log_level]
+
+    if args.quiet:
+        verbosity = 0
 
     return ParsedArgs(
         root_dir=root_dir,
@@ -245,6 +317,7 @@ def parse_args() -> ParsedArgs:
         max_file_bytes=max_file_bytes,
         copy=args.copy,
         force_stdout=force_stdout,
+        quiet=args.quiet,
         diff_range=args.diff_range,
         budget=args.budget,
         alpha=args.alpha,

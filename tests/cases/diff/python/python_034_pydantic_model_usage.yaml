@@ -1,3 +1,8 @@
+# Scenario: Pydantic schemas gain new fields, validators, and a new UserUpdateSchema
+# Changed: schemas.py adds fields to AddressSchema/UserSchema, strengthens password validation
+# Reviewer questions: Does root_validator import get used? Is use_enum_values correct for UserRole?
+# Trap 1: auth/token_service.py — manages auth tokens for users, shares "user" vocabulary but independent
+# Trap 2: middleware/rate_limiter.py — rate limits API requests, shares "API" domain but no dep on schemas
 initial:
   schemas.py: |
     from pydantic import BaseModel, EmailStr, Field, validator
@@ -61,41 +66,65 @@ initial:
 
     def validate():
         pass
-  unrelated/cache_layer.py: |
-    GARBAGE_PYTHON_034_001 = "cache layer marker"
-    GARBAGE_PYTHON_034_002 = "cache ttl constant"
+  auth/token_service.py: |
+    import hashlib
+    from typing import Optional, Dict
+    from dataclasses import dataclass
+    from datetime import datetime, timedelta
 
-    class CacheBackend:
-        GARBAGE_PYTHON_034_003 = "backend class marker"
+    @dataclass
+    class TokenData:
+        user_id: int
+        token: str
+        expires_at: datetime
 
-        def __init__(self, host: str = "localhost"):
-            self.host = host
+    class TokenService:
+        def __init__(self, secret_key: str, ttl_hours: int = 24):
+            self._secret = secret_key
+            self._ttl_hours = ttl_hours
+            self._tokens: Dict[str, TokenData] = {}
 
-        def get(self, key: str):
+        def generate_token(self, user_id: int) -> TokenData:
+            raw = f"{user_id}{self._secret}{datetime.now().isoformat()}"
+            token = hashlib.sha256(raw.encode()).hexdigest()
+            data = TokenData(
+                user_id=user_id, token=token,
+                expires_at=datetime.now() + timedelta(hours=self._ttl_hours),
+            )
+            self._tokens[token] = data
+            return data
+
+        def validate_token(self, token: str) -> Optional[int]:
+            data = self._tokens.get(token)
+            if data and datetime.now() < data.expires_at:
+                return data.user_id
             return None
-  unrelated/queue_manager.py: |
-    GARBAGE_PYTHON_034_004 = "queue manager marker"
-    GARBAGE_PYTHON_034_005 = "queue size constant"
+  middleware/rate_limiter.py: |
+    import time
+    from typing import Dict, Optional
+    from dataclasses import dataclass
 
-    class MessageQueue:
-        GARBAGE_PYTHON_034_006 = "queue class marker"
+    @dataclass
+    class RateLimitConfig:
+        requests_per_minute: int = 60
+        burst_size: int = 10
 
-        def __init__(self, name: str):
-            self.name = name
-
-        def publish(self, message: dict) -> bool:
-            return True
-  unrelated/rate_limiter.py: |
-    GARBAGE_PYTHON_034_007 = "rate limiter marker"
-    GARBAGE_PYTHON_034_008 = "rate limit constant"
-
-    class RateLimiter:
-        GARBAGE_PYTHON_034_009 = "limiter class marker"
-
-        def __init__(self, requests_per_second: int = 100):
-            self.requests_per_second = requests_per_second
+    class ApiRateLimiter:
+        def __init__(self, config: RateLimitConfig):
+            self._config = config
+            self._requests: Dict[str, list[float]] = {}
 
         def is_allowed(self, client_id: str) -> bool:
+            now = time.time()
+            window_start = now - 60
+            if client_id not in self._requests:
+                self._requests[client_id] = []
+            self._requests[client_id] = [
+                t for t in self._requests[client_id] if t > window_start
+            ]
+            if len(self._requests[client_id]) >= self._config.requests_per_minute:
+                return False
+            self._requests[client_id].append(now)
             return True
 changed:
   schemas.py: |
@@ -178,59 +207,84 @@ changed:
 
     def validate():
         pass
-  unrelated/cache_layer.py: |
-    GARBAGE_PYTHON_034_001 = "cache layer marker"
-    GARBAGE_PYTHON_034_002 = "cache ttl constant"
+  auth/token_service.py: |
+    import hashlib
+    from typing import Optional, Dict
+    from dataclasses import dataclass
+    from datetime import datetime, timedelta
 
-    class CacheBackend:
-        GARBAGE_PYTHON_034_003 = "backend class marker"
+    @dataclass
+    class TokenData:
+        user_id: int
+        token: str
+        expires_at: datetime
 
-        def __init__(self, host: str = "localhost"):
-            self.host = host
+    class TokenService:
+        def __init__(self, secret_key: str, ttl_hours: int = 24):
+            self._secret = secret_key
+            self._ttl_hours = ttl_hours
+            self._tokens: Dict[str, TokenData] = {}
 
-        def get(self, key: str):
+        def generate_token(self, user_id: int) -> TokenData:
+            raw = f"{user_id}{self._secret}{datetime.now().isoformat()}"
+            token = hashlib.sha256(raw.encode()).hexdigest()
+            data = TokenData(
+                user_id=user_id, token=token,
+                expires_at=datetime.now() + timedelta(hours=self._ttl_hours),
+            )
+            self._tokens[token] = data
+            return data
+
+        def validate_token(self, token: str) -> Optional[int]:
+            data = self._tokens.get(token)
+            if data and datetime.now() < data.expires_at:
+                return data.user_id
             return None
-  unrelated/queue_manager.py: |
-    GARBAGE_PYTHON_034_004 = "queue manager marker"
-    GARBAGE_PYTHON_034_005 = "queue size constant"
+  middleware/rate_limiter.py: |
+    import time
+    from typing import Dict, Optional
+    from dataclasses import dataclass
 
-    class MessageQueue:
-        GARBAGE_PYTHON_034_006 = "queue class marker"
+    @dataclass
+    class RateLimitConfig:
+        requests_per_minute: int = 60
+        burst_size: int = 10
 
-        def __init__(self, name: str):
-            self.name = name
-
-        def publish(self, message: dict) -> bool:
-            return True
-  unrelated/rate_limiter.py: |
-    GARBAGE_PYTHON_034_007 = "rate limiter marker"
-    GARBAGE_PYTHON_034_008 = "rate limit constant"
-
-    class RateLimiter:
-        GARBAGE_PYTHON_034_009 = "limiter class marker"
-
-        def __init__(self, requests_per_second: int = 100):
-            self.requests_per_second = requests_per_second
+    class ApiRateLimiter:
+        def __init__(self, config: RateLimitConfig):
+            self._config = config
+            self._requests: Dict[str, list[float]] = {}
 
         def is_allowed(self, client_id: str) -> bool:
+            now = time.time()
+            window_start = now - 60
+            if client_id not in self._requests:
+                self._requests[client_id] = []
+            self._requests[client_id] = [
+                t for t in self._requests[client_id] if t > window_start
+            ]
+            if len(self._requests[client_id]) >= self._config.requests_per_minute:
+                return False
+            self._requests[client_id].append(now)
             return True
 must_include_files:
 - schemas.py
-must_include_content:
-- from pydantic import BaseModel, EmailStr, Field, validator, root_validator
-- 'def full_address(self) -> str:'
+- api.py
+must_include_content_from:
+  schemas.py:
+  - 'from pydantic import BaseModel, EmailStr, Field, validator, root_validator'
+  - 'def full_address(self) -> str:'
 must_not_include:
-- GARBAGE_PYTHON_034_001
-- GARBAGE_PYTHON_034_002
-- GARBAGE_PYTHON_034_003
-- GARBAGE_PYTHON_034_004
-- GARBAGE_PYTHON_034_005
-- GARBAGE_PYTHON_034_006
-- GARBAGE_PYTHON_034_007
-- GARBAGE_PYTHON_034_008
-- GARBAGE_PYTHON_034_009
-- cache_layer.py
-- queue_manager.py
-- rate_limiter.py
+- TokenService
+- TokenData
+- generate_token
+- validate_token
+- ApiRateLimiter
+- RateLimitConfig
+must_not_include_files:
+- auth/token_service.py
+- middleware/rate_limiter.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

@@ -1,3 +1,35 @@
+# Scenario: NetworkResult sealed class gains Loading and Empty subtypes, plus
+#   computed properties isSuccess/isError/isLoading. Error gains cause: Throwable?.
+#   ResultHandler and ApiClient both use NetworkResult.
+#
+# Diff shows:
+#   NetworkResult.kt: + data object Loading, + data object Empty,
+#     + Error gets cause: Throwable?, + isSuccess/isError/isLoading properties
+#   ResultHandler.kt: when() branches updated for Loading/Empty in handle(),
+#     unwrapOrNull uses `else -> null`, unwrapOrThrow throws IllegalStateException
+#
+# Reviewer questions:
+#   Q1: "Are the when() branches in ResultHandler exhaustive for the new subtypes?"
+#       -> NetworkResult.kt defines Success, Error, Loading, Empty. ResultHandler.kt
+#          must handle all four in handle() — reviewer must compare branches.
+#
+#   Q2: "Does unwrapOrThrow correctly handle Loading and Empty?"
+#       -> NetworkResult.kt: Loading and Empty are distinct from Error.
+#          ResultHandler throws IllegalStateException for else branch.
+#          Reviewer must see all subtypes to judge correctness.
+#
+# Not needed for comprehension:
+#   - ApiClient.kt: Uses NetworkResult.Success and NetworkResult.Error in get().
+#     DIRECT TYPE OVERLAP: constructs NetworkResult instances. But ApiClient
+#     doesn't use Loading or Empty — the new subtypes. It wasn't changed.
+#     Including it doesn't help review exhaustiveness of when() branches.
+#
+#   - CachePolicy.kt: Network caching strategy with retry/timeout logic.
+#     Same networking package. But unrelated to sealed class subtypes.
+#
+#   - NetworkLogger.kt: Logs network request/response pairs. Same package,
+#     similar naming. But doesn't use NetworkResult at all.
+
 initial:
   src/main/kotlin/com/example/network/result/NetworkResult.kt: |
     package com.example.network.result
@@ -52,60 +84,60 @@ initial:
             return "{}"
         }
     }
-  src/main/kotlin/com/example/network/unrelated/RetryPolicy.kt: |
-    package com.example.network.unrelated
+  src/main/kotlin/com/example/network/cache/CachePolicy.kt: |
+    package com.example.network.cache
 
-    class RetryPolicy {
-        companion object {
-            const val GARBAGE_JAVA_026_RETRY_A = "retry_policy_marker"
-            private const val GARBAGE_JAVA_026_RETRY_B = "retry_internal_tag"
+    import java.time.Duration
+    import java.time.Instant
+
+    class CachePolicy(
+        private val maxAge: Duration = Duration.ofMinutes(5),
+        private val maxRetries: Int = 3
+    ) {
+        private val cache = mutableMapOf<String, CacheEntry>()
+
+        fun get(key: String): String? {
+            val entry = cache[key] ?: return null
+            if (Duration.between(entry.storedAt, Instant.now()) > maxAge) {
+                cache.remove(key)
+                return null
+            }
+            return entry.value
         }
 
-        private var maxRetries = 3
-        private var backoffMs = 1000L
-
-        fun withMaxRetries(count: Int): RetryPolicy {
-            maxRetries = count
-            return this
+        fun put(key: String, value: String) {
+            cache[key] = CacheEntry(value, Instant.now())
         }
 
-        fun withBackoff(ms: Long): RetryPolicy {
-            backoffMs = ms
-            return this
+        fun invalidate(key: String) {
+            cache.remove(key)
         }
 
-        fun reset() {
-            maxRetries = 3
-            backoffMs = 1000L
-            println(GARBAGE_JAVA_026_RETRY_A + GARBAGE_JAVA_026_RETRY_B)
-        }
+        private data class CacheEntry(val value: String, val storedAt: Instant)
     }
-  src/main/kotlin/com/example/network/unrelated/ConnectionPool.kt: |
-    package com.example.network.unrelated
+  src/main/kotlin/com/example/network/logging/NetworkLogger.kt: |
+    package com.example.network.logging
 
-    class ConnectionPool {
-        companion object {
-            const val GARBAGE_JAVA_026_POOL_C = "connection_pool_marker"
-            private const val GARBAGE_JAVA_026_POOL_D = "pool_internal_tag"
+    import java.time.Instant
+
+    class NetworkLogger {
+        private val logs = mutableListOf<LogEntry>()
+
+        fun logRequest(method: String, url: String) {
+            logs.add(LogEntry("REQUEST", "$method $url", Instant.now()))
         }
 
-        private val activeConnections = mutableListOf<String>()
-
-        fun acquire(host: String): String {
-            val conn = "conn-$host-${activeConnections.size}"
-            activeConnections.add(conn)
-            return conn
+        fun logResponse(statusCode: Int, body: String) {
+            logs.add(LogEntry("RESPONSE", "$statusCode: ${body.take(200)}", Instant.now()))
         }
 
-        fun release(conn: String) {
-            activeConnections.remove(conn)
+        fun getRecentLogs(count: Int): List<LogEntry> {
+            return logs.takeLast(count)
         }
 
-        fun drainAll() {
-            activeConnections.clear()
-            println(GARBAGE_JAVA_026_POOL_C + GARBAGE_JAVA_026_POOL_D)
-        }
+        data class LogEntry(val type: String, val message: String, val timestamp: Instant)
     }
+
 changed:
   src/main/kotlin/com/example/network/result/NetworkResult.kt: |
     package com.example.network.result
@@ -169,72 +201,97 @@ changed:
             return "{}"
         }
     }
-  src/main/kotlin/com/example/network/unrelated/RetryPolicy.kt: |
-    package com.example.network.unrelated
+  src/main/kotlin/com/example/network/cache/CachePolicy.kt: |
+    package com.example.network.cache
 
-    class RetryPolicy {
-        companion object {
-            const val GARBAGE_JAVA_026_RETRY_A = "retry_policy_marker"
-            private const val GARBAGE_JAVA_026_RETRY_B = "retry_internal_tag"
+    import java.time.Duration
+    import java.time.Instant
+
+    class CachePolicy(
+        private val maxAge: Duration = Duration.ofMinutes(5),
+        private val maxRetries: Int = 3
+    ) {
+        private val cache = mutableMapOf<String, CacheEntry>()
+
+        fun get(key: String): String? {
+            val entry = cache[key] ?: return null
+            if (Duration.between(entry.storedAt, Instant.now()) > maxAge) {
+                cache.remove(key)
+                return null
+            }
+            return entry.value
         }
 
-        private var maxRetries = 3
-        private var backoffMs = 1000L
-
-        fun withMaxRetries(count: Int): RetryPolicy {
-            maxRetries = count
-            return this
+        fun put(key: String, value: String) {
+            cache[key] = CacheEntry(value, Instant.now())
         }
 
-        fun withBackoff(ms: Long): RetryPolicy {
-            backoffMs = ms
-            return this
+        fun invalidate(key: String) {
+            cache.remove(key)
         }
 
-        fun reset() {
-            maxRetries = 3
-            backoffMs = 1000L
-            println(GARBAGE_JAVA_026_RETRY_A + GARBAGE_JAVA_026_RETRY_B)
-        }
+        private data class CacheEntry(val value: String, val storedAt: Instant)
     }
-  src/main/kotlin/com/example/network/unrelated/ConnectionPool.kt: |
-    package com.example.network.unrelated
+  src/main/kotlin/com/example/network/logging/NetworkLogger.kt: |
+    package com.example.network.logging
 
-    class ConnectionPool {
-        companion object {
-            const val GARBAGE_JAVA_026_POOL_C = "connection_pool_marker"
-            private const val GARBAGE_JAVA_026_POOL_D = "pool_internal_tag"
+    import java.time.Instant
+
+    class NetworkLogger {
+        private val logs = mutableListOf<LogEntry>()
+
+        fun logRequest(method: String, url: String) {
+            logs.add(LogEntry("REQUEST", "$method $url", Instant.now()))
         }
 
-        private val activeConnections = mutableListOf<String>()
-
-        fun acquire(host: String): String {
-            val conn = "conn-$host-${activeConnections.size}"
-            activeConnections.add(conn)
-            return conn
+        fun logResponse(statusCode: Int, body: String) {
+            logs.add(LogEntry("RESPONSE", "$statusCode: ${body.take(200)}", Instant.now()))
         }
 
-        fun release(conn: String) {
-            activeConnections.remove(conn)
+        fun getRecentLogs(count: Int): List<LogEntry> {
+            return logs.takeLast(count)
         }
 
-        fun drainAll() {
-            activeConnections.clear()
-            println(GARBAGE_JAVA_026_POOL_C + GARBAGE_JAVA_026_POOL_D)
-        }
+        data class LogEntry(val type: String, val message: String, val timestamp: Instant)
     }
+
 must_include_files:
-- src/main/kotlin/com/example/network/handler/ResultHandler.kt
-- src/main/kotlin/com/example/network/result/NetworkResult.kt
-must_include_content:
-- is NetworkResult.Loading -> {}
-- 'data class Error(val message: String, val cause: Throwable? = null) : NetworkResult<Nothing>()'
+  - src/main/kotlin/com/example/network/handler/ResultHandler.kt
+  - src/main/kotlin/com/example/network/result/NetworkResult.kt
+
+must_include_content_from:
+  src/main/kotlin/com/example/network/result/NetworkResult.kt:
+    - "data object Loading"
+    - "data object Empty"
+    - "val cause: Throwable?"
+    - "val isSuccess: Boolean"
+  src/main/kotlin/com/example/network/handler/ResultHandler.kt:
+    - "is NetworkResult.Loading -> {}"
+    - "is NetworkResult.Empty -> {}"
+    - "throw IllegalStateException"
+
 must_not_include:
-- GARBAGE_JAVA_026_POOL_C
-- GARBAGE_JAVA_026_POOL_D
-- GARBAGE_JAVA_026_RETRY_A
-- GARBAGE_JAVA_026_RETRY_B
-- ConnectionPool.kt
-- RetryPolicy.kt
+  # --- ApiClient.kt: constructs NetworkResult but wasn't changed ---
+  # Uses Success/Error only. Doesn't use Loading/Empty. Including it
+  # doesn't help review when() exhaustiveness.
+  - ApiClient
+  - fetchData
+  # --- CachePolicy.kt: network caching, unrelated to sealed class ---
+  - CachePolicy
+  - maxAge
+  - CacheEntry
+  # --- NetworkLogger.kt: request/response logging ---
+  - NetworkLogger
+  - logRequest
+  - logResponse
+  - LogEntry
+
+must_not_include_files:
+  - src/main/kotlin/com/example/network/client/ApiClient.kt
+  - src/main/kotlin/com/example/network/cache/CachePolicy.kt
+  - src/main/kotlin/com/example/network/logging/NetworkLogger.kt
+
+max_fragments: 8
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

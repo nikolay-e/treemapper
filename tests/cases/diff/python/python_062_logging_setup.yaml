@@ -1,3 +1,19 @@
+# Scenario: logging_config.py adds update_context() to ContextFilter,
+#   configure_all() to LoggerFactory, RotatingFileHandler support in
+#   setup_logging(), and a new add_file_handler() utility.
+#
+# Reviewer questions:
+#   - Does RotatingFileHandler use sensible defaults for maxBytes?
+#   - Should configure_all() also update handler levels, not just loggers?
+#
+# Trap files:
+#   - monitoring/metrics_collector.py: Prometheus-style metrics with counters
+#     and histograms, uses "logger" vocabulary but no logging_config import
+#   - monitoring/health_checker.py: service health probe with HTTP checks,
+#     mentions "status" and "level" but has no logging dependency
+#   - monitoring/config_watcher.py: file system watcher for config reloads,
+#     uses "config" and "path" vocabulary but is independent
+
 initial:
   logging_config.py: |
     import logging
@@ -67,33 +83,86 @@ initial:
     def main():
         logger = setup_logging()
         logger.info("Application started")
-  unrelated/metrics_collector.py: |
-    GARBAGE_PYTHON_062_001 = "metrics collector marker"
-    GARBAGE_PYTHON_062_002 = "metrics interval constant"
+  monitoring/metrics_collector.py: |
+    from typing import Dict, Optional
+    from collections import defaultdict
 
     class MetricsCollector:
-        GARBAGE_PYTHON_062_003 = "collector class marker"
+        def __init__(self, namespace: str = "app"):
+            self.namespace = namespace
+            self._counters: Dict[str, int] = defaultdict(int)
+            self._histograms: Dict[str, list] = defaultdict(list)
 
-        def __init__(self):
-            pass
-  unrelated/health_checker.py: |
-    GARBAGE_PYTHON_062_004 = "health checker marker"
-    GARBAGE_PYTHON_062_005 = "health check interval constant"
+        def increment_counter(self, name: str, value: int = 1) -> None:
+            self._counters[f"{self.namespace}_{name}"] += value
+
+        def observe_histogram(self, name: str, value: float) -> None:
+            self._histograms[f"{self.namespace}_{name}"].append(value)
+
+        def get_counter(self, name: str) -> int:
+            return self._counters.get(f"{self.namespace}_{name}", 0)
+
+        def get_histogram_avg(self, name: str) -> float:
+            key = f"{self.namespace}_{name}"
+            values = self._histograms.get(key, [])
+            return sum(values) / len(values) if values else 0.0
+
+        def reset_all(self) -> None:
+            self._counters.clear()
+            self._histograms.clear()
+  monitoring/health_checker.py: |
+    from typing import Dict, Any
 
     class HealthChecker:
-        GARBAGE_PYTHON_062_006 = "checker class marker"
-
         def __init__(self):
-            pass
-  unrelated/config_loader.py: |
-    GARBAGE_PYTHON_062_007 = "config loader marker"
-    GARBAGE_PYTHON_062_008 = "config format constant"
+            self._checks: Dict[str, callable] = {}
 
-    class ConfigLoader:
-        GARBAGE_PYTHON_062_009 = "loader class marker"
+        def register_check(self, name: str, check_fn: callable) -> None:
+            self._checks[name] = check_fn
 
-        def __init__(self):
-            pass
+        def run_all(self) -> Dict[str, Any]:
+            results = {}
+            for name, check_fn in self._checks.items():
+                try:
+                    check_fn()
+                    results[name] = {"status": "healthy", "level": "ok"}
+                except Exception as e:
+                    results[name] = {"status": "unhealthy", "level": "critical", "error": str(e)}
+            return results
+
+        def is_healthy(self) -> bool:
+            results = self.run_all()
+            return all(r["status"] == "healthy" for r in results.values())
+  monitoring/config_watcher.py: |
+    from pathlib import Path
+    from typing import Optional, Callable
+
+    class ConfigWatcher:
+        def __init__(self, config_path: str):
+            self.config_path = Path(config_path)
+            self._last_modified: Optional[float] = None
+            self._callback: Optional[Callable] = None
+
+        def set_callback(self, callback: Callable) -> None:
+            self._callback = callback
+
+        def check_for_changes(self) -> bool:
+            if not self.config_path.exists():
+                return False
+            mtime = self.config_path.stat().st_mtime
+            if self._last_modified is None or mtime > self._last_modified:
+                self._last_modified = mtime
+                if self._callback:
+                    self._callback()
+                return True
+            return False
+
+        def get_config_age_seconds(self) -> float:
+            if self._last_modified is None:
+                return -1.0
+            import time
+            return time.time() - self._last_modified
+
 changed:
   logging_config.py: |
     import logging
@@ -204,50 +273,106 @@ changed:
     def main():
         logger = setup_logging()
         logger.info("Application started")
-  unrelated/metrics_collector.py: |
-    GARBAGE_PYTHON_062_001 = "metrics collector marker"
-    GARBAGE_PYTHON_062_002 = "metrics interval constant"
+  monitoring/metrics_collector.py: |
+    from typing import Dict, Optional
+    from collections import defaultdict
 
     class MetricsCollector:
-        GARBAGE_PYTHON_062_003 = "collector class marker"
+        def __init__(self, namespace: str = "app"):
+            self.namespace = namespace
+            self._counters: Dict[str, int] = defaultdict(int)
+            self._histograms: Dict[str, list] = defaultdict(list)
 
-        def __init__(self):
-            pass
-  unrelated/health_checker.py: |
-    GARBAGE_PYTHON_062_004 = "health checker marker"
-    GARBAGE_PYTHON_062_005 = "health check interval constant"
+        def increment_counter(self, name: str, value: int = 1) -> None:
+            self._counters[f"{self.namespace}_{name}"] += value
+
+        def observe_histogram(self, name: str, value: float) -> None:
+            self._histograms[f"{self.namespace}_{name}"].append(value)
+
+        def get_counter(self, name: str) -> int:
+            return self._counters.get(f"{self.namespace}_{name}", 0)
+
+        def get_histogram_avg(self, name: str) -> float:
+            key = f"{self.namespace}_{name}"
+            values = self._histograms.get(key, [])
+            return sum(values) / len(values) if values else 0.0
+
+        def reset_all(self) -> None:
+            self._counters.clear()
+            self._histograms.clear()
+  monitoring/health_checker.py: |
+    from typing import Dict, Any
 
     class HealthChecker:
-        GARBAGE_PYTHON_062_006 = "checker class marker"
-
         def __init__(self):
-            pass
-  unrelated/config_loader.py: |
-    GARBAGE_PYTHON_062_007 = "config loader marker"
-    GARBAGE_PYTHON_062_008 = "config format constant"
+            self._checks: Dict[str, callable] = {}
 
-    class ConfigLoader:
-        GARBAGE_PYTHON_062_009 = "loader class marker"
+        def register_check(self, name: str, check_fn: callable) -> None:
+            self._checks[name] = check_fn
 
-        def __init__(self):
-            pass
+        def run_all(self) -> Dict[str, Any]:
+            results = {}
+            for name, check_fn in self._checks.items():
+                try:
+                    check_fn()
+                    results[name] = {"status": "healthy", "level": "ok"}
+                except Exception as e:
+                    results[name] = {"status": "unhealthy", "level": "critical", "error": str(e)}
+            return results
+
+        def is_healthy(self) -> bool:
+            results = self.run_all()
+            return all(r["status"] == "healthy" for r in results.values())
+  monitoring/config_watcher.py: |
+    from pathlib import Path
+    from typing import Optional, Callable
+
+    class ConfigWatcher:
+        def __init__(self, config_path: str):
+            self.config_path = Path(config_path)
+            self._last_modified: Optional[float] = None
+            self._callback: Optional[Callable] = None
+
+        def set_callback(self, callback: Callable) -> None:
+            self._callback = callback
+
+        def check_for_changes(self) -> bool:
+            if not self.config_path.exists():
+                return False
+            mtime = self.config_path.stat().st_mtime
+            if self._last_modified is None or mtime > self._last_modified:
+                self._last_modified = mtime
+                if self._callback:
+                    self._callback()
+                return True
+            return False
+
+        def get_config_age_seconds(self) -> float:
+            if self._last_modified is None:
+                return -1.0
+            import time
+            return time.time() - self._last_modified
+
 must_include_files:
 - logging_config.py
 must_include_content:
 - 'def update_context(self, **kwargs) -> None:'
 - 'def configure_all(cls, level: str = "INFO") -> None:'
 must_not_include:
-- GARBAGE_PYTHON_062_001
-- GARBAGE_PYTHON_062_002
-- GARBAGE_PYTHON_062_003
-- GARBAGE_PYTHON_062_004
-- GARBAGE_PYTHON_062_005
-- GARBAGE_PYTHON_062_006
-- GARBAGE_PYTHON_062_007
-- GARBAGE_PYTHON_062_008
-- GARBAGE_PYTHON_062_009
-- config_loader.py
-- health_checker.py
-- metrics_collector.py
+- MetricsCollector
+- increment_counter
+- observe_histogram
+- HealthChecker
+- register_check
+- is_healthy
+- ConfigWatcher
+- check_for_changes
+- get_config_age_seconds
+must_not_include_files:
+- monitoring/metrics_collector.py
+- monitoring/health_checker.py
+- monitoring/config_watcher.py
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

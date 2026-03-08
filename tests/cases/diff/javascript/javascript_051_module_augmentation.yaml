@@ -1,3 +1,24 @@
+# Scenario: augmentation.ts extends the User interface via `declare module` to add
+# a 'role' field. original.ts defines the base User interface.
+#
+# Diff: augmentation.ts adds `role?: 'admin' | 'user'` to the User augmentation
+# and updates createUserWithEmail to accept an optional role parameter.
+#
+# Reviewer questions:
+#   Q1: "What does the original User interface look like?"
+#       -> original.ts (UNCHANGED) defines User with id and name. The augmentation
+#          already added email, now adds role. Reviewer needs the base type to
+#          understand the full merged interface.
+#   Q2: "Is createUser in original.ts affected?"
+#       -> original.ts: createUser returns { id, name } — no email, no role.
+#          The augmented fields are optional, so it still type-checks.
+#
+# Not needed:
+#   - user-permissions.ts: role-based permission checking with admin/user/guest.
+#     Mentions role strings but doesn't use module augmentation. No import edge.
+#   - user-serializer.ts: JSON serialization for User objects. Works with User
+#     type but doesn't augment it.
+
 initial:
   original.ts: |
     export interface User {
@@ -20,27 +41,25 @@ initial:
     export function createUserWithEmail(name: string, email: string): User {
         return { id: Date.now().toString(), name, email };
     }
-  garbage_email.ts: |
-    const GARBAGE_JS_051_EMAIL_MARKER_A = "email";
-    const GARBAGE_JS_051_SMTP_MARKER_B = true;
+  user-permissions.ts: |
+    type Role = 'admin' | 'user' | 'guest';
 
-    class EmailDispatcher {
-        static GARBAGE_JS_051_EMAIL_CLASS_C = "dispatcher";
+    const permissions: Record<Role, string[]> = {
+        admin: ['read', 'write', 'delete'],
+        user: ['read', 'write'],
+        guest: ['read'],
+    };
 
-        send(to: string, subject: string, body: string): void {
-            // noop
-        }
+    export function hasPermission(role: Role, action: string): boolean {
+        return permissions[role]?.includes(action) ?? false;
     }
-  garbage_logging.ts: |
-    const GARBAGE_JS_051_LOG_MARKER_D = "logging";
-    const GARBAGE_JS_051_TRANSPORT_MARKER_E = 512;
+  user-serializer.ts: |
+    export function serializeUser(user: { id: string; name: string }): string {
+        return JSON.stringify(user);
+    }
 
-    class LogAggregator {
-        static GARBAGE_JS_051_LOG_CLASS_F = true;
-
-        append(level: string, message: string): void {
-            // noop
-        }
+    export function deserializeUser(json: string): { id: string; name: string } {
+        return JSON.parse(json);
     }
 changed:
   original.ts: |
@@ -65,41 +84,46 @@ changed:
     export function createUserWithEmail(name: string, email: string, role?: 'admin' | 'user'): User {
         return { id: Date.now().toString(), name, email, role };
     }
-  garbage_email.ts: |
-    const GARBAGE_JS_051_EMAIL_MARKER_A = "email";
-    const GARBAGE_JS_051_SMTP_MARKER_B = true;
+  user-permissions.ts: |
+    type Role = 'admin' | 'user' | 'guest';
 
-    class EmailDispatcher {
-        static GARBAGE_JS_051_EMAIL_CLASS_C = "dispatcher";
+    const permissions: Record<Role, string[]> = {
+        admin: ['read', 'write', 'delete'],
+        user: ['read', 'write'],
+        guest: ['read'],
+    };
 
-        send(to: string, subject: string, body: string): void {
-            // noop
-        }
+    export function hasPermission(role: Role, action: string): boolean {
+        return permissions[role]?.includes(action) ?? false;
     }
-  garbage_logging.ts: |
-    const GARBAGE_JS_051_LOG_MARKER_D = "logging";
-    const GARBAGE_JS_051_TRANSPORT_MARKER_E = 512;
+  user-serializer.ts: |
+    export function serializeUser(user: { id: string; name: string }): string {
+        return JSON.stringify(user);
+    }
 
-    class LogAggregator {
-        static GARBAGE_JS_051_LOG_CLASS_F = true;
-
-        append(level: string, message: string): void {
-            // noop
-        }
+    export function deserializeUser(json: string): { id: string; name: string } {
+        return JSON.parse(json);
     }
 must_include_files:
-- augmentation.ts
-must_include_content:
-- 'role?: ''admin'' | ''user'';'
-- 'function createUserWithEmail(name: string, email: string, role?: ''admin'' | ''user''): User {'
+  # Q1: original.ts defines the base User interface that augmentation.ts extends
+  - original.ts
+must_include_content_from:
+  original.ts:
+    - "interface User {"
+    - "id: string"
+    - "name: string"
 must_not_include:
-- GARBAGE_JS_051_EMAIL_CLASS_C
-- GARBAGE_JS_051_EMAIL_MARKER_A
-- GARBAGE_JS_051_LOG_CLASS_F
-- GARBAGE_JS_051_LOG_MARKER_D
-- GARBAGE_JS_051_SMTP_MARKER_B
-- GARBAGE_JS_051_TRANSPORT_MARKER_E
-- garbage_email.ts
-- garbage_logging.ts
+  # user-permissions.ts: permission checking, no module augmentation usage
+  - hasPermission
+  - permissions
+  - guest
+  # user-serializer.ts: serialization, doesn't augment the type
+  - serializeUser
+  - deserializeUser
+must_not_include_files:
+  - user-permissions.ts
+  - user-serializer.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

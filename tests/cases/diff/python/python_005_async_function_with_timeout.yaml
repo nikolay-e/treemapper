@@ -1,3 +1,8 @@
+# Scenario: fetch_data() and HttpClient gain timeout parameter support
+# Changed: async_utils.py adds timeout params to fetch_data, HttpClient, fetch_multiple, retry_fetch
+# Reviewer questions: How do callers handle timeouts? Does FetchStatus.TIMEOUT get used?
+# Trap 1: rate_limiter.py — async rate limiting, shares "async" vocabulary but no import from async_utils
+# Trap 2: health_check.py — async health checks with timeouts, similar domain but independent
 initial:
   async_utils.py: |
     import asyncio
@@ -82,49 +87,79 @@ initial:
 
         def _process_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
             return {"processed": True, "original": data}
-  garbage_websocket.py: |
-    GARBAGE_MARKER_WEBSOCKET_001 = "websocket garbage"
-    UNRELATED_WS_PORT_002 = 8080
+  rate_limiter.py: |
+    import asyncio
+    import time
+    from typing import Dict, Optional
+    from dataclasses import dataclass
 
-    class WebSocketHandler:
-        GARBAGE_WS_CLASS_003 = "ws class marker"
+    @dataclass
+    class RateLimitConfig:
+        requests_per_second: int = 100
+        burst_size: int = 10
+        timeout_seconds: float = 30.0
 
-        def __init__(self):
-            self._connections: list = []
+    class AsyncRateLimiter:
+        def __init__(self, config: RateLimitConfig):
+            self._config = config
+            self._tokens: float = config.burst_size
+            self._last_refill = time.monotonic()
+            self._lock = asyncio.Lock()
 
-        async def connect(self, client_id: str) -> None:
-            self._connections.append(client_id)
+        async def acquire(self) -> bool:
+            async with self._lock:
+                now = time.monotonic()
+                elapsed = now - self._last_refill
+                self._tokens = min(
+                    self._config.burst_size,
+                    self._tokens + elapsed * self._config.requests_per_second,
+                )
+                self._last_refill = now
+                if self._tokens >= 1:
+                    self._tokens -= 1
+                    return True
+                return False
 
-        async def disconnect(self, client_id: str) -> None:
-            self._connections.remove(client_id)
+        async def wait_and_acquire(self) -> None:
+            while not await self.acquire():
+                await asyncio.sleep(1.0 / self._config.requests_per_second)
+  health_check.py: |
+    import asyncio
+    from typing import Dict, Any, List
+    from dataclasses import dataclass
+    from enum import Enum
 
-        async def broadcast(self, message: str) -> None:
-            pass
+    class ServiceStatus(Enum):
+        HEALTHY = "healthy"
+        DEGRADED = "degraded"
+        UNHEALTHY = "unhealthy"
 
-    class WebSocketPool:
-        GARBAGE_WS_POOL_004 = "ws pool marker"
+    @dataclass
+    class HealthResult:
+        service_name: str
+        status: ServiceStatus
+        response_time_ms: float
+        details: Optional[Dict[str, Any]] = None
 
-        def get_connection(self) -> Optional["WebSocketHandler"]:
-            return None
-  garbage_streaming.py: |
-    GARBAGE_MARKER_STREAM_005 = "streaming garbage"
-    UNRELATED_CHUNK_SIZE_006 = 4096
+    class HealthChecker:
+        def __init__(self, timeout_seconds: float = 5.0):
+            self._timeout = timeout_seconds
+            self._checks: Dict[str, callable] = {}
 
-    class StreamProcessor:
-        GARBAGE_STREAM_CLASS_007 = True
+        def register_check(self, name: str, check_fn: callable) -> None:
+            self._checks[name] = check_fn
 
-        def __init__(self, chunk_size: int = 1024):
-            self.chunk_size = chunk_size
-
-        async def process_stream(self, data: bytes) -> bytes:
-            return data
-
-        async def read_chunks(self) -> AsyncIterator[bytes]:
-            yield b""
-
-    def calculate_stream_rate(bytes_transferred: int, seconds: float) -> float:
-        GARBAGE_RATE_MARKER_008 = "rate marker"
-        return bytes_transferred / seconds if seconds > 0 else 0.0
+        async def run_checks(self) -> List[HealthResult]:
+            results = []
+            for name, check_fn in self._checks.items():
+                try:
+                    start = asyncio.get_event_loop().time()
+                    await asyncio.wait_for(check_fn(), timeout=self._timeout)
+                    elapsed = (asyncio.get_event_loop().time() - start) * 1000
+                    results.append(HealthResult(name, ServiceStatus.HEALTHY, elapsed))
+                except asyncio.TimeoutError:
+                    results.append(HealthResult(name, ServiceStatus.UNHEALTHY, self._timeout * 1000))
+            return results
 changed:
   async_utils.py: |
     import asyncio
@@ -217,62 +252,99 @@ changed:
 
         def _process_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
             return {"processed": True, "original": data}
-  garbage_websocket.py: |
-    GARBAGE_MARKER_WEBSOCKET_001 = "websocket garbage"
-    UNRELATED_WS_PORT_002 = 8080
+  rate_limiter.py: |
+    import asyncio
+    import time
+    from typing import Dict, Optional
+    from dataclasses import dataclass
 
-    class WebSocketHandler:
-        GARBAGE_WS_CLASS_003 = "ws class marker"
+    @dataclass
+    class RateLimitConfig:
+        requests_per_second: int = 100
+        burst_size: int = 10
+        timeout_seconds: float = 30.0
 
-        def __init__(self):
-            self._connections: list = []
+    class AsyncRateLimiter:
+        def __init__(self, config: RateLimitConfig):
+            self._config = config
+            self._tokens: float = config.burst_size
+            self._last_refill = time.monotonic()
+            self._lock = asyncio.Lock()
 
-        async def connect(self, client_id: str) -> None:
-            self._connections.append(client_id)
+        async def acquire(self) -> bool:
+            async with self._lock:
+                now = time.monotonic()
+                elapsed = now - self._last_refill
+                self._tokens = min(
+                    self._config.burst_size,
+                    self._tokens + elapsed * self._config.requests_per_second,
+                )
+                self._last_refill = now
+                if self._tokens >= 1:
+                    self._tokens -= 1
+                    return True
+                return False
 
-        async def disconnect(self, client_id: str) -> None:
-            self._connections.remove(client_id)
+        async def wait_and_acquire(self) -> None:
+            while not await self.acquire():
+                await asyncio.sleep(1.0 / self._config.requests_per_second)
+  health_check.py: |
+    import asyncio
+    from typing import Dict, Any, List
+    from dataclasses import dataclass
+    from enum import Enum
 
-        async def broadcast(self, message: str) -> None:
-            pass
+    class ServiceStatus(Enum):
+        HEALTHY = "healthy"
+        DEGRADED = "degraded"
+        UNHEALTHY = "unhealthy"
 
-    class WebSocketPool:
-        GARBAGE_WS_POOL_004 = "ws pool marker"
+    @dataclass
+    class HealthResult:
+        service_name: str
+        status: ServiceStatus
+        response_time_ms: float
+        details: Optional[Dict[str, Any]] = None
 
-        def get_connection(self) -> Optional["WebSocketHandler"]:
-            return None
-  garbage_streaming.py: |
-    GARBAGE_MARKER_STREAM_005 = "streaming garbage"
-    UNRELATED_CHUNK_SIZE_006 = 4096
+    class HealthChecker:
+        def __init__(self, timeout_seconds: float = 5.0):
+            self._timeout = timeout_seconds
+            self._checks: Dict[str, callable] = {}
 
-    class StreamProcessor:
-        GARBAGE_STREAM_CLASS_007 = True
+        def register_check(self, name: str, check_fn: callable) -> None:
+            self._checks[name] = check_fn
 
-        def __init__(self, chunk_size: int = 1024):
-            self.chunk_size = chunk_size
-
-        async def process_stream(self, data: bytes) -> bytes:
-            return data
-
-        async def read_chunks(self) -> AsyncIterator[bytes]:
-            yield b""
-
-    def calculate_stream_rate(bytes_transferred: int, seconds: float) -> float:
-        GARBAGE_RATE_MARKER_008 = "rate marker"
-        return bytes_transferred / seconds if seconds > 0 else 0.0
+        async def run_checks(self) -> List[HealthResult]:
+            results = []
+            for name, check_fn in self._checks.items():
+                try:
+                    start = asyncio.get_event_loop().time()
+                    await asyncio.wait_for(check_fn(), timeout=self._timeout)
+                    elapsed = (asyncio.get_event_loop().time() - start) * 1000
+                    results.append(HealthResult(name, ServiceStatus.HEALTHY, elapsed))
+                except asyncio.TimeoutError:
+                    results.append(HealthResult(name, ServiceStatus.UNHEALTHY, self._timeout * 1000))
+            return results
 must_include_files:
 - async_utils.py
-must_include_content:
-- 'def __init__(self, base_url: str = "", default_timeout: float = 30.0):'
-- 'async def get(self, path: str, timeout: Optional[float] = None) -> Dict[str, Any]:'
+- handler.py
+must_include_content_from:
+  async_utils.py:
+  - 'def __init__(self, base_url: str = "", default_timeout: float = 30.0):'
+  - 'async def get(self, path: str, timeout: Optional[float] = None) -> Dict[str, Any]:'
+  handler.py:
+  - from async_utils import fetch_data, FetchResult, FetchStatus, HttpClient
 must_not_include:
-- GARBAGE_MARKER_STREAM_005
-- GARBAGE_MARKER_WEBSOCKET_001
-- GARBAGE_RATE_MARKER_008
-- GARBAGE_STREAM_CLASS_007
-- GARBAGE_WS_CLASS_003
-- GARBAGE_WS_POOL_004
-- garbage_streaming.py
-- garbage_websocket.py
+- AsyncRateLimiter
+- RateLimitConfig
+- wait_and_acquire
+- HealthChecker
+- HealthResult
+- ServiceStatus
+must_not_include_files:
+- rate_limiter.py
+- health_check.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

@@ -1,3 +1,22 @@
+# Reviewer sees: TodoList.tsx is rewritten from scratch with useState<TodoItem[]>,
+# imports TodoItem and createTodo from ./types, and uses them to add/toggle todos.
+#
+# Q1: "What shape does TodoItem have — what fields does the component render?"
+#     -> src/types.ts defines TodoItem with id, text, completed, priority.
+#        The component accesses t.id, t.completed, t.text — reviewer confirms
+#        these fields exist. The priority field is unused in the component,
+#        which might be intentional or an oversight.
+# Q2: "What does createTodo() return? Does it match TodoItem[]?"
+#     -> src/types.ts exports createTodo() which constructs a TodoItem with
+#        Date.now() id and default 'medium' priority. Reviewer confirms the
+#        factory aligns with the state type parameter.
+#
+# Not needed:
+#   - src/db/schema.ts: database schema definitions. Backend persistence
+#     layer, unrelated to frontend React state management.
+#   - src/config/constants.ts: application constants. Different concern,
+#     no import relationship to TodoList or types.
+
 initial:
   src/types.ts: |
     export interface TodoItem {
@@ -17,43 +36,33 @@ initial:
     }
   src/TodoList.tsx: |
     console.log('initial');
-  src/unrelated/breadcrumbs.tsx: |
-    const GARBAGE_JSX_028_BREADCRUMB_CONFIG_A = 'breadcrumb_garbage_marker';
-
-    export interface GarbageBreadcrumbItem {
-        label: string;
-        href: string;
+  # --- Not needed: database schema, backend concern ---
+  src/db/schema.ts: |
+    interface TableColumn {
+        name: string;
+        type: 'string' | 'number' | 'boolean' | 'date';
+        nullable?: boolean;
     }
 
-    export function GarbageBreadcrumbs({ items }: { items: GarbageBreadcrumbItem[] }) {
-        return (
-            <nav>
-                {items.map((item, i) => (
-                    <span key={i}>{item.label}</span>
-                ))}
-            </nav>
-        );
+    export const usersTable: TableColumn[] = [
+        { name: 'id', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'created_at', type: 'date' },
+    ];
+
+    export function validateSchema(columns: TableColumn[], data: Record<string, unknown>): boolean {
+        return columns.every(col => col.nullable || data[col.name] !== undefined);
+    }
+  # --- Not needed: app constants, no import relationship ---
+  src/config/constants.ts: |
+    export const APP_NAME = 'TodoApp';
+    export const MAX_RETRIES = 3;
+    export const REQUEST_TIMEOUT = 5000;
+
+    export function getApiBaseUrl(): string {
+        return process.env.API_URL || 'http://localhost:3000';
     }
 
-    export function GARBAGE_JSX_028_RENDER_CRUMBS_B(): void {
-        console.log('GARBAGE_JSX_028_CRUMBS_OUTPUT_C');
-    }
-  src/unrelated/tooltip.tsx: |
-    const GARBAGE_JSX_028_TOOLTIP_CONFIG_D = { delay: 300, position: 'top' };
-
-    export class GARBAGE_JSX_028_TOOLTIP_MANAGER_E {
-        show(target: string): void {
-            console.log('showing tooltip for', target);
-        }
-
-        hide(): void {
-            console.log('hiding tooltip');
-        }
-    }
-
-    export function GARBAGE_JSX_028_DISMISS_TOOLTIP_F(): void {
-        console.log('dismissing tooltip');
-    }
 changed:
   src/types.ts: |
     export interface TodoItem {
@@ -104,55 +113,53 @@ changed:
             </div>
         );
     }
-  src/unrelated/breadcrumbs.tsx: |
-    const GARBAGE_JSX_028_BREADCRUMB_CONFIG_A = 'breadcrumb_garbage_marker';
-
-    export interface GarbageBreadcrumbItem {
-        label: string;
-        href: string;
+  src/db/schema.ts: |
+    interface TableColumn {
+        name: string;
+        type: 'string' | 'number' | 'boolean' | 'date';
+        nullable?: boolean;
     }
 
-    export function GarbageBreadcrumbs({ items }: { items: GarbageBreadcrumbItem[] }) {
-        return (
-            <nav>
-                {items.map((item, i) => (
-                    <span key={i}>{item.label}</span>
-                ))}
-            </nav>
-        );
+    export const usersTable: TableColumn[] = [
+        { name: 'id', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'created_at', type: 'date' },
+    ];
+
+    export function validateSchema(columns: TableColumn[], data: Record<string, unknown>): boolean {
+        return columns.every(col => col.nullable || data[col.name] !== undefined);
+    }
+  src/config/constants.ts: |
+    export const APP_NAME = 'TodoApp';
+    export const MAX_RETRIES = 3;
+    export const REQUEST_TIMEOUT = 5000;
+
+    export function getApiBaseUrl(): string {
+        return process.env.API_URL || 'http://localhost:3000';
     }
 
-    export function GARBAGE_JSX_028_RENDER_CRUMBS_B(): void {
-        console.log('GARBAGE_JSX_028_CRUMBS_OUTPUT_C');
-    }
-  src/unrelated/tooltip.tsx: |
-    const GARBAGE_JSX_028_TOOLTIP_CONFIG_D = { delay: 300, position: 'top' };
-
-    export class GARBAGE_JSX_028_TOOLTIP_MANAGER_E {
-        show(target: string): void {
-            console.log('showing tooltip for', target);
-        }
-
-        hide(): void {
-            console.log('hiding tooltip');
-        }
-    }
-
-    export function GARBAGE_JSX_028_DISMISS_TOOLTIP_F(): void {
-        console.log('dismissing tooltip');
-    }
 must_include_files:
-- src/TodoList.tsx
-must_include_content:
-- import { useState } from 'react';
-- '[todos, setTodos] = useState<TodoItem[]>([])'
+  # Unchanged — defines TodoItem shape and createTodo factory the component uses.
+  # Reviewer needs to confirm fields accessed (id, text, completed) exist on the type,
+  # and that createTodo returns a proper TodoItem for the state array.
+  - src/types.ts
+must_include_content_from:
+  src/types.ts:
+    - "TodoItem"
+    - "createTodo"
 must_not_include:
-- GARBAGE_JSX_028_BREADCRUMB_CONFIG_A
-- GARBAGE_JSX_028_DISMISS_TOOLTIP_F
-- GARBAGE_JSX_028_RENDER_CRUMBS_B
-- GARBAGE_JSX_028_TOOLTIP_CONFIG_D
-- GARBAGE_JSX_028_TOOLTIP_MANAGER_E
-- breadcrumbs.tsx
-- tooltip.tsx
+  # schema.ts: database schema, backend concern
+  - TableColumn
+  - usersTable
+  - validateSchema
+  # constants.ts: app config, no import relationship
+  - APP_NAME
+  - MAX_RETRIES
+  - getApiBaseUrl
+must_not_include_files:
+  - src/db/schema.ts
+  - src/config/constants.ts
+max_fragments: 10
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

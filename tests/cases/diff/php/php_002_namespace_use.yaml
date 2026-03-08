@@ -1,3 +1,41 @@
+# Scenario: CheckoutController adds PaymentService dependency for checkout flow
+#   — reviewer needs PaymentService to verify calculateTotal/process calls
+#
+# Diff shows:
+#   - class CheckoutController { index(): array }
+#   + use App\Services\PaymentService; constructor injection;
+#     checkout() calls calculateTotal() and process()
+#
+# Reviewer questions:
+#   Q1: "What does calculateTotal() actually compute — is 0.08 tax rate correct?"
+#       -> PaymentService.calculateTotal multiplies amount by (1 + taxRate).
+#          Constructor default is 0.1, but checkout passes 0.08 via constructor.
+#   Q2: "What does process() validate — can it reject the total?"
+#       -> process() returns true only if amount > 0.
+#
+# Not needed for comprehension:
+#   - src/Services/ShippingService.php: another service in same namespace with
+#     calculateTotal() method name overlap. Same float-based calculation style,
+#     same Services namespace. But not imported by CheckoutController.
+#
+#   - src/Controllers/CartController.php: checkout-adjacent controller in same
+#     Controllers namespace. Has getTotal() method — similar to calculateTotal.
+#     Manages items that feed into checkout flow. But has no PaymentService
+#     dependency and doesn't help verify calculateTotal/process behavior.
+#
+#   - src/Services/DiscountService.php: another service that modifies prices.
+#     Has applyDiscount(float $amount) with same parameter signature as
+#     PaymentService methods. Could plausibly be called before checkout.
+#     But not referenced in the diff.
+#
+#   - src/Events/PaymentProcessed.php: shares "Payment" naming with PaymentService.
+#     Event class for payment lifecycle. Same domain vocabulary. But it's an
+#     event data object, not the service being called in the diff.
+#
+#   - src/Controllers/OrderController.php: sibling controller that also handles
+#     monetary transactions. Has processOrder() method name that overlaps with
+#     PaymentService->process(). But independent controller.
+
 initial:
   src/Services/PaymentService.php: |
     <?php
@@ -5,21 +43,30 @@ initial:
 
     class PaymentService {
         private float $taxRate;
+        private string $currency;
 
-        public function __construct(float $taxRate = 0.1) {
+        public function __construct(float $taxRate = 0.1, string $currency = 'USD') {
             $this->taxRate = $taxRate;
+            $this->currency = $currency;
         }
 
         public function process(float $amount): bool {
-            return $amount > 0;
+            if ($amount <= 0) {
+                return false;
+            }
+            return $this->chargeGateway($amount);
         }
 
         public function calculateTotal(float $amount): float {
-            return $amount * (1 + $this->taxRate);
+            return round($amount * (1 + $this->taxRate), 2);
         }
 
         public function refund(float $amount): bool {
             return $amount > 0 && $amount <= 10000;
+        }
+
+        private function chargeGateway(float $amount): bool {
+            return true;
         }
     }
   src/Controllers/CheckoutController.php: |
@@ -31,31 +78,130 @@ initial:
             return ['page' => 'checkout'];
         }
     }
-  src/garbage_queue_handler.php: |
+  src/Services/ShippingService.php: |
     <?php
-    GARBAGE_PHP_002_QUEUE_NAME_A = "default";
-    GARBAGE_PHP_002_MAX_RETRIES_B = 3;
+    namespace App\Services;
 
-    class GarbageQueueHandler {
-        GARBAGE_PHP_002_TIMEOUT_SEC_C = 30;
+    class ShippingService {
+        private float $baseRate;
+        private string $defaultZone;
 
-        public function push(string $job): void {
-            GARBAGE_PHP_002_PRIORITY_D = "normal";
+        public function __construct(float $baseRate = 5.99, string $defaultZone = 'domestic') {
+            $this->baseRate = $baseRate;
+            $this->defaultZone = $defaultZone;
+        }
+
+        public function calculateTotal(float $weight, string $zone = 'domestic'): float {
+            $zoneMultiplier = match($zone) {
+                'international' => 3.0,
+                'express' => 2.0,
+                default => 1.0,
+            };
+            return round($this->baseRate * $weight * $zoneMultiplier, 2);
+        }
+
+        public function estimateDelivery(string $zone): int {
+            return match($zone) {
+                'international' => 14,
+                'express' => 2,
+                default => 5,
+            };
         }
     }
-  src/garbage_rate_limiter.php: |
+  src/Controllers/CartController.php: |
     <?php
-    GARBAGE_PHP_002_WINDOW_SIZE_E = 60;
-    GARBAGE_PHP_002_MAX_REQUESTS_F = 100;
+    namespace App\Controllers;
 
-    class GarbageRateLimiter {
-        GARBAGE_PHP_002_STRATEGY_G = "sliding_window";
+    class CartController {
+        private array $items = [];
 
-        public function isAllowed(string $key): bool {
-            GARBAGE_PHP_002_BUCKET_SIZE_H = 10;
-            return true;
+        public function add(string $productId, int $quantity, float $price): void {
+            $this->items[] = ['id' => $productId, 'qty' => $quantity, 'price' => $price];
+        }
+
+        public function getTotal(): float {
+            return array_sum(array_map(
+                fn($item) => $item['qty'] * $item['price'],
+                $this->items
+            ));
+        }
+
+        public function clear(): void {
+            $this->items = [];
+        }
+
+        public function getItems(): array {
+            return $this->items;
         }
     }
+  src/Services/DiscountService.php: |
+    <?php
+    namespace App\Services;
+
+    class DiscountService {
+        private array $activeCodes = [];
+
+        public function applyDiscount(float $amount, string $code): float {
+            $rate = $this->getDiscountRate($code);
+            return round($amount * (1 - $rate), 2);
+        }
+
+        public function registerCode(string $code, float $rate): void {
+            $this->activeCodes[$code] = $rate;
+        }
+
+        private function getDiscountRate(string $code): float {
+            return $this->activeCodes[$code] ?? 0.0;
+        }
+    }
+  src/Events/PaymentProcessed.php: |
+    <?php
+    namespace App\Events;
+
+    class PaymentProcessed {
+        public readonly float $amount;
+        public readonly string $transactionId;
+        public readonly \DateTimeImmutable $processedAt;
+
+        public function __construct(float $amount, string $transactionId) {
+            $this->amount = $amount;
+            $this->transactionId = $transactionId;
+            $this->processedAt = new \DateTimeImmutable();
+        }
+
+        public function toArray(): array {
+            return [
+                'amount' => $this->amount,
+                'transaction_id' => $this->transactionId,
+                'processed_at' => $this->processedAt->format('c'),
+            ];
+        }
+    }
+  src/Controllers/OrderController.php: |
+    <?php
+    namespace App\Controllers;
+
+    class OrderController {
+        private array $orders = [];
+
+        public function processOrder(int $orderId, float $amount): array {
+            $this->orders[$orderId] = ['amount' => $amount, 'status' => 'processing'];
+            return $this->orders[$orderId];
+        }
+
+        public function getOrder(int $orderId): ?array {
+            return $this->orders[$orderId] ?? null;
+        }
+
+        public function cancelOrder(int $orderId): bool {
+            if (isset($this->orders[$orderId])) {
+                $this->orders[$orderId]['status'] = 'cancelled';
+                return true;
+            }
+            return false;
+        }
+    }
+
 changed:
   src/Services/PaymentService.php: |
     <?php
@@ -63,21 +209,30 @@ changed:
 
     class PaymentService {
         private float $taxRate;
+        private string $currency;
 
-        public function __construct(float $taxRate = 0.1) {
+        public function __construct(float $taxRate = 0.1, string $currency = 'USD') {
             $this->taxRate = $taxRate;
+            $this->currency = $currency;
         }
 
         public function process(float $amount): bool {
-            return $amount > 0;
+            if ($amount <= 0) {
+                return false;
+            }
+            return $this->chargeGateway($amount);
         }
 
         public function calculateTotal(float $amount): float {
-            return $amount * (1 + $this->taxRate);
+            return round($amount * (1 + $this->taxRate), 2);
         }
 
         public function refund(float $amount): bool {
             return $amount > 0 && $amount <= 10000;
+        }
+
+        private function chargeGateway(float $amount): bool {
+            return true;
         }
     }
   src/Controllers/CheckoutController.php: |
@@ -103,48 +258,173 @@ changed:
             return ['total' => $total, 'success' => $success];
         }
     }
-  src/garbage_queue_handler.php: |
+  src/Services/ShippingService.php: |
     <?php
-    GARBAGE_PHP_002_QUEUE_NAME_A = "default";
-    GARBAGE_PHP_002_MAX_RETRIES_B = 3;
+    namespace App\Services;
 
-    class GarbageQueueHandler {
-        GARBAGE_PHP_002_TIMEOUT_SEC_C = 30;
+    class ShippingService {
+        private float $baseRate;
+        private string $defaultZone;
 
-        public function push(string $job): void {
-            GARBAGE_PHP_002_PRIORITY_D = "normal";
+        public function __construct(float $baseRate = 5.99, string $defaultZone = 'domestic') {
+            $this->baseRate = $baseRate;
+            $this->defaultZone = $defaultZone;
+        }
+
+        public function calculateTotal(float $weight, string $zone = 'domestic'): float {
+            $zoneMultiplier = match($zone) {
+                'international' => 3.0,
+                'express' => 2.0,
+                default => 1.0,
+            };
+            return round($this->baseRate * $weight * $zoneMultiplier, 2);
+        }
+
+        public function estimateDelivery(string $zone): int {
+            return match($zone) {
+                'international' => 14,
+                'express' => 2,
+                default => 5,
+            };
         }
     }
-  src/garbage_rate_limiter.php: |
+  src/Controllers/CartController.php: |
     <?php
-    GARBAGE_PHP_002_WINDOW_SIZE_E = 60;
-    GARBAGE_PHP_002_MAX_REQUESTS_F = 100;
+    namespace App\Controllers;
 
-    class GarbageRateLimiter {
-        GARBAGE_PHP_002_STRATEGY_G = "sliding_window";
+    class CartController {
+        private array $items = [];
 
-        public function isAllowed(string $key): bool {
-            GARBAGE_PHP_002_BUCKET_SIZE_H = 10;
-            return true;
+        public function add(string $productId, int $quantity, float $price): void {
+            $this->items[] = ['id' => $productId, 'qty' => $quantity, 'price' => $price];
+        }
+
+        public function getTotal(): float {
+            return array_sum(array_map(
+                fn($item) => $item['qty'] * $item['price'],
+                $this->items
+            ));
+        }
+
+        public function clear(): void {
+            $this->items = [];
+        }
+
+        public function getItems(): array {
+            return $this->items;
         }
     }
+  src/Services/DiscountService.php: |
+    <?php
+    namespace App\Services;
+
+    class DiscountService {
+        private array $activeCodes = [];
+
+        public function applyDiscount(float $amount, string $code): float {
+            $rate = $this->getDiscountRate($code);
+            return round($amount * (1 - $rate), 2);
+        }
+
+        public function registerCode(string $code, float $rate): void {
+            $this->activeCodes[$code] = $rate;
+        }
+
+        private function getDiscountRate(string $code): float {
+            return $this->activeCodes[$code] ?? 0.0;
+        }
+    }
+  src/Events/PaymentProcessed.php: |
+    <?php
+    namespace App\Events;
+
+    class PaymentProcessed {
+        public readonly float $amount;
+        public readonly string $transactionId;
+        public readonly \DateTimeImmutable $processedAt;
+
+        public function __construct(float $amount, string $transactionId) {
+            $this->amount = $amount;
+            $this->transactionId = $transactionId;
+            $this->processedAt = new \DateTimeImmutable();
+        }
+
+        public function toArray(): array {
+            return [
+                'amount' => $this->amount,
+                'transaction_id' => $this->transactionId,
+                'processed_at' => $this->processedAt->format('c'),
+            ];
+        }
+    }
+  src/Controllers/OrderController.php: |
+    <?php
+    namespace App\Controllers;
+
+    class OrderController {
+        private array $orders = [];
+
+        public function processOrder(int $orderId, float $amount): array {
+            $this->orders[$orderId] = ['amount' => $amount, 'status' => 'processing'];
+            return $this->orders[$orderId];
+        }
+
+        public function getOrder(int $orderId): ?array {
+            return $this->orders[$orderId] ?? null;
+        }
+
+        public function cancelOrder(int $orderId): bool {
+            if (isset($this->orders[$orderId])) {
+                $this->orders[$orderId]['status'] = 'cancelled';
+                return true;
+            }
+            return false;
+        }
+    }
+
 must_include_files:
-- src/Controllers/CheckoutController.php
-must_include_content:
-- |
-  use App\Services\PaymentService
+  - src/Controllers/CheckoutController.php
+  # Q1/Q2: Reviewer needs PaymentService to verify calculateTotal/process behavior
+  - src/Services/PaymentService.php
+
+must_include_content_from:
+  src/Controllers/CheckoutController.php:
+    - "use App\\Services\\PaymentService"
+    - "$this->paymentService->calculateTotal($amount)"
+    - "$this->paymentService->process($total)"
+  src/Services/PaymentService.php:
+    - "public function calculateTotal(float $amount): float"
+    - "return round($amount * (1 + $this->taxRate), 2)"
+    - "public function process(float $amount): bool"
+
 must_not_include:
-- GARBAGE_PHP_002_QUEUE_NAME_A
-- GARBAGE_PHP_002_MAX_RETRIES_B
-- GARBAGE_PHP_002_TIMEOUT_SEC_C
-- GARBAGE_PHP_002_PRIORITY_D
-- GARBAGE_PHP_002_WINDOW_SIZE_E
-- GARBAGE_PHP_002_MAX_REQUESTS_F
-- GARBAGE_PHP_002_STRATEGY_G
-- GARBAGE_PHP_002_BUCKET_SIZE_H
-- GarbageQueueHandler
-- GarbageRateLimiter
-- garbage_queue_handler.php
-- garbage_rate_limiter.php
+  # --- ShippingService.php: same namespace, has calculateTotal but different signature ---
+  - "class ShippingService"
+  - "zoneMultiplier"
+  - "estimateDelivery"
+  # --- CartController.php: checkout-adjacent, has getTotal() but no PaymentService ---
+  - "class CartController"
+  - "getItems"
+  # --- DiscountService.php: same namespace, modifies prices, similar float signatures ---
+  - "class DiscountService"
+  - "applyDiscount"
+  - "getDiscountRate"
+  # --- PaymentProcessed.php: shares "Payment" naming, same domain vocabulary ---
+  - "class PaymentProcessed"
+  - "transactionId"
+  # --- OrderController.php: sibling controller with processOrder() name overlap ---
+  - "class OrderController"
+  - "processOrder"
+  - "cancelOrder"
+
+must_not_include_files:
+  - src/Services/ShippingService.php
+  - src/Controllers/CartController.php
+  - src/Services/DiscountService.php
+  - src/Events/PaymentProcessed.php
+  - src/Controllers/OrderController.php
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

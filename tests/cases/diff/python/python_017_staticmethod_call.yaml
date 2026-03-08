@@ -1,3 +1,8 @@
+# Scenario: ContactForm starts calling Validator static methods (is_email, is_phone)
+# Changed: forms.py imports Validator and uses Validator.is_email(), Validator.is_phone()
+# Reviewer questions: Are validation errors collected? Is sanitize_input applied to output?
+# Trap 1: input_sanitizer.py — sanitizes HTML input, shares "sanitize/validate" vocabulary but independent
+# Trap 2: password_policy.py — validates password strength, shares "validator" domain but no dep
 initial:
   validators.py: |
     import re
@@ -43,24 +48,46 @@ initial:
   forms.py: |
     def validate_form():
         pass
-  garbage_unrelated_db.py: |
-    GARBAGE_PY_DB_847291 = "database connection garbage"
-    UNRELATED_DB_MARKER_392847 = "unused db connection pooling"
+  input_sanitizer.py: |
+    import re
+    from typing import Optional
 
-    class GarbageDatabaseConnection:
-        GARBAGE_CONN_STR_182736 = "postgres://garbage"
+    class InputSanitizer:
+        DANGEROUS_PATTERNS = [
+            re.compile(r'<script[^>]*>.*?</script>', re.IGNORECASE | re.DOTALL),
+        ]
 
-        def garbage_connect(self):
-            return self.GARBAGE_CONN_STR_182736
-  garbage_unrelated_cache.py: |
-    GARBAGE_PY_CACHE_563829 = "redis cache garbage"
-    UNRELATED_CACHE_MARKER_847261 = "unused cache invalidation"
+        @staticmethod
+        def sanitize_html(text: str) -> str:
+            result = text
+            for pattern in InputSanitizer.DANGEROUS_PATTERNS:
+                result = pattern.sub('', result)
+            return result.strip()
 
-    class GarbageCacheManager:
-        GARBAGE_CACHE_TTL_928374 = 3600
+        @staticmethod
+        def escape_sql(text: str) -> str:
+            return text.replace("'", "''").replace(";", "")
+  password_policy.py: |
+    from typing import List
+    from dataclasses import dataclass
 
-        def garbage_get(self, key):
-            return f"Garbage cached: {key}"
+    @dataclass
+    class PasswordPolicy:
+        min_length: int = 8
+        require_uppercase: bool = True
+        require_digit: bool = True
+
+    class PasswordValidator:
+        def __init__(self, policy: PasswordPolicy = None):
+            self._policy = policy or PasswordPolicy()
+
+        def validate(self, password: str) -> List[str]:
+            errors = []
+            if len(password) < self._policy.min_length:
+                errors.append("Too short")
+            if self._policy.require_uppercase and not any(c.isupper() for c in password):
+                errors.append("Must contain uppercase")
+            return errors
 changed:
   validators.py: |
     import re
@@ -135,35 +162,64 @@ changed:
             "phone": phone,
             "valid": valid_email and valid_phone
         }
-  garbage_unrelated_db.py: |
-    GARBAGE_PY_DB_847291 = "database connection garbage"
-    UNRELATED_DB_MARKER_392847 = "unused db connection pooling"
+  input_sanitizer.py: |
+    import re
+    from typing import Optional
 
-    class GarbageDatabaseConnection:
-        GARBAGE_CONN_STR_182736 = "postgres://garbage"
+    class InputSanitizer:
+        DANGEROUS_PATTERNS = [
+            re.compile(r'<script[^>]*>.*?</script>', re.IGNORECASE | re.DOTALL),
+        ]
 
-        def garbage_connect(self):
-            return self.GARBAGE_CONN_STR_182736
-  garbage_unrelated_cache.py: |
-    GARBAGE_PY_CACHE_563829 = "redis cache garbage"
-    UNRELATED_CACHE_MARKER_847261 = "unused cache invalidation"
+        @staticmethod
+        def sanitize_html(text: str) -> str:
+            result = text
+            for pattern in InputSanitizer.DANGEROUS_PATTERNS:
+                result = pattern.sub('', result)
+            return result.strip()
 
-    class GarbageCacheManager:
-        GARBAGE_CACHE_TTL_928374 = 3600
+        @staticmethod
+        def escape_sql(text: str) -> str:
+            return text.replace("'", "''").replace(";", "")
+  password_policy.py: |
+    from typing import List
+    from dataclasses import dataclass
 
-        def garbage_get(self, key):
-            return f"Garbage cached: {key}"
+    @dataclass
+    class PasswordPolicy:
+        min_length: int = 8
+        require_uppercase: bool = True
+        require_digit: bool = True
+
+    class PasswordValidator:
+        def __init__(self, policy: PasswordPolicy = None):
+            self._policy = policy or PasswordPolicy()
+
+        def validate(self, password: str) -> List[str]:
+            errors = []
+            if len(password) < self._policy.min_length:
+                errors.append("Too short")
+            if self._policy.require_uppercase and not any(c.isupper() for c in password):
+                errors.append("Must contain uppercase")
+            return errors
 must_include_files:
+- validators.py
 - forms.py
-must_include_content:
-- from validators import Validator, ValidationResult, ValidationSeverity
-- 'def validate_email(self, email: str) -> bool:'
+must_include_content_from:
+  forms.py:
+  - 'from validators import Validator, ValidationResult, ValidationSeverity'
+  - 'def validate_email(self, email: str) -> bool:'
 must_not_include:
-- GARBAGE_CACHE_TTL_928374
-- GARBAGE_CONN_STR_182736
-- GARBAGE_PY_CACHE_563829
-- GARBAGE_PY_DB_847291
-- garbage_unrelated_cache.py
-- garbage_unrelated_db.py
+- InputSanitizer
+- sanitize_html
+- escape_sql
+- PasswordValidator
+- PasswordPolicy
+- require_uppercase
+must_not_include_files:
+- input_sanitizer.py
+- password_policy.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

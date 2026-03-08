@@ -1,3 +1,35 @@
+# Scenario: client.py adds `from constants import *` and rewrites call()
+#   and build_headers() to use imported constants (DEFAULT_HEADERS,
+#   TIMEOUT_SECONDS, get_full_url). constants.py is unchanged.
+#
+# Diff shows:
+#   + from constants import *
+#   + url = get_full_url(endpoint)
+#   + headers = build_headers(DEFAULT_HEADERS)
+#   + "timeout": TIMEOUT_SECONDS
+#   ~ build_headers now copies DEFAULT_HEADERS with dict()
+#
+# Reviewer questions:
+#   Q1: "What names come through the star import via __all__?"
+#       -> constants.py (UNCHANGED): __all__ lists MAX_RETRIES,
+#          TIMEOUT_SECONDS, BASE_URL, DEFAULT_HEADERS, RATE_LIMIT.
+#          Note: get_full_url() is NOT in __all__ — the diff calls it
+#          but it won't be available via star import. Bug to catch.
+#
+#   Q2: "Are DEFAULT_HEADERS and TIMEOUT_SECONDS used correctly?"
+#       -> constants.py: DEFAULT_HEADERS = {"Content-Type": "application/json"},
+#          TIMEOUT_SECONDS = 30. The diff uses both as expected.
+#
+# Not needed for comprehension:
+#   - integrations/oauth_client.py: OAuthClient with build_auth_headers()
+#     and call_api(endpoint, method). HARDEST TRAP: same HTTP client
+#     pattern — builds headers, calls endpoints, uses method param.
+#     Even has a "headers" dict. But doesn't import from constants,
+#     uses its own auth token pattern instead.
+#
+#   - storage/file_manager.py: FileManager with save/delete operations.
+#     Completely different domain (file I/O), no dependency on constants.
+
 initial:
   constants.py: |
     MAX_RETRIES = 3
@@ -19,39 +51,46 @@ initial:
         if extra:
             headers.update(extra)
         return headers
-  garbage_localization.py: |
-    GARBAGE_PY_044_LOCALE_A = "localization marker"
-    GARBAGE_PY_044_TRANS_B = "translation marker"
+  integrations/oauth_client.py: |
+    from typing import Optional
 
-    class Translator:
-        GARBAGE_PY_044_TRANSLATOR_C = "translator instance marker"
+    class OAuthClient:
+        def __init__(self, client_id: str, client_secret: str, token_url: str):
+            self.client_id = client_id
+            self.client_secret = client_secret
+            self.token_url = token_url
+            self._access_token: Optional[str] = None
 
-        def __init__(self, locale: str = "en"):
-            self.locale = locale
-            self._translations = {}
+        def authenticate(self) -> str:
+            self._access_token = f"token_{self.client_id}"
+            return self._access_token
 
-        def translate(self, key: str) -> str:
-            return self._translations.get(key, key)
+        def build_auth_headers(self) -> dict:
+            return {"Authorization": f"Bearer {self._access_token}"}
 
-        def load_translations(self, path: str) -> None:
-            GARBAGE_PY_044_LOAD_D = "load translations marker"
-            pass
-  garbage_file_storage.py: |
-    GARBAGE_PY_044_STORAGE_E = "file storage marker"
-    GARBAGE_PY_044_UPLOAD_F = "upload handler marker"
+        def call_api(self, endpoint: str, method: str = "GET") -> dict:
+            headers = self.build_auth_headers()
+            return {"url": endpoint, "method": method, "headers": headers}
+  storage/file_manager.py: |
+    from pathlib import Path
 
-    class FileStorage:
-        GARBAGE_PY_044_FS_G = True
+    class FileManager:
+        def __init__(self, base_dir: str = "/tmp/uploads"):
+            self.base_dir = Path(base_dir)
 
-        def __init__(self, base_path: str):
-            self.base_path = base_path
+        def save(self, filename: str, content: bytes) -> Path:
+            path = self.base_dir / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+            return path
 
-        def save_file(self, filename: str, content: bytes) -> str:
-            return f"{self.base_path}/{filename}"
+        def delete(self, filename: str) -> bool:
+            path = self.base_dir / filename
+            if path.exists():
+                path.unlink()
+                return True
+            return False
 
-        def delete_file(self, filepath: str) -> bool:
-            GARBAGE_PY_044_DELETE_H = "delete marker"
-            return True
 changed:
   constants.py: |
     MAX_RETRIES = 3
@@ -77,54 +116,78 @@ changed:
         if extra:
             headers.update(extra)
         return headers
-  garbage_localization.py: |
-    GARBAGE_PY_044_LOCALE_A = "localization marker"
-    GARBAGE_PY_044_TRANS_B = "translation marker"
+  integrations/oauth_client.py: |
+    from typing import Optional
 
-    class Translator:
-        GARBAGE_PY_044_TRANSLATOR_C = "translator instance marker"
+    class OAuthClient:
+        def __init__(self, client_id: str, client_secret: str, token_url: str):
+            self.client_id = client_id
+            self.client_secret = client_secret
+            self.token_url = token_url
+            self._access_token: Optional[str] = None
 
-        def __init__(self, locale: str = "en"):
-            self.locale = locale
-            self._translations = {}
+        def authenticate(self) -> str:
+            self._access_token = f"token_{self.client_id}"
+            return self._access_token
 
-        def translate(self, key: str) -> str:
-            return self._translations.get(key, key)
+        def build_auth_headers(self) -> dict:
+            return {"Authorization": f"Bearer {self._access_token}"}
 
-        def load_translations(self, path: str) -> None:
-            GARBAGE_PY_044_LOAD_D = "load translations marker"
-            pass
-  garbage_file_storage.py: |
-    GARBAGE_PY_044_STORAGE_E = "file storage marker"
-    GARBAGE_PY_044_UPLOAD_F = "upload handler marker"
+        def call_api(self, endpoint: str, method: str = "GET") -> dict:
+            headers = self.build_auth_headers()
+            return {"url": endpoint, "method": method, "headers": headers}
+  storage/file_manager.py: |
+    from pathlib import Path
 
-    class FileStorage:
-        GARBAGE_PY_044_FS_G = True
+    class FileManager:
+        def __init__(self, base_dir: str = "/tmp/uploads"):
+            self.base_dir = Path(base_dir)
 
-        def __init__(self, base_path: str):
-            self.base_path = base_path
+        def save(self, filename: str, content: bytes) -> Path:
+            path = self.base_dir / filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+            return path
 
-        def save_file(self, filename: str, content: bytes) -> str:
-            return f"{self.base_path}/{filename}"
+        def delete(self, filename: str) -> bool:
+            path = self.base_dir / filename
+            if path.exists():
+                path.unlink()
+                return True
+            return False
 
-        def delete_file(self, filepath: str) -> bool:
-            GARBAGE_PY_044_DELETE_H = "delete marker"
-            return True
 must_include_files:
-- client.py
-must_include_content:
-- from constants import *
-- 'def call(endpoint: str, method: str = "GET") -> dict:'
+  - client.py
+  # Q1: constants.py defines __all__ controlling what star import provides
+  - constants.py
+
+must_include_content_from:
+  client.py:
+    - "from constants import *"
+    - 'def call(endpoint: str, method: str = "GET") -> dict:'
+    - "get_full_url(endpoint)"
+    - "TIMEOUT_SECONDS"
+  constants.py:
+    - '__all__ = ["MAX_RETRIES", "TIMEOUT_SECONDS", "BASE_URL", "DEFAULT_HEADERS", "RATE_LIMIT"]'
+    - 'DEFAULT_HEADERS = {"Content-Type": "application/json"}'
+
 must_not_include:
-- GARBAGE_PY_044_DELETE_H
-- GARBAGE_PY_044_FS_G
-- GARBAGE_PY_044_LOAD_D
-- GARBAGE_PY_044_LOCALE_A
-- GARBAGE_PY_044_STORAGE_E
-- GARBAGE_PY_044_TRANSLATOR_C
-- GARBAGE_PY_044_TRANS_B
-- GARBAGE_PY_044_UPLOAD_F
-- garbage_file_storage.py
-- garbage_localization.py
+  # --- oauth_client.py: same HTTP client pattern, headers/endpoint ---
+  # build_auth_headers() and call_api() — same "build headers, call
+  # endpoint" pattern. But uses auth tokens, not constants. No import.
+  - OAuthClient
+  - build_auth_headers
+  - call_api
+  - "_access_token"
+  # --- file_manager.py: unrelated file I/O domain ---
+  - FileManager
+  - write_bytes
+
+must_not_include_files:
+  - integrations/oauth_client.py
+  - storage/file_manager.py
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

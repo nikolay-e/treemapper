@@ -1,3 +1,10 @@
+# Scenario: seed_func returns "modified seed" — tests that changed file gets high PPR score
+# Changed: seed_module.py — seed_func() changes return value
+# Reviewer needs: seed_module.py (changed, the seed node should score high)
+# Trap: random_init.py — seed-related naming (initialize_seed, SeedGenerator)
+# Trap: seed_validator.py — also has seed_* naming, validates seed values
+# Trap: cache_manager.py — completely unrelated module
+
 initial:
   seed_module.py: |
     def seed_func():
@@ -5,41 +12,28 @@ initial:
   other_module.py: |
     def other_func():
         return "other"
-
-  # --- Tricky garbage: similar seed-related naming but different identifiers ---
-  garbage_seed_config.py: |
-    GARBAGE_PPR_018_SEED_CFG_A = "seed_configuration"
-    GARBAGE_PPR_018_SEED_MODE_B = "random"
-
+  random_init.py: |
     SEED_INITIAL = 12345
 
     def initialize_seed():
         return SEED_INITIAL
 
     class SeedGenerator:
-        GARBAGE_PPR_018_SEED_GEN_C = True
-
         def generate(self):
             return initialize_seed()
-
-  # --- Tricky garbage: structural sibling with similar module naming ---
-  garbage_seed_helper.py: |
-    GARBAGE_PPR_018_HELPER_INIT_D = "seed_helper"
-    GARBAGE_PPR_018_HELPER_VER_E = "2.0"
-
+  seed_validator.py: |
     def seed_helper():
         return "helper"
 
     class SeedProcessor:
-        GARBAGE_PPR_018_HELPER_PROC_F = True
-
         def process(self):
             return seed_helper()
 
-  # --- Plain garbage: no overlap ---
-  garbage_cache.py: |
-    GARBAGE_PPR_018_CACHE_SIZE_G = 1024
-    GARBAGE_PPR_018_CACHE_TTL_H = 3600
+        def validate_seed(self, value):
+            return value is not None
+  cache_manager.py: |
+    CACHE_SIZE = 1024
+    CACHE_TTL = 3600
 
     class CacheManager:
         def get(self, key: str):
@@ -52,38 +46,28 @@ changed:
   other_module.py: |
     def other_func():
         return "other"
-
-  garbage_seed_config.py: |
-    GARBAGE_PPR_018_SEED_CFG_A = "seed_configuration"
-    GARBAGE_PPR_018_SEED_MODE_B = "random"
-
+  random_init.py: |
     SEED_INITIAL = 12345
 
     def initialize_seed():
         return SEED_INITIAL
 
     class SeedGenerator:
-        GARBAGE_PPR_018_SEED_GEN_C = True
-
         def generate(self):
             return initialize_seed()
-
-  garbage_seed_helper.py: |
-    GARBAGE_PPR_018_HELPER_INIT_D = "seed_helper"
-    GARBAGE_PPR_018_HELPER_VER_E = "2.0"
-
+  seed_validator.py: |
     def seed_helper():
         return "helper"
 
     class SeedProcessor:
-        GARBAGE_PPR_018_HELPER_PROC_F = True
-
         def process(self):
             return seed_helper()
 
-  garbage_cache.py: |
-    GARBAGE_PPR_018_CACHE_SIZE_G = 1024
-    GARBAGE_PPR_018_CACHE_TTL_H = 3600
+        def validate_seed(self, value):
+            return value is not None
+  cache_manager.py: |
+    CACHE_SIZE = 1024
+    CACHE_TTL = 3600
 
     class CacheManager:
         def get(self, key: str):
@@ -105,23 +89,18 @@ must_include_content_from:
 
 must_not_include:
 - other_func
-# Plain garbage markers
-- GARBAGE_PPR_018_CACHE_SIZE_G
-- GARBAGE_PPR_018_CACHE_TTL_H
-# Tricky: seed-related naming and patterns
-- GARBAGE_PPR_018_SEED_CFG_A
-- GARBAGE_PPR_018_SEED_MODE_B
-- GARBAGE_PPR_018_SEED_GEN_C
-# Tricky: similar naming pattern (seed_*)
-- GARBAGE_PPR_018_HELPER_INIT_D
-- GARBAGE_PPR_018_HELPER_VER_E
-- GARBAGE_PPR_018_HELPER_PROC_F
+- SeedGenerator
+- initialize_seed
+- SeedProcessor
+- seed_helper
+- CacheManager
+- CACHE_SIZE
 
 must_not_include_files:
 - other_module.py
-- garbage_seed_config.py
-- garbage_seed_helper.py
-- garbage_cache.py
+- random_init.py
+- seed_validator.py
+- cache_manager.py
 
 max_fragments: 4
 max_files: 2

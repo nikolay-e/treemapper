@@ -1,31 +1,56 @@
+# Scenario: Adding count-based instance scaling with a variable and
+#   index-based naming tags.
+# Reviewer questions:
+#   1. What other resources reference the web instance? (outputs.tf exposes instance IDs)
+#   2. How are instances tagged to distinguish replicas? (count.index in Name tag)
+# Traps:
+#   - database/replicas.tf: uses count for RDS read replicas (same meta-argument, different resource)
+#   - scaling_policy.tf: ASG scaling policies (different scaling approach entirely)
+
 initial:
   main.tf: |
     resource "aws_instance" "web" {
       ami           = var.ami_id
       instance_type = "t3.micro"
     }
-  # --- Tricky garbage: sibling .tf with same count pattern for a different resource ---
-  database/replicas_GARBAGE_TF_035_A.tf: |
-    # GARBAGE_TF_035_DB_REPLICAS_A - Database read replicas with count
-    variable "replica_count_GARBAGE_TF_035_A" {
+  outputs.tf: |
+    output "instance_ids" {
+      value = aws_instance.web[*].id
+    }
+
+    output "instance_public_ips" {
+      value = aws_instance.web[*].public_ip
+    }
+  database/replicas.tf: |
+    variable "replica_count" {
       default = 2
     }
 
-    resource "aws_db_instance" "replica_GARBAGE_TF_035_A" {
-      count               = var.replica_count_GARBAGE_TF_035_A
+    resource "aws_db_instance" "replica" {
+      count               = var.replica_count
       replicate_source_db = aws_db_instance.primary.id
       instance_class      = "db.t3.medium"
 
       tags = {
-        Name = "replica-${count.index}-GARBAGE_TF_035_B"
+        Name = "replica-${count.index}"
       }
     }
-  # --- Plain garbage: unrelated script ---
-  scripts/scale_check_GARBAGE_TF_035_C.sh: |
-    #!/bin/bash
-    # GARBAGE_TF_035_SCALE_C - Instance scaling checker
-    echo "Checking scale GARBAGE_TF_035_SCALE_D"
-    aws ec2 describe-instances --query 'Reservations[].Instances[].InstanceId'
+  scaling_policy.tf: |
+    resource "aws_autoscaling_policy" "scale_up" {
+      name                   = "scale-up"
+      autoscaling_group_name = aws_autoscaling_group.web.name
+      adjustment_type        = "ChangeInCapacity"
+      scaling_adjustment     = 1
+      cooldown               = 300
+    }
+
+    resource "aws_autoscaling_policy" "scale_down" {
+      name                   = "scale-down"
+      autoscaling_group_name = aws_autoscaling_group.web.name
+      adjustment_type        = "ChangeInCapacity"
+      scaling_adjustment     = -1
+      cooldown               = 300
+    }
 
 changed:
   main.tf: |
@@ -42,47 +67,31 @@ changed:
         Name = "web-${count.index}"
       }
     }
-  database/replicas_GARBAGE_TF_035_A.tf: |
-    # GARBAGE_TF_035_DB_REPLICAS_A - Database read replicas with count
-    variable "replica_count_GARBAGE_TF_035_A" {
-      default = 2
-    }
 
-    resource "aws_db_instance" "replica_GARBAGE_TF_035_A" {
-      count               = var.replica_count_GARBAGE_TF_035_A
-      replicate_source_db = aws_db_instance.primary.id
-      instance_class      = "db.t3.medium"
-
-      tags = {
-        Name = "replica-${count.index}-GARBAGE_TF_035_B"
-      }
-    }
-  scripts/scale_check_GARBAGE_TF_035_C.sh: |
-    #!/bin/bash
-    # GARBAGE_TF_035_SCALE_C - Instance scaling checker
-    echo "Checking scale GARBAGE_TF_035_SCALE_D"
-    aws ec2 describe-instances --query 'Reservations[].Instances[].InstanceId'
-
+# outputs.tf is unchanged but the reviewer needs it to see that the
+# splat expression [*] already anticipates multiple instances
 must_include_files:
-- main.tf
+  - outputs.tf
 
 must_include_content_from:
-  main.tf:
-    - variable "instance_count" {
-    - count         = var.instance_count
-    - Name = "web-${count.index}"
+  outputs.tf:
+    - aws_instance.web[*].id
+    - output "instance_public_ips" {
 
 must_not_include:
-- GARBAGE_TF_035_DB_REPLICAS_A
-- GARBAGE_TF_035_B
-- GARBAGE_TF_035_SCALE_C
-- GARBAGE_TF_035_SCALE_D
+  # Database replicas use count but for RDS, different resource type
+  - replica_count
+  - replicate_source_db
+  - db.t3.medium
+  # ASG scaling policies are a different approach to scaling
+  - aws_autoscaling_policy
+  - ChangeInCapacity
 
 must_not_include_files:
-- database/replicas_GARBAGE_TF_035_A.tf
-- scripts/scale_check_GARBAGE_TF_035_C.sh
+  - database/replicas.tf
+  - scaling_policy.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

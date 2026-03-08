@@ -1,16 +1,43 @@
+# Scenario: Adding prevent_destroy to a production RDS instance to protect
+#   against accidental deletion via terraform destroy.
+# Reviewer questions:
+#   1. Are there backups configured for this database? (backups.tf)
+#   2. What other resources depend on this DB? (main.tf references it)
+# Traps:
+#   - storage/s3.tf: also has prevent_destroy but on S3 bucket (same meta, different resource)
+#   - iam/roles.tf: IAM role (unrelated to database protection)
+
 initial:
   database.tf: |
     resource "aws_db_instance" "main" {
-      identifier     = "production-db"
-      engine         = "postgres"
-      instance_class = "db.r5.large"
+      identifier           = "production-db"
+      engine               = "postgres"
+      engine_version       = "15.4"
+      instance_class       = "db.r5.large"
+      allocated_storage    = 100
+      storage_encrypted    = true
+      deletion_protection  = true
     }
+  backups.tf: |
+    resource "aws_db_instance" "main" {
+      backup_retention_period = 7
+      backup_window           = "03:00-04:00"
+      maintenance_window      = "mon:04:00-mon:05:00"
+      copy_tags_to_snapshot   = true
+      skip_final_snapshot     = false
+      final_snapshot_identifier = "production-db-final"
+    }
+  main.tf: |
+    resource "aws_instance" "app" {
+      ami           = var.ami_id
+      instance_type = "t3.micro"
 
-  # --- Tricky garbage: sibling .tf with lifecycle block on different resource ---
-  garbage_tf_050_lifecycle_s3.tf: |
-    GARBAGE_TF_050_LIFECYCLE_S3_A = "s3_lifecycle"
-    GARBAGE_TF_050_BUCKET_LOCK_B = true
-
+      tags = {
+        Name = "app-server"
+        DB   = aws_db_instance.main.endpoint
+      }
+    }
+  storage/s3.tf: |
     resource "aws_s3_bucket" "logs" {
       bucket = "app-logs-archive"
 
@@ -18,70 +45,58 @@ initial:
         prevent_destroy = true
       }
     }
-
-  # --- Plain garbage ---
-  garbage_tf_050_iam.tf: |
-    GARBAGE_TF_050_IAM_ROLE_C = "lambda-exec"
-    GARBAGE_TF_050_IAM_PATH_D = "/service/"
-
+  iam/roles.tf: |
     resource "aws_iam_role" "lambda" {
       name               = "lambda-execution-role"
-      assume_role_policy = "{}"
+      assume_role_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [{
+          Action = "sts:AssumeRole"
+          Effect = "Allow"
+          Principal = { Service = "lambda.amazonaws.com" }
+        }]
+      })
     }
 
 changed:
   database.tf: |
     resource "aws_db_instance" "main" {
-      identifier     = "production-db"
-      engine         = "postgres"
-      instance_class = "db.r5.large"
+      identifier           = "production-db"
+      engine               = "postgres"
+      engine_version       = "15.4"
+      instance_class       = "db.r5.large"
+      allocated_storage    = 100
+      storage_encrypted    = true
+      deletion_protection  = true
 
       lifecycle {
         prevent_destroy = true
       }
-    }
-
-  garbage_tf_050_lifecycle_s3.tf: |
-    GARBAGE_TF_050_LIFECYCLE_S3_A = "s3_lifecycle"
-    GARBAGE_TF_050_BUCKET_LOCK_B = true
-
-    resource "aws_s3_bucket" "logs" {
-      bucket = "app-logs-archive"
-
-      lifecycle {
-        prevent_destroy = true
-      }
-    }
-
-  garbage_tf_050_iam.tf: |
-    GARBAGE_TF_050_IAM_ROLE_C = "lambda-exec"
-    GARBAGE_TF_050_IAM_PATH_D = "/service/"
-
-    resource "aws_iam_role" "lambda" {
-      name               = "lambda-execution-role"
-      assume_role_policy = "{}"
     }
 
 must_include_files:
-- database.tf
+  - database.tf
+  - main.tf
 
 must_include_content_from:
   database.tf:
     - prevent_destroy = true
     - resource "aws_db_instance" "main" {
     - engine         = "postgres"
+  main.tf:
+    - aws_db_instance.main.endpoint
 
 must_not_include:
-- GARBAGE_TF_050_LIFECYCLE_S3_A
-- GARBAGE_TF_050_BUCKET_LOCK_B
-- GARBAGE_TF_050_IAM_ROLE_C
-- GARBAGE_TF_050_IAM_PATH_D
+  # S3 lifecycle - same prevent_destroy but on a log bucket, different concern
+  - app-logs-archive
+  # IAM role - unrelated to database protection
+  - lambda-execution-role
 
 must_not_include_files:
-- garbage_tf_050_lifecycle_s3.tf
-- garbage_tf_050_iam.tf
+  - storage/s3.tf
+  - iam/roles.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

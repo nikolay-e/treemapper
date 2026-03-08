@@ -1,3 +1,22 @@
+# Scenario: TodoList.tsx is rewritten to use useState<TodoItem[]> where TodoItem
+# is imported from types.ts.
+#
+# Diff: TodoList.tsx adds `import { TodoItem } from './types'` and uses
+# `useState<TodoItem[]>([])` to manage todo state, creating items with
+# { id, text, completed: false }.
+#
+# Reviewer questions:
+#   Q1: "What shape does TodoItem have?"
+#       -> types.ts (UNCHANGED) defines TodoItem with id: string, text: string,
+#          completed: boolean. Reviewer verifies the component creates new items
+#          matching this interface.
+#
+# Not needed:
+#   - todo-filters.ts: filter functions (filterCompleted, filterActive) that import
+#     TodoItem. Same domain but not imported by TodoList.tsx in this change.
+#   - TodoItemView.tsx: renders a single todo item (TodoItemViewProps). Despite name
+#     overlap with TodoItem, this child component is not used by TodoList.tsx here.
+
 initial:
   types.ts: |
     export interface TodoItem {
@@ -7,27 +26,29 @@ initial:
     }
   TodoList.tsx: |
     console.log('initial');
-  garbage_notifications.ts: |
-    const GARBAGE_JS_059_NOTIFY_MARKER_A = "notifications";
-    const GARBAGE_JS_059_PUSH_MARKER_B = true;
+  todo-filters.ts: |
+    import { TodoItem } from './types';
 
-    class PushNotificationService {
-        static GARBAGE_JS_059_NOTIFY_CLASS_C = "push";
-
-        notify(userId: string, title: string): void {
-            // noop
-        }
+    export function filterCompleted(items: TodoItem[]): TodoItem[] {
+        return items.filter(item => item.completed);
     }
-  garbage_throttle.ts: |
-    const GARBAGE_JS_059_THROTTLE_MARKER_D = "throttle";
-    const GARBAGE_JS_059_LIMITER_MARKER_E = 1000;
 
-    class RequestThrottler {
-        static GARBAGE_JS_059_THROTTLE_CLASS_F = true;
+    export function filterActive(items: TodoItem[]): TodoItem[] {
+        return items.filter(item => !item.completed);
+    }
+  TodoItemView.tsx: |
+    interface TodoItemViewProps {
+        text: string;
+        completed: boolean;
+        onToggle: () => void;
+    }
 
-        shouldAllow(clientIp: string): boolean {
-            return true;
-        }
+    export function TodoItemView({ text, completed, onToggle }: TodoItemViewProps) {
+        return (
+            <li onClick={onToggle} style={{ textDecoration: completed ? 'line-through' : 'none' }}>
+                {text}
+            </li>
+        );
     }
 changed:
   types.ts: |
@@ -49,41 +70,48 @@ changed:
 
         return <div>{todos.map(t => <span key={t.id}>{t.text}</span>)}</div>;
     }
-  garbage_notifications.ts: |
-    const GARBAGE_JS_059_NOTIFY_MARKER_A = "notifications";
-    const GARBAGE_JS_059_PUSH_MARKER_B = true;
+  todo-filters.ts: |
+    import { TodoItem } from './types';
 
-    class PushNotificationService {
-        static GARBAGE_JS_059_NOTIFY_CLASS_C = "push";
-
-        notify(userId: string, title: string): void {
-            // noop
-        }
+    export function filterCompleted(items: TodoItem[]): TodoItem[] {
+        return items.filter(item => item.completed);
     }
-  garbage_throttle.ts: |
-    const GARBAGE_JS_059_THROTTLE_MARKER_D = "throttle";
-    const GARBAGE_JS_059_LIMITER_MARKER_E = 1000;
 
-    class RequestThrottler {
-        static GARBAGE_JS_059_THROTTLE_CLASS_F = true;
+    export function filterActive(items: TodoItem[]): TodoItem[] {
+        return items.filter(item => !item.completed);
+    }
+  TodoItemView.tsx: |
+    interface TodoItemViewProps {
+        text: string;
+        completed: boolean;
+        onToggle: () => void;
+    }
 
-        shouldAllow(clientIp: string): boolean {
-            return true;
-        }
+    export function TodoItemView({ text, completed, onToggle }: TodoItemViewProps) {
+        return (
+            <li onClick={onToggle} style={{ textDecoration: completed ? 'line-through' : 'none' }}>
+                {text}
+            </li>
+        );
     }
 must_include_files:
-- TodoList.tsx
-must_include_content:
-- import { useState } from 'react';
-- '[todos, setTodos] = useState<TodoItem[]>([])'
+  # Q1: types.ts defines TodoItem that TodoList.tsx imports for useState generic
+  - types.ts
+must_include_content_from:
+  types.ts:
+    - "interface TodoItem {"
+    - "completed: boolean"
 must_not_include:
-- GARBAGE_JS_059_LIMITER_MARKER_E
-- GARBAGE_JS_059_NOTIFY_CLASS_C
-- GARBAGE_JS_059_NOTIFY_MARKER_A
-- GARBAGE_JS_059_PUSH_MARKER_B
-- GARBAGE_JS_059_THROTTLE_CLASS_F
-- GARBAGE_JS_059_THROTTLE_MARKER_D
-- garbage_notifications.ts
-- garbage_throttle.ts
+  # todo-filters.ts: filtering functions not used by TodoList.tsx
+  - filterCompleted
+  - filterActive
+  # TodoItemView.tsx: child component not used in this change
+  - TodoItemViewProps
+  - onToggle
+must_not_include_files:
+  - todo-filters.ts
+  - TodoItemView.tsx
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

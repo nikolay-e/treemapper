@@ -103,9 +103,45 @@ changed:
     def retrieve_log(log_id: int) -> dict:
         RETRIEVE_LOG_MARKER_BCD111 = True
         return {"log_id": log_id}
+# Scenario: cart_manager.py gains validation and get_cart_total().
+#   Three unrelated files in different domains (weather, stocks, audit)
+#   have no structural connection to cart operations.
+#
+# Not needed for comprehension:
+#   - weather/forecast_api.py: weather data fetching, no cart connection.
+#   - stocks/market_tracker.py: stock price tracking, no cart connection.
+#   - logging/audit_recorder.py: action recording, no cart connection.
+
 must_include_files:
-- src/shopping/cart_manager.py
-must_include_content:
-- 'if cart_id <= 0 or item_id <= 0:'
+  - src/shopping/cart_manager.py
+
+must_include_content_from:
+  src/shopping/cart_manager.py:
+    - "if cart_id <= 0 or item_id <= 0:"
+    - "def get_cart_total(cart_id: int) -> float:"
+
+must_not_include:
+  # --- weather/forecast_api.py ---
+  - WEATHER_API_MARKER_XYZ111
+  - FETCH_TEMP_MARKER_ABC222
+  - FETCH_HUMID_MARKER_DEF333
+  - PARSER_MARKER_GHI444
+  - WeatherDataParser
+  # --- stocks/market_tracker.py ---
+  - STOCKS_TRACKER_MARKER_JKL555
+  - STOCK_PRICE_MARKER_MNO666
+  - MARKET_CAP_MARKER_PQR777
+  - ANALYZER_MARKER_STU888
+  - StockAnalyzer
+  # --- logging/audit_recorder.py ---
+  - AUDIT_RECORDER_MARKER_VWX999
+  - RECORD_ACTION_MARKER_YZA000
+  - RETRIEVE_LOG_MARKER_BCD111
+
+must_not_include_files:
+  - external/weather/forecast_api.py
+  - external/stocks/market_tracker.py
+  - tools/logging/audit_recorder.py
+
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,40 +1,31 @@
+# Scenario: single_func changes return value from 1 to 2 — single isolated node
+# Changed: single.py — single_func() returns 2 (was 1)
+# Reviewer needs: single.py (changed, only relevant file)
+# Trap: alt_single.py — defines single_func() too, name collision but no import
+# Trap: solo_runner.py — similar single-function module structure
+# Trap: storage_backend.py — completely unrelated
+
 initial:
   single.py: |
     def single_func():
         return 1
-
-  # --- Tricky garbage: also defines single_func but no import ---
-  garbage_alt_single.py: |
-    GARBAGE_PPR_021_ALT_SINGLE_A = "alt_single"
-    GARBAGE_PPR_021_ALT_RET_B = 1
-
+  alt_single.py: |
     def single_func():
         return "alternate_single"
 
     class SingleWrapper:
-        GARBAGE_PPR_021_ALT_WRAP_C = True
-
         def wrap(self):
             return single_func()
-
-  # --- Tricky garbage: similar single-function module ---
-  garbage_solo_func.py: |
-    GARBAGE_PPR_021_SOLO_NAME_D = "solo"
-    GARBAGE_PPR_021_SOLO_FLAG_E = True
-
+  solo_runner.py: |
     def solo_func():
         return 999
 
     class SoloRunner:
-        GARBAGE_PPR_021_SOLO_RUN_F = 42
-
         def execute(self):
             return solo_func()
-
-  # --- Plain garbage: no overlap ---
-  garbage_storage.py: |
-    GARBAGE_PPR_021_STORE_PATH_G = "/var/data"
-    GARBAGE_PPR_021_STORE_TYPE_H = "filesystem"
+  storage_backend.py: |
+    STORE_PATH = "/var/data"
+    STORE_TYPE = "filesystem"
 
     class StorageBackend:
         def save(self, data):
@@ -44,36 +35,23 @@ changed:
   single.py: |
     def single_func():
         return 2
-
-  garbage_alt_single.py: |
-    GARBAGE_PPR_021_ALT_SINGLE_A = "alt_single"
-    GARBAGE_PPR_021_ALT_RET_B = 1
-
+  alt_single.py: |
     def single_func():
         return "alternate_single"
 
     class SingleWrapper:
-        GARBAGE_PPR_021_ALT_WRAP_C = True
-
         def wrap(self):
             return single_func()
-
-  garbage_solo_func.py: |
-    GARBAGE_PPR_021_SOLO_NAME_D = "solo"
-    GARBAGE_PPR_021_SOLO_FLAG_E = True
-
+  solo_runner.py: |
     def solo_func():
         return 999
 
     class SoloRunner:
-        GARBAGE_PPR_021_SOLO_RUN_F = 42
-
         def execute(self):
             return solo_func()
-
-  garbage_storage.py: |
-    GARBAGE_PPR_021_STORE_PATH_G = "/var/data"
-    GARBAGE_PPR_021_STORE_TYPE_H = "filesystem"
+  storage_backend.py: |
+    STORE_PATH = "/var/data"
+    STORE_TYPE = "filesystem"
 
     class StorageBackend:
         def save(self, data):
@@ -94,22 +72,17 @@ must_include_content_from:
     - return 2
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_PPR_021_STORE_PATH_G
-- GARBAGE_PPR_021_STORE_TYPE_H
-# Tricky: also defines single_func
-- GARBAGE_PPR_021_ALT_SINGLE_A
-- GARBAGE_PPR_021_ALT_RET_B
-- GARBAGE_PPR_021_ALT_WRAP_C
-# Tricky: similar single-function module structure
-- GARBAGE_PPR_021_SOLO_NAME_D
-- GARBAGE_PPR_021_SOLO_FLAG_E
-- GARBAGE_PPR_021_SOLO_RUN_F
+- SingleWrapper
+- alternate_single
+- SoloRunner
+- solo_func
+- StorageBackend
+- STORE_PATH
 
 must_not_include_files:
-- garbage_alt_single.py
-- garbage_solo_func.py
-- garbage_storage.py
+- alt_single.py
+- solo_runner.py
+- storage_backend.py
 
 max_fragments: 4
 max_files: 2

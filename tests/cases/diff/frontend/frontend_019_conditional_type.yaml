@@ -1,3 +1,18 @@
+# Scenario: TypeScript file adds conditional types built on base type primitives.
+#
+# Diff: conditional.ts adds Unwrap, UnwrapArray, IsArray, IsPrimitive, and
+# DeepUnwrap conditional types using Primitive from primitives.ts.
+#
+# Reviewer questions:
+#   Q1: "What is Primitive?" → primitives.ts (UNCHANGED) defines it as
+#        string | number | boolean | null | undefined.
+#   Q2: "What are JsonValue, JsonObject, JsonArray?" → primitives.ts
+#        defines the recursive JSON types used alongside Primitive.
+#
+# Not needed:
+#   - src/types/branded.ts: also uses conditional types but for branding patterns.
+#   - src/utils/typecheck.ts: runtime type checking functions, not compile-time types.
+
 initial:
   src/primitives.ts: |
     export type Primitive = string | number | boolean | null | undefined;
@@ -7,56 +22,42 @@ initial:
     export interface JsonArray extends Array<JsonValue> {}
   src/conditional.ts: |
     console.log('initial');
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_019_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/types/branded.ts: |
+    declare const brand: unique symbol;
+
+    export type Brand<T, B extends string> = T & { readonly [brand]: B };
+
+    export type UserId = Brand<string, 'UserId'>;
+    export type OrderId = Brand<string, 'OrderId'>;
+    export type Email = Brand<string, 'Email'>;
+
+    export function createUserId(id: string): UserId {
+        return id as UserId;
     }
 
-    // GARBAGE_FE_019_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function createOrderId(id: string): OrderId {
+        return id as OrderId;
+    }
+  src/utils/typecheck.ts: |
+    export function isString(value: unknown): value is string {
+        return typeof value === 'string';
     }
 
-    // GARBAGE_FE_019_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_019_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export function isNumber(value: unknown): value is number {
+        return typeof value === 'number' && !isNaN(value);
     }
 
-    // GARBAGE_FE_019_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
+    export function isObject(value: unknown): value is Record<string, unknown> {
+        return typeof value === 'object' && value !== null && !Array.isArray(value);
     }
+
+    export function isNonEmpty(value: unknown): boolean {
+        if (typeof value === 'string') return value.length > 0;
+        if (Array.isArray(value)) return value.length > 0;
+        if (isObject(value)) return Object.keys(value).length > 0;
+        return value != null;
+    }
+
 changed:
   src/primitives.ts: |
     export type Primitive = string | number | boolean | null | undefined;
@@ -80,68 +81,65 @@ changed:
         : T extends Array<infer V>
         ? Array<DeepUnwrap<V>>
         : T;
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_019_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/types/branded.ts: |
+    declare const brand: unique symbol;
+
+    export type Brand<T, B extends string> = T & { readonly [brand]: B };
+
+    export type UserId = Brand<string, 'UserId'>;
+    export type OrderId = Brand<string, 'OrderId'>;
+    export type Email = Brand<string, 'Email'>;
+
+    export function createUserId(id: string): UserId {
+        return id as UserId;
     }
 
-    // GARBAGE_FE_019_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function createOrderId(id: string): OrderId {
+        return id as OrderId;
+    }
+  src/utils/typecheck.ts: |
+    export function isString(value: unknown): value is string {
+        return typeof value === 'string';
     }
 
-    // GARBAGE_FE_019_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_019_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export function isNumber(value: unknown): value is number {
+        return typeof value === 'number' && !isNaN(value);
     }
 
-    // GARBAGE_FE_019_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
+    export function isObject(value: unknown): value is Record<string, unknown> {
+        return typeof value === 'object' && value !== null && !Array.isArray(value);
     }
+
+    export function isNonEmpty(value: unknown): boolean {
+        if (typeof value === 'string') return value.length > 0;
+        if (Array.isArray(value)) return value.length > 0;
+        if (isObject(value)) return Object.keys(value).length > 0;
+        return value != null;
+    }
+
 must_include_files:
-- src/conditional.ts
-must_include_content:
-- import { Primitive } from './primitives';
-- 'type Unwrap<T> = T extends Promise<infer U> ? U : T;'
+  - src/conditional.ts
+
+must_include_content_from:
+  src/conditional.ts:
+    - "import { Primitive } from './primitives'"
+    - "type Unwrap<T> = T extends Promise<infer U> ? U : T;"
+
 must_not_include:
-- GARBAGE_FE_019_COLOR_A
-- GARBAGE_FE_019_COLOR_B
-- GARBAGE_FE_019_CONTRAST_C
-- GARBAGE_FE_019_DEBOUNCE_D
-- GARBAGE_FE_019_THROTTLE_E
-- color_utils.ts
-- debounce_utils.ts
+  # branded.ts: conditional type patterns but for branding, not unwrapping
+  - Brand
+  - createUserId
+  - createOrderId
+  # typecheck.ts: runtime type checking, not compile-time conditional types
+  - isString
+  - isNumber
+  - isNonEmpty
+
+must_not_include_files:
+  - src/types/branded.ts
+  - src/utils/typecheck.ts
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

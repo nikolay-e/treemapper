@@ -1,3 +1,20 @@
+# Scenario: app.ts is rewritten to import authMiddleware and use it globally,
+# then define a protected route.
+#
+# Diff: app.ts adds `import { authMiddleware } from './authMiddleware'`, creates
+# an express app, applies authMiddleware with app.use(), and adds GET /protected.
+#
+# Reviewer questions:
+#   Q1: "What does authMiddleware check?"
+#       -> authMiddleware.ts (UNCHANGED) checks req.headers.authorization and returns
+#          401 if missing. Reviewer verifies the /protected route is actually secured.
+#
+# Not needed:
+#   - cors-middleware.ts: CORS configuration middleware. Same middleware signature
+#     (req, res, next) but handles cross-origin headers, not authentication.
+#   - error-handler.ts: Express error handling middleware. Different concern
+#     (error formatting with 4 params), not related to auth.
+
 initial:
   authMiddleware.ts: |
     import { Request, Response, NextFunction } from 'express';
@@ -11,27 +28,21 @@ initial:
     }
   app.ts: |
     console.log('initial');
-  garbage_health.ts: |
-    const GARBAGE_JS_052_HEALTH_MARKER_A = "healthcheck";
-    const GARBAGE_JS_052_PING_MARKER_B = true;
+  cors-middleware.ts: |
+    import { Request, Response, NextFunction } from 'express';
 
-    class HealthChecker {
-        static GARBAGE_JS_052_HEALTH_CLASS_C = "checker";
-
-        check(service: string): boolean {
-            return true;
-        }
+    export function corsMiddleware(req: Request, res: Response, next: NextFunction) {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        next();
     }
-  garbage_scheduler.ts: |
-    const GARBAGE_JS_052_SCHEDULE_MARKER_D = "scheduler";
-    const GARBAGE_JS_052_CRON_MARKER_E = 60;
+  error-handler.ts: |
+    import { Request, Response, NextFunction } from 'express';
 
-    class TaskScheduler {
-        static GARBAGE_JS_052_SCHEDULER_CLASS_F = true;
-
-        schedule(cron: string, handler: () => void): void {
-            // noop
-        }
+    export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
+        console.error(err.stack);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 changed:
   authMiddleware.ts: |
@@ -54,41 +65,40 @@ changed:
     app.get('/protected', (req, res) => {
         res.json({ message: 'Protected content' });
     });
-  garbage_health.ts: |
-    const GARBAGE_JS_052_HEALTH_MARKER_A = "healthcheck";
-    const GARBAGE_JS_052_PING_MARKER_B = true;
+  cors-middleware.ts: |
+    import { Request, Response, NextFunction } from 'express';
 
-    class HealthChecker {
-        static GARBAGE_JS_052_HEALTH_CLASS_C = "checker";
-
-        check(service: string): boolean {
-            return true;
-        }
+    export function corsMiddleware(req: Request, res: Response, next: NextFunction) {
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        next();
     }
-  garbage_scheduler.ts: |
-    const GARBAGE_JS_052_SCHEDULE_MARKER_D = "scheduler";
-    const GARBAGE_JS_052_CRON_MARKER_E = 60;
+  error-handler.ts: |
+    import { Request, Response, NextFunction } from 'express';
 
-    class TaskScheduler {
-        static GARBAGE_JS_052_SCHEDULER_CLASS_F = true;
-
-        schedule(cron: string, handler: () => void): void {
-            // noop
-        }
+    export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
+        console.error(err.stack);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 must_include_files:
-- app.ts
-must_include_content:
-- import express from 'express';
-- app = express()
+  # Q1: authMiddleware.ts is imported by app.ts — reviewer needs to see what it checks
+  - authMiddleware.ts
+must_include_content_from:
+  authMiddleware.ts:
+    - "function authMiddleware(req: Request, res: Response, next: NextFunction)"
+    - "req.headers.authorization"
 must_not_include:
-- GARBAGE_JS_052_CRON_MARKER_E
-- GARBAGE_JS_052_HEALTH_CLASS_C
-- GARBAGE_JS_052_HEALTH_MARKER_A
-- GARBAGE_JS_052_PING_MARKER_B
-- GARBAGE_JS_052_SCHEDULER_CLASS_F
-- GARBAGE_JS_052_SCHEDULE_MARKER_D
-- garbage_health.ts
-- garbage_scheduler.ts
+  # cors-middleware.ts: CORS handling, different middleware concern
+  - corsMiddleware
+  - Access-Control-Allow-Origin
+  # error-handler.ts: error formatting middleware, not auth
+  - errorHandler
+  - Internal Server Error
+must_not_include_files:
+  - cors-middleware.ts
+  - error-handler.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

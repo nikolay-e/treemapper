@@ -1,3 +1,25 @@
+# Scenario: babel.config.json changes preset-env from simple string to array
+#   with targets: {node: "18"}, and adds @babel/preset-typescript.
+#
+# Reviewer questions:
+#   Q1: "Does targeting node 18 affect existing code using private fields?"
+#       -> src/modern.js: uses #prefix private field (class syntax). Node 18
+#          supports this natively, so Babel won't need to transform it.
+#
+#   Q2: "Does adding preset-typescript affect existing .js files?"
+#       -> src/modern.js and src/runtime.js are .js files. TypeScript preset
+#          will strip type annotations if present but won't break .js files.
+#
+# Not needed:
+#   - tsconfig.json: TypeScript compiler config. Related to TS setup but
+#     Babel handles TS compilation here, not tsc. Different tool concern.
+#
+#   - package.json: Babel plugin versions. Same tool domain but deps
+#     don't help review whether the config changes are correct.
+#
+#   - .babelrc: Alternative Babel config location. Could conflict with
+#     babel.config.json but that's a separate concern.
+
 initial:
   babel.config.json: |
     {
@@ -12,6 +34,7 @@ initial:
         }
       }
     }
+
   src/modern.js: |
     const greet = (name) => `Hello, ${name}`;
 
@@ -43,6 +66,7 @@ initial:
 
     export { greet, createPipeline, MessageBuilder, formatOutput };
     export default greet;
+
   src/runtime.js: |
     import { greet, MessageBuilder } from './modern';
 
@@ -60,67 +84,37 @@ initial:
     }
 
     export { startApp, processMessage };
-  unrelated/hasher.js: |
-    const GARBAGE_JSON_006_HASH_SALT_A = 'default_salt_value';
 
-    class GARBAGE_JSON_006_STRING_HASHER_B {
-        constructor(salt) {
-            this.salt = salt || GARBAGE_JSON_006_HASH_SALT_A;
-        }
-
-        hash(input) {
-            let hash = 0;
-            const salted = this.salt + input;
-            for (let i = 0; i < salted.length; i++) {
-                const char = salted.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash;
-            }
-            return Math.abs(hash).toString(36);
-        }
+  tsconfig.json: |
+    {
+      "compilerOptions": {
+        "target": "ES2020",
+        "module": "commonjs",
+        "strict": true,
+        "esModuleInterop": true,
+        "noEmit": true,
+        "skipLibCheck": true
+      },
+      "include": ["src/**/*"]
     }
 
-    function GARBAGE_JSON_006_QUICK_HASH_C(value) {
-        const hasher = new GARBAGE_JSON_006_STRING_HASHER_B();
-        return hasher.hash(value);
+  package.json: |
+    {
+      "name": "modern-app",
+      "version": "1.0.0",
+      "scripts": {
+        "build": "babel src --out-dir dist",
+        "build:ts": "tsc && babel dist --out-dir lib"
+      },
+      "devDependencies": {
+        "@babel/core": "^7.22.0",
+        "@babel/preset-env": "^7.22.0",
+        "@babel/preset-typescript": "^7.22.0",
+        "@babel/plugin-proposal-class-properties": "^7.18.0",
+        "@babel/plugin-transform-runtime": "^7.22.0"
+      }
     }
 
-    module.exports = { GARBAGE_JSON_006_STRING_HASHER_B, GARBAGE_JSON_006_QUICK_HASH_C };
-  unrelated/batcher.js: |
-    const GARBAGE_JSON_006_BATCH_SIZE_D = 100;
-
-    class GARBAGE_JSON_006_REQUEST_BATCHER_E {
-        constructor(size) {
-            this.batchSize = size || GARBAGE_JSON_006_BATCH_SIZE_D;
-            this.queue = [];
-            this.results = [];
-        }
-
-        add(item) {
-            this.queue.push(item);
-            if (this.queue.length >= this.batchSize) {
-                this.flush();
-            }
-        }
-
-        flush() {
-            this.results.push([...this.queue]);
-            this.queue = [];
-        }
-
-        getResults() {
-            if (this.queue.length > 0) this.flush();
-            return this.results;
-        }
-    }
-
-    function GARBAGE_JSON_006_BATCH_PROCESS_F(items) {
-        const batcher = new GARBAGE_JSON_006_REQUEST_BATCHER_E();
-        items.forEach(item => batcher.add(item));
-        return batcher.getResults();
-    }
-
-    module.exports = { GARBAGE_JSON_006_REQUEST_BATCHER_E, GARBAGE_JSON_006_BATCH_PROCESS_F };
 changed:
   babel.config.json: |
     {
@@ -138,129 +132,28 @@ changed:
         }
       }
     }
-  src/modern.js: |
-    const greet = (name) => `Hello, ${name}`;
 
-    const createPipeline = (...fns) => (input) =>
-        fns.reduce((acc, fn) => fn(acc), input);
-
-    class MessageBuilder {
-        #prefix = '';
-
-        constructor(prefix) {
-            this.#prefix = prefix;
-        }
-
-        build(text) {
-            return `${this.#prefix}: ${text}`;
-        }
-
-        withTimestamp(text) {
-            const ts = new Date().toISOString();
-            return this.build(`[${ts}] ${text}`);
-        }
-    }
-
-    const formatOutput = createPipeline(
-        (s) => s.trim(),
-        (s) => s.toLowerCase(),
-        (s) => s.replace(/\s+/g, '-')
-    );
-
-    export { greet, createPipeline, MessageBuilder, formatOutput };
-    export default greet;
-  src/runtime.js: |
-    import { greet, MessageBuilder } from './modern';
-
-    const builder = new MessageBuilder('APP');
-
-    function startApp(userName) {
-        const welcome = greet(userName);
-        const message = builder.withTimestamp(welcome);
-        console.log(message);
-        return message;
-    }
-
-    function processMessage(text) {
-        return builder.build(text);
-    }
-
-    export { startApp, processMessage };
-  unrelated/hasher.js: |
-    const GARBAGE_JSON_006_HASH_SALT_A = 'default_salt_value';
-
-    class GARBAGE_JSON_006_STRING_HASHER_B {
-        constructor(salt) {
-            this.salt = salt || GARBAGE_JSON_006_HASH_SALT_A;
-        }
-
-        hash(input) {
-            let hash = 0;
-            const salted = this.salt + input;
-            for (let i = 0; i < salted.length; i++) {
-                const char = salted.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash;
-            }
-            return Math.abs(hash).toString(36);
-        }
-    }
-
-    function GARBAGE_JSON_006_QUICK_HASH_C(value) {
-        const hasher = new GARBAGE_JSON_006_STRING_HASHER_B();
-        return hasher.hash(value);
-    }
-
-    module.exports = { GARBAGE_JSON_006_STRING_HASHER_B, GARBAGE_JSON_006_QUICK_HASH_C };
-  unrelated/batcher.js: |
-    const GARBAGE_JSON_006_BATCH_SIZE_D = 100;
-
-    class GARBAGE_JSON_006_REQUEST_BATCHER_E {
-        constructor(size) {
-            this.batchSize = size || GARBAGE_JSON_006_BATCH_SIZE_D;
-            this.queue = [];
-            this.results = [];
-        }
-
-        add(item) {
-            this.queue.push(item);
-            if (this.queue.length >= this.batchSize) {
-                this.flush();
-            }
-        }
-
-        flush() {
-            this.results.push([...this.queue]);
-            this.queue = [];
-        }
-
-        getResults() {
-            if (this.queue.length > 0) this.flush();
-            return this.results;
-        }
-    }
-
-    function GARBAGE_JSON_006_BATCH_PROCESS_F(items) {
-        const batcher = new GARBAGE_JSON_006_REQUEST_BATCHER_E();
-        items.forEach(item => batcher.add(item));
-        return batcher.getResults();
-    }
-
-    module.exports = { GARBAGE_JSON_006_REQUEST_BATCHER_E, GARBAGE_JSON_006_BATCH_PROCESS_F };
 must_include_files:
-- babel.config.json
-must_include_content:
-- '["@babel/preset-env", {"targets": {"node": "18"}}],'
+  - babel.config.json
+
+must_include_content_from:
+  babel.config.json:
+    - '"targets": {"node": "18"}'
+    - "@babel/preset-typescript"
+
 must_not_include:
-- GARBAGE_JSON_006_BATCH_PROCESS_F
-- GARBAGE_JSON_006_BATCH_PROCESS_F(items
-- GARBAGE_JSON_006_BATCH_SIZE_D
-- GARBAGE_JSON_006_HASH_SALT_A
-- GARBAGE_JSON_006_QUICK_HASH_C
-- GARBAGE_JSON_006_QUICK_HASH_C(value
-- GARBAGE_JSON_006_REQUEST_BATCHER_E
-- GARBAGE_JSON_006_STRING_HASHER_B
-- batcher.js
-- hasher.js
+  # --- tsconfig.json: different TS tool ---
+  - "noEmit"
+  - "skipLibCheck"
+  # --- package.json: deps ---
+  - "@babel/core"
+  - "build:ts"
+
+must_not_include_files:
+  - tsconfig.json
+  - package.json
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

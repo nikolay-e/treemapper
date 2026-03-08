@@ -1,3 +1,20 @@
+# Scenario: UserService is implemented with Swift error handling using
+# the AppError enum, guard-throw pattern, and switch-based error handling.
+#
+# Diff: UserService.swift goes from empty class to fetchUser() with
+# guard/throw, handleError() with switch, and a User struct.
+#
+# Reviewer questions:
+#   Q1: "What error cases are defined?"
+#       -> AppError.swift (UNCHANGED) defines networkError, validationError,
+#          notFound, unauthorized with localizedDescription.
+#
+# Not needed:
+#   - ErrorPresenter.swift: displays errors in the UI as alerts.
+#     Error-adjacent vocabulary but no dependency from UserService.
+#   - NetworkMonitor.swift: monitors network connectivity.
+#     Network-related naming but not referenced by UserService error handling.
+
 initial:
   AppError.swift: |
     enum AppError: Error {
@@ -22,18 +39,48 @@ initial:
   UserService.swift: |
     // Initial
     class UserService {}
-  GarbageRecoveryHandler.swift: |
-    class GarbageRecoveryHandler {
-        static let GARBAGE_JVM_063_RECOVER_MARKER_A = "marker"
-        static let GARBAGE_JVM_063_RETRY_MARKER_B = "marker"
-        func noop() {}
+  ErrorPresenter.swift: |
+    import Foundation
+
+    class ErrorPresenter {
+        func presentAlert(for error: AppError) -> String {
+            switch error {
+            case .networkError:
+                return "Please check your internet connection"
+            case .validationError:
+                return "Please correct the highlighted fields"
+            case .notFound:
+                return "The requested item could not be found"
+            case .unauthorized:
+                return "Your session has expired. Please log in again"
+            }
+        }
+
+        func shouldRetry(error: AppError) -> Bool {
+            if case .networkError = error { return true }
+            return false
+        }
     }
-  GarbageCircuitBreaker.swift: |
-    class GarbageCircuitBreaker {
-        static let GARBAGE_JVM_063_CIRCUIT_MARKER_C = "marker"
-        static let GARBAGE_JVM_063_BREAKER_MARKER_D = "marker"
-        func noop() {}
+  NetworkMonitor.swift: |
+    import Foundation
+
+    class NetworkMonitor {
+        private(set) var isConnected = true
+        private(set) var connectionType: String = "wifi"
+
+        func startMonitoring() {
+            print("Network monitoring started")
+        }
+
+        func stopMonitoring() {
+            print("Network monitoring stopped")
+        }
+
+        func checkConnectivity() -> Bool {
+            return isConnected
+        }
     }
+
 changed:
   AppError.swift: |
     enum AppError: Error {
@@ -91,28 +138,66 @@ changed:
         let id: String
         let name: String
     }
-  GarbageRecoveryHandler.swift: |
-    class GarbageRecoveryHandler {
-        static let GARBAGE_JVM_063_RECOVER_MARKER_A = "marker"
-        static let GARBAGE_JVM_063_RETRY_MARKER_B = "marker"
-        func noop() {}
+  ErrorPresenter.swift: |
+    import Foundation
+
+    class ErrorPresenter {
+        func presentAlert(for error: AppError) -> String {
+            switch error {
+            case .networkError:
+                return "Please check your internet connection"
+            case .validationError:
+                return "Please correct the highlighted fields"
+            case .notFound:
+                return "The requested item could not be found"
+            case .unauthorized:
+                return "Your session has expired. Please log in again"
+            }
+        }
+
+        func shouldRetry(error: AppError) -> Bool {
+            if case .networkError = error { return true }
+            return false
+        }
     }
-  GarbageCircuitBreaker.swift: |
-    class GarbageCircuitBreaker {
-        static let GARBAGE_JVM_063_CIRCUIT_MARKER_C = "marker"
-        static let GARBAGE_JVM_063_BREAKER_MARKER_D = "marker"
-        func noop() {}
+  NetworkMonitor.swift: |
+    import Foundation
+
+    class NetworkMonitor {
+        private(set) var isConnected = true
+        private(set) var connectionType: String = "wifi"
+
+        func startMonitoring() {
+            print("Network monitoring started")
+        }
+
+        func stopMonitoring() {
+            print("Network monitoring stopped")
+        }
+
+        func checkConnectivity() -> Bool {
+            return isConnected
+        }
     }
+
 must_include_files:
-- UserService.swift
-must_include_content:
-- class UserService {
+  - UserService.swift
+must_include_content_from:
+  UserService.swift:
+    - "class UserService {"
 must_not_include:
-- GARBAGE_JVM_063_BREAKER_MARKER_D
-- GARBAGE_JVM_063_CIRCUIT_MARKER_C
-- GARBAGE_JVM_063_RECOVER_MARKER_A
-- GARBAGE_JVM_063_RETRY_MARKER_B
-- GarbageCircuitBreaker.swift
-- GarbageRecoveryHandler.swift
+  # ErrorPresenter.swift: UI error display, no dependency from UserService
+  - ErrorPresenter
+  - presentAlert
+  - shouldRetry
+  # NetworkMonitor.swift: connectivity monitor, not referenced by UserService
+  - NetworkMonitor
+  - startMonitoring
+  - checkConnectivity
+must_not_include_files:
+  - ErrorPresenter.swift
+  - NetworkMonitor.swift
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

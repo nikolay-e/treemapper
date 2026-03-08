@@ -1,7 +1,28 @@
+# Scenario: Cache is refactored from single-owner HashMap to Arc<RwLock<HashMap>>
+# for thread-safe shared ownership. Methods change from &mut self to &self, and
+# a Clone impl is added that clones the Arc handle.
+#
+# Diff: src/cache.rs wraps data in Arc<RwLock<...>>, changes method signatures,
+# adds clone_handle() and Clone impl.
+#
+# Reviewer questions:
+#   Q1: "Is the RwLock usage correct (read vs write)?" -> src/cache.rs (CHANGED)
+#        uses .read().unwrap() for get/contains/len/is_empty and .write().unwrap()
+#        for set — correct separation.
+#   Q2: "How is shared ownership established?" -> Clone impl clones Arc handle,
+#        clone_handle() exposes the raw Arc for external holders.
+#
+# Trap files (plausible but no dependency on Cache or its Arc/RwLock internals):
+#   - src/session_store.rs: stores user sessions in a HashMap<String, Session>.
+#     Same "key-value store" domain but uses no Arc/RwLock, single-threaded design.
+#   - src/rate_limiter.rs: tracks request counts per client. Uses AtomicU64 for
+#     thread safety — same concurrency domain but different type entirely.
+
 initial:
   src/lib.rs: |
     pub mod cache;
-    pub mod unrelated;
+    pub mod session_store;
+    pub mod rate_limiter;
   src/cache.rs: |
     use std::collections::HashMap;
 
@@ -30,45 +51,75 @@ initial:
             self.data.is_empty()
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod email_validator;
-    pub mod slug_generator;
-  src/unrelated/email_validator.rs: |
-    // GARBAGE_RUST_037_EMAIL_VALIDATOR_A
-    pub const GARBAGE_RUST_037_EMAIL_REGEX_B: &str = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$";
+  src/session_store.rs: |
+    use std::collections::HashMap;
 
-    pub struct GarbageEmailValidator037 {
-        allowed_domains: Vec<String>,
+    pub struct Session {
+        pub user_id: String,
+        pub token: String,
+        pub expires_at: u64,
     }
 
-    impl GarbageEmailValidator037 {
-        pub fn garbage_validate_037(&self, email: &str) -> bool {
-            email.contains('@') && email.contains('.')
+    pub struct SessionStore {
+        sessions: HashMap<String, Session>,
+    }
+
+    impl SessionStore {
+        pub fn new() -> Self {
+            Self { sessions: HashMap::new() }
         }
 
-        pub fn garbage_is_allowed_domain_037(&self, email: &str) -> bool {
-            self.allowed_domains.iter().any(|d| email.ends_with(d.as_str()))
+        pub fn create_session(&mut self, user_id: &str, token: &str, ttl: u64) {
+            self.sessions.insert(token.to_string(), Session {
+                user_id: user_id.to_string(),
+                token: token.to_string(),
+                expires_at: ttl,
+            });
+        }
+
+        pub fn get_session(&self, token: &str) -> Option<&Session> {
+            self.sessions.get(token)
+        }
+
+        pub fn revoke(&mut self, token: &str) -> bool {
+            self.sessions.remove(token).is_some()
         }
     }
-  src/unrelated/slug_generator.rs: |
-    // GARBAGE_RUST_037_SLUG_GENERATOR_C
-    pub const GARBAGE_RUST_037_SEPARATOR_D: &str = "-";
+  src/rate_limiter.rs: |
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::collections::HashMap;
 
-    pub struct GarbageSlugGenerator037;
+    pub struct RateLimiter {
+        limits: HashMap<String, u64>,
+        window_seconds: u64,
+    }
 
-    impl GarbageSlugGenerator037 {
-        pub fn garbage_slugify_037(&self, input: &str) -> String {
-            input.to_lowercase().replace(' ', GARBAGE_RUST_037_SEPARATOR_D)
+    impl RateLimiter {
+        pub fn new(window_seconds: u64) -> Self {
+            Self {
+                limits: HashMap::new(),
+                window_seconds,
+            }
         }
 
-        pub fn garbage_deslugify_037(&self, slug: &str) -> String {
-            slug.replace(GARBAGE_RUST_037_SEPARATOR_D, " ")
+        pub fn set_limit(&mut self, key: &str, max_requests: u64) {
+            self.limits.insert(key.to_string(), max_requests);
+        }
+
+        pub fn check(&self, key: &str, current_count: u64) -> bool {
+            self.limits.get(key).map_or(true, |&limit| current_count < limit)
+        }
+
+        pub fn window(&self) -> u64 {
+            self.window_seconds
         }
     }
+
 changed:
   src/lib.rs: |
     pub mod cache;
-    pub mod unrelated;
+    pub mod session_store;
+    pub mod rate_limiter;
   src/cache.rs: |
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
@@ -116,53 +167,91 @@ changed:
             }
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod email_validator;
-    pub mod slug_generator;
-  src/unrelated/email_validator.rs: |
-    // GARBAGE_RUST_037_EMAIL_VALIDATOR_A
-    pub const GARBAGE_RUST_037_EMAIL_REGEX_B: &str = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$";
+  src/session_store.rs: |
+    use std::collections::HashMap;
 
-    pub struct GarbageEmailValidator037 {
-        allowed_domains: Vec<String>,
+    pub struct Session {
+        pub user_id: String,
+        pub token: String,
+        pub expires_at: u64,
     }
 
-    impl GarbageEmailValidator037 {
-        pub fn garbage_validate_037(&self, email: &str) -> bool {
-            email.contains('@') && email.contains('.')
+    pub struct SessionStore {
+        sessions: HashMap<String, Session>,
+    }
+
+    impl SessionStore {
+        pub fn new() -> Self {
+            Self { sessions: HashMap::new() }
         }
 
-        pub fn garbage_is_allowed_domain_037(&self, email: &str) -> bool {
-            self.allowed_domains.iter().any(|d| email.ends_with(d.as_str()))
+        pub fn create_session(&mut self, user_id: &str, token: &str, ttl: u64) {
+            self.sessions.insert(token.to_string(), Session {
+                user_id: user_id.to_string(),
+                token: token.to_string(),
+                expires_at: ttl,
+            });
+        }
+
+        pub fn get_session(&self, token: &str) -> Option<&Session> {
+            self.sessions.get(token)
+        }
+
+        pub fn revoke(&mut self, token: &str) -> bool {
+            self.sessions.remove(token).is_some()
         }
     }
-  src/unrelated/slug_generator.rs: |
-    // GARBAGE_RUST_037_SLUG_GENERATOR_C
-    pub const GARBAGE_RUST_037_SEPARATOR_D: &str = "-";
+  src/rate_limiter.rs: |
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::collections::HashMap;
 
-    pub struct GarbageSlugGenerator037;
+    pub struct RateLimiter {
+        limits: HashMap<String, u64>,
+        window_seconds: u64,
+    }
 
-    impl GarbageSlugGenerator037 {
-        pub fn garbage_slugify_037(&self, input: &str) -> String {
-            input.to_lowercase().replace(' ', GARBAGE_RUST_037_SEPARATOR_D)
+    impl RateLimiter {
+        pub fn new(window_seconds: u64) -> Self {
+            Self {
+                limits: HashMap::new(),
+                window_seconds,
+            }
         }
 
-        pub fn garbage_deslugify_037(&self, slug: &str) -> String {
-            slug.replace(GARBAGE_RUST_037_SEPARATOR_D, " ")
+        pub fn set_limit(&mut self, key: &str, max_requests: u64) {
+            self.limits.insert(key.to_string(), max_requests);
+        }
+
+        pub fn check(&self, key: &str, current_count: u64) -> bool {
+            self.limits.get(key).map_or(true, |&limit| current_count < limit)
+        }
+
+        pub fn window(&self) -> u64 {
+            self.window_seconds
         }
     }
+
 must_include_files:
-- src/cache.rs
-must_include_content:
-- use std::sync::{Arc, RwLock};
-- 'data: Arc<RwLock<HashMap<String, String>>>,'
+  # Changed: Cache refactored to Arc<RwLock<HashMap>>
+  - src/cache.rs
+must_include_content_from:
+  src/cache.rs:
+    - "use std::sync::{Arc, RwLock};"
+    - "data: Arc<RwLock<HashMap<String, String>>>,"
+    - "pub fn clone_handle(&self)"
 must_not_include:
-- GARBAGE_RUST_037_EMAIL_REGEX_B
-- GARBAGE_RUST_037_EMAIL_VALIDATOR_A
-- GARBAGE_RUST_037_SEPARATOR_D
-- GARBAGE_RUST_037_SLUG_GENERATOR_C
-- email_validator.rs
-- mod.rs
-- slug_generator.rs
+  # session_store.rs: key-value store but single-threaded, no Arc/RwLock
+  - SessionStore
+  - create_session
+  - revoke
+  # rate_limiter.rs: concurrency-aware but uses AtomicU64, no Cache dependency
+  - RateLimiter
+  - set_limit
+  - window_seconds
+must_not_include_files:
+  - src/session_store.rs
+  - src/rate_limiter.rs
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

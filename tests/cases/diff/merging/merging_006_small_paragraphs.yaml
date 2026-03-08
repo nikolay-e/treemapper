@@ -1,3 +1,22 @@
+# Test: Release notes text file has small paragraph-level edits across sections
+#
+# Scenario: docs/release_notes.txt is updated from v2.4.0 to v2.4.1.
+# Changes span multiple short paragraphs: a new bug fix is added,
+# one known issue is removed, and a migration step is added. This
+# tests that the algorithm properly presents fragments from a single
+# text file with many small changes scattered across sections.
+#
+# Reviewer questions:
+#   Q1: "What changed between v2.4.0 and v2.4.1?"
+#       -> The diff itself shows: new CSV fix line, removed upload
+#          issue, new migration step, version bump in title.
+#
+# Not needed:
+#   - docs/api_reference.txt: API documentation. Different document
+#     type, not related to release notes.
+#   - docs/architecture.txt: architecture description. Design doc,
+#     unrelated to the patch release changes.
+
 initial:
   docs/release_notes.txt: |
     Release Notes v2.4.0
@@ -26,69 +45,34 @@ initial:
     Update all API clients to use v2 authentication.
     Review timeout settings in configuration files.
     Test webhook integrations with the new retry behavior.
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  # --- Not needed: API reference, different document type ---
+  docs/api_reference.txt: |
+    API Reference
+    =============
 
-    class TextSanitizer:
-        GARBAGE_MERGE_006_MARKER_A = "sanitizer_tag"
+    GET /api/users
+      Returns a list of all active users.
+      Parameters: page (int), limit (int)
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    POST /api/users
+      Creates a new user account.
+      Body: { name, email, role }
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+    DELETE /api/users/:id
+      Deactivates a user account.
+      Requires admin permissions.
+  # --- Not needed: architecture doc, design concern ---
+  docs/architecture.txt: |
+    Architecture Overview
+    =====================
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_006_A_CLEAN: {cleaned}"
+    The system follows a layered architecture:
+    - Presentation layer: REST API endpoints
+    - Business layer: Service classes with domain logic
+    - Data layer: Repository pattern with PostgreSQL
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
-
-    SANITIZER_VERSION = "GARBAGE_MERGE_006_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
-
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    class SystemMonitor:
-        GARBAGE_MERGE_006_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_006_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_006_B_VERSION"
+    All communication between layers uses typed DTOs.
+    Background jobs run via a Redis-backed task queue.
 changed:
   docs/release_notes.txt: |
     Release Notes v2.4.1
@@ -118,77 +102,44 @@ changed:
     Review timeout settings in configuration files.
     Test webhook integrations with the new retry behavior.
     Run the data migration script before deploying.
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  docs/api_reference.txt: |
+    API Reference
+    =============
 
-    class TextSanitizer:
-        GARBAGE_MERGE_006_MARKER_A = "sanitizer_tag"
+    GET /api/users
+      Returns a list of all active users.
+      Parameters: page (int), limit (int)
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    POST /api/users
+      Creates a new user account.
+      Body: { name, email, role }
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+    DELETE /api/users/:id
+      Deactivates a user account.
+      Requires admin permissions.
+  docs/architecture.txt: |
+    Architecture Overview
+    =====================
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_006_A_CLEAN: {cleaned}"
+    The system follows a layered architecture:
+    - Presentation layer: REST API endpoints
+    - Business layer: Service classes with domain logic
+    - Data layer: Repository pattern with PostgreSQL
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
-
-    SANITIZER_VERSION = "GARBAGE_MERGE_006_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
-
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    class SystemMonitor:
-        GARBAGE_MERGE_006_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_006_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_006_B_VERSION"
+    All communication between layers uses typed DTOs.
+    Background jobs run via a Redis-backed task queue.
 must_include_files:
-- docs/release_notes.txt
+  - docs/release_notes.txt
 must_include_content:
-- Fixed CSV export encoding issue for Unicode characters.
+  - "Fixed CSV export encoding issue for Unicode characters."
 must_not_include:
-- GARBAGE_MERGE_006_MARKER_A
-- GARBAGE_MERGE_006_MARKER_B
-- health_monitor.py
-- text_sanitizer.py
+  # api_reference.txt: API docs, different document type
+  - "API Reference"
+  - "GET /api/users"
+  # architecture.txt: design document, unrelated to release patch
+  - "Architecture Overview"
+  - "layered architecture"
+max_fragments: 8
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

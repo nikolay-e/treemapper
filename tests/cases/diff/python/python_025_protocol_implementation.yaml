@@ -1,3 +1,8 @@
+# Scenario: concrete models implement Protocol interfaces (Serializable, Comparable)
+# Changed: models.py imports Protocols and implements their methods on concrete classes
+# Reviewer questions: Are all protocol methods implemented? Does structural subtyping work?
+# Trap 1: validators.py — validates model data, shares "model" vocabulary but no dep on protocols
+# Trap 2: mappers.py — maps between models, shares "model" domain but independent of protocols
 initial:
   protocols.py: |
     from typing import Protocol, TypeVar, Optional, List, runtime_checkable
@@ -46,20 +51,47 @@ initial:
   models.py: |
     class User:
         pass
-  garbage_ml_predictor.py: |
-    GARBAGE_PY_ML_827364 = "ml predictor garbage"
-    UNRELATED_ML_MARKER_918273 = "unused sklearn config"
+  validators.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
 
-    class GarbageMLPredictor:
-        def garbage_predict(self, features):
-            return [0.5, 0.3]
-  garbage_search_engine.py: |
-    GARBAGE_PY_SEARCH_918273 = "search engine garbage"
-    UNRELATED_SEARCH_MARKER_827163 = "unused elasticsearch config"
+    @dataclass
+    class ValidationError:
+        field: str
+        message: str
 
-    class GarbageSearchEngine:
-        def garbage_search(self, query):
-            return ["garbage_result"]
+    class ModelValidator:
+        def __init__(self):
+            self._rules: Dict[str, List[callable]] = {}
+
+        def add_rule(self, field: str, rule: callable) -> None:
+            if field not in self._rules:
+                self._rules[field] = []
+            self._rules[field].append(rule)
+
+        def validate(self, data: Dict[str, Any]) -> List[ValidationError]:
+            errors = []
+            for field, rules in self._rules.items():
+                value = data.get(field)
+                for rule in rules:
+                    if not rule(value):
+                        errors.append(ValidationError(field, f"Validation failed for {field}"))
+            return errors
+  mappers.py: |
+    from typing import Dict, Any, TypeVar, Type
+
+    T = TypeVar('T')
+
+    class ModelMapper:
+        def __init__(self):
+            self._mappings: Dict[str, Dict[str, str]] = {}
+
+        def register_mapping(self, source: str, target: str, field_map: Dict[str, str]) -> None:
+            self._mappings[f"{source}->{target}"] = field_map
+
+        def map(self, source_data: Dict[str, Any], source: str, target: str) -> Dict[str, Any]:
+            field_map = self._mappings.get(f"{source}->{target}", {})
+            return {field_map.get(k, k): v for k, v in source_data.items()}
 changed:
   protocols.py: |
     from typing import Protocol, TypeVar, Optional, List, runtime_checkable
@@ -156,29 +188,64 @@ changed:
                 del self._storage[id]
                 return True
             return False
-  garbage_ml_predictor.py: |
-    GARBAGE_PY_ML_827364 = "ml predictor garbage"
-    UNRELATED_ML_MARKER_918273 = "unused sklearn config"
+  validators.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
 
-    class GarbageMLPredictor:
-        def garbage_predict(self, features):
-            return [0.5, 0.3]
-  garbage_search_engine.py: |
-    GARBAGE_PY_SEARCH_918273 = "search engine garbage"
-    UNRELATED_SEARCH_MARKER_827163 = "unused elasticsearch config"
+    @dataclass
+    class ValidationError:
+        field: str
+        message: str
 
-    class GarbageSearchEngine:
-        def garbage_search(self, query):
-            return ["garbage_result"]
+    class ModelValidator:
+        def __init__(self):
+            self._rules: Dict[str, List[callable]] = {}
+
+        def add_rule(self, field: str, rule: callable) -> None:
+            if field not in self._rules:
+                self._rules[field] = []
+            self._rules[field].append(rule)
+
+        def validate(self, data: Dict[str, Any]) -> List[ValidationError]:
+            errors = []
+            for field, rules in self._rules.items():
+                value = data.get(field)
+                for rule in rules:
+                    if not rule(value):
+                        errors.append(ValidationError(field, f"Validation failed for {field}"))
+            return errors
+  mappers.py: |
+    from typing import Dict, Any, TypeVar, Type
+
+    T = TypeVar('T')
+
+    class ModelMapper:
+        def __init__(self):
+            self._mappings: Dict[str, Dict[str, str]] = {}
+
+        def register_mapping(self, source: str, target: str, field_map: Dict[str, str]) -> None:
+            self._mappings[f"{source}->{target}"] = field_map
+
+        def map(self, source_data: Dict[str, Any], source: str, target: str) -> Dict[str, Any]:
+            field_map = self._mappings.get(f"{source}->{target}", {})
+            return {field_map.get(k, k): v for k, v in source_data.items()}
 must_include_files:
 - models.py
-must_include_content:
-- from protocols import Serializable, Comparable, Repository, EntityMetadata, is_serializable
-- 'def __lt__(self, other: "User") -> bool:'
+- protocols.py
+must_include_content_from:
+  models.py:
+  - 'from protocols import Serializable, Comparable, Repository, EntityMetadata, is_serializable'
+  - 'def __lt__(self, other: "User") -> bool:'
 must_not_include:
-- GARBAGE_PY_ML_827364
-- GARBAGE_PY_SEARCH_918273
-- garbage_ml_predictor.py
-- garbage_search_engine.py
+- ModelValidator
+- ValidationError
+- add_rule
+- ModelMapper
+- register_mapping
+must_not_include_files:
+- validators.py
+- mappers.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

@@ -1,3 +1,8 @@
+# Scenario: A modulo function is added to calculator.py; __pycache__ also changes.
+# Reviewer asks: "What new arithmetic operation was added?"
+# Trap rationale: converter.py and formatter.py share math/number vocabulary
+# but are not imported by calculator.py. __pycache__ must be ignored.
+
 initial:
   calculator.py: |
     from typing import Union
@@ -22,41 +27,47 @@ initial:
         return base ** exponent
   __pycache__/calculator.cpython-311.pyc: binary_content_placeholder
   __pycache__/utils.cpython-311.pyc: binary_content_placeholder
-  garbage_matrix.py: |
-    GARBAGE_OPS_004_MATRIX_A = "matrix operations marker"
-    GARBAGE_OPS_004_VECTOR_B = "vector math marker"
+  utils/converter.py: |
+    from typing import Union
 
-    class MatrixOps:
-        GARBAGE_OPS_004_DET_C = "determinant marker"
+    Number = Union[int, float]
 
-        def __init__(self, rows: int = 3, cols: int = 3):
-            self.rows = rows
-            self.cols = cols
+    UNIT_CONVERSIONS = {
+        "km_to_miles": 0.621371,
+        "kg_to_lbs": 2.20462,
+        "celsius_to_fahrenheit_offset": 32,
+    }
 
-        def transpose(self, matrix: list[list[float]]) -> list[list[float]]:
-            return [list(row) for row in zip(*matrix)]
+    def km_to_miles(km: Number) -> float:
+        return km * UNIT_CONVERSIONS["km_to_miles"]
 
-        def multiply(self, a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
-            GARBAGE_OPS_004_DOT_D = "dot product marker"
-            return [[0.0] * len(b[0]) for _ in range(len(a))]
-  garbage_stats.py: |
-    GARBAGE_OPS_004_STATS_E = "statistics module marker"
-    GARBAGE_OPS_004_MEAN_F = "mean calculation marker"
+    def celsius_to_fahrenheit(celsius: Number) -> float:
+        return celsius * 9 / 5 + UNIT_CONVERSIONS["celsius_to_fahrenheit_offset"]
 
-    class StatisticsEngine:
-        GARBAGE_OPS_004_MEDIAN_G = True
+    class UnitConverter:
+        def __init__(self, precision: int = 2):
+            self.precision = precision
 
-        def __init__(self):
-            self._data: list[float] = []
+        def convert(self, value: Number, factor: float) -> float:
+            return round(value * factor, self.precision)
+  utils/formatter.py: |
+    from typing import Union
 
-        def add_sample(self, value: float) -> None:
-            self._data.append(value)
+    Number = Union[int, float]
 
-        def compute_mean(self) -> float:
-            GARBAGE_OPS_004_VARIANCE_H = "variance marker"
-            if not self._data:
-                return 0.0
-            return sum(self._data) / len(self._data)
+    DECIMAL_SEPARATOR = "."
+    THOUSANDS_SEPARATOR = ","
+
+    class NumberFormatter:
+        def __init__(self, decimal_places: int = 2):
+            self.decimal_places = decimal_places
+
+        def format_currency(self, amount: Number, symbol: str = "$") -> str:
+            formatted = f"{amount:,.{self.decimal_places}f}"
+            return f"{symbol}{formatted}"
+
+        def format_percentage(self, value: Number) -> str:
+            return f"{value:.{self.decimal_places}f}%"
 changed:
   calculator.py: |
     from typing import Union
@@ -86,57 +97,62 @@ changed:
         return a % b
   __pycache__/calculator.cpython-311.pyc: binary_content_updated
   __pycache__/utils.cpython-311.pyc: binary_content_placeholder
-  garbage_matrix.py: |
-    GARBAGE_OPS_004_MATRIX_A = "matrix operations marker"
-    GARBAGE_OPS_004_VECTOR_B = "vector math marker"
+  utils/converter.py: |
+    from typing import Union
 
-    class MatrixOps:
-        GARBAGE_OPS_004_DET_C = "determinant marker"
+    Number = Union[int, float]
 
-        def __init__(self, rows: int = 3, cols: int = 3):
-            self.rows = rows
-            self.cols = cols
+    UNIT_CONVERSIONS = {
+        "km_to_miles": 0.621371,
+        "kg_to_lbs": 2.20462,
+        "celsius_to_fahrenheit_offset": 32,
+    }
 
-        def transpose(self, matrix: list[list[float]]) -> list[list[float]]:
-            return [list(row) for row in zip(*matrix)]
+    def km_to_miles(km: Number) -> float:
+        return km * UNIT_CONVERSIONS["km_to_miles"]
 
-        def multiply(self, a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
-            GARBAGE_OPS_004_DOT_D = "dot product marker"
-            return [[0.0] * len(b[0]) for _ in range(len(a))]
-  garbage_stats.py: |
-    GARBAGE_OPS_004_STATS_E = "statistics module marker"
-    GARBAGE_OPS_004_MEAN_F = "mean calculation marker"
+    def celsius_to_fahrenheit(celsius: Number) -> float:
+        return celsius * 9 / 5 + UNIT_CONVERSIONS["celsius_to_fahrenheit_offset"]
 
-    class StatisticsEngine:
-        GARBAGE_OPS_004_MEDIAN_G = True
+    class UnitConverter:
+        def __init__(self, precision: int = 2):
+            self.precision = precision
 
-        def __init__(self):
-            self._data: list[float] = []
+        def convert(self, value: Number, factor: float) -> float:
+            return round(value * factor, self.precision)
+  utils/formatter.py: |
+    from typing import Union
 
-        def add_sample(self, value: float) -> None:
-            self._data.append(value)
+    Number = Union[int, float]
 
-        def compute_mean(self) -> float:
-            GARBAGE_OPS_004_VARIANCE_H = "variance marker"
-            if not self._data:
-                return 0.0
-            return sum(self._data) / len(self._data)
-must_include:
+    DECIMAL_SEPARATOR = "."
+    THOUSANDS_SEPARATOR = ","
+
+    class NumberFormatter:
+        def __init__(self, decimal_places: int = 2):
+            self.decimal_places = decimal_places
+
+        def format_currency(self, amount: Number, symbol: str = "$") -> str:
+            formatted = f"{amount:,.{self.decimal_places}f}"
+            return f"{symbol}{formatted}"
+
+        def format_percentage(self, value: Number) -> str:
+            return f"{value:.{self.decimal_places}f}%"
+must_include_files:
 - calculator.py
 must_not_include:
 - cpython-311.pyc
 - __pycache__
-- GARBAGE_OPS_004_MATRIX_A
-- GARBAGE_OPS_004_VECTOR_B
-- GARBAGE_OPS_004_DET_C
-- GARBAGE_OPS_004_DOT_D
-- GARBAGE_OPS_004_STATS_E
-- GARBAGE_OPS_004_MEAN_F
-- GARBAGE_OPS_004_MEDIAN_G
-- GARBAGE_OPS_004_VARIANCE_H
-- MatrixOps
-- StatisticsEngine
-- garbage_matrix.py
-- garbage_stats.py
+- UnitConverter
+- NumberFormatter
+- UNIT_CONVERSIONS
+- DECIMAL_SEPARATOR
+- converter.py
+- formatter.py
+must_not_include_files:
+- __pycache__/calculator.cpython-311.pyc
+- __pycache__/utils.cpython-311.pyc
+- utils/converter.py
+- utils/formatter.py
 add_garbage_files: false
 skip_garbage_check: true

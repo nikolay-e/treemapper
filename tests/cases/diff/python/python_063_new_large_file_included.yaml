@@ -1,3 +1,17 @@
+# Scenario: service.py imports new AdvancedInsights class from advanced.py,
+#   which itself imports from stats.py. The new advanced.py is a large file
+#   with trend detection, outlier analysis, and rolling correlation.
+#
+# Reviewer questions:
+#   - Does AdvancedInsights correctly use calculate_std from stats.py?
+#   - Is the rolling correlation window_size handling correct?
+#
+# Trap files:
+#   - billing/invoice_generator.py: financial document generation with template
+#     and order vocabulary, no connection to analytics
+#   - caching/cache_manager.py: key-value cache with TTL, uses "get/set"
+#     vocabulary but has no dependency on analytics modules
+
 initial:
   src/analytics/service.py: |
     from src.analytics.stats import calculate_mean, calculate_median
@@ -52,36 +66,66 @@ initial:
         if c >= len(sorted_vals):
             return sorted_vals[f]
         return sorted_vals[f] + (k - f) * (sorted_vals[c] - sorted_vals[f])
-  garbage_billing.py: |
-    GARBAGE_PY063_BILLING_MARKER_A = "billing module"
-    GARBAGE_PY063_INVOICE_MARKER_B = True
+  billing/invoice_generator.py: |
+    from typing import Optional
 
     class InvoiceGenerator:
-        GARBAGE_PY063_GENERATOR_MARKER_C = "invoice gen"
+        def __init__(self, template: str = "default"):
+            self.template = template
+            self._invoices: list[dict] = []
 
-        def __init__(self):
-            self.GARBAGE_PY063_TEMPLATE_MARKER_D = "default"
+        def generate(self, order_id: int, line_items: list[dict]) -> dict:
+            total = sum(item.get("amount", 0) for item in line_items)
+            invoice = {
+                "id": f"INV-{order_id}",
+                "order_id": order_id,
+                "total": total,
+                "items": line_items,
+                "template": self.template,
+            }
+            self._invoices.append(invoice)
+            return invoice
 
-        def generate(self, order_id: int) -> str:
-            return f"INV-{order_id}"
-
-        def send_invoice(self, invoice_id: str) -> bool:
-            GARBAGE_PY063_SEND_MARKER_E = "sent"
+        def send_invoice(self, invoice_id: str, recipient_email: str) -> bool:
             return True
-  garbage_cache.py: |
-    GARBAGE_PY063_CACHE_MARKER_F = "cache module"
-    GARBAGE_PY063_REDIS_MARKER_G = 3600
+
+        def get_invoice(self, invoice_id: str) -> Optional[dict]:
+            for inv in self._invoices:
+                if inv["id"] == invoice_id:
+                    return inv
+            return None
+
+        def void_invoice(self, invoice_id: str) -> bool:
+            self._invoices = [i for i in self._invoices if i["id"] != invoice_id]
+            return True
+  caching/cache_manager.py: |
+    from typing import Any, Optional
 
     class CacheManager:
-        GARBAGE_PY063_MANAGER_MARKER_H = "manager"
+        def __init__(self, default_ttl: int = 300):
+            self.default_ttl = default_ttl
+            self._store: dict[str, Any] = {}
 
-        def get(self, key: str) -> str:
-            GARBAGE_PY063_GET_MARKER_I = "cache hit"
-            return ""
+        def get(self, key: str) -> Optional[Any]:
+            return self._store.get(key)
 
-        def set(self, key: str, value: str, ttl: int = 300) -> None:
-            GARBAGE_PY063_SET_MARKER_J = "cache set"
-            pass
+        def set(self, key: str, value: Any, ttl: int = None) -> None:
+            self._store[key] = value
+
+        def delete(self, key: str) -> bool:
+            if key in self._store:
+                del self._store[key]
+                return True
+            return False
+
+        def clear(self) -> int:
+            count = len(self._store)
+            self._store.clear()
+            return count
+
+        def get_stats(self) -> dict:
+            return {"size": len(self._store), "ttl": self.default_ttl}
+
 changed:
   src/analytics/service.py: |
     from src.analytics.stats import calculate_mean, calculate_median
@@ -206,36 +250,66 @@ changed:
         if c >= len(sorted_vals):
             return sorted_vals[f]
         return sorted_vals[f] + (k - f) * (sorted_vals[c] - sorted_vals[f])
-  garbage_billing.py: |
-    GARBAGE_PY063_BILLING_MARKER_A = "billing module"
-    GARBAGE_PY063_INVOICE_MARKER_B = True
+  billing/invoice_generator.py: |
+    from typing import Optional
 
     class InvoiceGenerator:
-        GARBAGE_PY063_GENERATOR_MARKER_C = "invoice gen"
+        def __init__(self, template: str = "default"):
+            self.template = template
+            self._invoices: list[dict] = []
 
-        def __init__(self):
-            self.GARBAGE_PY063_TEMPLATE_MARKER_D = "default"
+        def generate(self, order_id: int, line_items: list[dict]) -> dict:
+            total = sum(item.get("amount", 0) for item in line_items)
+            invoice = {
+                "id": f"INV-{order_id}",
+                "order_id": order_id,
+                "total": total,
+                "items": line_items,
+                "template": self.template,
+            }
+            self._invoices.append(invoice)
+            return invoice
 
-        def generate(self, order_id: int) -> str:
-            return f"INV-{order_id}"
-
-        def send_invoice(self, invoice_id: str) -> bool:
-            GARBAGE_PY063_SEND_MARKER_E = "sent"
+        def send_invoice(self, invoice_id: str, recipient_email: str) -> bool:
             return True
-  garbage_cache.py: |
-    GARBAGE_PY063_CACHE_MARKER_F = "cache module"
-    GARBAGE_PY063_REDIS_MARKER_G = 3600
+
+        def get_invoice(self, invoice_id: str) -> Optional[dict]:
+            for inv in self._invoices:
+                if inv["id"] == invoice_id:
+                    return inv
+            return None
+
+        def void_invoice(self, invoice_id: str) -> bool:
+            self._invoices = [i for i in self._invoices if i["id"] != invoice_id]
+            return True
+  caching/cache_manager.py: |
+    from typing import Any, Optional
 
     class CacheManager:
-        GARBAGE_PY063_MANAGER_MARKER_H = "manager"
+        def __init__(self, default_ttl: int = 300):
+            self.default_ttl = default_ttl
+            self._store: dict[str, Any] = {}
 
-        def get(self, key: str) -> str:
-            GARBAGE_PY063_GET_MARKER_I = "cache hit"
-            return ""
+        def get(self, key: str) -> Optional[Any]:
+            return self._store.get(key)
 
-        def set(self, key: str, value: str, ttl: int = 300) -> None:
-            GARBAGE_PY063_SET_MARKER_J = "cache set"
-            pass
+        def set(self, key: str, value: Any, ttl: int = None) -> None:
+            self._store[key] = value
+
+        def delete(self, key: str) -> bool:
+            if key in self._store:
+                del self._store[key]
+                return True
+            return False
+
+        def clear(self) -> int:
+            count = len(self._store)
+            self._store.clear()
+            return count
+
+        def get_stats(self) -> dict:
+            return {"size": len(self._store), "ttl": self.default_ttl}
+
 must_include_files:
 - src/analytics/advanced.py
 must_include_content:
@@ -243,17 +317,15 @@ must_include_content:
 - def detect_trend(self, values
 - def find_outliers(self, values
 must_not_include:
-- GARBAGE_PY063_BILLING_MARKER_A
-- GARBAGE_PY063_INVOICE_MARKER_B
-- GARBAGE_PY063_GENERATOR_MARKER_C
-- GARBAGE_PY063_TEMPLATE_MARKER_D
-- GARBAGE_PY063_SEND_MARKER_E
-- GARBAGE_PY063_CACHE_MARKER_F
-- GARBAGE_PY063_REDIS_MARKER_G
-- GARBAGE_PY063_MANAGER_MARKER_H
-- GARBAGE_PY063_GET_MARKER_I
-- GARBAGE_PY063_SET_MARKER_J
-- garbage_billing.py
-- garbage_cache.py
+- InvoiceGenerator
+- send_invoice
+- void_invoice
+- CacheManager
+- get_stats
+must_not_include_files:
+- billing/invoice_generator.py
+- caching/cache_manager.py
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

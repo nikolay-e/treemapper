@@ -1,3 +1,21 @@
+# Scenario: Button.tsx is rewritten to use useContext(ThemeContext) to get theme
+# colors and apply them as inline styles.
+#
+# Diff: Button.tsx adds `import { ThemeContext } from './ThemeContext'`, calls
+# `useContext(ThemeContext)`, and applies theme.primary as backgroundColor.
+#
+# Reviewer questions:
+#   Q1: "What does ThemeContext provide?"
+#       -> ThemeContext.tsx (UNCHANGED) defines Theme with primary and secondary
+#          color strings, and creates the context with defaults '#000' and '#fff'.
+#          Reviewer verifies Button uses theme.primary correctly.
+#
+# Not needed:
+#   - AuthContext.tsx: another React context for authentication (AuthState with
+#     isAuthenticated, userId). Same context pattern but entirely different domain.
+#   - ThemeProvider.tsx: wraps children with ThemeContext.Provider using light/dark
+#     themes. Provides the context but not needed to understand consumption.
+
 initial:
   ThemeContext.tsx: |
     import { createContext } from 'react';
@@ -10,27 +28,25 @@ initial:
     export const ThemeContext = createContext<Theme>({ primary: '#000', secondary: '#fff' });
   Button.tsx: |
     console.log('initial');
-  garbage_circuit.ts: |
-    const GARBAGE_JS_060_CIRCUIT_MARKER_A = "circuitbreaker";
-    const GARBAGE_JS_060_BREAKER_MARKER_B = true;
+  AuthContext.tsx: |
+    import { createContext } from 'react';
 
-    class CircuitBreakerGuard {
-        static GARBAGE_JS_060_CIRCUIT_CLASS_C = "guard";
-
-        isOpen(serviceName: string): boolean {
-            return false;
-        }
+    export interface AuthState {
+        isAuthenticated: boolean;
+        userId: string | null;
     }
-  garbage_retry.ts: |
-    const GARBAGE_JS_060_RETRY_MARKER_D = "retry";
-    const GARBAGE_JS_060_BACKOFF_MARKER_E = 3;
 
-    class ExponentialBackoffRetrier {
-        static GARBAGE_JS_060_RETRY_CLASS_F = true;
+    export const AuthContext = createContext<AuthState>({ isAuthenticated: false, userId: null });
+  ThemeProvider.tsx: |
+    import { useState } from 'react';
+    import { ThemeContext, Theme } from './ThemeContext';
 
-        attempt(fn: () => Promise<void>, maxRetries: number): Promise<void> {
-            return fn();
-        }
+    const lightTheme: Theme = { primary: '#007bff', secondary: '#6c757d' };
+    const darkTheme: Theme = { primary: '#375a7f', secondary: '#444' };
+
+    export function ThemeProvider({ children }: { children: React.ReactNode }) {
+        const [theme] = useState<Theme>(lightTheme);
+        return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
     }
 changed:
   ThemeContext.tsx: |
@@ -50,40 +66,46 @@ changed:
         const theme = useContext(ThemeContext);
         return <button style={{ backgroundColor: theme.primary }}>{children}</button>;
     }
-  garbage_circuit.ts: |
-    const GARBAGE_JS_060_CIRCUIT_MARKER_A = "circuitbreaker";
-    const GARBAGE_JS_060_BREAKER_MARKER_B = true;
+  AuthContext.tsx: |
+    import { createContext } from 'react';
 
-    class CircuitBreakerGuard {
-        static GARBAGE_JS_060_CIRCUIT_CLASS_C = "guard";
-
-        isOpen(serviceName: string): boolean {
-            return false;
-        }
+    export interface AuthState {
+        isAuthenticated: boolean;
+        userId: string | null;
     }
-  garbage_retry.ts: |
-    const GARBAGE_JS_060_RETRY_MARKER_D = "retry";
-    const GARBAGE_JS_060_BACKOFF_MARKER_E = 3;
 
-    class ExponentialBackoffRetrier {
-        static GARBAGE_JS_060_RETRY_CLASS_F = true;
+    export const AuthContext = createContext<AuthState>({ isAuthenticated: false, userId: null });
+  ThemeProvider.tsx: |
+    import { useState } from 'react';
+    import { ThemeContext, Theme } from './ThemeContext';
 
-        attempt(fn: () => Promise<void>, maxRetries: number): Promise<void> {
-            return fn();
-        }
+    const lightTheme: Theme = { primary: '#007bff', secondary: '#6c757d' };
+    const darkTheme: Theme = { primary: '#375a7f', secondary: '#444' };
+
+    export function ThemeProvider({ children }: { children: React.ReactNode }) {
+        const [theme] = useState<Theme>(lightTheme);
+        return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
     }
 must_include_files:
-- Button.tsx
-must_include_content:
-- 'function Button({ children }: { children: React.ReactNode }) {'
+  # Q1: ThemeContext.tsx defines the Theme type and context that Button.tsx consumes
+  - ThemeContext.tsx
+must_include_content_from:
+  ThemeContext.tsx:
+    - "interface Theme {"
+    - "primary: string"
 must_not_include:
-- GARBAGE_JS_060_BACKOFF_MARKER_E
-- GARBAGE_JS_060_BREAKER_MARKER_B
-- GARBAGE_JS_060_CIRCUIT_CLASS_C
-- GARBAGE_JS_060_CIRCUIT_MARKER_A
-- GARBAGE_JS_060_RETRY_CLASS_F
-- GARBAGE_JS_060_RETRY_MARKER_D
-- garbage_circuit.ts
-- garbage_retry.ts
+  # AuthContext.tsx: different context, not consumed by Button
+  - AuthState
+  - AuthContext
+  - isAuthenticated
+  # ThemeProvider.tsx: provides the context, not needed to understand consumption
+  - ThemeProvider
+  - lightTheme
+  - darkTheme
+must_not_include_files:
+  - AuthContext.tsx
+  - ThemeProvider.tsx
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

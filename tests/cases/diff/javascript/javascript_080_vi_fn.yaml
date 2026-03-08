@@ -1,42 +1,51 @@
+# Reviewer sees: callback.test.ts uses vi.fn() to mock a callback and
+# verifies processNumbers calls it for each element.
+# Q1: "What does processNumbers do with the callback?"
+#     -> callback.ts: calls callback(n) for each number via forEach.
+#        Test asserts 3 calls with values 1, 2, 3 — matches the impl.
+# Q2: "What is the Callback type signature?"
+#     -> callback.ts: (value: number) => void. The vi.fn() mock
+#        satisfies this signature implicitly.
+#
+# Not needed:
+#   - array-utils.ts: array manipulation (unique, chunk). Same array
+#     domain but processNumbers handles its own iteration.
+#   - callback.types.ts: extended callback types (async, error, progress).
+#     Not imported by callback.ts or the test.
+
 initial:
-  callback.ts: |
+  src/callback.ts: |
     export type Callback = (value: number) => void;
 
     export function processNumbers(numbers: number[], callback: Callback) {
         numbers.forEach(n => callback(n));
     }
-  callback.test.ts: |
-    console.log('initial');
-  garbage_serialization.ts: |
-    const GARBAGE_JS_080_SERIAL_MARKER_A = "serialization";
-    const GARBAGE_JS_080_FORMAT_MARKER_B = true;
-
-    class JsonSerializer {
-        static GARBAGE_JS_080_SERIALIZER_CLASS_C = "serializer";
-
-        serialize(data: unknown): string {
-            return JSON.stringify(data);
-        }
+  src/callback.test.ts: |
+    console.log('placeholder');
+  src/array-utils.ts: |
+    export function unique<T>(items: T[]): T[] {
+        return [...new Set(items)];
     }
-  garbage_migration.ts: |
-    const GARBAGE_JS_080_MIGRATE_MARKER_D = "migration";
-    const GARBAGE_JS_080_VERSION_MARKER_E = 3;
 
-    class SchemaMigrator {
-        static GARBAGE_JS_080_MIGRATOR_CLASS_F = true;
-
-        migrate(version: number): boolean {
-            return version > 0;
+    export function chunk<T>(items: T[], size: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < items.length; i += size) {
+            chunks.push(items.slice(i, i + size));
         }
+        return chunks;
     }
+  src/callback.types.ts: |
+    export type AsyncCallback<T> = (value: T) => Promise<void>;
+    export type ErrorCallback = (error: Error) => void;
+    export type ProgressCallback = (current: number, total: number) => void;
 changed:
-  callback.ts: |
+  src/callback.ts: |
     export type Callback = (value: number) => void;
 
     export function processNumbers(numbers: number[], callback: Callback) {
         numbers.forEach(n => callback(n));
     }
-  callback.test.ts: |
+  src/callback.test.ts: |
     import { describe, it, expect, vi } from 'vitest';
     import { processNumbers } from './callback';
 
@@ -50,41 +59,42 @@ changed:
             expect(callback).toHaveBeenCalledWith(3);
         });
     });
-  garbage_serialization.ts: |
-    const GARBAGE_JS_080_SERIAL_MARKER_A = "serialization";
-    const GARBAGE_JS_080_FORMAT_MARKER_B = true;
-
-    class JsonSerializer {
-        static GARBAGE_JS_080_SERIALIZER_CLASS_C = "serializer";
-
-        serialize(data: unknown): string {
-            return JSON.stringify(data);
-        }
+  src/array-utils.ts: |
+    export function unique<T>(items: T[]): T[] {
+        return [...new Set(items)];
     }
-  garbage_migration.ts: |
-    const GARBAGE_JS_080_MIGRATE_MARKER_D = "migration";
-    const GARBAGE_JS_080_VERSION_MARKER_E = 3;
 
-    class SchemaMigrator {
-        static GARBAGE_JS_080_MIGRATOR_CLASS_F = true;
-
-        migrate(version: number): boolean {
-            return version > 0;
+    export function chunk<T>(items: T[], size: number): T[][] {
+        const chunks: T[][] = [];
+        for (let i = 0; i < items.length; i += size) {
+            chunks.push(items.slice(i, i + size));
         }
+        return chunks;
     }
+  src/callback.types.ts: |
+    export type AsyncCallback<T> = (value: T) => Promise<void>;
+    export type ErrorCallback = (error: Error) => void;
+    export type ProgressCallback = (current: number, total: number) => void;
 must_include_files:
-- callback.test.ts
-must_include_content:
-- import { describe, it, expect, vi } from 'vitest';
-- const callback = vi.fn();
+  # Unchanged file — the module under test. Reviewer needs to see
+  # processNumbers implementation to verify test assertions.
+  - src/callback.ts
+must_include_content_from:
+  src/callback.ts:
+    - "processNumbers"
+    - "forEach"
 must_not_include:
-- GARBAGE_JS_080_FORMAT_MARKER_B
-- GARBAGE_JS_080_MIGRATE_MARKER_D
-- GARBAGE_JS_080_MIGRATOR_CLASS_F
-- GARBAGE_JS_080_SERIALIZER_CLASS_C
-- GARBAGE_JS_080_SERIAL_MARKER_A
-- GARBAGE_JS_080_VERSION_MARKER_E
-- garbage_migration.ts
-- garbage_serialization.ts
+  # array-utils.ts: array utilities not used by processNumbers
+  - unique
+  - chunk
+  # callback.types.ts: extended types not imported
+  - AsyncCallback
+  - ErrorCallback
+  - ProgressCallback
+must_not_include_files:
+  - src/array-utils.ts
+  - src/callback.types.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

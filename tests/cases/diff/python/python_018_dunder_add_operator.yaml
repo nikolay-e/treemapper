@@ -1,3 +1,8 @@
+# Scenario: CheckoutService uses Cart.__add__ to merge carts and accesses Cart totals
+# Changed: checkout.py imports Cart and uses cart1 + cart2, len(cart), cart.subtotal()
+# Reviewer questions: Does merge preserve discounts? Is tax consistent across merged carts?
+# Trap 1: payment_gateway.py — processes payments, shares "checkout/order" vocabulary but independent
+# Trap 2: shipping_calculator.py — calculates shipping, shares "cart" domain but no dep
 initial:
   cart.py: |
     from dataclasses import dataclass, field
@@ -105,42 +110,55 @@ initial:
   checkout.py: |
     def process():
         pass
-  garbage_payment_processor.py: |
-    GARBAGE_PY_PAY_928371 = "payment processing garbage"
-    UNRELATED_PAY_MARKER_182746 = "unused payment gateway"
+  payment_gateway.py: |
+    from typing import Optional
+    from dataclasses import dataclass
+    from decimal import Decimal
+    from datetime import datetime
+    from enum import Enum
 
-    class GarbagePaymentProcessor:
-        GARBAGE_API_KEY_827364 = "sk_garbage_key_12345"
+    class PaymentStatus(Enum):
+        PENDING = "pending"
+        CAPTURED = "captured"
+        REFUNDED = "refunded"
 
-        def garbage_charge(self, amount, card):
-            return f"Garbage charge: {amount}"
+    @dataclass
+    class PaymentResult:
+        transaction_id: str
+        status: PaymentStatus
+        amount: Decimal
 
-        def garbage_refund(self, transaction_id):
-            return f"Garbage refund: {transaction_id}"
+    class PaymentGateway:
+        def __init__(self, api_key: str, sandbox: bool = True):
+            self._api_key = api_key
+            self._sandbox = sandbox
 
-    def garbage_validate_card(card_number):
-        return f"Garbage card: {card_number}"
-  garbage_shipping_calc.py: |
-    GARBAGE_PY_SHIP_736291 = "shipping calculator garbage"
-    UNRELATED_SHIP_MARKER_918273 = "unused shipping rates"
+        def authorize(self, amount: Decimal, card_token: str) -> PaymentResult:
+            return PaymentResult("txn_001", PaymentStatus.PENDING, amount)
 
-    class GarbageShippingCalculator:
-        GARBAGE_RATE_BASE_827163 = 5.99
+        def capture(self, transaction_id: str) -> PaymentResult:
+            return PaymentResult(transaction_id, PaymentStatus.CAPTURED, Decimal("0"))
+  shipping_calculator.py: |
+    from dataclasses import dataclass
+    from decimal import Decimal
+    from enum import Enum
 
-        def garbage_calculate_rate(self, weight, zone):
-            return self.GARBAGE_RATE_BASE_827163 * weight
+    class ShippingMethod(Enum):
+        STANDARD = "standard"
+        EXPRESS = "express"
 
-        def garbage_estimate_delivery(self, zip_code):
-            return "3-5 garbage days"
-  garbage_inventory_sync.py: |
-    GARBAGE_PY_INV_182736 = "inventory sync garbage"
-    UNRELATED_INV_MARKER_736281 = "unused stock levels"
+    @dataclass
+    class ShippingRate:
+        method: ShippingMethod
+        cost: Decimal
+        estimated_days: int
 
-    def garbage_sync_inventory():
-        return "Garbage inventory synced"
-
-    def garbage_check_availability(sku):
-        return f"Garbage availability: {sku}"
+    class ShippingCalculator:
+        def calculate(self, weight_kg: float, method: ShippingMethod = ShippingMethod.STANDARD) -> ShippingRate:
+            base = Decimal("5.99") if method == ShippingMethod.STANDARD else Decimal("12.99")
+            surcharge = Decimal(str(max(0, weight_kg - 5) * 2))
+            days = 5 if method == ShippingMethod.STANDARD else 2
+            return ShippingRate(method=method, cost=base + surcharge, estimated_days=days)
 changed:
   cart.py: |
     from dataclasses import dataclass, field
@@ -282,55 +300,73 @@ changed:
             "tax": str(customer_cart.tax()),
             "total": str(customer_cart.total())
         }
-  garbage_payment_processor.py: |
-    GARBAGE_PY_PAY_928371 = "payment processing garbage"
-    UNRELATED_PAY_MARKER_182746 = "unused payment gateway"
+  payment_gateway.py: |
+    from typing import Optional
+    from dataclasses import dataclass
+    from decimal import Decimal
+    from datetime import datetime
+    from enum import Enum
 
-    class GarbagePaymentProcessor:
-        GARBAGE_API_KEY_827364 = "sk_garbage_key_12345"
+    class PaymentStatus(Enum):
+        PENDING = "pending"
+        CAPTURED = "captured"
+        REFUNDED = "refunded"
 
-        def garbage_charge(self, amount, card):
-            return f"Garbage charge: {amount}"
+    @dataclass
+    class PaymentResult:
+        transaction_id: str
+        status: PaymentStatus
+        amount: Decimal
 
-        def garbage_refund(self, transaction_id):
-            return f"Garbage refund: {transaction_id}"
+    class PaymentGateway:
+        def __init__(self, api_key: str, sandbox: bool = True):
+            self._api_key = api_key
+            self._sandbox = sandbox
 
-    def garbage_validate_card(card_number):
-        return f"Garbage card: {card_number}"
-  garbage_shipping_calc.py: |
-    GARBAGE_PY_SHIP_736291 = "shipping calculator garbage"
-    UNRELATED_SHIP_MARKER_918273 = "unused shipping rates"
+        def authorize(self, amount: Decimal, card_token: str) -> PaymentResult:
+            return PaymentResult("txn_001", PaymentStatus.PENDING, amount)
 
-    class GarbageShippingCalculator:
-        GARBAGE_RATE_BASE_827163 = 5.99
+        def capture(self, transaction_id: str) -> PaymentResult:
+            return PaymentResult(transaction_id, PaymentStatus.CAPTURED, Decimal("0"))
+  shipping_calculator.py: |
+    from dataclasses import dataclass
+    from decimal import Decimal
+    from enum import Enum
 
-        def garbage_calculate_rate(self, weight, zone):
-            return self.GARBAGE_RATE_BASE_827163 * weight
+    class ShippingMethod(Enum):
+        STANDARD = "standard"
+        EXPRESS = "express"
 
-        def garbage_estimate_delivery(self, zip_code):
-            return "3-5 garbage days"
-  garbage_inventory_sync.py: |
-    GARBAGE_PY_INV_182736 = "inventory sync garbage"
-    UNRELATED_INV_MARKER_736281 = "unused stock levels"
+    @dataclass
+    class ShippingRate:
+        method: ShippingMethod
+        cost: Decimal
+        estimated_days: int
 
-    def garbage_sync_inventory():
-        return "Garbage inventory synced"
-
-    def garbage_check_availability(sku):
-        return f"Garbage availability: {sku}"
+    class ShippingCalculator:
+        def calculate(self, weight_kg: float, method: ShippingMethod = ShippingMethod.STANDARD) -> ShippingRate:
+            base = Decimal("5.99") if method == ShippingMethod.STANDARD else Decimal("12.99")
+            surcharge = Decimal(str(max(0, weight_kg - 5) * 2))
+            days = 5 if method == ShippingMethod.STANDARD else 2
+            return ShippingRate(method=method, cost=base + surcharge, estimated_days=days)
 must_include_files:
+- cart.py
 - checkout.py
-must_include_content:
-- from cart import Cart, CartItem, Discount, DiscountType
-- 'def __init__(self):'
+must_include_content_from:
+  checkout.py:
+  - 'from cart import Cart, CartItem, Discount, DiscountType'
+  - 'def __init__(self):'
 must_not_include:
-- GARBAGE_API_KEY_827364
-- GARBAGE_PY_INV_182736
-- GARBAGE_PY_PAY_928371
-- GARBAGE_PY_SHIP_736291
-- GARBAGE_RATE_BASE_827163
-- garbage_inventory_sync.py
-- garbage_payment_processor.py
-- garbage_shipping_calc.py
+- PaymentGateway
+- PaymentResult
+- PaymentStatus
+- ShippingCalculator
+- ShippingRate
+- ShippingMethod
+must_not_include_files:
+- payment_gateway.py
+- shipping_calculator.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

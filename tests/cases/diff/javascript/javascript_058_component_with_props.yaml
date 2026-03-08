@@ -1,3 +1,20 @@
+# Scenario: App.tsx is rewritten to import Card from Card.tsx and render it
+# with title="Welcome" and children content.
+#
+# Diff: App.tsx adds `import { Card } from './Card'` and renders
+# `<Card title="Welcome"><p>Hello World</p></Card>`.
+#
+# Reviewer questions:
+#   Q1: "What props does Card accept?"
+#       -> Card.tsx (UNCHANGED) defines CardProps with title: string and
+#          children: React.ReactNode. Reviewer verifies App passes valid props.
+#
+# Not needed:
+#   - Header.tsx: another UI component in the same directory (HeaderProps with
+#     title, subtitle). Sibling component not used by App.tsx.
+#   - Card.styles.ts: CSS-in-JS styling for Card (container, title styles).
+#     Visual concern, not related to the props interface.
+
 initial:
   Card.tsx: |
     interface CardProps {
@@ -15,28 +32,25 @@ initial:
     }
   App.tsx: |
     console.log('initial');
-  garbage_webhook.ts: |
-    const GARBAGE_JS_058_WEBHOOK_MARKER_A = "webhook";
-    const GARBAGE_JS_058_ENDPOINT_MARKER_B = true;
-
-    class WebhookDispatcher {
-        static GARBAGE_JS_058_WEBHOOK_CLASS_C = "dispatcher";
-
-        deliver(url: string, payload: object): boolean {
-            return true;
-        }
+  Header.tsx: |
+    interface HeaderProps {
+        title: string;
+        subtitle?: string;
     }
-  garbage_templating.ts: |
-    const GARBAGE_JS_058_TEMPLATE_MARKER_D = "templating";
-    const GARBAGE_JS_058_RENDER_MARKER_E = 64;
 
-    class TemplateRenderer {
-        static GARBAGE_JS_058_TEMPLATE_CLASS_F = true;
-
-        render(template: string, context: Record<string, string>): string {
-            return template;
-        }
+    export function Header({ title, subtitle }: HeaderProps) {
+        return (
+            <header>
+                <h1>{title}</h1>
+                {subtitle && <p>{subtitle}</p>}
+            </header>
+        );
     }
+  Card.styles.ts: |
+    export const cardStyles = {
+        container: { border: '1px solid #ddd', borderRadius: '8px', padding: '16px' },
+        title: { fontSize: '18px', fontWeight: 'bold' as const, marginBottom: '8px' },
+    };
 changed:
   Card.tsx: |
     interface CardProps {
@@ -62,41 +76,43 @@ changed:
             </Card>
         );
     }
-  garbage_webhook.ts: |
-    const GARBAGE_JS_058_WEBHOOK_MARKER_A = "webhook";
-    const GARBAGE_JS_058_ENDPOINT_MARKER_B = true;
-
-    class WebhookDispatcher {
-        static GARBAGE_JS_058_WEBHOOK_CLASS_C = "dispatcher";
-
-        deliver(url: string, payload: object): boolean {
-            return true;
-        }
+  Header.tsx: |
+    interface HeaderProps {
+        title: string;
+        subtitle?: string;
     }
-  garbage_templating.ts: |
-    const GARBAGE_JS_058_TEMPLATE_MARKER_D = "templating";
-    const GARBAGE_JS_058_RENDER_MARKER_E = 64;
 
-    class TemplateRenderer {
-        static GARBAGE_JS_058_TEMPLATE_CLASS_F = true;
-
-        render(template: string, context: Record<string, string>): string {
-            return template;
-        }
+    export function Header({ title, subtitle }: HeaderProps) {
+        return (
+            <header>
+                <h1>{title}</h1>
+                {subtitle && <p>{subtitle}</p>}
+            </header>
+        );
     }
+  Card.styles.ts: |
+    export const cardStyles = {
+        container: { border: '1px solid #ddd', borderRadius: '8px', padding: '16px' },
+        title: { fontSize: '18px', fontWeight: 'bold' as const, marginBottom: '8px' },
+    };
 must_include_files:
-- App.tsx
-must_include_content:
-- import { Card } from './Card';
-- function App() {
+  # Q1: Card.tsx defines the props interface that App.tsx must satisfy
+  - Card.tsx
+must_include_content_from:
+  Card.tsx:
+    - "interface CardProps {"
+    - "title: string"
 must_not_include:
-- GARBAGE_JS_058_ENDPOINT_MARKER_B
-- GARBAGE_JS_058_RENDER_MARKER_E
-- GARBAGE_JS_058_TEMPLATE_CLASS_F
-- GARBAGE_JS_058_TEMPLATE_MARKER_D
-- GARBAGE_JS_058_WEBHOOK_CLASS_C
-- GARBAGE_JS_058_WEBHOOK_MARKER_A
-- garbage_templating.ts
-- garbage_webhook.ts
+  # Header.tsx: sibling component not used by App.tsx
+  - HeaderProps
+  - subtitle
+  # Card.styles.ts: styling, not related to prop interface
+  - cardStyles
+  - borderRadius
+must_not_include_files:
+  - Header.tsx
+  - Card.styles.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

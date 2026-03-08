@@ -1,3 +1,12 @@
+# Scenario: Adding encryption (KMS), DynamoDB locking to an existing S3 backend
+#   configuration for state file security.
+# Reviewer questions:
+#   1. Does the KMS key referenced exist? (kms.tf)
+#   2. Does the DynamoDB lock table exist? (dynamodb.tf)
+# Traps:
+#   - envs/staging/backend.tf: staging backend with its own encryption (same pattern, different env)
+#   - logging/cloudwatch.tf: CloudWatch log group (unrelated to state encryption)
+
 initial:
   backend.tf: |
     terraform {
@@ -7,12 +16,29 @@ initial:
         region = "us-east-1"
       }
     }
+  kms.tf: |
+    resource "aws_kms_key" "state_encryption" {
+      description             = "Terraform state encryption"
+      deletion_window_in_days = 10
+      enable_key_rotation     = true
+    }
 
-  # --- Tricky garbage: sibling .tf with backend block for different environment ---
-  garbage_tf_059_backend_staging.tf: |
-    GARBAGE_TF_059_BACKEND_STAGING_A = "staging_state"
-    GARBAGE_TF_059_STATE_BUCKET_B = "staging-tf-state"
+    resource "aws_kms_alias" "state_encryption" {
+      name          = "alias/terraform-state-key"
+      target_key_id = aws_kms_key.state_encryption.key_id
+    }
+  dynamodb.tf: |
+    resource "aws_dynamodb_table" "state_lock" {
+      name         = "terraform-state-lock"
+      billing_mode = "PAY_PER_REQUEST"
+      hash_key     = "LockID"
 
+      attribute {
+        name = "LockID"
+        type = "S"
+      }
+    }
+  envs/staging/backend.tf: |
     terraform {
       backend "s3" {
         bucket         = "staging-terraform-state"
@@ -22,12 +48,7 @@ initial:
         dynamodb_table = "staging-state-lock"
       }
     }
-
-  # --- Plain garbage ---
-  garbage_tf_059_logs.tf: |
-    GARBAGE_TF_059_LOG_GROUP_C = "/app/production"
-    GARBAGE_TF_059_RETENTION_D = 30
-
+  logging/cloudwatch.tf: |
     resource "aws_cloudwatch_log_group" "app" {
       name              = "/app/production"
       retention_in_days = 30
@@ -46,50 +67,31 @@ changed:
       }
     }
 
-  garbage_tf_059_backend_staging.tf: |
-    GARBAGE_TF_059_BACKEND_STAGING_A = "staging_state"
-    GARBAGE_TF_059_STATE_BUCKET_B = "staging-tf-state"
-
-    terraform {
-      backend "s3" {
-        bucket         = "staging-terraform-state"
-        key            = "staging/terraform.tfstate"
-        region         = "eu-west-1"
-        encrypt        = true
-        dynamodb_table = "staging-state-lock"
-      }
-    }
-
-  garbage_tf_059_logs.tf: |
-    GARBAGE_TF_059_LOG_GROUP_C = "/app/production"
-    GARBAGE_TF_059_RETENTION_D = 30
-
-    resource "aws_cloudwatch_log_group" "app" {
-      name              = "/app/production"
-      retention_in_days = 30
-    }
-
 must_include_files:
-- backend.tf
+  - backend.tf
+  - dynamodb.tf
 
 must_include_content_from:
   backend.tf:
     - encrypt        = true
     - kms_key_id     = "arn:aws:kms:us-east-1:123456789:key/abc123"
     - dynamodb_table = "terraform-state-lock"
-    - bucket         = "my-terraform-state"
+  dynamodb.tf:
+    - resource "aws_dynamodb_table" "state_lock" {
+    - name         = "terraform-state-lock"
 
 must_not_include:
-- GARBAGE_TF_059_BACKEND_STAGING_A
-- GARBAGE_TF_059_STATE_BUCKET_B
-- GARBAGE_TF_059_LOG_GROUP_C
-- GARBAGE_TF_059_RETENTION_D
+  # Staging backend - same encryption pattern but for staging environment
+  - staging-terraform-state
+  - staging-state-lock
+  # CloudWatch - logging config unrelated to state encryption
+  - retention_in_days = 30
 
 must_not_include_files:
-- garbage_tf_059_backend_staging.tf
-- garbage_tf_059_logs.tf
+  - envs/staging/backend.tf
+  - logging/cloudwatch.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

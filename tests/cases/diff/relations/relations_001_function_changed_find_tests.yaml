@@ -1,3 +1,21 @@
+# Test: calculator.add() changed to use float conversion — test file must be pulled
+#
+# Scenario: calculator.py changes add() from simple `a + b` to `float(a) + float(b)`.
+# tests/test_calculator.py (UNCHANGED) imports and tests add(), so a reviewer needs
+# to see the test expectations to assess if the type change breaks anything.
+#
+# Reviewer questions:
+#   Q1: "Will the existing test_add assertions still pass with float return?"
+#       -> tests/test_calculator.py (UNCHANGED) imports add and asserts add(1,2)==3
+#   Q2: "Are there other callers of add() that depend on integer return type?"
+#       -> test_calculator.py is the only importer.
+#
+# Trap files (plausible but unrelated):
+#   - math_utils.py: helper math functions — same domain (arithmetic) but
+#     calculator.py doesn't import or use it.
+#   - conversion_helpers.py: type conversion utilities — similar to float()
+#     usage but no dependency from calculator.py.
+
 initial:
   calculator.py: |
     def add(a, b):
@@ -14,24 +32,37 @@ initial:
 
     def test_subtract():
         assert subtract(5, 3) == 2
-  garbage_analytics.py: |
-    GARBAGE_REL_001_ANALYTICS_MARKER_A = "analytics"
-    GARBAGE_REL_001_TRACKER_MARKER_B = True
+  math_utils.py: |
+    import math
 
-    class AnalyticsTracker:
-        GARBAGE_REL_001_CLASS_MARKER_C = "tracker"
+    def clamp(value, min_val, max_val):
+        return max(min_val, min(value, max_val))
 
-        def track(self, event: str) -> None:
-            pass
-  garbage_cache.py: |
-    GARBAGE_REL_001_CACHE_MARKER_D = "cache"
-    GARBAGE_REL_001_TTL_MARKER_E = 3600
+    def round_to_precision(value, precision=2):
+        factor = 10 ** precision
+        return math.floor(value * factor + 0.5) / factor
 
-    class CacheManager:
-        GARBAGE_REL_001_MANAGER_CLASS_F = True
+    def percentage(part, whole):
+        if whole == 0:
+            return 0.0
+        return (part / whole) * 100.0
+  conversion_helpers.py: |
+    def to_int_safe(value, default=0):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
 
-        def get(self, key: str) -> str:
-            return ""
+    def to_float_safe(value, default=0.0):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+
+    def to_bool(value):
+        if isinstance(value, str):
+            return value.lower() in ('true', '1', 'yes')
+        return bool(value)
 changed:
   calculator.py: |
     def add(a, b):
@@ -48,41 +79,60 @@ changed:
 
     def test_subtract():
         assert subtract(5, 3) == 2
-  garbage_analytics.py: |
-    GARBAGE_REL_001_ANALYTICS_MARKER_A = "analytics"
-    GARBAGE_REL_001_TRACKER_MARKER_B = True
+  math_utils.py: |
+    import math
 
-    class AnalyticsTracker:
-        GARBAGE_REL_001_CLASS_MARKER_C = "tracker"
+    def clamp(value, min_val, max_val):
+        return max(min_val, min(value, max_val))
 
-        def track(self, event: str) -> None:
-            pass
-  garbage_cache.py: |
-    GARBAGE_REL_001_CACHE_MARKER_D = "cache"
-    GARBAGE_REL_001_TTL_MARKER_E = 3600
+    def round_to_precision(value, precision=2):
+        factor = 10 ** precision
+        return math.floor(value * factor + 0.5) / factor
 
-    class CacheManager:
-        GARBAGE_REL_001_MANAGER_CLASS_F = True
+    def percentage(part, whole):
+        if whole == 0:
+            return 0.0
+        return (part / whole) * 100.0
+  conversion_helpers.py: |
+    def to_int_safe(value, default=0):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
 
-        def get(self, key: str) -> str:
-            return ""
+    def to_float_safe(value, default=0.0):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+
+    def to_bool(value):
+        if isinstance(value, str):
+            return value.lower() in ('true', '1', 'yes')
+        return bool(value)
 must_include_files:
-- calculator.py
-- tests/test_calculator.py
-must_include_content:
-- |
-  def add(a, b):
-      return float(a) + float(b)
+  - calculator.py
+  # Q1: test imports add — reviewer must see if float return breaks assertions
+  - tests/test_calculator.py
+must_include_content_from:
+  calculator.py:
+    - "return float(a) + float(b)"
+  tests/test_calculator.py:
+    - "from calculator import add, subtract"
+    - "assert add(1, 2) == 3"
 must_not_include:
-- GARBAGE_REL_001_ANALYTICS_MARKER_A
-- GARBAGE_REL_001_TRACKER_MARKER_B
-- GARBAGE_REL_001_CLASS_MARKER_C
-- GARBAGE_REL_001_CACHE_MARKER_D
-- GARBAGE_REL_001_TTL_MARKER_E
-- GARBAGE_REL_001_MANAGER_CLASS_F
-- AnalyticsTracker
-- CacheManager
-- garbage_analytics.py
-- garbage_cache.py
+  # math_utils.py: unrelated math helpers
+  - clamp
+  - round_to_precision
+  - percentage
+  # conversion_helpers.py: similar float conversion but no dependency
+  - to_int_safe
+  - to_float_safe
+  - to_bool
+must_not_include_files:
+  - math_utils.py
+  - conversion_helpers.py
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,22 @@
+# Scenario: ArgoCD values.yaml for app-a gets a new image tag (main-def5678),
+#   and app-b gets a replica count bump from 2 to 3. Both are small YAML
+#   config changes that should NOT pull in unrelated infrastructure files.
+#
+# Reviewer questions:
+#   - Is the new image tag format correct (main-<sha7>)?
+#   - Does increasing replicaCount to 3 require HPA adjustment?
+#
+# Trap files:
+#   - ansible/scripts/consistency_checker.py: large infrastructure validation
+#     script with permission/checksum/service checks, uses "config" and
+#     "service" vocabulary but has no ArgoCD or Helm dependency
+#   - scripts/backup.sh: database and config backup script with pg_dump,
+#     mentions "config" and "database" but is operational tooling
+#   - scripts/restore.sh: disaster recovery script with database restore,
+#     uses "service" and "config" vocabulary but is independent
+#   - docs/runbook.md: operations runbook with incident response procedures,
+#     mentions "deployment" and "scaling" but is documentation only
+
 initial:
   argocd/apps/app-a/values.yaml: |
     replicaCount: 2
@@ -85,26 +104,20 @@ initial:
     from pathlib import Path
     from typing import Dict, List, Optional, Tuple
 
-    GARBAGE_REG005_CHECKER_CONFIG = "/etc/consistency/config.json"
-    GARBAGE_REG005_CHECKER_VERSION = "2.4.1"
-
     class ConsistencyChecker:
-        def __init__(self, base_path: str, config_path: str = GARBAGE_REG005_CHECKER_CONFIG):
+        def __init__(self, base_path: str, config_path: str = "/etc/consistency/config.json"):
             self.base_path = Path(base_path)
             self.config_path = Path(config_path)
-            self.GARBAGE_REG005_CHECKER_INIT = True
             self.errors: List[Dict] = []
             self.warnings: List[Dict] = []
 
         def load_config(self) -> Dict:
-            GARBAGE_REG005_CHECKER_LOAD = "loading"
             if not self.config_path.exists():
                 return {"rules": [], "ignore_patterns": []}
             with open(self.config_path) as f:
                 return json.load(f)
 
         def check_file_permissions(self, target_dir: str) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_PERMS = "checking_permissions"
             results = []
             target = self.base_path / target_dir
             for filepath in target.rglob("*"):
@@ -119,7 +132,6 @@ initial:
             return results
 
         def check_file_checksums(self, manifest_path: str) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_CHECKSUMS = "verifying_checksums"
             mismatches = []
             manifest = self.base_path / manifest_path
             if not manifest.exists():
@@ -141,7 +153,6 @@ initial:
             return mismatches
 
         def check_service_configs(self, services: List[str]) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_SERVICES = "checking_services"
             issues = []
             for service in services:
                 config_path = self.base_path / "etc" / service / "config.yml"
@@ -158,7 +169,6 @@ initial:
             return issues
 
         def check_disk_usage(self, threshold_percent: int = 85) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_DISK = "checking_disk"
             alerts = []
             import shutil
             for mount in ["/", "/data", "/var/log"]:
@@ -176,7 +186,6 @@ initial:
             return alerts
 
         def check_log_rotation(self, log_dir: str = "/var/log") -> List[Dict]:
-            GARBAGE_REG005_CHECKER_LOGS = "checking_logs"
             issues = []
             log_path = Path(log_dir)
             for logfile in log_path.glob("*.log"):
@@ -190,7 +199,6 @@ initial:
             return issues
 
         def check_certificate_expiry(self, cert_dir: str) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_CERTS = "checking_certs"
             import subprocess
             expiring = []
             cert_path = Path(cert_dir)
@@ -205,32 +213,7 @@ initial:
                     pass
             return expiring
 
-        def check_dns_resolution(self, hostnames: List[str]) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_DNS = "checking_dns"
-            import socket
-            failures = []
-            for hostname in hostnames:
-                try:
-                    socket.gethostbyname(hostname)
-                except socket.gaierror:
-                    failures.append({"hostname": hostname, "status": "unresolvable"})
-            return failures
-
-        def check_port_availability(self, ports: List[int], host: str = "localhost") -> List[Dict]:
-            GARBAGE_REG005_CHECKER_PORTS = "checking_ports"
-            import socket
-            unavailable = []
-            for port in ports:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(2)
-                result = sock.connect_ex((host, port))
-                if result != 0:
-                    unavailable.append({"port": port, "host": host, "status": "closed"})
-                sock.close()
-            return unavailable
-
         def generate_report(self) -> Dict:
-            GARBAGE_REG005_CHECKER_REPORT = "generating_report"
             return {
                 "errors": self.errors,
                 "warnings": self.warnings,
@@ -240,7 +223,6 @@ initial:
             }
 
         def run_all_checks(self, config: Optional[Dict] = None) -> Dict:
-            GARBAGE_REG005_CHECKER_RUNALL = "running_all_checks"
             if config is None:
                 config = self.load_config()
             self.errors.extend(self.check_file_permissions("etc"))
@@ -254,12 +236,10 @@ initial:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    GARBAGE_REG005_BACKUP_TAG="backup-v3"
-    GARBAGE_REG005_BACKUP_RETENTION=30
-
     BACKUP_DIR="/opt/backups"
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     BACKUP_NAME="full_backup_${TIMESTAMP}"
+    RETENTION_DAYS=30
 
     log() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
@@ -268,7 +248,6 @@ initial:
     backup_database() {
         local db_name=$1
         local output_file="${BACKUP_DIR}/db/${db_name}_${TIMESTAMP}.sql.gz"
-        GARBAGE_REG005_BACKUP_DB="dumping_database"
         log "Backing up database: ${db_name}"
         pg_dump -h localhost -U postgres "${db_name}" | gzip > "${output_file}"
         log "Database backup complete: ${output_file}"
@@ -276,7 +255,6 @@ initial:
 
     backup_configs() {
         local config_archive="${BACKUP_DIR}/configs/configs_${TIMESTAMP}.tar.gz"
-        GARBAGE_REG005_BACKUP_CONFIGS="archiving_configs"
         log "Backing up configuration files"
         tar czf "${config_archive}" \
             /etc/nginx/ \
@@ -288,16 +266,14 @@ initial:
 
     backup_certificates() {
         local cert_archive="${BACKUP_DIR}/certs/certs_${TIMESTAMP}.tar.gz"
-        GARBAGE_REG005_BACKUP_CERTS="archiving_certs"
         log "Backing up certificates"
         tar czf "${cert_archive}" /etc/letsencrypt/ 2>/dev/null || true
         log "Certificate backup complete: ${cert_archive}"
     }
 
     cleanup_old_backups() {
-        GARBAGE_REG005_BACKUP_CLEANUP="cleaning_up"
-        log "Cleaning up backups older than ${GARBAGE_REG005_BACKUP_RETENTION} days"
-        find "${BACKUP_DIR}" -type f -mtime "+${GARBAGE_REG005_BACKUP_RETENTION}" -delete
+        log "Cleaning up backups older than ${RETENTION_DAYS} days"
+        find "${BACKUP_DIR}" -type f -mtime "+${RETENTION_DAYS}" -delete
     }
 
     main() {
@@ -318,9 +294,6 @@ initial:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    GARBAGE_REG005_RESTORE_TAG="restore-v2"
-    GARBAGE_REG005_RESTORE_VERIFY=true
-
     BACKUP_DIR="/opt/backups"
 
     log() {
@@ -330,7 +303,6 @@ initial:
     restore_database() {
         local backup_file=$1
         local db_name=$2
-        GARBAGE_REG005_RESTORE_DB="restoring_database"
         log "Restoring database ${db_name} from ${backup_file}"
 
         psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS ${db_name};"
@@ -342,7 +314,6 @@ initial:
 
     restore_configs() {
         local archive=$1
-        GARBAGE_REG005_RESTORE_CONFIGS="restoring_configs"
         log "Restoring configuration from ${archive}"
         tar xzf "${archive}" -C /
         systemctl daemon-reload
@@ -350,7 +321,6 @@ initial:
     }
 
     verify_restore() {
-        GARBAGE_REG005_RESTORE_CHECK="verifying"
         log "Verifying restored services"
         for service in nginx app-backend app-worker; do
             if systemctl is-active --quiet "${service}"; then
@@ -363,7 +333,6 @@ initial:
     }
 
     list_available_backups() {
-        GARBAGE_REG005_RESTORE_LIST="listing"
         log "Available backups:"
         ls -la "${BACKUP_DIR}"/db/*.sql.gz 2>/dev/null || echo "  No database backups"
         ls -la "${BACKUP_DIR}"/configs/*.tar.gz 2>/dev/null || echo "  No config backups"
@@ -394,11 +363,7 @@ initial:
   docs/runbook.md: |
     # Operations Runbook
 
-    GARBAGE_REG005_RUNBOOK_HEADER
-
     ## Incident Response
-
-    GARBAGE_REG005_RUNBOOK_INCIDENT
 
     ### Severity Levels
 
@@ -411,8 +376,6 @@ initial:
 
     ## Common Procedures
 
-    GARBAGE_REG005_RUNBOOK_PROCEDURES
-
     ### Database Failover
 
     1. Verify primary is down: `pg_isready -h primary.db.local`
@@ -421,15 +384,11 @@ initial:
     4. Verify connections: `psql -h db.local -c "SELECT 1"`
     5. Notify team in #incidents channel
 
-    GARBAGE_REG005_RUNBOOK_FAILOVER
-
     ### Scaling Procedures
 
     - Horizontal: `kubectl scale deployment/app --replicas=N`
     - Vertical: Update resource limits in values.yaml, apply via ArgoCD
     - Database: Contact DBA team for read replica provisioning
-
-    GARBAGE_REG005_RUNBOOK_SCALING
 
     ### Certificate Renewal
 
@@ -440,15 +399,12 @@ initial:
     kubectl apply -f certificate.yaml
     ```
 
-    GARBAGE_REG005_RUNBOOK_CERTS
-
     ## Monitoring
 
     - Grafana: https://grafana.internal/dashboards
     - Prometheus: https://prometheus.internal/alerts
     - Logs: `kubectl logs -f deployment/app -n production`
 
-    GARBAGE_REG005_RUNBOOK_MONITORING
 changed:
   argocd/apps/app-a/values.yaml: |
     replicaCount: 2
@@ -536,26 +492,20 @@ changed:
     from pathlib import Path
     from typing import Dict, List, Optional, Tuple
 
-    GARBAGE_REG005_CHECKER_CONFIG = "/etc/consistency/config.json"
-    GARBAGE_REG005_CHECKER_VERSION = "2.4.1"
-
     class ConsistencyChecker:
-        def __init__(self, base_path: str, config_path: str = GARBAGE_REG005_CHECKER_CONFIG):
+        def __init__(self, base_path: str, config_path: str = "/etc/consistency/config.json"):
             self.base_path = Path(base_path)
             self.config_path = Path(config_path)
-            self.GARBAGE_REG005_CHECKER_INIT = True
             self.errors: List[Dict] = []
             self.warnings: List[Dict] = []
 
         def load_config(self) -> Dict:
-            GARBAGE_REG005_CHECKER_LOAD = "loading"
             if not self.config_path.exists():
                 return {"rules": [], "ignore_patterns": []}
             with open(self.config_path) as f:
                 return json.load(f)
 
         def check_file_permissions(self, target_dir: str) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_PERMS = "checking_permissions"
             results = []
             target = self.base_path / target_dir
             for filepath in target.rglob("*"):
@@ -570,7 +520,6 @@ changed:
             return results
 
         def check_file_checksums(self, manifest_path: str) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_CHECKSUMS = "verifying_checksums"
             mismatches = []
             manifest = self.base_path / manifest_path
             if not manifest.exists():
@@ -592,7 +541,6 @@ changed:
             return mismatches
 
         def check_service_configs(self, services: List[str]) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_SERVICES = "checking_services"
             issues = []
             for service in services:
                 config_path = self.base_path / "etc" / service / "config.yml"
@@ -609,7 +557,6 @@ changed:
             return issues
 
         def check_disk_usage(self, threshold_percent: int = 85) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_DISK = "checking_disk"
             alerts = []
             import shutil
             for mount in ["/", "/data", "/var/log"]:
@@ -627,7 +574,6 @@ changed:
             return alerts
 
         def check_log_rotation(self, log_dir: str = "/var/log") -> List[Dict]:
-            GARBAGE_REG005_CHECKER_LOGS = "checking_logs"
             issues = []
             log_path = Path(log_dir)
             for logfile in log_path.glob("*.log"):
@@ -641,7 +587,6 @@ changed:
             return issues
 
         def check_certificate_expiry(self, cert_dir: str) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_CERTS = "checking_certs"
             import subprocess
             expiring = []
             cert_path = Path(cert_dir)
@@ -656,32 +601,7 @@ changed:
                     pass
             return expiring
 
-        def check_dns_resolution(self, hostnames: List[str]) -> List[Dict]:
-            GARBAGE_REG005_CHECKER_DNS = "checking_dns"
-            import socket
-            failures = []
-            for hostname in hostnames:
-                try:
-                    socket.gethostbyname(hostname)
-                except socket.gaierror:
-                    failures.append({"hostname": hostname, "status": "unresolvable"})
-            return failures
-
-        def check_port_availability(self, ports: List[int], host: str = "localhost") -> List[Dict]:
-            GARBAGE_REG005_CHECKER_PORTS = "checking_ports"
-            import socket
-            unavailable = []
-            for port in ports:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(2)
-                result = sock.connect_ex((host, port))
-                if result != 0:
-                    unavailable.append({"port": port, "host": host, "status": "closed"})
-                sock.close()
-            return unavailable
-
         def generate_report(self) -> Dict:
-            GARBAGE_REG005_CHECKER_REPORT = "generating_report"
             return {
                 "errors": self.errors,
                 "warnings": self.warnings,
@@ -691,7 +611,6 @@ changed:
             }
 
         def run_all_checks(self, config: Optional[Dict] = None) -> Dict:
-            GARBAGE_REG005_CHECKER_RUNALL = "running_all_checks"
             if config is None:
                 config = self.load_config()
             self.errors.extend(self.check_file_permissions("etc"))
@@ -705,12 +624,10 @@ changed:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    GARBAGE_REG005_BACKUP_TAG="backup-v3"
-    GARBAGE_REG005_BACKUP_RETENTION=30
-
     BACKUP_DIR="/opt/backups"
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
     BACKUP_NAME="full_backup_${TIMESTAMP}"
+    RETENTION_DAYS=30
 
     log() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
@@ -719,7 +636,6 @@ changed:
     backup_database() {
         local db_name=$1
         local output_file="${BACKUP_DIR}/db/${db_name}_${TIMESTAMP}.sql.gz"
-        GARBAGE_REG005_BACKUP_DB="dumping_database"
         log "Backing up database: ${db_name}"
         pg_dump -h localhost -U postgres "${db_name}" | gzip > "${output_file}"
         log "Database backup complete: ${output_file}"
@@ -727,7 +643,6 @@ changed:
 
     backup_configs() {
         local config_archive="${BACKUP_DIR}/configs/configs_${TIMESTAMP}.tar.gz"
-        GARBAGE_REG005_BACKUP_CONFIGS="archiving_configs"
         log "Backing up configuration files"
         tar czf "${config_archive}" \
             /etc/nginx/ \
@@ -739,16 +654,14 @@ changed:
 
     backup_certificates() {
         local cert_archive="${BACKUP_DIR}/certs/certs_${TIMESTAMP}.tar.gz"
-        GARBAGE_REG005_BACKUP_CERTS="archiving_certs"
         log "Backing up certificates"
         tar czf "${cert_archive}" /etc/letsencrypt/ 2>/dev/null || true
         log "Certificate backup complete: ${cert_archive}"
     }
 
     cleanup_old_backups() {
-        GARBAGE_REG005_BACKUP_CLEANUP="cleaning_up"
-        log "Cleaning up backups older than ${GARBAGE_REG005_BACKUP_RETENTION} days"
-        find "${BACKUP_DIR}" -type f -mtime "+${GARBAGE_REG005_BACKUP_RETENTION}" -delete
+        log "Cleaning up backups older than ${RETENTION_DAYS} days"
+        find "${BACKUP_DIR}" -type f -mtime "+${RETENTION_DAYS}" -delete
     }
 
     main() {
@@ -769,9 +682,6 @@ changed:
     #!/usr/bin/env bash
     set -euo pipefail
 
-    GARBAGE_REG005_RESTORE_TAG="restore-v2"
-    GARBAGE_REG005_RESTORE_VERIFY=true
-
     BACKUP_DIR="/opt/backups"
 
     log() {
@@ -781,7 +691,6 @@ changed:
     restore_database() {
         local backup_file=$1
         local db_name=$2
-        GARBAGE_REG005_RESTORE_DB="restoring_database"
         log "Restoring database ${db_name} from ${backup_file}"
 
         psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS ${db_name};"
@@ -793,7 +702,6 @@ changed:
 
     restore_configs() {
         local archive=$1
-        GARBAGE_REG005_RESTORE_CONFIGS="restoring_configs"
         log "Restoring configuration from ${archive}"
         tar xzf "${archive}" -C /
         systemctl daemon-reload
@@ -801,7 +709,6 @@ changed:
     }
 
     verify_restore() {
-        GARBAGE_REG005_RESTORE_CHECK="verifying"
         log "Verifying restored services"
         for service in nginx app-backend app-worker; do
             if systemctl is-active --quiet "${service}"; then
@@ -814,7 +721,6 @@ changed:
     }
 
     list_available_backups() {
-        GARBAGE_REG005_RESTORE_LIST="listing"
         log "Available backups:"
         ls -la "${BACKUP_DIR}"/db/*.sql.gz 2>/dev/null || echo "  No database backups"
         ls -la "${BACKUP_DIR}"/configs/*.tar.gz 2>/dev/null || echo "  No config backups"
@@ -845,11 +751,7 @@ changed:
   docs/runbook.md: |
     # Operations Runbook
 
-    GARBAGE_REG005_RUNBOOK_HEADER
-
     ## Incident Response
-
-    GARBAGE_REG005_RUNBOOK_INCIDENT
 
     ### Severity Levels
 
@@ -862,8 +764,6 @@ changed:
 
     ## Common Procedures
 
-    GARBAGE_REG005_RUNBOOK_PROCEDURES
-
     ### Database Failover
 
     1. Verify primary is down: `pg_isready -h primary.db.local`
@@ -872,15 +772,11 @@ changed:
     4. Verify connections: `psql -h db.local -c "SELECT 1"`
     5. Notify team in #incidents channel
 
-    GARBAGE_REG005_RUNBOOK_FAILOVER
-
     ### Scaling Procedures
 
     - Horizontal: `kubectl scale deployment/app --replicas=N`
     - Vertical: Update resource limits in values.yaml, apply via ArgoCD
     - Database: Contact DBA team for read replica provisioning
-
-    GARBAGE_REG005_RUNBOOK_SCALING
 
     ### Certificate Renewal
 
@@ -891,54 +787,47 @@ changed:
     kubectl apply -f certificate.yaml
     ```
 
-    GARBAGE_REG005_RUNBOOK_CERTS
-
     ## Monitoring
 
     - Grafana: https://grafana.internal/dashboards
     - Prometheus: https://prometheus.internal/alerts
     - Logs: `kubectl logs -f deployment/app -n production`
 
-    GARBAGE_REG005_RUNBOOK_MONITORING
 must_include_files:
-- argocd/apps/app-a/values.yaml
-- argocd/apps/app-b/values.yaml
-must_include_content:
-- main-def5678
-- 'replicaCount: 3'
+  - argocd/apps/app-a/values.yaml
+  - argocd/apps/app-b/values.yaml
+must_include_content_from:
+  argocd/apps/app-a/values.yaml:
+    - "main-def5678"
+  argocd/apps/app-b/values.yaml:
+    - "replicaCount: 3"
+max_fragments: 6
+max_files: 3
 must_not_include:
-- GARBAGE_REG005_CHECKER_CONFIG
-- GARBAGE_REG005_CHECKER_VERSION
-- GARBAGE_REG005_CHECKER_INIT
-- GARBAGE_REG005_CHECKER_LOAD
-- GARBAGE_REG005_CHECKER_PERMS
-- GARBAGE_REG005_CHECKER_CHECKSUMS
-- GARBAGE_REG005_CHECKER_SERVICES
-- GARBAGE_REG005_CHECKER_DISK
-- GARBAGE_REG005_CHECKER_LOGS
-- GARBAGE_REG005_CHECKER_CERTS
-- GARBAGE_REG005_CHECKER_DNS
-- GARBAGE_REG005_CHECKER_PORTS
-- GARBAGE_REG005_CHECKER_REPORT
-- GARBAGE_REG005_CHECKER_RUNALL
-- GARBAGE_REG005_BACKUP_TAG
-- GARBAGE_REG005_BACKUP_RETENTION
-- GARBAGE_REG005_BACKUP_DB
-- GARBAGE_REG005_BACKUP_CONFIGS
-- GARBAGE_REG005_BACKUP_CERTS
-- GARBAGE_REG005_BACKUP_CLEANUP
-- GARBAGE_REG005_RESTORE_TAG
-- GARBAGE_REG005_RESTORE_VERIFY
-- GARBAGE_REG005_RESTORE_DB
-- GARBAGE_REG005_RESTORE_CONFIGS
-- GARBAGE_REG005_RESTORE_CHECK
-- GARBAGE_REG005_RESTORE_LIST
-- GARBAGE_REG005_RUNBOOK_HEADER
-- GARBAGE_REG005_RUNBOOK_INCIDENT
-- GARBAGE_REG005_RUNBOOK_PROCEDURES
-- GARBAGE_REG005_RUNBOOK_FAILOVER
-- GARBAGE_REG005_RUNBOOK_SCALING
-- GARBAGE_REG005_RUNBOOK_CERTS
-- GARBAGE_REG005_RUNBOOK_MONITORING
+- ConsistencyChecker
+- check_file_permissions
+- check_file_checksums
+- check_service_configs
+- check_disk_usage
+- check_log_rotation
+- check_certificate_expiry
+- generate_report
+- run_all_checks
+- backup_database
+- backup_configs
+- backup_certificates
+- cleanup_old_backups
+- restore_database
+- restore_configs
+- verify_restore
+- list_available_backups
+- Operations Runbook
+- Incident Response
+- Database Failover
+must_not_include_files:
+- ansible/scripts/consistency_checker.py
+- scripts/backup.sh
+- scripts/restore.sh
+- docs/runbook.md
 add_garbage_files: false
 skip_garbage_check: true

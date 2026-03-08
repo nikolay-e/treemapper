@@ -1,3 +1,9 @@
+# Scenario: User.full_name property changed to support optional title prefix
+# Changed: user.py — __init__ gets title param, full_name property adds title logic
+# Reviewer needs: user.py (changed) + views.py (unchanged, uses user.full_name extensively)
+# Trap: payment.py — financial service with similar __init__ pattern, unrelated domain
+# Trap: inventory.py — has similar property-based getters and role checks, no dependency
+
 initial:
   user.py: |
     from typing import Optional, List
@@ -74,13 +80,8 @@ initial:
                 UserRole.GUEST: "<span class='badge guest'>Guest</span>",
             }
             return badges.get(role, "")
-  garbage_payment.py: |
-    GARBAGE_MARKER_PAYMENT_001 = "payment garbage marker"
-    UNRELATED_PAYMENT_CONST_002 = 99.99
-
+  payment.py: |
     class PaymentProcessor:
-        GARBAGE_PROCESSOR_MARKER_003 = "processor marker"
-
         def __init__(self, api_key: str):
             self.api_key = api_key
 
@@ -91,19 +92,19 @@ initial:
             return True
 
     class StripeGateway:
-        GARBAGE_STRIPE_MARKER_004 = "stripe marker"
-
         def create_customer(self, email: str) -> str:
             return "cus_abc123"
-  garbage_inventory.py: |
-    GARBAGE_MARKER_INVENTORY_005 = "inventory garbage"
-    UNRELATED_STOCK_CONSTANT_006 = 1000
-
+  inventory.py: |
     class InventoryManager:
-        GARBAGE_INVENTORY_CLASS_007 = True
+        def __init__(self):
+            self.stock = {}
+
+        @property
+        def total_items(self) -> int:
+            return sum(self.stock.values())
 
         def check_stock(self, product_id: int) -> int:
-            return 50
+            return self.stock.get(product_id, 0)
 
         def reserve_stock(self, product_id: int, quantity: int) -> bool:
             return True
@@ -112,8 +113,8 @@ initial:
             pass
 
     def calculate_reorder_point(daily_sales: float, lead_time: int) -> float:
-        GARBAGE_REORDER_MARKER_008 = "local garbage"
         return daily_sales * lead_time * 1.5
+
 changed:
   user.py: |
     from typing import Optional, List
@@ -193,13 +194,8 @@ changed:
                 UserRole.GUEST: "<span class='badge guest'>Guest</span>",
             }
             return badges.get(role, "")
-  garbage_payment.py: |
-    GARBAGE_MARKER_PAYMENT_001 = "payment garbage marker"
-    UNRELATED_PAYMENT_CONST_002 = 99.99
-
+  payment.py: |
     class PaymentProcessor:
-        GARBAGE_PROCESSOR_MARKER_003 = "processor marker"
-
         def __init__(self, api_key: str):
             self.api_key = api_key
 
@@ -210,19 +206,19 @@ changed:
             return True
 
     class StripeGateway:
-        GARBAGE_STRIPE_MARKER_004 = "stripe marker"
-
         def create_customer(self, email: str) -> str:
             return "cus_abc123"
-  garbage_inventory.py: |
-    GARBAGE_MARKER_INVENTORY_005 = "inventory garbage"
-    UNRELATED_STOCK_CONSTANT_006 = 1000
-
+  inventory.py: |
     class InventoryManager:
-        GARBAGE_INVENTORY_CLASS_007 = True
+        def __init__(self):
+            self.stock = {}
+
+        @property
+        def total_items(self) -> int:
+            return sum(self.stock.values())
 
         def check_stock(self, product_id: int) -> int:
-            return 50
+            return self.stock.get(product_id, 0)
 
         def reserve_stock(self, product_id: int, quantity: int) -> bool:
             return True
@@ -231,21 +227,29 @@ changed:
             pass
 
     def calculate_reorder_point(daily_sales: float, lead_time: int) -> float:
-        GARBAGE_REORDER_MARKER_008 = "local garbage"
         return daily_sales * lead_time * 1.5
+
 must_include_files:
 - user.py
-must_include_content:
-- 'def __init__(self, first: str, last: str, email: str = "", role: UserRole = UserRole.USER, title: Optional[str] = None):'
-- 'if self.title:'
+
+must_include_content_from:
+  user.py:
+    - 'title: Optional[str] = None'
+    - 'if self.title:'
+
 must_not_include:
-- GARBAGE_INVENTORY_CLASS_007
-- GARBAGE_MARKER_INVENTORY_005
-- GARBAGE_MARKER_PAYMENT_001
-- GARBAGE_PROCESSOR_MARKER_003
-- GARBAGE_REORDER_MARKER_008
-- GARBAGE_STRIPE_MARKER_004
-- garbage_inventory.py
-- garbage_payment.py
+- PaymentProcessor
+- StripeGateway
+- InventoryManager
+- calculate_reorder_point
+- check_stock
+- charge
+
+must_not_include_files:
+- payment.py
+- inventory.py
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

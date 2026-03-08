@@ -1,3 +1,31 @@
+# Scenario: UserAccountService refactored from generic RuntimeExceptions to
+#   custom exception hierarchy: ApiException base class, ValidationException,
+#   ResourceNotFoundException, DuplicateResourceException, AuthenticationException.
+#   GlobalExceptionHandler added with @RestControllerAdvice.
+#
+# Diff shows:
+#   + ApiException with errorCode, httpStatus, errorId, timestamp, details
+#   + ValidationException.forField() factory method with FieldError record
+#   + ResourceNotFoundException with resourceType/resourceId
+#   + DuplicateResourceException for duplicate detection
+#   + AuthenticationException with static factories (invalidCredentials, accountInactive)
+#   + GlobalExceptionHandler: @ExceptionHandler for ApiException and generic Exception
+#   + ErrorResponse record for API responses
+#   + RateLimitException (unused by UserAccountService but in hierarchy)
+#
+# Reviewer questions:
+#   Q1: "Does ApiException.toErrorResponse() produce the right structure?"
+#       -> Needs ErrorResponse.java: record with errorId, errorCode, message,
+#         status, timestamp, details. toErrorResponse() builds this record.
+#
+#   Q2: "Do all exception subclasses pass correct httpStatus codes?"
+#       -> Self-contained: ValidationException=400, ResourceNotFound=404,
+#         DuplicateResource=409, Authentication=401, RateLimit=429.
+#
+# Not needed for comprehension:
+#   - SessionManager, AuditLogger, PasswordHasher: unrelated services.
+#     No structural edges to the exception hierarchy.
+
 initial:
   src/main/java/com/apigateway/service/UserAccountService.java: |
     package com.apigateway.service;
@@ -643,27 +671,57 @@ changed:
         }
     }
 must_include_files:
-- src/main/java/com/apigateway/controller/GlobalExceptionHandler.java
-- src/main/java/com/apigateway/exception/ApiException.java
-- src/main/java/com/apigateway/exception/AuthenticationException.java
-- src/main/java/com/apigateway/exception/DuplicateResourceException.java
-- src/main/java/com/apigateway/exception/RateLimitException.java
-- src/main/java/com/apigateway/exception/ResourceNotFoundException.java
-- src/main/java/com/apigateway/exception/ValidationException.java
-- src/main/java/com/apigateway/service/UserAccountService.java
-must_include_content:
-- package com.apigateway.controller;
-- '@RestControllerAdvice'
+  - src/main/java/com/apigateway/controller/GlobalExceptionHandler.java
+  - src/main/java/com/apigateway/exception/ApiException.java
+  - src/main/java/com/apigateway/exception/AuthenticationException.java
+  - src/main/java/com/apigateway/exception/DuplicateResourceException.java
+  - src/main/java/com/apigateway/exception/RateLimitException.java
+  - src/main/java/com/apigateway/exception/ResourceNotFoundException.java
+  - src/main/java/com/apigateway/exception/ValidationException.java
+  - src/main/java/com/apigateway/service/UserAccountService.java
+
+must_include_content_from:
+  src/main/java/com/apigateway/controller/GlobalExceptionHandler.java:
+    - "package com.apigateway.controller"
+    - '@RestControllerAdvice'
+    - "@ExceptionHandler(ApiException.class)"
+  src/main/java/com/apigateway/exception/ApiException.java:
+    - "public ErrorResponse toErrorResponse()"
+    - "private final String errorCode"
+  src/main/java/com/apigateway/exception/ValidationException.java:
+    - "public static ValidationException forField"
+  src/main/java/com/apigateway/exception/AuthenticationException.java:
+    - "public static AuthenticationException invalidCredentials()"
+
 must_not_include:
-- GARBAGE_JAVA_AUDIT_E031D
-- GARBAGE_JAVA_EXPIRED_E031C
-- GARBAGE_JAVA_FAILED_E031F
-- GARBAGE_JAVA_HASH_E031G
-- GARBAGE_JAVA_LOG_E031E
-- GARBAGE_JAVA_SALT_E031H
-- GARBAGE_JAVA_SESSION_E031A
-- GARBAGE_JAVA_TOKEN_E031B
-- AuditLogger.java
-- PasswordHasher.java
+  # --- SessionManager: unrelated session handling service ---
+  # HARD TRAP: same package (apigateway), Spring @Service, uses UUID
+  # and Instant like the exception classes. But manages sessions,
+  # not exceptions.
+  - SessionManager
+  - createSession
+  - invalidateSession
+  - GARBAGE_JAVA_SESSION_E031A
+  - GARBAGE_JAVA_TOKEN_E031B
+  - GARBAGE_JAVA_EXPIRED_E031C
+  # --- AuditLogger: unrelated audit service ---
+  - AuditLogger
+  - logAction
+  - getFailedActions
+  - GARBAGE_JAVA_AUDIT_E031D
+  - GARBAGE_JAVA_LOG_E031E
+  - GARBAGE_JAVA_FAILED_E031F
+  # --- PasswordHasher: unrelated security utility ---
+  - PasswordHasher
+  - generateSalt
+  - hashPassword
+  - GARBAGE_JAVA_HASH_E031G
+  - GARBAGE_JAVA_SALT_E031H
+
+must_not_include_files:
+  - src/main/java/com/apigateway/unrelated/SessionManager.java
+  - src/main/java/com/apigateway/unrelated/AuditLogger.java
+  - src/main/java/com/apigateway/unrelated/PasswordHasher.java
+
 add_garbage_files: false
 skip_garbage_check: true

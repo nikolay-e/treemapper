@@ -1,3 +1,18 @@
+# Scenario: pom.xml adds spring-boot-starter-data-jpa and postgresql dependencies
+# to enable database persistence in a Spring Boot application.
+#
+# Diff: pom.xml gains two new <dependency> blocks for JPA and PostgreSQL.
+#
+# Reviewer questions:
+#   Q1: "What existing dependencies does the project already have?"
+#       -> pom.xml (CHANGED) already has spring-boot-starter-web.
+#
+# Not needed:
+#   - build.gradle: a Gradle build file for a separate module in the same repo.
+#     Build-system vocabulary overlap but no dependency edge to the Maven pom.xml.
+#   - src/main/resources/logback.xml: logging configuration.
+#     Lives in the same project but unrelated to dependency management.
+
 initial:
   pom.xml: |
     <?xml version="1.0" encoding="UTF-8"?>
@@ -27,18 +42,33 @@ initial:
             SpringApplication.run(Application.class, args);
         }
     }
-  GarbagePluginConfig.java: |
-    public class GarbagePluginConfig {
-        public static final String GARBAGE_JVM_038_PLUGIN_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_038_REPO_MARKER_B = "marker";
-        public void noop() {}
+  build.gradle: |
+    plugins {
+        id 'java'
+        id 'org.springframework.boot' version '3.0.0'
     }
-  GarbageDeployConfig.java: |
-    public class GarbageDeployConfig {
-        public static final String GARBAGE_JVM_038_DEPLOY_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_038_RELEASE_MARKER_D = "marker";
-        public void noop() {}
+
+    repositories {
+        mavenCentral()
     }
+
+    dependencies {
+        implementation 'org.springframework.boot:spring-boot-starter-web:3.0.0'
+        testImplementation 'org.springframework.boot:spring-boot-starter-test:3.0.0'
+    }
+  src/main/resources/logback.xml: |
+    <configuration>
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </configuration>
+
 changed:
   pom.xml: |
     <?xml version="1.0" encoding="UTF-8"?>
@@ -78,28 +108,49 @@ changed:
             SpringApplication.run(Application.class, args);
         }
     }
-  GarbagePluginConfig.java: |
-    public class GarbagePluginConfig {
-        public static final String GARBAGE_JVM_038_PLUGIN_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_038_REPO_MARKER_B = "marker";
-        public void noop() {}
+  build.gradle: |
+    plugins {
+        id 'java'
+        id 'org.springframework.boot' version '3.0.0'
     }
-  GarbageDeployConfig.java: |
-    public class GarbageDeployConfig {
-        public static final String GARBAGE_JVM_038_DEPLOY_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_038_RELEASE_MARKER_D = "marker";
-        public void noop() {}
+
+    repositories {
+        mavenCentral()
     }
+
+    dependencies {
+        implementation 'org.springframework.boot:spring-boot-starter-web:3.0.0'
+        testImplementation 'org.springframework.boot:spring-boot-starter-test:3.0.0'
+    }
+  src/main/resources/logback.xml: |
+    <configuration>
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </configuration>
+
 must_include_files:
-- pom.xml
-must_include_content:
-- <artifactId>spring-boot-starter-data-jpa</artifactId>
+  - pom.xml
+must_include_content_from:
+  pom.xml:
+    - "<artifactId>spring-boot-starter-data-jpa</artifactId>"
 must_not_include:
-- GARBAGE_JVM_038_DEPLOY_MARKER_C
-- GARBAGE_JVM_038_PLUGIN_MARKER_A
-- GARBAGE_JVM_038_RELEASE_MARKER_D
-- GARBAGE_JVM_038_REPO_MARKER_B
-- GarbageDeployConfig.java
-- GarbagePluginConfig.java
+  # build.gradle: separate Gradle build file, not related to Maven pom changes
+  - "build.gradle"
+  - "spring-boot-starter-test"
+  # logback.xml: logging config, unrelated to dependency additions
+  - ConsoleAppender
+  - logback
+must_not_include_files:
+  - build.gradle
+  - src/main/resources/logback.xml
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

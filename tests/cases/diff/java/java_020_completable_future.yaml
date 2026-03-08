@@ -1,3 +1,36 @@
+# Scenario: PaymentResult is refactored from a class to a record with a new
+#   transactionId field. AsyncPaymentService is added as a large new service
+#   with CompletableFuture chains using PaymentResult, PaymentRequest,
+#   PaymentGateway, FraudCheckService, NotificationService.
+#
+# Diff shows:
+#   PaymentResult.java: class -> record, new transactionId field,
+#     constructor changes, getter removal
+#   AsyncPaymentService.java: NEW file with processPaymentAsync(),
+#     validate/fraud/authorize/capture chain, retry, batch, timeout
+#   + PaymentRequest.java, PaymentMethod.java, AuthorizationResult.java,
+#     CaptureResult.java, PaymentException.java, PaymentGateway.java,
+#     FraudCheckService.java, NotificationService.java (all new records/interfaces)
+#
+# Reviewer questions:
+#   Q1: "Does PaymentService.processPayment still work after PaymentResult
+#       became a record with 4 fields?"
+#       -> PaymentService.java (UNCHANGED) constructs PaymentResult(orderId,
+#          success, message) with 3 args. But the new record has 4 fields.
+#          CRITICAL: this is a compile error reviewer must catch.
+#
+#   Q2: "Does AsyncPaymentService correctly chain the CompletableFuture stages?"
+#       -> AuthorizationResult.java and CaptureResult.java define the records
+#          passed between stages. PaymentGateway.java defines authorize/capture
+#          interfaces. Reviewer needs all these to trace the chain.
+#
+# Not needed for comprehension:
+#   - BpmCalculator.java: Music tempo calculator. Completely unrelated domain.
+#
+#   - WateringScheduler.java: Plant watering schedule. Completely unrelated domain.
+#
+#   - QuizScorer.java: Trivia quiz scoring. Completely unrelated domain.
+
 initial:
   src/main/java/com/payment/service/PaymentService.java: |
     package com.payment.service;
@@ -51,43 +84,27 @@ initial:
     package com.unrelated.music;
 
     public class BpmCalculator {
-        public static final String GARBAGE_JAVA_REFUND_C035A = "bpm_marker_alpha";
-        private static final String GARBAGE_JAVA_VOID_C035B = "tempo_marker_beta";
-
         public int calculateBpm(long[] tapTimestamps) {
             if (tapTimestamps.length < 2) return 0;
             long totalInterval = tapTimestamps[tapTimestamps.length - 1] - tapTimestamps[0];
             long avgInterval = totalInterval / (tapTimestamps.length - 1);
-            logGarbageMarkers();
             return (int) (60000 / avgInterval);
         }
 
         public long millisecondsPerBeat(int bpm) {
-            String GARBAGE_JAVA_PROCESS_C035C = "beat_marker_gamma";
-            System.out.println(GARBAGE_JAVA_PROCESS_C035C);
             return 60000 / bpm;
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_REFUND_C035A + GARBAGE_JAVA_VOID_C035B);
         }
     }
   src/main/java/com/unrelated/plants/WateringScheduler.java: |
     package com.unrelated.plants;
 
     public class WateringScheduler {
-        public static final String GARBAGE_JAVA_FRAUD_C035D = "water_marker_delta";
-        private static final String GARBAGE_JAVA_RISK_C035E = "schedule_marker_epsilon";
-
         public int daysUntilWatering(String plantType, int daysSinceLastWater) {
-            logGarbageMarkers();
             int wateringInterval = getWateringInterval(plantType);
             return Math.max(0, wateringInterval - daysSinceLastWater);
         }
 
         public int getWateringInterval(String plantType) {
-            String GARBAGE_JAVA_FLAG_C035F = "interval_marker_zeta";
-            System.out.println(GARBAGE_JAVA_FLAG_C035F);
             return switch (plantType.toLowerCase()) {
                 case "cactus" -> 14;
                 case "fern" -> 3;
@@ -95,20 +112,12 @@ initial:
                 default -> 7;
             };
         }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_FRAUD_C035D + GARBAGE_JAVA_RISK_C035E);
-        }
     }
   src/main/java/com/unrelated/trivia/QuizScorer.java: |
     package com.unrelated.trivia;
 
     public class QuizScorer {
-        public static final String GARBAGE_JAVA_RECEIPT_C035G = "quiz_marker_eta";
-
         public int calculateScore(int correct, int total, int timeBonusSeconds) {
-            String GARBAGE_JAVA_GEN_C035H = "score_marker_theta";
-            System.out.println(GARBAGE_JAVA_RECEIPT_C035G + GARBAGE_JAVA_GEN_C035H);
             int baseScore = correct * 100;
             int timeBonus = Math.max(0, timeBonusSeconds * 5);
             return baseScore + timeBonus;
@@ -122,6 +131,7 @@ initial:
             return "F";
         }
     }
+
 changed:
   src/main/java/com/payment/service/PaymentService.java: |
     package com.payment.service;
@@ -163,81 +173,6 @@ changed:
 
         public boolean isSuccess() {
             return success;
-        }
-    }
-  src/main/java/com/unrelated/music/BpmCalculator.java: |
-    package com.unrelated.music;
-
-    public class BpmCalculator {
-        public static final String GARBAGE_JAVA_REFUND_C035A = "bpm_marker_alpha";
-        private static final String GARBAGE_JAVA_VOID_C035B = "tempo_marker_beta";
-
-        public int calculateBpm(long[] tapTimestamps) {
-            if (tapTimestamps.length < 2) return 0;
-            long totalInterval = tapTimestamps[tapTimestamps.length - 1] - tapTimestamps[0];
-            long avgInterval = totalInterval / (tapTimestamps.length - 1);
-            logGarbageMarkers();
-            return (int) (60000 / avgInterval);
-        }
-
-        public long millisecondsPerBeat(int bpm) {
-            String GARBAGE_JAVA_PROCESS_C035C = "beat_marker_gamma";
-            System.out.println(GARBAGE_JAVA_PROCESS_C035C);
-            return 60000 / bpm;
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_REFUND_C035A + GARBAGE_JAVA_VOID_C035B);
-        }
-    }
-  src/main/java/com/unrelated/plants/WateringScheduler.java: |
-    package com.unrelated.plants;
-
-    public class WateringScheduler {
-        public static final String GARBAGE_JAVA_FRAUD_C035D = "water_marker_delta";
-        private static final String GARBAGE_JAVA_RISK_C035E = "schedule_marker_epsilon";
-
-        public int daysUntilWatering(String plantType, int daysSinceLastWater) {
-            logGarbageMarkers();
-            int wateringInterval = getWateringInterval(plantType);
-            return Math.max(0, wateringInterval - daysSinceLastWater);
-        }
-
-        public int getWateringInterval(String plantType) {
-            String GARBAGE_JAVA_FLAG_C035F = "interval_marker_zeta";
-            System.out.println(GARBAGE_JAVA_FLAG_C035F);
-            return switch (plantType.toLowerCase()) {
-                case "cactus" -> 14;
-                case "fern" -> 3;
-                case "succulent" -> 10;
-                default -> 7;
-            };
-        }
-
-        private void logGarbageMarkers() {
-            System.out.println(GARBAGE_JAVA_FRAUD_C035D + GARBAGE_JAVA_RISK_C035E);
-        }
-    }
-  src/main/java/com/unrelated/trivia/QuizScorer.java: |
-    package com.unrelated.trivia;
-
-    public class QuizScorer {
-        public static final String GARBAGE_JAVA_RECEIPT_C035G = "quiz_marker_eta";
-
-        public int calculateScore(int correct, int total, int timeBonusSeconds) {
-            String GARBAGE_JAVA_GEN_C035H = "score_marker_theta";
-            System.out.println(GARBAGE_JAVA_RECEIPT_C035G + GARBAGE_JAVA_GEN_C035H);
-            int baseScore = correct * 100;
-            int timeBonus = Math.max(0, timeBonusSeconds * 5);
-            return baseScore + timeBonus;
-        }
-
-        public String getGrade(int scorePercent) {
-            if (scorePercent >= 90) return "A";
-            if (scorePercent >= 80) return "B";
-            if (scorePercent >= 70) return "C";
-            if (scorePercent >= 60) return "D";
-            return "F";
         }
     }
   src/main/java/com/payment/service/AsyncPaymentService.java: |
@@ -508,30 +443,97 @@ changed:
     public interface NotificationService {
         CompletableFuture<Boolean> sendConfirmation(String email, PaymentResult result);
     }
+  src/main/java/com/unrelated/music/BpmCalculator.java: |
+    package com.unrelated.music;
+
+    public class BpmCalculator {
+        public int calculateBpm(long[] tapTimestamps) {
+            if (tapTimestamps.length < 2) return 0;
+            long totalInterval = tapTimestamps[tapTimestamps.length - 1] - tapTimestamps[0];
+            long avgInterval = totalInterval / (tapTimestamps.length - 1);
+            return (int) (60000 / avgInterval);
+        }
+
+        public long millisecondsPerBeat(int bpm) {
+            return 60000 / bpm;
+        }
+    }
+  src/main/java/com/unrelated/plants/WateringScheduler.java: |
+    package com.unrelated.plants;
+
+    public class WateringScheduler {
+        public int daysUntilWatering(String plantType, int daysSinceLastWater) {
+            int wateringInterval = getWateringInterval(plantType);
+            return Math.max(0, wateringInterval - daysSinceLastWater);
+        }
+
+        public int getWateringInterval(String plantType) {
+            return switch (plantType.toLowerCase()) {
+                case "cactus" -> 14;
+                case "fern" -> 3;
+                case "succulent" -> 10;
+                default -> 7;
+            };
+        }
+    }
+  src/main/java/com/unrelated/trivia/QuizScorer.java: |
+    package com.unrelated.trivia;
+
+    public class QuizScorer {
+        public int calculateScore(int correct, int total, int timeBonusSeconds) {
+            int baseScore = correct * 100;
+            int timeBonus = Math.max(0, timeBonusSeconds * 5);
+            return baseScore + timeBonus;
+        }
+
+        public String getGrade(int scorePercent) {
+            if (scorePercent >= 90) return "A";
+            if (scorePercent >= 80) return "B";
+            if (scorePercent >= 70) return "C";
+            if (scorePercent >= 60) return "D";
+            return "F";
+        }
+    }
+
 must_include_files:
-- src/main/java/com/payment/service/AsyncPaymentService.java
-- src/main/java/com/payment/service/AuthorizationResult.java
-- src/main/java/com/payment/service/CaptureResult.java
-- src/main/java/com/payment/service/NotificationService.java
-- src/main/java/com/payment/service/PaymentException.java
-- src/main/java/com/payment/service/PaymentGateway.java
-- src/main/java/com/payment/service/PaymentMethod.java
-- src/main/java/com/payment/service/PaymentRequest.java
-- src/main/java/com/payment/service/PaymentResult.java
-must_include_content:
-- package com.payment.service;
-- public CompletableFuture<PaymentResult> processPaymentAsync(PaymentRequest request) {
+  - src/main/java/com/payment/service/AsyncPaymentService.java
+  - src/main/java/com/payment/service/AuthorizationResult.java
+  - src/main/java/com/payment/service/CaptureResult.java
+  - src/main/java/com/payment/service/NotificationService.java
+  - src/main/java/com/payment/service/PaymentException.java
+  - src/main/java/com/payment/service/PaymentGateway.java
+  - src/main/java/com/payment/service/PaymentMethod.java
+  - src/main/java/com/payment/service/PaymentRequest.java
+  - src/main/java/com/payment/service/PaymentResult.java
+
+must_include_content_from:
+  src/main/java/com/payment/service/PaymentResult.java:
+    - "public record PaymentResult"
+    - "String transactionId"
+  src/main/java/com/payment/service/AsyncPaymentService.java:
+    - "public CompletableFuture<PaymentResult> processPaymentAsync(PaymentRequest request)"
+    - "thenCompose(this::checkFraud)"
+
 must_not_include:
-- GARBAGE_JAVA_FLAG_C035F
-- GARBAGE_JAVA_FRAUD_C035D
-- GARBAGE_JAVA_GEN_C035H
-- GARBAGE_JAVA_PROCESS_C035C
-- GARBAGE_JAVA_RECEIPT_C035G
-- GARBAGE_JAVA_REFUND_C035A
-- GARBAGE_JAVA_RISK_C035E
-- GARBAGE_JAVA_VOID_C035B
-- BpmCalculator.java
-- QuizScorer.java
-- WateringScheduler.java
+  # --- BpmCalculator.java: music tempo, completely unrelated ---
+  - BpmCalculator
+  - calculateBpm
+  - millisecondsPerBeat
+  # --- WateringScheduler.java: plant care, completely unrelated ---
+  - WateringScheduler
+  - daysUntilWatering
+  - getWateringInterval
+  # --- QuizScorer.java: trivia scoring, completely unrelated ---
+  - QuizScorer
+  - calculateScore
+  - getGrade
+
+must_not_include_files:
+  - src/main/java/com/unrelated/music/BpmCalculator.java
+  - src/main/java/com/unrelated/plants/WateringScheduler.java
+  - src/main/java/com/unrelated/trivia/QuizScorer.java
+
+max_fragments: 20
+max_files: 12
 add_garbage_files: false
 skip_garbage_check: true

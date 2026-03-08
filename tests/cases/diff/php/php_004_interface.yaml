@@ -1,3 +1,23 @@
+# Test 004: ApiHandler implements RequestHandler interface with validation
+#           — reviewer needs RequestHandler contract to verify method signatures
+#
+# Scenario: ApiHandler changes from a simple responder to implementing the
+# RequestHandler interface. It adds handle(), validate(), and getMiddleware()
+# methods matching the interface contract.
+#
+# Reviewer questions:
+#   Q1: "Does ApiHandler fulfill all RequestHandler methods?"
+#       -> handle(array): array, validate(array): bool, getMiddleware(): array.
+#   Q2: "Is the Middleware interface also relevant here?"
+#       -> getMiddleware returns string names, not Middleware instances, so the
+#       Middleware interface is not directly consumed here.
+#
+# Trap files (plausible but unrelated):
+#   - src/Contracts/EventDispatcher.php: another interface in same namespace,
+#     but not implemented by ApiHandler.
+#   - src/Handlers/WebhookHandler.php: sibling handler class that could also
+#     implement RequestHandler, but is independent of this change.
+
 initial:
   src/Contracts/RequestHandler.php: |
     <?php
@@ -24,32 +44,35 @@ initial:
             return ['data' => $data, 'status' => 200];
         }
     }
-  src/garbage_geo_calculator.php: |
+  src/Contracts/EventDispatcher.php: |
     <?php
-    GARBAGE_PHP_004_EARTH_RADIUS_A = 6371;
-    GARBAGE_PHP_004_PROJECTION_B = "mercator";
+    namespace App\Contracts;
 
-    class GarbageGeoCalculator {
-        GARBAGE_PHP_004_PRECISION_C = 6;
+    interface EventDispatcher {
+        public function dispatch(string $event, array $payload): void;
+        public function listen(string $event, callable $listener): void;
+        public function hasListeners(string $event): bool;
+    }
+  src/Handlers/WebhookHandler.php: |
+    <?php
+    namespace App\Handlers;
 
-        public function distance(float $lat1, float $lon1): float {
-            GARBAGE_PHP_004_UNIT_D = "km";
-            return 0.0;
+    class WebhookHandler {
+        private string $secret;
+
+        public function __construct(string $secret) {
+            $this->secret = $secret;
+        }
+
+        public function verifySignature(string $payload, string $signature): bool {
+            return hash_hmac('sha256', $payload, $this->secret) === $signature;
+        }
+
+        public function process(array $event): array {
+            return ['event' => $event['type'], 'processed' => true];
         }
     }
-  src/garbage_barcode_gen.php: |
-    <?php
-    GARBAGE_PHP_004_FORMAT_E = "EAN13";
-    GARBAGE_PHP_004_DPI_F = 300;
 
-    class GarbageBarcodeGen {
-        GARBAGE_PHP_004_MODULE_WIDTH_G = 2;
-
-        public function generate(string $data): string {
-            GARBAGE_PHP_004_CHECKSUM_H = true;
-            return "";
-        }
-    }
 changed:
   src/Contracts/RequestHandler.php: |
     <?php
@@ -89,49 +112,62 @@ changed:
             return ['auth', 'throttle'];
         }
     }
-  src/garbage_geo_calculator.php: |
+  src/Contracts/EventDispatcher.php: |
     <?php
-    GARBAGE_PHP_004_EARTH_RADIUS_A = 6371;
-    GARBAGE_PHP_004_PROJECTION_B = "mercator";
+    namespace App\Contracts;
 
-    class GarbageGeoCalculator {
-        GARBAGE_PHP_004_PRECISION_C = 6;
+    interface EventDispatcher {
+        public function dispatch(string $event, array $payload): void;
+        public function listen(string $event, callable $listener): void;
+        public function hasListeners(string $event): bool;
+    }
+  src/Handlers/WebhookHandler.php: |
+    <?php
+    namespace App\Handlers;
 
-        public function distance(float $lat1, float $lon1): float {
-            GARBAGE_PHP_004_UNIT_D = "km";
-            return 0.0;
+    class WebhookHandler {
+        private string $secret;
+
+        public function __construct(string $secret) {
+            $this->secret = $secret;
+        }
+
+        public function verifySignature(string $payload, string $signature): bool {
+            return hash_hmac('sha256', $payload, $this->secret) === $signature;
+        }
+
+        public function process(array $event): array {
+            return ['event' => $event['type'], 'processed' => true];
         }
     }
-  src/garbage_barcode_gen.php: |
-    <?php
-    GARBAGE_PHP_004_FORMAT_E = "EAN13";
-    GARBAGE_PHP_004_DPI_F = 300;
 
-    class GarbageBarcodeGen {
-        GARBAGE_PHP_004_MODULE_WIDTH_G = 2;
-
-        public function generate(string $data): string {
-            GARBAGE_PHP_004_CHECKSUM_H = true;
-            return "";
-        }
-    }
 must_include_files:
-- src/Handlers/ApiHandler.php
-must_include_content:
-- |
-  implements RequestHandler
+  - src/Handlers/ApiHandler.php
+  # Q1: Reviewer needs the interface contract to verify method compliance
+  - src/Contracts/RequestHandler.php
+
+must_include_content_from:
+  src/Handlers/ApiHandler.php:
+    - "implements RequestHandler"
+    - "public function validate(array $request): bool"
+  src/Contracts/RequestHandler.php:
+    - "interface RequestHandler"
+    - "public function handle(array $request): array"
+
 must_not_include:
-- GARBAGE_PHP_004_EARTH_RADIUS_A
-- GARBAGE_PHP_004_PROJECTION_B
-- GARBAGE_PHP_004_PRECISION_C
-- GARBAGE_PHP_004_UNIT_D
-- GARBAGE_PHP_004_FORMAT_E
-- GARBAGE_PHP_004_DPI_F
-- GARBAGE_PHP_004_MODULE_WIDTH_G
-- GARBAGE_PHP_004_CHECKSUM_H
-- GarbageGeoCalculator
-- GarbageBarcodeGen
-- garbage_geo_calculator.php
-- garbage_barcode_gen.php
+  # --- EventDispatcher.php: sibling interface in same namespace, not implemented ---
+  - "interface EventDispatcher"
+  - "hasListeners"
+  # --- WebhookHandler.php: sibling handler, shares process() name but independent ---
+  - "class WebhookHandler"
+  - "verifySignature"
+  - "hash_hmac"
+
+must_not_include_files:
+  - src/Contracts/EventDispatcher.php
+  - src/Handlers/WebhookHandler.php
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

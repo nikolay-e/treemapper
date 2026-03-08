@@ -1,3 +1,20 @@
+# Scenario: UserActor is implemented as a full Akka actor handling CreateUser,
+# DeleteUser, and GetUser messages defined in Messages.scala.
+#
+# Diff: UserActor.scala goes from empty class to full Actor implementation
+# with receive, pattern matching on messages, mutable state, and companion object.
+#
+# Reviewer questions:
+#   Q1: "What messages does UserActor handle?"
+#       -> Messages.scala (UNCHANGED) defines CreateUser, DeleteUser, GetUser,
+#          UserCreated as case classes extending UserMessage.
+#
+# Not needed:
+#   - OrderActor.scala: another Akka actor for order processing.
+#     Same actor pattern but handles different message types, no dependency.
+#   - ActorConfig.scala: Akka system configuration object.
+#     Infrastructure code, not referenced by UserActor implementation.
+
 initial:
   Messages.scala: |
     sealed trait UserMessage
@@ -8,18 +25,43 @@ initial:
   UserActor.scala: |
     // Initial
     class UserActor {}
-  GarbageStreamSource.scala: |
-    object GarbageStreamSource {
-      val GARBAGE_JVM_048_STREAM_MARKER_A = "marker"
-      val GARBAGE_JVM_048_SOURCE_MARKER_B = "marker"
-      def noop(): Unit = {}
+  OrderActor.scala: |
+    import akka.actor.{Actor, ActorLogging, Props}
+
+    sealed trait OrderMessage
+    case class PlaceOrder(item: String, quantity: Int) extends OrderMessage
+    case class CancelOrder(orderId: String) extends OrderMessage
+
+    class OrderActor extends Actor with ActorLogging {
+      private var orders: Map[String, (String, Int)] = Map.empty
+
+      def receive: Receive = {
+        case PlaceOrder(item, qty) =>
+          val id = java.util.UUID.randomUUID().toString
+          orders = orders + (id -> (item, qty))
+          log.info(s"Placed order $id")
+
+        case CancelOrder(id) =>
+          orders = orders - id
+          log.info(s"Cancelled order $id")
+      }
     }
-  GarbageStreamSink.scala: |
-    object GarbageStreamSink {
-      val GARBAGE_JVM_048_SINK_MARKER_C = "marker"
-      val GARBAGE_JVM_048_FLOW_MARKER_D = "marker"
-      def noop(): Unit = {}
+
+    object OrderActor {
+      def props: Props = Props[OrderActor]()
     }
+  ActorConfig.scala: |
+    import akka.actor.ActorSystem
+    import com.typesafe.config.ConfigFactory
+
+    object ActorConfig {
+      val system: ActorSystem = ActorSystem("app-system", ConfigFactory.load())
+
+      def shutdown(): Unit = {
+        system.terminate()
+      }
+    }
+
 changed:
   Messages.scala: |
     sealed trait UserMessage
@@ -52,28 +94,61 @@ changed:
     object UserActor {
       def props: Props = Props[UserActor]()
     }
-  GarbageStreamSource.scala: |
-    object GarbageStreamSource {
-      val GARBAGE_JVM_048_STREAM_MARKER_A = "marker"
-      val GARBAGE_JVM_048_SOURCE_MARKER_B = "marker"
-      def noop(): Unit = {}
+  OrderActor.scala: |
+    import akka.actor.{Actor, ActorLogging, Props}
+
+    sealed trait OrderMessage
+    case class PlaceOrder(item: String, quantity: Int) extends OrderMessage
+    case class CancelOrder(orderId: String) extends OrderMessage
+
+    class OrderActor extends Actor with ActorLogging {
+      private var orders: Map[String, (String, Int)] = Map.empty
+
+      def receive: Receive = {
+        case PlaceOrder(item, qty) =>
+          val id = java.util.UUID.randomUUID().toString
+          orders = orders + (id -> (item, qty))
+          log.info(s"Placed order $id")
+
+        case CancelOrder(id) =>
+          orders = orders - id
+          log.info(s"Cancelled order $id")
+      }
     }
-  GarbageStreamSink.scala: |
-    object GarbageStreamSink {
-      val GARBAGE_JVM_048_SINK_MARKER_C = "marker"
-      val GARBAGE_JVM_048_FLOW_MARKER_D = "marker"
-      def noop(): Unit = {}
+
+    object OrderActor {
+      def props: Props = Props[OrderActor]()
     }
+  ActorConfig.scala: |
+    import akka.actor.ActorSystem
+    import com.typesafe.config.ConfigFactory
+
+    object ActorConfig {
+      val system: ActorSystem = ActorSystem("app-system", ConfigFactory.load())
+
+      def shutdown(): Unit = {
+        system.terminate()
+      }
+    }
+
 must_include_files:
-- UserActor.scala
-must_include_content:
-- import akka.actor.{Actor, ActorLogging, Props}
+  - UserActor.scala
+must_include_content_from:
+  UserActor.scala:
+    - "import akka.actor.{Actor, ActorLogging, Props}"
 must_not_include:
-- GARBAGE_JVM_048_FLOW_MARKER_D
-- GARBAGE_JVM_048_SINK_MARKER_C
-- GARBAGE_JVM_048_SOURCE_MARKER_B
-- GARBAGE_JVM_048_STREAM_MARKER_A
-- GarbageStreamSink.scala
-- GarbageStreamSource.scala
+  # OrderActor.scala: different actor, same pattern but no dependency on UserActor
+  - OrderActor
+  - PlaceOrder
+  - CancelOrder
+  # ActorConfig.scala: system setup, not referenced by UserActor
+  - ActorConfig
+  - ActorSystem
+  - ConfigFactory
+must_not_include_files:
+  - OrderActor.scala
+  - ActorConfig.scala
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

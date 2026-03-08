@@ -1,3 +1,8 @@
+# Scenario: EventDispatcher.dispatch now formats payloads and logs; version bumped.
+# Reviewer asks: "How does dispatch behavior change, and why the version bump?"
+# Trap rationale: message_queue.py and audit_logger.py share event/logging
+# vocabulary but are not imported by event_handler.py.
+
 initial:
   src/event_handler.py: |
     import logging
@@ -38,69 +43,56 @@ initial:
                 "total_events": self._event_count,
                 "registered_types": list(self._handlers.keys()),
             }
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  src/message_queue.py: |
+    from collections import deque
+    from typing import Any, Optional
 
-    class TextSanitizer:
-        GARBAGE_MERGE_002_MARKER_A = "sanitizer_tag"
+    MAX_QUEUE_SIZE = 10000
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    class MessageQueue:
+        def __init__(self, max_size: int = MAX_QUEUE_SIZE):
+            self.max_size = max_size
+            self._queue: deque = deque(maxlen=max_size)
+            self._processed_count = 0
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+        def enqueue(self, message: Any) -> bool:
+            if len(self._queue) >= self.max_size:
+                return False
+            self._queue.append(message)
+            return True
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_002_A_CLEAN: {cleaned}"
+        def dequeue(self) -> Optional[Any]:
+            if not self._queue:
+                return None
+            self._processed_count += 1
+            return self._queue.popleft()
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+        def size(self) -> int:
+            return len(self._queue)
+  src/audit_logger.py: |
+    import logging
+    from datetime import datetime
+    from typing import Dict, Any
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_002_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
+    AUDIT_LOG_NAME = "audit"
 
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
+    class AuditLogger:
+        def __init__(self):
+            self._logger = logging.getLogger(AUDIT_LOG_NAME)
+            self._entries: list[Dict[str, Any]] = []
 
-    class SystemMonitor:
-        GARBAGE_MERGE_002_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_002_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
+        def log_action(self, actor: str, action: str, resource: str) -> None:
+            entry = {
+                "actor": actor,
+                "action": action,
+                "resource": resource,
+                "timestamp": datetime.utcnow().isoformat(),
             }
+            self._entries.append(entry)
+            self._logger.info(f"{actor} performed {action} on {resource}")
 
-    MONITOR_VERSION = "GARBAGE_MERGE_002_B_VERSION"
+        def recent_entries(self, count: int = 10) -> list[Dict[str, Any]]:
+            return self._entries[-count:]
 changed:
   src/event_handler.py: |
     import logging
@@ -144,78 +136,70 @@ changed:
                 "total_events": self._event_count,
                 "registered_types": list(self._handlers.keys()),
             }
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  src/message_queue.py: |
+    from collections import deque
+    from typing import Any, Optional
 
-    class TextSanitizer:
-        GARBAGE_MERGE_002_MARKER_A = "sanitizer_tag"
+    MAX_QUEUE_SIZE = 10000
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
+    class MessageQueue:
+        def __init__(self, max_size: int = MAX_QUEUE_SIZE):
+            self.max_size = max_size
+            self._queue: deque = deque(maxlen=max_size)
+            self._processed_count = 0
 
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
+        def enqueue(self, message: Any) -> bool:
+            if len(self._queue) >= self.max_size:
+                return False
+            self._queue.append(message)
+            return True
 
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_002_A_CLEAN: {cleaned}"
+        def dequeue(self) -> Optional[Any]:
+            if not self._queue:
+                return None
+            self._processed_count += 1
+            return self._queue.popleft()
 
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
+        def size(self) -> int:
+            return len(self._queue)
+  src/audit_logger.py: |
+    import logging
+    from datetime import datetime
+    from typing import Dict, Any
 
-    SANITIZER_VERSION = "GARBAGE_MERGE_002_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
+    AUDIT_LOG_NAME = "audit"
 
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
+    class AuditLogger:
+        def __init__(self):
+            self._logger = logging.getLogger(AUDIT_LOG_NAME)
+            self._entries: list[Dict[str, Any]] = []
 
-    class SystemMonitor:
-        GARBAGE_MERGE_002_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_002_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
+        def log_action(self, actor: str, action: str, resource: str) -> None:
+            entry = {
+                "actor": actor,
+                "action": action,
+                "resource": resource,
+                "timestamp": datetime.utcnow().isoformat(),
             }
+            self._entries.append(entry)
+            self._logger.info(f"{actor} performed {action} on {resource}")
 
-    MONITOR_VERSION = "GARBAGE_MERGE_002_B_VERSION"
+        def recent_entries(self, count: int = 10) -> list[Dict[str, Any]]:
+            return self._entries[-count:]
 must_include_files:
 - src/event_handler.py
 must_include_content:
 - '"version": "2.0",'
 - formatted = format_event_payload(event_type, payload)
 must_not_include:
-- GARBAGE_MERGE_002_MARKER_A
-- GARBAGE_MERGE_002_MARKER_B
-- health_monitor.py
-- text_sanitizer.py
+- MessageQueue
+- AuditLogger
+- MAX_QUEUE_SIZE
+- AUDIT_LOG_NAME
+- message_queue.py
+- audit_logger.py
+must_not_include_files:
+- src/message_queue.py
+- src/audit_logger.py
 add_garbage_files: false
 skip_garbage_check: true

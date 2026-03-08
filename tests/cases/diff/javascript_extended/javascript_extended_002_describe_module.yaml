@@ -1,3 +1,17 @@
+# Reviewer sees: calculator.test.ts tests add, subtract, multiply,
+# divide, and modulo functions from calculator.ts.
+# Q: "What are the actual implementations — does 'divide by zero'
+#    really throw, and does modulo use %?"
+#    -> src/calculator.ts: divide throws Error('Division by zero')
+#       when b === 0; modulo returns a % b. Test assertions match
+#       the implementation exactly.
+#
+# Not needed:
+#   - src/unrelated/analytics.ts: event tracking. Different directory
+#     and concern, no relation to calculator.
+#   - src/unrelated/i18n.ts: translation system. Different domain,
+#     no connection to arithmetic.
+
 initial:
   src/calculator.ts: |
     export function add(a: number, b: number): number {
@@ -23,11 +37,9 @@ initial:
         return a % b;
     }
   src/calculator.test.ts: |
-    console.log('initial');
+    console.log('placeholder');
   src/unrelated/analytics.ts: |
-    const GARBAGE_JSX_002_ANALYTICS_TRACKER_A = 'analytics_garbage_marker';
-
-    export class GarbageAnalyticsTracker {
+    export class AnalyticsTracker {
         private events: string[] = [];
 
         trackEvent(name: string): void {
@@ -39,20 +51,23 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_002_FLUSH_EVENTS_B(): void {
-        console.log('GARBAGE_JSX_002_FLUSH_OUTPUT_C');
+    export function flushEvents(): void {
+        console.log('flushing analytics events');
     }
   src/unrelated/i18n.ts: |
-    const GARBAGE_JSX_002_I18N_CONFIG_D = { locale: 'en', fallback: 'en' };
+    const translations: Record<string, Record<string, string>> = {
+        en: { greeting: 'Hello' },
+        fr: { greeting: 'Bonjour' },
+    };
 
-    export class GARBAGE_JSX_002_TRANSLATOR_E {
-        translate(key: string): string {
-            return key;
+    export class Translator {
+        translate(key: string, locale: string = 'en'): string {
+            return translations[locale]?.[key] ?? key;
         }
     }
 
-    export function GARBAGE_JSX_002_LOAD_LOCALE_F(): void {
-        console.log('loading locale');
+    export function loadLocale(locale: string): void {
+        console.log('loading locale:', locale);
     }
 changed:
   src/calculator.ts: |
@@ -121,9 +136,7 @@ changed:
         });
     });
   src/unrelated/analytics.ts: |
-    const GARBAGE_JSX_002_ANALYTICS_TRACKER_A = 'analytics_garbage_marker';
-
-    export class GarbageAnalyticsTracker {
+    export class AnalyticsTracker {
         private events: string[] = [];
 
         trackEvent(name: string): void {
@@ -135,33 +148,42 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_002_FLUSH_EVENTS_B(): void {
-        console.log('GARBAGE_JSX_002_FLUSH_OUTPUT_C');
+    export function flushEvents(): void {
+        console.log('flushing analytics events');
     }
   src/unrelated/i18n.ts: |
-    const GARBAGE_JSX_002_I18N_CONFIG_D = { locale: 'en', fallback: 'en' };
+    const translations: Record<string, Record<string, string>> = {
+        en: { greeting: 'Hello' },
+        fr: { greeting: 'Bonjour' },
+    };
 
-    export class GARBAGE_JSX_002_TRANSLATOR_E {
-        translate(key: string): string {
-            return key;
+    export class Translator {
+        translate(key: string, locale: string = 'en'): string {
+            return translations[locale]?.[key] ?? key;
         }
     }
 
-    export function GARBAGE_JSX_002_LOAD_LOCALE_F(): void {
-        console.log('loading locale');
+    export function loadLocale(locale: string): void {
+        console.log('loading locale:', locale);
     }
 must_include_files:
-- src/calculator.test.ts
-must_include_content:
-- import { add, subtract, multiply, divide, modulo } from './calculator';
-- it('should add two positive numbers', () => {
+  # Unchanged file — the module under test. Reviewer needs to see
+  # the implementations to verify test assertions are correct.
+  - src/calculator.ts
+must_include_content_from:
+  src/calculator.ts:
+    - "function add"
+    - "Division by zero"
 must_not_include:
-- GARBAGE_JSX_002_ANALYTICS_TRACKER_A
-- GARBAGE_JSX_002_FLUSH_EVENTS_B
-- GARBAGE_JSX_002_I18N_CONFIG_D
-- GARBAGE_JSX_002_LOAD_LOCALE_F
-- GARBAGE_JSX_002_TRANSLATOR_E
-- analytics.ts
-- i18n.ts
+  # analytics.ts: event tracking, unrelated to calculator
+  - AnalyticsTracker
+  - flushEvents
+  - trackEvent
+  # i18n.ts: translation system, different concern
+  - Translator
+  - loadLocale
+  - Bonjour
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

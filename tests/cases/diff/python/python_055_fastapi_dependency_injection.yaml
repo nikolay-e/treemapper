@@ -1,3 +1,17 @@
+# Scenario: FastAPI dependencies.py adds Depends(get_db) to get_current_user,
+#   chains require_admin via Depends(get_current_user), and routers/protected.py
+#   wires up profile/admin endpoints using these dependencies.
+#
+# Reviewer questions:
+#   - Is the dependency chain get_db -> get_current_user -> require_admin correct?
+#   - Does Depends(get_current_user) properly propagate the db session?
+#
+# Trap files:
+#   - services/object_storage.py: storage service with put/get methods, mentions
+#     "key" and "data" but has no FastAPI or dependency injection connection
+#   - services/email_sender.py: email sending with SMTP, mentions "user" in
+#     recipient context but has no import from dependencies or database
+
 initial:
   database.py: |
     from typing import Generator
@@ -46,41 +60,51 @@ initial:
     @router.get("/status")
     async def get_status():
         return {"status": "public"}
-  garbage_storage.py: |
-    GARBAGE_PY_055_STORE_A = "storage backend marker"
-    GARBAGE_PY_055_BUCKET_B = "bucket config marker"
+  services/object_storage.py: |
+    from typing import Optional
 
-    class ObjectStorage:
-        GARBAGE_PY_055_UPLOAD_C = "upload handler marker"
-
-        def __init__(self, bucket: str = "default"):
+    class ObjectStorageClient:
+        def __init__(self, bucket: str = "default", region: str = "us-east-1"):
             self.bucket = bucket
+            self.region = region
             self._objects: dict[str, bytes] = {}
 
-        def put(self, key: str, data: bytes) -> str:
+        def put_object(self, key: str, data: bytes) -> str:
             self._objects[key] = data
             return f"s3://{self.bucket}/{key}"
 
-        def get(self, key: str) -> bytes | None:
-            GARBAGE_PY_055_DOWNLOAD_D = "download marker"
+        def get_object(self, key: str) -> Optional[bytes]:
             return self._objects.get(key)
-  garbage_email.py: |
-    GARBAGE_PY_055_SMTP_E = "smtp client marker"
-    GARBAGE_PY_055_TEMPLATE_F = "email template marker"
+
+        def delete_object(self, key: str) -> bool:
+            if key in self._objects:
+                del self._objects[key]
+                return True
+            return False
+
+        def list_objects(self, prefix: str = "") -> list[str]:
+            return [k for k in self._objects if k.startswith(prefix)]
+  services/email_sender.py: |
+    from typing import Optional
 
     class EmailSender:
-        GARBAGE_PY_055_ATTACH_G = True
-
         def __init__(self, smtp_host: str = "localhost", smtp_port: int = 587):
             self.smtp_host = smtp_host
             self.smtp_port = smtp_port
+            self._sent: list[dict] = []
 
         def send(self, to: str, subject: str, body: str) -> bool:
+            self._sent.append({"to": to, "subject": subject, "body": body})
             return True
 
         def send_bulk(self, recipients: list[str], subject: str, body: str) -> int:
-            GARBAGE_PY_055_BULK_H = "bulk send marker"
+            for recipient in recipients:
+                self.send(recipient, subject, body)
             return len(recipients)
+
+        def get_sent_count(self) -> int:
+            return len(self._sent)
+
 changed:
   database.py: |
     from typing import Generator
@@ -147,41 +171,51 @@ changed:
     @router.get("/status")
     async def get_status():
         return {"status": "public"}
-  garbage_storage.py: |
-    GARBAGE_PY_055_STORE_A = "storage backend marker"
-    GARBAGE_PY_055_BUCKET_B = "bucket config marker"
+  services/object_storage.py: |
+    from typing import Optional
 
-    class ObjectStorage:
-        GARBAGE_PY_055_UPLOAD_C = "upload handler marker"
-
-        def __init__(self, bucket: str = "default"):
+    class ObjectStorageClient:
+        def __init__(self, bucket: str = "default", region: str = "us-east-1"):
             self.bucket = bucket
+            self.region = region
             self._objects: dict[str, bytes] = {}
 
-        def put(self, key: str, data: bytes) -> str:
+        def put_object(self, key: str, data: bytes) -> str:
             self._objects[key] = data
             return f"s3://{self.bucket}/{key}"
 
-        def get(self, key: str) -> bytes | None:
-            GARBAGE_PY_055_DOWNLOAD_D = "download marker"
+        def get_object(self, key: str) -> Optional[bytes]:
             return self._objects.get(key)
-  garbage_email.py: |
-    GARBAGE_PY_055_SMTP_E = "smtp client marker"
-    GARBAGE_PY_055_TEMPLATE_F = "email template marker"
+
+        def delete_object(self, key: str) -> bool:
+            if key in self._objects:
+                del self._objects[key]
+                return True
+            return False
+
+        def list_objects(self, prefix: str = "") -> list[str]:
+            return [k for k in self._objects if k.startswith(prefix)]
+  services/email_sender.py: |
+    from typing import Optional
 
     class EmailSender:
-        GARBAGE_PY_055_ATTACH_G = True
-
         def __init__(self, smtp_host: str = "localhost", smtp_port: int = 587):
             self.smtp_host = smtp_host
             self.smtp_port = smtp_port
+            self._sent: list[dict] = []
 
         def send(self, to: str, subject: str, body: str) -> bool:
+            self._sent.append({"to": to, "subject": subject, "body": body})
             return True
 
         def send_bulk(self, recipients: list[str], subject: str, body: str) -> int:
-            GARBAGE_PY_055_BULK_H = "bulk send marker"
+            for recipient in recipients:
+                self.send(recipient, subject, body)
             return len(recipients)
+
+        def get_sent_count(self) -> int:
+            return len(self._sent)
+
 must_include_files:
 - dependencies.py
 - routers/protected.py
@@ -189,15 +223,16 @@ must_include_content:
 - from database import get_db, DatabaseSession
 - async def get_current_user(
 must_not_include:
-- GARBAGE_PY_055_ATTACH_G
-- GARBAGE_PY_055_BUCKET_B
-- GARBAGE_PY_055_BULK_H
-- GARBAGE_PY_055_DOWNLOAD_D
-- GARBAGE_PY_055_SMTP_E
-- GARBAGE_PY_055_STORE_A
-- GARBAGE_PY_055_TEMPLATE_F
-- GARBAGE_PY_055_UPLOAD_C
-- garbage_email.py
-- garbage_storage.py
+- ObjectStorageClient
+- put_object
+- delete_object
+- EmailSender
+- send_bulk
+- get_sent_count
+must_not_include_files:
+- services/object_storage.py
+- services/email_sender.py
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

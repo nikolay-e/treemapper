@@ -1,3 +1,22 @@
+# Scenario: Config class is refactored from plain instantiation to a
+# thread-safe double-checked locking singleton pattern.
+#
+# Diff: Config.java gains volatile static instance, private constructor,
+# synchronized getInstance(), and reads from env vars. A new AppContext.java
+# is added that calls Config.getInstance().
+#
+# Reviewer questions:
+#   Q1: "Where is the singleton consumed?"
+#       -> AppContext.java (NEW) calls Config.getInstance() and getValue().
+#   Q2: "Is the singleton thread-safe?"
+#       -> Config.java uses volatile + synchronized double-check.
+#
+# Not needed:
+#   - src/main/java/com/example/DatabaseConfig.java: another config class.
+#     Similar naming but independent configuration, no reference to Config.
+#   - src/main/java/com/example/PropertyLoader.java: loads .properties files.
+#     Configuration-adjacent but not used by Config singleton.
+
 initial:
   src/main/java/com/example/Config.java: |
     package com.example;
@@ -13,18 +32,48 @@ initial:
             return value;
         }
     }
-  GarbageFlyweight.java: |
-    public class GarbageFlyweight {
-        public static final String GARBAGE_JVM_041_FLYWEIGHT_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_041_POOL_MARKER_B = "marker";
-        public void noop() {}
+  src/main/java/com/example/DatabaseConfig.java: |
+    package com.example;
+
+    public class DatabaseConfig {
+        private String url;
+        private String username;
+        private int poolSize;
+
+        public DatabaseConfig(String url, String username, int poolSize) {
+            this.url = url;
+            this.username = username;
+            this.poolSize = poolSize;
+        }
+
+        public String getUrl() { return url; }
+        public String getUsername() { return username; }
+        public int getPoolSize() { return poolSize; }
     }
-  GarbageLazyInit.java: |
-    public class GarbageLazyInit {
-        public static final String GARBAGE_JVM_041_LAZY_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_041_EAGER_MARKER_D = "marker";
-        public void noop() {}
+  src/main/java/com/example/PropertyLoader.java: |
+    package com.example;
+
+    import java.io.InputStream;
+    import java.util.Properties;
+
+    public class PropertyLoader {
+        private final Properties properties = new Properties();
+
+        public void load(String filename) {
+            try (InputStream is = getClass().getClassLoader().getResourceAsStream(filename)) {
+                if (is != null) {
+                    properties.load(is);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load properties", e);
+            }
+        }
+
+        public String get(String key) {
+            return properties.getProperty(key);
+        }
     }
+
 changed:
   src/main/java/com/example/Config.java: |
     package com.example;
@@ -61,30 +110,68 @@ changed:
             System.out.println("Config: " + config.getValue());
         }
     }
-  GarbageFlyweight.java: |
-    public class GarbageFlyweight {
-        public static final String GARBAGE_JVM_041_FLYWEIGHT_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_041_POOL_MARKER_B = "marker";
-        public void noop() {}
+  src/main/java/com/example/DatabaseConfig.java: |
+    package com.example;
+
+    public class DatabaseConfig {
+        private String url;
+        private String username;
+        private int poolSize;
+
+        public DatabaseConfig(String url, String username, int poolSize) {
+            this.url = url;
+            this.username = username;
+            this.poolSize = poolSize;
+        }
+
+        public String getUrl() { return url; }
+        public String getUsername() { return username; }
+        public int getPoolSize() { return poolSize; }
     }
-  GarbageLazyInit.java: |
-    public class GarbageLazyInit {
-        public static final String GARBAGE_JVM_041_LAZY_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_041_EAGER_MARKER_D = "marker";
-        public void noop() {}
+  src/main/java/com/example/PropertyLoader.java: |
+    package com.example;
+
+    import java.io.InputStream;
+    import java.util.Properties;
+
+    public class PropertyLoader {
+        private final Properties properties = new Properties();
+
+        public void load(String filename) {
+            try (InputStream is = getClass().getClassLoader().getResourceAsStream(filename)) {
+                if (is != null) {
+                    properties.load(is);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load properties", e);
+            }
+        }
+
+        public String get(String key) {
+            return properties.getProperty(key);
+        }
     }
+
 must_include_files:
-- src/main/java/com/example/AppContext.java
-- src/main/java/com/example/Config.java
-must_include_content:
-- package com.example;
-- public class AppContext {
+  # Q1: AppContext calls Config.getInstance()
+  - src/main/java/com/example/AppContext.java
+  - src/main/java/com/example/Config.java
+must_include_content_from:
+  src/main/java/com/example/AppContext.java:
+    - "public class AppContext {"
+  src/main/java/com/example/Config.java:
+    - "private static volatile Config instance;"
 must_not_include:
-- GARBAGE_JVM_041_EAGER_MARKER_D
-- GARBAGE_JVM_041_FLYWEIGHT_MARKER_A
-- GARBAGE_JVM_041_LAZY_MARKER_C
-- GARBAGE_JVM_041_POOL_MARKER_B
-- GarbageFlyweight.java
-- GarbageLazyInit.java
+  # DatabaseConfig.java: separate config class, no reference to Config singleton
+  - DatabaseConfig
+  - getPoolSize
+  # PropertyLoader.java: properties loading utility, not used by Config
+  - PropertyLoader
+  - getResourceAsStream
+must_not_include_files:
+  - src/main/java/com/example/DatabaseConfig.java
+  - src/main/java/com/example/PropertyLoader.java
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

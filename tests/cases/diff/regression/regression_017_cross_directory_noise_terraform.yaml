@@ -1,3 +1,21 @@
+# Test: Terraform infra changes — cross-directory source code is noise
+#
+# Scenario: infra/main.tf is updated to use variable interpolation, add tags,
+# add S3 versioning resource, and add IAM policy attachment. infra/variables.tf
+# adds enable_versioning variable. Application source code is unchanged.
+#
+# Reviewer questions:
+#   Q1: "What new AWS resources were added?"
+#       -> aws_s3_bucket_versioning and aws_iam_role_policy_attachment in main.tf.
+#   Q2: "What new variables were introduced?"
+#       -> enable_versioning (bool, default true) in variables.tf.
+#
+# Trap files (plausible but unrelated):
+#   - scripts/deploy.sh: deployment script — infra-adjacent but not Terraform.
+#   - scripts/teardown.sh: resource cleanup — infra-adjacent but not Terraform.
+#   - src/lambda_handler.py: Lambda function code — references same IAM role
+#     but is application code, not infrastructure definition.
+
 initial:
   infra/main.tf: |
     provider "aws" {
@@ -30,23 +48,54 @@ initial:
       type    = string
       default = "us-east-1"
     }
-  scripts/GARBAGE_REG017_deploy.py: |
-    GARBAGE_REG017_DEPLOY_MARKER = "deploy_garbage"
-    def GARBAGE_REG017_deploy_to_staging():
-        return "GARBAGE_REG017_DEPLOY_RESULT"
-  scripts/GARBAGE_REG017_cleanup.py: |
-    GARBAGE_REG017_CLEANUP_MARKER = "cleanup_garbage"
-    def GARBAGE_REG017_run_cleanup():
-        return "GARBAGE_REG017_CLEANUP_RESULT"
-  src/GARBAGE_REG017_worker.py: |
-    class GARBAGE_REG017_BackgroundWorker:
-        GARBAGE_REG017_WORKER_MARKER = "worker_garbage"
-        def GARBAGE_REG017_process_job(self):
-            return "GARBAGE_REG017_WORKER_RESULT"
-  src/GARBAGE_REG017_scheduler.py: |
-    GARBAGE_REG017_SCHEDULER_MARKER = "scheduler_garbage"
-    def GARBAGE_REG017_schedule_task():
-        return "GARBAGE_REG017_SCHEDULER_RESULT"
+  scripts/deploy.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    ENVIRONMENT="${1:-staging}"
+    REGION="${2:-us-east-1}"
+
+    echo "Deploying to $ENVIRONMENT in $REGION..."
+
+    aws s3 sync dist/ "s3://myapp-artifacts-${ENVIRONMENT}/" --delete
+    aws lambda update-function-code \
+        --function-name "myapp-${ENVIRONMENT}" \
+        --s3-bucket "myapp-artifacts-${ENVIRONMENT}" \
+        --s3-key "lambda.zip" \
+        --region "$REGION"
+
+    echo "Deployment complete."
+  scripts/teardown.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    ENVIRONMENT="${1:-staging}"
+
+    echo "Tearing down $ENVIRONMENT resources..."
+
+    aws s3 rm "s3://myapp-data-${ENVIRONMENT}" --recursive
+    aws lambda delete-function --function-name "myapp-${ENVIRONMENT}"
+    aws iam delete-role --role-name "lambda-execution-role-${ENVIRONMENT}"
+
+    echo "Teardown complete."
+  src/lambda_handler.py: |
+    import json
+    import boto3
+    from typing import Dict, Any
+
+    s3_client = boto3.client("s3")
+
+    def handler(event: Dict[str, Any], context) -> Dict[str, Any]:
+        bucket = event.get("bucket", "myapp-data-bucket")
+        key = event.get("key")
+        if not key:
+            return {"statusCode": 400, "body": json.dumps({"error": "key required"})}
+        try:
+            response = s3_client.get_object(Bucket=bucket, Key=key)
+            content = response["Body"].read().decode("utf-8")
+            return {"statusCode": 200, "body": json.dumps({"content": content})}
+        except s3_client.exceptions.NoSuchKey:
+            return {"statusCode": 404, "body": json.dumps({"error": "not found"})}
 changed:
   infra/main.tf: |
     provider "aws" {
@@ -100,36 +149,80 @@ changed:
       type    = bool
       default = true
     }
-  scripts/GARBAGE_REG017_deploy.py: |
-    GARBAGE_REG017_DEPLOY_MARKER = "deploy_garbage"
-    def GARBAGE_REG017_deploy_to_staging():
-        return "GARBAGE_REG017_DEPLOY_RESULT"
-  scripts/GARBAGE_REG017_cleanup.py: |
-    GARBAGE_REG017_CLEANUP_MARKER = "cleanup_garbage"
-    def GARBAGE_REG017_run_cleanup():
-        return "GARBAGE_REG017_CLEANUP_RESULT"
-  src/GARBAGE_REG017_worker.py: |
-    class GARBAGE_REG017_BackgroundWorker:
-        GARBAGE_REG017_WORKER_MARKER = "worker_garbage"
-        def GARBAGE_REG017_process_job(self):
-            return "GARBAGE_REG017_WORKER_RESULT"
-  src/GARBAGE_REG017_scheduler.py: |
-    GARBAGE_REG017_SCHEDULER_MARKER = "scheduler_garbage"
-    def GARBAGE_REG017_schedule_task():
-        return "GARBAGE_REG017_SCHEDULER_RESULT"
+  scripts/deploy.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    ENVIRONMENT="${1:-staging}"
+    REGION="${2:-us-east-1}"
+
+    echo "Deploying to $ENVIRONMENT in $REGION..."
+
+    aws s3 sync dist/ "s3://myapp-artifacts-${ENVIRONMENT}/" --delete
+    aws lambda update-function-code \
+        --function-name "myapp-${ENVIRONMENT}" \
+        --s3-bucket "myapp-artifacts-${ENVIRONMENT}" \
+        --s3-key "lambda.zip" \
+        --region "$REGION"
+
+    echo "Deployment complete."
+  scripts/teardown.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    ENVIRONMENT="${1:-staging}"
+
+    echo "Tearing down $ENVIRONMENT resources..."
+
+    aws s3 rm "s3://myapp-data-${ENVIRONMENT}" --recursive
+    aws lambda delete-function --function-name "myapp-${ENVIRONMENT}"
+    aws iam delete-role --role-name "lambda-execution-role-${ENVIRONMENT}"
+
+    echo "Teardown complete."
+  src/lambda_handler.py: |
+    import json
+    import boto3
+    from typing import Dict, Any
+
+    s3_client = boto3.client("s3")
+
+    def handler(event: Dict[str, Any], context) -> Dict[str, Any]:
+        bucket = event.get("bucket", "myapp-data-bucket")
+        key = event.get("key")
+        if not key:
+            return {"statusCode": 400, "body": json.dumps({"error": "key required"})}
+        try:
+            response = s3_client.get_object(Bucket=bucket, Key=key)
+            content = response["Body"].read().decode("utf-8")
+            return {"statusCode": 200, "body": json.dumps({"content": content})}
+        except s3_client.exceptions.NoSuchKey:
+            return {"statusCode": 404, "body": json.dumps({"error": "not found"})}
 must_include_files:
-- infra/main.tf
-must_include_content:
-- aws_s3_bucket_versioning
-- aws_iam_role_policy_attachment
+  - infra/main.tf
+  # Q2: variables.tf adds the new enable_versioning variable
+  - infra/variables.tf
+must_include_content_from:
+  infra/main.tf:
+    - "aws_s3_bucket_versioning"
+    - "aws_iam_role_policy_attachment"
+  infra/variables.tf:
+    - "enable_versioning"
 must_not_include:
-- GARBAGE_REG017_DEPLOY_MARKER
-- GARBAGE_REG017_DEPLOY_RESULT
-- GARBAGE_REG017_CLEANUP_MARKER
-- GARBAGE_REG017_CLEANUP_RESULT
-- GARBAGE_REG017_WORKER_MARKER
-- GARBAGE_REG017_WORKER_RESULT
-- GARBAGE_REG017_SCHEDULER_MARKER
-- GARBAGE_REG017_SCHEDULER_RESULT
+  # scripts/deploy.sh: deployment shell script — not Terraform, not changed
+  - "aws s3 sync"
+  - "aws lambda update-function-code"
+  # scripts/teardown.sh: teardown shell script — not Terraform, not changed
+  - "aws s3 rm"
+  - "aws iam delete-role"
+  # src/lambda_handler.py: application code — references same bucket but not infra
+  - s3_client
+  - "s3_client.get_object"
+  - NoSuchKey
+must_not_include_files:
+  - scripts/deploy.sh
+  - scripts/teardown.sh
+  - src/lambda_handler.py
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

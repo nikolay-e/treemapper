@@ -1,5 +1,38 @@
+# Scenario: manager.cpp goes from empty main to ResourceManager that uses
+#   std::unique_ptr<Resource> for exclusive ownership of Resource objects.
+#
+# Reviewer questions:
+#   Q1: "What is Resource — what constructor does make_unique<Resource>(id) call?"
+#       -> include/resource.h: Resource(const std::string& id) sets this->id.
+#          make_unique<Resource>("resource-1") calls this constructor.
+#
+#   Q2: "Does res->use() exist on Resource?"
+#       -> include/resource.h: public void use() {}. Reviewer must verify
+#          this method exists and is accessible on Resource.
+#
+#   Q3: "Is ownership transfer correct via std::move?"
+#       -> Diff: processBuffer(std::move(b)) — wait, this is ResourceManager,
+#          not Buffer. acquire() returns unique_ptr, process() calls acquire
+#          then res->use(). The unique_ptr goes out of scope after use —
+#          automatic cleanup. Reviewer must verify no dangling access.
+#
+# Not needed:
+#   - src/connection_pool.cpp: Also uses std::unique_ptr with a different
+#     resource type. Same make_unique pattern. Different domain (connections).
+#
+#   - include/resource_factory.h: Factory that creates Resource objects.
+#     Returns unique_ptr<Resource>. Direct structural edge. But factory
+#     abstraction doesn't help review ResourceManager's ownership logic.
+#
+#   - src/shared_cache.cpp: Uses std::shared_ptr<Resource> (not unique_ptr).
+#     Same Resource type, different ownership model. Could confuse reviewer
+#     about which smart pointer pattern is intended.
+#
+#   - tests/resource_test.cpp: Tests Resource construction and use().
+#     Same types. But tests don't help review ownership semantics.
+
 initial:
-  resource.h: |
+  include/resource.h: |
     #pragma once
     #include <string>
 
@@ -9,60 +42,95 @@ initial:
         Resource(const std::string& id) : id(id) {}
         void use() {}
     };
-  manager.cpp: |
+
+  src/manager.cpp: |
     #include <iostream>
     int main() { return 0; }
-  garbage_matrix.cpp: |
-    #include <array>
-    const char* GARBAGE_JVM_009_MATRIX_MARKER_A = "mat_multiply";
-    const char* GARBAGE_JVM_009_TRANSPOSE_MARKER_B = "mat_transpose";
 
-    class GarbageMatrix2x2 {
-        std::array<double, 4> data_;
-    public:
-        GarbageMatrix2x2() : data_{1, 0, 0, 1} {}
-        double at(int r, int c) const { return data_[r * 2 + c]; }
-        void set(int r, int c, double v) { data_[r * 2 + c] = v; }
-    };
-  garbage_throttle.cpp: |
-    #include <chrono>
-    const char* GARBAGE_JVM_009_THROTTLE_MARKER_C = "rate_limit";
-    const char* GARBAGE_JVM_009_BURST_MARKER_D = "burst_allow";
-
-    class GarbageRateThrottle {
-        int max_per_second_;
-        int count_ = 0;
-    public:
-        GarbageRateThrottle(int max) : max_per_second_(max) {}
-        bool allow() { return ++count_ <= max_per_second_; }
-        void reset() { count_ = 0; }
-    };
-  garbage_pool.cpp: |
-    const char* GARBAGE_JVM_009_POOL_MARKER_A = "marker";
-    const char* GARBAGE_JVM_009_RECYCLE_MARKER_B = "marker";
-
-    class GarbageObjectPool {
-        void noop() {}
-    };
-  garbage_factory.cpp: |
-    const char* GARBAGE_JVM_009_FACTORY_MARKER_C = "marker";
-    const char* GARBAGE_JVM_009_DESTROY_MARKER_D = "marker";
-
-    class GarbageObjectFactory {
-        void noop() {}
-    };
-changed:
-  resource.h: |
-    #pragma once
+  src/connection_pool.cpp: |
+    #include <memory>
+    #include <vector>
     #include <string>
 
-    class Resource {
+    class Connection {
     public:
-        std::string id;
-        Resource(const std::string& id) : id(id) {}
-        void use() {}
+        std::string host;
+        int port;
+        Connection(const std::string& h, int p) : host(h), port(p) {}
+        void execute(const std::string& query) {}
+        void close() {}
     };
-  manager.cpp: |
+
+    class ConnectionPool {
+        std::vector<std::unique_ptr<Connection>> pool_;
+    public:
+        std::unique_ptr<Connection> acquire(const std::string& host, int port) {
+            return std::make_unique<Connection>(host, port);
+        }
+
+        void releaseAll() { pool_.clear(); }
+        size_t size() const { return pool_.size(); }
+    };
+
+  include/resource_factory.h: |
+    #pragma once
+    #include "resource.h"
+    #include <memory>
+    #include <string>
+
+    class ResourceFactory {
+    public:
+        static std::unique_ptr<Resource> create(const std::string& id) {
+            return std::make_unique<Resource>(id);
+        }
+
+        static std::unique_ptr<Resource> createWithPrefix(
+            const std::string& prefix,
+            const std::string& name)
+        {
+            return std::make_unique<Resource>(prefix + "-" + name);
+        }
+    };
+
+  src/shared_cache.cpp: |
+    #include "resource.h"
+    #include <memory>
+    #include <unordered_map>
+    #include <string>
+
+    class SharedCache {
+        std::unordered_map<std::string, std::shared_ptr<Resource>> cache_;
+    public:
+        std::shared_ptr<Resource> get(const std::string& key) {
+            auto it = cache_.find(key);
+            if (it != cache_.end()) return it->second;
+            auto res = std::make_shared<Resource>(key);
+            cache_[key] = res;
+            return res;
+        }
+
+        size_t size() const { return cache_.size(); }
+        void evict(const std::string& key) { cache_.erase(key); }
+    };
+
+  tests/resource_test.cpp: |
+    #include "resource.h"
+    #include <cassert>
+    #include <memory>
+
+    void test_resource_creation() {
+        auto res = std::make_unique<Resource>("test-1");
+        assert(res->id == "test-1");
+    }
+
+    void test_resource_use() {
+        Resource r("test-2");
+        r.use();
+        assert(r.id == "test-2");
+    }
+
+changed:
+  src/manager.cpp: |
     #include "resource.h"
     #include <memory>
 
@@ -77,61 +145,47 @@ changed:
             res->use();
         }
     };
-  garbage_matrix.cpp: |
-    #include <array>
-    const char* GARBAGE_JVM_009_MATRIX_MARKER_A = "mat_multiply";
-    const char* GARBAGE_JVM_009_TRANSPOSE_MARKER_B = "mat_transpose";
 
-    class GarbageMatrix2x2 {
-        std::array<double, 4> data_;
-    public:
-        GarbageMatrix2x2() : data_{1, 0, 0, 1} {}
-        double at(int r, int c) const { return data_[r * 2 + c]; }
-        void set(int r, int c, double v) { data_[r * 2 + c] = v; }
-    };
-  garbage_throttle.cpp: |
-    #include <chrono>
-    const char* GARBAGE_JVM_009_THROTTLE_MARKER_C = "rate_limit";
-    const char* GARBAGE_JVM_009_BURST_MARKER_D = "burst_allow";
-
-    class GarbageRateThrottle {
-        int max_per_second_;
-        int count_ = 0;
-    public:
-        GarbageRateThrottle(int max) : max_per_second_(max) {}
-        bool allow() { return ++count_ <= max_per_second_; }
-        void reset() { count_ = 0; }
-    };
-  garbage_pool.cpp: |
-    const char* GARBAGE_JVM_009_POOL_MARKER_A = "marker";
-    const char* GARBAGE_JVM_009_RECYCLE_MARKER_B = "marker";
-
-    class GarbageObjectPool {
-        void noop() {}
-    };
-  garbage_factory.cpp: |
-    const char* GARBAGE_JVM_009_FACTORY_MARKER_C = "marker";
-    const char* GARBAGE_JVM_009_DESTROY_MARKER_D = "marker";
-
-    class GarbageObjectFactory {
-        void noop() {}
-    };
 must_include_files:
-- manager.cpp
-must_include_content:
-- class ResourceManager {
+  - src/manager.cpp
+  # Q1+Q2: Reviewer needs Resource to verify the constructor and use() method.
+  - include/resource.h
+
+must_include_content_from:
+  src/manager.cpp:
+    - "class ResourceManager"
+    - "std::unique_ptr<Resource> acquire"
+    - "std::make_unique<Resource>(id)"
+    - "res->use()"
+  include/resource.h:
+    - "Resource(const std::string& id)"
+    - "void use()"
+
 must_not_include:
-- GARBAGE_JVM_009_BURST_MARKER_D
-- GARBAGE_JVM_009_DESTROY_MARKER_D
-- GARBAGE_JVM_009_FACTORY_MARKER_C
-- GARBAGE_JVM_009_MATRIX_MARKER_A
-- GARBAGE_JVM_009_POOL_MARKER_A
-- GARBAGE_JVM_009_RECYCLE_MARKER_B
-- GARBAGE_JVM_009_THROTTLE_MARKER_C
-- GARBAGE_JVM_009_TRANSPOSE_MARKER_B
-- garbage_factory.cpp
-- garbage_matrix.cpp
-- garbage_pool.cpp
-- garbage_throttle.cpp
+  # --- connection_pool.cpp: same unique_ptr pattern, different type ---
+  - ConnectionPool
+  - Connection
+  - "execute(const std::string& query)"
+  - releaseAll
+  # --- resource_factory.h: creates Resources, different concern ---
+  - ResourceFactory
+  - createWithPrefix
+  # --- shared_cache.cpp: shared_ptr not unique_ptr ---
+  - SharedCache
+  - shared_ptr
+  - make_shared
+  - evict
+  # --- tests ---
+  - test_resource_creation
+  - test_resource_use
+
+must_not_include_files:
+  - src/connection_pool.cpp
+  - include/resource_factory.h
+  - src/shared_cache.cpp
+  - tests/resource_test.cpp
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

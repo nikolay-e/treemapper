@@ -1,3 +1,19 @@
+# Reviewer sees: service.test.ts mocks api.ts and tests getUserDisplayName
+# and getUserEmail from service.ts.
+# Q1: "What does service.ts do with fetchUser results?"
+#     -> src/service.ts: getUserDisplayName formats `name (role)`,
+#        getUserEmail returns user.email. Mock return values must
+#        match the fields the service reads.
+# Q2: "What is fetchUser's return type?"
+#     -> src/api.ts: UserResponse with id, name, email, role. Mock's
+#        mockResolvedValue must match this shape.
+#
+# Not needed:
+#   - src/unrelated/storage.ts: local storage adapter. Different
+#     infrastructure concern (persistence vs API calls).
+#   - src/unrelated/notifications.ts: notification dispatch. Different
+#     domain (notifications vs user data retrieval).
+
 initial:
   src/api.ts: |
     export interface UserResponse {
@@ -32,11 +48,9 @@ initial:
         return user.email;
     }
   src/service.test.ts: |
-    console.log('initial');
+    console.log('placeholder');
   src/unrelated/storage.ts: |
-    const GARBAGE_JSX_004_STORAGE_ADAPTER_A = 'storage_garbage_marker';
-
-    export class GarbageStorageAdapter {
+    export class StorageAdapter {
         private data: Record<string, string> = {};
 
         save(key: string, value: string): void {
@@ -48,20 +62,18 @@ initial:
         }
     }
 
-    export function GARBAGE_JSX_004_SYNC_STORAGE_B(): void {
-        console.log('GARBAGE_JSX_004_SYNC_OUTPUT_C');
+    export function syncStorage(): void {
+        console.log('syncing storage');
     }
   src/unrelated/notifications.ts: |
-    const GARBAGE_JSX_004_NOTIFICATION_HUB_D = { provider: 'email', enabled: true };
-
-    export class GARBAGE_JSX_004_NOTIFIER_E {
+    export class Notifier {
         send(message: string): void {
-            console.log(message);
+            console.log('notification:', message);
         }
     }
 
-    export function GARBAGE_JSX_004_DISPATCH_NOTIFICATION_F(): void {
-        console.log('dispatching notification');
+    export function dispatchNotification(userId: string, text: string): void {
+        console.log('dispatching to', userId, text);
     }
 changed:
   src/api.ts: |
@@ -126,9 +138,7 @@ changed:
         });
     });
   src/unrelated/storage.ts: |
-    const GARBAGE_JSX_004_STORAGE_ADAPTER_A = 'storage_garbage_marker';
-
-    export class GarbageStorageAdapter {
+    export class StorageAdapter {
         private data: Record<string, string> = {};
 
         save(key: string, value: string): void {
@@ -140,33 +150,41 @@ changed:
         }
     }
 
-    export function GARBAGE_JSX_004_SYNC_STORAGE_B(): void {
-        console.log('GARBAGE_JSX_004_SYNC_OUTPUT_C');
+    export function syncStorage(): void {
+        console.log('syncing storage');
     }
   src/unrelated/notifications.ts: |
-    const GARBAGE_JSX_004_NOTIFICATION_HUB_D = { provider: 'email', enabled: true };
-
-    export class GARBAGE_JSX_004_NOTIFIER_E {
+    export class Notifier {
         send(message: string): void {
-            console.log(message);
+            console.log('notification:', message);
         }
     }
 
-    export function GARBAGE_JSX_004_DISPATCH_NOTIFICATION_F(): void {
-        console.log('dispatching notification');
+    export function dispatchNotification(userId: string, text: string): void {
+        console.log('dispatching to', userId, text);
     }
 must_include_files:
-- src/service.test.ts
-must_include_content:
-- import { getUserDisplayName, getUserEmail } from './service';
-- mockedFetchUser = fetchUser as jest.MockedFunction<typeof fetchUser>
+  # Unchanged — the service layer that the test exercises. Reviewer
+  # needs to see how getUserDisplayName formats the response.
+  - src/service.ts
+  # Unchanged — the API module being mocked. Reviewer needs to see
+  # UserResponse shape to verify mock return values are correct.
+  - src/api.ts
+must_include_content_from:
+  src/service.ts:
+    - "getUserDisplayName"
+    - "user.name"
+  src/api.ts:
+    - "UserResponse"
+    - "fetchUser"
 must_not_include:
-- GARBAGE_JSX_004_DISPATCH_NOTIFICATION_F
-- GARBAGE_JSX_004_NOTIFICATION_HUB_D
-- GARBAGE_JSX_004_NOTIFIER_E
-- GARBAGE_JSX_004_STORAGE_ADAPTER_A
-- GARBAGE_JSX_004_SYNC_STORAGE_B
-- notifications.ts
-- storage.ts
+  # storage.ts: persistence layer, unrelated to API mocking
+  - StorageAdapter
+  - syncStorage
+  # notifications.ts: notification dispatch, different domain
+  - Notifier
+  - dispatchNotification
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

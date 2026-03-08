@@ -1,3 +1,10 @@
+# Scenario: Two modules change simultaneously — tests multiple PPR seed nodes
+# Changed: module_a.py returns "modified a", module_b.py returns "modified b"
+# Reviewer needs: module_a.py (changed) + module_b.py (changed)
+# Trap: module_bundle.py — redefines func_a/func_b, name collision but different module
+# Trap: module_d.py — structural sibling matching module_a/module_b naming convention
+# Trap: email_service.py — completely unrelated module
+
 initial:
   module_a.py: |
     def func_a():
@@ -8,12 +15,7 @@ initial:
   module_c.py: |
     def func_c():
         return "c"
-
-  # --- Tricky garbage: same function names func_a/func_b but no import edge ---
-  garbage_alt_modules.py: |
-    GARBAGE_PPR_019_ALT_MOD_A = "alternate_modules"
-    GARBAGE_PPR_019_ALT_VER_B = "v2"
-
+  module_bundle.py: |
     def func_a():
         return "alternate_a"
 
@@ -21,29 +23,18 @@ initial:
         return "alternate_b"
 
     class ModuleBundle:
-        GARBAGE_PPR_019_ALT_BUNDLE_C = True
-
         def get_all(self):
             return [func_a(), func_b()]
-
-  # --- Tricky garbage: structural sibling module_d matching naming ---
-  garbage_module_d.py: |
-    GARBAGE_PPR_019_MOD_D_INIT_D = "module_d"
-    GARBAGE_PPR_019_MOD_D_VER_E = "1.0"
-
+  module_d.py: |
     def func_d():
         return "d"
 
     class ModuleDHandler:
-        GARBAGE_PPR_019_MOD_D_HANDLE_F = True
-
         def handle(self):
             return func_d()
-
-  # --- Plain garbage: no overlap ---
-  garbage_email.py: |
-    GARBAGE_PPR_019_EMAIL_HOST_G = "smtp.example.com"
-    GARBAGE_PPR_019_EMAIL_PORT_H = 587
+  email_service.py: |
+    SMTP_HOST = "smtp.example.com"
+    SMTP_PORT = 587
 
     class EmailSender:
         def send(self, to: str, body: str):
@@ -59,11 +50,7 @@ changed:
   module_c.py: |
     def func_c():
         return "c"
-
-  garbage_alt_modules.py: |
-    GARBAGE_PPR_019_ALT_MOD_A = "alternate_modules"
-    GARBAGE_PPR_019_ALT_VER_B = "v2"
-
+  module_bundle.py: |
     def func_a():
         return "alternate_a"
 
@@ -71,27 +58,18 @@ changed:
         return "alternate_b"
 
     class ModuleBundle:
-        GARBAGE_PPR_019_ALT_BUNDLE_C = True
-
         def get_all(self):
             return [func_a(), func_b()]
-
-  garbage_module_d.py: |
-    GARBAGE_PPR_019_MOD_D_INIT_D = "module_d"
-    GARBAGE_PPR_019_MOD_D_VER_E = "1.0"
-
+  module_d.py: |
     def func_d():
         return "d"
 
     class ModuleDHandler:
-        GARBAGE_PPR_019_MOD_D_HANDLE_F = True
-
         def handle(self):
             return func_d()
-
-  garbage_email.py: |
-    GARBAGE_PPR_019_EMAIL_HOST_G = "smtp.example.com"
-    GARBAGE_PPR_019_EMAIL_PORT_H = 587
+  email_service.py: |
+    SMTP_HOST = "smtp.example.com"
+    SMTP_PORT = 587
 
     class EmailSender:
         def send(self, to: str, body: str):
@@ -118,22 +96,17 @@ must_include_content_from:
     - return "modified b"
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_PPR_019_EMAIL_HOST_G
-- GARBAGE_PPR_019_EMAIL_PORT_H
-# Tricky: redefines func_a and func_b
-- GARBAGE_PPR_019_ALT_MOD_A
-- GARBAGE_PPR_019_ALT_VER_B
-- GARBAGE_PPR_019_ALT_BUNDLE_C
-# Tricky: structural sibling module_d
-- GARBAGE_PPR_019_MOD_D_INIT_D
-- GARBAGE_PPR_019_MOD_D_VER_E
-- GARBAGE_PPR_019_MOD_D_HANDLE_F
+- ModuleBundle
+- alternate_a
+- ModuleDHandler
+- func_d
+- EmailSender
+- SMTP_HOST
 
 must_not_include_files:
-- garbage_alt_modules.py
-- garbage_module_d.py
-- garbage_email.py
+- module_bundle.py
+- module_d.py
+- email_service.py
 
 max_fragments: 6
 max_files: 3

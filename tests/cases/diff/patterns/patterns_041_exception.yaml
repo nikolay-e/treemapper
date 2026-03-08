@@ -1,3 +1,22 @@
+# Test 041: New PermissionDeniedError + stricter validation in user_repository
+#           — reviewer needs exceptions.py, user_repository.py, and new tests
+#
+# Scenario: exceptions.py gains PermissionDeniedError class. user_repository.py
+# adds name-required validation in create(). Tests add pytest.raises checks
+# for NotFoundError and ValidationError with attribute assertions.
+#
+# Reviewer questions:
+#   Q1: "What fields does ValidationError expose for test assertions?"
+#       -> .field and .message attributes set in __init__.
+#   Q2: "Is PermissionDeniedError used anywhere yet?"
+#       -> Defined but not imported by user_repository — forward-looking addition.
+#
+# Trap files (plausible but unrelated):
+#   - src/auth_errors.py: another error hierarchy (AuthenticationError) with
+#     similar pattern but for auth, not user CRUD.
+#   - src/product_repository.py: similar repository with create/get and
+#     could raise ValidationError, but independent of user_repository changes.
+
 initial:
   src/exceptions.py: |
     class ValidationError(Exception):
@@ -36,6 +55,38 @@ initial:
         repo = UserRepository()
         user = repo.create({"name": "Test", "email": "test@example.com"})
         assert user["name"] == "Test"
+  src/auth_errors.py: |
+    class AuthenticationError(Exception):
+        pass
+
+    class TokenExpiredError(AuthenticationError):
+        def __init__(self, token_id: str):
+            self.token_id = token_id
+            super().__init__(f"Token {token_id} expired")
+
+    class InvalidCredentialsError(AuthenticationError):
+        def __init__(self, username: str):
+            self.username = username
+            super().__init__(f"Invalid credentials for {username}")
+  src/product_repository.py: |
+    from src.exceptions import NotFoundError, ValidationError
+
+    class ProductRepository:
+        def __init__(self):
+            self.products = {}
+
+        def get(self, product_id: int):
+            if product_id not in self.products:
+                raise NotFoundError("Product", str(product_id))
+            return self.products[product_id]
+
+        def create(self, data: dict):
+            if "name" not in data:
+                raise ValidationError("name", "is required")
+            product_id = len(self.products) + 1
+            self.products[product_id] = {**data, "id": product_id}
+            return self.products[product_id]
+
 changed:
   src/exceptions.py: |
     class ValidationError(Exception):
@@ -104,12 +155,66 @@ changed:
         with pytest.raises(ValidationError) as exc_info:
             repo.create({"email": "test@example.com"})
         assert exc_info.value.field == "name"
+  src/auth_errors.py: |
+    class AuthenticationError(Exception):
+        pass
+
+    class TokenExpiredError(AuthenticationError):
+        def __init__(self, token_id: str):
+            self.token_id = token_id
+            super().__init__(f"Token {token_id} expired")
+
+    class InvalidCredentialsError(AuthenticationError):
+        def __init__(self, username: str):
+            self.username = username
+            super().__init__(f"Invalid credentials for {username}")
+  src/product_repository.py: |
+    from src.exceptions import NotFoundError, ValidationError
+
+    class ProductRepository:
+        def __init__(self):
+            self.products = {}
+
+        def get(self, product_id: int):
+            if product_id not in self.products:
+                raise NotFoundError("Product", str(product_id))
+            return self.products[product_id]
+
+        def create(self, data: dict):
+            if "name" not in data:
+                raise ValidationError("name", "is required")
+            product_id = len(self.products) + 1
+            self.products[product_id] = {**data, "id": product_id}
+            return self.products[product_id]
+
 must_include_files:
-- src/exceptions.py
-- src/user_repository.py
-- tests/test_user_repository.py
-must_include_content:
-- 'class PermissionDeniedError(Exception):'
-- import pytest
+  - src/exceptions.py
+  - src/user_repository.py
+  - tests/test_user_repository.py
+
+must_include_content_from:
+  src/exceptions.py:
+    - "class PermissionDeniedError(Exception):"
+  tests/test_user_repository.py:
+    - "import pytest"
+    - "pytest.raises(NotFoundError)"
+  src/user_repository.py:
+    - 'raise ValidationError("name", "is required")'
+
+must_not_include:
+  # --- auth_errors.py: separate error hierarchy for auth domain ---
+  - "class AuthenticationError"
+  - "TokenExpiredError"
+  - "InvalidCredentialsError"
+  # --- product_repository.py: sibling repo, uses same exceptions but independent ---
+  - "class ProductRepository"
+  - '"Product"'
+
+must_not_include_files:
+  - src/auth_errors.py
+  - src/product_repository.py
+
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

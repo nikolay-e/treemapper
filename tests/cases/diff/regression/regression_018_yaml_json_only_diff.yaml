@@ -1,3 +1,23 @@
+# Test: YAML/JSON config-only diff — pre-commit, CI workflow, and package.json
+#
+# Scenario: Three config files changed simultaneously: .pre-commit-config.yaml
+# gets new hooks (gitleaks), .github/workflows/ci.yml adds lint job and
+# pull_request trigger, package.json bumps to v2.0.0 with new deps and scripts.
+# No source code files are changed.
+#
+# Reviewer questions:
+#   Q1: "What security tooling was added?"
+#       -> .pre-commit-config.yaml adds gitleaks hook for secrets scanning.
+#   Q2: "What new npm scripts were added?"
+#       -> package.json adds lint, build, start scripts with eslint/tsc.
+#
+# Trap files (plausible but unrelated):
+#   - src/server.ts: Express server code — references express from package.json
+#     but is unchanged and not affected by config changes.
+#   - src/middleware/auth.ts: auth middleware — same project but unrelated to
+#     config updates.
+#   - tsconfig.json: TypeScript config — CI-adjacent but not changed.
+
 initial:
   .pre-commit-config.yaml: |
     repos:
@@ -21,19 +41,61 @@ initial:
         "express": "^4.18.0"
       }
     }
-  src/GARBAGE_REG018_controller.py: |
-    class GARBAGE_REG018_MainController:
-        GARBAGE_REG018_CONTROLLER_MARKER = "controller_garbage"
-        def GARBAGE_REG018_handle_index(self):
-            return "GARBAGE_REG018_INDEX_RESULT"
-  src/GARBAGE_REG018_middleware.py: |
-    GARBAGE_REG018_MIDDLEWARE_MARKER = "middleware_garbage"
-    def GARBAGE_REG018_auth_middleware():
-        return "GARBAGE_REG018_AUTH_RESULT"
-  lib/GARBAGE_REG018_cache.py: |
-    GARBAGE_REG018_CACHE_MARKER = "cache_garbage"
-    def GARBAGE_REG018_invalidate_cache():
-        return "GARBAGE_REG018_CACHE_RESULT"
+  src/server.ts: |
+    import express from 'express';
+    import { authMiddleware } from './middleware/auth';
+
+    const app = express();
+    app.use(express.json());
+    app.use(authMiddleware);
+
+    app.get('/health', (req, res) => {
+        res.json({ status: 'ok' });
+    });
+
+    app.get('/api/users', (req, res) => {
+        res.json({ users: [] });
+    });
+
+    app.listen(3000, () => {
+        console.log('Server running on port 3000');
+    });
+  src/middleware/auth.ts: |
+    import { Request, Response, NextFunction } from 'express';
+
+    export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+        const token = req.headers.authorization;
+        if (!token) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+        if (!token.startsWith('Bearer ')) {
+            res.status(401).json({ error: 'Invalid token format' });
+            return;
+        }
+        next();
+    }
+
+    export function optionalAuth(req: Request, res: Response, next: NextFunction): void {
+        const token = req.headers.authorization;
+        if (token && token.startsWith('Bearer ')) {
+            req.user = { authenticated: true };
+        }
+        next();
+    }
+  tsconfig.json: |
+    {
+      "compilerOptions": {
+        "target": "ES2020",
+        "module": "commonjs",
+        "strict": true,
+        "esModuleInterop": true,
+        "outDir": "./dist",
+        "rootDir": "./src"
+      },
+      "include": ["src/**/*"],
+      "exclude": ["node_modules", "dist"]
+    }
 changed:
   .pre-commit-config.yaml: |
     repos:
@@ -88,33 +150,86 @@ changed:
         "start": "node dist/index.js"
       }
     }
-  src/GARBAGE_REG018_controller.py: |
-    class GARBAGE_REG018_MainController:
-        GARBAGE_REG018_CONTROLLER_MARKER = "controller_garbage"
-        def GARBAGE_REG018_handle_index(self):
-            return "GARBAGE_REG018_INDEX_RESULT"
-  src/GARBAGE_REG018_middleware.py: |
-    GARBAGE_REG018_MIDDLEWARE_MARKER = "middleware_garbage"
-    def GARBAGE_REG018_auth_middleware():
-        return "GARBAGE_REG018_AUTH_RESULT"
-  lib/GARBAGE_REG018_cache.py: |
-    GARBAGE_REG018_CACHE_MARKER = "cache_garbage"
-    def GARBAGE_REG018_invalidate_cache():
-        return "GARBAGE_REG018_CACHE_RESULT"
+  src/server.ts: |
+    import express from 'express';
+    import { authMiddleware } from './middleware/auth';
+
+    const app = express();
+    app.use(express.json());
+    app.use(authMiddleware);
+
+    app.get('/health', (req, res) => {
+        res.json({ status: 'ok' });
+    });
+
+    app.get('/api/users', (req, res) => {
+        res.json({ users: [] });
+    });
+
+    app.listen(3000, () => {
+        console.log('Server running on port 3000');
+    });
+  src/middleware/auth.ts: |
+    import { Request, Response, NextFunction } from 'express';
+
+    export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+        const token = req.headers.authorization;
+        if (!token) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+        if (!token.startsWith('Bearer ')) {
+            res.status(401).json({ error: 'Invalid token format' });
+            return;
+        }
+        next();
+    }
+
+    export function optionalAuth(req: Request, res: Response, next: NextFunction): void {
+        const token = req.headers.authorization;
+        if (token && token.startsWith('Bearer ')) {
+            req.user = { authenticated: true };
+        }
+        next();
+    }
+  tsconfig.json: |
+    {
+      "compilerOptions": {
+        "target": "ES2020",
+        "module": "commonjs",
+        "strict": true,
+        "esModuleInterop": true,
+        "outDir": "./dist",
+        "rootDir": "./src"
+      },
+      "include": ["src/**/*"],
+      "exclude": ["node_modules", "dist"]
+    }
 must_include_files:
-- .pre-commit-config.yaml
-- .github/workflows/ci.yml
-- package.json
-must_include_content:
-- gitleaks
-- 'needs: lint'
-- '"version": "2.0.0"'
+  - .pre-commit-config.yaml
+  - .github/workflows/ci.yml
+  - package.json
+must_include_content_from:
+  .pre-commit-config.yaml:
+    - "gitleaks"
+  .github/workflows/ci.yml:
+    - "needs: lint"
+  package.json:
+    - '"version": "2.0.0"'
 must_not_include:
-- GARBAGE_REG018_CONTROLLER_MARKER
-- GARBAGE_REG018_INDEX_RESULT
-- GARBAGE_REG018_MIDDLEWARE_MARKER
-- GARBAGE_REG018_AUTH_RESULT
-- GARBAGE_REG018_CACHE_MARKER
-- GARBAGE_REG018_CACHE_RESULT
+  # src/server.ts: Express server — unchanged, not affected by config updates
+  - authMiddleware
+  - "app.listen"
+  # src/middleware/auth.ts: auth middleware — unchanged
+  - optionalAuth
+  - "Invalid token format"
+  # tsconfig.json: TypeScript config — unchanged
+  - esModuleInterop
+must_not_include_files:
+  - src/server.ts
+  - src/middleware/auth.ts
+  - tsconfig.json
+max_fragments: 5
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

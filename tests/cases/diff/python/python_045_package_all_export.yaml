@@ -1,3 +1,28 @@
+# Scenario: mylib/__init__.py adds __all__ to explicitly export validators
+#   and formatters. validators.py and formatters.py are unchanged but
+#   define the functions being re-exported.
+#
+# Diff shows:
+#   + __all__ = ["validate_email", "validate_url", "format_currency", "format_percentage"]
+#
+# Reviewer questions:
+#   Q1: "Does __all__ correctly list all public API names from the imports?"
+#       -> Same file: from .validators import validate_email, validate_url;
+#          from .formatters import format_currency, format_percentage.
+#          __all__ lists all four. Reviewer verifies 1:1 correspondence.
+#
+#   Q2: "Are the re-exported names consistent with what the submodules define?"
+#       -> mylib/validators.py (UNCHANGED) defines validate_email, validate_url.
+#          mylib/formatters.py (UNCHANGED) defines format_currency, format_percentage.
+#          Reviewer verifies __all__ names match actual function names.
+#
+# Not needed for comprehension:
+#   - processors/image_optimizer.py: ImageOptimizer with optimize/resize.
+#     Different package entirely. No import from or dependency on mylib.
+#
+#   - generators/report_builder.py: ReportBuilder with add_section/generate.
+#     Different package. No dependency on mylib or its exports.
+
 initial:
   mylib/validators.py: |
     def validate_email(email: str) -> bool:
@@ -16,38 +41,40 @@ initial:
   mylib/__init__.py: |
     from .validators import validate_email, validate_url
     from .formatters import format_currency, format_percentage
-  garbage_image_proc.py: |
-    GARBAGE_PY_045_IMAGE_A = "image processing marker"
-    GARBAGE_PY_045_RESIZE_B = "resize operation marker"
+  processors/image_optimizer.py: |
+    from pathlib import Path
 
-    class ImageProcessor:
-        GARBAGE_PY_045_PROC_C = "processor marker"
-
-        def __init__(self, quality: int = 85):
+    class ImageOptimizer:
+        def __init__(self, quality: int = 85, max_width: int = 1920):
             self.quality = quality
+            self.max_width = max_width
 
-        def resize(self, width: int, height: int) -> dict:
-            return {"width": width, "height": height}
+        def optimize(self, input_path: str, output_path: str) -> dict:
+            return {"input": input_path, "output": output_path, "quality": self.quality}
 
-        def compress(self, data: bytes) -> bytes:
-            GARBAGE_PY_045_COMPRESS_D = "compress marker"
-            return data
-  garbage_pdf_gen.py: |
-    GARBAGE_PY_045_PDF_E = "pdf generation marker"
-    GARBAGE_PY_045_RENDER_F = "pdf render marker"
+        def resize(self, width: int, height: int) -> tuple[int, int]:
+            if width > self.max_width:
+                ratio = self.max_width / width
+                return self.max_width, int(height * ratio)
+            return width, height
+  generators/report_builder.py: |
+    from typing import Any
 
-    class PdfGenerator:
-        GARBAGE_PY_045_GEN_G = True
-
-        def __init__(self, page_size: str = "A4"):
+    class ReportBuilder:
+        def __init__(self, title: str, page_size: str = "A4"):
+            self.title = title
             self.page_size = page_size
+            self._sections: list[dict] = []
 
-        def add_page(self, content: str) -> None:
-            pass
+        def add_section(self, heading: str, content: str) -> None:
+            self._sections.append({"heading": heading, "content": content})
 
-        def generate(self) -> bytes:
-            GARBAGE_PY_045_OUTPUT_H = "output marker"
-            return b""
+        def generate(self) -> str:
+            parts = [f"# {self.title}\n"]
+            for section in self._sections:
+                parts.append(f"## {section['heading']}\n{section['content']}\n")
+            return "\n".join(parts)
+
 changed:
   mylib/validators.py: |
     def validate_email(email: str) -> bool:
@@ -68,52 +95,68 @@ changed:
     from .formatters import format_currency, format_percentage
 
     __all__ = ["validate_email", "validate_url", "format_currency", "format_percentage"]
-  garbage_image_proc.py: |
-    GARBAGE_PY_045_IMAGE_A = "image processing marker"
-    GARBAGE_PY_045_RESIZE_B = "resize operation marker"
+  processors/image_optimizer.py: |
+    from pathlib import Path
 
-    class ImageProcessor:
-        GARBAGE_PY_045_PROC_C = "processor marker"
-
-        def __init__(self, quality: int = 85):
+    class ImageOptimizer:
+        def __init__(self, quality: int = 85, max_width: int = 1920):
             self.quality = quality
+            self.max_width = max_width
 
-        def resize(self, width: int, height: int) -> dict:
-            return {"width": width, "height": height}
+        def optimize(self, input_path: str, output_path: str) -> dict:
+            return {"input": input_path, "output": output_path, "quality": self.quality}
 
-        def compress(self, data: bytes) -> bytes:
-            GARBAGE_PY_045_COMPRESS_D = "compress marker"
-            return data
-  garbage_pdf_gen.py: |
-    GARBAGE_PY_045_PDF_E = "pdf generation marker"
-    GARBAGE_PY_045_RENDER_F = "pdf render marker"
+        def resize(self, width: int, height: int) -> tuple[int, int]:
+            if width > self.max_width:
+                ratio = self.max_width / width
+                return self.max_width, int(height * ratio)
+            return width, height
+  generators/report_builder.py: |
+    from typing import Any
 
-    class PdfGenerator:
-        GARBAGE_PY_045_GEN_G = True
-
-        def __init__(self, page_size: str = "A4"):
+    class ReportBuilder:
+        def __init__(self, title: str, page_size: str = "A4"):
+            self.title = title
             self.page_size = page_size
+            self._sections: list[dict] = []
 
-        def add_page(self, content: str) -> None:
-            pass
+        def add_section(self, heading: str, content: str) -> None:
+            self._sections.append({"heading": heading, "content": content})
 
-        def generate(self) -> bytes:
-            GARBAGE_PY_045_OUTPUT_H = "output marker"
-            return b""
+        def generate(self) -> str:
+            parts = [f"# {self.title}\n"]
+            for section in self._sections:
+                parts.append(f"## {section['heading']}\n{section['content']}\n")
+            return "\n".join(parts)
+
 must_include_files:
-- mylib/__init__.py
-must_include_content:
-- __all__ = ["validate_email", "validate_url", "format_currency", "format_percentage"]
+  - mylib/__init__.py
+  # Q2: validators.py defines the re-exported functions
+  - mylib/validators.py
+
+must_include_content_from:
+  mylib/__init__.py:
+    - '__all__ = ["validate_email", "validate_url", "format_currency", "format_percentage"]'
+    - "from .validators import validate_email, validate_url"
+    - "from .formatters import format_currency, format_percentage"
+  mylib/validators.py:
+    - "def validate_email(email: str) -> bool:"
+
 must_not_include:
-- GARBAGE_PY_045_COMPRESS_D
-- GARBAGE_PY_045_GEN_G
-- GARBAGE_PY_045_IMAGE_A
-- GARBAGE_PY_045_OUTPUT_H
-- GARBAGE_PY_045_PDF_E
-- GARBAGE_PY_045_PROC_C
-- GARBAGE_PY_045_RENDER_F
-- GARBAGE_PY_045_RESIZE_B
-- garbage_image_proc.py
-- garbage_pdf_gen.py
+  # --- image_optimizer.py: different package, no mylib dependency ---
+  - ImageOptimizer
+  - optimize
+  - max_width
+  # --- report_builder.py: different package, no mylib dependency ---
+  - ReportBuilder
+  - add_section
+  - generate
+
+must_not_include_files:
+  - processors/image_optimizer.py
+  - generators/report_builder.py
+
+max_fragments: 6
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

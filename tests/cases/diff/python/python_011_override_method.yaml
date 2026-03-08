@@ -1,3 +1,8 @@
+# Scenario: CustomProcessor overrides BaseProcessor's process, validate, _transform, get_stats
+# Changed: custom_processor.py imports BaseProcessor and implements full override chain
+# Reviewer questions: Does super().process(validated) double-count? Is ValidationError handled?
+# Trap 1: pipeline.py — data pipeline with process/transform methods but no dep on base_processor
+# Trap 2: filter_chain.py — filter chain with validate pattern but independent implementation
 initial:
   base_processor.py: |
     from typing import List, Optional, Any, Dict, Callable
@@ -94,43 +99,61 @@ initial:
 
         def configure(self, config: dict) -> None:
             self.config = config
-  garbage_logging.py: |
-    GARBAGE_MARKER_LOG_001 = "logging garbage"
-    UNRELATED_LOG_LEVEL_002 = "DEBUG"
+  pipeline.py: |
+    from typing import List, Any, Callable, Optional
+    from dataclasses import dataclass
 
-    class LogFormatter:
-        GARBAGE_LOG_CLASS_003 = "log class marker"
+    @dataclass
+    class PipelineStage:
+        name: str
+        transform: Callable[[Any], Any]
+        enabled: bool = True
 
-        def __init__(self, format_string: str = "%(message)s"):
-            self.format_string = format_string
-
-        def format(self, record: dict) -> str:
-            return str(record)
-
-    class LogRotator:
-        GARBAGE_ROTATE_MARKER_004 = "rotate marker"
-
-        def rotate(self, filename: str) -> None:
-            pass
-  garbage_scheduler.py: |
-    GARBAGE_MARKER_SCHED_005 = "scheduler garbage"
-    UNRELATED_INTERVAL_006 = 60
-
-    class TaskScheduler:
-        GARBAGE_SCHED_CLASS_007 = True
-
+    class DataPipeline:
         def __init__(self):
-            self._tasks: List[dict] = []
+            self._stages: List[PipelineStage] = []
+            self._processed_count = 0
 
-        def schedule(self, task: callable, interval: int) -> None:
-            self._tasks.append({"task": task, "interval": interval})
+        def add_stage(self, name: str, transform: Callable[[Any], Any]) -> None:
+            self._stages.append(PipelineStage(name=name, transform=transform))
 
-        def run(self) -> None:
-            pass
+        def process(self, data: List[Any]) -> List[Any]:
+            result = data
+            for stage in self._stages:
+                if stage.enabled:
+                    result = [stage.transform(item) for item in result]
+                    self._processed_count += len(result)
+            return result
 
-    def format_cron_expression(expression: str) -> str:
-        GARBAGE_FORMAT_CRON_008 = "format cron marker"
-        return expression
+        def get_stats(self) -> dict:
+            return {"stages": len(self._stages), "processed": self._processed_count}
+  filter_chain.py: |
+    from typing import List, Any, Callable, Optional
+    from dataclasses import dataclass
+
+    @dataclass
+    class FilterRule:
+        name: str
+        predicate: Callable[[Any], bool]
+        error_message: str = ""
+
+    class FilterChain:
+        def __init__(self):
+            self._filters: List[FilterRule] = []
+            self._rejected_count = 0
+
+        def add_filter(self, name: str, predicate: Callable[[Any], bool]) -> None:
+            self._filters.append(FilterRule(name=name, predicate=predicate))
+
+        def validate(self, item: Any) -> bool:
+            for rule in self._filters:
+                if not rule.predicate(item):
+                    self._rejected_count += 1
+                    return False
+            return True
+
+        def filter_all(self, items: List[Any]) -> List[Any]:
+            return [item for item in items if self.validate(item)]
 changed:
   base_processor.py: |
     from typing import List, Optional, Any, Dict, Callable
@@ -257,56 +280,79 @@ changed:
             stats = super().get_stats()
             stats["uppercase_transforms"] = self._uppercase_count
             return stats
-  garbage_logging.py: |
-    GARBAGE_MARKER_LOG_001 = "logging garbage"
-    UNRELATED_LOG_LEVEL_002 = "DEBUG"
+  pipeline.py: |
+    from typing import List, Any, Callable, Optional
+    from dataclasses import dataclass
 
-    class LogFormatter:
-        GARBAGE_LOG_CLASS_003 = "log class marker"
+    @dataclass
+    class PipelineStage:
+        name: str
+        transform: Callable[[Any], Any]
+        enabled: bool = True
 
-        def __init__(self, format_string: str = "%(message)s"):
-            self.format_string = format_string
-
-        def format(self, record: dict) -> str:
-            return str(record)
-
-    class LogRotator:
-        GARBAGE_ROTATE_MARKER_004 = "rotate marker"
-
-        def rotate(self, filename: str) -> None:
-            pass
-  garbage_scheduler.py: |
-    GARBAGE_MARKER_SCHED_005 = "scheduler garbage"
-    UNRELATED_INTERVAL_006 = 60
-
-    class TaskScheduler:
-        GARBAGE_SCHED_CLASS_007 = True
-
+    class DataPipeline:
         def __init__(self):
-            self._tasks: List[dict] = []
+            self._stages: List[PipelineStage] = []
+            self._processed_count = 0
 
-        def schedule(self, task: callable, interval: int) -> None:
-            self._tasks.append({"task": task, "interval": interval})
+        def add_stage(self, name: str, transform: Callable[[Any], Any]) -> None:
+            self._stages.append(PipelineStage(name=name, transform=transform))
 
-        def run(self) -> None:
-            pass
+        def process(self, data: List[Any]) -> List[Any]:
+            result = data
+            for stage in self._stages:
+                if stage.enabled:
+                    result = [stage.transform(item) for item in result]
+                    self._processed_count += len(result)
+            return result
 
-    def format_cron_expression(expression: str) -> str:
-        GARBAGE_FORMAT_CRON_008 = "format cron marker"
-        return expression
+        def get_stats(self) -> dict:
+            return {"stages": len(self._stages), "processed": self._processed_count}
+  filter_chain.py: |
+    from typing import List, Any, Callable, Optional
+    from dataclasses import dataclass
+
+    @dataclass
+    class FilterRule:
+        name: str
+        predicate: Callable[[Any], bool]
+        error_message: str = ""
+
+    class FilterChain:
+        def __init__(self):
+            self._filters: List[FilterRule] = []
+            self._rejected_count = 0
+
+        def add_filter(self, name: str, predicate: Callable[[Any], bool]) -> None:
+            self._filters.append(FilterRule(name=name, predicate=predicate))
+
+        def validate(self, item: Any) -> bool:
+            for rule in self._filters:
+                if not rule.predicate(item):
+                    self._rejected_count += 1
+                    return False
+            return True
+
+        def filter_all(self, items: List[Any]) -> List[Any]:
+            return [item for item in items if self.validate(item)]
 must_include_files:
 - custom_processor.py
-must_include_content:
-- from typing import List, Optional, Dict
-- 'def __init__(self, name: str = "custom", min_length: int = 3):'
+- base_processor.py
+must_include_content_from:
+  custom_processor.py:
+  - from base_processor import BaseProcessor, ProcessingStatus, ValidationError
+  - 'def __init__(self, name: str = "custom", min_length: int = 3):'
 must_not_include:
-- GARBAGE_FORMAT_CRON_008
-- GARBAGE_LOG_CLASS_003
-- GARBAGE_MARKER_LOG_001
-- GARBAGE_MARKER_SCHED_005
-- GARBAGE_ROTATE_MARKER_004
-- GARBAGE_SCHED_CLASS_007
-- garbage_logging.py
-- garbage_scheduler.py
+- DataPipeline
+- PipelineStage
+- add_stage
+- FilterChain
+- FilterRule
+- filter_all
+must_not_include_files:
+- pipeline.py
+- filter_chain.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

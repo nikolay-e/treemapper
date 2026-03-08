@@ -1,3 +1,23 @@
+# Scenario: APIClient is implemented to fetch and decode a generic Codable
+# APIResponse wrapping User objects using URLSession and JSONDecoder.
+#
+# Diff: APIClient.swift goes from empty class to fetchUsers() with
+# URLSession dataTask, JSONDecoder with iso8601 date strategy, and
+# APIResponse<[User]> decoding.
+#
+# Reviewer questions:
+#   Q1: "What is the shape of the API response?"
+#       -> APIResponse.swift (UNCHANGED) defines generic APIResponse<T: Codable>
+#          with data, status, timestamp fields.
+#   Q2: "What Codable model is being decoded?"
+#       -> User.swift (UNCHANGED) defines User: Codable with id, name, email.
+#
+# Not needed:
+#   - LocalStorage.swift: persists Codable objects to UserDefaults.
+#     Codable-adjacent but no dependency from APIClient.
+#   - DateFormatter+Extensions.swift: date formatting utilities.
+#     Date-related vocabulary but APIClient uses JSONDecoder.dateDecodingStrategy.
+
 initial:
   User.swift: |
     struct User: Codable {
@@ -14,18 +34,44 @@ initial:
   APIClient.swift: |
     // Initial
     class APIClient {}
-  GarbageArchiver.swift: |
-    class GarbageArchiver {
-        static let GARBAGE_JVM_061_ARCHIVE_MARKER_A = "marker"
-        static let GARBAGE_JVM_061_UNARCHIVE_MARKER_B = "marker"
-        func noop() {}
+  LocalStorage.swift: |
+    import Foundation
+
+    class LocalStorage {
+        private let defaults = UserDefaults.standard
+
+        func save<T: Codable>(_ value: T, forKey key: String) {
+            if let data = try? JSONEncoder().encode(value) {
+                defaults.set(data, forKey: key)
+            }
+        }
+
+        func load<T: Codable>(forKey key: String, as type: T.Type) -> T? {
+            guard let data = defaults.data(forKey: key) else { return nil }
+            return try? JSONDecoder().decode(type, from: data)
+        }
+
+        func remove(forKey key: String) {
+            defaults.removeObject(forKey: key)
+        }
     }
-  GarbagePlistCoder.swift: |
-    class GarbagePlistCoder {
-        static let GARBAGE_JVM_061_PLIST_MARKER_C = "marker"
-        static let GARBAGE_JVM_061_BINARY_MARKER_D = "marker"
-        func noop() {}
+  DateFormatterExtensions.swift: |
+    import Foundation
+
+    extension DateFormatter {
+        static let iso8601Full: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+            return formatter
+        }()
+
+        static let shortDate: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            return formatter
+        }()
     }
+
 changed:
   User.swift: |
     struct User: Codable {
@@ -62,28 +108,62 @@ changed:
             }.resume()
         }
     }
-  GarbageArchiver.swift: |
-    class GarbageArchiver {
-        static let GARBAGE_JVM_061_ARCHIVE_MARKER_A = "marker"
-        static let GARBAGE_JVM_061_UNARCHIVE_MARKER_B = "marker"
-        func noop() {}
+  LocalStorage.swift: |
+    import Foundation
+
+    class LocalStorage {
+        private let defaults = UserDefaults.standard
+
+        func save<T: Codable>(_ value: T, forKey key: String) {
+            if let data = try? JSONEncoder().encode(value) {
+                defaults.set(data, forKey: key)
+            }
+        }
+
+        func load<T: Codable>(forKey key: String, as type: T.Type) -> T? {
+            guard let data = defaults.data(forKey: key) else { return nil }
+            return try? JSONDecoder().decode(type, from: data)
+        }
+
+        func remove(forKey key: String) {
+            defaults.removeObject(forKey: key)
+        }
     }
-  GarbagePlistCoder.swift: |
-    class GarbagePlistCoder {
-        static let GARBAGE_JVM_061_PLIST_MARKER_C = "marker"
-        static let GARBAGE_JVM_061_BINARY_MARKER_D = "marker"
-        func noop() {}
+  DateFormatterExtensions.swift: |
+    import Foundation
+
+    extension DateFormatter {
+        static let iso8601Full: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+            return formatter
+        }()
+
+        static let shortDate: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            return formatter
+        }()
     }
+
 must_include_files:
-- APIClient.swift
-must_include_content:
-- import Foundation
+  - APIClient.swift
+must_include_content_from:
+  APIClient.swift:
+    - "import Foundation"
 must_not_include:
-- GARBAGE_JVM_061_ARCHIVE_MARKER_A
-- GARBAGE_JVM_061_BINARY_MARKER_D
-- GARBAGE_JVM_061_PLIST_MARKER_C
-- GARBAGE_JVM_061_UNARCHIVE_MARKER_B
-- GarbageArchiver.swift
-- GarbagePlistCoder.swift
+  # LocalStorage.swift: UserDefaults persistence, no dependency from APIClient
+  - LocalStorage
+  - UserDefaults
+  - removeObject
+  # DateFormatterExtensions.swift: date formatting, not used by APIClient
+  - DateFormatterExtensions
+  - iso8601Full
+  - shortDate
+must_not_include_files:
+  - LocalStorage.swift
+  - DateFormatterExtensions.swift
+max_fragments: 5
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

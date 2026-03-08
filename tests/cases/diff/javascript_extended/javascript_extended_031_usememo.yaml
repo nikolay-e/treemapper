@@ -1,3 +1,24 @@
+# Reviewer sees: Stats.tsx is rewritten to import expensiveComputation and
+# averageValue from ./compute and wrap both in useMemo with [items] dependency.
+#
+# Q1: "What does expensiveComputation do — is useMemo justified?"
+#     -> src/compute.ts: reduces items with n*n accumulation (O(n) with
+#        expensive per-element math). Memoizing this avoids recomputation
+#        on every render when items haven't changed. Justified.
+# Q2: "What does averageValue return — is .toFixed(2) safe?"
+#     -> src/compute.ts: returns 0 for empty arrays (no division by zero),
+#        otherwise total/length. The number return type makes .toFixed(2)
+#        safe. Reviewer confirms.
+# Q3: "Is filterOutliers used by the component?"
+#     -> src/compute.ts exports filterOutliers but Stats.tsx doesn't import
+#        it. That's fine — it exists for other consumers.
+#
+# Not needed:
+#   - src/components/chart.tsx: chart rendering component. Stats displays
+#     text values, no chart integration in this diff.
+#   - src/utils/format.ts: number formatting utilities. The component
+#     uses .toFixed(2) directly, not a shared formatter.
+
 initial:
   src/compute.ts: |
     export function expensiveComputation(items: number[]): number {
@@ -16,39 +37,47 @@ initial:
     }
   src/Stats.tsx: |
     console.log('initial');
-  src/unrelated/avatar.tsx: |
-    const GARBAGE_JSX_031_AVATAR_CONFIG_A = 'avatar_garbage_marker';
-
-    export interface GarbageAvatarProps {
-        src: string;
-        size: number;
+  # --- Not needed: chart rendering, Stats shows text values ---
+  src/components/chart.tsx: |
+    interface ChartProps {
+        data: number[];
+        width: number;
+        height: number;
+        color?: string;
     }
 
-    export function GarbageAvatar({ src, size }: GarbageAvatarProps) {
-        return <img src={src} width={size} height={size} alt="avatar" />;
+    export function BarChart({ data, width, height, color = '#4a90d9' }: ChartProps) {
+        const maxVal = Math.max(...data);
+        const barWidth = width / data.length;
+        return (
+            <svg width={width} height={height}>
+                {data.map((val, i) => (
+                    <rect
+                        key={i}
+                        x={i * barWidth}
+                        y={height - (val / maxVal) * height}
+                        width={barWidth - 2}
+                        height={(val / maxVal) * height}
+                        fill={color}
+                    />
+                ))}
+            </svg>
+        );
+    }
+  # --- Not needed: formatting utils, component uses .toFixed directly ---
+  src/utils/format.ts: |
+    export function formatCurrency(value: number, currency = 'USD'): string {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
     }
 
-    export function GARBAGE_JSX_031_GENERATE_INITIALS_B(name: string): string {
-        return 'GARBAGE_JSX_031_INITIALS_OUTPUT_C';
-    }
-  src/unrelated/spinner.tsx: |
-    const GARBAGE_JSX_031_SPINNER_CONFIG_D = { size: 40, color: 'blue' };
-
-    export class GARBAGE_JSX_031_SPINNER_MANAGER_E {
-        private visible = false;
-
-        show(): void {
-            this.visible = true;
-        }
-
-        hide(): void {
-            this.visible = false;
-        }
+    export function formatPercentage(value: number, decimals = 1): string {
+        return `${(value * 100).toFixed(decimals)}%`;
     }
 
-    export function GARBAGE_JSX_031_RENDER_SPINNER_F(): void {
-        console.log('rendering spinner');
+    export function formatCompact(value: number): string {
+        return new Intl.NumberFormat('en-US', { notation: 'compact' }).format(value);
     }
+
 changed:
   src/compute.ts: |
     export function expensiveComputation(items: number[]): number {
@@ -85,51 +114,67 @@ changed:
             </div>
         );
     }
-  src/unrelated/avatar.tsx: |
-    const GARBAGE_JSX_031_AVATAR_CONFIG_A = 'avatar_garbage_marker';
-
-    export interface GarbageAvatarProps {
-        src: string;
-        size: number;
+  src/components/chart.tsx: |
+    interface ChartProps {
+        data: number[];
+        width: number;
+        height: number;
+        color?: string;
     }
 
-    export function GarbageAvatar({ src, size }: GarbageAvatarProps) {
-        return <img src={src} width={size} height={size} alt="avatar" />;
+    export function BarChart({ data, width, height, color = '#4a90d9' }: ChartProps) {
+        const maxVal = Math.max(...data);
+        const barWidth = width / data.length;
+        return (
+            <svg width={width} height={height}>
+                {data.map((val, i) => (
+                    <rect
+                        key={i}
+                        x={i * barWidth}
+                        y={height - (val / maxVal) * height}
+                        width={barWidth - 2}
+                        height={(val / maxVal) * height}
+                        fill={color}
+                    />
+                ))}
+            </svg>
+        );
+    }
+  src/utils/format.ts: |
+    export function formatCurrency(value: number, currency = 'USD'): string {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
     }
 
-    export function GARBAGE_JSX_031_GENERATE_INITIALS_B(name: string): string {
-        return 'GARBAGE_JSX_031_INITIALS_OUTPUT_C';
-    }
-  src/unrelated/spinner.tsx: |
-    const GARBAGE_JSX_031_SPINNER_CONFIG_D = { size: 40, color: 'blue' };
-
-    export class GARBAGE_JSX_031_SPINNER_MANAGER_E {
-        private visible = false;
-
-        show(): void {
-            this.visible = true;
-        }
-
-        hide(): void {
-            this.visible = false;
-        }
+    export function formatPercentage(value: number, decimals = 1): string {
+        return `${(value * 100).toFixed(decimals)}%`;
     }
 
-    export function GARBAGE_JSX_031_RENDER_SPINNER_F(): void {
-        console.log('rendering spinner');
+    export function formatCompact(value: number): string {
+        return new Intl.NumberFormat('en-US', { notation: 'compact' }).format(value);
     }
+
 must_include_files:
-- src/Stats.tsx
-must_include_content:
-- import { useMemo } from 'react';
-- interface StatsProps {
+  # Unchanged — defines the two functions the component memoizes.
+  # Reviewer needs to see expensiveComputation is truly expensive (justifying
+  # useMemo) and averageValue handles empty arrays safely.
+  - src/compute.ts
+must_include_content_from:
+  src/compute.ts:
+    - "expensiveComputation"
+    - "averageValue"
+    - "items.reduce"
 must_not_include:
-- GARBAGE_JSX_031_AVATAR_CONFIG_A
-- GARBAGE_JSX_031_GENERATE_INITIALS_B(name
-- GARBAGE_JSX_031_RENDER_SPINNER_F
-- GARBAGE_JSX_031_SPINNER_CONFIG_D
-- GARBAGE_JSX_031_SPINNER_MANAGER_E
-- avatar.tsx
-- spinner.tsx
+  # chart.tsx: visual chart, Stats renders text values
+  - BarChart
+  - ChartProps
+  # format.ts: number formatting helpers, component uses .toFixed directly
+  - formatCurrency
+  - formatPercentage
+  - formatCompact
+must_not_include_files:
+  - src/components/chart.tsx
+  - src/utils/format.ts
+max_fragments: 8
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

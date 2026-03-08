@@ -1,3 +1,12 @@
+# Scenario: Adding a second AZ worth of public and private subnets using
+#   cidrsubnet() for automatic CIDR calculation.
+# Reviewer questions:
+#   1. What VPC CIDR are these subnets carved from? (networking.tf has the vpc_cidr variable)
+#   2. What route tables will these new subnets use? (routes.tf)
+# Traps:
+#   - database/subnets.tf: database-tier subnets also using cidrsubnet (same function, different tier)
+#   - waf/rules.tf: WAF rules (unrelated to subnet layout)
+
 initial:
   networking.tf: |
     variable "vpc_cidr" {
@@ -5,39 +14,43 @@ initial:
     }
 
     resource "aws_subnet" "public_a" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 1)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 1)
       availability_zone = "us-east-1a"
     }
 
     resource "aws_subnet" "private_a" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 10)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 10)
       availability_zone = "us-east-1a"
     }
+  routes.tf: |
+    resource "aws_route_table" "public" {
+      vpc_id = aws_vpc.main.id
 
-  # --- Tricky garbage: same resource type aws_subnet but for database tier ---
-  garbage_db_subnets.tf: |
-    GARBAGE_TF_065_DBSUB_MARKER_A = "database-subnets"
-    GARBAGE_TF_065_DBSUB_MARKER_B = "db-tier-network"
+      route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.main.id
+      }
+    }
 
+    resource "aws_route_table_association" "public_a" {
+      subnet_id      = aws_subnet.public_a.id
+      route_table_id = aws_route_table.public.id
+    }
+  database/subnets.tf: |
     resource "aws_subnet" "db_a" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 100)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 100)
       availability_zone = "us-east-1a"
     }
 
     resource "aws_subnet" "db_b" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 101)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 101)
       availability_zone = "us-east-1b"
     }
-
-  # --- Plain garbage: no overlap ---
-  garbage_waf.tf: |
-    GARBAGE_TF_065_WAF_MARKER_C = "waf-rules"
-    GARBAGE_TF_065_WAF_MARKER_D = "rate-limiting"
-
+  waf/rules.tf: |
     resource "aws_wafv2_web_acl" "main" {
       name  = "app-waf"
       scope = "REGIONAL"
@@ -58,68 +71,32 @@ changed:
     }
 
     resource "aws_subnet" "public_a" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 1)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 1)
       availability_zone = "us-east-1a"
     }
 
     resource "aws_subnet" "public_b" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 2)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 2)
       availability_zone = "us-east-1b"
     }
 
     resource "aws_subnet" "private_a" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 10)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 10)
       availability_zone = "us-east-1a"
     }
 
     resource "aws_subnet" "private_b" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 11)
+      vpc_id            = aws_vpc.main.id
+      cidr_block        = cidrsubnet(var.vpc_cidr, 8, 11)
       availability_zone = "us-east-1b"
     }
-
-  # --- Tricky garbage: same resource type aws_subnet but for database tier ---
-  garbage_db_subnets.tf: |
-    GARBAGE_TF_065_DBSUB_MARKER_A = "database-subnets"
-    GARBAGE_TF_065_DBSUB_MARKER_B = "db-tier-network"
-
-    resource "aws_subnet" "db_a" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 100)
-      availability_zone = "us-east-1a"
-    }
-
-    resource "aws_subnet" "db_b" {
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(var.vpc_cidr, 8, 101)
-      availability_zone = "us-east-1b"
-    }
-
-  # --- Plain garbage: no overlap ---
-  garbage_waf.tf: |
-    GARBAGE_TF_065_WAF_MARKER_C = "waf-rules"
-    GARBAGE_TF_065_WAF_MARKER_D = "rate-limiting"
-
-    resource "aws_wafv2_web_acl" "main" {
-      name  = "app-waf"
-      scope = "REGIONAL"
-      default_action {
-        allow {}
-      }
-      visibility_config {
-        metric_name                = "app-waf"
-        sampled_requests_enabled   = true
-        cloudwatch_metrics_enabled = true
-      }
-    }
-
-# === Assertions ===
 
 must_include_files:
-- networking.tf
+  - networking.tf
+  - routes.tf
 
 must_include_content_from:
   networking.tf:
@@ -127,20 +104,21 @@ must_include_content_from:
     - cidrsubnet(var.vpc_cidr, 8, 2)
     - 'resource "aws_subnet" "private_b"'
     - cidrsubnet(var.vpc_cidr, 8, 11)
+  routes.tf:
+    - resource "aws_route_table" "public" {
 
 must_not_include:
-# Tricky garbage markers (sibling aws_subnet resource)
-- GARBAGE_TF_065_DBSUB_MARKER_A
-- GARBAGE_TF_065_DBSUB_MARKER_B
-# Plain garbage markers
-- GARBAGE_TF_065_WAF_MARKER_C
-- GARBAGE_TF_065_WAF_MARKER_D
+  # Database subnets - also use cidrsubnet but for database tier (different CIDR offsets)
+  - aws_subnet" "db_a"
+  - cidrsubnet(var.vpc_cidr, 8, 100)
+  # WAF rules - security layer unrelated to subnet layout
+  - aws_wafv2_web_acl
 
 must_not_include_files:
-- garbage_db_subnets.tf
-- garbage_waf.tf
+  - database/subnets.tf
+  - waf/rules.tf
 
-max_fragments: 4
-max_files: 1
+max_fragments: 5
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,29 @@
+# Scenario: pom.xml gains spring-boot-starter-data-jpa, postgresql, and
+#   flyway-core dependencies. Only pom.xml is changed.
+#
+# Diff shows:
+#   + spring-boot-starter-data-jpa dependency
+#   + postgresql runtime dependency
+#   + flyway-core dependency
+#
+# Reviewer questions:
+#   Q1: "Are there any existing JPA entities or repositories that will work with
+#       the new data-jpa dependency?"
+#       -> InventoryApplication.java and HealthController.java (UNCHANGED) don't
+#          use JPA. Reviewer needs existing code to assess if dependencies are premature.
+#
+# Not needed for comprehension:
+#   - InventoryApplication.java: Standard @SpringBootApplication main class.
+#     Not changed. Does not reference JPA, PostgreSQL, or Flyway.
+#
+#   - HealthController.java: Simple REST endpoint returning status.
+#     Not changed. No JPA or database usage.
+#
+#   - InventoryEntity.java: JPA entity using new data-jpa dependency.
+#     KEYWORD OVERLAP: uses @Entity, @Id — directly related to new dependency.
+#     HARDEST TRAP. But entity existence doesn't help review whether the
+#     Maven dependency declaration itself is correct.
+
 initial:
   pom.xml: |
     <?xml version="1.0" encoding="UTF-8"?>
@@ -64,58 +90,38 @@ initial:
             return Map.of("status", "UP", "service", "inventory");
         }
     }
-  src/main/java/com/example/inventory/unrelated/AuditLogger.java: |
-    package com.example.inventory.unrelated;
+  src/main/java/com/example/inventory/entity/InventoryEntity.java: |
+    package com.example.inventory.entity;
 
+    import jakarta.persistence.*;
     import java.time.Instant;
-    import java.util.LinkedList;
-    import java.util.List;
 
-    public class AuditLogger {
-        public static final String GARBAGE_JAVA_021_AUDIT_A = "audit_marker_alpha";
-        private static final String GARBAGE_JAVA_021_AUDIT_B = "audit_marker_beta";
+    @Entity
+    @Table(name = "inventory")
+    public class InventoryEntity {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
 
-        private final List<String> auditTrail = new LinkedList<>();
+        @Column(nullable = false)
+        private String productName;
 
-        public void logAction(String action) {
-            String entry = Instant.now() + ": " + action;
-            auditTrail.add(entry);
-        }
+        @Column(nullable = false)
+        private int quantity;
 
-        public List<String> getTrail() {
-            return List.copyOf(auditTrail);
-        }
+        @Column(name = "last_updated")
+        private Instant lastUpdated;
 
-        public void clearTrail() {
-            auditTrail.clear();
-            System.out.println(GARBAGE_JAVA_021_AUDIT_A + GARBAGE_JAVA_021_AUDIT_B);
-        }
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getProductName() { return productName; }
+        public void setProductName(String productName) { this.productName = productName; }
+        public int getQuantity() { return quantity; }
+        public void setQuantity(int quantity) { this.quantity = quantity; }
+        public Instant getLastUpdated() { return lastUpdated; }
+        public void setLastUpdated(Instant lastUpdated) { this.lastUpdated = lastUpdated; }
     }
-  src/main/java/com/example/inventory/unrelated/CacheWarmer.java: |
-    package com.example.inventory.unrelated;
 
-    import java.util.HashMap;
-    import java.util.Map;
-
-    public class CacheWarmer {
-        public static final String GARBAGE_JAVA_021_CACHE_C = "cache_warmer_marker";
-        private static final String GARBAGE_JAVA_021_CACHE_D = "cache_internal_marker";
-
-        private final Map<String, Object> warmCache = new HashMap<>();
-
-        public void warmUp(String key, Object value) {
-            warmCache.put(key, value);
-        }
-
-        public Object retrieve(String key) {
-            return warmCache.getOrDefault(key, GARBAGE_JAVA_021_CACHE_C);
-        }
-
-        public void evictAll() {
-            warmCache.clear();
-            System.out.println(GARBAGE_JAVA_021_CACHE_D);
-        }
-    }
 changed:
   pom.xml: |
     <?xml version="1.0" encoding="UTF-8"?>
@@ -195,68 +201,70 @@ changed:
             return Map.of("status", "UP", "service", "inventory");
         }
     }
-  src/main/java/com/example/inventory/unrelated/AuditLogger.java: |
-    package com.example.inventory.unrelated;
+  src/main/java/com/example/inventory/entity/InventoryEntity.java: |
+    package com.example.inventory.entity;
 
+    import jakarta.persistence.*;
     import java.time.Instant;
-    import java.util.LinkedList;
-    import java.util.List;
 
-    public class AuditLogger {
-        public static final String GARBAGE_JAVA_021_AUDIT_A = "audit_marker_alpha";
-        private static final String GARBAGE_JAVA_021_AUDIT_B = "audit_marker_beta";
+    @Entity
+    @Table(name = "inventory")
+    public class InventoryEntity {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
 
-        private final List<String> auditTrail = new LinkedList<>();
+        @Column(nullable = false)
+        private String productName;
 
-        public void logAction(String action) {
-            String entry = Instant.now() + ": " + action;
-            auditTrail.add(entry);
-        }
+        @Column(nullable = false)
+        private int quantity;
 
-        public List<String> getTrail() {
-            return List.copyOf(auditTrail);
-        }
+        @Column(name = "last_updated")
+        private Instant lastUpdated;
 
-        public void clearTrail() {
-            auditTrail.clear();
-            System.out.println(GARBAGE_JAVA_021_AUDIT_A + GARBAGE_JAVA_021_AUDIT_B);
-        }
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getProductName() { return productName; }
+        public void setProductName(String productName) { this.productName = productName; }
+        public int getQuantity() { return quantity; }
+        public void setQuantity(int quantity) { this.quantity = quantity; }
+        public Instant getLastUpdated() { return lastUpdated; }
+        public void setLastUpdated(Instant lastUpdated) { this.lastUpdated = lastUpdated; }
     }
-  src/main/java/com/example/inventory/unrelated/CacheWarmer.java: |
-    package com.example.inventory.unrelated;
 
-    import java.util.HashMap;
-    import java.util.Map;
-
-    public class CacheWarmer {
-        public static final String GARBAGE_JAVA_021_CACHE_C = "cache_warmer_marker";
-        private static final String GARBAGE_JAVA_021_CACHE_D = "cache_internal_marker";
-
-        private final Map<String, Object> warmCache = new HashMap<>();
-
-        public void warmUp(String key, Object value) {
-            warmCache.put(key, value);
-        }
-
-        public Object retrieve(String key) {
-            return warmCache.getOrDefault(key, GARBAGE_JAVA_021_CACHE_C);
-        }
-
-        public void evictAll() {
-            warmCache.clear();
-            System.out.println(GARBAGE_JAVA_021_CACHE_D);
-        }
-    }
 must_include_files:
-- pom.xml
-must_include_content:
-- <artifactId>spring-boot-starter-data-jpa</artifactId>
+  - pom.xml
+
+must_include_content_from:
+  pom.xml:
+    - "<artifactId>spring-boot-starter-data-jpa</artifactId>"
+    - "<artifactId>postgresql</artifactId>"
+    - "<artifactId>flyway-core</artifactId>"
+
 must_not_include:
-- GARBAGE_JAVA_021_AUDIT_A
-- GARBAGE_JAVA_021_AUDIT_B
-- GARBAGE_JAVA_021_CACHE_C
-- GARBAGE_JAVA_021_CACHE_D
-- AuditLogger.java
-- CacheWarmer.java
+  # --- InventoryApplication.java: standard main class ---
+  # Not changed. Doesn't reference JPA/PostgreSQL/Flyway.
+  - InventoryApplication
+  - SpringApplication.run
+  # --- HealthController.java: simple REST endpoint ---
+  # Not changed. No database usage.
+  - HealthController
+  - "/health"
+  # --- InventoryEntity.java: JPA entity using @Entity ---
+  # KEYWORD OVERLAP: uses jakarta.persistence which requires data-jpa.
+  # HARDEST TRAP. But entity code doesn't help review the Maven config.
+  - InventoryEntity
+  - "jakarta.persistence"
+  - "@Table"
+  - "@GeneratedValue"
+
+must_not_include_files:
+  - src/main/java/com/example/inventory/InventoryApplication.java
+  - src/main/java/com/example/inventory/controller/HealthController.java
+  - src/main/java/com/example/inventory/entity/InventoryEntity.java
+
+max_fragments: 5
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

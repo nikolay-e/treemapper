@@ -1,3 +1,20 @@
+# Scenario: Service class mixes in Logging and Metrics traits,
+# using log(), debug(), and recordMetric() in its process() method.
+#
+# Diff: Service.scala goes from empty class to "extends Logging with Metrics"
+# and implements process() calling mixed-in methods.
+#
+# Reviewer questions:
+#   Q1: "What methods do the mixed-in traits provide?"
+#       -> Logging.scala (UNCHANGED) defines log() and debug().
+#       -> Metrics.scala (UNCHANGED) defines recordMetric().
+#
+# Not needed:
+#   - Auditing.scala: another trait for audit trail logging.
+#     Same trait-mixin pattern but not mixed into Service.
+#   - HealthCheck.scala: trait for health monitoring.
+#     Monitoring-adjacent vocabulary but not referenced by Service.
+
 initial:
   Logging.scala: |
     trait Logging {
@@ -13,18 +30,28 @@ initial:
   Service.scala: |
     // Initial
     class Service {}
-  GarbageCakePattern.scala: |
-    object GarbageCakePattern {
-      val GARBAGE_JVM_058_CAKE_MARKER_A = "marker"
-      val GARBAGE_JVM_058_LAYER_MARKER_B = "marker"
-      def noop(): Unit = {}
+  Auditing.scala: |
+    trait Auditing {
+      def audit(action: String, userId: String): Unit = {
+        println(s"[AUDIT] $userId: $action at ${System.currentTimeMillis()}")
+      }
+
+      def auditAccess(resource: String, userId: String): Unit = {
+        audit(s"accessed $resource", userId)
+      }
     }
-  GarbageModuleLoader.scala: |
-    object GarbageModuleLoader {
-      val GARBAGE_JVM_058_MODULE_MARKER_C = "marker"
-      val GARBAGE_JVM_058_COMPONENT_MARKER_D = "marker"
-      def noop(): Unit = {}
+  HealthCheck.scala: |
+    trait HealthCheck {
+      def isHealthy: Boolean = true
+
+      def checkDependency(name: String): Boolean = {
+        println(s"Checking health of $name")
+        true
+      }
+
+      def status: Map[String, Boolean] = Map("self" -> isHealthy)
     }
+
 changed:
   Logging.scala: |
     trait Logging {
@@ -45,28 +72,45 @@ changed:
         debug("Process complete")
       }
     }
-  GarbageCakePattern.scala: |
-    object GarbageCakePattern {
-      val GARBAGE_JVM_058_CAKE_MARKER_A = "marker"
-      val GARBAGE_JVM_058_LAYER_MARKER_B = "marker"
-      def noop(): Unit = {}
+  Auditing.scala: |
+    trait Auditing {
+      def audit(action: String, userId: String): Unit = {
+        println(s"[AUDIT] $userId: $action at ${System.currentTimeMillis()}")
+      }
+
+      def auditAccess(resource: String, userId: String): Unit = {
+        audit(s"accessed $resource", userId)
+      }
     }
-  GarbageModuleLoader.scala: |
-    object GarbageModuleLoader {
-      val GARBAGE_JVM_058_MODULE_MARKER_C = "marker"
-      val GARBAGE_JVM_058_COMPONENT_MARKER_D = "marker"
-      def noop(): Unit = {}
+  HealthCheck.scala: |
+    trait HealthCheck {
+      def isHealthy: Boolean = true
+
+      def checkDependency(name: String): Boolean = {
+        println(s"Checking health of $name")
+        true
+      }
+
+      def status: Map[String, Boolean] = Map("self" -> isHealthy)
     }
+
 must_include_files:
-- Service.scala
-must_include_content:
-- class Service extends Logging with Metrics {
+  - Service.scala
+must_include_content_from:
+  Service.scala:
+    - "class Service extends Logging with Metrics {"
 must_not_include:
-- GARBAGE_JVM_058_CAKE_MARKER_A
-- GARBAGE_JVM_058_COMPONENT_MARKER_D
-- GARBAGE_JVM_058_LAYER_MARKER_B
-- GARBAGE_JVM_058_MODULE_MARKER_C
-- GarbageCakePattern.scala
-- GarbageModuleLoader.scala
+  # Auditing.scala: another trait, not mixed into Service
+  - Auditing
+  - auditAccess
+  # HealthCheck.scala: monitoring trait, not referenced by Service
+  - HealthCheck
+  - checkDependency
+  - isHealthy
+must_not_include_files:
+  - Auditing.scala
+  - HealthCheck.scala
+max_fragments: 5
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

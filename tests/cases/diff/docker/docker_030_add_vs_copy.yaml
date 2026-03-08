@@ -1,3 +1,12 @@
+# Scenario: Python Dockerfile refactored to use ADD for tar extraction and
+# remote URL fetch (with --checksum) instead of manual COPY + RUN tar -xzf.
+# COPY retained for regular files. App code and requirements unchanged.
+#
+# Reviewer questions:
+#   1. Does src/app.py reference /app/assets/ and /app/config/ matching ADD target paths?
+#   2. Does the app load config from /app/config/ — what file does load_config read?
+#   3. Does the app expect assets at /app/assets/ — matching ADD extraction target?
+
 initial:
   src/app.py: |
     import os
@@ -29,16 +38,26 @@ initial:
     RUN tar -xzf assets.tar.gz && rm assets.tar.gz
     COPY src/ ./src/
     CMD ["python", "src/app.py"]
+
+  # Trap: prepare assets script — creates the tarball, but is build tooling
   scripts/prepare_assets.sh: |
     #!/bin/bash
-    tar -czf assets.tar.gz assets/
-  tests/test_assets.py: |
-    def test_assets_loaded():
-        pass
-  docs/assets.md: |
-    # Asset Management
-  cdn/config.yaml: ''
-  build/checksums.txt: ''
+    cd assets/
+    tar -czf ../assets.tar.gz .
+    echo "Assets packed: $(du -sh ../assets.tar.gz)"
+
+  # Trap: CDN config — mentions assets but is delivery infrastructure
+  cdn/config.yaml: |
+    origins:
+      - name: app-assets
+        bucket: s3://my-assets-bucket
+        path: /assets/
+
+  # Trap: build checksums — mentions sha256 but is separate verification tooling
+  build/checksums.txt: |
+    sha256:abc123def456  assets.tar.gz
+    sha256:789ghi012jkl  config-defaults.json
+
 changed:
   src/app.py: |
     import os
@@ -90,19 +109,41 @@ changed:
     USER appuser
 
     CMD ["python", "src/app.py"]
+
   scripts/prepare_assets.sh: |
     #!/bin/bash
-    tar -czf assets.tar.gz assets/
-  tests/test_assets.py: |
-    def test_assets_loaded():
-        pass
-  docs/assets.md: |
-    # Asset Management
-  cdn/config.yaml: ''
-  build/checksums.txt: ''
+    cd assets/
+    tar -czf ../assets.tar.gz .
+    echo "Assets packed: $(du -sh ../assets.tar.gz)"
+  cdn/config.yaml: |
+    origins:
+      - name: app-assets
+        bucket: s3://my-assets-bucket
+        path: /assets/
+  build/checksums.txt: |
+    sha256:abc123def456  assets.tar.gz
+    sha256:789ghi012jkl  config-defaults.json
+
+# === Assertions ===
+
 must_include_files:
 - Dockerfile
-must_include_content:
-- FROM base AS dependencies
+
+must_include_content_from:
+  # Reviewer needs to verify app references the exact paths used in ADD directives
+  src/app.py:
+    - ASSETS_DIR = Path('/app/assets')
+    - CONFIG_DIR = Path('/app/config')
+
+must_not_include_files:
+  # Prepare script — creates the tarball but is build tooling, not Dockerfile concern
+- scripts/prepare_assets.sh
+  # CDN config — asset delivery infrastructure, not Docker build
+- cdn/config.yaml
+  # Checksums — mentions same sha256 but is separate verification tooling
+- build/checksums.txt
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

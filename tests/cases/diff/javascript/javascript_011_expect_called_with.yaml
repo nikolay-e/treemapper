@@ -1,3 +1,21 @@
+# Scenario: Test uses jest.fn with toHaveBeenCalledWith — reviewer needs the interface.
+#
+# Diff: notifier.test.ts is written from scratch. It imports sendNotification and
+# Notification from notifier.ts, creates a jest.fn callback, and asserts it was
+# called with { title: 'Hello', body: 'World' }.
+#
+# Reviewer questions:
+#   Q1: "What is the Notification interface shape and how does sendNotification
+#        call the callback?" -> notifier.ts (UNCHANGED) defines Notification as
+#        { title: string; body: string } and sendNotification calls notify({ title, body }).
+#        The reviewer verifies the mock assertion matches the real call.
+#
+# Not needed:
+#   - notification-queue.ts: queues notifications for batch delivery.
+#     Different layer, doesn't use sendNotification directly.
+#   - template-engine.ts: renders notification body from templates.
+#     Unrelated step, not invoked in sendNotification.
+
 initial:
   notifier.ts: |
     export interface Notification {
@@ -10,28 +28,27 @@ initial:
     }
   notifier.test.ts: |
     console.log('initial');
-  garbage_throttling.ts: |
-    const GARBAGE_JS_011_BUCKET_MARKER_A = "throttling";
-    const GARBAGE_JS_011_REFILL_MARKER_B = true;
-
-    class TokenBucket {
-        static GARBAGE_JS_011_BUCKET_CLASS_C = "bucket";
-
-        consume(tokens: number): boolean {
-            return false;
-        }
+  notification-queue.ts: |
+    interface QueuedNotification {
+        recipient: string;
+        message: string;
+        scheduledAt: Date;
     }
-  garbage_circuitbreaker.ts: |
-    const GARBAGE_JS_011_CIRCUIT_MARKER_D = "circuitbreaker";
-    const GARBAGE_JS_011_TRIP_MARKER_E = 42;
 
-    class CircuitBreaker {
-        static GARBAGE_JS_011_BREAKER_CLASS_F = true;
+    const queue: QueuedNotification[] = [];
 
-        execute(fn: () => void): void {
-            fn();
-        }
+    export function enqueueNotification(recipient: string, message: string): void {
+        queue.push({ recipient, message, scheduledAt: new Date() });
     }
+
+    export function flushQueue(): QueuedNotification[] {
+        return queue.splice(0);
+    }
+  template-engine.ts: |
+    export function renderTemplate(template: string, vars: Record<string, string>): string {
+        return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
+    }
+
 changed:
   notifier.ts: |
     export interface Notification {
@@ -52,40 +69,46 @@ changed:
             expect(notify).toHaveBeenCalledWith({ title: 'Hello', body: 'World' });
         });
     });
-  garbage_throttling.ts: |
-    const GARBAGE_JS_011_BUCKET_MARKER_A = "throttling";
-    const GARBAGE_JS_011_REFILL_MARKER_B = true;
-
-    class TokenBucket {
-        static GARBAGE_JS_011_BUCKET_CLASS_C = "bucket";
-
-        consume(tokens: number): boolean {
-            return false;
-        }
+  notification-queue.ts: |
+    interface QueuedNotification {
+        recipient: string;
+        message: string;
+        scheduledAt: Date;
     }
-  garbage_circuitbreaker.ts: |
-    const GARBAGE_JS_011_CIRCUIT_MARKER_D = "circuitbreaker";
-    const GARBAGE_JS_011_TRIP_MARKER_E = 42;
 
-    class CircuitBreaker {
-        static GARBAGE_JS_011_BREAKER_CLASS_F = true;
+    const queue: QueuedNotification[] = [];
 
-        execute(fn: () => void): void {
-            fn();
-        }
+    export function enqueueNotification(recipient: string, message: string): void {
+        queue.push({ recipient, message, scheduledAt: new Date() });
     }
+
+    export function flushQueue(): QueuedNotification[] {
+        return queue.splice(0);
+    }
+  template-engine.ts: |
+    export function renderTemplate(template: string, vars: Record<string, string>): string {
+        return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
+    }
+
 must_include_files:
-- notifier.test.ts
-must_include_content:
-- it('should call notify with correct args', () => {
+  # Q1: notifier.ts defines Notification interface and sendNotification behavior
+  - notifier.ts
+must_include_content_from:
+  notifier.ts:
+    - "interface Notification {"
+    - "function sendNotification"
+    - "notify({ title, body })"
 must_not_include:
-- GARBAGE_JS_011_BREAKER_CLASS_F
-- GARBAGE_JS_011_BUCKET_CLASS_C
-- GARBAGE_JS_011_BUCKET_MARKER_A
-- GARBAGE_JS_011_CIRCUIT_MARKER_D
-- GARBAGE_JS_011_REFILL_MARKER_B
-- GARBAGE_JS_011_TRIP_MARKER_E
-- garbage_circuitbreaker.ts
-- garbage_throttling.ts
+  # notification-queue.ts: batch delivery, different mechanism
+  - enqueueNotification
+  - flushQueue
+  - QueuedNotification
+  # template-engine.ts: template rendering, not part of notification sending
+  - renderTemplate
+must_not_include_files:
+  - notification-queue.ts
+  - template-engine.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

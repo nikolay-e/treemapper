@@ -1,3 +1,8 @@
+# Scenario: Web-frontend deployment replicas bumped from 2 to 5 for traffic scaling
+# Changed: k8s/apps/web-frontend/deployment.yaml increases replicas from 2 to 5
+# Reviewer questions: Does the HPA already manage scaling — will static replicas conflict? Are resource limits adequate for 5 pods?
+# Trap 1: k8s/infra/cluster-autoscaler.yaml — cluster autoscaler config, shares scaling vocabulary but no dep
+# Trap 2: k8s/apps/web-frontend/network-policy.yaml — network policy for same app, shares labels but no dep on replicas
 initial:
   k8s/apps/web-frontend/deployment.yaml: |
     apiVersion: apps/v1
@@ -62,29 +67,47 @@ initial:
           target:
             type: Utilization
             averageUtilization: 70
-  k8s/unrelated/batch-jobs/cleanup.yaml: |
-    # GARBAGE_K8S_402_BATCH_CLEANUP
-    apiVersion: batch/v1
-    kind: Job
+  k8s/infra/cluster-autoscaler.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_402_CLEANUP_JOB
+      name: cluster-autoscaler
+      namespace: kube-system
     spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cluster-autoscaler
       template:
         spec:
           containers:
-          - name: cleanup
-            image: busybox:GARBAGE_K8S_402_BUSYBOX_VERSION
-            command: ["sh", "-c", "echo GARBAGE_K8S_402_CLEANUP_MARKER"]
-          restartPolicy: Never
-  k8s/unrelated/secrets/external-api.yaml: |
-    # GARBAGE_K8S_402_EXTERNAL_SECRET
-    apiVersion: v1
-    kind: Secret
+          - name: autoscaler
+            image: registry.k8s.io/autoscaling/cluster-autoscaler:v1.28.0
+            command:
+            - ./cluster-autoscaler
+            - --cloud-provider=aws
+            - --scale-down-delay-after-add=10m
+            - --scale-down-unneeded-time=5m
+  k8s/apps/web-frontend/network-policy.yaml: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
     metadata:
-      name: GARBAGE_K8S_402_API_SECRET
-    type: Opaque
-    data:
-      api-key: R0FSQkFHRV9LOFM0MDJfQVBJX0tFWQ==
+      name: web-frontend-netpol
+      namespace: production
+    spec:
+      podSelector:
+        matchLabels:
+          app: web-frontend
+      policyTypes:
+      - Ingress
+      ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        ports:
+        - port: 80
+          protocol: TCP
 changed:
   k8s/apps/web-frontend/deployment.yaml: |
     apiVersion: apps/v1
@@ -149,38 +172,61 @@ changed:
           target:
             type: Utilization
             averageUtilization: 70
-  k8s/unrelated/batch-jobs/cleanup.yaml: |
-    # GARBAGE_K8S_402_BATCH_CLEANUP
-    apiVersion: batch/v1
-    kind: Job
+  k8s/infra/cluster-autoscaler.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
     metadata:
-      name: GARBAGE_K8S_402_CLEANUP_JOB
+      name: cluster-autoscaler
+      namespace: kube-system
     spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: cluster-autoscaler
       template:
         spec:
           containers:
-          - name: cleanup
-            image: busybox:GARBAGE_K8S_402_BUSYBOX_VERSION
-            command: ["sh", "-c", "echo GARBAGE_K8S_402_CLEANUP_MARKER"]
-          restartPolicy: Never
-  k8s/unrelated/secrets/external-api.yaml: |
-    # GARBAGE_K8S_402_EXTERNAL_SECRET
-    apiVersion: v1
-    kind: Secret
+          - name: autoscaler
+            image: registry.k8s.io/autoscaling/cluster-autoscaler:v1.28.0
+            command:
+            - ./cluster-autoscaler
+            - --cloud-provider=aws
+            - --scale-down-delay-after-add=10m
+            - --scale-down-unneeded-time=5m
+  k8s/apps/web-frontend/network-policy.yaml: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
     metadata:
-      name: GARBAGE_K8S_402_API_SECRET
-    type: Opaque
-    data:
-      api-key: R0FSQkFHRV9LOFM0MDJfQVBJX0tFWQ==
+      name: web-frontend-netpol
+      namespace: production
+    spec:
+      podSelector:
+        matchLabels:
+          app: web-frontend
+      policyTypes:
+      - Ingress
+      ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        ports:
+        - port: 80
+          protocol: TCP
 must_include_files:
 - k8s/apps/web-frontend/deployment.yaml
+must_include_content_from:
+  k8s/apps/web-frontend/deployment.yaml:
+  - 'replicas: 5'
 must_not_include:
-- GARBAGE_K8S_402_API_SECRET
-- GARBAGE_K8S_402_BATCH_CLEANUP
-- GARBAGE_K8S_402_CLEANUP_JOB
-- GARBAGE_K8S_402_CLEANUP_MARKER
-- GARBAGE_K8S_402_EXTERNAL_SECRET
-- cleanup.yaml
-- external-api.yaml
+- cluster-autoscaler
+- scale-down-delay
+- web-frontend-netpol
+- ingress-nginx
+must_not_include_files:
+- k8s/infra/cluster-autoscaler.yaml
+- k8s/apps/web-frontend/network-policy.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

@@ -1,3 +1,16 @@
+# Scenario: app.py starts using HelperClass and TextFormatter via the package's
+#   __init__.py re-exports, adding real business logic.
+#
+# Reviewer questions:
+#   - Does app.py correctly import through __init__.py?
+#   - Are HelperClass.validate_config() and TextFormatter.format_title() the right APIs?
+#
+# Trap files:
+#   - plugins/webhook_handler.py: also uses config dicts and processes events but
+#     has no dependency on mypackage
+#   - monitoring/health_endpoint.py: has similar run()/status patterns but is
+#     completely independent
+
 initial:
   mypackage/helpers.py: |
     class HelperClass:
@@ -28,38 +41,37 @@ initial:
   app.py: |
     def run():
         pass
-  garbage_webhooks.py: |
-    GARBAGE_PY_040_WEBHOOK_A = "webhook handler marker"
-    GARBAGE_PY_040_PAYLOAD_B = "payload parser marker"
+  plugins/webhook_handler.py: |
+    from typing import Any
 
     class WebhookHandler:
-        GARBAGE_PY_040_HANDLER_C = "handler instance marker"
-
-        def __init__(self, secret: str):
+        def __init__(self, secret: str, config: dict):
             self._secret = secret
+            self._config = config
 
         def verify_signature(self, payload: bytes, signature: str) -> bool:
             return True
 
         def process_event(self, event_type: str, data: dict) -> dict:
-            GARBAGE_PY_040_EVENT_D = "event marker"
             return {"type": event_type, "processed": True}
-  garbage_health_check.py: |
-    GARBAGE_PY_040_HEALTH_E = "health check marker"
-    GARBAGE_PY_040_STATUS_F = "status endpoint marker"
 
-    class HealthChecker:
-        GARBAGE_PY_040_CHECKER_G = True
+        def validate_config(self) -> bool:
+            return "endpoint" in self._config and "secret" in self._config
+  monitoring/health_endpoint.py: |
+    from datetime import datetime
 
+    class HealthEndpoint:
         def __init__(self):
-            self._checks = []
+            self._checks: list[dict] = []
+            self._start_time = datetime.utcnow()
 
         def add_check(self, name: str, check_fn) -> None:
             self._checks.append({"name": name, "fn": check_fn})
 
         def run_all(self) -> dict:
-            GARBAGE_PY_040_RUN_H = "run checks marker"
-            return {"status": "healthy", "checks": len(self._checks)}
+            results = {c["name"]: c["fn"]() for c in self._checks}
+            return {"status": "healthy", "checks": results}
+
 changed:
   mypackage/helpers.py: |
     class HelperClass:
@@ -98,53 +110,52 @@ changed:
             title = formatter.format_title(helper.help())
             return title
         return None
-  garbage_webhooks.py: |
-    GARBAGE_PY_040_WEBHOOK_A = "webhook handler marker"
-    GARBAGE_PY_040_PAYLOAD_B = "payload parser marker"
+  plugins/webhook_handler.py: |
+    from typing import Any
 
     class WebhookHandler:
-        GARBAGE_PY_040_HANDLER_C = "handler instance marker"
-
-        def __init__(self, secret: str):
+        def __init__(self, secret: str, config: dict):
             self._secret = secret
+            self._config = config
 
         def verify_signature(self, payload: bytes, signature: str) -> bool:
             return True
 
         def process_event(self, event_type: str, data: dict) -> dict:
-            GARBAGE_PY_040_EVENT_D = "event marker"
             return {"type": event_type, "processed": True}
-  garbage_health_check.py: |
-    GARBAGE_PY_040_HEALTH_E = "health check marker"
-    GARBAGE_PY_040_STATUS_F = "status endpoint marker"
 
-    class HealthChecker:
-        GARBAGE_PY_040_CHECKER_G = True
+        def validate_config(self) -> bool:
+            return "endpoint" in self._config and "secret" in self._config
+  monitoring/health_endpoint.py: |
+    from datetime import datetime
 
+    class HealthEndpoint:
         def __init__(self):
-            self._checks = []
+            self._checks: list[dict] = []
+            self._start_time = datetime.utcnow()
 
         def add_check(self, name: str, check_fn) -> None:
             self._checks.append({"name": name, "fn": check_fn})
 
         def run_all(self) -> dict:
-            GARBAGE_PY_040_RUN_H = "run checks marker"
-            return {"status": "healthy", "checks": len(self._checks)}
+            results = {c["name"]: c["fn"]() for c in self._checks}
+            return {"status": "healthy", "checks": results}
+
 must_include_files:
 - app.py
 must_include_content:
 - from mypackage import HelperClass, TextFormatter
 - 'config = {"name": "myapp", "version": "1.0"}'
 must_not_include:
-- GARBAGE_PY_040_CHECKER_G
-- GARBAGE_PY_040_EVENT_D
-- GARBAGE_PY_040_HANDLER_C
-- GARBAGE_PY_040_HEALTH_E
-- GARBAGE_PY_040_PAYLOAD_B
-- GARBAGE_PY_040_RUN_H
-- GARBAGE_PY_040_STATUS_F
-- GARBAGE_PY_040_WEBHOOK_A
-- garbage_health_check.py
-- garbage_webhooks.py
+- WebhookHandler
+- verify_signature
+- HealthEndpoint
+- run_all
+- process_event
+must_not_include_files:
+- plugins/webhook_handler.py
+- monitoring/health_endpoint.py
+max_fragments: 8
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

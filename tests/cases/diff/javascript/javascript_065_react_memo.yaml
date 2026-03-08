@@ -1,5 +1,19 @@
+# Reviewer sees: Dashboard.tsx imports ExpensiveList (memo-wrapped) and
+# renders it alongside a counter that triggers re-renders.
+# Q1: "What does ExpensiveList render, and is memo effective here?"
+#     -> ExpensiveList.tsx: memo(ExpensiveListComponent) renders items
+#        as <li> elements. Dashboard's [items] from useState is stable
+#        across count updates, so memo prevents wasteful re-renders.
+# Q2: "What is the Item type that ExpensiveList expects?"
+#     -> ExpensiveList.tsx: { id: string; name: string }. Dashboard
+#        passes matching objects — shapes align.
+#
+# Not needed:
+#   - Sidebar.tsx: sibling component not used by Dashboard.
+#   - list-utils.ts: list utilities not imported by either component.
+
 initial:
-  ExpensiveList.tsx: |
+  src/ExpensiveList.tsx: |
     import { memo } from 'react';
 
     interface Item {
@@ -22,32 +36,33 @@ initial:
     }
 
     export const ExpensiveList = memo(ExpensiveListComponent);
-  Dashboard.tsx: |
-    console.log('initial');
-  garbage_health_checks.ts: |
-    const GARBAGE_JS_065_HEALTH_MARKER_A = "health";
-    const GARBAGE_JS_065_HEARTBEAT_MARKER_B = true;
-
-    class HealthChecker {
-        static GARBAGE_JS_065_CHECKER_CLASS_C = "checker";
-
-        ping(endpoint: string): boolean {
-            return true;
-        }
+  src/Dashboard.tsx: |
+    export function Dashboard() {
+        return <div>Placeholder</div>;
     }
-  garbage_scheduling.ts: |
-    const GARBAGE_JS_065_SCHEDULE_MARKER_D = "scheduling";
-    const GARBAGE_JS_065_INTERVAL_MARKER_E = 300;
+  src/Sidebar.tsx: |
+    interface SidebarProps {
+        collapsed: boolean;
+        onToggle: () => void;
+    }
 
-    class TaskScheduler {
-        static GARBAGE_JS_065_SCHEDULER_CLASS_F = true;
-
-        enqueue(task: string, delayMs: number): void {
-            // noop
-        }
+    export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+        return (
+            <aside style={{ width: collapsed ? '60px' : '240px' }}>
+                <button onClick={onToggle}>{collapsed ? '>' : '<'}</button>
+            </aside>
+        );
+    }
+  src/list-utils.ts: |
+    export function groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {
+        return items.reduce((groups, item) => {
+            const value = String(item[key]);
+            (groups[value] = groups[value] ?? []).push(item);
+            return groups;
+        }, {} as Record<string, T[]>);
     }
 changed:
-  ExpensiveList.tsx: |
+  src/ExpensiveList.tsx: |
     import { memo } from 'react';
 
     interface Item {
@@ -70,7 +85,7 @@ changed:
     }
 
     export const ExpensiveList = memo(ExpensiveListComponent);
-  Dashboard.tsx: |
+  src/Dashboard.tsx: |
     import { useState } from 'react';
     import { ExpensiveList } from './ExpensiveList';
 
@@ -85,41 +100,42 @@ changed:
             </div>
         );
     }
-  garbage_health_checks.ts: |
-    const GARBAGE_JS_065_HEALTH_MARKER_A = "health";
-    const GARBAGE_JS_065_HEARTBEAT_MARKER_B = true;
-
-    class HealthChecker {
-        static GARBAGE_JS_065_CHECKER_CLASS_C = "checker";
-
-        ping(endpoint: string): boolean {
-            return true;
-        }
+  src/Sidebar.tsx: |
+    interface SidebarProps {
+        collapsed: boolean;
+        onToggle: () => void;
     }
-  garbage_scheduling.ts: |
-    const GARBAGE_JS_065_SCHEDULE_MARKER_D = "scheduling";
-    const GARBAGE_JS_065_INTERVAL_MARKER_E = 300;
 
-    class TaskScheduler {
-        static GARBAGE_JS_065_SCHEDULER_CLASS_F = true;
-
-        enqueue(task: string, delayMs: number): void {
-            // noop
-        }
+    export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+        return (
+            <aside style={{ width: collapsed ? '60px' : '240px' }}>
+                <button onClick={onToggle}>{collapsed ? '>' : '<'}</button>
+            </aside>
+        );
+    }
+  src/list-utils.ts: |
+    export function groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {
+        return items.reduce((groups, item) => {
+            const value = String(item[key]);
+            (groups[value] = groups[value] ?? []).push(item);
+            return groups;
+        }, {} as Record<string, T[]>);
     }
 must_include_files:
-- Dashboard.tsx
-must_include_content:
-- import { useState } from 'react';
-- '[items] = useState([{ id: ''1'', name: ''Item 1'' }])'
+  # Unchanged file — the import target. Reviewer needs to see the
+  # memo wrapper and Item type to evaluate render optimization.
+  - src/ExpensiveList.tsx
+must_include_content_from:
+  src/ExpensiveList.tsx:
+    - "memo(ExpensiveListComponent)"
+    - "ExpensiveListProps"
 must_not_include:
-- GARBAGE_JS_065_CHECKER_CLASS_C
-- GARBAGE_JS_065_HEALTH_MARKER_A
-- GARBAGE_JS_065_HEARTBEAT_MARKER_B
-- GARBAGE_JS_065_INTERVAL_MARKER_E
-- GARBAGE_JS_065_SCHEDULER_CLASS_F
-- GARBAGE_JS_065_SCHEDULE_MARKER_D
-- garbage_health_checks.ts
-- garbage_scheduling.ts
+  # Sidebar.tsx: sibling component not used by Dashboard
+  - SidebarProps
+  - collapsed
+  # list-utils.ts: list utilities not imported
+  - groupBy
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

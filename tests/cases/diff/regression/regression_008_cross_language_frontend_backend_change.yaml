@@ -1,3 +1,32 @@
+# Test: Cross-language change — new backend API endpoint + new frontend page consuming it
+#
+# Scenario: backend/src/api.py adds a /api/insights endpoint that delegates
+# to AnalyticsService.get_insights(). The service gains get_insights() and
+# _compute_trends() methods that use existing calculator functions.
+# On the frontend, a new InsightsPage.tsx and useInsights.ts hook are added,
+# consuming the new /api/insights endpoint.
+#
+# Reviewer questions:
+#   Q1: "get_insights calls calculate_score and weighted_average — what do
+#        those functions do? Will they handle the trend data correctly?"
+#       -> backend/src/analytics/calculator.py: unchanged module defining
+#          calculate_score (normalizes values) and weighted_average. Reviewer
+#          confirms these functions exist and their behavior matches how
+#          get_insights uses them.
+#   Q2: "The AnalyticsService already had get_summary — how does get_insights
+#        compare? Any shared logic?"
+#       -> Both are in the diff (backend/src/analytics/service.py is changed).
+#          Both call calculate_score and weighted_average, both use
+#          _fetch_period_data. The diff makes this visible.
+#
+# Not needed:
+#   - frontend/src/components/Header.tsx: layout component. No import
+#     relationship with InsightsPage or useInsights.
+#   - frontend/src/components/Footer.tsx: layout component. Renders
+#     static navigation links, unrelated to insights data flow.
+#   - backend/src/auth/permissions.py: authorization module. Not imported
+#     by the API endpoints and unrelated to analytics.
+
 initial:
   backend/src/api.py: |
     from flask import Flask, jsonify, request
@@ -84,20 +113,16 @@ initial:
             return sorted_vals[-1]
         fraction = idx - lower
         return sorted_vals[lower] + (sorted_vals[upper] - sorted_vals[lower]) * fraction
+  # --- Not needed: layout component, no analytics data flow ---
   frontend/src/components/Header.tsx: |
     import React from 'react';
 
     interface HeaderProps {
       title: string;
-      GARBAGE_REG008_HEADER_TITLE: string;
     }
 
     export const Header: React.FC<HeaderProps> = ({ title }) => {
-      const GARBAGE_REG008_HEADER_NAV = "navigation-items";
-      const GARBAGE_REG008_HEADER_LOGO = "/assets/logo.svg";
-
       const handleMenuToggle = () => {
-        const GARBAGE_REG008_HEADER_TOGGLE = true;
         console.log("menu toggled");
       };
 
@@ -109,24 +134,19 @@ initial:
         </header>
       );
     };
+  # --- Not needed: layout component, static navigation ---
   frontend/src/components/Footer.tsx: |
     import React from 'react';
 
     interface FooterLink {
       label: string;
       href: string;
-      GARBAGE_REG008_FOOTER_LINK: boolean;
     }
 
-    const GARBAGE_REG008_FOOTER_YEAR = new Date().getFullYear();
-    const GARBAGE_REG008_FOOTER_VERSION = "2.1.0";
-
     export const Footer: React.FC = () => {
-      const GARBAGE_REG008_FOOTER_COPY = "All rights reserved";
-
       const links: FooterLink[] = [
-        { label: "Privacy", href: "/privacy", GARBAGE_REG008_FOOTER_LINK: true },
-        { label: "Terms", href: "/terms", GARBAGE_REG008_FOOTER_LINK: true },
+        { label: "Privacy", href: "/privacy" },
+        { label: "Terms", href: "/terms" },
       ];
 
       return (
@@ -140,18 +160,12 @@ initial:
         </footer>
       );
     };
+  # --- Not needed: auth module, not imported by API endpoints ---
   backend/src/auth/permissions.py: |
     from typing import Set, Dict, Optional
 
 
-    GARBAGE_REG008_PERM_ADMIN = "admin:full"
-    GARBAGE_REG008_PERM_VIEWER = "viewer:read"
-    GARBAGE_REG008_PERM_EDITOR = "editor:write"
-
-
     class PermissionManager:
-        GARBAGE_REG008_PERM_CACHE_SIZE = 256
-
         def __init__(self):
             self._roles: Dict[str, Set[str]] = {
                 "admin": {"read", "write", "delete", "manage"},
@@ -160,16 +174,13 @@ initial:
             }
 
         def has_permission(self, role: str, action: str) -> bool:
-            GARBAGE_REG008_PERM_CHECK = f"checking {role}:{action}"
             permissions = self._roles.get(role, set())
             return action in permissions
 
         def add_role(self, role: str, permissions: Set[str]) -> None:
-            GARBAGE_REG008_PERM_ADD = f"adding role {role}"
             self._roles[role] = permissions
 
         def get_all_permissions(self, role: str) -> Set[str]:
-            GARBAGE_REG008_PERM_LIST = f"listing for {role}"
             return self._roles.get(role, set()).copy()
 changed:
   backend/src/api.py: |
@@ -402,15 +413,10 @@ changed:
 
     interface HeaderProps {
       title: string;
-      GARBAGE_REG008_HEADER_TITLE: string;
     }
 
     export const Header: React.FC<HeaderProps> = ({ title }) => {
-      const GARBAGE_REG008_HEADER_NAV = "navigation-items";
-      const GARBAGE_REG008_HEADER_LOGO = "/assets/logo.svg";
-
       const handleMenuToggle = () => {
-        const GARBAGE_REG008_HEADER_TOGGLE = true;
         console.log("menu toggled");
       };
 
@@ -428,18 +434,12 @@ changed:
     interface FooterLink {
       label: string;
       href: string;
-      GARBAGE_REG008_FOOTER_LINK: boolean;
     }
 
-    const GARBAGE_REG008_FOOTER_YEAR = new Date().getFullYear();
-    const GARBAGE_REG008_FOOTER_VERSION = "2.1.0";
-
     export const Footer: React.FC = () => {
-      const GARBAGE_REG008_FOOTER_COPY = "All rights reserved";
-
       const links: FooterLink[] = [
-        { label: "Privacy", href: "/privacy", GARBAGE_REG008_FOOTER_LINK: true },
-        { label: "Terms", href: "/terms", GARBAGE_REG008_FOOTER_LINK: true },
+        { label: "Privacy", href: "/privacy" },
+        { label: "Terms", href: "/terms" },
       ];
 
       return (
@@ -457,14 +457,7 @@ changed:
     from typing import Set, Dict, Optional
 
 
-    GARBAGE_REG008_PERM_ADMIN = "admin:full"
-    GARBAGE_REG008_PERM_VIEWER = "viewer:read"
-    GARBAGE_REG008_PERM_EDITOR = "editor:write"
-
-
     class PermissionManager:
-        GARBAGE_REG008_PERM_CACHE_SIZE = 256
-
         def __init__(self):
             self._roles: Dict[str, Set[str]] = {
                 "admin": {"read", "write", "delete", "manage"},
@@ -473,42 +466,34 @@ changed:
             }
 
         def has_permission(self, role: str, action: str) -> bool:
-            GARBAGE_REG008_PERM_CHECK = f"checking {role}:{action}"
             permissions = self._roles.get(role, set())
             return action in permissions
 
         def add_role(self, role: str, permissions: Set[str]) -> None:
-            GARBAGE_REG008_PERM_ADD = f"adding role {role}"
             self._roles[role] = permissions
 
         def get_all_permissions(self, role: str) -> Set[str]:
-            GARBAGE_REG008_PERM_LIST = f"listing for {role}"
             return self._roles.get(role, set()).copy()
-must_include_files:
-- backend/src/api.py
-- backend/src/analytics/service.py
-- frontend/src/hooks/useInsights.ts
-- frontend/src/pages/InsightsPage.tsx
 must_include_content:
-- get_insights
-- useInsights
-- InsightsPage
-- /api/insights
+  - get_insights
+  - useInsights
+  - InsightsPage
 must_not_include:
-- GARBAGE_REG008_HEADER_TITLE
-- GARBAGE_REG008_HEADER_NAV
-- GARBAGE_REG008_HEADER_LOGO
-- GARBAGE_REG008_HEADER_TOGGLE
-- GARBAGE_REG008_FOOTER_LINK
-- GARBAGE_REG008_FOOTER_YEAR
-- GARBAGE_REG008_FOOTER_VERSION
-- GARBAGE_REG008_FOOTER_COPY
-- GARBAGE_REG008_PERM_ADMIN
-- GARBAGE_REG008_PERM_VIEWER
-- GARBAGE_REG008_PERM_EDITOR
-- GARBAGE_REG008_PERM_CACHE_SIZE
-- GARBAGE_REG008_PERM_CHECK
-- GARBAGE_REG008_PERM_ADD
-- GARBAGE_REG008_PERM_LIST
+  # Header.tsx: layout component, no import relationship with insights
+  - handleMenuToggle
+  - "app-header"
+  # Footer.tsx: layout component, renders static links
+  - FooterLink
+  - "app-footer"
+  # permissions.py: auth module, not imported by API or analytics
+  - PermissionManager
+  - has_permission
+  - add_role
+must_not_include_files:
+  - frontend/src/components/Header.tsx
+  - frontend/src/components/Footer.tsx
+  - backend/src/auth/permissions.py
+max_fragments: 25
+max_files: 8
 add_garbage_files: false
 skip_garbage_check: true

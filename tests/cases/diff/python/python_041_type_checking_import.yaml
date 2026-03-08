@@ -1,3 +1,32 @@
+# Scenario: models.py adds bind_service(service: UserService) using
+#   TYPE_CHECKING import to avoid circular dependency. services.py
+#   (also changed) now calls user.bind_service(self) during creation.
+#
+# Diff shows:
+#   models.py:
+#     + def bind_service(self, service: UserService) -> None:
+#     +     self._service = service
+#   services.py:
+#     ~ def create(self, ...): user = User(name, email); user.bind_service(self)
+#
+# Reviewer questions:
+#   Q1: "Is the TYPE_CHECKING guard correct for the circular import?"
+#       -> models.py (both initial and changed): from __future__ import
+#          annotations + if TYPE_CHECKING: from services import UserService.
+#          Reviewer verifies the guard prevents runtime circular import.
+#
+#   Q2: "Does bind_service properly wire the bidirectional relationship?"
+#       -> models.py: bind_service sets self._service = service.
+#          services.py: create() calls user.bind_service(self), passing
+#          the UserService instance. Reviewer verifies the wiring.
+#
+# Not needed for comprehension:
+#   - serializers/json_codec.py: JsonSerializer with serialize/deserialize.
+#     No dependency on models.py or services.py. Independent utility.
+#
+#   - middleware/request_pipeline.py: RequestMiddleware with handler chain.
+#     No relationship to User/UserService circular dependency pattern.
+
 initial:
   models.py: |
     from __future__ import annotations
@@ -32,32 +61,41 @@ initial:
                 return False
             self.repository.save(user)
             return True
-  garbage_serialization.py: |
-    GARBAGE_PY_041_SERIAL_A = "serialization marker"
-    GARBAGE_PY_041_JSON_B = "json codec marker"
+  serializers/json_codec.py: |
+    import json
+    from typing import Any
 
     class JsonSerializer:
-        GARBAGE_PY_041_SERIALIZER_C = "serializer class marker"
+        def __init__(self, indent: int = 2):
+            self.indent = indent
 
         def serialize(self, obj: dict) -> str:
-            return str(obj)
+            return json.dumps(obj, indent=self.indent, default=str)
 
         def deserialize(self, data: str) -> dict:
-            GARBAGE_PY_041_DESER_D = "deserialize marker"
-            return {}
-  garbage_middleware.py: |
-    GARBAGE_PY_041_MIDDLEWARE_E = "middleware chain marker"
-    GARBAGE_PY_041_CHAIN_F = "request chain marker"
+            return json.loads(data)
+
+        def serialize_list(self, items: list[dict]) -> str:
+            return json.dumps(items, indent=self.indent, default=str)
+  middleware/request_pipeline.py: |
+    from typing import Callable, Any
 
     class RequestMiddleware:
-        GARBAGE_PY_041_REQUEST_G = True
+        def __init__(self):
+            self._handlers: list[Callable] = []
+
+        def add_handler(self, handler: Callable) -> None:
+            self._handlers.append(handler)
 
         def process_request(self, request: dict) -> dict:
-            return request
+            result = request
+            for handler in self._handlers:
+                result = handler(result)
+            return result
 
         def process_response(self, response: dict) -> dict:
-            GARBAGE_PY_041_RESPONSE_H = "response marker"
             return response
+
 changed:
   models.py: |
     from __future__ import annotations
@@ -97,48 +135,69 @@ changed:
                 return False
             self.repository.save(user)
             return True
-  garbage_serialization.py: |
-    GARBAGE_PY_041_SERIAL_A = "serialization marker"
-    GARBAGE_PY_041_JSON_B = "json codec marker"
+  serializers/json_codec.py: |
+    import json
+    from typing import Any
 
     class JsonSerializer:
-        GARBAGE_PY_041_SERIALIZER_C = "serializer class marker"
+        def __init__(self, indent: int = 2):
+            self.indent = indent
 
         def serialize(self, obj: dict) -> str:
-            return str(obj)
+            return json.dumps(obj, indent=self.indent, default=str)
 
         def deserialize(self, data: str) -> dict:
-            GARBAGE_PY_041_DESER_D = "deserialize marker"
-            return {}
-  garbage_middleware.py: |
-    GARBAGE_PY_041_MIDDLEWARE_E = "middleware chain marker"
-    GARBAGE_PY_041_CHAIN_F = "request chain marker"
+            return json.loads(data)
+
+        def serialize_list(self, items: list[dict]) -> str:
+            return json.dumps(items, indent=self.indent, default=str)
+  middleware/request_pipeline.py: |
+    from typing import Callable, Any
 
     class RequestMiddleware:
-        GARBAGE_PY_041_REQUEST_G = True
+        def __init__(self):
+            self._handlers: list[Callable] = []
+
+        def add_handler(self, handler: Callable) -> None:
+            self._handlers.append(handler)
 
         def process_request(self, request: dict) -> dict:
-            return request
+            result = request
+            for handler in self._handlers:
+                result = handler(result)
+            return result
 
         def process_response(self, response: dict) -> dict:
-            GARBAGE_PY_041_RESPONSE_H = "response marker"
             return response
+
 must_include_files:
-- models.py
-- services.py
-must_include_content:
-- 'def bind_service(self, service: UserService) -> None:'
-- user = User(name, email)
+  - models.py
+  - services.py
+
+must_include_content_from:
+  models.py:
+    - 'def bind_service(self, service: UserService) -> None:'
+    - "if TYPE_CHECKING:"
+    - "from services import UserService"
+  services.py:
+    - "user = User(name, email)"
+    - "user.bind_service(self)"
+
 must_not_include:
-- GARBAGE_PY_041_CHAIN_F
-- GARBAGE_PY_041_DESER_D
-- GARBAGE_PY_041_JSON_B
-- GARBAGE_PY_041_MIDDLEWARE_E
-- GARBAGE_PY_041_REQUEST_G
-- GARBAGE_PY_041_RESPONSE_H
-- GARBAGE_PY_041_SERIALIZER_C
-- GARBAGE_PY_041_SERIAL_A
-- garbage_middleware.py
-- garbage_serialization.py
+  # --- json_codec.py: serialization, no model/service dependency ---
+  - JsonSerializer
+  - serialize_list
+  - deserialize
+  # --- request_pipeline.py: middleware chain, no User/UserService dep ---
+  - RequestMiddleware
+  - process_request
+  - add_handler
+
+must_not_include_files:
+  - serializers/json_codec.py
+  - middleware/request_pipeline.py
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

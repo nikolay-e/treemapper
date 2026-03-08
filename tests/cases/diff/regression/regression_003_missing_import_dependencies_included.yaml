@@ -1,3 +1,20 @@
+# Scenario: analytics/service.py adds compute_advanced_score() which calls
+#   functions from stats.py, series.py, and config.py via deep import chains.
+#   All four analytics modules must be included for a reviewer to understand
+#   the data flow.
+#
+# Reviewer questions:
+#   - Does compute_advanced_score correctly chain resample -> EMA -> correlation?
+#   - Is the confidence calculation (1.0 - p_value) appropriate?
+#
+# Trap files:
+#   - src/models/user.py: User dataclass with admin check, mentions "data"
+#     and "user" but has no analytics import chain
+#   - src/models/session.py: Session token management with expiry logic,
+#     uses "timestamp" and "token" vocabulary but no analytics connection
+#   - tests/test_utils.py: test database helpers with fixtures, mentions
+#     "data" and "setup" but is test infrastructure, not analytics
+
 initial:
   src/analytics/service.py: |
     from typing import Dict, List, Optional
@@ -119,37 +136,32 @@ initial:
     from typing import List, Optional
     from datetime import datetime
 
-    GARBAGE_REG003_USER_TABLE_NAME = "users"
-    GARBAGE_REG003_USER_MAX_NAME_LENGTH = 128
-
     @dataclass
     class User:
         id: int
         username: str
         email: str
         created_at: datetime = field(default_factory=datetime.utcnow)
-        GARBAGE_REG003_USER_ACTIVE_FLAG: bool = True
+        is_active: bool = True
 
         def is_admin(self) -> bool:
-            GARBAGE_REG003_USER_ADMIN_CHECK = self.username
             return self.username in ("admin", "superuser")
 
         def display_name(self) -> str:
-            GARBAGE_REG003_USER_DISPLAY_MARKER = True
             return f"{self.username} ({self.email})"
 
     @dataclass
     class UserPreferences:
         user_id: int
         theme: str = "default"
-        GARBAGE_REG003_USER_PREF_LOCALE: str = "en"
+        locale: str = "en"
         notifications_enabled: bool = True
   src/models/session.py: |
     from dataclasses import dataclass
     from datetime import datetime, timedelta
 
-    GARBAGE_REG003_SESSION_DURATION_HOURS = 24
-    GARBAGE_REG003_SESSION_COOKIE_NAME = "sid"
+    SESSION_DURATION_HOURS = 24
+    SESSION_COOKIE_NAME = "sid"
 
     @dataclass
     class Session:
@@ -158,19 +170,16 @@ initial:
         token: str
         created_at: datetime
         expires_at: datetime
-        GARBAGE_REG003_SESSION_REVOKED_FLAG: bool = False
+        is_revoked: bool = False
 
         def is_valid(self) -> bool:
-            GARBAGE_REG003_SESSION_VALID_CHECK = True
-            return datetime.utcnow() < self.expires_at and not self.GARBAGE_REG003_SESSION_REVOKED_FLAG
+            return datetime.utcnow() < self.expires_at and not self.is_revoked
 
         def remaining_seconds(self) -> float:
-            GARBAGE_REG003_SESSION_REMAINING_MARKER = True
             delta = self.expires_at - datetime.utcnow()
             return max(0.0, delta.total_seconds())
 
     def create_session_token(user_id: int, duration_hours: int = 24) -> Session:
-        GARBAGE_REG003_SESSION_TOKEN_FACTORY = True
         now = datetime.utcnow()
         return Session(
             id=f"sess_{user_id}_{int(now.timestamp())}",
@@ -182,28 +191,23 @@ initial:
   tests/test_utils.py: |
     from datetime import datetime
 
-    GARBAGE_REG003_TEST_FIXTURE_PATH = "/tmp/test_data"
-    GARBAGE_REG003_TEST_TIMEOUT_SECONDS = 30
-
     class TestDatabaseHelper:
-        GARBAGE_REG003_TEST_DB_NAME = "test_db"
-        GARBAGE_REG003_TEST_DB_HOST = "localhost"
+        def __init__(self, db_name: str = "test_db", host: str = "localhost"):
+            self.db_name = db_name
+            self.host = host
 
         def setup_tables(self) -> None:
-            GARBAGE_REG003_TEST_SETUP_MARKER = True
             pass
 
         def teardown_tables(self) -> None:
-            GARBAGE_REG003_TEST_TEARDOWN_MARKER = True
             pass
 
         def insert_fixture(self, table: str, data: dict) -> int:
-            GARBAGE_REG003_TEST_INSERT_MARKER = table
             return 1
 
     def make_test_timestamp() -> datetime:
-        GARBAGE_REG003_TEST_TIMESTAMP_MARKER = True
         return datetime(2025, 1, 15, 12, 0, 0)
+
 changed:
   src/analytics/service.py: |
     from typing import Dict, List, Optional
@@ -357,37 +361,32 @@ changed:
     from typing import List, Optional
     from datetime import datetime
 
-    GARBAGE_REG003_USER_TABLE_NAME = "users"
-    GARBAGE_REG003_USER_MAX_NAME_LENGTH = 128
-
     @dataclass
     class User:
         id: int
         username: str
         email: str
         created_at: datetime = field(default_factory=datetime.utcnow)
-        GARBAGE_REG003_USER_ACTIVE_FLAG: bool = True
+        is_active: bool = True
 
         def is_admin(self) -> bool:
-            GARBAGE_REG003_USER_ADMIN_CHECK = self.username
             return self.username in ("admin", "superuser")
 
         def display_name(self) -> str:
-            GARBAGE_REG003_USER_DISPLAY_MARKER = True
             return f"{self.username} ({self.email})"
 
     @dataclass
     class UserPreferences:
         user_id: int
         theme: str = "default"
-        GARBAGE_REG003_USER_PREF_LOCALE: str = "en"
+        locale: str = "en"
         notifications_enabled: bool = True
   src/models/session.py: |
     from dataclasses import dataclass
     from datetime import datetime, timedelta
 
-    GARBAGE_REG003_SESSION_DURATION_HOURS = 24
-    GARBAGE_REG003_SESSION_COOKIE_NAME = "sid"
+    SESSION_DURATION_HOURS = 24
+    SESSION_COOKIE_NAME = "sid"
 
     @dataclass
     class Session:
@@ -396,19 +395,16 @@ changed:
         token: str
         created_at: datetime
         expires_at: datetime
-        GARBAGE_REG003_SESSION_REVOKED_FLAG: bool = False
+        is_revoked: bool = False
 
         def is_valid(self) -> bool:
-            GARBAGE_REG003_SESSION_VALID_CHECK = True
-            return datetime.utcnow() < self.expires_at and not self.GARBAGE_REG003_SESSION_REVOKED_FLAG
+            return datetime.utcnow() < self.expires_at and not self.is_revoked
 
         def remaining_seconds(self) -> float:
-            GARBAGE_REG003_SESSION_REMAINING_MARKER = True
             delta = self.expires_at - datetime.utcnow()
             return max(0.0, delta.total_seconds())
 
     def create_session_token(user_id: int, duration_hours: int = 24) -> Session:
-        GARBAGE_REG003_SESSION_TOKEN_FACTORY = True
         now = datetime.utcnow()
         return Session(
             id=f"sess_{user_id}_{int(now.timestamp())}",
@@ -420,61 +416,62 @@ changed:
   tests/test_utils.py: |
     from datetime import datetime
 
-    GARBAGE_REG003_TEST_FIXTURE_PATH = "/tmp/test_data"
-    GARBAGE_REG003_TEST_TIMEOUT_SECONDS = 30
-
     class TestDatabaseHelper:
-        GARBAGE_REG003_TEST_DB_NAME = "test_db"
-        GARBAGE_REG003_TEST_DB_HOST = "localhost"
+        def __init__(self, db_name: str = "test_db", host: str = "localhost"):
+            self.db_name = db_name
+            self.host = host
 
         def setup_tables(self) -> None:
-            GARBAGE_REG003_TEST_SETUP_MARKER = True
             pass
 
         def teardown_tables(self) -> None:
-            GARBAGE_REG003_TEST_TEARDOWN_MARKER = True
             pass
 
         def insert_fixture(self, table: str, data: dict) -> int:
-            GARBAGE_REG003_TEST_INSERT_MARKER = table
             return 1
 
     def make_test_timestamp() -> datetime:
-        GARBAGE_REG003_TEST_TIMESTAMP_MARKER = True
         return datetime(2025, 1, 15, 12, 0, 0)
+
 must_include_files:
 - src/analytics/service.py
 - src/analytics/stats.py
 - src/analytics/series.py
 - src/analytics/config.py
-must_include_content:
-- def compute_advanced_score
-- pearson_correlation_with_pvalue
-- calculate_ema_value
-- resample_series
-- align_timestamps
-- load_trend_config
-- get_quality_window
+must_include_content_from:
+  src/analytics/service.py:
+    - "def compute_advanced_score"
+    - "pearson_correlation_with_pvalue"
+    - "resample_series"
+    - "load_trend_config"
+  src/analytics/stats.py:
+    - "def pearson_correlation_with_pvalue"
+    - "def calculate_ema_value"
+  src/analytics/series.py:
+    - "def resample_series"
+    - "def align_timestamps"
+  src/analytics/config.py:
+    - "def load_trend_config"
+    - "def get_quality_window"
+max_fragments: 10
+max_files: 5
 must_not_include:
-- GARBAGE_REG003_USER_TABLE_NAME
-- GARBAGE_REG003_USER_MAX_NAME_LENGTH
-- GARBAGE_REG003_USER_ACTIVE_FLAG
-- GARBAGE_REG003_USER_ADMIN_CHECK
-- GARBAGE_REG003_USER_DISPLAY_MARKER
-- GARBAGE_REG003_USER_PREF_LOCALE
-- GARBAGE_REG003_SESSION_DURATION_HOURS
-- GARBAGE_REG003_SESSION_COOKIE_NAME
-- GARBAGE_REG003_SESSION_REVOKED_FLAG
-- GARBAGE_REG003_SESSION_VALID_CHECK
-- GARBAGE_REG003_SESSION_REMAINING_MARKER
-- GARBAGE_REG003_SESSION_TOKEN_FACTORY
-- GARBAGE_REG003_TEST_FIXTURE_PATH
-- GARBAGE_REG003_TEST_TIMEOUT_SECONDS
-- GARBAGE_REG003_TEST_DB_NAME
-- GARBAGE_REG003_TEST_DB_HOST
-- GARBAGE_REG003_TEST_SETUP_MARKER
-- GARBAGE_REG003_TEST_TEARDOWN_MARKER
-- GARBAGE_REG003_TEST_INSERT_MARKER
-- GARBAGE_REG003_TEST_TIMESTAMP_MARKER
+- is_admin
+- display_name
+- UserPreferences
+- SESSION_DURATION_HOURS
+- SESSION_COOKIE_NAME
+- is_revoked
+- create_session_token
+- remaining_seconds
+- TestDatabaseHelper
+- setup_tables
+- teardown_tables
+- insert_fixture
+- make_test_timestamp
+must_not_include_files:
+- src/models/user.py
+- src/models/session.py
+- tests/test_utils.py
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,22 @@
+# Test 037: test_data_processor adds retry tests for process_with_retry
+#           — reviewer needs DataProcessor and ApiClient to understand retry logic
+#
+# Scenario: New tests test_retry_on_failure and test_retry_exhausted_raises
+# are added to test_data_processor.py. They verify DataProcessor.process_with_retry
+# behavior when ApiClient.fetch_data raises ConnectionError.
+#
+# Reviewer questions:
+#   Q1: "What does process_with_retry do on failure?"
+#       -> Retries up to `retries` times, re-raises on last attempt.
+#   Q2: "What method does it call that can fail?"
+#       -> self.client.fetch_data(endpoint), which calls requests.get.
+#
+# Trap files (plausible but unrelated):
+#   - src/retry_utils.py: generic retry decorator utility with similar
+#     retry/backoff vocabulary but not used by DataProcessor.
+#   - tests/test_api_client.py: tests for ApiClient directly but not
+#     relevant to DataProcessor retry behavior review.
+
 initial:
   src/api_client.py: |
     import requests
@@ -44,6 +63,35 @@ initial:
         processor = DataProcessor(mock_client)
         result = processor.process_user_data(1)
         assert result["processed"] is True
+  src/retry_utils.py: |
+    import time
+    from functools import wraps
+
+    def retry(max_attempts=3, backoff=1.0):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                for attempt in range(max_attempts):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception:
+                        if attempt == max_attempts - 1:
+                            raise
+                        time.sleep(backoff * (attempt + 1))
+            return wrapper
+        return decorator
+  tests/test_api_client.py: |
+    from unittest.mock import patch, Mock
+    from src.api_client import ApiClient
+
+    def test_fetch_data_success():
+        client = ApiClient("http://localhost")
+        with patch('requests.get') as mock_get:
+            mock_get.return_value.json.return_value = {"id": 1}
+            mock_get.return_value.raise_for_status = Mock()
+            result = client.fetch_data("users/1")
+            assert result["id"] == 1
+
 changed:
   src/api_client.py: |
     import requests
@@ -114,10 +162,61 @@ changed:
         processor = DataProcessor(mock_client)
         with pytest.raises(ConnectionError):
             processor.process_with_retry("users/1", retries=3)
+  src/retry_utils.py: |
+    import time
+    from functools import wraps
+
+    def retry(max_attempts=3, backoff=1.0):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                for attempt in range(max_attempts):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception:
+                        if attempt == max_attempts - 1:
+                            raise
+                        time.sleep(backoff * (attempt + 1))
+            return wrapper
+        return decorator
+  tests/test_api_client.py: |
+    from unittest.mock import patch, Mock
+    from src.api_client import ApiClient
+
+    def test_fetch_data_success():
+        client = ApiClient("http://localhost")
+        with patch('requests.get') as mock_get:
+            mock_get.return_value.json.return_value = {"id": 1}
+            mock_get.return_value.raise_for_status = Mock()
+            result = client.fetch_data("users/1")
+            assert result["id"] == 1
+
 must_include_files:
-- tests/test_data_processor.py
-must_include_content:
-- import pytest
-- 'def test_retry_on_failure():'
+  - tests/test_data_processor.py
+  # Q1: Reviewer needs DataProcessor to understand process_with_retry logic
+  - src/data_processor.py
+
+must_include_content_from:
+  tests/test_data_processor.py:
+    - "import pytest"
+    - "def test_retry_on_failure():"
+  src/data_processor.py:
+    - "def process_with_retry(self, endpoint: str, retries: int = 3) -> dict:"
+
+must_not_include:
+  # --- retry_utils.py: generic retry decorator, similar pattern but unused ---
+  - "def retry(max_attempts"
+  - "time.sleep(backoff"
+  - "@wraps"
+  # --- test_api_client.py: tests ApiClient directly, not DataProcessor retry ---
+  - "test_fetch_data_success"
+  - "patch('requests.get')"
+
+must_not_include_files:
+  - src/retry_utils.py
+  - tests/test_api_client.py
+
+max_fragments: 8
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

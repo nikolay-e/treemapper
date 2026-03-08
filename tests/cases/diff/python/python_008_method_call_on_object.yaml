@@ -1,3 +1,8 @@
+# Scenario: ProfileHandler starts calling methods on User objects (update_profile, activate)
+# Changed: handlers/profile.py imports User, calls user.update_profile() and user.activate()
+# Reviewer questions: Is user.active check sufficient? What if user.status is DELETED?
+# Trap 1: handlers/session.py — manages user sessions, shares "user" vocabulary but no dep on models/user
+# Trap 2: handlers/notification.py — sends user notifications, shares "user" domain but independent
 initial:
   models/user.py: |
     from typing import Optional, List, Dict, Any
@@ -116,46 +121,82 @@ initial:
 
         def format_response(self, data: Dict[str, Any]) -> Dict[str, Any]:
             return {"data": data, "timestamp": datetime.now().isoformat()}
-  garbage_auth.py: |
-    GARBAGE_MARKER_AUTH_001 = "auth garbage"
-    UNRELATED_TOKEN_EXPIRY_002 = 3600
+  handlers/session.py: |
+    from typing import Dict, Any, Optional, List
+    from dataclasses import dataclass
+    from datetime import datetime, timedelta
+    import hashlib
 
-    class AuthManager:
-        GARBAGE_AUTH_CLASS_003 = "auth class marker"
+    @dataclass
+    class SessionData:
+        session_id: str
+        user_id: int
+        created_at: datetime
+        expires_at: datetime
+        ip_address: str
 
-        def __init__(self, secret_key: str = "secret"):
-            self.secret_key = secret_key
+    class SessionManager:
+        def __init__(self, max_sessions_per_user: int = 5):
+            self._sessions: Dict[str, SessionData] = {}
+            self._max_sessions = max_sessions_per_user
 
-        def generate_token(self, user_id: int) -> str:
-            return f"token_{user_id}"
+        def create_session(self, user_id: int, ip_address: str) -> SessionData:
+            session_id = hashlib.sha256(
+                f"{user_id}{datetime.now().isoformat()}".encode()
+            ).hexdigest()[:32]
+            session = SessionData(
+                session_id=session_id,
+                user_id=user_id,
+                created_at=datetime.now(),
+                expires_at=datetime.now() + timedelta(hours=24),
+                ip_address=ip_address,
+            )
+            self._sessions[session_id] = session
+            return session
 
-        def verify_token(self, token: str) -> Optional[int]:
+        def validate_session(self, session_id: str) -> Optional[SessionData]:
+            session = self._sessions.get(session_id)
+            if session and datetime.now() < session.expires_at:
+                return session
             return None
 
-    class OAuthProvider:
-        GARBAGE_OAUTH_MARKER_004 = "oauth marker"
+        def revoke_session(self, session_id: str) -> bool:
+            return self._sessions.pop(session_id, None) is not None
+  handlers/notification.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-        def get_authorization_url(self) -> str:
-            return "https://oauth.example.com/auth"
-  garbage_permissions.py: |
-    GARBAGE_MARKER_PERM_005 = "permissions garbage"
-    UNRELATED_ADMIN_ROLE_006 = "admin"
+    @dataclass
+    class UserNotification:
+        user_id: int
+        message: str
+        notification_type: str
+        read: bool = False
+        created_at: Optional[datetime] = None
 
-    class PermissionChecker:
-        GARBAGE_PERM_CLASS_007 = True
-
+    class NotificationHandler:
         def __init__(self):
-            self._permissions: Dict[str, List[str]] = {}
+            self._notifications: List[UserNotification] = []
 
-        def has_permission(self, user_id: int, permission: str) -> bool:
-            return True
+        def send_notification(self, user_id: int, message: str, notification_type: str = "info") -> None:
+            self._notifications.append(UserNotification(
+                user_id=user_id,
+                message=message,
+                notification_type=notification_type,
+                created_at=datetime.now(),
+            ))
 
-        def grant_permission(self, user_id: int, permission: str) -> None:
-            pass
+        def get_unread(self, user_id: int) -> List[UserNotification]:
+            return [n for n in self._notifications if n.user_id == user_id and not n.read]
 
-    def format_permission_error(permission: str) -> str:
-        GARBAGE_FORMAT_PERM_008 = "format perm marker"
-        return f"Missing permission: {permission}"
+        def mark_read(self, user_id: int) -> int:
+            count = 0
+            for n in self._notifications:
+                if n.user_id == user_id and not n.read:
+                    n.read = True
+                    count += 1
+            return count
 changed:
   models/user.py: |
     from typing import Optional, List, Dict, Any
@@ -286,59 +327,100 @@ changed:
                 "success": success,
                 "status": user.status.value
             }
-  garbage_auth.py: |
-    GARBAGE_MARKER_AUTH_001 = "auth garbage"
-    UNRELATED_TOKEN_EXPIRY_002 = 3600
+  handlers/session.py: |
+    from typing import Dict, Any, Optional, List
+    from dataclasses import dataclass
+    from datetime import datetime, timedelta
+    import hashlib
 
-    class AuthManager:
-        GARBAGE_AUTH_CLASS_003 = "auth class marker"
+    @dataclass
+    class SessionData:
+        session_id: str
+        user_id: int
+        created_at: datetime
+        expires_at: datetime
+        ip_address: str
 
-        def __init__(self, secret_key: str = "secret"):
-            self.secret_key = secret_key
+    class SessionManager:
+        def __init__(self, max_sessions_per_user: int = 5):
+            self._sessions: Dict[str, SessionData] = {}
+            self._max_sessions = max_sessions_per_user
 
-        def generate_token(self, user_id: int) -> str:
-            return f"token_{user_id}"
+        def create_session(self, user_id: int, ip_address: str) -> SessionData:
+            session_id = hashlib.sha256(
+                f"{user_id}{datetime.now().isoformat()}".encode()
+            ).hexdigest()[:32]
+            session = SessionData(
+                session_id=session_id,
+                user_id=user_id,
+                created_at=datetime.now(),
+                expires_at=datetime.now() + timedelta(hours=24),
+                ip_address=ip_address,
+            )
+            self._sessions[session_id] = session
+            return session
 
-        def verify_token(self, token: str) -> Optional[int]:
+        def validate_session(self, session_id: str) -> Optional[SessionData]:
+            session = self._sessions.get(session_id)
+            if session and datetime.now() < session.expires_at:
+                return session
             return None
 
-    class OAuthProvider:
-        GARBAGE_OAUTH_MARKER_004 = "oauth marker"
+        def revoke_session(self, session_id: str) -> bool:
+            return self._sessions.pop(session_id, None) is not None
+  handlers/notification.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-        def get_authorization_url(self) -> str:
-            return "https://oauth.example.com/auth"
-  garbage_permissions.py: |
-    GARBAGE_MARKER_PERM_005 = "permissions garbage"
-    UNRELATED_ADMIN_ROLE_006 = "admin"
+    @dataclass
+    class UserNotification:
+        user_id: int
+        message: str
+        notification_type: str
+        read: bool = False
+        created_at: Optional[datetime] = None
 
-    class PermissionChecker:
-        GARBAGE_PERM_CLASS_007 = True
-
+    class NotificationHandler:
         def __init__(self):
-            self._permissions: Dict[str, List[str]] = {}
+            self._notifications: List[UserNotification] = []
 
-        def has_permission(self, user_id: int, permission: str) -> bool:
-            return True
+        def send_notification(self, user_id: int, message: str, notification_type: str = "info") -> None:
+            self._notifications.append(UserNotification(
+                user_id=user_id,
+                message=message,
+                notification_type=notification_type,
+                created_at=datetime.now(),
+            ))
 
-        def grant_permission(self, user_id: int, permission: str) -> None:
-            pass
+        def get_unread(self, user_id: int) -> List[UserNotification]:
+            return [n for n in self._notifications if n.user_id == user_id and not n.read]
 
-    def format_permission_error(permission: str) -> str:
-        GARBAGE_FORMAT_PERM_008 = "format perm marker"
-        return f"Missing permission: {permission}"
+        def mark_read(self, user_id: int) -> int:
+            count = 0
+            for n in self._notifications:
+                if n.user_id == user_id and not n.read:
+                    n.read = True
+                    count += 1
+            return count
 must_include_files:
 - handlers/profile.py
-must_include_content:
-- from typing import Dict, Any, Optional, List
-- 'def handle_update(self, user: User, data: Dict[str, Any]) -> User:'
+- models/user.py
+must_include_content_from:
+  handlers/profile.py:
+  - from models.user import User, AccountStatus
+  - 'def handle_update(self, user: User, data: Dict[str, Any]) -> User:'
 must_not_include:
-- GARBAGE_AUTH_CLASS_003
-- GARBAGE_FORMAT_PERM_008
-- GARBAGE_MARKER_AUTH_001
-- GARBAGE_MARKER_PERM_005
-- GARBAGE_OAUTH_MARKER_004
-- GARBAGE_PERM_CLASS_007
-- garbage_auth.py
-- garbage_permissions.py
+- SessionManager
+- SessionData
+- validate_session
+- NotificationHandler
+- UserNotification
+- send_notification
+must_not_include_files:
+- handlers/session.py
+- handlers/notification.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

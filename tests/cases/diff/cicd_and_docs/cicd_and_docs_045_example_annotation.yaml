@@ -1,118 +1,238 @@
+# Test 045: parse() adds schema validation — reviewer needs types and callers
+#
+# Scenario: parse() gains an optional ParseOptions parameter and now throws
+# SchemaValidationError on invalid input. Return type changes from raw object
+# to ParseResult (which includes validation metadata).
+#
+# Reviewer questions:
+#   Q1: "What is ParseResult?" -> types.ts defines it: { data, valid, errors? }
+#       Without this, reviewer cannot verify the return statement is correct.
+#   Q2: "Who calls parse()?" -> handler.ts does `const data = parse(rawBody)` and
+#       uses `data` as plain object. This caller is NOW BROKEN: return type
+#       changed from object to ParseResult, and parse() can now throw.
+#   Q3: "What is SchemaValidationError?" -> errors.ts defines it with message
+#       and path fields. Reviewer needs this to verify the throw is correct.
+#
+# Not needed for comprehension:
+#   - formatter.ts: formats OUTPUT after parsing. Does not call parse(),
+#     does not use ParseResult. Zero signal for this change.
+#   - examples/parsing.ts: standalone demo, imports parse but a reviewer
+#     checking a schema validation change does not need example code.
+#   - package.json: name/version metadata. No comprehension value.
+#   - validator-utils.ts: string validation utilities (isEmail, isUrl).
+#     Shares the word "validation" but has nothing to do with schema
+#     validation of parsed JSON objects.
+
 initial:
   src/parser.ts: |
-    /**
-     * Parse JSON string
-     * @example
-     * const data = parse('{"key": "value"}');
-     */
+    import { ParseResult } from './types';
+
     export function parse(input: string): object {
       return JSON.parse(input);
     }
 
+    export function stringify(data: object, indent?: number): string {
+      return JSON.stringify(data, null, indent);
+    }
+  src/types.ts: |
+    export interface ParseResult {
+      data: object;
+      valid: boolean;
+      errors?: ValidationDetail[];
+    }
+
+    export interface ValidationDetail {
+      path: string;
+      message: string;
+      rule: string;
+    }
+
     export interface ParseOptions {
       schema?: object;
       strict?: boolean;
+      coerceTypes?: boolean;
+    }
+  src/errors.ts: |
+    export class SchemaValidationError extends Error {
+      readonly path: string;
+      readonly violations: string[];
+
+      constructor(message: string, path: string, violations: string[]) {
+        super(message);
+        this.name = 'SchemaValidationError';
+        this.path = path;
+        this.violations = violations;
+      }
+
+      toJSON(): object {
+        return {
+          name: this.name,
+          message: this.message,
+          path: this.path,
+          violations: this.violations,
+        };
+      }
+    }
+
+    export class ParserInternalError extends Error {
+      constructor(cause: unknown) {
+        super(`Internal parser failure: ${cause}`);
+        this.name = 'ParserInternalError';
+      }
+    }
+  src/handler.ts: |
+    import { parse } from './parser';
+
+    export function handleRequest(rawBody: string): {
+      status: number;
+      body: object;
+    } {
+      try {
+        const data = parse(rawBody);
+        return { status: 200, body: data };
+      } catch {
+        return { status: 400, body: { error: 'Invalid JSON' } };
+      }
+    }
+
+    export function handleBatchRequest(items: string[]): object[] {
+      return items.map((item) => {
+        const result = handleRequest(item);
+        return result.body;
+      });
+    }
+  src/formatter.ts: |
+    export function formatAsTable(data: object): string {
+      const entries = Object.entries(data);
+      const maxKeyLen = Math.max(...entries.map(([k]) => k.length));
+      return entries
+        .map(([key, val]) => `${key.padEnd(maxKeyLen)} : ${JSON.stringify(val)}`)
+        .join('\n');
+    }
+
+    export function formatAsYaml(data: object, indent: number = 2): string {
+      const spaces = ' '.repeat(indent);
+      return Object.entries(data)
+        .map(([key, val]) => `${key}:\n${spaces}${JSON.stringify(val)}`)
+        .join('\n');
+    }
+  src/validator-utils.ts: |
+    export function isEmail(value: string): boolean {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
+
+    export function isUrl(value: string): boolean {
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    export function isNonEmpty(value: string): boolean {
+      return value.trim().length > 0;
+    }
+
+    export function isInRange(value: number, min: number, max: number): boolean {
+      return value >= min && value <= max;
     }
   examples/parsing.ts: |
     import { parse } from '../src/parser';
 
-    const data = parse('{"key": "value"}');
-    console.log(data);
+    const simple = parse('{"name": "Alice", "age": 30}');
+    console.log('Parsed:', simple);
+
+    try {
+      parse('not valid json');
+    } catch (e) {
+      console.log('Expected error:', e);
+    }
   package.json: |
     {
-      "name": "json-parser",
-      "version": "1.0.0",
+      "name": "@acme/json-parser",
+      "version": "2.3.0",
       "main": "dist/parser.js",
-      "types": "dist/parser.d.ts"
+      "types": "dist/parser.d.ts",
+      "license": "MIT"
     }
-  garbage_example_collector.ts: |
-    const GARBAGE_CICD_DOCS_045_COLLECTOR_MARKER_A = "jsdoc";
-    const GARBAGE_CICD_DOCS_045_FILTER_MARKER_B = "@example";
 
-    class GarbageExampleCollector {
-      static GARBAGE_CICD_DOCS_045_RECURSIVE_MARKER_C = true;
-      collect(): void {}
-    }
-  garbage_example_runner.ts: |
-    const GARBAGE_CICD_DOCS_045_RUNNER_MARKER_D = "ts-node";
-    const GARBAGE_CICD_DOCS_045_SANDBOX_MARKER_E = "vm2";
-
-    class GarbageExampleRunner {
-      static GARBAGE_CICD_DOCS_045_TIMEOUT_MARKER_F = 5000;
-      run(): void {}
-    }
 changed:
   src/parser.ts: |
-    /**
-     * Parse JSON string with validation
-     * @example
-     * // Basic usage
-     * const data = parse('{"key": "value"}');
-     *
-     * @example
-     * // With schema validation
-     * const schema = { type: 'object', required: ['key'] };
-     * const data = parse('{"key": "value"}', { schema });
-     *
-     * @example
-     * // See examples/parsing.ts for more examples
-     */
-    export function parse(input: string, options?: ParseOptions): object {
-      const parsed = JSON.parse(input);
+    import { ParseResult, ParseOptions } from './types';
+    import { SchemaValidationError } from './errors';
+
+    export function parse(input: string, options?: ParseOptions): ParseResult {
+      const data = JSON.parse(input);
       if (options?.schema) {
-        validate(parsed, options.schema);
+        const errors = validateSchema(data, options.schema, options.strict);
+        if (errors.length > 0) {
+          throw new SchemaValidationError(
+            `Validation failed with ${errors.length} error(s)`,
+            '$',
+            errors,
+          );
+        }
+        return { data, valid: true };
       }
-      return parsed;
+      return { data, valid: true };
     }
 
-    export interface ParseOptions {
-      schema?: object;
-      strict?: boolean;
+    function validateSchema(
+      data: object,
+      schema: object,
+      strict?: boolean
+    ): string[] {
+      return [];
     }
 
-    function validate(data: object, schema: object): void {
-      // Schema validation logic
+    export function stringify(data: object, indent?: number): string {
+      return JSON.stringify(data, null, indent);
     }
-  examples/parsing.ts: |
-    import { parse } from '../src/parser';
 
-    const data = parse('{"key": "value"}');
-    console.log(data);
-  package.json: |
-    {
-      "name": "json-parser",
-      "version": "1.0.0",
-      "main": "dist/parser.js",
-      "types": "dist/parser.d.ts"
-    }
-  garbage_example_collector.ts: |
-    const GARBAGE_CICD_DOCS_045_COLLECTOR_MARKER_A = "jsdoc";
-    const GARBAGE_CICD_DOCS_045_FILTER_MARKER_B = "@example";
-
-    class GarbageExampleCollector {
-      static GARBAGE_CICD_DOCS_045_RECURSIVE_MARKER_C = true;
-      collect(): void {}
-    }
-  garbage_example_runner.ts: |
-    const GARBAGE_CICD_DOCS_045_RUNNER_MARKER_D = "ts-node";
-    const GARBAGE_CICD_DOCS_045_SANDBOX_MARKER_E = "vm2";
-
-    class GarbageExampleRunner {
-      static GARBAGE_CICD_DOCS_045_TIMEOUT_MARKER_F = 5000;
-      run(): void {}
-    }
 must_include_files:
-- src/parser.ts
-must_include_content:
-- parsed = JSON.parse(input)
-- interface ParseOptions {
+  - src/parser.ts
+  # Q1: "What is ParseResult?" — reviewer needs to see the 3 fields
+  # (data, valid, errors?) to verify the return statements are correct.
+  - src/types.ts
+  # Q2: "Who calls parse() and are they affected?" — handler.ts does
+  # `const data = parse(rawBody)` treating result as plain object.
+  # Return type changed from object -> ParseResult. The caller is
+  # now using ParseResult where it expects object.
+  - src/handler.ts
+must_include_content_from:
+  src/parser.ts:
+    - "function parse"
+    - SchemaValidationError
+    - ParseResult
+  src/types.ts:
+    - interface ParseResult
+    - interface ParseOptions
+    - "valid: boolean"
+  src/handler.ts:
+    # The critical line: caller treats result as plain object
+    - "const data = parse(rawBody)"
 must_not_include:
-- GARBAGE_CICD_DOCS_045_COLLECTOR_MARKER_A
-- GARBAGE_CICD_DOCS_045_FILTER_MARKER_B
-- GARBAGE_CICD_DOCS_045_RECURSIVE_MARKER_C
-- GARBAGE_CICD_DOCS_045_RUNNER_MARKER_D
-- GARBAGE_CICD_DOCS_045_SANDBOX_MARKER_E
-- GARBAGE_CICD_DOCS_045_TIMEOUT_MARKER_F
-- garbage_example_runner.ts
+  # --- formatter.ts: unrelated output formatting ---
+  - formatAsTable
+  - formatAsYaml
+  # --- validator-utils.ts: string validation, not schema validation ---
+  - isEmail
+  - isUrl
+  - isNonEmpty
+  - isInRange
+  # --- examples/parsing.ts: standalone demo ---
+  - "Parsed:"
+  - "Expected error:"
+  # --- package.json: metadata ---
+  - "@acme/json-parser"
+  - "dist/parser.js"
+must_not_include_files:
+  - src/formatter.ts
+  - src/validator-utils.ts
+  - package.json
+  - examples/parsing.ts
+max_fragments: 10
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

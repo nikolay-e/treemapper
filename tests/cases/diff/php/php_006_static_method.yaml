@@ -1,3 +1,22 @@
+# Test 006: UserRegistration service uses User static methods for CRUD
+#           — reviewer needs User model to verify static API (find, create, all, count)
+#
+# Scenario: UserRegistration gains register(), listAll(), getTotalCount() that
+# call User::find(), User::create(), User::all(), User::count(). Adds email
+# uniqueness check via User::find(1).
+#
+# Reviewer questions:
+#   Q1: "What do User::find and User::create return?"
+#       -> find returns ?self (nullable), create returns self after inserting.
+#   Q2: "Does User::all return objects or arrays?"
+#       -> array_values of the static $users array, so User objects.
+#
+# Trap files (plausible but unrelated):
+#   - src/Services/UserNotification.php: shares "User" prefix, sends emails
+#     to users, but doesn't use User model static methods.
+#   - src/Models/Role.php: related to users conceptually (user roles), but
+#     not imported or referenced by UserRegistration.
+
 initial:
   src/Models/User.php: |
     <?php
@@ -43,32 +62,44 @@ initial:
             return !empty($name);
         }
     }
-  src/garbage_audio_encoder.php: |
+  src/Services/UserNotification.php: |
     <?php
-    GARBAGE_PHP_006_BITRATE_A = 320;
-    GARBAGE_PHP_006_SAMPLE_RATE_B = 44100;
+    namespace App\Services;
 
-    class GarbageAudioEncoder {
-        GARBAGE_PHP_006_CHANNELS_C = 2;
+    class UserNotification {
+        private string $fromEmail;
 
-        public function encode(string $input): string {
-            GARBAGE_PHP_006_CODEC_D = "aac";
-            return $input;
+        public function __construct(string $fromEmail = 'noreply@app.com') {
+            $this->fromEmail = $fromEmail;
+        }
+
+        public function sendWelcome(string $toEmail, string $userName): bool {
+            $subject = "Welcome, {$userName}!";
+            return $this->sendMail($toEmail, $subject, "Thanks for joining.");
+        }
+
+        private function sendMail(string $to, string $subject, string $body): bool {
+            return !empty($to) && !empty($subject);
         }
     }
-  src/garbage_pdf_merger.php: |
+  src/Models/Role.php: |
     <?php
-    GARBAGE_PHP_006_PAGE_SIZE_E = "A4";
-    GARBAGE_PHP_006_ORIENTATION_F = "portrait";
+    namespace App\Models;
 
-    class GarbagePdfMerger {
-        GARBAGE_PHP_006_COMPRESSION_G = true;
+    class Role {
+        public string $name;
+        public array $permissions;
 
-        public function merge(array $files): string {
-            GARBAGE_PHP_006_METADATA_H = "merged";
-            return "";
+        public function __construct(string $name, array $permissions = []) {
+            $this->name = $name;
+            $this->permissions = $permissions;
+        }
+
+        public function hasPermission(string $permission): bool {
+            return in_array($permission, $this->permissions);
         }
     }
+
 changed:
   src/Models/User.php: |
     <?php
@@ -129,49 +160,71 @@ changed:
             return User::count();
         }
     }
-  src/garbage_audio_encoder.php: |
+  src/Services/UserNotification.php: |
     <?php
-    GARBAGE_PHP_006_BITRATE_A = 320;
-    GARBAGE_PHP_006_SAMPLE_RATE_B = 44100;
+    namespace App\Services;
 
-    class GarbageAudioEncoder {
-        GARBAGE_PHP_006_CHANNELS_C = 2;
+    class UserNotification {
+        private string $fromEmail;
 
-        public function encode(string $input): string {
-            GARBAGE_PHP_006_CODEC_D = "aac";
-            return $input;
+        public function __construct(string $fromEmail = 'noreply@app.com') {
+            $this->fromEmail = $fromEmail;
+        }
+
+        public function sendWelcome(string $toEmail, string $userName): bool {
+            $subject = "Welcome, {$userName}!";
+            return $this->sendMail($toEmail, $subject, "Thanks for joining.");
+        }
+
+        private function sendMail(string $to, string $subject, string $body): bool {
+            return !empty($to) && !empty($subject);
         }
     }
-  src/garbage_pdf_merger.php: |
+  src/Models/Role.php: |
     <?php
-    GARBAGE_PHP_006_PAGE_SIZE_E = "A4";
-    GARBAGE_PHP_006_ORIENTATION_F = "portrait";
+    namespace App\Models;
 
-    class GarbagePdfMerger {
-        GARBAGE_PHP_006_COMPRESSION_G = true;
+    class Role {
+        public string $name;
+        public array $permissions;
 
-        public function merge(array $files): string {
-            GARBAGE_PHP_006_METADATA_H = "merged";
-            return "";
+        public function __construct(string $name, array $permissions = []) {
+            $this->name = $name;
+            $this->permissions = $permissions;
+        }
+
+        public function hasPermission(string $permission): bool {
+            return in_array($permission, $this->permissions);
         }
     }
+
 must_include_files:
-- src/Services/UserRegistration.php
-must_include_content:
-- |
-  User::create($name, $email)
+  - src/Services/UserRegistration.php
+  # Q1/Q2: Reviewer needs User model to verify static API signatures
+  - src/Models/User.php
+
+must_include_content_from:
+  src/Services/UserRegistration.php:
+    - "User::create($name, $email)"
+    - "User::find(1)"
+  src/Models/User.php:
+    - "public static function find(int $id): ?self"
+    - "public static function create(string $name, string $email): self"
+
 must_not_include:
-- GARBAGE_PHP_006_BITRATE_A
-- GARBAGE_PHP_006_SAMPLE_RATE_B
-- GARBAGE_PHP_006_CHANNELS_C
-- GARBAGE_PHP_006_CODEC_D
-- GARBAGE_PHP_006_PAGE_SIZE_E
-- GARBAGE_PHP_006_ORIENTATION_F
-- GARBAGE_PHP_006_COMPRESSION_G
-- GARBAGE_PHP_006_METADATA_H
-- GarbageAudioEncoder
-- GarbagePdfMerger
-- garbage_audio_encoder.php
-- garbage_pdf_merger.php
+  # --- UserNotification.php: shares "User" prefix but no model dependency ---
+  - "class UserNotification"
+  - "sendWelcome"
+  - "sendMail"
+  # --- Role.php: user-adjacent model but not referenced ---
+  - "class Role"
+  - "hasPermission"
+
+must_not_include_files:
+  - src/Services/UserNotification.php
+  - src/Models/Role.php
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

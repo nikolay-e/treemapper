@@ -1,7 +1,14 @@
+# Scenario: Extending Point from 2D to 3D and adding a Rectangle struct
+# Changed: src/models.rs — Point gains z field, distance_to updated, Rectangle added
+# Reviewer questions: Are all Point constructors updated for 3D? Does Display show z?
+# Trap files:
+#   - src/color.rs: RGBA color struct — similar "multi-field numeric struct" pattern but unrelated
+#   - src/transform.rs: Affine transform matrices — geometry-adjacent vocabulary but no import edge
 initial:
   src/lib.rs: |
     pub mod models;
-    pub mod unrelated;
+    pub mod color;
+    pub mod transform;
   src/models.rs: |
     use std::fmt;
 
@@ -38,56 +45,67 @@ initial:
             Self::origin()
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod networking;
-    pub mod serialization;
-  src/unrelated/networking.rs: |
-    // GARBAGE_RUST_NETWORK_001
-    use std::net::IpAddr;
-
-    pub const GARBAGE_DEFAULT_PORT_002: u16 = 8080;
-    pub const GARBAGE_TIMEOUT_MS_003: u64 = 30000;
-
-    pub struct GarbageNetworkConfig004 {
-        host: String,
-        port: u16,
-        timeout: u64,
+  src/color.rs: |
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Color {
+        pub r: u8,
+        pub g: u8,
+        pub b: u8,
+        pub a: u8,
     }
 
-    impl GarbageNetworkConfig004 {
-        pub fn garbage_connect_005(&self) -> Result<(), String> {
-            Err("GARBAGE_CONNECTION_ERROR_006".to_string())
+    impl Color {
+        pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+            Self { r, g, b, a }
         }
 
-        pub fn garbage_disconnect_007(&self) {
-            println!("Disconnecting from {}:{}", self.host, self.port);
-        }
-    }
-
-    pub trait GarbageNetworkHandler008 {
-        fn garbage_handle_request_009(&self, data: &[u8]) -> Vec<u8>;
-    }
-  src/unrelated/serialization.rs: |
-    // GARBAGE_RUST_SERIAL_010
-    pub const GARBAGE_FORMAT_VERSION_011: u32 = 1;
-
-    pub struct GarbageSerializer012 {
-        buffer: Vec<u8>,
-    }
-
-    impl GarbageSerializer012 {
-        pub fn garbage_serialize_013<T>(&mut self, _value: &T) {
-            // GARBAGE_SERIALIZE_IMPL_014
+        pub fn white() -> Self {
+            Self::new(255, 255, 255, 255)
         }
 
-        pub fn garbage_deserialize_015<T>(&self) -> Option<T> {
-            None
+        pub fn black() -> Self {
+            Self::new(0, 0, 0, 255)
+        }
+
+        pub fn to_hex(&self) -> String {
+            format!("#{:02x}{:02x}{:02x}{:02x}", self.r, self.g, self.b, self.a)
+        }
+    }
+  src/transform.rs: |
+    pub struct AffineTransform {
+        matrix: [[f64; 3]; 3],
+    }
+
+    impl AffineTransform {
+        pub fn identity() -> Self {
+            Self {
+                matrix: [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                ],
+            }
+        }
+
+        pub fn translate(dx: f64, dy: f64) -> Self {
+            let mut t = Self::identity();
+            t.matrix[0][2] = dx;
+            t.matrix[1][2] = dy;
+            t
+        }
+
+        pub fn scale(sx: f64, sy: f64) -> Self {
+            let mut t = Self::identity();
+            t.matrix[0][0] = sx;
+            t.matrix[1][1] = sy;
+            t
         }
     }
 changed:
   src/lib.rs: |
     pub mod models;
-    pub mod unrelated;
+    pub mod color;
+    pub mod transform;
   src/models.rs: |
     use std::fmt;
 
@@ -150,50 +168,60 @@ changed:
             (self.width - self.height).abs() < f64::EPSILON
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod networking;
-    pub mod serialization;
-  src/unrelated/networking.rs: |
-    // GARBAGE_RUST_NETWORK_001
-    use std::net::IpAddr;
-
-    pub const GARBAGE_DEFAULT_PORT_002: u16 = 8080;
-    pub const GARBAGE_TIMEOUT_MS_003: u64 = 30000;
-
-    pub struct GarbageNetworkConfig004 {
-        host: String,
-        port: u16,
-        timeout: u64,
+  src/color.rs: |
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Color {
+        pub r: u8,
+        pub g: u8,
+        pub b: u8,
+        pub a: u8,
     }
 
-    impl GarbageNetworkConfig004 {
-        pub fn garbage_connect_005(&self) -> Result<(), String> {
-            Err("GARBAGE_CONNECTION_ERROR_006".to_string())
+    impl Color {
+        pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+            Self { r, g, b, a }
         }
 
-        pub fn garbage_disconnect_007(&self) {
-            println!("Disconnecting from {}:{}", self.host, self.port);
-        }
-    }
-
-    pub trait GarbageNetworkHandler008 {
-        fn garbage_handle_request_009(&self, data: &[u8]) -> Vec<u8>;
-    }
-  src/unrelated/serialization.rs: |
-    // GARBAGE_RUST_SERIAL_010
-    pub const GARBAGE_FORMAT_VERSION_011: u32 = 1;
-
-    pub struct GarbageSerializer012 {
-        buffer: Vec<u8>,
-    }
-
-    impl GarbageSerializer012 {
-        pub fn garbage_serialize_013<T>(&mut self, _value: &T) {
-            // GARBAGE_SERIALIZE_IMPL_014
+        pub fn white() -> Self {
+            Self::new(255, 255, 255, 255)
         }
 
-        pub fn garbage_deserialize_015<T>(&self) -> Option<T> {
-            None
+        pub fn black() -> Self {
+            Self::new(0, 0, 0, 255)
+        }
+
+        pub fn to_hex(&self) -> String {
+            format!("#{:02x}{:02x}{:02x}{:02x}", self.r, self.g, self.b, self.a)
+        }
+    }
+  src/transform.rs: |
+    pub struct AffineTransform {
+        matrix: [[f64; 3]; 3],
+    }
+
+    impl AffineTransform {
+        pub fn identity() -> Self {
+            Self {
+                matrix: [
+                    [1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0],
+                    [0.0, 0.0, 1.0],
+                ],
+            }
+        }
+
+        pub fn translate(dx: f64, dy: f64) -> Self {
+            let mut t = Self::identity();
+            t.matrix[0][2] = dx;
+            t.matrix[1][2] = dy;
+            t
+        }
+
+        pub fn scale(sx: f64, sy: f64) -> Self {
+            let mut t = Self::identity();
+            t.matrix[0][0] = sx;
+            t.matrix[1][1] = sy;
+            t
         }
     }
 must_include_files:
@@ -202,14 +230,13 @@ must_include_content:
 - 'pub fn new(x: f64, y: f64, z: f64) -> Self {'
 - let dz = self.z - other.z;
 must_not_include:
-- GARBAGE_DEFAULT_PORT_002
-- GARBAGE_FORMAT_VERSION_011
-- GARBAGE_RUST_NETWORK_001
-- GARBAGE_RUST_SERIAL_010
-- GARBAGE_SERIALIZE_IMPL_014
-- GARBAGE_TIMEOUT_MS_003
-- mod.rs
-- networking.rs
-- serialization.rs
+- AffineTransform
+- to_hex
+- color.rs
+- transform.rs
+must_not_include_files:
+- src/color.rs
+- src/transform.rs
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,9 @@
+# Scenario: User model starts using Callbacks module for before_save/after_save lifecycle hooks
+# Changed: app/models/user.rb — added require_relative, include Callbacks, before_save/after_save declarations, save with callbacks
+# Reviewer questions: Does run_before_callbacks execute in correct order? Does after_save fire only on successful persist?
+# Trap files:
+#   - lib/event_bus.rb: Pub/sub event system — "callbacks/hooks" vocabulary overlap but no Callbacks module import
+#   - lib/validator.rb: Validation pipeline — "before_save" domain overlap but independent validation chain
 initial:
   lib/callbacks.rb: |
     module Callbacks
@@ -39,26 +45,59 @@ initial:
         true
       end
     end
-  lib/garbage_color_theme.rb: |
-    GARBAGE_RUBY_017_PALETTE_NAME_A = "ocean_breeze"
-    GARBAGE_RUBY_017_PRIMARY_HEX_B = "#0077B6"
+  lib/event_bus.rb: |
+    class EventBus
+      def initialize
+        @subscribers = Hash.new { |h, k| h[k] = [] }
+      end
 
-    class GarbageColorThemeEngine
-      GARBAGE_RUBY_017_MAX_COLORS_C = 12
+      def subscribe(event, &handler)
+        @subscribers[event] << handler
+      end
 
-      def apply_theme(element)
-        GARBAGE_RUBY_017_PALETTE_NAME_A
+      def publish(event, data = {})
+        @subscribers[event].each { |handler| handler.call(data) }
+      end
+
+      def unsubscribe(event)
+        @subscribers.delete(event)
+      end
+
+      def subscriber_count(event)
+        @subscribers[event].size
+      end
+
+      def clear_all
+        @subscribers.clear
       end
     end
-  lib/garbage_font_loader.rb: |
-    GARBAGE_RUBY_017_FONT_FAMILY_D = "Inter"
-    GARBAGE_RUBY_017_FALLBACK_FONT_E = "sans-serif"
+  lib/validator.rb: |
+    class ValidationPipeline
+      def initialize
+        @rules = []
+      end
 
-    class GarbageFontLoader
-      GARBAGE_RUBY_017_MAX_FONT_SIZE_F = 72
+      def add_rule(field, &block)
+        @rules << { field: field, check: block }
+      end
 
-      def load_font(name)
-        GARBAGE_RUBY_017_FONT_FAMILY_D
+      def validate(record)
+        errors = []
+        @rules.each do |rule|
+          value = record.send(rule[:field])
+          unless rule[:check].call(value)
+            errors << "#{rule[:field]} is invalid"
+          end
+        end
+        errors
+      end
+
+      def valid?(record)
+        validate(record).empty?
+      end
+
+      def rule_count
+        @rules.size
       end
     end
 changed:
@@ -137,26 +176,59 @@ changed:
         true
       end
     end
-  lib/garbage_color_theme.rb: |
-    GARBAGE_RUBY_017_PALETTE_NAME_A = "ocean_breeze"
-    GARBAGE_RUBY_017_PRIMARY_HEX_B = "#0077B6"
+  lib/event_bus.rb: |
+    class EventBus
+      def initialize
+        @subscribers = Hash.new { |h, k| h[k] = [] }
+      end
 
-    class GarbageColorThemeEngine
-      GARBAGE_RUBY_017_MAX_COLORS_C = 12
+      def subscribe(event, &handler)
+        @subscribers[event] << handler
+      end
 
-      def apply_theme(element)
-        GARBAGE_RUBY_017_PALETTE_NAME_A
+      def publish(event, data = {})
+        @subscribers[event].each { |handler| handler.call(data) }
+      end
+
+      def unsubscribe(event)
+        @subscribers.delete(event)
+      end
+
+      def subscriber_count(event)
+        @subscribers[event].size
+      end
+
+      def clear_all
+        @subscribers.clear
       end
     end
-  lib/garbage_font_loader.rb: |
-    GARBAGE_RUBY_017_FONT_FAMILY_D = "Inter"
-    GARBAGE_RUBY_017_FALLBACK_FONT_E = "sans-serif"
+  lib/validator.rb: |
+    class ValidationPipeline
+      def initialize
+        @rules = []
+      end
 
-    class GarbageFontLoader
-      GARBAGE_RUBY_017_MAX_FONT_SIZE_F = 72
+      def add_rule(field, &block)
+        @rules << { field: field, check: block }
+      end
 
-      def load_font(name)
-        GARBAGE_RUBY_017_FONT_FAMILY_D
+      def validate(record)
+        errors = []
+        @rules.each do |rule|
+          value = record.send(rule[:field])
+          unless rule[:check].call(value)
+            errors << "#{rule[:field]} is invalid"
+          end
+        end
+        errors
+      end
+
+      def valid?(record)
+        validate(record).empty?
+      end
+
+      def rule_count
+        @rules.size
       end
     end
 must_include_files:
@@ -165,15 +237,15 @@ must_include_content:
 - |
   before_save :normalize_email, :set_updated_at
 must_not_include:
-- GARBAGE_RUBY_017_PALETTE_NAME_A
-- GARBAGE_RUBY_017_PRIMARY_HEX_B
-- GARBAGE_RUBY_017_MAX_COLORS_C
-- GARBAGE_RUBY_017_FONT_FAMILY_D
-- GARBAGE_RUBY_017_FALLBACK_FONT_E
-- GARBAGE_RUBY_017_MAX_FONT_SIZE_F
-- GarbageColorThemeEngine
-- GarbageFontLoader
-- garbage_color_theme.rb
-- garbage_font_loader.rb
+- EventBus
+- ValidationPipeline
+- subscriber_count
+- rule_count
+- event_bus.rb
+- validator.rb
+must_not_include_files:
+- lib/event_bus.rb
+- lib/validator.rb
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

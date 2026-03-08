@@ -1,52 +1,33 @@
-initial:
-  caller.sh: |
-    #!/bin/bash
+# Scenario: validate.sh adds file-existence check and explicit exit codes.
+# Sources error_handler.sh for handle_error() and log_error().
+#
+# Reviewer questions:
+#   Q1: "What does handle_error() do with code 2?"
+#       -> error_handler.sh: case 2 maps to "Invalid argument".
+#   Q2: "Does handle_error() handle code 1?"
+#       -> error_handler.sh: case 1 maps to "General error".
+#
+# Not needed:
+#   - scripts/lint.sh: shellcheck linting, doesn't define error handling.
+#   - scripts/test_validate.sh: test harness, doesn't define error handler.
+#   - scripts/retry.sh: HARDEST TRAP — sources error_handler.sh, calls
+#     handle_error() and log_error() for retry logic. Same source edge,
+#     same function calls. But retry policy, not error definition.
+#   - scripts/notify_error.sh: sends alerts on specific exit codes.
+#     References exit codes. But alerting, not handler definition.
+#   - lib/exit_codes.sh: declares readonly EXIT_SUCCESS=0, EXIT_GENERAL=1.
+#     Related exit code concept but not sourced by validate.sh.
 
-    handle_error() {
-        local code=$1
-        case $code in
-            0) echo "Success" ;;
-            1) echo "General error" ;;
-            *) echo "Unknown error: $code" ;;
-        esac
-    }
+initial:
   validate.sh: |
     #!/bin/bash
-    source ./caller.sh
+    source ./error_handler.sh
 
     if [[ -z "$1" ]]; then
         echo "Error: No input provided"
         exit 2
     fi
-  unrelated/garbage_logrotate.sh: |
-    #!/bin/bash
-    # GARBAGE_SH_017_LOGROTATE_CONF_A
-    GARBAGE_SH_017_MAX_SIZE_B="100M"
-
-    garbage_rotate_logs_017() {
-        local logfile=$1
-        echo "Rotating $logfile"
-    }
-
-    garbage_compress_old_017() {
-        local dir=$1
-        echo "Compressing old logs in $dir"
-    }
-  unrelated/garbage_swap_mgmt.sh: |
-    #!/bin/bash
-    # GARBAGE_SH_017_SWAP_MGMT_C
-    GARBAGE_SH_017_SWAPPINESS_D="10"
-
-    garbage_check_swap_017() {
-        echo "Swap usage: 0%"
-    }
-
-    garbage_add_swap_017() {
-        local size=$1
-        echo "Adding ${size}G swap"
-    }
-changed:
-  caller.sh: |
+  error_handler.sh: |
     #!/bin/bash
 
     handle_error() {
@@ -58,61 +39,170 @@ changed:
             *) echo "Unknown error: $code" ;;
         esac
     }
+
+    log_error() {
+        local msg=$1
+        echo "[ERROR] $(date +%T) $msg" >> /var/log/app/errors.log
+    }
+  scripts/lint.sh: |
+    #!/bin/bash
+    shellcheck validate.sh error_handler.sh
+    echo "Lint: $?"
+  scripts/test_validate.sh: |
+    #!/bin/bash
+    echo "Test 1: missing arg"
+    ./validate.sh
+    echo "Exit: $?"
+    echo "Test 2: valid file"
+    ./validate.sh /etc/hosts
+    echo "Exit: $?"
+  scripts/retry.sh: |
+    #!/bin/bash
+    source ./error_handler.sh
+    MAX_ATTEMPTS=3
+    attempt=0
+    while [[ $attempt -lt $MAX_ATTEMPTS ]]; do
+        ./validate.sh "$1"
+        exit_code=$?
+        handle_error $exit_code
+        if [[ $exit_code -eq 0 ]]; then
+            break
+        fi
+        log_error "Attempt $attempt failed with code $exit_code"
+        ((attempt++))
+        sleep 2
+    done
+  scripts/notify_error.sh: |
+    #!/bin/bash
+    ./validate.sh "$1"
+    code=$?
+    if [[ $code -ne 0 ]]; then
+        echo "ALERT: validate.sh exited with code $code" | mail -s "Validation Failed" admin@example.com
+    fi
+  lib/exit_codes.sh: |
+    #!/bin/bash
+    readonly EXIT_SUCCESS=0
+    readonly EXIT_GENERAL=1
+    readonly EXIT_INVALID_ARG=2
+    readonly EXIT_NOT_FOUND=127
+
+changed:
   validate.sh: |
     #!/bin/bash
-    source ./caller.sh
+    source ./error_handler.sh
 
     if [[ -z "$1" ]]; then
+        log_error "No input provided"
         echo "Error: No input provided"
         exit 2
     fi
 
     if [[ ! -f "$1" ]]; then
+        log_error "File not found: $1"
         echo "Error: File not found"
         exit 1
     fi
 
-    echo "Validation passed"
+    echo "Validation passed for: $1"
     handle_error $?
     exit 0
-  unrelated/garbage_logrotate.sh: |
+  error_handler.sh: |
     #!/bin/bash
-    # GARBAGE_SH_017_LOGROTATE_CONF_A
-    GARBAGE_SH_017_MAX_SIZE_B="100M"
 
-    garbage_rotate_logs_017() {
-        local logfile=$1
-        echo "Rotating $logfile"
+    handle_error() {
+        local code=$1
+        case $code in
+            0) echo "Success" ;;
+            1) echo "General error" ;;
+            2) echo "Invalid argument" ;;
+            *) echo "Unknown error: $code" ;;
+        esac
     }
 
-    garbage_compress_old_017() {
-        local dir=$1
-        echo "Compressing old logs in $dir"
+    log_error() {
+        local msg=$1
+        echo "[ERROR] $(date +%T) $msg" >> /var/log/app/errors.log
     }
-  unrelated/garbage_swap_mgmt.sh: |
+  scripts/lint.sh: |
     #!/bin/bash
-    # GARBAGE_SH_017_SWAP_MGMT_C
-    GARBAGE_SH_017_SWAPPINESS_D="10"
+    shellcheck validate.sh error_handler.sh
+    echo "Lint: $?"
+  scripts/test_validate.sh: |
+    #!/bin/bash
+    echo "Test 1: missing arg"
+    ./validate.sh
+    echo "Exit: $?"
+    echo "Test 2: valid file"
+    ./validate.sh /etc/hosts
+    echo "Exit: $?"
+  scripts/retry.sh: |
+    #!/bin/bash
+    source ./error_handler.sh
+    MAX_ATTEMPTS=3
+    attempt=0
+    while [[ $attempt -lt $MAX_ATTEMPTS ]]; do
+        ./validate.sh "$1"
+        exit_code=$?
+        handle_error $exit_code
+        if [[ $exit_code -eq 0 ]]; then
+            break
+        fi
+        log_error "Attempt $attempt failed with code $exit_code"
+        ((attempt++))
+        sleep 2
+    done
+  scripts/notify_error.sh: |
+    #!/bin/bash
+    ./validate.sh "$1"
+    code=$?
+    if [[ $code -ne 0 ]]; then
+        echo "ALERT: validate.sh exited with code $code" | mail -s "Validation Failed" admin@example.com
+    fi
+  lib/exit_codes.sh: |
+    #!/bin/bash
+    readonly EXIT_SUCCESS=0
+    readonly EXIT_GENERAL=1
+    readonly EXIT_INVALID_ARG=2
+    readonly EXIT_NOT_FOUND=127
 
-    garbage_check_swap_017() {
-        echo "Swap usage: 0%"
-    }
+must_include_files:
+  - validate.sh
+  - error_handler.sh
 
-    garbage_add_swap_017() {
-        local size=$1
-        echo "Adding ${size}G swap"
-    }
-must_include:
-- validate.sh
-- handle_error
+must_include_content_from:
+  error_handler.sh:
+    - handle_error()
+    - log_error()
+    - "2) echo"
+  validate.sh:
+    - "handle_error $?"
+    - "log_error"
+
 must_not_include:
-- GARBAGE_SH_017_LOGROTATE_CONF_A
-- GARBAGE_SH_017_MAX_SIZE_B
-- garbage_rotate_logs_017
-- garbage_compress_old_017
-- GARBAGE_SH_017_SWAP_MGMT_C
-- GARBAGE_SH_017_SWAPPINESS_D
-- garbage_check_swap_017
-- garbage_add_swap_017
+  # --- lint.sh: code quality tool ---
+  - shellcheck
+  - "Lint:"
+  # --- test_validate.sh: test harness ---
+  - "Test 1: missing arg"
+  - "Test 2: valid file"
+  # --- retry.sh: HARDEST TRAP, sources error_handler.sh ---
+  - MAX_ATTEMPTS
+  - "Attempt $attempt failed"
+  # --- notify_error.sh: alerting ---
+  - "ALERT:"
+  - "Validation Failed"
+  # --- exit_codes.sh: constant definitions ---
+  - EXIT_SUCCESS
+  - EXIT_NOT_FOUND
+
+must_not_include_files:
+  - scripts/lint.sh
+  - scripts/test_validate.sh
+  - scripts/retry.sh
+  - scripts/notify_error.sh
+  - lib/exit_codes.sh
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

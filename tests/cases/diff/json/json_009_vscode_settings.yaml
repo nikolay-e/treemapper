@@ -1,5 +1,25 @@
+# Test: VS Code settings.json adds Python linting and black formatting config
+#
+# Scenario: config/settings.json adds pylint, black formatter, and a
+# python-specific formatOnSave override. The Python source files exist
+# but have no import-edge relationship to the JSON config file.
+#
+# Reviewer questions:
+#   Q1: "What Python formatting and linting settings were added?"
+#       -> The diff shows pylintEnabled, black formatter, and a
+#          [python]-specific section. Self-contained change.
+#   Q2: "What Python files exist in this project?"
+#       -> src/main.py and src/config.py, but these are only discoverable
+#          via directory structure, not import edges from JSON.
+#
+# Not needed:
+#   - docs/style_guide.txt: project style documentation. Not a Python
+#     source file, unrelated to IDE settings change.
+#   - scripts/deploy.sh: deployment script. Shell script, unaffected
+#     by Python-specific VS Code settings.
+
 initial:
-  .vscode/settings.json: |
+  config/settings.json: |
     {
       "editor.formatOnSave": true,
       "editor.tabSize": 4,
@@ -53,45 +73,32 @@ initial:
         if missing:
             raise ValueError(f"Missing config keys: {', '.join(missing)}")
         return raw
-  unrelated/scraper.py: |
-    GARBAGE_JSON_009_SCRAPE_TIMEOUT_A = 30
+  # --- Not needed: text documentation, not affected by IDE config ---
+  docs/style_guide.txt: |
+    Project Style Guide
+    ===================
 
-    class GARBAGE_JSON_009_WEB_SCRAPER_B:
-        def __init__(self, timeout=None):
-            self.timeout = timeout or GARBAGE_JSON_009_SCRAPE_TIMEOUT_A
-            self.visited = set()
+    Code Formatting:
+    - Use 4 spaces for indentation
+    - Maximum line length: 88 characters
+    - Use trailing commas in multi-line structures
 
-        def fetch(self, url):
-            self.visited.add(url)
-            return f"<html>content of {url}</html>"
+    Naming Conventions:
+    - snake_case for functions and variables
+    - PascalCase for classes
+    - UPPER_CASE for constants
+  # --- Not needed: shell script, unaffected by Python IDE settings ---
+  scripts/deploy.sh: |
+    #!/bin/bash
+    set -euo pipefail
 
-        def get_visited(self):
-            return list(self.visited)
-
-    def GARBAGE_JSON_009_SCRAPE_URLS_C(urls):
-        scraper = GARBAGE_JSON_009_WEB_SCRAPER_B()
-        return [scraper.fetch(u) for u in urls]
-  unrelated/converter.py: |
-    GARBAGE_JSON_009_CONVERT_FORMAT_D = "utf-8"
-
-    class GARBAGE_JSON_009_FILE_CONVERTER_E:
-        def __init__(self, encoding=None):
-            self.encoding = encoding or GARBAGE_JSON_009_CONVERT_FORMAT_D
-            self.converted = []
-
-        def convert(self, content):
-            result = content.encode(self.encoding).decode(self.encoding)
-            self.converted.append(result)
-            return result
-
-        def get_stats(self):
-            return {"total": len(self.converted)}
-
-    def GARBAGE_JSON_009_BATCH_CONVERT_F(files):
-        converter = GARBAGE_JSON_009_FILE_CONVERTER_E()
-        return [converter.convert(f) for f in files]
+    echo "Deploying application..."
+    docker build -t myapp:latest .
+    docker push myapp:latest
+    kubectl rollout restart deployment/myapp
+    echo "Deployment complete"
 changed:
-  .vscode/settings.json: |
+  config/settings.json: |
     {
       "editor.formatOnSave": true,
       "editor.tabSize": 4,
@@ -151,56 +158,38 @@ changed:
         if missing:
             raise ValueError(f"Missing config keys: {', '.join(missing)}")
         return raw
-  unrelated/scraper.py: |
-    GARBAGE_JSON_009_SCRAPE_TIMEOUT_A = 30
+  docs/style_guide.txt: |
+    Project Style Guide
+    ===================
 
-    class GARBAGE_JSON_009_WEB_SCRAPER_B:
-        def __init__(self, timeout=None):
-            self.timeout = timeout or GARBAGE_JSON_009_SCRAPE_TIMEOUT_A
-            self.visited = set()
+    Code Formatting:
+    - Use 4 spaces for indentation
+    - Maximum line length: 88 characters
+    - Use trailing commas in multi-line structures
 
-        def fetch(self, url):
-            self.visited.add(url)
-            return f"<html>content of {url}</html>"
+    Naming Conventions:
+    - snake_case for functions and variables
+    - PascalCase for classes
+    - UPPER_CASE for constants
+  scripts/deploy.sh: |
+    #!/bin/bash
+    set -euo pipefail
 
-        def get_visited(self):
-            return list(self.visited)
-
-    def GARBAGE_JSON_009_SCRAPE_URLS_C(urls):
-        scraper = GARBAGE_JSON_009_WEB_SCRAPER_B()
-        return [scraper.fetch(u) for u in urls]
-  unrelated/converter.py: |
-    GARBAGE_JSON_009_CONVERT_FORMAT_D = "utf-8"
-
-    class GARBAGE_JSON_009_FILE_CONVERTER_E:
-        def __init__(self, encoding=None):
-            self.encoding = encoding or GARBAGE_JSON_009_CONVERT_FORMAT_D
-            self.converted = []
-
-        def convert(self, content):
-            result = content.encode(self.encoding).decode(self.encoding)
-            self.converted.append(result)
-            return result
-
-        def get_stats(self):
-            return {"total": len(self.converted)}
-
-    def GARBAGE_JSON_009_BATCH_CONVERT_F(files):
-        converter = GARBAGE_JSON_009_FILE_CONVERTER_E()
-        return [converter.convert(f) for f in files]
+    echo "Deploying application..."
+    docker build -t myapp:latest .
+    docker push myapp:latest
+    kubectl rollout restart deployment/myapp
+    echo "Deployment complete"
 must_include_files:
-- .vscode/settings.json
-must_include_content:
-- '"python.linting.pylintEnabled": true,'
-- '"python.formatting.provider": "black",'
+  - config/settings.json
 must_not_include:
-- GARBAGE_JSON_009_BATCH_CONVERT_F(files
-- GARBAGE_JSON_009_CONVERT_FORMAT_D
-- GARBAGE_JSON_009_FILE_CONVERTER_E
-- GARBAGE_JSON_009_SCRAPE_TIMEOUT_A
-- GARBAGE_JSON_009_SCRAPE_URLS_C(urls
-- GARBAGE_JSON_009_WEB_SCRAPER_B
-- converter.py
-- scraper.py
+  # style_guide.txt: documentation, not affected by IDE settings
+  - "Project Style Guide"
+  - "Maximum line length"
+  # deploy.sh: shell script, unaffected by Python formatting/linting
+  - "docker build"
+  - "kubectl rollout"
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

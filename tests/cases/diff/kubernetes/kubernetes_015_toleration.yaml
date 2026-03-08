@@ -1,3 +1,35 @@
+# Scenario: Critical-service deployment adds tolerations for dedicated nodes,
+#   critical-workloads, and not-ready conditions. Only
+#   k8s/apps/critical/deployment.yaml is changed.
+#
+# Diff shows:
+#   + toleration: dedicated=high-priority:NoSchedule
+#   + toleration: critical-workloads:NoExecute with tolerationSeconds: 3600
+#   + toleration: node.kubernetes.io/not-ready:NoExecute with tolerationSeconds: 300
+#
+# Reviewer questions:
+#   Q1: "Is tolerationSeconds=3600 too long for critical-workloads NoExecute?"
+#       -> Pure config review: 3600s = 1 hour. Pod stays on a tainted node
+#          for 1 hour before eviction. For a "critical" service, this is
+#          a long time to run on a problematic node.
+#
+#   Q2: "Does the dedicated=high-priority taint actually exist on nodes?"
+#       -> Needs to verify node taints, but that's runtime state.
+#          The taint-manager CronJob applies this exact taint.
+#
+# Not needed for comprehension:
+#   - k8s/infra/taint-manager.yaml: CronJob that runs kubectl taint with
+#     "dedicated=high-priority:NoSchedule". Direct structural edge: applies
+#     the EXACT taint being tolerated. HARDEST TRAP: the toleration key
+#     "dedicated" with value "high-priority" directly references the taint
+#     this CronJob manages. But the reviewer can evaluate tolerations purely
+#     from the deployment config — whether tolerationSeconds values are
+#     appropriate doesn't depend on how taints are applied.
+#
+#   - k8s/apps/critical/pdb.yaml: PDB selecting app: critical-service with
+#     minAvailable: 2. Shares same label selector and "critical" naming.
+#     But PDB controls disruption budgets during node drains, not toleration
+#     behavior. Different scheduling concern entirely.
 initial:
   k8s/apps/critical/deployment.yaml: |
     apiVersion: apps/v1
@@ -49,26 +81,38 @@ initial:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/gatekeeper/constraint.yaml: |
-    # GARBAGE_K8S_415_GATEKEEPER_CONSTRAINT
-    apiVersion: constraints.gatekeeper.sh/v1beta1
-    kind: K8sRequiredLabels
+  k8s/infra/taint-manager.yaml: |
+    apiVersion: batch/v1
+    kind: CronJob
     metadata:
-      name: GARBAGE_K8S_415_CONSTRAINT_NAME
+      name: taint-manager
+      namespace: kube-system
     spec:
-      match:
-        kinds:
-        - apiGroups: GARBAGE_K8S_415_API_GROUPS
-          kinds: GARBAGE_K8S_415_KINDS
-  k8s/unrelated/falco/falco-rules.yaml: |
-    # GARBAGE_K8S_415_FALCO_RULES
-    apiVersion: v1
-    kind: ConfigMap
+      schedule: "*/30 * * * *"
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: taint-manager-sa
+              containers:
+              - name: taint-manager
+                image: bitnami/kubectl:1.28
+                command:
+                - /bin/sh
+                - -c
+                - kubectl taint nodes --selector=dedicated=high-priority dedicated=high-priority:NoSchedule --overwrite
+              restartPolicy: Never
+  k8s/apps/critical/pdb.yaml: |
+    apiVersion: policy/v1
+    kind: PodDisruptionBudget
     metadata:
-      name: GARBAGE_K8S_415_FALCO_CONFIG
-    data:
-      rules: GARBAGE_K8S_415_RULE_CONTENT
-      output: GARBAGE_K8S_415_OUTPUT_FORMAT
+      name: critical-service-pdb
+      namespace: production
+    spec:
+      minAvailable: 2
+      selector:
+        matchLabels:
+          app: critical-service
 changed:
   k8s/apps/critical/deployment.yaml: |
     apiVersion: apps/v1
@@ -133,40 +177,59 @@ changed:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/gatekeeper/constraint.yaml: |
-    # GARBAGE_K8S_415_GATEKEEPER_CONSTRAINT
-    apiVersion: constraints.gatekeeper.sh/v1beta1
-    kind: K8sRequiredLabels
+  k8s/infra/taint-manager.yaml: |
+    apiVersion: batch/v1
+    kind: CronJob
     metadata:
-      name: GARBAGE_K8S_415_CONSTRAINT_NAME
+      name: taint-manager
+      namespace: kube-system
     spec:
-      match:
-        kinds:
-        - apiGroups: GARBAGE_K8S_415_API_GROUPS
-          kinds: GARBAGE_K8S_415_KINDS
-  k8s/unrelated/falco/falco-rules.yaml: |
-    # GARBAGE_K8S_415_FALCO_RULES
-    apiVersion: v1
-    kind: ConfigMap
+      schedule: "*/30 * * * *"
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: taint-manager-sa
+              containers:
+              - name: taint-manager
+                image: bitnami/kubectl:1.28
+                command:
+                - /bin/sh
+                - -c
+                - kubectl taint nodes --selector=dedicated=high-priority dedicated=high-priority:NoSchedule --overwrite
+              restartPolicy: Never
+  k8s/apps/critical/pdb.yaml: |
+    apiVersion: policy/v1
+    kind: PodDisruptionBudget
     metadata:
-      name: GARBAGE_K8S_415_FALCO_CONFIG
-    data:
-      rules: GARBAGE_K8S_415_RULE_CONTENT
-      output: GARBAGE_K8S_415_OUTPUT_FORMAT
+      name: critical-service-pdb
+      namespace: production
+    spec:
+      minAvailable: 2
+      selector:
+        matchLabels:
+          app: critical-service
 must_include_files:
 - k8s/apps/critical/deployment.yaml
-must_include_content:
-- '- key: "dedicated"'
+must_include_content_from:
+  k8s/apps/critical/deployment.yaml:
+    - 'key: "dedicated"'
+    - 'tolerationSeconds: 3600'
+    - 'tolerationSeconds: 300'
+    - 'node.kubernetes.io/not-ready'
 must_not_include:
-- GARBAGE_K8S_415_API_GROUPS
-- GARBAGE_K8S_415_CONSTRAINT_NAME
-- GARBAGE_K8S_415_FALCO_CONFIG
-- GARBAGE_K8S_415_FALCO_RULES
-- GARBAGE_K8S_415_GATEKEEPER_CONSTRAINT
-- GARBAGE_K8S_415_KINDS
-- GARBAGE_K8S_415_OUTPUT_FORMAT
-- GARBAGE_K8S_415_RULE_CONTENT
-- constraint.yaml
-- falco-rules.yaml
+  # --- taint-manager.yaml: applies exact taint being tolerated ---
+  - taint-manager
+  - taint-manager-sa
+  - "bitnami/kubectl"
+  # --- pdb.yaml: same app label, different scheduling concern ---
+  - critical-service-pdb
+  - PodDisruptionBudget
+  - "minAvailable: 2"
+must_not_include_files:
+  - k8s/infra/taint-manager.yaml
+  - k8s/apps/critical/pdb.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

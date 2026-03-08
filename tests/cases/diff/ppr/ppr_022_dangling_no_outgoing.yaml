@@ -1,3 +1,25 @@
+# Scenario: hub_func() adds a return value while still calling leaf1_func
+#   and leaf2_func from imported modules. Only hub.py is changed.
+#
+# Diff shows:
+#   + return "modified"   (added after leaf1_func/leaf2_func calls)
+#
+# Reviewer questions:
+#   Q1: "What do leaf1_func/leaf2_func return — should hub_func use them?"
+#       -> leaf1_func returns "leaf1", leaf2_func returns "leaf2". The diff
+#         ignores both return values and returns "modified" instead.
+#
+# Not needed for comprehension:
+#   - alt_hub.py: HARDEST TRAP — imports the SAME leaf1/leaf2 modules,
+#     defines its own hub_func() that concatenates their returns. Same
+#     import pattern, same function name, same dependencies. But different
+#     module — not the hub_func being changed.
+#
+#   - leaf3.py: Structural sibling matching leaf1/leaf2 naming pattern.
+#     But not imported by hub.py.
+#
+#   - auth_provider.py: Unrelated infrastructure module.
+
 initial:
   hub.py: |
     from leaf1 import leaf1_func
@@ -12,41 +34,26 @@ initial:
   leaf2.py: |
     def leaf2_func():
         return "leaf2"
-
-  # --- Tricky garbage: also defines hub_func and imports leaves ---
-  garbage_alt_hub.py: |
+  alt_hub.py: |
     from leaf1 import leaf1_func
     from leaf2 import leaf2_func
-    GARBAGE_PPR_022_ALT_HUB_A = "alt_hub"
-    GARBAGE_PPR_022_ALT_VER_B = "2.0"
 
     def hub_func():
         return leaf1_func() + leaf2_func()
 
     class HubManager:
-        GARBAGE_PPR_022_ALT_MGR_C = True
-
         def orchestrate(self):
             return hub_func()
-
-  # --- Tricky garbage: structural sibling — also a leaf-like module ---
-  garbage_leaf3.py: |
-    GARBAGE_PPR_022_LEAF3_INIT_D = "leaf3"
-    GARBAGE_PPR_022_LEAF3_FLAG_E = True
-
+  leaf3.py: |
     def leaf3_func():
         return "leaf3"
 
     class Leaf3Processor:
-        GARBAGE_PPR_022_LEAF3_PROC_F = 33
-
         def process(self):
             return leaf3_func()
-
-  # --- Plain garbage: no overlap ---
-  garbage_auth.py: |
-    GARBAGE_PPR_022_AUTH_TOKEN_G = "bearer_placeholder"
-    GARBAGE_PPR_022_AUTH_EXP_H = 7200
+  auth_provider.py: |
+    AUTH_TOKEN_PREFIX = "bearer"
+    TOKEN_EXPIRY = 7200
 
     class AuthProvider:
         def authenticate(self, username: str):
@@ -67,74 +74,58 @@ changed:
   leaf2.py: |
     def leaf2_func():
         return "leaf2"
-
-  garbage_alt_hub.py: |
+  alt_hub.py: |
     from leaf1 import leaf1_func
     from leaf2 import leaf2_func
-    GARBAGE_PPR_022_ALT_HUB_A = "alt_hub"
-    GARBAGE_PPR_022_ALT_VER_B = "2.0"
 
     def hub_func():
         return leaf1_func() + leaf2_func()
 
     class HubManager:
-        GARBAGE_PPR_022_ALT_MGR_C = True
-
         def orchestrate(self):
             return hub_func()
-
-  garbage_leaf3.py: |
-    GARBAGE_PPR_022_LEAF3_INIT_D = "leaf3"
-    GARBAGE_PPR_022_LEAF3_FLAG_E = True
-
+  leaf3.py: |
     def leaf3_func():
         return "leaf3"
 
     class Leaf3Processor:
-        GARBAGE_PPR_022_LEAF3_PROC_F = 33
-
         def process(self):
             return leaf3_func()
-
-  garbage_auth.py: |
-    GARBAGE_PPR_022_AUTH_TOKEN_G = "bearer_placeholder"
-    GARBAGE_PPR_022_AUTH_EXP_H = 7200
+  auth_provider.py: |
+    AUTH_TOKEN_PREFIX = "bearer"
+    TOKEN_EXPIRY = 7200
 
     class AuthProvider:
         def authenticate(self, username: str):
             pass
 
-# === Assertions ===
-
 must_include:
-- hub_func
-- modified
+  - hub_func
+  - modified
 
 must_include_files:
-- hub.py
+  - hub.py
 
 must_include_content_from:
   hub.py:
-    - 'def hub_func():'
-    - return "modified"
+    - "def hub_func():"
+    - 'return "modified"'
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_PPR_022_AUTH_TOKEN_G
-- GARBAGE_PPR_022_AUTH_EXP_H
-# Tricky: redefines hub_func and imports same leaves
-- GARBAGE_PPR_022_ALT_HUB_A
-- GARBAGE_PPR_022_ALT_VER_B
-- GARBAGE_PPR_022_ALT_MGR_C
-# Tricky: structural sibling leaf module
-- GARBAGE_PPR_022_LEAF3_INIT_D
-- GARBAGE_PPR_022_LEAF3_FLAG_E
-- GARBAGE_PPR_022_LEAF3_PROC_F
+  # --- alt_hub.py: HARDEST TRAP — same imports, same function name ---
+  - HubManager
+  - orchestrate
+  # --- leaf3.py: sibling naming pattern ---
+  - Leaf3Processor
+  - leaf3_func
+  # --- auth_provider.py: unrelated ---
+  - AuthProvider
+  - AUTH_TOKEN_PREFIX
 
 must_not_include_files:
-- garbage_alt_hub.py
-- garbage_leaf3.py
-- garbage_auth.py
+  - alt_hub.py
+  - leaf3.py
+  - auth_provider.py
 
 max_fragments: 6
 max_files: 3

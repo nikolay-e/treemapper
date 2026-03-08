@@ -1,14 +1,26 @@
+# Scenario: Adding a versions.tf file to pin terraform and AWS provider versions.
+# Reviewer questions:
+#   1. What resources exist that depend on the AWS provider? (main.tf)
+#   2. Are there any provider-specific features used that need version >= 5.0? (main.tf)
+# Traps:
+#   - modules/gcp/versions.tf: GCP provider version constraints (same block pattern, different cloud)
+#   - outputs.tf: unrelated outputs file (no provider dependency)
+
 initial:
   main.tf: |
     resource "aws_instance" "web" {
-      ami = "ami-12345"
+      ami           = "ami-12345"
+      instance_type = "t3.micro"
+
+      tags = {
+        Name = "web-server"
+      }
     }
 
-  # --- Tricky garbage: sibling .tf with terraform block and version constraints ---
-  garbage_tf_047_version_override.tf: |
-    GARBAGE_TF_047_VERSION_OVERRIDE_A = "override"
-    GARBAGE_TF_047_COMPAT_CHECK_B = true
-
+    resource "aws_s3_bucket" "data" {
+      bucket = "app-data-bucket"
+    }
+  modules/gcp/versions.tf: |
     terraform {
       required_version = ">= 1.0.0"
 
@@ -19,22 +31,29 @@ initial:
         }
       }
     }
-
-  # --- Plain garbage ---
-  garbage_tf_047_outputs.tf: |
-    GARBAGE_TF_047_OUTPUT_MARKER_C = "outputs"
-    GARBAGE_TF_047_EXPORT_FLAG_D = false
-
+  outputs.tf: |
     output "instance_id" {
-      value = "i-placeholder"
+      value = aws_instance.web.id
+    }
+
+    output "bucket_name" {
+      value = aws_s3_bucket.data.bucket
     }
 
 changed:
   main.tf: |
     resource "aws_instance" "web" {
-      ami = "ami-12345"
+      ami           = "ami-12345"
+      instance_type = "t3.micro"
+
+      tags = {
+        Name = "web-server"
+      }
     }
 
+    resource "aws_s3_bucket" "data" {
+      bucket = "app-data-bucket"
+    }
   versions.tf: |
     terraform {
       required_version = ">= 1.5.0, < 2.0.0"
@@ -47,50 +66,29 @@ changed:
       }
     }
 
-  garbage_tf_047_version_override.tf: |
-    GARBAGE_TF_047_VERSION_OVERRIDE_A = "override"
-    GARBAGE_TF_047_COMPAT_CHECK_B = true
-
-    terraform {
-      required_version = ">= 1.0.0"
-
-      required_providers {
-        google = {
-          source  = "hashicorp/google"
-          version = "~> 4.0"
-        }
-      }
-    }
-
-  garbage_tf_047_outputs.tf: |
-    GARBAGE_TF_047_OUTPUT_MARKER_C = "outputs"
-    GARBAGE_TF_047_EXPORT_FLAG_D = false
-
-    output "instance_id" {
-      value = "i-placeholder"
-    }
-
 must_include_files:
-- versions.tf
+  - versions.tf
+  - main.tf
 
 must_include_content_from:
   versions.tf:
     - required_version = ">= 1.5.0, < 2.0.0"
     - source  = "hashicorp/aws"
     - version = "~> 5.0"
+  main.tf:
+    - resource "aws_instance" "web" {
 
 must_not_include:
-- GARBAGE_TF_047_VERSION_OVERRIDE_A
-- GARBAGE_TF_047_COMPAT_CHECK_B
-- GARBAGE_TF_047_OUTPUT_MARKER_C
-- GARBAGE_TF_047_EXPORT_FLAG_D
+  # GCP versions - same terraform block structure but for a different cloud provider
+  - hashicorp/google
+  # Outputs - references resources but doesn't affect version requirements
+  - output "bucket_name" {
 
 must_not_include_files:
-- garbage_tf_047_version_override.tf
-- garbage_tf_047_outputs.tf
-- main.tf
+  - modules/gcp/versions.tf
+  - outputs.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 5
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

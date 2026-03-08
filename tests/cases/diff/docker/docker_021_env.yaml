@@ -1,3 +1,30 @@
+# Test 021: Node.js Dockerfile gains extensive ENV/ARG/LABEL configuration
+#           — reviewer needs config.ts to verify env var consumption
+#
+# Scenario: Node.js Dockerfile gains extensive ENV configuration: NODE_ENV, NPM_CONFIG_*,
+# runtime ENV (PORT, LOG_LEVEL, REQUEST_TIMEOUT, etc.), ARG for build metadata, and OCI
+# LABEL directives. Previously it was a simple single-stage with no ENV at all.
+#
+# Reviewer questions:
+#   Q1: "Does src/config.ts consume these env vars (PORT, LOG_LEVEL)?"
+#       -> config.ts reads process.env.PORT, process.env.LOG_LEVEL, etc.
+#       Reviewer needs to verify the Dockerfile defaults match what the
+#       application expects.
+#   Q2: "Does package.json define the build/start scripts the Dockerfile uses?"
+#       -> package.json has `"build": "tsc"` and `"start": "node dist/index.js"`.
+#       Reviewer verifies these exist for RUN npm run build and CMD.
+#   Q3: "Does the app actually listen on the PORT env var?"
+#       -> src/index.ts has `app.listen(config.port, ...)`. Confirmed.
+#
+# Not needed:
+#   - scripts/local_dev.sh: sets NODE_ENV=development — opposite of production
+#     Dockerfile defaults, local dev helper.
+#   - tests/config.test.ts: tests config loading but is test infrastructure.
+#   - terraform/variables.tf: defines "environment" variable — same names
+#     but completely different infrastructure layer.
+#   - .env.example: template file listing same env vars — adds nothing
+#     beyond what the Dockerfile already shows.
+
 initial:
   src/config.ts: |
     export const config = {
@@ -9,7 +36,17 @@ initial:
     };
   src/index.ts: |
     import { config } from './config';
-    console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
+    import express from 'express';
+
+    const app = express();
+
+    app.get('/health', (req, res) => {
+        res.json({ status: 'ok', port: config.port });
+    });
+
+    app.listen(config.port, () => {
+        console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
+    });
   package.json: |
     {
       "name": "api-service",
@@ -29,16 +66,26 @@ initial:
   scripts/local_dev.sh: |
     #!/bin/bash
     export NODE_ENV=development
+    export LOG_LEVEL=debug
     npm run dev
   tests/config.test.ts: |
     describe('Config', () => {
-        it('should load env vars', () => {});
+        it('should load env vars', () => {
+            process.env.PORT = '4000';
+            const { config } = require('../src/config');
+            expect(config.port).toBe(4000);
+        });
     });
-  docs/environment.md: |
-    # Environment Variables
   terraform/variables.tf: |
     variable "environment" { default = "production" }
-  .env.example: ''
+    variable "port" { default = 3000 }
+    variable "log_level" { default = "info" }
+  .env.example: |
+    NODE_ENV=development
+    PORT=3000
+    LOG_LEVEL=info
+    DATABASE_URL=postgres://localhost:5432/app
+
 changed:
   src/config.ts: |
     export const config = {
@@ -50,7 +97,17 @@ changed:
     };
   src/index.ts: |
     import { config } from './config';
-    console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
+    import express from 'express';
+
+    const app = express();
+
+    app.get('/health', (req, res) => {
+        res.json({ status: 'ok', port: config.port });
+    });
+
+    app.listen(config.port, () => {
+        console.log(`Running in ${config.nodeEnv} mode on port ${config.port}`);
+    });
   package.json: |
     {
       "name": "api-service",
@@ -111,19 +168,60 @@ changed:
   scripts/local_dev.sh: |
     #!/bin/bash
     export NODE_ENV=development
+    export LOG_LEVEL=debug
     npm run dev
   tests/config.test.ts: |
     describe('Config', () => {
-        it('should load env vars', () => {});
+        it('should load env vars', () => {
+            process.env.PORT = '4000';
+            const { config } = require('../src/config');
+            expect(config.port).toBe(4000);
+        });
     });
-  docs/environment.md: |
-    # Environment Variables
   terraform/variables.tf: |
     variable "environment" { default = "production" }
-  .env.example: ''
+    variable "port" { default = 3000 }
+    variable "log_level" { default = "info" }
+  .env.example: |
+    NODE_ENV=development
+    PORT=3000
+    LOG_LEVEL=info
+    DATABASE_URL=postgres://localhost:5432/app
+
 must_include_files:
-- Dockerfile
-must_include_content:
-- ARG BUILD_DATE
+  - Dockerfile
+  # Q1: Does the app consume PORT, LOG_LEVEL etc. matching Dockerfile ENV?
+  - src/config.ts
+
+must_include_content_from:
+  Dockerfile:
+    - ARG BUILD_DATE
+    - ENV NODE_ENV=production \
+    - ENV PORT=3000 \
+    - LOG_LEVEL=info
+  src/config.ts:
+    - "port: parseInt(process.env.PORT || '3000')"
+    - "logLevel: process.env.LOG_LEVEL || 'info'"
+
+must_not_include:
+  # --- local_dev.sh: sets opposite env values, local dev helper ---
+  - NODE_ENV=development
+  - LOG_LEVEL=debug
+  # --- tests: test infrastructure, tests config loading ---
+  - "should load env vars"
+  - "expect(config.port).toBe(4000)"
+  # --- terraform: different infrastructure layer ---
+  - 'variable "environment"'
+  - 'variable "port"'
+  # --- .env.example: template file, same vars but no new info ---
+  - "DATABASE_URL=postgres://localhost"
+must_not_include_files:
+  - scripts/local_dev.sh
+  - tests/config.test.ts
+  - terraform/variables.tf
+  - .env.example
+
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

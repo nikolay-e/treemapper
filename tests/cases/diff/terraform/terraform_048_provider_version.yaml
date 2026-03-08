@@ -1,3 +1,12 @@
+# Scenario: Upgrading the AWS provider from ~> 4.0 to ~> 5.0 and adding
+#   random and null provider requirements.
+# Reviewer questions:
+#   1. Which resources use the random or null provider? (main.tf)
+#   2. Are there any breaking changes from AWS provider 4.x to 5.x in existing resources? (main.tf)
+# Traps:
+#   - modules/gcp/versions.tf: GCP provider version (same block pattern, different cloud)
+#   - locals.tf: locals block with common tags (no provider dependency)
+
 initial:
   versions.tf: |
     terraform {
@@ -8,12 +17,12 @@ initial:
         }
       }
     }
-
-  # --- Tricky garbage: sibling .tf with required_providers for different cloud ---
-  garbage_tf_048_gcp_providers.tf: |
-    GARBAGE_TF_048_GCP_PROVIDER_A = "google-cloud"
-    GARBAGE_TF_048_GCP_VERSION_B = "4.84"
-
+  main.tf: |
+    resource "aws_instance" "web" {
+      ami           = "ami-12345"
+      instance_type = "t3.micro"
+    }
+  modules/gcp/versions.tf: |
     terraform {
       required_providers {
         google = {
@@ -26,12 +35,7 @@ initial:
         }
       }
     }
-
-  # --- Plain garbage ---
-  garbage_tf_048_tags.tf: |
-    GARBAGE_TF_048_TAG_POLICY_C = "mandatory"
-    GARBAGE_TF_048_TAG_ENV_D = "development"
-
+  locals.tf: |
     locals {
       common_tags = {
         Team    = "platform"
@@ -58,55 +62,30 @@ changed:
       }
     }
 
-  garbage_tf_048_gcp_providers.tf: |
-    GARBAGE_TF_048_GCP_PROVIDER_A = "google-cloud"
-    GARBAGE_TF_048_GCP_VERSION_B = "4.84"
-
-    terraform {
-      required_providers {
-        google = {
-          source  = "hashicorp/google"
-          version = "~> 4.84"
-        }
-        google-beta = {
-          source  = "hashicorp/google-beta"
-          version = "~> 4.84"
-        }
-      }
-    }
-
-  garbage_tf_048_tags.tf: |
-    GARBAGE_TF_048_TAG_POLICY_C = "mandatory"
-    GARBAGE_TF_048_TAG_ENV_D = "development"
-
-    locals {
-      common_tags = {
-        Team    = "platform"
-        Project = "infra"
-      }
-    }
-
 must_include_files:
-- versions.tf
+  - versions.tf
+  - main.tf
 
 must_include_content_from:
   versions.tf:
     - version = "~> 5.0"
     - source  = "hashicorp/random"
-    - version = "~> 3.5"
     - source  = "hashicorp/null"
+  main.tf:
+    - resource "aws_instance" "web" {
 
 must_not_include:
-- GARBAGE_TF_048_GCP_PROVIDER_A
-- GARBAGE_TF_048_GCP_VERSION_B
-- GARBAGE_TF_048_TAG_POLICY_C
-- GARBAGE_TF_048_TAG_ENV_D
+  # GCP provider versions - same block type but for a different cloud
+  - hashicorp/google
+  - hashicorp/google-beta
+  # Locals - tag definitions unrelated to provider version changes
+  - common_tags
 
 must_not_include_files:
-- garbage_tf_048_gcp_providers.tf
-- garbage_tf_048_tags.tf
+  - modules/gcp/versions.tf
+  - locals.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

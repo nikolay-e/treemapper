@@ -1,3 +1,9 @@
+# Scenario: FileProcessor gains a status field and new method; .treemapperignore
+# excludes *.tmp and *.log files which also changed.
+# Reviewer asks: "What new functionality was added to FileProcessor?"
+# Trap rationale: file_archiver.py and directory_scanner.py share filesystem
+# vocabulary but are not imported by main.py. *.tmp and *.log must be excluded.
+
 initial:
   .treemapperignore: |
     *.tmp
@@ -31,39 +37,39 @@ initial:
     [2024-01-01 00:00:00] INFO: Application started
     [2024-01-01 00:01:00] DEBUG: Processing request
     [2024-01-01 00:02:00] ERROR: Something failed
-  garbage_archiver.py: |
-    GARBAGE_OPS_006_ARCHIVE_A = "archiver module marker"
-    GARBAGE_OPS_006_COMPRESS_B = "compression marker"
+  utils/file_archiver.py: |
+    import tarfile
+    from pathlib import Path
+
+    ARCHIVE_EXTENSION = ".tar.gz"
 
     class FileArchiver:
-        GARBAGE_OPS_006_TAR_C = "tar format marker"
-
         def __init__(self, archive_dir: str = "/tmp/archives"):
-            self.archive_dir = archive_dir
+            self.archive_dir = Path(archive_dir)
 
-        def archive(self, files: list[str]) -> str:
-            return f"{self.archive_dir}/archive.tar.gz"
+        def create_archive(self, files: list[str], name: str) -> Path:
+            archive_path = self.archive_dir / f"{name}{ARCHIVE_EXTENSION}"
+            return archive_path
 
-        def extract(self, archive_path: str) -> list[str]:
-            GARBAGE_OPS_006_UNPACK_D = "unpack marker"
+        def list_contents(self, archive_path: str) -> list[str]:
             return []
-  garbage_watcher.py: |
-    GARBAGE_OPS_006_WATCH_E = "file watcher marker"
-    GARBAGE_OPS_006_INOTIFY_F = "inotify config marker"
+  utils/directory_scanner.py: |
+    from pathlib import Path
+    from typing import Iterator
 
-    class FileWatcher:
-        GARBAGE_OPS_006_DEBOUNCE_G = True
+    SKIP_PATTERNS = {".git", "__pycache__", "node_modules"}
 
-        def __init__(self, watch_dir: str = "."):
-            self.watch_dir = watch_dir
-            self._handlers: dict[str, callable] = {}
+    class DirectoryScanner:
+        def __init__(self, root: str = "."):
+            self.root = Path(root)
 
-        def on_change(self, pattern: str, handler: callable) -> None:
-            self._handlers[pattern] = handler
+        def scan(self) -> Iterator[Path]:
+            for item in self.root.rglob("*"):
+                if not any(p in item.parts for p in SKIP_PATTERNS):
+                    yield item
 
-        def start(self) -> None:
-            GARBAGE_OPS_006_POLL_H = "polling fallback marker"
-            pass
+        def count_files(self) -> int:
+            return sum(1 for _ in self.scan() if _.is_file())
 changed:
   .treemapperignore: |
     *.tmp
@@ -101,55 +107,54 @@ changed:
     [2024-01-01 00:01:00] DEBUG: Processing request
     [2024-01-01 00:02:00] ERROR: Something failed
     [2024-06-15 10:00:00] INFO: Application restarted
-  garbage_archiver.py: |
-    GARBAGE_OPS_006_ARCHIVE_A = "archiver module marker"
-    GARBAGE_OPS_006_COMPRESS_B = "compression marker"
+  utils/file_archiver.py: |
+    import tarfile
+    from pathlib import Path
+
+    ARCHIVE_EXTENSION = ".tar.gz"
 
     class FileArchiver:
-        GARBAGE_OPS_006_TAR_C = "tar format marker"
-
         def __init__(self, archive_dir: str = "/tmp/archives"):
-            self.archive_dir = archive_dir
+            self.archive_dir = Path(archive_dir)
 
-        def archive(self, files: list[str]) -> str:
-            return f"{self.archive_dir}/archive.tar.gz"
+        def create_archive(self, files: list[str], name: str) -> Path:
+            archive_path = self.archive_dir / f"{name}{ARCHIVE_EXTENSION}"
+            return archive_path
 
-        def extract(self, archive_path: str) -> list[str]:
-            GARBAGE_OPS_006_UNPACK_D = "unpack marker"
+        def list_contents(self, archive_path: str) -> list[str]:
             return []
-  garbage_watcher.py: |
-    GARBAGE_OPS_006_WATCH_E = "file watcher marker"
-    GARBAGE_OPS_006_INOTIFY_F = "inotify config marker"
+  utils/directory_scanner.py: |
+    from pathlib import Path
+    from typing import Iterator
 
-    class FileWatcher:
-        GARBAGE_OPS_006_DEBOUNCE_G = True
+    SKIP_PATTERNS = {".git", "__pycache__", "node_modules"}
 
-        def __init__(self, watch_dir: str = "."):
-            self.watch_dir = watch_dir
-            self._handlers: dict[str, callable] = {}
+    class DirectoryScanner:
+        def __init__(self, root: str = "."):
+            self.root = Path(root)
 
-        def on_change(self, pattern: str, handler: callable) -> None:
-            self._handlers[pattern] = handler
+        def scan(self) -> Iterator[Path]:
+            for item in self.root.rglob("*"):
+                if not any(p in item.parts for p in SKIP_PATTERNS):
+                    yield item
 
-        def start(self) -> None:
-            GARBAGE_OPS_006_POLL_H = "polling fallback marker"
-            pass
-must_include:
+        def count_files(self) -> int:
+            return sum(1 for _ in self.scan() if _.is_file())
+must_include_files:
 - main.py
 must_not_include:
 - cache.tmp
 - debug.log
-- GARBAGE_OPS_006_ARCHIVE_A
-- GARBAGE_OPS_006_COMPRESS_B
-- GARBAGE_OPS_006_TAR_C
-- GARBAGE_OPS_006_UNPACK_D
-- GARBAGE_OPS_006_WATCH_E
-- GARBAGE_OPS_006_INOTIFY_F
-- GARBAGE_OPS_006_DEBOUNCE_G
-- GARBAGE_OPS_006_POLL_H
 - FileArchiver
-- FileWatcher
-- garbage_archiver.py
-- garbage_watcher.py
+- DirectoryScanner
+- ARCHIVE_EXTENSION
+- SKIP_PATTERNS
+- file_archiver.py
+- directory_scanner.py
+must_not_include_files:
+- cache.tmp
+- debug.log
+- utils/file_archiver.py
+- utils/directory_scanner.py
 add_garbage_files: false
 skip_garbage_check: true

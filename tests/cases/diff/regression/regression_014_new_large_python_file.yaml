@@ -1,3 +1,23 @@
+# Test: New user_service.py imports repository, models, and validators
+#
+# Scenario: A new file src/user_service.py is created that imports and uses
+# UserRepository, User/UserProfile models, and validation functions. All
+# three dependency files (UNCHANGED) must be included for review context.
+#
+# Reviewer questions:
+#   Q1: "What validation does register_user() perform?"
+#       -> src/validators.py (UNCHANGED) has validate_email, validate_username,
+#          validate_password functions.
+#   Q2: "What fields does User have?"
+#       -> src/models.py (UNCHANGED) defines User(id, name, email, created_at,
+#          updated_at) and UserProfile(user_id, bio, avatar_url).
+#
+# Trap files (plausible but unrelated):
+#   - scripts/seed_data.py: database seeding — same user domain but not
+#     imported by user_service.py.
+#   - scripts/migrate.py: database migrations — infrastructure concern,
+#     not a runtime dependency of user_service.py.
+
 initial:
   src/repository.py: |
     from typing import List, Optional
@@ -56,18 +76,52 @@ initial:
         if not any(c.isupper() for c in password):
             errors.append("Password must contain uppercase letter")
         return errors
-  scripts/GARBAGE_REG014_seed_data.py: |
-    GARBAGE_REG014_SEED_MARKER = "seed_data_garbage"
-    def GARBAGE_REG014_populate_database():
-        return "GARBAGE_REG014_POPULATE_RESULT"
-  scripts/GARBAGE_REG014_migrate.py: |
-    GARBAGE_REG014_MIGRATE_MARKER = "migrate_garbage"
-    def GARBAGE_REG014_run_migrations():
-        return "GARBAGE_REG014_MIGRATION_RESULT"
-  utils/GARBAGE_REG014_helpers.py: |
-    GARBAGE_REG014_HELPER_MARKER = "helper_garbage"
-    def GARBAGE_REG014_format_output():
-        return "GARBAGE_REG014_FORMAT_RESULT"
+  scripts/seed_data.py: |
+    from src.repository import UserRepository
+
+    SAMPLE_USERS = [
+        {"name": "Alice Johnson", "email": "alice@example.com", "password": "hashed_pw_1"},
+        {"name": "Bob Smith", "email": "bob@example.com", "password": "hashed_pw_2"},
+        {"name": "Carol White", "email": "carol@example.com", "password": "hashed_pw_3"},
+    ]
+
+    def populate_database(db_connection):
+        repo = UserRepository(db_connection)
+        for user_data in SAMPLE_USERS:
+            repo.create(user_data)
+        return len(SAMPLE_USERS)
+
+    def clear_database(db_connection):
+        db_connection.execute("DELETE FROM users")
+        db_connection.execute("DELETE FROM user_profiles")
+  scripts/migrate.py: |
+    import sqlite3
+    from pathlib import Path
+
+    MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+
+    def get_current_version(conn: sqlite3.Connection) -> int:
+        try:
+            cursor = conn.execute("SELECT MAX(version) FROM schema_migrations")
+            result = cursor.fetchone()[0]
+            return result or 0
+        except sqlite3.OperationalError:
+            conn.execute("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)")
+            return 0
+
+    def run_migrations(db_path: str) -> int:
+        conn = sqlite3.connect(db_path)
+        current = get_current_version(conn)
+        applied = 0
+        for migration_file in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            version = int(migration_file.stem.split("_")[0])
+            if version > current:
+                conn.executescript(migration_file.read_text())
+                conn.execute("INSERT INTO schema_migrations VALUES (?)", (version,))
+                applied += 1
+        conn.commit()
+        conn.close()
+        return applied
 changed:
   src/repository.py: |
     from typing import List, Optional
@@ -173,30 +227,81 @@ changed:
             if data is None:
                 return None
             return UserProfile(user_id=user_id, bio=data.get("bio"), avatar_url=data.get("avatar_url"))
-  scripts/GARBAGE_REG014_seed_data.py: |
-    GARBAGE_REG014_SEED_MARKER = "seed_data_garbage"
-    def GARBAGE_REG014_populate_database():
-        return "GARBAGE_REG014_POPULATE_RESULT"
-  scripts/GARBAGE_REG014_migrate.py: |
-    GARBAGE_REG014_MIGRATE_MARKER = "migrate_garbage"
-    def GARBAGE_REG014_run_migrations():
-        return "GARBAGE_REG014_MIGRATION_RESULT"
-  utils/GARBAGE_REG014_helpers.py: |
-    GARBAGE_REG014_HELPER_MARKER = "helper_garbage"
-    def GARBAGE_REG014_format_output():
-        return "GARBAGE_REG014_FORMAT_RESULT"
+  scripts/seed_data.py: |
+    from src.repository import UserRepository
+
+    SAMPLE_USERS = [
+        {"name": "Alice Johnson", "email": "alice@example.com", "password": "hashed_pw_1"},
+        {"name": "Bob Smith", "email": "bob@example.com", "password": "hashed_pw_2"},
+        {"name": "Carol White", "email": "carol@example.com", "password": "hashed_pw_3"},
+    ]
+
+    def populate_database(db_connection):
+        repo = UserRepository(db_connection)
+        for user_data in SAMPLE_USERS:
+            repo.create(user_data)
+        return len(SAMPLE_USERS)
+
+    def clear_database(db_connection):
+        db_connection.execute("DELETE FROM users")
+        db_connection.execute("DELETE FROM user_profiles")
+  scripts/migrate.py: |
+    import sqlite3
+    from pathlib import Path
+
+    MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+
+    def get_current_version(conn: sqlite3.Connection) -> int:
+        try:
+            cursor = conn.execute("SELECT MAX(version) FROM schema_migrations")
+            result = cursor.fetchone()[0]
+            return result or 0
+        except sqlite3.OperationalError:
+            conn.execute("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)")
+            return 0
+
+    def run_migrations(db_path: str) -> int:
+        conn = sqlite3.connect(db_path)
+        current = get_current_version(conn)
+        applied = 0
+        for migration_file in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            version = int(migration_file.stem.split("_")[0])
+            if version > current:
+                conn.executescript(migration_file.read_text())
+                conn.execute("INSERT INTO schema_migrations VALUES (?)", (version,))
+                applied += 1
+        conn.commit()
+        conn.close()
+        return applied
 must_include_files:
-- src/user_service.py
-must_include_content:
-- class UserService
-- def register_user
-- def get_user
+  - src/user_service.py
+  # Q1: validators.py has the validation functions user_service.py imports
+  - src/validators.py
+  # Q2: models.py defines User and UserProfile data classes
+  - src/models.py
+  # user_service imports UserRepository
+  - src/repository.py
+must_include_content_from:
+  src/user_service.py:
+    - "class UserService"
+    - "def register_user"
+    - "def get_user"
+  src/validators.py:
+    - "def validate_email"
+    - "def validate_password"
 must_not_include:
-- GARBAGE_REG014_SEED_MARKER
-- GARBAGE_REG014_POPULATE_RESULT
-- GARBAGE_REG014_MIGRATE_MARKER
-- GARBAGE_REG014_MIGRATION_RESULT
-- GARBAGE_REG014_HELPER_MARKER
-- GARBAGE_REG014_FORMAT_RESULT
+  # scripts/seed_data.py: database seeding — dev tooling, not runtime dependency
+  - SAMPLE_USERS
+  - populate_database
+  - clear_database
+  # scripts/migrate.py: schema migrations — infrastructure, not runtime
+  - run_migrations
+  - get_current_version
+  - schema_migrations
+must_not_include_files:
+  - scripts/seed_data.py
+  - scripts/migrate.py
+max_fragments: 8
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

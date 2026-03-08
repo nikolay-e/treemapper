@@ -1,3 +1,20 @@
+# Scenario: formatter.ts is rewritten to import localeConfig from locale.ts
+# and create an Intl.DateTimeFormat with those settings.
+#
+# Diff: formatter.ts adds `import { localeConfig } from './locale'` and uses
+# localeConfig.locale and localeConfig.options to construct the formatter.
+#
+# Reviewer questions:
+#   Q1: "What locale and formatting options does the new formatter use?"
+#       -> locale.ts (UNCHANGED) defines locale='en-US' with year/month/day options.
+#          Without seeing these, the reviewer cannot verify DateTimeFormat is configured correctly.
+#
+# Not needed:
+#   - number-format.ts: Intl.NumberFormat utility for currencies/percentages. Same Intl API
+#     family and same directory, but formats numbers not dates. No import edge from formatter.ts.
+#   - timezone-utils.ts: timezone conversion helpers that also use Intl.DateTimeFormat internally.
+#     Related to dates but about timezone offsets, not locale-driven date display.
+
 initial:
   locale.ts: |
     export const localeConfig = {
@@ -10,27 +27,26 @@ initial:
     };
   formatter.ts: |
     console.log('initial');
-  garbage_logging.ts: |
-    const GARBAGE_JS_034_LOG_MARKER_A = "logging";
-    const GARBAGE_JS_034_LEVEL_MARKER_B = true;
-
-    class LogAggregator {
-        static GARBAGE_JS_034_AGGREGATOR_CLASS_C = "aggregator";
-
-        aggregate(entries: string[]): string {
-            return entries.join("\n");
-        }
+  number-format.ts: |
+    export function formatCurrency(amount: number, currency: string = 'USD'): string {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency,
+        }).format(amount);
     }
-  garbage_metrics.ts: |
-    const GARBAGE_JS_034_METRIC_MARKER_D = "metrics";
-    const GARBAGE_JS_034_COUNTER_MARKER_E = 42;
 
-    class MetricsCollector {
-        static GARBAGE_JS_034_COLLECTOR_CLASS_F = true;
+    export function formatPercent(value: number): string {
+        return new Intl.NumberFormat('en-US', { style: 'percent' }).format(value);
+    }
+  timezone-utils.ts: |
+    export function toUTC(date: Date): Date {
+        return new Date(date.toISOString());
+    }
 
-        record(name: string, value: number): void {
-            // noop
-        }
+    export function getTimezoneOffset(timezone: string): number {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' });
+        return now.getTimezoneOffset();
     }
 changed:
   locale.ts: |
@@ -49,40 +65,46 @@ changed:
         const formatter = new Intl.DateTimeFormat(localeConfig.locale, localeConfig.options);
         return formatter.format(date);
     }
-  garbage_logging.ts: |
-    const GARBAGE_JS_034_LOG_MARKER_A = "logging";
-    const GARBAGE_JS_034_LEVEL_MARKER_B = true;
-
-    class LogAggregator {
-        static GARBAGE_JS_034_AGGREGATOR_CLASS_C = "aggregator";
-
-        aggregate(entries: string[]): string {
-            return entries.join("\n");
-        }
+  number-format.ts: |
+    export function formatCurrency(amount: number, currency: string = 'USD'): string {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency,
+        }).format(amount);
     }
-  garbage_metrics.ts: |
-    const GARBAGE_JS_034_METRIC_MARKER_D = "metrics";
-    const GARBAGE_JS_034_COUNTER_MARKER_E = 42;
 
-    class MetricsCollector {
-        static GARBAGE_JS_034_COLLECTOR_CLASS_F = true;
+    export function formatPercent(value: number): string {
+        return new Intl.NumberFormat('en-US', { style: 'percent' }).format(value);
+    }
+  timezone-utils.ts: |
+    export function toUTC(date: Date): Date {
+        return new Date(date.toISOString());
+    }
 
-        record(name: string, value: number): void {
-            // noop
-        }
+    export function getTimezoneOffset(timezone: string): number {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' });
+        return now.getTimezoneOffset();
     }
 must_include_files:
-- formatter.ts
-must_include_content:
-- 'function formatDate(date: Date): string {'
+  # Q1: locale.ts defines the locale config that the formatter imports
+  - locale.ts
+must_include_content_from:
+  locale.ts:
+    - "localeConfig"
+    - "'en-US'"
 must_not_include:
-- GARBAGE_JS_034_AGGREGATOR_CLASS_C
-- GARBAGE_JS_034_COLLECTOR_CLASS_F
-- GARBAGE_JS_034_COUNTER_MARKER_E
-- GARBAGE_JS_034_LEVEL_MARKER_B
-- GARBAGE_JS_034_LOG_MARKER_A
-- GARBAGE_JS_034_METRIC_MARKER_D
-- garbage_logging.ts
-- garbage_metrics.ts
+  # number-format.ts: Intl.NumberFormat for currencies, no import edge from formatter.ts
+  - formatCurrency
+  - formatPercent
+  - NumberFormat
+  # timezone-utils.ts: timezone offsets, not locale-driven date formatting
+  - toUTC
+  - getTimezoneOffset
+must_not_include_files:
+  - number-format.ts
+  - timezone-utils.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

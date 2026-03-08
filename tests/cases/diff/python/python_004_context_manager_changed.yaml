@@ -1,3 +1,8 @@
+# Scenario: transaction() context manager gains timing instrumentation
+# Changed: db.py adds time.time() calls to measure transaction duration
+# Reviewer questions: How does timing affect callers? Does savepoint need timing too?
+# Trap 1: audit_log.py — logs database events but does NOT import from db.py
+# Trap 2: connection_monitor.py — monitors connection pool health, shares "pool"/"connection" vocabulary but independent
 initial:
   db.py: |
     from contextlib import contextmanager
@@ -95,56 +100,91 @@ initial:
     def store(data: Any) -> None:
         service = DataService()
         service.save_data(data)
-  garbage_cache.py: |
-    GARBAGE_MARKER_CACHE_001 = "cache garbage marker"
-    UNRELATED_CACHE_TTL_002 = 3600
+  audit_log.py: |
+    import logging
+    from typing import Dict, Any, List, Optional
+    from datetime import datetime
+    from dataclasses import dataclass
 
-    class CacheManager:
-        GARBAGE_CACHE_CLASS_003 = "cache class marker"
+    logger = logging.getLogger(__name__)
 
-        def __init__(self, backend: str = "memory"):
-            self.backend = backend
-            self._store: dict = {}
+    @dataclass
+    class AuditEntry:
+        timestamp: datetime
+        action: str
+        table_name: str
+        record_id: Optional[str] = None
+        changes: Optional[Dict[str, Any]] = None
 
-        def get(self, key: str) -> Any:
-            return self._store.get(key)
+    class AuditLogger:
+        def __init__(self, retention_days: int = 90):
+            self._entries: List[AuditEntry] = []
+            self._retention_days = retention_days
 
-        def set(self, key: str, value: Any, ttl: int = 300) -> None:
-            self._store[key] = value
+        def log_transaction(self, action: str, table_name: str, record_id: str) -> None:
+            entry = AuditEntry(
+                timestamp=datetime.now(),
+                action=action,
+                table_name=table_name,
+                record_id=record_id,
+            )
+            self._entries.append(entry)
+            logger.info(f"Audit: {action} on {table_name}/{record_id}")
 
-        def delete(self, key: str) -> bool:
-            return self._store.pop(key, None) is not None
+        def get_entries(self, table_name: Optional[str] = None) -> List[AuditEntry]:
+            if table_name:
+                return [e for e in self._entries if e.table_name == table_name]
+            return self._entries.copy()
 
-        def clear(self) -> None:
-            self._store.clear()
+        def purge_old_entries(self) -> int:
+            cutoff = datetime.now()
+            original_count = len(self._entries)
+            self._entries = [e for e in self._entries if e.timestamp > cutoff]
+            return original_count - len(self._entries)
+  connection_monitor.py: |
+    import threading
+    import logging
+    from typing import Dict, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class RedisCache:
-        GARBAGE_REDIS_MARKER_004 = "redis marker"
+    logger = logging.getLogger(__name__)
 
-        def ping(self) -> bool:
-            return True
-  garbage_queue.py: |
-    GARBAGE_MARKER_QUEUE_005 = "queue garbage"
-    UNRELATED_QUEUE_SIZE_006 = 1000
+    @dataclass
+    class ConnectionMetrics:
+        pool_size: int
+        active_connections: int
+        idle_connections: int
+        total_acquired: int
+        total_released: int
 
-    class MessageQueue:
-        GARBAGE_QUEUE_CLASS_007 = True
+    class ConnectionMonitor:
+        def __init__(self, check_interval: int = 30):
+            self._check_interval = check_interval
+            self._metrics_history: List[ConnectionMetrics] = []
+            self._lock = threading.Lock()
 
-        def __init__(self):
-            self._messages: list = []
+        def record_metrics(self, pool_size: int, active: int) -> None:
+            with self._lock:
+                metrics = ConnectionMetrics(
+                    pool_size=pool_size,
+                    active_connections=active,
+                    idle_connections=pool_size - active,
+                    total_acquired=0,
+                    total_released=0,
+                )
+                self._metrics_history.append(metrics)
 
-        def publish(self, topic: str, message: dict) -> None:
-            self._messages.append({"topic": topic, "message": message})
+        def get_latest(self) -> Optional[ConnectionMetrics]:
+            with self._lock:
+                return self._metrics_history[-1] if self._metrics_history else None
 
-        def subscribe(self, topic: str) -> None:
-            pass
-
-        def consume(self) -> Optional[dict]:
-            return self._messages.pop(0) if self._messages else None
-
-    def format_message(message: dict) -> str:
-        GARBAGE_FORMAT_QUEUE_008 = "format queue marker"
-        return str(message)
+        def get_average_utilization(self) -> float:
+            with self._lock:
+                if not self._metrics_history:
+                    return 0.0
+                total = sum(m.active_connections / max(m.pool_size, 1) for m in self._metrics_history)
+                return total / len(self._metrics_history)
 changed:
   db.py: |
     from contextlib import contextmanager
@@ -246,68 +286,111 @@ changed:
     def store(data: Any) -> None:
         service = DataService()
         service.save_data(data)
-  garbage_cache.py: |
-    GARBAGE_MARKER_CACHE_001 = "cache garbage marker"
-    UNRELATED_CACHE_TTL_002 = 3600
+  audit_log.py: |
+    import logging
+    from typing import Dict, Any, List, Optional
+    from datetime import datetime
+    from dataclasses import dataclass
 
-    class CacheManager:
-        GARBAGE_CACHE_CLASS_003 = "cache class marker"
+    logger = logging.getLogger(__name__)
 
-        def __init__(self, backend: str = "memory"):
-            self.backend = backend
-            self._store: dict = {}
+    @dataclass
+    class AuditEntry:
+        timestamp: datetime
+        action: str
+        table_name: str
+        record_id: Optional[str] = None
+        changes: Optional[Dict[str, Any]] = None
 
-        def get(self, key: str) -> Any:
-            return self._store.get(key)
+    class AuditLogger:
+        def __init__(self, retention_days: int = 90):
+            self._entries: List[AuditEntry] = []
+            self._retention_days = retention_days
 
-        def set(self, key: str, value: Any, ttl: int = 300) -> None:
-            self._store[key] = value
+        def log_transaction(self, action: str, table_name: str, record_id: str) -> None:
+            entry = AuditEntry(
+                timestamp=datetime.now(),
+                action=action,
+                table_name=table_name,
+                record_id=record_id,
+            )
+            self._entries.append(entry)
+            logger.info(f"Audit: {action} on {table_name}/{record_id}")
 
-        def delete(self, key: str) -> bool:
-            return self._store.pop(key, None) is not None
+        def get_entries(self, table_name: Optional[str] = None) -> List[AuditEntry]:
+            if table_name:
+                return [e for e in self._entries if e.table_name == table_name]
+            return self._entries.copy()
 
-        def clear(self) -> None:
-            self._store.clear()
+        def purge_old_entries(self) -> int:
+            cutoff = datetime.now()
+            original_count = len(self._entries)
+            self._entries = [e for e in self._entries if e.timestamp > cutoff]
+            return original_count - len(self._entries)
+  connection_monitor.py: |
+    import threading
+    import logging
+    from typing import Dict, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class RedisCache:
-        GARBAGE_REDIS_MARKER_004 = "redis marker"
+    logger = logging.getLogger(__name__)
 
-        def ping(self) -> bool:
-            return True
-  garbage_queue.py: |
-    GARBAGE_MARKER_QUEUE_005 = "queue garbage"
-    UNRELATED_QUEUE_SIZE_006 = 1000
+    @dataclass
+    class ConnectionMetrics:
+        pool_size: int
+        active_connections: int
+        idle_connections: int
+        total_acquired: int
+        total_released: int
 
-    class MessageQueue:
-        GARBAGE_QUEUE_CLASS_007 = True
+    class ConnectionMonitor:
+        def __init__(self, check_interval: int = 30):
+            self._check_interval = check_interval
+            self._metrics_history: List[ConnectionMetrics] = []
+            self._lock = threading.Lock()
 
-        def __init__(self):
-            self._messages: list = []
+        def record_metrics(self, pool_size: int, active: int) -> None:
+            with self._lock:
+                metrics = ConnectionMetrics(
+                    pool_size=pool_size,
+                    active_connections=active,
+                    idle_connections=pool_size - active,
+                    total_acquired=0,
+                    total_released=0,
+                )
+                self._metrics_history.append(metrics)
 
-        def publish(self, topic: str, message: dict) -> None:
-            self._messages.append({"topic": topic, "message": message})
+        def get_latest(self) -> Optional[ConnectionMetrics]:
+            with self._lock:
+                return self._metrics_history[-1] if self._metrics_history else None
 
-        def subscribe(self, topic: str) -> None:
-            pass
-
-        def consume(self) -> Optional[dict]:
-            return self._messages.pop(0) if self._messages else None
-
-    def format_message(message: dict) -> str:
-        GARBAGE_FORMAT_QUEUE_008 = "format queue marker"
-        return str(message)
+        def get_average_utilization(self) -> float:
+            with self._lock:
+                if not self._metrics_history:
+                    return 0.0
+                total = sum(m.active_connections / max(m.pool_size, 1) for m in self._metrics_history)
+                return total / len(self._metrics_history)
 must_include_files:
 - db.py
-must_include_content:
-- start_time = time.time()
+- service.py
+must_include_content_from:
+  db.py:
+  - start_time = time.time()
+  - 'logger.info(f"Committing (took {elapsed:.2f}s)")'
+  service.py:
+  - from db import transaction, savepoint
 must_not_include:
-- GARBAGE_CACHE_CLASS_003
-- GARBAGE_FORMAT_QUEUE_008
-- GARBAGE_MARKER_CACHE_001
-- GARBAGE_MARKER_QUEUE_005
-- GARBAGE_QUEUE_CLASS_007
-- GARBAGE_REDIS_MARKER_004
-- garbage_cache.py
-- garbage_queue.py
+- AuditLogger
+- AuditEntry
+- log_transaction
+- ConnectionMonitor
+- ConnectionMetrics
+- get_average_utilization
+must_not_include_files:
+- audit_log.py
+- connection_monitor.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 4

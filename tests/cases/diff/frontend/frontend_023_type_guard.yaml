@@ -1,3 +1,21 @@
+# Scenario: New file creates type guard functions for a union of imported interfaces.
+#
+# Diff: guards.ts imports User, Admin, Guest from entities.ts, creates Person union,
+# and adds isUser/isAdmin/isGuest/hasEmail type guards.
+#
+# Reviewer questions:
+#   Q1: "What discriminant field does each entity use?" -> entities.ts (UNCHANGED)
+#        shows type: 'user', type: 'admin', type: 'guest'. The guards check these
+#        values, so the reviewer must see the source interfaces.
+#   Q2: "Does Admin really extend User?" -> entities.ts shows Admin extends User
+#        adding permissions[]. This explains why hasEmail returns User | Admin.
+#
+# Not needed:
+#   - src/validators/input.ts: also uses `input is T` type narrowing syntax but for
+#     form validation (isValidEmail, isPositiveNumber). Different domain.
+#   - src/types/animal.ts: another discriminated union (Dog|Cat|Bird) with guards.
+#     Same structural pattern but entirely different domain, no import edge.
+
 initial:
   src/entities.ts: |
     export interface User {
@@ -18,56 +36,33 @@ initial:
     }
   src/guards.ts: |
     console.log('initial');
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_023_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/validators/input.ts: |
+    export function isValidEmail(input: unknown): input is string {
+        return typeof input === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
     }
 
-    // GARBAGE_FE_023_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function isPositiveNumber(input: unknown): input is number {
+        return typeof input === 'number' && input > 0;
+    }
+  src/types/animal.ts: |
+    export interface Dog {
+        kind: 'dog';
+        name: string;
+        breed: string;
     }
 
-    // GARBAGE_FE_023_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_023_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export interface Cat {
+        kind: 'cat';
+        name: string;
+        indoor: boolean;
     }
 
-    // GARBAGE_FE_023_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
+    export type Animal = Dog | Cat;
+
+    export function isDog(animal: Animal): animal is Dog {
+        return animal.kind === 'dog';
     }
+
 changed:
   src/entities.ts: |
     export interface User {
@@ -107,78 +102,52 @@ changed:
     export function hasEmail(person: Person): person is User | Admin {
         return 'email' in person;
     }
-
-    export function processIdentity(person: Person): string {
-        if (isAdmin(person)) {
-            return 'Admin: ' + person.name;
-        }
-        if (isGuest(person)) {
-            return 'Guest: ' + person.sessionId;
-        }
-        return 'User: ' + person.name;
-    }
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_023_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/validators/input.ts: |
+    export function isValidEmail(input: unknown): input is string {
+        return typeof input === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input);
     }
 
-    // GARBAGE_FE_023_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function isPositiveNumber(input: unknown): input is number {
+        return typeof input === 'number' && input > 0;
+    }
+  src/types/animal.ts: |
+    export interface Dog {
+        kind: 'dog';
+        name: string;
+        breed: string;
     }
 
-    // GARBAGE_FE_023_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
-    }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_023_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
-    ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+    export interface Cat {
+        kind: 'cat';
+        name: string;
+        indoor: boolean;
     }
 
-    // GARBAGE_FE_023_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
+    export type Animal = Dog | Cat;
+
+    export function isDog(animal: Animal): animal is Dog {
+        return animal.kind === 'dog';
     }
+
 must_include_files:
-- src/guards.ts
-must_include_content:
-- import { User, Admin, Guest } from './entities';
-- type Person = User | Admin | Guest;
+  # Q1+Q2: entities.ts defines the interfaces being guarded — reviewer needs discriminants
+  - src/entities.ts
+must_include_content_from:
+  src/entities.ts:
+    - "interface User {"
+    - "interface Admin extends User {"
+    - "interface Guest {"
 must_not_include:
-- GARBAGE_FE_023_COLOR_A
-- GARBAGE_FE_023_COLOR_B
-- GARBAGE_FE_023_CONTRAST_C
-- GARBAGE_FE_023_DEBOUNCE_D
-- GARBAGE_FE_023_THROTTLE_E
-- color_utils.ts
-- debounce_utils.ts
+  # input.ts: type narrowing for form values, not entity discrimination
+  - isValidEmail
+  - isPositiveNumber
+  # animal.ts: discriminated union with guards but different domain, no import edge
+  - Animal
+  - isDog
+must_not_include_files:
+  - src/validators/input.ts
+  - src/types/animal.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

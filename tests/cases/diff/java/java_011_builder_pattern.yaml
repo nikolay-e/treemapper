@@ -1,3 +1,34 @@
+# Scenario: OrderRequest refactored from constructor to Builder pattern.
+#   Gains ShippingInfo, BillingInfo, PaymentMethod types. Adds calculateSubtotal,
+#   calculateTotal, toBuilder. Only OrderRequest.java is changed.
+#
+# Diff shows:
+#   + Builder inner class with fluent methods
+#   + ShippingInfo, BillingInfo records, PaymentMethod enum (new files)
+#   + calculateSubtotal() uses OrderItemRequest::getSubtotal
+#   + calculateTotal() applies discount
+#   + toBuilder() for copy-and-modify pattern
+#   + Objects.requireNonNull validations
+#
+# Reviewer questions:
+#   Q1: "What is ShippingInfo — what fields does it provide?"
+#       -> Needs ShippingInfo.java: record with recipientName, addressLine1/2,
+#         city, state, postalCode, country, phoneNumber, deliveryInstructions.
+#
+#   Q2: "What is PaymentMethod — what options exist?"
+#       -> Needs PaymentMethod.java: enum with CREDIT_CARD, DEBIT_CARD,
+#         PAYPAL, BANK_TRANSFER, APPLE_PAY, GOOGLE_PAY. The diff defaults
+#         to PaymentMethod.CREDIT_CARD.
+#
+#   Q3: "Does OrderItemRequest have getSubtotal() used in calculateSubtotal()?"
+#       -> Needs OrderItemRequest.java: has getSubtotal() that multiplies
+#         unitPrice by quantity.
+#
+# Not needed for comprehension:
+#   - OrderService.java: calls createOrder(request) — but doesn't help
+#     review the Builder correctness.
+#   - CacheWarmerService, FeatureFlagService, RateLimiterService: unrelated.
+
 initial:
   src/main/java/com/orderapi/dto/OrderRequest.java: |
     package com.orderapi.dto;
@@ -654,23 +685,44 @@ changed:
         GOOGLE_PAY
     }
 must_include_files:
-- src/main/java/com/orderapi/dto/BillingInfo.java
-- src/main/java/com/orderapi/dto/OrderRequest.java
-- src/main/java/com/orderapi/dto/PaymentMethod.java
-- src/main/java/com/orderapi/dto/ShippingInfo.java
-must_include_content:
-- package com.orderapi.dto;
-- import java.util.Collections;
+  - src/main/java/com/orderapi/dto/BillingInfo.java
+  - src/main/java/com/orderapi/dto/OrderRequest.java
+  - src/main/java/com/orderapi/dto/PaymentMethod.java
+  - src/main/java/com/orderapi/dto/ShippingInfo.java
+
+must_include_content_from:
+  src/main/java/com/orderapi/dto/OrderRequest.java:
+    - "import java.util.Collections"
+    - "public static Builder builder()"
+    - "public BigDecimal calculateSubtotal()"
+    - "public Builder toBuilder()"
+  src/main/java/com/orderapi/dto/ShippingInfo.java:
+    - "String recipientName"
+    - "String deliveryInstructions"
+  src/main/java/com/orderapi/dto/PaymentMethod.java:
+    - "CREDIT_CARD"
+    - "PAYPAL"
+
 must_not_include:
-- GARBAGE_JAVA_ACQUIRE_B021G
-- GARBAGE_JAVA_CACHE_B021A
-- GARBAGE_JAVA_FLAG_B021D
-- GARBAGE_JAVA_RATE_B021F
-- GARBAGE_JAVA_TOGGLE_B021E
-- GARBAGE_JAVA_USER_B021C
-- GARBAGE_JAVA_WARM_B021B
-- CacheWarmerService.java
-- FeatureFlagService.java
-- RateLimiterService.java
+  # --- CacheWarmerService: unrelated scheduled service ---
+  - CacheWarmerService
+  - warmProductCache
+  - GARBAGE_JAVA_CACHE_B021A
+  - GARBAGE_JAVA_WARM_B021B
+  - GARBAGE_JAVA_USER_B021C
+  # --- FeatureFlagService: unrelated feature toggle ---
+  - FeatureFlagService
+  - GARBAGE_JAVA_FLAG_B021D
+  - GARBAGE_JAVA_TOGGLE_B021E
+  # --- RateLimiterService: unrelated rate limiting ---
+  - RateLimiterService
+  - GARBAGE_JAVA_RATE_B021F
+  - GARBAGE_JAVA_ACQUIRE_B021G
+
+must_not_include_files:
+  - src/main/java/com/orderapi/unrelated/CacheWarmerService.java
+  - src/main/java/com/orderapi/unrelated/FeatureFlagService.java
+  - src/main/java/com/orderapi/unrelated/RateLimiterService.java
+
 add_garbage_files: false
 skip_garbage_check: true

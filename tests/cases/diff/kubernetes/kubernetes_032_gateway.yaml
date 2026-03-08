@@ -1,3 +1,46 @@
+# Scenario: Istio Gateway upgraded from HTTP-only to HTTPS with TLS config,
+#   cipher suites, HTTP->HTTPS redirect, second host, and labels.
+#
+# Diff shows:
+#   - single HTTP server on port 80 for api.example.com
+#   + HTTPS server on 443 with SIMPLE TLS, credential, cipher suites, minProtocolVersion
+#   + HTTP server on 80 with httpsRedirect: true
+#   + api-internal.example.com added to both servers
+#   + labels on metadata
+#
+# Reviewer questions:
+#   Q1: "Does the VirtualService reference this gateway by name?"
+#       -> Needs k8s/base/virtual-service.yaml: VirtualService with
+#          gateways: [api-gateway], confirming the gateway name matches.
+#
+#   Q2: "Are the TLS hosts consistent with the VirtualService hosts?"
+#       -> VirtualService hosts: api.example.com, api-internal.example.com.
+#          Gateway servers host both domains. Consistent.
+#
+#   Q3: "Is SIMPLE TLS mode correct, or should it be MUTUAL?"
+#       -> Needs k8s/base/peer-authentication.yaml: PeerAuthentication with
+#          mtls mode: STRICT. This is mesh-internal mTLS. The gateway uses
+#          SIMPLE for external clients. Reviewer can verify these are
+#          complementary, not contradictory.
+#
+# Not needed for comprehension:
+#   - k8s/base/deployment.yaml: The api-service deployment. The gateway
+#     routes traffic to services via VirtualService, not directly to pods.
+#     Deployment details don't help review TLS/redirect configuration.
+#
+#   - k8s/base/service.yaml: Service with ports 80/443. The gateway doesn't
+#     reference the service directly — the VirtualService does. Port mapping
+#     doesn't help review gateway TLS config.
+#
+#   - k8s/mesh/envoy-ratelimit.yaml: EnvoyFilter for rate limiting on
+#     ingressgateway. Shares the istio: ingressgateway selector label.
+#     HARD TRAP: same workloadSelector as the gateway's selector. But the
+#     EnvoyFilter patches HTTP filters, not TLS configuration.
+#
+#   - k8s/mesh/istio-telemetry.yaml: Telemetry config for access logging
+#     and metrics in istio-system. Shares Istio vocabulary but configures
+#     observability, not routing or TLS.
+
 initial:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -95,55 +138,38 @@ initial:
     spec:
       mtls:
         mode: STRICT
-  k8s/unrelated/cert-manager/clusterissuer.yaml: |
-    # GARBAGE_K8S_432_CERT_MANAGER
-    apiVersion: cert-manager.io/v1
-    kind: ClusterIssuer
+  k8s/mesh/envoy-ratelimit.yaml: |
+    apiVersion: networking.istio.io/v1alpha3
+    kind: EnvoyFilter
     metadata:
-      name: GARBAGE_K8S_432_ISSUER_NAME
+      name: ratelimit-filter
+      namespace: istio-system
     spec:
-      acme:
-        server: GARBAGE_K8S_432_ACME_SERVER
-        email: GARBAGE_K8S_432_EMAIL
-        privateKeySecretRef:
-          name: GARBAGE_K8S_432_SECRET_NAME
-  k8s/unrelated/external-dns/externaldns.yaml: |
-    # GARBAGE_K8S_432_EXTERNAL_DNS
-    apiVersion: apps/v1
-    kind: Deployment
+      workloadSelector:
+        labels:
+          istio: ingressgateway
+      configPatches:
+      - applyTo: HTTP_FILTER
+        match:
+          context: GATEWAY
+        patch:
+          operation: INSERT_BEFORE
+          value:
+            name: envoy.filters.http.ratelimit
+  k8s/mesh/istio-telemetry.yaml: |
+    apiVersion: telemetry.istio.io/v1alpha1
+    kind: Telemetry
     metadata:
-      name: GARBAGE_K8S_432_EXTERNALDNS
-      namespace: external-dns
+      name: mesh-default
+      namespace: istio-system
     spec:
-      selector:
-        matchLabels:
-          app: GARBAGE_K8S_432_EXTERNALDNS_LABEL
-      template:
-        spec:
-          containers:
-          - name: external-dns
-            image: GARBAGE_K8S_432_EXTERNALDNS_IMAGE
-            args:
-            - GARBAGE_K8S_432_PROVIDER_ARG
-  k8s/unrelated/secrets/external-secrets.yaml: |
-    # GARBAGE_K8S_432_EXTERNAL_SECRETS
-    apiVersion: external-secrets.io/v1beta1
-    kind: ExternalSecret
-    metadata:
-      name: GARBAGE_K8S_432_EXT_SECRET
-      namespace: secrets
-    spec:
-      secretStoreRef:
-        name: GARBAGE_K8S_432_SECRET_STORE
-        kind: GARBAGE_K8S_432_STORE_KIND
-      target:
-        name: GARBAGE_K8S_432_TARGET_SECRET
-  .github/workflows/deploy.yaml: |
-    on:
-      push:
-    jobs:
-      deploy:
-        steps:
+      accessLogging:
+      - providers:
+        - name: envoy
+      metrics:
+      - providers:
+        - name: prometheus
+
 changed:
   k8s/base/deployment.yaml: |
     apiVersion: apps/v1
@@ -260,77 +286,71 @@ changed:
     spec:
       mtls:
         mode: STRICT
-  k8s/unrelated/cert-manager/clusterissuer.yaml: |
-    # GARBAGE_K8S_432_CERT_MANAGER
-    apiVersion: cert-manager.io/v1
-    kind: ClusterIssuer
+  k8s/mesh/envoy-ratelimit.yaml: |
+    apiVersion: networking.istio.io/v1alpha3
+    kind: EnvoyFilter
     metadata:
-      name: GARBAGE_K8S_432_ISSUER_NAME
+      name: ratelimit-filter
+      namespace: istio-system
     spec:
-      acme:
-        server: GARBAGE_K8S_432_ACME_SERVER
-        email: GARBAGE_K8S_432_EMAIL
-        privateKeySecretRef:
-          name: GARBAGE_K8S_432_SECRET_NAME
-  k8s/unrelated/external-dns/externaldns.yaml: |
-    # GARBAGE_K8S_432_EXTERNAL_DNS
-    apiVersion: apps/v1
-    kind: Deployment
+      workloadSelector:
+        labels:
+          istio: ingressgateway
+      configPatches:
+      - applyTo: HTTP_FILTER
+        match:
+          context: GATEWAY
+        patch:
+          operation: INSERT_BEFORE
+          value:
+            name: envoy.filters.http.ratelimit
+  k8s/mesh/istio-telemetry.yaml: |
+    apiVersion: telemetry.istio.io/v1alpha1
+    kind: Telemetry
     metadata:
-      name: GARBAGE_K8S_432_EXTERNALDNS
-      namespace: external-dns
+      name: mesh-default
+      namespace: istio-system
     spec:
-      selector:
-        matchLabels:
-          app: GARBAGE_K8S_432_EXTERNALDNS_LABEL
-      template:
-        spec:
-          containers:
-          - name: external-dns
-            image: GARBAGE_K8S_432_EXTERNALDNS_IMAGE
-            args:
-            - GARBAGE_K8S_432_PROVIDER_ARG
-  k8s/unrelated/secrets/external-secrets.yaml: |
-    # GARBAGE_K8S_432_EXTERNAL_SECRETS
-    apiVersion: external-secrets.io/v1beta1
-    kind: ExternalSecret
-    metadata:
-      name: GARBAGE_K8S_432_EXT_SECRET
-      namespace: secrets
-    spec:
-      secretStoreRef:
-        name: GARBAGE_K8S_432_SECRET_STORE
-        kind: GARBAGE_K8S_432_STORE_KIND
-      target:
-        name: GARBAGE_K8S_432_TARGET_SECRET
-  .github/workflows/deploy.yaml: |
-    on:
-      push:
-    jobs:
-      deploy:
-        steps:
+      accessLogging:
+      - providers:
+        - name: envoy
+      metrics:
+      - providers:
+        - name: prometheus
+
 must_include_files:
-- k8s/base/gateway.yaml
-must_include_content:
-- 'app: api-gateway'
+  - k8s/base/gateway.yaml
+
+must_include_content_from:
+  k8s/base/gateway.yaml:
+    - "credentialName: api-tls-cert"
+    - "httpsRedirect: true"
+    - "ECDHE-RSA-AES256-GCM-SHA384"
+    - "api-internal.example.com"
+
 must_not_include:
-- GARBAGE_K8S_432_ACME_SERVER
-- GARBAGE_K8S_432_CERT_MANAGER
-- GARBAGE_K8S_432_EMAIL
-- GARBAGE_K8S_432_EXTERNALDNS
-- GARBAGE_K8S_432_EXTERNALDNS_IMAGE
-- GARBAGE_K8S_432_EXTERNALDNS_LABEL
-- GARBAGE_K8S_432_EXTERNAL_DNS
-- GARBAGE_K8S_432_EXTERNAL_SECRETS
-- GARBAGE_K8S_432_EXT_SECRET
-- GARBAGE_K8S_432_ISSUER_NAME
-- GARBAGE_K8S_432_PROVIDER_ARG
-- GARBAGE_K8S_432_SECRET_NAME
-- GARBAGE_K8S_432_SECRET_STORE
-- GARBAGE_K8S_432_STORE_KIND
-- GARBAGE_K8S_432_TARGET_SECRET
-- clusterissuer.yaml
-- external-secrets.yaml
-- externaldns.yaml
+  # --- deployment: pod config not needed for gateway TLS review ---
+  - "api-service:v1.5.0"
+  - "sidecar.istio.io/inject"
+  # --- service: port mapping doesn't help review gateway config ---
+  - "targetPort: 8080"
+  - "targetPort: 8443"
+  # --- envoy ratelimit: HARD TRAP — same ingressgateway selector,
+  #     but EnvoyFilter patches HTTP filters, not TLS ---
+  - ratelimit-filter
+  - envoy.filters.http.ratelimit
+  - INSERT_BEFORE
+  # --- istio telemetry: observability config, not routing/TLS ---
+  - mesh-default
+  - accessLogging
+
+must_not_include_files:
+  - k8s/base/deployment.yaml
+  - k8s/base/service.yaml
+  - k8s/mesh/envoy-ratelimit.yaml
+  - k8s/mesh/istio-telemetry.yaml
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,5 +1,19 @@
+# Reviewer sees: UserForm.tsx dispatches addUser action from userSlice.
+# Q1: "What payload shape does addUser expect?"
+#     -> userSlice.ts: PayloadAction<User> where User = { id, name }.
+#        Reviewer verifies dispatched { id, name } matches the type.
+# Q2: "What does the addUser reducer do?"
+#     -> userSlice.ts: state.users.push(action.payload). Immer-style
+#        mutation. Reviewer understands the state change.
+#
+# Not needed:
+#   - productSlice.ts: Redux slice for products. Same toolkit
+#     pattern but different domain.
+#   - UserForm.test.tsx: test file placeholder. No comprehension
+#     value for understanding the dispatch flow.
+
 initial:
-  userSlice.ts: |
+  src/store/userSlice.ts: |
     import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
     interface User {
@@ -28,32 +42,43 @@ initial:
     });
 
     export const { addUser, removeUser } = userSlice.actions;
-  UserForm.tsx: |
-    console.log('initial');
-  garbage_auditing.ts: |
-    const GARBAGE_JS_067_AUDIT_MARKER_A = "auditing";
-    const GARBAGE_JS_067_TRAIL_MARKER_B = true;
-
-    class AuditLogger {
-        static GARBAGE_JS_067_LOGGER_CLASS_C = "logger";
-
-        log(action: string, userId: string): void {
-            // noop
-        }
+  src/components/UserForm.tsx: |
+    export function UserForm() {
+        return <div>Placeholder</div>;
     }
-  garbage_encryption.ts: |
-    const GARBAGE_JS_067_ENCRYPT_MARKER_D = "encryption";
-    const GARBAGE_JS_067_KEYSIZE_MARKER_E = 256;
+  src/store/productSlice.ts: |
+    import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-    class EncryptionService {
-        static GARBAGE_JS_067_ENCSERVICE_CLASS_F = true;
-
-        encrypt(plaintext: string, key: string): string {
-            return plaintext;
-        }
+    interface Product {
+        id: string;
+        name: string;
+        price: number;
     }
+
+    const initialState = { products: [] as Product[] };
+
+    export const productSlice = createSlice({
+        name: 'products',
+        initialState,
+        reducers: {
+            addProduct: (state, action: PayloadAction<Product>) => {
+                state.products.push(action.payload);
+            },
+        },
+    });
+
+    export const { addProduct } = productSlice.actions;
+  src/components/UserForm.test.tsx: |
+    import { render, screen, fireEvent } from '@testing-library/react';
+    import { Provider } from 'react-redux';
+
+    describe('UserForm', () => {
+        it('placeholder test', () => {
+            expect(true).toBe(true);
+        });
+    });
 changed:
-  userSlice.ts: |
+  src/store/userSlice.ts: |
     import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
     interface User {
@@ -82,9 +107,9 @@ changed:
     });
 
     export const { addUser, removeUser } = userSlice.actions;
-  UserForm.tsx: |
+  src/components/UserForm.tsx: |
     import { useDispatch } from 'react-redux';
-    import { addUser } from './userSlice';
+    import { addUser } from '../store/userSlice';
 
     export function UserForm() {
         const dispatch = useDispatch();
@@ -95,41 +120,53 @@ changed:
 
         return <button onClick={handleAdd}>Add User</button>;
     }
-  garbage_auditing.ts: |
-    const GARBAGE_JS_067_AUDIT_MARKER_A = "auditing";
-    const GARBAGE_JS_067_TRAIL_MARKER_B = true;
+  src/store/productSlice.ts: |
+    import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-    class AuditLogger {
-        static GARBAGE_JS_067_LOGGER_CLASS_C = "logger";
-
-        log(action: string, userId: string): void {
-            // noop
-        }
+    interface Product {
+        id: string;
+        name: string;
+        price: number;
     }
-  garbage_encryption.ts: |
-    const GARBAGE_JS_067_ENCRYPT_MARKER_D = "encryption";
-    const GARBAGE_JS_067_KEYSIZE_MARKER_E = 256;
 
-    class EncryptionService {
-        static GARBAGE_JS_067_ENCSERVICE_CLASS_F = true;
+    const initialState = { products: [] as Product[] };
 
-        encrypt(plaintext: string, key: string): string {
-            return plaintext;
-        }
-    }
+    export const productSlice = createSlice({
+        name: 'products',
+        initialState,
+        reducers: {
+            addProduct: (state, action: PayloadAction<Product>) => {
+                state.products.push(action.payload);
+            },
+        },
+    });
+
+    export const { addProduct } = productSlice.actions;
+  src/components/UserForm.test.tsx: |
+    import { render, screen, fireEvent } from '@testing-library/react';
+    import { Provider } from 'react-redux';
+
+    describe('UserForm', () => {
+        it('placeholder test', () => {
+            expect(true).toBe(true);
+        });
+    });
 must_include_files:
-- UserForm.tsx
-must_include_content:
-- import { useDispatch } from 'react-redux';
-- dispatch = useDispatch()
+  # Unchanged file — the slice that defines addUser. Reviewer needs
+  # to see the payload type and reducer logic.
+  - src/store/userSlice.ts
+must_include_content_from:
+  src/store/userSlice.ts:
+    - "PayloadAction<User>"
+    - "state.users.push"
 must_not_include:
-- GARBAGE_JS_067_AUDIT_MARKER_A
-- GARBAGE_JS_067_ENCRYPT_MARKER_D
-- GARBAGE_JS_067_ENCSERVICE_CLASS_F
-- GARBAGE_JS_067_KEYSIZE_MARKER_E
-- GARBAGE_JS_067_LOGGER_CLASS_C
-- GARBAGE_JS_067_TRAIL_MARKER_B
-- garbage_auditing.ts
-- garbage_encryption.ts
+  # productSlice.ts: different Redux domain (products)
+  - productSlice
+  - addProduct
+  # UserForm.test.tsx: test placeholder, no comprehension value
+  - placeholder test
+  - fireEvent
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

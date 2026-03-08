@@ -88,10 +88,54 @@ changed:
         def create_session(self, visitor_id: str) -> str:
             VISITOR_SESSION_MARKER_YYY000 = True
             return f"visit_{visitor_id}"
+# Scenario: auth/login.py gains hashlib-based session tokens, input validation,
+#   and invalidate_session(). billing/subscription.py and analytics/tracking.py
+#   have identically-named functions (authenticate_*, create_session) that are
+#   NOT related.
+#
+# Reviewer question:
+#   Q1: "Is the session token generation in create_session secure?"
+#       -> Self-contained in login.py: uses hashlib.sha256.
+#
+# Not needed for comprehension:
+#   - billing/subscription.py: has authenticate_payment(), create_session() —
+#     IDENTICAL method names to login.py but different domain (payment cards).
+#   - analytics/tracking.py: has authenticate_api_key(), create_session() —
+#     IDENTICAL method names but for visitor tracking.
+
 must_include_files:
-- app/auth/login.py
-must_include_content:
-- import hashlib
-- 'if not username or not password:'
+  - app/auth/login.py
+
+must_include_content_from:
+  app/auth/login.py:
+    - "import hashlib"
+    - "if not username or not password:"
+    - "def invalidate_session(session_id: str) -> bool:"
+
+must_not_include:
+  # --- billing/subscription.py: identical method names, different domain ---
+  # HARDEST TRAP: authenticate_payment() and create_session() share
+  # function name stems with authenticate_user() and create_session()
+  # in the diff. But they handle payment card auth, not user auth.
+  - SUBSCRIPTION_MODULE_MARKER_PPP111
+  - AUTH_PAYMENT_MARKER_QQQ222
+  - CREATE_INVOICE_MARKER_RRR333
+  - MANAGER_MARKER_SSS444
+  - SESSION_MARKER_TTT555
+  - authenticate_payment
+  - SubscriptionManager
+  # --- analytics/tracking.py: identical method names, different domain ---
+  - TRACKING_MODULE_MARKER_UUU666
+  - AUTH_API_MARKER_VVV777
+  - CREATE_EVENT_MARKER_WWW888
+  - TRACKER_MARKER_XXX999
+  - VISITOR_SESSION_MARKER_YYY000
+  - authenticate_api_key
+  - SessionTracker
+
+must_not_include_files:
+  - app/billing/subscription.py
+  - app/analytics/tracking.py
+
 add_garbage_files: false
 skip_garbage_check: true

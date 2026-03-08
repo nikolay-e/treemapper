@@ -1,3 +1,9 @@
+# Scenario: Config class starts using DSL module for metaprogrammed accessors and validators
+# Changed: lib/config.rb — added require_relative, include DSL, define_accessors/validators, initializer, valid? method
+# Reviewer questions: Does define_method correctly generate getters/setters? Are validators called with correct method names?
+# Trap files:
+#   - lib/serializer.rb: Attribute serialization via method_missing — "dynamic methods" pattern overlap but no DSL import
+#   - lib/schema_builder.rb: Schema definition DSL — "define_method/class_eval" vocabulary overlap but independent module
 initial:
   lib/dsl.rb: |
     module DSL
@@ -33,26 +39,70 @@ initial:
         @data = {}
       end
     end
-  lib/garbage_currency.rb: |
-    GARBAGE_RUBY_014_BASE_CURRENCY_A = "USD"
-    GARBAGE_RUBY_014_EXCHANGE_API_B = "openexchangerates"
+  lib/serializer.rb: |
+    class AttributeSerializer
+      def initialize(object)
+        @object = object
+        @serialized = {}
+      end
 
-    class GarbageCurrencyConverter
-      GARBAGE_RUBY_014_PRECISION_DIGITS_C = 4
+      def method_missing(name, *args)
+        if name.to_s.start_with?('serialize_')
+          attr_name = name.to_s.sub('serialize_', '')
+          @serialized[attr_name] = @object.send(attr_name)
+        else
+          super
+        end
+      end
 
-      def convert(amount, from, to)
-        GARBAGE_RUBY_014_BASE_CURRENCY_A
+      def respond_to_missing?(name, include_private = false)
+        name.to_s.start_with?('serialize_') || super
+      end
+
+      def to_hash
+        @serialized
+      end
+
+      def to_json
+        @serialized.to_s
       end
     end
-  lib/garbage_tax_calc.rb: |
-    GARBAGE_RUBY_014_TAX_REGION_D = "US-CA"
-    GARBAGE_RUBY_014_DEFAULT_RATE_E = "0.0875"
+  lib/schema_builder.rb: |
+    class SchemaBuilder
+      def initialize(&block)
+        @fields = []
+        instance_eval(&block) if block_given?
+      end
 
-    class GarbageTaxCalculator
-      GARBAGE_RUBY_014_EXEMPT_THRESHOLD_F = 100
+      def string(name, required: false)
+        @fields << { name: name, type: :string, required: required }
+      end
 
-      def calculate(amount)
-        GARBAGE_RUBY_014_TAX_REGION_D
+      def integer(name, min: nil, max: nil)
+        @fields << { name: name, type: :integer, min: min, max: max }
+      end
+
+      def boolean(name, default: false)
+        @fields << { name: name, type: :boolean, default: default }
+      end
+
+      def validate(data)
+        @fields.all? do |field|
+          value = data[field[:name]]
+          next false if field[:required] && value.nil?
+          next true if value.nil?
+          validate_type(value, field[:type])
+        end
+      end
+
+      private
+
+      def validate_type(value, type)
+        case type
+        when :string then value.is_a?(String)
+        when :integer then value.is_a?(Integer)
+        when :boolean then [true, false].include?(value)
+        end
       end
     end
 changed:
@@ -104,26 +154,70 @@ changed:
         validate_host && validate_port
       end
     end
-  lib/garbage_currency.rb: |
-    GARBAGE_RUBY_014_BASE_CURRENCY_A = "USD"
-    GARBAGE_RUBY_014_EXCHANGE_API_B = "openexchangerates"
+  lib/serializer.rb: |
+    class AttributeSerializer
+      def initialize(object)
+        @object = object
+        @serialized = {}
+      end
 
-    class GarbageCurrencyConverter
-      GARBAGE_RUBY_014_PRECISION_DIGITS_C = 4
+      def method_missing(name, *args)
+        if name.to_s.start_with?('serialize_')
+          attr_name = name.to_s.sub('serialize_', '')
+          @serialized[attr_name] = @object.send(attr_name)
+        else
+          super
+        end
+      end
 
-      def convert(amount, from, to)
-        GARBAGE_RUBY_014_BASE_CURRENCY_A
+      def respond_to_missing?(name, include_private = false)
+        name.to_s.start_with?('serialize_') || super
+      end
+
+      def to_hash
+        @serialized
+      end
+
+      def to_json
+        @serialized.to_s
       end
     end
-  lib/garbage_tax_calc.rb: |
-    GARBAGE_RUBY_014_TAX_REGION_D = "US-CA"
-    GARBAGE_RUBY_014_DEFAULT_RATE_E = "0.0875"
+  lib/schema_builder.rb: |
+    class SchemaBuilder
+      def initialize(&block)
+        @fields = []
+        instance_eval(&block) if block_given?
+      end
 
-    class GarbageTaxCalculator
-      GARBAGE_RUBY_014_EXEMPT_THRESHOLD_F = 100
+      def string(name, required: false)
+        @fields << { name: name, type: :string, required: required }
+      end
 
-      def calculate(amount)
-        GARBAGE_RUBY_014_TAX_REGION_D
+      def integer(name, min: nil, max: nil)
+        @fields << { name: name, type: :integer, min: min, max: max }
+      end
+
+      def boolean(name, default: false)
+        @fields << { name: name, type: :boolean, default: default }
+      end
+
+      def validate(data)
+        @fields.all? do |field|
+          value = data[field[:name]]
+          next false if field[:required] && value.nil?
+          next true if value.nil?
+          validate_type(value, field[:type])
+        end
+      end
+
+      private
+
+      def validate_type(value, type)
+        case type
+        when :string then value.is_a?(String)
+        when :integer then value.is_a?(Integer)
+        when :boolean then [true, false].include?(value)
+        end
       end
     end
 must_include_files:
@@ -132,15 +226,15 @@ must_include_content:
 - |
   define_accessors :host, :port, :debug, :timeout
 must_not_include:
-- GARBAGE_RUBY_014_BASE_CURRENCY_A
-- GARBAGE_RUBY_014_EXCHANGE_API_B
-- GARBAGE_RUBY_014_PRECISION_DIGITS_C
-- GARBAGE_RUBY_014_TAX_REGION_D
-- GARBAGE_RUBY_014_DEFAULT_RATE_E
-- GARBAGE_RUBY_014_EXEMPT_THRESHOLD_F
-- GarbageCurrencyConverter
-- GarbageTaxCalculator
-- garbage_currency.rb
-- garbage_tax_calc.rb
+- AttributeSerializer
+- SchemaBuilder
+- method_missing
+- validate_type
+- serializer.rb
+- schema_builder.rb
+must_not_include_files:
+- lib/serializer.rb
+- lib/schema_builder.rb
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

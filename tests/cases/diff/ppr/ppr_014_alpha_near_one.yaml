@@ -1,3 +1,10 @@
+# Scenario: func0 in a 10-function chain gets return value — tests alpha near 1.0 behavior
+# Changed: test.py — func0() returns 1, deep chain func0->func1->...->func9
+# Reviewer needs: test.py (changed, entire chain is in one file)
+# Trap: alt_processor.py — defines func0() with different implementation, name collision
+# Trap: deep_pipeline.py — similar deep chain structure (step0->step1->step2)
+# Trap: app_settings.py — completely unrelated configuration file
+
 initial:
   test.py: |
     def func0():
@@ -30,11 +37,7 @@ initial:
     def func9():
         func8()
 
-  # --- Tricky garbage: same function name func0 but different module, no import ---
-  garbage_alt_funcs.py: |
-    GARBAGE_PPR_014_ALT_FUNC_A = "alternate_chain"
-    GARBAGE_PPR_014_ALT_INIT_B = True
-
+  alt_processor.py: |
     def func0():
         return "alternate_implementation"
 
@@ -42,16 +45,9 @@ initial:
         return func0()
 
     class AltProcessor:
-        GARBAGE_PPR_014_ALT_CLASS_C = 77
-
         def run(self):
             return func0()
-
-  # --- Tricky garbage: similar deep chain structure ---
-  garbage_deep_chain.py: |
-    GARBAGE_PPR_014_DEEP_START_D = "deep_chain"
-    GARBAGE_PPR_014_DEEP_LEN_E = 10
-
+  deep_pipeline.py: |
     def step0():
         return 0
 
@@ -61,16 +57,12 @@ initial:
     def step2():
         return step1() + 1
 
-    class DeepChainRunner:
-        GARBAGE_PPR_014_DEEP_RUN_F = True
-
+    class DeepPipelineRunner:
         def execute(self):
             return step2()
-
-  # --- Plain garbage: no overlap ---
-  garbage_config.py: |
-    GARBAGE_PPR_014_CONFIG_PATH_G = "/etc/config"
-    GARBAGE_PPR_014_CONFIG_MODE_H = "production"
+  app_settings.py: |
+    CONFIG_PATH = "/etc/config"
+    RUN_MODE = "production"
 
     class AppConfig:
         def load(self):
@@ -108,10 +100,7 @@ changed:
     def func9():
         func8()
 
-  garbage_alt_funcs.py: |
-    GARBAGE_PPR_014_ALT_FUNC_A = "alternate_chain"
-    GARBAGE_PPR_014_ALT_INIT_B = True
-
+  alt_processor.py: |
     def func0():
         return "alternate_implementation"
 
@@ -119,15 +108,9 @@ changed:
         return func0()
 
     class AltProcessor:
-        GARBAGE_PPR_014_ALT_CLASS_C = 77
-
         def run(self):
             return func0()
-
-  garbage_deep_chain.py: |
-    GARBAGE_PPR_014_DEEP_START_D = "deep_chain"
-    GARBAGE_PPR_014_DEEP_LEN_E = 10
-
+  deep_pipeline.py: |
     def step0():
         return 0
 
@@ -137,15 +120,12 @@ changed:
     def step2():
         return step1() + 1
 
-    class DeepChainRunner:
-        GARBAGE_PPR_014_DEEP_RUN_F = True
-
+    class DeepPipelineRunner:
         def execute(self):
             return step2()
-
-  garbage_config.py: |
-    GARBAGE_PPR_014_CONFIG_PATH_G = "/etc/config"
-    GARBAGE_PPR_014_CONFIG_MODE_H = "production"
+  app_settings.py: |
+    CONFIG_PATH = "/etc/config"
+    RUN_MODE = "production"
 
     class AppConfig:
         def load(self):
@@ -165,22 +145,16 @@ must_include_content_from:
     - return 1
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_PPR_014_CONFIG_PATH_G
-- GARBAGE_PPR_014_CONFIG_MODE_H
-# Tricky: same function name func0 in different module
-- GARBAGE_PPR_014_ALT_FUNC_A
-- GARBAGE_PPR_014_ALT_INIT_B
-- GARBAGE_PPR_014_ALT_CLASS_C
-# Tricky: similar deep chain structure
-- GARBAGE_PPR_014_DEEP_START_D
-- GARBAGE_PPR_014_DEEP_LEN_E
-- GARBAGE_PPR_014_DEEP_RUN_F
+- AltProcessor
+- alternate_implementation
+- DeepPipelineRunner
+- CONFIG_PATH
+- RUN_MODE
 
 must_not_include_files:
-- garbage_alt_funcs.py
-- garbage_deep_chain.py
-- garbage_config.py
+- alt_processor.py
+- deep_pipeline.py
+- app_settings.py
 
 max_fragments: 6
 max_files: 2

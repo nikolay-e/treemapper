@@ -1,3 +1,23 @@
+# Scenario: emitter.ts adds emitUserDeleted and emitUserUpdated functions.
+# listener.ts subscribes to 'userCreated' via appEmitter.on().
+#
+# Diff: emitter.ts adds two new emit functions for 'userDeleted' and 'userUpdated'
+# events alongside the existing emitUserCreated.
+#
+# Reviewer questions:
+#   Q1: "Are there listeners for the new events?"
+#       -> listener.ts (UNCHANGED) imports appEmitter and subscribes only to
+#          'userCreated'. The new 'userDeleted' and 'userUpdated' events fire
+#          into the void — reviewer flags missing handlers.
+#   Q2: "What's the existing event handling pattern?"
+#       -> listener.ts: appEmitter.on('userCreated', handler) shows the wiring convention.
+#
+# Not needed:
+#   - user-repository.ts: CRUD operations on users (saveUser, removeUser, findUser).
+#     Might eventually call emitUserDeleted, but doesn't import emitter yet.
+#   - notification-service.ts: sends notifications via external HTTP API.
+#     Different communication mechanism entirely, no EventEmitter usage.
+
 initial:
   emitter.ts: |
     import { EventEmitter } from 'events';
@@ -13,27 +33,41 @@ initial:
     appEmitter.on('userCreated', (user) => {
         console.log('User created:', user);
     });
-  garbage_storage.ts: |
-    const GARBAGE_JS_048_STORAGE_MARKER_A = "storage";
-    const GARBAGE_JS_048_BUCKET_MARKER_B = true;
-
-    class ObjectStorage {
-        static GARBAGE_JS_048_STORAGE_CLASS_C = "object_store";
-
-        upload(key: string, data: Buffer): Promise<string> {
-            return Promise.resolve(key);
-        }
+  user-repository.ts: |
+    interface UserRecord {
+        id: string;
+        name: string;
+        email: string;
     }
-  garbage_indexing.ts: |
-    const GARBAGE_JS_048_INDEX_MARKER_D = "indexing";
-    const GARBAGE_JS_048_SHARD_MARKER_E = 16;
 
-    class SearchIndexer {
-        static GARBAGE_JS_048_INDEXER_CLASS_F = true;
+    const users = new Map<string, UserRecord>();
 
-        index(docId: string, content: string): void {
-            // noop
-        }
+    export function saveUser(user: UserRecord): void {
+        users.set(user.id, user);
+    }
+
+    export function removeUser(id: string): boolean {
+        return users.delete(id);
+    }
+
+    export function findUser(id: string): UserRecord | undefined {
+        return users.get(id);
+    }
+  notification-service.ts: |
+    export async function sendEmailNotification(to: string, subject: string, body: string): Promise<boolean> {
+        const response = await fetch('/api/notifications/email', {
+            method: 'POST',
+            body: JSON.stringify({ to, subject, body }),
+        });
+        return response.ok;
+    }
+
+    export async function sendPushNotification(userId: string, message: string): Promise<boolean> {
+        const response = await fetch('/api/notifications/push', {
+            method: 'POST',
+            body: JSON.stringify({ userId, message }),
+        });
+        return response.ok;
     }
 changed:
   emitter.ts: |
@@ -58,41 +92,62 @@ changed:
     appEmitter.on('userCreated', (user) => {
         console.log('User created:', user);
     });
-  garbage_storage.ts: |
-    const GARBAGE_JS_048_STORAGE_MARKER_A = "storage";
-    const GARBAGE_JS_048_BUCKET_MARKER_B = true;
-
-    class ObjectStorage {
-        static GARBAGE_JS_048_STORAGE_CLASS_C = "object_store";
-
-        upload(key: string, data: Buffer): Promise<string> {
-            return Promise.resolve(key);
-        }
+  user-repository.ts: |
+    interface UserRecord {
+        id: string;
+        name: string;
+        email: string;
     }
-  garbage_indexing.ts: |
-    const GARBAGE_JS_048_INDEX_MARKER_D = "indexing";
-    const GARBAGE_JS_048_SHARD_MARKER_E = 16;
 
-    class SearchIndexer {
-        static GARBAGE_JS_048_INDEXER_CLASS_F = true;
+    const users = new Map<string, UserRecord>();
 
-        index(docId: string, content: string): void {
-            // noop
-        }
+    export function saveUser(user: UserRecord): void {
+        users.set(user.id, user);
+    }
+
+    export function removeUser(id: string): boolean {
+        return users.delete(id);
+    }
+
+    export function findUser(id: string): UserRecord | undefined {
+        return users.get(id);
+    }
+  notification-service.ts: |
+    export async function sendEmailNotification(to: string, subject: string, body: string): Promise<boolean> {
+        const response = await fetch('/api/notifications/email', {
+            method: 'POST',
+            body: JSON.stringify({ to, subject, body }),
+        });
+        return response.ok;
+    }
+
+    export async function sendPushNotification(userId: string, message: string): Promise<boolean> {
+        const response = await fetch('/api/notifications/push', {
+            method: 'POST',
+            body: JSON.stringify({ userId, message }),
+        });
+        return response.ok;
     }
 must_include_files:
-- emitter.ts
-must_include_content:
-- appEmitter = new EventEmitter()
-- 'function emitUserCreated(user: { id: string; name: string }) {'
+  # Q1: listener.ts imports appEmitter — reviewer checks if new events have handlers
+  - listener.ts
+must_include_content_from:
+  listener.ts:
+    - "import { appEmitter } from './emitter'"
+    - "appEmitter.on('userCreated'"
 must_not_include:
-- GARBAGE_JS_048_BUCKET_MARKER_B
-- GARBAGE_JS_048_INDEXER_CLASS_F
-- GARBAGE_JS_048_INDEX_MARKER_D
-- GARBAGE_JS_048_SHARD_MARKER_E
-- GARBAGE_JS_048_STORAGE_CLASS_C
-- GARBAGE_JS_048_STORAGE_MARKER_A
-- garbage_indexing.ts
-- garbage_storage.ts
+  # user-repository.ts: CRUD operations, doesn't import emitter
+  - UserRecord
+  - saveUser
+  - removeUser
+  - findUser
+  # notification-service.ts: external HTTP notifications, no EventEmitter usage
+  - sendEmailNotification
+  - sendPushNotification
+must_not_include_files:
+  - user-repository.ts
+  - notification-service.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

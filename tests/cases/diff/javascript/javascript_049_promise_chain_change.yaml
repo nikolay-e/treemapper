@@ -1,3 +1,24 @@
+# Scenario: api.ts's fetchData return type widens to include a metadata field.
+# consumer.ts imports fetchData and accesses result.data.
+#
+# Diff: api.ts changes return type from `{ data: string }` to
+# `{ data: string; metadata: { timestamp: number } }`, adding a .then() step
+# that attaches metadata.
+#
+# Reviewer questions:
+#   Q1: "Does the type change break existing consumers?"
+#       -> consumer.ts (UNCHANGED) accesses result.data — still valid since the type
+#          was widened (added metadata), not narrowed. Existing access patterns work.
+#   Q2: "Should the consumer use the new metadata field?"
+#       -> consumer.ts only logs result.data. Reviewer decides if metadata should
+#          be consumed.
+#
+# Not needed:
+#   - api-types.ts: shared ApiResponse/PaginatedResponse types. Not imported by
+#     api.ts or consumer.ts — api.ts uses inline types.
+#   - retry-fetch.ts: fetch wrapper with retry logic. Transport-level concern,
+#     different module entirely.
+
 initial:
   api.ts: |
     export function fetchData(): Promise<{ data: string }> {
@@ -9,27 +30,24 @@ initial:
     fetchData().then(result => {
         console.log(result.data);
     });
-  garbage_analytics.ts: |
-    const GARBAGE_JS_049_ANALYTICS_MARKER_A = "analytics";
-    const GARBAGE_JS_049_TRACKER_MARKER_B = true;
-
-    class AnalyticsTracker {
-        static GARBAGE_JS_049_TRACKER_CLASS_C = "tracker";
-
-        track(event: string, payload: Record<string, unknown>): void {
-            // noop
-        }
+  api-types.ts: |
+    export interface ApiResponse<T> {
+        data: T;
+        status: number;
+        message: string;
     }
-  garbage_caching.ts: |
-    const GARBAGE_JS_049_CACHE_MARKER_D = "caching";
-    const GARBAGE_JS_049_TTL_MARKER_E = 3600;
 
-    class CacheManager {
-        static GARBAGE_JS_049_CACHE_CLASS_F = true;
-
-        get(key: string): string | null {
-            return null;
+    export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+        page: number;
+        totalPages: number;
+    }
+  retry-fetch.ts: |
+    export async function retryFetch(url: string, retries: number = 3): Promise<Response> {
+        for (let i = 0; i < retries; i++) {
+            try { return await fetch(url); }
+            catch (e) { if (i === retries - 1) throw e; }
         }
+        throw new Error('Unreachable');
     }
 changed:
   api.ts: |
@@ -47,41 +65,43 @@ changed:
     fetchData().then(result => {
         console.log(result.data);
     });
-  garbage_analytics.ts: |
-    const GARBAGE_JS_049_ANALYTICS_MARKER_A = "analytics";
-    const GARBAGE_JS_049_TRACKER_MARKER_B = true;
-
-    class AnalyticsTracker {
-        static GARBAGE_JS_049_TRACKER_CLASS_C = "tracker";
-
-        track(event: string, payload: Record<string, unknown>): void {
-            // noop
-        }
+  api-types.ts: |
+    export interface ApiResponse<T> {
+        data: T;
+        status: number;
+        message: string;
     }
-  garbage_caching.ts: |
-    const GARBAGE_JS_049_CACHE_MARKER_D = "caching";
-    const GARBAGE_JS_049_TTL_MARKER_E = 3600;
 
-    class CacheManager {
-        static GARBAGE_JS_049_CACHE_CLASS_F = true;
-
-        get(key: string): string | null {
-            return null;
+    export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+        page: number;
+        totalPages: number;
+    }
+  retry-fetch.ts: |
+    export async function retryFetch(url: string, retries: number = 3): Promise<Response> {
+        for (let i = 0; i < retries; i++) {
+            try { return await fetch(url); }
+            catch (e) { if (i === retries - 1) throw e; }
         }
+        throw new Error('Unreachable');
     }
 must_include_files:
-- api.ts
-must_include_content:
-- res => res.json()
-- 'metadata: { timestamp: Date.now() },'
+  # Q1: consumer.ts imports fetchData — reviewer checks if type change breaks callers
+  - consumer.ts
+must_include_content_from:
+  consumer.ts:
+    - "import { fetchData } from './api'"
+    - "result.data"
 must_not_include:
-- GARBAGE_JS_049_ANALYTICS_MARKER_A
-- GARBAGE_JS_049_CACHE_CLASS_F
-- GARBAGE_JS_049_CACHE_MARKER_D
-- GARBAGE_JS_049_TRACKER_CLASS_C
-- GARBAGE_JS_049_TRACKER_MARKER_B
-- GARBAGE_JS_049_TTL_MARKER_E
-- garbage_analytics.ts
-- garbage_caching.ts
+  # api-types.ts: shared type defs not used by api.ts or consumer.ts
+  - ApiResponse
+  - PaginatedResponse
+  - totalPages
+  # retry-fetch.ts: transport-level retry, different concern
+  - retryFetch
+must_not_include_files:
+  - api-types.ts
+  - retry-fetch.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

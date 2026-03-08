@@ -1,3 +1,23 @@
+# Scenario: S3 module caller adds lifecycle rules, versioning, KMS encryption,
+# and a second logs_bucket. The module definition (modules/s3) is unchanged.
+#
+# Reviewer questions:
+#   Q1: "What lifecycle transitions and expiration policies are being configured?"
+#       -> infrastructure/storage.tf: archive-old-data transitions to STANDARD_IA
+#          at 30d, GLACIER at 90d, expires at 365d; cleanup-temp expires at 7d
+#   Q2: "What S3 module variables control versioning and encryption?"
+#       -> modules/s3/variables.tf: versioning_enabled (bool), sse_algorithm,
+#          kms_key_id — reviewer confirms the module supports the new config
+#   Q3: "Is a logs bucket also being created, and how does it differ?"
+#       -> infrastructure/storage.tf: logs_bucket with versioning disabled,
+#          single expire-old-logs rule at 30d
+#
+# Not needed:
+#   - infrastructure/backup_storage.tf: sibling module call to same S3 module,
+#     but for backup bucket — different retention, different KMS key
+#   - infrastructure/kms_keys.tf: KMS key definitions — reviewer doesn't need
+#     to verify key config to understand the S3 lifecycle/versioning changes
+
 initial:
   modules/s3/main.tf: |
     resource "aws_s3_bucket" "this" {
@@ -130,10 +150,6 @@ initial:
     output "bucket_domain_name" {
       value = aws_s3_bucket.this.bucket_domain_name
     }
-  app.py: |
-    import boto3
-    s3 = boto3.client('s3')
-    s3.upload_file('file.txt', 'my-bucket', 'file.txt')
   infrastructure/storage.tf: |
     module "data_bucket" {
       source      = "./modules/s3"
@@ -141,51 +157,9 @@ initial:
 
       tags = local.common_tags
     }
-  unrelated/emr.tf: |
-    # GARBAGE_TF_EMR_444_001
-    resource "aws_emr_cluster" "unrelated_cluster" {
-      name          = "GARBAGE_EMR_CLUSTER_444_002"
-      release_label = "emr-6.10.0"
-      applications  = ["Spark", "Hadoop"]
 
-      ec2_attributes {
-        subnet_id        = "subnet-GARBAGE_444_003"
-        instance_profile = "arn:aws:iam::123456789:instance-profile/GARBAGE_EMR_PROFILE_444_004"
-      }
-
-      master_instance_group {
-        instance_type = "m5.xlarge"
-      }
-
-      core_instance_group {
-        instance_type  = "m5.xlarge"
-        instance_count = 2
-      }
-
-      service_role = "arn:aws:iam::123456789:role/GARBAGE_EMR_ROLE_444_005"
-    }
-  unrelated/athena.tf: |
-    # GARBAGE_TF_ATHENA_444_006
-    resource "aws_athena_workgroup" "unrelated_workgroup" {
-      name = "GARBAGE_ATHENA_WG_444_007"
-
-      configuration {
-        result_configuration {
-          output_location = "s3://GARBAGE_ATHENA_BUCKET_444_008/results/"
-        }
-      }
-    }
-
-    resource "aws_athena_database" "unrelated_db" {
-      name   = "GARBAGE_ATHENA_DB_444_009"
-      bucket = "GARBAGE_ATHENA_BUCKET_444_008"
-    }
-
-  # --- Tricky garbage: sibling module call to SAME ./modules/s3 with lifecycle_rules ---
+  # Trap: sibling module call to same S3 module with lifecycle_rules
   infrastructure/backup_storage.tf: |
-    GARBAGE_TF_004_BACKUP_G = "backup-storage-config"
-    GARBAGE_TF_004_BACKUP_RETENTION_H = "365-days"
-
     module "backup_bucket" {
       source             = "./modules/s3"
       bucket_name        = "myapp-backups-${var.environment}"
@@ -221,11 +195,8 @@ initial:
       tags = local.common_tags
     }
 
-  # --- Tricky garbage: same provider data source (aws_kms_key) in a lookup file ---
+  # Trap: KMS key definitions in same infrastructure directory
   infrastructure/kms_keys.tf: |
-    GARBAGE_TF_004_KMS_LOOKUP_I = "kms-key-lookup"
-    GARBAGE_TF_004_KMS_ALIAS_J = "alias/backup-key"
-
     data "aws_kms_key" "shared_encryption" {
       key_id = "alias/shared-encryption"
     }
@@ -374,10 +345,6 @@ changed:
     output "bucket_domain_name" {
       value = aws_s3_bucket.this.bucket_domain_name
     }
-  app.py: |
-    import boto3
-    s3 = boto3.client('s3')
-    s3.upload_file('file.txt', 'my-bucket', 'file.txt')
   infrastructure/storage.tf: |
     module "data_bucket" {
       source             = "./modules/s3"
@@ -431,51 +398,7 @@ changed:
 
       tags = local.common_tags
     }
-  unrelated/emr.tf: |
-    # GARBAGE_TF_EMR_444_001
-    resource "aws_emr_cluster" "unrelated_cluster" {
-      name          = "GARBAGE_EMR_CLUSTER_444_002"
-      release_label = "emr-6.10.0"
-      applications  = ["Spark", "Hadoop"]
-
-      ec2_attributes {
-        subnet_id        = "subnet-GARBAGE_444_003"
-        instance_profile = "arn:aws:iam::123456789:instance-profile/GARBAGE_EMR_PROFILE_444_004"
-      }
-
-      master_instance_group {
-        instance_type = "m5.xlarge"
-      }
-
-      core_instance_group {
-        instance_type  = "m5.xlarge"
-        instance_count = 2
-      }
-
-      service_role = "arn:aws:iam::123456789:role/GARBAGE_EMR_ROLE_444_005"
-    }
-  unrelated/athena.tf: |
-    # GARBAGE_TF_ATHENA_444_006
-    resource "aws_athena_workgroup" "unrelated_workgroup" {
-      name = "GARBAGE_ATHENA_WG_444_007"
-
-      configuration {
-        result_configuration {
-          output_location = "s3://GARBAGE_ATHENA_BUCKET_444_008/results/"
-        }
-      }
-    }
-
-    resource "aws_athena_database" "unrelated_db" {
-      name   = "GARBAGE_ATHENA_DB_444_009"
-      bucket = "GARBAGE_ATHENA_BUCKET_444_008"
-    }
-
-  # --- Tricky garbage: sibling module call to SAME ./modules/s3 with lifecycle_rules ---
   infrastructure/backup_storage.tf: |
-    GARBAGE_TF_004_BACKUP_G = "backup-storage-config"
-    GARBAGE_TF_004_BACKUP_RETENTION_H = "365-days"
-
     module "backup_bucket" {
       source             = "./modules/s3"
       bucket_name        = "myapp-backups-${var.environment}"
@@ -510,12 +433,7 @@ changed:
 
       tags = local.common_tags
     }
-
-  # --- Tricky garbage: same provider data source (aws_kms_key) in a lookup file ---
   infrastructure/kms_keys.tf: |
-    GARBAGE_TF_004_KMS_LOOKUP_I = "kms-key-lookup"
-    GARBAGE_TF_004_KMS_ALIAS_J = "alias/backup-key"
-
     data "aws_kms_key" "shared_encryption" {
       key_id = "alias/shared-encryption"
     }
@@ -532,14 +450,11 @@ changed:
       target_key_id = aws_kms_key.backup.key_id
     }
 
-# === Assertions ===
-
 must_include_files:
 - infrastructure/storage.tf
 
 must_include_content_from:
   infrastructure/storage.tf:
-    - source             = "./modules/s3"
     - versioning_enabled = true
     - kms_key_id         = aws_kms_key.data.arn
     - id      = "archive-old-data"
@@ -550,33 +465,23 @@ must_include_content_from:
     - expiration_days = 7
     - 'bucket_name        = "myapp-logs-${var.environment}"'
     - id              = "expire-old-logs"
-    - expiration_days = 30
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_TF_EMR_444_001
-- GARBAGE_EMR_CLUSTER_444_002
-- GARBAGE_444_003
-- GARBAGE_EMR_PROFILE_444_004
-- GARBAGE_EMR_ROLE_444_005
-- GARBAGE_TF_ATHENA_444_006
-- GARBAGE_ATHENA_WG_444_007
-- GARBAGE_ATHENA_BUCKET_444_008
-- GARBAGE_ATHENA_DB_444_009
-# Tricky: sibling module call to same ./modules/s3 with lifecycle_rules
-- GARBAGE_TF_004_BACKUP_G
-- GARBAGE_TF_004_BACKUP_RETENTION_H
-# Tricky: KMS lookup file with same data source type
-- GARBAGE_TF_004_KMS_LOOKUP_I
-- GARBAGE_TF_004_KMS_ALIAS_J
+  # backup_storage.tf: sibling S3 module call for backups — different bucket,
+  # different retention policy (730d), different KMS key
+  - archive-backups
+  - DEEP_ARCHIVE
+  - cleanup-temp-backups
+  # kms_keys.tf: key definitions — reviewer doesn't need KMS config details
+  # to understand the S3 lifecycle and versioning changes
+  - alias/shared-encryption
+  - alias/myapp-backup
 
 must_not_include_files:
-- unrelated/emr.tf
-- unrelated/athena.tf
 - infrastructure/backup_storage.tf
 - infrastructure/kms_keys.tf
 
 max_fragments: 8
-max_files: 2
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

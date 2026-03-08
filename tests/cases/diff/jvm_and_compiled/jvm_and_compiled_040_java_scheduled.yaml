@@ -1,3 +1,19 @@
+# Scenario: ScheduledTasks adds SLF4J logging and a new daily cron job.
+#
+# Diff: ScheduledTasks.java replaces System.out.println with logger.info()
+# and adds a new @Scheduled(cron=...) dailyReport method.
+#
+# Reviewer questions:
+#   Q1: "What is the schedule configuration for existing tasks?"
+#       -> ScheduledTasks.java (CHANGED) shows fixedRate=60000 on cleanupTask
+#          and cron expression on the new dailyReport method.
+#
+# Not needed:
+#   - src/main/java/com/example/BatchProcessor.java: another scheduled component.
+#     Uses @Scheduled too but has no dependency on ScheduledTasks.
+#   - src/main/resources/application.yml: app config with scheduling properties.
+#     Contains scheduling.enabled flag but ScheduledTasks doesn't read it.
+
 initial:
   src/main/java/com/example/ScheduledTasks.java: |
     package com.example;
@@ -12,18 +28,38 @@ initial:
             System.out.println("Running cleanup");
         }
     }
-  GarbageCronScheduler.java: |
-    public class GarbageCronScheduler {
-        public static final String GARBAGE_JVM_040_CRON_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_040_QUARTZ_MARKER_B = "marker";
-        public void noop() {}
+  src/main/java/com/example/BatchProcessor.java: |
+    package com.example;
+
+    import org.springframework.scheduling.annotation.Scheduled;
+    import org.springframework.stereotype.Component;
+
+    @Component
+    public class BatchProcessor {
+        @Scheduled(fixedDelay = 300000)
+        public void processBatch() {
+            System.out.println("Processing batch");
+        }
+
+        @Scheduled(cron = "0 0 * * * ?")
+        public void hourlyAggregation() {
+            System.out.println("Hourly aggregation");
+        }
     }
-  GarbageTimerTask.java: |
-    public class GarbageTimerTask {
-        public static final String GARBAGE_JVM_040_TIMER_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_040_INTERVAL_MARKER_D = "marker";
-        public void noop() {}
-    }
+  src/main/resources/application.yml: |
+    spring:
+      task:
+        scheduling:
+          pool:
+            size: 5
+      application:
+        name: scheduled-app
+
+    logging:
+      level:
+        root: INFO
+        com.example: DEBUG
+
 changed:
   src/main/java/com/example/ScheduledTasks.java: |
     package com.example;
@@ -47,29 +83,56 @@ changed:
             logger.info("Generating daily report");
         }
     }
-  GarbageCronScheduler.java: |
-    public class GarbageCronScheduler {
-        public static final String GARBAGE_JVM_040_CRON_MARKER_A = "marker";
-        public static final String GARBAGE_JVM_040_QUARTZ_MARKER_B = "marker";
-        public void noop() {}
+  src/main/java/com/example/BatchProcessor.java: |
+    package com.example;
+
+    import org.springframework.scheduling.annotation.Scheduled;
+    import org.springframework.stereotype.Component;
+
+    @Component
+    public class BatchProcessor {
+        @Scheduled(fixedDelay = 300000)
+        public void processBatch() {
+            System.out.println("Processing batch");
+        }
+
+        @Scheduled(cron = "0 0 * * * ?")
+        public void hourlyAggregation() {
+            System.out.println("Hourly aggregation");
+        }
     }
-  GarbageTimerTask.java: |
-    public class GarbageTimerTask {
-        public static final String GARBAGE_JVM_040_TIMER_MARKER_C = "marker";
-        public static final String GARBAGE_JVM_040_INTERVAL_MARKER_D = "marker";
-        public void noop() {}
-    }
+  src/main/resources/application.yml: |
+    spring:
+      task:
+        scheduling:
+          pool:
+            size: 5
+      application:
+        name: scheduled-app
+
+    logging:
+      level:
+        root: INFO
+        com.example: DEBUG
+
 must_include_files:
-- src/main/java/com/example/ScheduledTasks.java
-must_include_content:
-- import org.slf4j.Logger;
-- logger.info("Running cleanup");
+  - src/main/java/com/example/ScheduledTasks.java
+must_include_content_from:
+  src/main/java/com/example/ScheduledTasks.java:
+    - "import org.slf4j.Logger;"
+    - 'logger.info("Running cleanup");'
 must_not_include:
-- GARBAGE_JVM_040_CRON_MARKER_A
-- GARBAGE_JVM_040_INTERVAL_MARKER_D
-- GARBAGE_JVM_040_QUARTZ_MARKER_B
-- GARBAGE_JVM_040_TIMER_MARKER_C
-- GarbageCronScheduler.java
-- GarbageTimerTask.java
+  # BatchProcessor.java: another scheduled component, no dependency on ScheduledTasks
+  - BatchProcessor
+  - processBatch
+  - hourlyAggregation
+  # application.yml: config file, not referenced by the changed code
+  - scheduling-app
+  - pool
+must_not_include_files:
+  - src/main/java/com/example/BatchProcessor.java
+  - src/main/resources/application.yml
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

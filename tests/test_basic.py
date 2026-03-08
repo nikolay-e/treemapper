@@ -246,7 +246,7 @@ def test_unicode_content_and_encoding_errors(temp_project, run_mapper, caplog):
     (temp_project / "binary.bin").write_bytes(binary_content)
 
     output_path = temp_project / "encodings_output.yaml"
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, logger="treemapper"):
         assert run_mapper([".", "-o", str(output_path), "--log-level", "warning"])
     result = load_yaml(output_path)
 

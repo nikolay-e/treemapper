@@ -1,3 +1,15 @@
+# Scenario: Add a private route table with NAT gateway route
+#
+# Reviewer questions:
+#   1. What NAT gateway does the default route use? (nat.tf aws_nat_gateway.main)
+#   2. What private subnet gets this route table? (network.tf aws_subnet.private)
+#
+# The diff adds aws_route_table "private" and its association to network.tf.
+# nat.tf (unchanged) defines the NAT gateway that the route targets.
+# A reviewer needs nat.tf to verify the route target exists and is correct.
+#
+# Traps: public_routes.tf is same resource type but routes via IGW.
+
 initial:
   network.tf: |
     resource "aws_vpc" "main" {
@@ -8,12 +20,17 @@ initial:
       vpc_id     = aws_vpc.main.id
       cidr_block = "10.0.1.0/24"
     }
+  nat.tf: |
+    resource "aws_eip" "nat" {
+      domain = "vpc"
+    }
 
-  # --- Tricky garbage: same resource type aws_route_table but for public subnet ---
+    resource "aws_nat_gateway" "main" {
+      allocation_id = aws_eip.nat.id
+      subnet_id     = aws_subnet.public.id
+      depends_on    = [aws_internet_gateway.main]
+    }
   public_routes.tf: |
-    GARBAGE_TF_021_PUB_ROUTE_A = "public-routing"
-    GARBAGE_TF_021_PUB_IGW_B = "igw-main"
-
     resource "aws_route_table" "public" {
       vpc_id = aws_vpc.main.id
 
@@ -27,14 +44,6 @@ initial:
       subnet_id      = aws_subnet.public.id
       route_table_id = aws_route_table.public.id
     }
-
-  # --- Plain garbage ---
-  garbage_health_checker.py: |
-    GARBAGE_TF_021_HEALTH_CHECK_C = "uptime"
-    GARBAGE_TF_021_HEALTH_INTERVAL_D = 30
-
-    def check_endpoint(url):
-        return 200
 
 changed:
   network.tf: |
@@ -60,11 +69,17 @@ changed:
       subnet_id      = aws_subnet.private.id
       route_table_id = aws_route_table.private.id
     }
+  nat.tf: |
+    resource "aws_eip" "nat" {
+      domain = "vpc"
+    }
 
+    resource "aws_nat_gateway" "main" {
+      allocation_id = aws_eip.nat.id
+      subnet_id     = aws_subnet.public.id
+      depends_on    = [aws_internet_gateway.main]
+    }
   public_routes.tf: |
-    GARBAGE_TF_021_PUB_ROUTE_A = "public-routing"
-    GARBAGE_TF_021_PUB_IGW_B = "igw-main"
-
     resource "aws_route_table" "public" {
       vpc_id = aws_vpc.main.id
 
@@ -79,32 +94,25 @@ changed:
       route_table_id = aws_route_table.public.id
     }
 
-  garbage_health_checker.py: |
-    GARBAGE_TF_021_HEALTH_CHECK_C = "uptime"
-    GARBAGE_TF_021_HEALTH_INTERVAL_D = 30
-
-    def check_endpoint(url):
-        return 200
-
 must_include_files:
-- network.tf
+# Unchanged NAT gateway that the new route targets
+- nat.tf
 
 must_include_content_from:
-  network.tf:
-    - resource "aws_route_table" "private" {
-    - aws_nat_gateway.main.id
+  nat.tf:
+    # Reviewer needs the NAT definition to verify the route target
+    - resource "aws_nat_gateway" "main" {
+    - allocation_id = aws_eip.nat.id
 
 must_not_include:
-- GARBAGE_TF_021_PUB_ROUTE_A
-- GARBAGE_TF_021_PUB_IGW_B
-- GARBAGE_TF_021_HEALTH_CHECK_C
-- GARBAGE_TF_021_HEALTH_INTERVAL_D
+# Public route table uses IGW instead of NAT -- different routing strategy
+- gateway_id = aws_internet_gateway.main.id
+- route_table_id = aws_route_table.public.id
 
 must_not_include_files:
-- public_routes.tf
-- garbage_health_checker.py
+- public_routes.tf  # same resource type but public routing via IGW
 
-max_fragments: 3
-max_files: 1
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

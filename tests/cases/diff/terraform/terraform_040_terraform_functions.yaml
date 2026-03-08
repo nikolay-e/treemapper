@@ -1,23 +1,75 @@
+# Scenario: Expanding locals block with string, collection, encoding, and
+#   math functions to compute derived values used across resources.
+# Reviewer questions:
+#   1. Where are var.common_tags, var.extra_tags, etc. defined? (variables.tf)
+#   2. What config.json is being decoded with jsondecode? (config.json)
+# Traps:
+#   - networking/transforms.tf: also uses upper(), merge(), base64encode() but for networking
+#   - iam/roles.tf: uses jsonencode() in assume_role_policy but unrelated purpose
+
 initial:
   main.tf: |
     locals {
       name = "myapp"
     }
-  # --- Tricky garbage: sibling .tf with same locals/function pattern for a different purpose ---
-  networking/transforms_GARBAGE_TF_040_A.tf: |
-    # GARBAGE_TF_040_NET_FUNCS_A - Networking transformation locals
-    locals {
-      net_name_GARBAGE_TF_040_A = "network"
 
-      upper_net_name_GARBAGE_TF_040_A = upper(local.net_name_GARBAGE_TF_040_A)
-      merged_cidrs_GARBAGE_TF_040_B   = merge(var.private_cidrs, var.public_cidrs)
-      encoded_config_GARBAGE_TF_040_A = base64encode("network-config")
+    resource "aws_instance" "app" {
+      ami           = "ami-12345678"
+      instance_type = "t3.micro"
+      tags = {
+        Name = local.name
+      }
     }
-  # --- Plain garbage: unrelated IAM config ---
-  iam/roles_GARBAGE_TF_040_C.tf: |
-    # GARBAGE_TF_040_IAM_ROLES_C - IAM role definitions
-    resource "aws_iam_role" "lambda_GARBAGE_TF_040_C" {
-      name = "lambda-exec-GARBAGE_TF_040_C"
+  variables.tf: |
+    variable "common_tags" {
+      type    = map(string)
+      default = {
+        Project   = "myapp"
+        ManagedBy = "terraform"
+      }
+    }
+
+    variable "extra_tags" {
+      type    = map(string)
+      default = {}
+    }
+
+    variable "subnet_ids" {
+      type    = list(string)
+      default = []
+    }
+
+    variable "extra_subnet_ids" {
+      type    = list(string)
+      default = []
+    }
+
+    variable "min_count" {
+      type    = number
+      default = 1
+    }
+
+    variable "desired_count" {
+      type    = number
+      default = 2
+    }
+  config.json: |
+    {
+      "db_host": "db.internal",
+      "db_port": 5432,
+      "cache_ttl": 300
+    }
+  networking/transforms.tf: |
+    locals {
+      net_name = "network"
+
+      upper_net_name = upper(local.net_name)
+      merged_cidrs   = merge(var.private_cidrs, var.public_cidrs)
+      encoded_config = base64encode("network-config")
+    }
+  iam/roles.tf: |
+    resource "aws_iam_role" "lambda" {
+      name = "lambda-exec"
 
       assume_role_policy = jsonencode({
         Version = "2012-10-17"
@@ -29,11 +81,6 @@ initial:
           }
         }]
       })
-
-      tags = {
-        Name = "lambda-role-GARBAGE_TF_040_C"
-        Team = "platform-GARBAGE_TF_040_IAM_D"
-      }
     }
 
 changed:
@@ -41,72 +88,52 @@ changed:
     locals {
       name = "myapp"
 
-      # String functions
       upper_name = upper(local.name)
       trimmed    = trimspace("  hello  ")
 
-      # Collection functions
       merged_tags = merge(var.common_tags, var.extra_tags)
       flattened   = flatten([var.subnet_ids, var.extra_subnet_ids])
 
-      # Encoding functions
       encoded = base64encode("secret")
       decoded = jsondecode(file("config.json"))
 
-      # Math functions
       max_count = max(var.min_count, var.desired_count)
     }
-  networking/transforms_GARBAGE_TF_040_A.tf: |
-    # GARBAGE_TF_040_NET_FUNCS_A - Networking transformation locals
-    locals {
-      net_name_GARBAGE_TF_040_A = "network"
 
-      upper_net_name_GARBAGE_TF_040_A = upper(local.net_name_GARBAGE_TF_040_A)
-      merged_cidrs_GARBAGE_TF_040_B   = merge(var.private_cidrs, var.public_cidrs)
-      encoded_config_GARBAGE_TF_040_A = base64encode("network-config")
-    }
-  iam/roles_GARBAGE_TF_040_C.tf: |
-    # GARBAGE_TF_040_IAM_ROLES_C - IAM role definitions
-    resource "aws_iam_role" "lambda_GARBAGE_TF_040_C" {
-      name = "lambda-exec-GARBAGE_TF_040_C"
-
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [{
-          Action = "sts:AssumeRole"
-          Effect = "Allow"
-          Principal = {
-            Service = "lambda.amazonaws.com"
-          }
-        }]
-      })
-
-      tags = {
-        Name = "lambda-role-GARBAGE_TF_040_C"
-        Team = "platform-GARBAGE_TF_040_IAM_D"
-      }
+    resource "aws_instance" "app" {
+      ami           = "ami-12345678"
+      instance_type = "t3.micro"
+      tags          = local.merged_tags
     }
 
+# variables.tf is unchanged but a reviewer needs to see the variable
+# definitions to understand the types flowing into merge(), flatten(), max()
+# config.json is unchanged but needed to understand what jsondecode returns
 must_include_files:
-- main.tf
+  - variables.tf
+  - config.json
 
 must_include_content_from:
-  main.tf:
-    - upper_name = upper(local.name)
-    - merged_tags = merge(var.common_tags, var.extra_tags)
-    - max_count = max(var.min_count, var.desired_count)
+  variables.tf:
+    - variable "common_tags" {
+    - variable "extra_tags" {
+    - variable "min_count" {
+    - variable "desired_count" {
+  config.json:
+    - db_host
 
 must_not_include:
-- GARBAGE_TF_040_NET_FUNCS_A
-- GARBAGE_TF_040_B
-- GARBAGE_TF_040_IAM_ROLES_C
-- GARBAGE_TF_040_IAM_D
+  # Networking transforms - also uses upper()/merge()/base64encode() but for network locals
+  - upper_net_name
+  - merged_cidrs
+  # IAM role - also uses jsonencode() but for completely different purpose
+  - lambda-exec
 
 must_not_include_files:
-- networking/transforms_GARBAGE_TF_040_A.tf
-- iam/roles_GARBAGE_TF_040_C.tf
+  - networking/transforms.tf
+  - iam/roles.tf
 
-max_fragments: 3
-max_files: 1
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

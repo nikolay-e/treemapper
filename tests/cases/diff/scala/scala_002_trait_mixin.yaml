@@ -1,3 +1,21 @@
+# Scenario: OrderService mixes in Logging and Metrics traits, gaining log/debug
+# and incrementCounter/recordMetric capabilities used in new business methods.
+#
+# Diff: src/services/OrderService.scala adds trait mixins and new methods that
+# call trait methods (log, incrementCounter, recordMetric, debug).
+#
+# Reviewer questions:
+#   Q1: "What methods does Logging provide?" -> src/traits/Logging.scala (UNCHANGED)
+#        provides log, debug, error with logPrefix.
+#   Q2: "What methods does Metrics provide?" -> src/traits/Metrics.scala (UNCHANGED)
+#        provides recordMetric, incrementCounter, getCounter.
+#
+# Trap files (plausible but no dependency on OrderService or its trait mixins):
+#   - src/traits/Serializable.scala: another trait in the same package. Shares
+#     "trait" pattern but provides serialization, not mixed into OrderService.
+#   - src/services/InventoryService.scala: another service. Same "services" package
+#     but no relationship to OrderService or its Logging/Metrics traits.
+
 initial:
   src/traits/Logging.scala: |
     package traits
@@ -38,22 +56,37 @@ initial:
         s"Processing order $orderId"
       }
     }
-  unrelated/CacheWarmer.scala: |
-    package cache
-    // GARBAGE_SCALA_002_MARKER_A
-    class CacheWarmer {
-      val GARBAGE_SCALA_002_TTL = 3600
-      def warm(): Unit = println("GARBAGE_SCALA_002_MARKER_B warming cache")
-      def evict(key: String): Unit = println(s"GARBAGE_SCALA_002_MARKER_C evicting $key")
+  src/traits/Serializable.scala: |
+    package traits
+
+    trait Serializable {
+      def serialize: String
+      def deserialize(data: String): Unit
+
+      def toJson: String = s"""{"type":"${getClass.getSimpleName}","data":"${serialize}"}"""
     }
-  unrelated/HealthCheck.scala: |
-    package health
-    // GARBAGE_SCALA_002_MARKER_D
-    object HealthCheck {
-      val GARBAGE_SCALA_002_ENDPOINT = "/health"
-      def check(): Boolean = { println("GARBAGE_SCALA_002_MARKER_E"); true }
-      def status(): String = "GARBAGE_SCALA_002_MARKER_F healthy"
+  src/services/InventoryService.scala: |
+    package services
+
+    class InventoryService {
+      private var stock: Map[String, Int] = Map.empty
+
+      def addStock(productId: String, quantity: Int): Unit = {
+        stock = stock.updated(productId, stock.getOrElse(productId, 0) + quantity)
+      }
+
+      def removeStock(productId: String, quantity: Int): Boolean = {
+        stock.get(productId) match {
+          case Some(current) if current >= quantity =>
+            stock = stock.updated(productId, current - quantity)
+            true
+          case _ => false
+        }
+      }
+
+      def getStock(productId: String): Int = stock.getOrElse(productId, 0)
     }
+
 changed:
   src/traits/Logging.scala: |
     package traits
@@ -107,32 +140,65 @@ changed:
         s"Order $orderId cancelled"
       }
     }
-  unrelated/CacheWarmer.scala: |
-    package cache
-    // GARBAGE_SCALA_002_MARKER_A
-    class CacheWarmer {
-      val GARBAGE_SCALA_002_TTL = 3600
-      def warm(): Unit = println("GARBAGE_SCALA_002_MARKER_B warming cache")
-      def evict(key: String): Unit = println(s"GARBAGE_SCALA_002_MARKER_C evicting $key")
+  src/traits/Serializable.scala: |
+    package traits
+
+    trait Serializable {
+      def serialize: String
+      def deserialize(data: String): Unit
+
+      def toJson: String = s"""{"type":"${getClass.getSimpleName}","data":"${serialize}"}"""
     }
-  unrelated/HealthCheck.scala: |
-    package health
-    // GARBAGE_SCALA_002_MARKER_D
-    object HealthCheck {
-      val GARBAGE_SCALA_002_ENDPOINT = "/health"
-      def check(): Boolean = { println("GARBAGE_SCALA_002_MARKER_E"); true }
-      def status(): String = "GARBAGE_SCALA_002_MARKER_F healthy"
+  src/services/InventoryService.scala: |
+    package services
+
+    class InventoryService {
+      private var stock: Map[String, Int] = Map.empty
+
+      def addStock(productId: String, quantity: Int): Unit = {
+        stock = stock.updated(productId, stock.getOrElse(productId, 0) + quantity)
+      }
+
+      def removeStock(productId: String, quantity: Int): Boolean = {
+        stock.get(productId) match {
+          case Some(current) if current >= quantity =>
+            stock = stock.updated(productId, current - quantity)
+            true
+          case _ => false
+        }
+      }
+
+      def getStock(productId: String): Int = stock.getOrElse(productId, 0)
     }
+
 must_include_files:
-- src/services/OrderService.scala
-must_include_content:
-- import traits.{Logging, Metrics}
+  # Changed: OrderService mixes in Logging and Metrics
+  - src/services/OrderService.scala
+  # Unchanged but essential: Logging trait defines log/debug/error
+  - src/traits/Logging.scala
+  # Unchanged but essential: Metrics trait defines incrementCounter/recordMetric
+  - src/traits/Metrics.scala
+must_include_content_from:
+  src/services/OrderService.scala:
+    - "import traits.{Logging, Metrics}"
+    - "class OrderService extends Logging with Metrics {"
+  src/traits/Logging.scala:
+    - "trait Logging {"
+  src/traits/Metrics.scala:
+    - "trait Metrics {"
 must_not_include:
-- GARBAGE_SCALA_002_ENDPOINT
-- GARBAGE_SCALA_002_MARKER_A
-- GARBAGE_SCALA_002_MARKER_D
-- GARBAGE_SCALA_002_TTL
-- CacheWarmer.scala
-- HealthCheck.scala
+  # Serializable.scala: another trait but not mixed into OrderService
+  - "trait Serializable"
+  - toJson
+  - deserialize
+  # InventoryService.scala: another service, no OrderService dependency
+  - InventoryService
+  - addStock
+  - removeStock
+must_not_include_files:
+  - src/traits/Serializable.scala
+  - src/services/InventoryService.scala
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

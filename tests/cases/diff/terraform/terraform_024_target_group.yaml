@@ -1,21 +1,24 @@
-initial:
-  app.py: |
-    from flask import Flask
-    app = Flask(__name__)
+# Scenario: Add an ALB target group with health check for the app
+#
+# Reviewer questions:
+#   1. What ALB does this target group attach to? (aws_lb.main)
+#   2. What health check path and thresholds? (/health, 2/10)
+#   3. What port and protocol? (8080, HTTP)
+#
+# The diff adds aws_lb_target_group "app" to lb.tf with health check
+# configuration referencing the existing ALB.
+#
+# Traps: admin_target.tf has same target group type but for admin panel
+# on port 9090. app.py has the /health endpoint but is application code.
 
-    @app.route('/health')
-    def health():
-        return 'OK', 200
+initial:
   lb.tf: |
     resource "aws_lb" "main" {
       name = "main-alb"
     }
 
-  # --- Tricky garbage: same resource type aws_lb_target_group but for admin panel ---
+  # Trap: admin target group, same type, different port/path
   admin_target.tf: |
-    GARBAGE_TF_024_ADMIN_TG_A = "admin-panel"
-    GARBAGE_TF_024_ADMIN_PORT_B = 9090
-
     resource "aws_lb_target_group" "admin" {
       name        = "admin-tg"
       port        = 9090
@@ -32,15 +35,7 @@ initial:
       }
     }
 
-  # --- Plain garbage ---
-  garbage_config_loader.yaml: |
-    # GARBAGE_TF_024_CONFIG_LOADER_C
-    # GARBAGE_TF_024_CONFIG_VERSION_D
-    service:
-      name: legacy-config
-      port: 3000
-
-changed:
+  # Trap: app code with the health endpoint (not Terraform)
   app.py: |
     from flask import Flask
     app = Flask(__name__)
@@ -48,6 +43,8 @@ changed:
     @app.route('/health')
     def health():
         return 'OK', 200
+
+changed:
   lb.tf: |
     resource "aws_lb" "main" {
       name = "main-alb"
@@ -70,9 +67,6 @@ changed:
     }
 
   admin_target.tf: |
-    GARBAGE_TF_024_ADMIN_TG_A = "admin-panel"
-    GARBAGE_TF_024_ADMIN_PORT_B = 9090
-
     resource "aws_lb_target_group" "admin" {
       name        = "admin-tg"
       port        = 9090
@@ -89,12 +83,13 @@ changed:
       }
     }
 
-  garbage_config_loader.yaml: |
-    # GARBAGE_TF_024_CONFIG_LOADER_C
-    # GARBAGE_TF_024_CONFIG_VERSION_D
-    service:
-      name: legacy-config
-      port: 3000
+  app.py: |
+    from flask import Flask
+    app = Flask(__name__)
+
+    @app.route('/health')
+    def health():
+        return 'OK', 200
 
 must_include_files:
 - lb.tf
@@ -105,14 +100,17 @@ must_include_content_from:
     - 'path                = "/health"'
 
 must_not_include:
-- GARBAGE_TF_024_ADMIN_TG_A
-- GARBAGE_TF_024_ADMIN_PORT_B
-- GARBAGE_TF_024_CONFIG_LOADER_C
-- GARBAGE_TF_024_CONFIG_VERSION_D
+# Admin target group is same type but for admin panel (different port/path)
+- admin-tg
+- /admin/health
+- port        = 9090
+# App code is application layer, not Terraform
+- from flask import Flask
+- '@app.route'
 
 must_not_include_files:
-- admin_target.tf
-- garbage_config_loader.yaml
+- admin_target.tf  # same resource type, different target (admin)
+- app.py  # application code, not Terraform
 
 max_fragments: 4
 max_files: 2

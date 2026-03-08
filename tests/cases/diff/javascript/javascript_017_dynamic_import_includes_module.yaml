@@ -1,3 +1,28 @@
+# Scenario: main.ts is rewritten to dynamically import lazy.ts and call
+#   heavyComputation(). Only main.ts is changed.
+#
+# Diff shows:
+#   - console.log('initial');
+#   + async function loadModule() { const lazy = await import('./lazy'); ... }
+#
+# Reviewer questions:
+#   Q1: "What does heavyComputation return — is the result meaningful?"
+#       -> lazy.ts (UNCHANGED) loops 1M iterations summing i, returns result.
+#          Reviewer needs the body to understand performance and return value.
+#
+#   Q2: "Is lazy.heavyComputation the correct way to access after dynamic import?"
+#       -> Same file: exports function via `export function`. Dynamic import
+#          produces module namespace, so lazy.heavyComputation is correct.
+#
+# Not needed for comprehension:
+#   - heavy-computation.worker.ts: Web Worker that also calls heavyComputation.
+#     KEYWORD OVERLAP: references heavyComputation. But worker threading
+#     doesn't help review the dynamic import in main.ts.
+#
+#   - module-loader.ts: Generic dynamic module loader utility.
+#     CONCEPT OVERLAP: wraps import() calls. But the utility is not used
+#     by main.ts, which does its own bare import().
+
 initial:
   lazy.ts: |
     export function heavyComputation(): number {
@@ -9,28 +34,42 @@ initial:
     }
   main.ts: |
     console.log('initial');
-  garbage_health_check.ts: |
-    const GARBAGE_JS_017_HEALTH_MARKER_A = "health";
-    const GARBAGE_JS_017_PING_MARKER_B = true;
+  heavy-computation.worker.ts: |
+    import { heavyComputation } from './lazy';
 
-    class PingChecker {
-        static GARBAGE_JS_017_PING_CLASS_C = "ping";
+    self.onmessage = (event: MessageEvent) => {
+        const result = heavyComputation();
+        self.postMessage({ type: 'result', data: result });
+    };
 
-        ping(host: string): boolean {
-            return true;
+    self.onerror = (error: ErrorEvent) => {
+        self.postMessage({ type: 'error', message: error.message });
+    };
+  module-loader.ts: |
+    type ModuleMap = Record<string, () => Promise<unknown>>;
+
+    export class ModuleLoader {
+        private cache = new Map<string, unknown>();
+        private loaders: ModuleMap;
+
+        constructor(loaders: ModuleMap) {
+            this.loaders = loaders;
+        }
+
+        async load<T>(name: string): Promise<T> {
+            if (this.cache.has(name)) return this.cache.get(name) as T;
+            const loader = this.loaders[name];
+            if (!loader) throw new Error(`Unknown module: ${name}`);
+            const mod = await loader();
+            this.cache.set(name, mod);
+            return mod as T;
+        }
+
+        preload(names: string[]): Promise<unknown[]> {
+            return Promise.all(names.map(name => this.load(name)));
         }
     }
-  garbage_migration.ts: |
-    const GARBAGE_JS_017_MIGRATE_MARKER_D = "migrate";
-    const GARBAGE_JS_017_SCHEMA_MARKER_E = 42;
 
-    class SchemaMigrator {
-        static GARBAGE_JS_017_SCHEMA_CLASS_F = true;
-
-        migrate(version: number): void {
-            // noop
-        }
-    }
 changed:
   lazy.ts: |
     export function heavyComputation(): number {
@@ -48,41 +87,72 @@ changed:
     }
 
     loadModule();
-  garbage_health_check.ts: |
-    const GARBAGE_JS_017_HEALTH_MARKER_A = "health";
-    const GARBAGE_JS_017_PING_MARKER_B = true;
+  heavy-computation.worker.ts: |
+    import { heavyComputation } from './lazy';
 
-    class PingChecker {
-        static GARBAGE_JS_017_PING_CLASS_C = "ping";
+    self.onmessage = (event: MessageEvent) => {
+        const result = heavyComputation();
+        self.postMessage({ type: 'result', data: result });
+    };
 
-        ping(host: string): boolean {
-            return true;
+    self.onerror = (error: ErrorEvent) => {
+        self.postMessage({ type: 'error', message: error.message });
+    };
+  module-loader.ts: |
+    type ModuleMap = Record<string, () => Promise<unknown>>;
+
+    export class ModuleLoader {
+        private cache = new Map<string, unknown>();
+        private loaders: ModuleMap;
+
+        constructor(loaders: ModuleMap) {
+            this.loaders = loaders;
+        }
+
+        async load<T>(name: string): Promise<T> {
+            if (this.cache.has(name)) return this.cache.get(name) as T;
+            const loader = this.loaders[name];
+            if (!loader) throw new Error(`Unknown module: ${name}`);
+            const mod = await loader();
+            this.cache.set(name, mod);
+            return mod as T;
+        }
+
+        preload(names: string[]): Promise<unknown[]> {
+            return Promise.all(names.map(name => this.load(name)));
         }
     }
-  garbage_migration.ts: |
-    const GARBAGE_JS_017_MIGRATE_MARKER_D = "migrate";
-    const GARBAGE_JS_017_SCHEMA_MARKER_E = 42;
 
-    class SchemaMigrator {
-        static GARBAGE_JS_017_SCHEMA_CLASS_F = true;
-
-        migrate(version: number): void {
-            // noop
-        }
-    }
 must_include_files:
-- main.ts
-must_include_content:
-- lazy = await import('./lazy')
-- result = lazy.heavyComputation()
+  - main.ts
+  # Q1+Q2: heavyComputation body defines return value and export shape
+  - lazy.ts
+
+must_include_content_from:
+  main.ts:
+    - "await import('./lazy')"
+    - "lazy.heavyComputation()"
+  lazy.ts:
+    - "export function heavyComputation(): number"
+
 must_not_include:
-- GARBAGE_JS_017_HEALTH_MARKER_A
-- GARBAGE_JS_017_MIGRATE_MARKER_D
-- GARBAGE_JS_017_PING_CLASS_C
-- GARBAGE_JS_017_PING_MARKER_B
-- GARBAGE_JS_017_SCHEMA_CLASS_F
-- GARBAGE_JS_017_SCHEMA_MARKER_E
-- garbage_health_check.ts
-- garbage_migration.ts
+  # --- heavy-computation.worker.ts: Web Worker calling heavyComputation ---
+  # KEYWORD OVERLAP: imports and calls heavyComputation. But worker threading
+  # doesn't help review the dynamic import in main.ts.
+  - "self.onmessage"
+  - "self.postMessage"
+  - "self.onerror"
+  # --- module-loader.ts: generic dynamic loader utility ---
+  # CONCEPT OVERLAP: wraps import() calls. Not used by main.ts.
+  - ModuleLoader
+  - "await loader()"
+  - preload
+
+must_not_include_files:
+  - heavy-computation.worker.ts
+  - module-loader.ts
+
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

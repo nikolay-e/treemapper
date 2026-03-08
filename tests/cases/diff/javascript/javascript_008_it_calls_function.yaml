@@ -1,3 +1,20 @@
+# Scenario: Test imports and validates a function — reviewer needs the implementation.
+#
+# Diff: validator.test.ts is written from scratch importing isValidEmail from
+# validator.ts. Tests check valid and invalid email patterns.
+#
+# Reviewer questions:
+#   Q1: "What regex does isValidEmail use and do the test cases cover its edges?"
+#       -> validator.ts (UNCHANGED) uses /^[^\s@]+@[^\s@]+\.[^\s@]+$/.
+#          The reviewer must see the regex to judge whether 'test@example.com'
+#          and 'invalid' adequately exercise the pattern.
+#
+# Not needed:
+#   - sanitizer.ts: input sanitization (HTML stripping) in the same directory.
+#     Similar concern (input handling) but different responsibility, no import edge.
+#   - validator.constants.ts: error message constants for validation display.
+#     Not referenced by isValidEmail or the test.
+
 initial:
   validator.ts: |
     export function isValidEmail(email: string): boolean {
@@ -5,28 +22,19 @@ initial:
     }
   validator.test.ts: |
     console.log('initial');
-  garbage_migration.ts: |
-    const GARBAGE_JS_008_SCHEMA_MARKER_A = "migration";
-    const GARBAGE_JS_008_VERSION_MARKER_B = true;
-
-    class SchemaMigrator {
-        static GARBAGE_JS_008_MIGRATOR_CLASS_C = "migrator";
-
-        migrate(version: number): void {
-            // noop
-        }
+  sanitizer.ts: |
+    export function sanitizeHtml(input: string): string {
+        return input.replace(/<[^>]*>/g, '');
     }
-  garbage_backup.ts: |
-    const GARBAGE_JS_008_SNAPSHOT_MARKER_D = "backup";
-    const GARBAGE_JS_008_RESTORE_MARKER_E = 42;
 
-    class SnapshotManager {
-        static GARBAGE_JS_008_MANAGER_CLASS_F = true;
-
-        snapshot(path: string): void {
-            // noop
-        }
+    export function escapeSpecialChars(input: string): string {
+        return input.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
     }
+  validator.constants.ts: |
+    export const EMAIL_ERROR = 'Please enter a valid email address';
+    export const REQUIRED_ERROR = 'This field is required';
+    export const MIN_LENGTH_ERROR = 'Value is too short';
+
 changed:
   validator.ts: |
     export function isValidEmail(email: string): boolean {
@@ -44,41 +52,36 @@ changed:
             expect(isValidEmail('invalid')).toBe(false);
         });
     });
-  garbage_migration.ts: |
-    const GARBAGE_JS_008_SCHEMA_MARKER_A = "migration";
-    const GARBAGE_JS_008_VERSION_MARKER_B = true;
-
-    class SchemaMigrator {
-        static GARBAGE_JS_008_MIGRATOR_CLASS_C = "migrator";
-
-        migrate(version: number): void {
-            // noop
-        }
+  sanitizer.ts: |
+    export function sanitizeHtml(input: string): string {
+        return input.replace(/<[^>]*>/g, '');
     }
-  garbage_backup.ts: |
-    const GARBAGE_JS_008_SNAPSHOT_MARKER_D = "backup";
-    const GARBAGE_JS_008_RESTORE_MARKER_E = 42;
 
-    class SnapshotManager {
-        static GARBAGE_JS_008_MANAGER_CLASS_F = true;
-
-        snapshot(path: string): void {
-            // noop
-        }
+    export function escapeSpecialChars(input: string): string {
+        return input.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
     }
+  validator.constants.ts: |
+    export const EMAIL_ERROR = 'Please enter a valid email address';
+    export const REQUIRED_ERROR = 'This field is required';
+    export const MIN_LENGTH_ERROR = 'Value is too short';
+
 must_include_files:
-- validator.test.ts
-must_include_content:
-- import { isValidEmail } from './validator';
-- expect(isValidEmail('test@example.com')).toBe(true);
+  # Q1: validator.ts defines isValidEmail with the regex — reviewer checks test coverage
+  - validator.ts
+must_include_content_from:
+  validator.ts:
+    - "function isValidEmail(email: string)"
 must_not_include:
-- GARBAGE_JS_008_MANAGER_CLASS_F
-- GARBAGE_JS_008_MIGRATOR_CLASS_C
-- GARBAGE_JS_008_RESTORE_MARKER_E
-- GARBAGE_JS_008_SCHEMA_MARKER_A
-- GARBAGE_JS_008_SNAPSHOT_MARKER_D
-- GARBAGE_JS_008_VERSION_MARKER_B
-- garbage_backup.ts
-- garbage_migration.ts
+  # sanitizer.ts: different input processing, not used by validator tests
+  - sanitizeHtml
+  - escapeSpecialChars
+  # validator.constants.ts: error messages not referenced by isValidEmail
+  - EMAIL_ERROR
+  - REQUIRED_ERROR
+must_not_include_files:
+  - sanitizer.ts
+  - validator.constants.ts
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

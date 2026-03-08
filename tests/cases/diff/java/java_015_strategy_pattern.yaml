@@ -1,3 +1,30 @@
+# Scenario: ShippingCalculator refactored from if-else chain to Strategy
+#   pattern. ShippingStrategy interface introduced with four implementations.
+#   ShippingOrder gains new fields. ShippingQuote record added.
+#
+# Diff shows:
+#   + ShippingStrategy interface: calculateQuote, getEstimatedDaysToDelivery,
+#     isAvailableForDestination, getMethodCode, supportsHazardousMaterials
+#   + StandardShippingStrategy, ExpressShippingStrategy,
+#     OvernightShippingStrategy, FreeShippingStrategy implementations
+#   + ShippingCalculator now uses Map<String, ShippingStrategy> registry
+#   + getAllAvailableQuotes(), getCheapestQuote(), getFastestQuote()
+#   + ShippingOrder gains orderValue, hazardous fields
+#   + ShippingQuote record with cost, estimatedDays, displayName
+#
+# Reviewer questions:
+#   Q1: "What is ShippingQuote — does it have cost() and estimatedDays()?"
+#       -> Needs ShippingQuote.java: record with methodCode, cost,
+#         estimatedDays, displayName. Used in sorted/min comparisons.
+#
+#   Q2: "Does ShippingOrder have isHazardous() and getOrderValue()?"
+#       -> Needs ShippingOrder.java: new hazardous and orderValue fields.
+#         Used in strategy filtering and FreeShippingStrategy.
+#
+# Not needed for comprehension:
+#   - WarehouseInventory, PackagingService, CarrierIntegrationService:
+#     Unrelated shipping infrastructure with GARBAGE markers.
+
 initial:
   src/main/java/com/shipping/calculator/ShippingCalculator.java: |
     package com.shipping.calculator;
@@ -623,27 +650,51 @@ changed:
         }
     }
 must_include_files:
-- src/main/java/com/shipping/calculator/ShippingCalculator.java
-- src/main/java/com/shipping/model/ShippingOrder.java
-- src/main/java/com/shipping/model/ShippingQuote.java
-- src/main/java/com/shipping/strategy/ExpressShippingStrategy.java
-- src/main/java/com/shipping/strategy/FreeShippingStrategy.java
-- src/main/java/com/shipping/strategy/OvernightShippingStrategy.java
-- src/main/java/com/shipping/strategy/ShippingStrategy.java
-- src/main/java/com/shipping/strategy/StandardShippingStrategy.java
-must_include_content:
-- import com.shipping.model.ShippingOrder;
-- public ShippingQuote calculateQuote(String methodCode, ShippingOrder order) {
+  - src/main/java/com/shipping/calculator/ShippingCalculator.java
+  - src/main/java/com/shipping/model/ShippingOrder.java
+  - src/main/java/com/shipping/model/ShippingQuote.java
+  - src/main/java/com/shipping/strategy/ExpressShippingStrategy.java
+  - src/main/java/com/shipping/strategy/FreeShippingStrategy.java
+  - src/main/java/com/shipping/strategy/OvernightShippingStrategy.java
+  - src/main/java/com/shipping/strategy/ShippingStrategy.java
+  - src/main/java/com/shipping/strategy/StandardShippingStrategy.java
+
+must_include_content_from:
+  src/main/java/com/shipping/calculator/ShippingCalculator.java:
+    - "import com.shipping.model.ShippingOrder"
+    - "public ShippingQuote calculateQuote(String methodCode, ShippingOrder order)"
+    - "public List<ShippingQuote> getAllAvailableQuotes(ShippingOrder order)"
+  src/main/java/com/shipping/strategy/ShippingStrategy.java:
+    - "ShippingQuote calculateQuote(ShippingOrder order)"
+    - "boolean supportsHazardousMaterials()"
+  src/main/java/com/shipping/model/ShippingQuote.java:
+    - "BigDecimal cost"
+    - "int estimatedDays"
+
 must_not_include:
-- GARBAGE_JAVA_BOX_T025E
-- GARBAGE_JAVA_CARRIER_T025G
-- GARBAGE_JAVA_CUSTOM_T025F
-- GARBAGE_JAVA_PACK_T025D
-- GARBAGE_JAVA_RESERVE_T025C
-- GARBAGE_JAVA_SHIPMENT_T025H
-- GARBAGE_JAVA_STOCK_T025B
-- GARBAGE_JAVA_WAREHOUSE_T025A
-- PackagingService.java
-- WarehouseInventory.java
+  # --- WarehouseInventory: unrelated stock management ---
+  - WarehouseInventory
+  - addStock
+  - reserveStock
+  - GARBAGE_JAVA_WAREHOUSE_T025A
+  - GARBAGE_JAVA_STOCK_T025B
+  - GARBAGE_JAVA_RESERVE_T025C
+  # --- PackagingService: unrelated box sizing ---
+  - PackagingService
+  - selectBoxSize
+  - GARBAGE_JAVA_PACK_T025D
+  - GARBAGE_JAVA_BOX_T025E
+  - GARBAGE_JAVA_CUSTOM_T025F
+  # --- CarrierIntegrationService: unrelated carrier API ---
+  - CarrierIntegrationService
+  - createShipment
+  - GARBAGE_JAVA_CARRIER_T025G
+  - GARBAGE_JAVA_SHIPMENT_T025H
+
+must_not_include_files:
+  - src/main/java/com/shipping/unrelated/WarehouseInventory.java
+  - src/main/java/com/shipping/unrelated/PackagingService.java
+  - src/main/java/com/shipping/unrelated/CarrierIntegrationService.java
+
 add_garbage_files: false
 skip_garbage_check: true

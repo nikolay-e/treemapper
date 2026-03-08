@@ -1,3 +1,28 @@
+# Scenario: tsconfig.json enables strict: true, noImplicitAny: true, and
+#   upgrades target from ES2020 to ES2022.
+#
+# Reviewer questions:
+#   Q1: "Will strict: true break existing code with implicit 'any' types?"
+#       -> src/app.ts: processData(data: any), findUser(...predicate: any),
+#          mergeConfigs(base: any, override: any). These explicitly use 'any',
+#          which is allowed even with strict mode. But noImplicitAny would
+#          catch any function parameters missing type annotations.
+#
+#   Q2: "Does src/database.ts have implicit any issues?"
+#       -> src/database.ts: query(sql: string, params: any[]): Promise<any[]>
+#          and fetchUsers(): Promise<any[]>. Explicit 'any' — allowed but
+#          worth noting as a type safety concern.
+#
+# Not needed:
+#   - package.json: TypeScript version. Could affect which strict checks
+#     are available. But version doesn't help review the config changes.
+#
+#   - .eslintrc.json: Lint rules. Different tool. Could have overlapping
+#     type checks via @typescript-eslint but separate concern.
+#
+#   - jest.config.json: Test framework config. Same project but
+#     unrelated to TypeScript strictness.
+
 initial:
   tsconfig.json: |
     {
@@ -14,6 +39,7 @@ initial:
       "include": ["src/**/*"],
       "exclude": ["node_modules", "dist"]
     }
+
   src/app.ts: |
     interface UserRecord {
         id: number;
@@ -44,6 +70,7 @@ initial:
     }
 
     export { processData, findUser, transformRecords, mergeConfigs };
+
   src/database.ts: |
     import { processData, transformRecords } from './app';
 
@@ -72,68 +99,43 @@ initial:
     }
 
     export { DatabaseClient, DatabaseConfig };
-  unrelated/compressor.js: |
-    const GARBAGE_JSON_004_COMPRESS_LEVEL_A = 6;
 
-    class GARBAGE_JSON_004_DATA_COMPRESSOR_B {
-        constructor(level) {
-            this.level = level || GARBAGE_JSON_004_COMPRESS_LEVEL_A;
-            this.stats = { inputBytes: 0, outputBytes: 0 };
-        }
-
-        compress(data) {
-            this.stats.inputBytes += data.length;
-            const result = Buffer.from(data).toString('base64');
-            this.stats.outputBytes += result.length;
-            return result;
-        }
-
-        getCompressionRatio() {
-            return this.stats.outputBytes / this.stats.inputBytes;
-        }
+  package.json: |
+    {
+      "name": "ts-app",
+      "version": "1.0.0",
+      "scripts": {
+        "build": "tsc",
+        "typecheck": "tsc --noEmit"
+      },
+      "devDependencies": {
+        "typescript": "^5.2.0"
+      }
     }
 
-    function GARBAGE_JSON_004_QUICK_COMPRESS_C(input) {
-        const compressor = new GARBAGE_JSON_004_DATA_COMPRESSOR_B();
-        return compressor.compress(input);
+  .eslintrc.json: |
+    {
+      "parser": "@typescript-eslint/parser",
+      "plugins": ["@typescript-eslint"],
+      "extends": [
+        "eslint:recommended",
+        "plugin:@typescript-eslint/recommended"
+      ],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "warn"
+      }
     }
 
-    module.exports = { GARBAGE_JSON_004_DATA_COMPRESSOR_B, GARBAGE_JSON_004_QUICK_COMPRESS_C };
-  unrelated/indexer.js: |
-    const GARBAGE_JSON_004_INDEX_CONFIG_D = { maxEntries: 10000 };
-
-    class GARBAGE_JSON_004_SEARCH_INDEXER_E {
-        constructor(config) {
-            this.config = { ...GARBAGE_JSON_004_INDEX_CONFIG_D, ...config };
-            this.index = new Map();
-        }
-
-        addDocument(id, text) {
-            const terms = text.toLowerCase().split(/\s+/);
-            for (const term of terms) {
-                if (!this.index.has(term)) this.index.set(term, new Set());
-                this.index.get(term).add(id);
-            }
-        }
-
-        search(query) {
-            const terms = query.toLowerCase().split(/\s+/);
-            const results = new Set();
-            for (const term of terms) {
-                const docs = this.index.get(term) || new Set();
-                docs.forEach(d => results.add(d));
-            }
-            return [...results];
-        }
+  jest.config.json: |
+    {
+      "preset": "ts-jest",
+      "testEnvironment": "node",
+      "testMatch": ["**/*.test.ts"],
+      "transform": {
+        "^.+\\.ts$": "ts-jest"
+      }
     }
 
-    function GARBAGE_JSON_004_BUILD_INDEX_F(documents) {
-        const indexer = new GARBAGE_JSON_004_SEARCH_INDEXER_E();
-        documents.forEach(doc => indexer.addDocument(doc.id, doc.text));
-        return indexer;
-    }
-
-    module.exports = { GARBAGE_JSON_004_SEARCH_INDEXER_E, GARBAGE_JSON_004_BUILD_INDEX_F };
 changed:
   tsconfig.json: |
     {
@@ -151,141 +153,36 @@ changed:
       "include": ["src/**/*"],
       "exclude": ["node_modules", "dist"]
     }
-  src/app.ts: |
-    interface UserRecord {
-        id: number;
-        name: string;
-        email: string;
-        metadata?: Record<string, any>;
-    }
 
-    function processData(data: any) {
-        return data.value;
-    }
-
-    function findUser(users: UserRecord[], predicate: any): UserRecord | undefined {
-        return users.find(predicate);
-    }
-
-    function transformRecords(records: any[]): UserRecord[] {
-        return records.map(r => ({
-            id: r.id,
-            name: r.name || 'Unknown',
-            email: r.email || '',
-            metadata: r.extra,
-        }));
-    }
-
-    function mergeConfigs(base: any, override: any): any {
-        return { ...base, ...override };
-    }
-
-    export { processData, findUser, transformRecords, mergeConfigs };
-  src/database.ts: |
-    import { processData, transformRecords } from './app';
-
-    interface DatabaseConfig {
-        host: string;
-        port: number;
-        database: string;
-    }
-
-    class DatabaseClient {
-        private config: DatabaseConfig;
-
-        constructor(config: DatabaseConfig) {
-            this.config = config;
-        }
-
-        async query(sql: string, params: any[]): Promise<any[]> {
-            console.log(`Executing: ${sql} with ${params.length} params`);
-            return [];
-        }
-
-        async fetchUsers(): Promise<any[]> {
-            const raw = await this.query('SELECT * FROM users', []);
-            return transformRecords(raw);
-        }
-    }
-
-    export { DatabaseClient, DatabaseConfig };
-  unrelated/compressor.js: |
-    const GARBAGE_JSON_004_COMPRESS_LEVEL_A = 6;
-
-    class GARBAGE_JSON_004_DATA_COMPRESSOR_B {
-        constructor(level) {
-            this.level = level || GARBAGE_JSON_004_COMPRESS_LEVEL_A;
-            this.stats = { inputBytes: 0, outputBytes: 0 };
-        }
-
-        compress(data) {
-            this.stats.inputBytes += data.length;
-            const result = Buffer.from(data).toString('base64');
-            this.stats.outputBytes += result.length;
-            return result;
-        }
-
-        getCompressionRatio() {
-            return this.stats.outputBytes / this.stats.inputBytes;
-        }
-    }
-
-    function GARBAGE_JSON_004_QUICK_COMPRESS_C(input) {
-        const compressor = new GARBAGE_JSON_004_DATA_COMPRESSOR_B();
-        return compressor.compress(input);
-    }
-
-    module.exports = { GARBAGE_JSON_004_DATA_COMPRESSOR_B, GARBAGE_JSON_004_QUICK_COMPRESS_C };
-  unrelated/indexer.js: |
-    const GARBAGE_JSON_004_INDEX_CONFIG_D = { maxEntries: 10000 };
-
-    class GARBAGE_JSON_004_SEARCH_INDEXER_E {
-        constructor(config) {
-            this.config = { ...GARBAGE_JSON_004_INDEX_CONFIG_D, ...config };
-            this.index = new Map();
-        }
-
-        addDocument(id, text) {
-            const terms = text.toLowerCase().split(/\s+/);
-            for (const term of terms) {
-                if (!this.index.has(term)) this.index.set(term, new Set());
-                this.index.get(term).add(id);
-            }
-        }
-
-        search(query) {
-            const terms = query.toLowerCase().split(/\s+/);
-            const results = new Set();
-            for (const term of terms) {
-                const docs = this.index.get(term) || new Set();
-                docs.forEach(d => results.add(d));
-            }
-            return [...results];
-        }
-    }
-
-    function GARBAGE_JSON_004_BUILD_INDEX_F(documents) {
-        const indexer = new GARBAGE_JSON_004_SEARCH_INDEXER_E();
-        documents.forEach(doc => indexer.addDocument(doc.id, doc.text));
-        return indexer;
-    }
-
-    module.exports = { GARBAGE_JSON_004_SEARCH_INDEXER_E, GARBAGE_JSON_004_BUILD_INDEX_F };
 must_include_files:
-- tsconfig.json
-must_include_content:
-- '"strict": true,'
-- '"target": "ES2022",'
+  - tsconfig.json
+
+must_include_content_from:
+  tsconfig.json:
+    - '"strict": true'
+    - '"target": "ES2022"'
+    - '"noImplicitAny": true'
+
 must_not_include:
-- GARBAGE_JSON_004_BUILD_INDEX_F
-- GARBAGE_JSON_004_BUILD_INDEX_F(documents
-- GARBAGE_JSON_004_COMPRESS_LEVEL_A
-- GARBAGE_JSON_004_DATA_COMPRESSOR_B
-- GARBAGE_JSON_004_INDEX_CONFIG_D
-- GARBAGE_JSON_004_QUICK_COMPRESS_C
-- GARBAGE_JSON_004_QUICK_COMPRESS_C(input
-- GARBAGE_JSON_004_SEARCH_INDEXER_E
-- compressor.js
-- indexer.js
+  # --- package.json: deps and scripts, not TS config ---
+  - "typecheck"
+  - "tsc --noEmit"
+  - '"typescript": "^5.2.0"'
+  # --- .eslintrc.json: overlapping type checks but different tool ---
+  - "@typescript-eslint/parser"
+  - "no-explicit-any"
+  - "@typescript-eslint/recommended"
+  # --- jest.config.json: test framework config, unrelated to strict mode ---
+  - "ts-jest"
+  - "testMatch"
+  - "testEnvironment"
+
+must_not_include_files:
+  - package.json
+  - .eslintrc.json
+  - jest.config.json
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

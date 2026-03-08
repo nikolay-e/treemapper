@@ -1,7 +1,39 @@
+# Scenario: Adding step-based increment/decrement to a Counter struct.
+#   src/counter.rs gains a `step` field, with_step() constructor,
+#   increment/decrement/get/reset/set_step methods, and updated Display.
+#
+# Diff shows:
+#   + step: i32 field on Counter struct
+#   + pub fn with_step(name: &str, step: i32) -> Self
+#   + pub fn increment/decrement/get/reset/set_step methods
+#   ~ Display impl updated to show step
+#   ~ new() and with_name() updated to initialize step: 1
+#
+# Reviewer questions:
+#   Q1: "Does the Display impl correctly reflect the new step field?"
+#       -> Same file: write!(f, "Counter({}): {} (step: {})", ..., self.step).
+#          Reviewer verifies step is shown in the output format.
+#
+#   Q2: "Are all constructors initializing the step field?"
+#       -> Same file: new() sets step: 1, with_name() sets step: 1,
+#          with_step() accepts step parameter. All covered within the diff.
+#
+# Not needed for comprehension:
+#   - src/timer.rs: CountdownTimer with duration, start(), remaining(),
+#     is_expired(). HARDEST TRAP: similar "stateful numeric struct" pattern
+#     — a struct with internal state and methods that mutate it. Same
+#     module pattern (pub struct in same crate). But CountdownTimer tracks
+#     time, not counts, and has no import/type dependency on Counter.
+#
+#   - src/rate_limiter.rs: TokenBucket with capacity, tokens, try_consume().
+#     "Counter-like" vocabulary — tracks a numeric value that increments
+#     and decrements. But uses different types (u32 vs i32), different
+#     semantics (rate limiting vs counting), and no shared types.
 initial:
   src/lib.rs: |
     pub mod counter;
-    pub mod unrelated;
+    pub mod timer;
+    pub mod rate_limiter;
   src/counter.rs: |
     use std::fmt;
 
@@ -42,68 +74,86 @@ initial:
             write!(f, "Counter({}): {}", self.name, self.value)
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod database;
-    pub mod authentication;
-  src/unrelated/database.rs: |
-    // GARBAGE_RUST_DATABASE_001
-    use std::collections::HashMap;
+  src/timer.rs: |
+    use std::time::{Duration, Instant};
 
-    pub const GARBAGE_MAX_CONNECTIONS_002: u32 = 100;
-    pub const GARBAGE_QUERY_TIMEOUT_003: u64 = 5000;
-
-    pub struct GarbageDbConnection004 {
-        host: String,
-        port: u16,
-        database: String,
+    pub struct CountdownTimer {
+        duration: Duration,
+        started_at: Option<Instant>,
     }
 
-    impl GarbageDbConnection004 {
-        pub fn garbage_execute_query_005(&self, _query: &str) -> Result<Vec<HashMap<String, String>>, String> {
-            Err("GARBAGE_QUERY_ERROR_006".to_string())
+    impl CountdownTimer {
+        pub fn new(seconds: u64) -> Self {
+            Self {
+                duration: Duration::from_secs(seconds),
+                started_at: None,
+            }
         }
 
-        pub fn garbage_begin_transaction_007(&mut self) -> bool {
-            false
+        pub fn start(&mut self) {
+            self.started_at = Some(Instant::now());
         }
 
-        pub fn garbage_commit_008(&mut self) -> Result<(), String> {
-            Err("GARBAGE_COMMIT_ERROR_009".to_string())
-        }
-    }
-
-    pub trait GarbageQueryBuilder010 {
-        fn garbage_build_select_011(&self) -> String;
-        fn garbage_build_insert_012(&self) -> String;
-    }
-  src/unrelated/authentication.rs: |
-    // GARBAGE_RUST_AUTH_013
-    pub const GARBAGE_TOKEN_EXPIRY_014: u64 = 3600;
-    pub const GARBAGE_HASH_ROUNDS_015: u32 = 12;
-
-    pub struct GarbageAuthToken016 {
-        token: String,
-        user_id: u64,
-        expires_at: u64,
-    }
-
-    impl GarbageAuthToken016 {
-        pub fn garbage_validate_017(&self) -> bool {
-            false
+        pub fn remaining(&self) -> Duration {
+            match self.started_at {
+                Some(start) => {
+                    let elapsed = start.elapsed();
+                    if elapsed >= self.duration {
+                        Duration::ZERO
+                    } else {
+                        self.duration - elapsed
+                    }
+                }
+                None => self.duration,
+            }
         }
 
-        pub fn garbage_refresh_018(&mut self) -> Result<(), String> {
-            Err("GARBAGE_REFRESH_ERROR_019".to_string())
+        pub fn is_expired(&self) -> bool {
+            self.remaining() == Duration::ZERO
         }
     }
+  src/rate_limiter.rs: |
+    use std::time::{Duration, Instant};
 
-    pub fn garbage_hash_password_020(password: &str) -> String {
-        format!("GARBAGE_HASHED_{}", password)
+    pub struct TokenBucket {
+        capacity: u32,
+        tokens: u32,
+        refill_rate: u32,
+        last_refill: Instant,
+    }
+
+    impl TokenBucket {
+        pub fn new(capacity: u32, refill_rate: u32) -> Self {
+            Self {
+                capacity,
+                tokens: capacity,
+                refill_rate,
+                last_refill: Instant::now(),
+            }
+        }
+
+        pub fn try_consume(&mut self) -> bool {
+            self.refill();
+            if self.tokens > 0 {
+                self.tokens -= 1;
+                true
+            } else {
+                false
+            }
+        }
+
+        fn refill(&mut self) {
+            let elapsed = self.last_refill.elapsed();
+            let new_tokens = (elapsed.as_secs() as u32) * self.refill_rate;
+            self.tokens = (self.tokens + new_tokens).min(self.capacity);
+            self.last_refill = Instant::now();
+        }
     }
 changed:
   src/lib.rs: |
     pub mod counter;
-    pub mod unrelated;
+    pub mod timer;
+    pub mod rate_limiter;
   src/counter.rs: |
     use std::fmt;
 
@@ -175,77 +225,109 @@ changed:
             write!(f, "Counter({}): {} (step: {})", self.name, self.value, self.step)
         }
     }
-  src/unrelated/mod.rs: |
-    pub mod database;
-    pub mod authentication;
-  src/unrelated/database.rs: |
-    // GARBAGE_RUST_DATABASE_001
-    use std::collections::HashMap;
+  src/timer.rs: |
+    use std::time::{Duration, Instant};
 
-    pub const GARBAGE_MAX_CONNECTIONS_002: u32 = 100;
-    pub const GARBAGE_QUERY_TIMEOUT_003: u64 = 5000;
-
-    pub struct GarbageDbConnection004 {
-        host: String,
-        port: u16,
-        database: String,
+    pub struct CountdownTimer {
+        duration: Duration,
+        started_at: Option<Instant>,
     }
 
-    impl GarbageDbConnection004 {
-        pub fn garbage_execute_query_005(&self, _query: &str) -> Result<Vec<HashMap<String, String>>, String> {
-            Err("GARBAGE_QUERY_ERROR_006".to_string())
+    impl CountdownTimer {
+        pub fn new(seconds: u64) -> Self {
+            Self {
+                duration: Duration::from_secs(seconds),
+                started_at: None,
+            }
         }
 
-        pub fn garbage_begin_transaction_007(&mut self) -> bool {
-            false
+        pub fn start(&mut self) {
+            self.started_at = Some(Instant::now());
         }
 
-        pub fn garbage_commit_008(&mut self) -> Result<(), String> {
-            Err("GARBAGE_COMMIT_ERROR_009".to_string())
-        }
-    }
-
-    pub trait GarbageQueryBuilder010 {
-        fn garbage_build_select_011(&self) -> String;
-        fn garbage_build_insert_012(&self) -> String;
-    }
-  src/unrelated/authentication.rs: |
-    // GARBAGE_RUST_AUTH_013
-    pub const GARBAGE_TOKEN_EXPIRY_014: u64 = 3600;
-    pub const GARBAGE_HASH_ROUNDS_015: u32 = 12;
-
-    pub struct GarbageAuthToken016 {
-        token: String,
-        user_id: u64,
-        expires_at: u64,
-    }
-
-    impl GarbageAuthToken016 {
-        pub fn garbage_validate_017(&self) -> bool {
-            false
+        pub fn remaining(&self) -> Duration {
+            match self.started_at {
+                Some(start) => {
+                    let elapsed = start.elapsed();
+                    if elapsed >= self.duration {
+                        Duration::ZERO
+                    } else {
+                        self.duration - elapsed
+                    }
+                }
+                None => self.duration,
+            }
         }
 
-        pub fn garbage_refresh_018(&mut self) -> Result<(), String> {
-            Err("GARBAGE_REFRESH_ERROR_019".to_string())
+        pub fn is_expired(&self) -> bool {
+            self.remaining() == Duration::ZERO
         }
     }
+  src/rate_limiter.rs: |
+    use std::time::{Duration, Instant};
 
-    pub fn garbage_hash_password_020(password: &str) -> String {
-        format!("GARBAGE_HASHED_{}", password)
+    pub struct TokenBucket {
+        capacity: u32,
+        tokens: u32,
+        refill_rate: u32,
+        last_refill: Instant,
+    }
+
+    impl TokenBucket {
+        pub fn new(capacity: u32, refill_rate: u32) -> Self {
+            Self {
+                capacity,
+                tokens: capacity,
+                refill_rate,
+                last_refill: Instant::now(),
+            }
+        }
+
+        pub fn try_consume(&mut self) -> bool {
+            self.refill();
+            if self.tokens > 0 {
+                self.tokens -= 1;
+                true
+            } else {
+                false
+            }
+        }
+
+        fn refill(&mut self) {
+            let elapsed = self.last_refill.elapsed();
+            let new_tokens = (elapsed.as_secs() as u32) * self.refill_rate;
+            self.tokens = (self.tokens + new_tokens).min(self.capacity);
+            self.last_refill = Instant::now();
+        }
     }
 must_include_files:
-- src/counter.rs
-must_include_content:
-- 'pub fn with_step(name: &str, step: i32) -> Self {'
+  - src/counter.rs
+
+must_include_content_from:
+  src/counter.rs:
+    - 'pub fn with_step(name: &str, step: i32) -> Self {'
+    - "pub fn increment(&mut self)"
+    - "pub fn decrement(&mut self)"
+    - "self.value += self.step"
+
 must_not_include:
-- GARBAGE_HASH_ROUNDS_015
-- GARBAGE_MAX_CONNECTIONS_002
-- GARBAGE_QUERY_TIMEOUT_003
-- GARBAGE_RUST_AUTH_013
-- GARBAGE_RUST_DATABASE_001
-- GARBAGE_TOKEN_EXPIRY_014
-- authentication.rs
-- database.rs
-- mod.rs
+  # --- src/timer.rs: stateful numeric struct, similar pattern ---
+  # CountdownTimer has internal state + methods that modify it, same
+  # crate module pattern. But tracks Duration, not i32 counts.
+  - CountdownTimer
+  - is_expired
+  - remaining
+  # --- src/rate_limiter.rs: numeric value tracking, counter vocabulary ---
+  # TokenBucket increments/decrements tokens — same concept. But u32
+  # tokens with refill rate, not i32 with configurable step.
+  - TokenBucket
+  - try_consume
+  - refill_rate
+
+must_not_include_files:
+  - src/timer.rs
+  - src/rate_limiter.rs
+
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

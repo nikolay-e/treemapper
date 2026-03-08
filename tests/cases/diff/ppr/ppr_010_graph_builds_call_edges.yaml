@@ -1,3 +1,9 @@
+# Scenario: caller() adds return value; calls callee() — tests intra-file call edge detection
+# Changed: calls.py — caller() now returns 1, still calls callee()
+# Reviewer needs: calls.py (changed, both caller and callee in same file)
+# Trap: dispatcher.py — also has caller/callee pattern with dispatch/handle naming
+# Trap: pipeline.py — chain of function calls similar to caller->callee structure
+
 initial:
   calls.py: |
     def caller():
@@ -5,40 +11,25 @@ initial:
 
     def callee():
         pass
-  # --- Tricky garbage: same function names "caller" and "callee" ---
-  garbage_caller_collision.py: |
-    GARBAGE_PPR_010_CALLER_COLLISION_A = "caller_collision"
-    GARBAGE_PPR_010_CALLER_COLLISION_B = True
+  dispatcher.py: |
+    def dispatch(event):
+        return handle(event)
 
-    def caller():
-        return "completely_different_caller"
+    def handle(event):
+        return f"handled: {event}"
 
-    def callee():
-        return "completely_different_callee"
+    def notify(event):
+        dispatch(event)
+  pipeline.py: |
+    def step_one(data):
+        return step_two(data)
 
-    def caller_callee_chain():
-        return caller() + callee()
-  # --- Tricky garbage: same directory sibling with call pattern ---
-  garbage_call_sibling.py: |
-    GARBAGE_PPR_010_CALL_SIBLING_C = "call_sibling"
-    GARBAGE_PPR_010_CALL_SIBLING_D = 66
+    def step_two(data):
+        return data + "_processed"
 
-    def sibling_caller():
-        return sibling_callee()
+    def run_pipeline(data):
+        return step_one(data)
 
-    def sibling_callee():
-        return "sibling_callee_result"
-  # --- Tricky garbage: consumer of caller/callee results ---
-  garbage_call_consumer.py: |
-    GARBAGE_PPR_010_CALL_CONSUMER_E = "call_consumer"
-    GARBAGE_PPR_010_CALL_CONSUMER_F = 88
-
-    class CallResultConsumer:
-        def consume_result(self, data):
-            return str(data)
-
-        def format_call_output(self):
-            return "formatted_call"
 changed:
   calls.py: |
     def caller():
@@ -47,37 +38,24 @@ changed:
 
     def callee():
         pass
-  garbage_caller_collision.py: |
-    GARBAGE_PPR_010_CALLER_COLLISION_A = "caller_collision"
-    GARBAGE_PPR_010_CALLER_COLLISION_B = True
+  dispatcher.py: |
+    def dispatch(event):
+        return handle(event)
 
-    def caller():
-        return "completely_different_caller"
+    def handle(event):
+        return f"handled: {event}"
 
-    def callee():
-        return "completely_different_callee"
+    def notify(event):
+        dispatch(event)
+  pipeline.py: |
+    def step_one(data):
+        return step_two(data)
 
-    def caller_callee_chain():
-        return caller() + callee()
-  garbage_call_sibling.py: |
-    GARBAGE_PPR_010_CALL_SIBLING_C = "call_sibling"
-    GARBAGE_PPR_010_CALL_SIBLING_D = 66
+    def step_two(data):
+        return data + "_processed"
 
-    def sibling_caller():
-        return sibling_callee()
-
-    def sibling_callee():
-        return "sibling_callee_result"
-  garbage_call_consumer.py: |
-    GARBAGE_PPR_010_CALL_CONSUMER_E = "call_consumer"
-    GARBAGE_PPR_010_CALL_CONSUMER_F = 88
-
-    class CallResultConsumer:
-        def consume_result(self, data):
-            return str(data)
-
-        def format_call_output(self):
-            return "formatted_call"
+    def run_pipeline(data):
+        return step_one(data)
 
 # === Assertions ===
 
@@ -91,20 +69,15 @@ must_include_content_from:
     - return 1
 
 must_not_include:
-# Tricky: name collision with caller() and callee()
-- GARBAGE_PPR_010_CALLER_COLLISION_A
-- GARBAGE_PPR_010_CALLER_COLLISION_B
-# Tricky: same directory sibling with call pattern
-- GARBAGE_PPR_010_CALL_SIBLING_C
-- GARBAGE_PPR_010_CALL_SIBLING_D
-# Tricky: consumer of call results
-- GARBAGE_PPR_010_CALL_CONSUMER_E
-- GARBAGE_PPR_010_CALL_CONSUMER_F
+- dispatch
+- handle
+- step_one
+- step_two
+- run_pipeline
 
 must_not_include_files:
-- garbage_caller_collision.py
-- garbage_call_sibling.py
-- garbage_call_consumer.py
+- dispatcher.py
+- pipeline.py
 
 max_fragments: 4
 max_files: 2

@@ -1,3 +1,8 @@
+# Scenario: ReportGenerator uses partial functions from formatters module
+# Changed: reports.py imports partial-based formatters and uses them for report generation
+# Reviewer questions: Are partial args applied correctly? Does format_currency handle negatives?
+# Trap 1: chart_renderer.py — renders charts for reports, shares "report" vocabulary but independent
+# Trap 2: pdf_exporter.py — exports to PDF, shares "report/format" domain but no dep on formatters
 initial:
   formatters.py: |
     import functools
@@ -40,20 +45,49 @@ initial:
   reports.py: |
     def generate():
         pass
-  garbage_pdf_generator.py: |
-    GARBAGE_PY_PDF_827364 = "pdf generation garbage"
-    UNRELATED_PDF_MARKER_918273 = "unused reportlab config"
+  chart_renderer.py: |
+    from typing import List, Dict, Any, Optional
+    from dataclasses import dataclass
 
-    class GarbagePDFGenerator:
-        def garbage_create_pdf(self, content):
-            return f"Garbage PDF: {content}"
-  garbage_excel_export.py: |
-    GARBAGE_PY_EXCEL_918273 = "excel export garbage"
-    UNRELATED_EXCEL_MARKER_827163 = "unused openpyxl styles"
+    @dataclass
+    class ChartConfig:
+        title: str
+        chart_type: str = "bar"
+        width: int = 800
+        height: int = 400
 
-    class GarbageExcelExporter:
-        def garbage_create_workbook(self):
-            return "Garbage workbook created"
+    class ChartRenderer:
+        def __init__(self, config: ChartConfig):
+            self._config = config
+
+        def render_bar_chart(self, data: Dict[str, float]) -> str:
+            return f"<svg>{self._config.title}</svg>"
+
+        def render_line_chart(self, data: List[float]) -> str:
+            return f"<svg>line:{len(data)}</svg>"
+  pdf_exporter.py: |
+    from typing import List, Dict, Any
+    from dataclasses import dataclass
+
+    @dataclass
+    class PdfConfig:
+        page_size: str = "A4"
+        margin: int = 72
+        font_size: int = 12
+
+    class PdfExporter:
+        def __init__(self, config: PdfConfig):
+            self._config = config
+            self._pages: List[str] = []
+
+        def add_page(self, content: str) -> None:
+            self._pages.append(content)
+
+        def export(self, filename: str) -> str:
+            return f"{filename}.pdf"
+
+        def get_page_count(self) -> int:
+            return len(self._pages)
 changed:
   formatters.py: |
     import functools
@@ -115,29 +149,67 @@ changed:
             "total": format_currency(total),
             "items": [format_currency(a) for a in amounts]
         }
-  garbage_pdf_generator.py: |
-    GARBAGE_PY_PDF_827364 = "pdf generation garbage"
-    UNRELATED_PDF_MARKER_918273 = "unused reportlab config"
+  chart_renderer.py: |
+    from typing import List, Dict, Any, Optional
+    from dataclasses import dataclass
 
-    class GarbagePDFGenerator:
-        def garbage_create_pdf(self, content):
-            return f"Garbage PDF: {content}"
-  garbage_excel_export.py: |
-    GARBAGE_PY_EXCEL_918273 = "excel export garbage"
-    UNRELATED_EXCEL_MARKER_827163 = "unused openpyxl styles"
+    @dataclass
+    class ChartConfig:
+        title: str
+        chart_type: str = "bar"
+        width: int = 800
+        height: int = 400
 
-    class GarbageExcelExporter:
-        def garbage_create_workbook(self):
-            return "Garbage workbook created"
+    class ChartRenderer:
+        def __init__(self, config: ChartConfig):
+            self._config = config
+
+        def render_bar_chart(self, data: Dict[str, float]) -> str:
+            return f"<svg>{self._config.title}</svg>"
+
+        def render_line_chart(self, data: List[float]) -> str:
+            return f"<svg>line:{len(data)}</svg>"
+  pdf_exporter.py: |
+    from typing import List, Dict, Any
+    from dataclasses import dataclass
+
+    @dataclass
+    class PdfConfig:
+        page_size: str = "A4"
+        margin: int = 72
+        font_size: int = 12
+
+    class PdfExporter:
+        def __init__(self, config: PdfConfig):
+            self._config = config
+            self._pages: List[str] = []
+
+        def add_page(self, content: str) -> None:
+            self._pages.append(content)
+
+        def export(self, filename: str) -> str:
+            return f"{filename}.pdf"
+
+        def get_page_count(self) -> int:
+            return len(self._pages)
 must_include_files:
 - reports.py
-must_include_content:
-- from formatters import format_currency, format_percent, FormatterRegistry
-- 'def __init__(self):'
+- formatters.py
+must_include_content_from:
+  reports.py:
+  - 'from formatters import format_currency, format_percent, FormatterRegistry'
+  - 'class FinancialReport:'
 must_not_include:
-- GARBAGE_PY_EXCEL_918273
-- GARBAGE_PY_PDF_827364
-- garbage_excel_export.py
-- garbage_pdf_generator.py
+- ChartRenderer
+- ChartConfig
+- render_bar_chart
+- PdfExporter
+- PdfConfig
+- add_page
+must_not_include_files:
+- chart_renderer.py
+- pdf_exporter.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

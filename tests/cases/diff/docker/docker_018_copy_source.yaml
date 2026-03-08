@@ -1,3 +1,26 @@
+# Test 018: Python Dockerfile COPY paths restructured — reviewer needs to verify
+#           source directories match what Dockerfile copies
+#
+# Scenario: Python Flask Dockerfile rewritten from "pip install flask flask-cors" +
+# "COPY src/app.py" to multi-stage with requirements.txt install and structured
+# "COPY src/ ./src/" plus "COPY config/ ./config/". The COPY paths now match the
+# actual project layout.
+#
+# Reviewer questions:
+#   Q1: "Does src/ contain the modules (app.py, models.py) the Dockerfile copies?"
+#       -> src/app.py and src/models.py exist. Reviewer needs to see that the
+#       COPY path covers the actual source tree.
+#   Q2: "Does config/ contain files worth copying (logging.yaml)?"
+#       -> config/logging.yaml exists. Reviewer verifies the directory has content.
+#   Q3: "Are requirements.txt deps compatible with the new gunicorn CMD?"
+#       -> requirements.txt has flask, flask-cors, sqlalchemy. However, gunicorn
+#       is NOT in requirements.txt — reviewer spots a bug.
+#
+# Not needed:
+#   - scripts/seed_data.sh: ops utility for seeding data, unrelated to COPY paths.
+#   - tests/test_models.py: tests the models but does not inform COPY path review.
+#   - docs/api.md: static documentation about endpoints, not build-relevant.
+
 initial:
   requirements.txt: |
     flask==2.3.0
@@ -10,6 +33,10 @@ initial:
     from flask_cors import CORS
     app = Flask(__name__)
     CORS(app)
+
+    @app.route('/health')
+    def health():
+        return {'status': 'ok'}
   src/models.py: |
     from sqlalchemy import Column, Integer, String
     from sqlalchemy.ext.declarative import declarative_base
@@ -24,16 +51,26 @@ initial:
     COPY src/app.py /app/
     WORKDIR /app
     CMD ["python", "app.py"]
-  scripts/seed_data.sh: |
-    #!/bin/bash
-    python manage.py seed
-  tests/test_models.py: |
-    def test_user_model():
-        pass
-  docs/api.md: |
-    # API Documentation
   config/logging.yaml: |
     version: 1
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+  scripts/seed_data.sh: |
+    #!/bin/bash
+    python manage.py seed --count 100
+  tests/test_models.py: |
+    from src.models import User, Base
+    def test_user_model():
+        user = User(name="test")
+        assert user.name == "test"
+  docs/api.md: |
+    # API Documentation
+    ## Endpoints
+    - GET /health - Health check
+    - GET /users - List users
+
 changed:
   requirements.txt: |
     flask==2.3.0
@@ -46,6 +83,10 @@ changed:
     from flask_cors import CORS
     app = Flask(__name__)
     CORS(app)
+
+    @app.route('/health')
+    def health():
+        return {'status': 'ok'}
   src/models.py: |
     from sqlalchemy import Column, Integer, String
     from sqlalchemy.ext.declarative import declarative_base
@@ -78,19 +119,57 @@ changed:
 
     EXPOSE 5000
     CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "src.app:app"]
-  scripts/seed_data.sh: |
-    #!/bin/bash
-    python manage.py seed
-  tests/test_models.py: |
-    def test_user_model():
-        pass
-  docs/api.md: |
-    # API Documentation
   config/logging.yaml: |
     version: 1
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+  scripts/seed_data.sh: |
+    #!/bin/bash
+    python manage.py seed --count 100
+  tests/test_models.py: |
+    from src.models import User, Base
+    def test_user_model():
+        user = User(name="test")
+        assert user.name == "test"
+  docs/api.md: |
+    # API Documentation
+    ## Endpoints
+    - GET /health - Health check
+    - GET /users - List users
+
 must_include_files:
-- Dockerfile
-must_include_content:
-- FROM python:3.12-slim-bookworm AS base
+  - Dockerfile
+  # Q3: Are requirements.txt deps compatible with gunicorn CMD?
+  # Also confirms what gets installed in builder stage.
+  - requirements.txt
+
+must_include_content_from:
+  Dockerfile:
+    - FROM python:3.12-slim-bookworm AS base
+    - COPY src/ ./src/
+    - COPY config/ ./config/
+    - 'CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "src.app:app"]'
+  requirements.txt:
+    - flask==2.3.0
+
+must_not_include:
+  # --- seed script: ops utility, unrelated to COPY path changes ---
+  - "manage.py seed"
+  - "--count 100"
+  # --- tests: tests models but doesn't inform Dockerfile COPY review ---
+  - test_user_model
+  - "assert user.name"
+  # --- docs: static documentation, not build-relevant ---
+  - "API Documentation"
+  - "GET /users - List users"
+must_not_include_files:
+  - scripts/seed_data.sh
+  - tests/test_models.py
+  - docs/api.md
+
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

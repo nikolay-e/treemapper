@@ -1,3 +1,19 @@
+# Test: Multiple new GitHub template files and CONTRIBUTING.md added to project
+#
+# Scenario: Four new files are created in one commit: bug_report.yml,
+# feature_request.yml, config.yml (issue templates), and CONTRIBUTING.md.
+# The existing app code (src/app.py) is UNCHANGED.
+#
+# Reviewer questions:
+#   Q1: "What templates were added?"
+#       -> .github/ISSUE_TEMPLATE/bug_report.yml, feature_request.yml, config.yml
+#   Q2: "What contribution workflow is documented?"
+#       -> CONTRIBUTING.md describes fork, branch, test, PR process.
+#
+# Trap files (plausible but unrelated):
+#   - src/utils.py: utility functions — same project but unrelated to templates.
+#   - src/models.py: data models — same project but unrelated to project governance.
+
 initial:
   src/app.py: |
     from flask import Flask, jsonify, request
@@ -36,17 +52,12 @@ initial:
     from typing import List, Optional
     from datetime import datetime, timedelta
 
-    GARBAGE_REG012_UTIL_CACHE_TTL = 3600
-    GARBAGE_REG012_UTIL_MAX_RETRIES = 5
-
     def parse_date_range(start_str: str, end_str: str) -> tuple:
-        GARBAGE_REG012_UTIL_PARSE_MARKER = "parsing"
         start = datetime.fromisoformat(start_str)
         end = datetime.fromisoformat(end_str)
         return start, end
 
     def paginate_results(items: List, page: int, per_page: int = 20) -> dict:
-        GARBAGE_REG012_UTIL_PAGINATE_MARKER = page
         offset = (page - 1) * per_page
         paginated = items[offset:offset + per_page]
         return {
@@ -58,11 +69,9 @@ initial:
         }
 
     def slugify(text: str) -> str:
-        GARBAGE_REG012_UTIL_SLUGIFY_MARKER = text
         return text.lower().replace(" ", "-").replace("_", "-")
 
     def format_duration(seconds: int) -> str:
-        GARBAGE_REG012_UTIL_DURATION_MARKER = seconds
         hours, remainder = divmod(seconds, 3600)
         minutes, secs = divmod(remainder, 60)
         if hours > 0:
@@ -71,12 +80,9 @@ initial:
             return f"{minutes}m {secs}s"
         return f"{secs}s"
   src/models.py: |
-    from dataclasses import dataclass, field
+    from dataclasses import dataclass
     from datetime import datetime
-    from typing import Optional, List
-
-    GARBAGE_REG012_MODEL_TABLE_PREFIX = "pm_"
-    GARBAGE_REG012_MODEL_DEFAULT_STATUS = "open"
+    from typing import Optional
 
     @dataclass
     class Project:
@@ -84,10 +90,8 @@ initial:
         name: str
         description: str
         created_at: datetime
-        GARBAGE_REG012_MODEL_PROJECT_FLAG: bool = True
 
         def to_dict(self) -> dict:
-            GARBAGE_REG012_MODEL_PROJECT_DICT = self.name
             return {
                 "id": self.id,
                 "name": self.name,
@@ -102,10 +106,8 @@ initial:
         title: str
         status: str = "open"
         assignee: Optional[str] = None
-        GARBAGE_REG012_MODEL_TASK_PRIORITY: int = 0
 
         def to_dict(self) -> dict:
-            GARBAGE_REG012_MODEL_TASK_DICT = self.title
             return {
                 "id": self.id,
                 "project_id": self.project_id,
@@ -115,7 +117,6 @@ initial:
             }
 
         def is_closed(self) -> bool:
-            GARBAGE_REG012_MODEL_TASK_CHECK = True
             return self.status in ("closed", "resolved")
 changed:
   src/app.py: |
@@ -155,17 +156,12 @@ changed:
     from typing import List, Optional
     from datetime import datetime, timedelta
 
-    GARBAGE_REG012_UTIL_CACHE_TTL = 3600
-    GARBAGE_REG012_UTIL_MAX_RETRIES = 5
-
     def parse_date_range(start_str: str, end_str: str) -> tuple:
-        GARBAGE_REG012_UTIL_PARSE_MARKER = "parsing"
         start = datetime.fromisoformat(start_str)
         end = datetime.fromisoformat(end_str)
         return start, end
 
     def paginate_results(items: List, page: int, per_page: int = 20) -> dict:
-        GARBAGE_REG012_UTIL_PAGINATE_MARKER = page
         offset = (page - 1) * per_page
         paginated = items[offset:offset + per_page]
         return {
@@ -177,11 +173,9 @@ changed:
         }
 
     def slugify(text: str) -> str:
-        GARBAGE_REG012_UTIL_SLUGIFY_MARKER = text
         return text.lower().replace(" ", "-").replace("_", "-")
 
     def format_duration(seconds: int) -> str:
-        GARBAGE_REG012_UTIL_DURATION_MARKER = seconds
         hours, remainder = divmod(seconds, 3600)
         minutes, secs = divmod(remainder, 60)
         if hours > 0:
@@ -190,12 +184,9 @@ changed:
             return f"{minutes}m {secs}s"
         return f"{secs}s"
   src/models.py: |
-    from dataclasses import dataclass, field
+    from dataclasses import dataclass
     from datetime import datetime
-    from typing import Optional, List
-
-    GARBAGE_REG012_MODEL_TABLE_PREFIX = "pm_"
-    GARBAGE_REG012_MODEL_DEFAULT_STATUS = "open"
+    from typing import Optional
 
     @dataclass
     class Project:
@@ -203,10 +194,8 @@ changed:
         name: str
         description: str
         created_at: datetime
-        GARBAGE_REG012_MODEL_PROJECT_FLAG: bool = True
 
         def to_dict(self) -> dict:
-            GARBAGE_REG012_MODEL_PROJECT_DICT = self.name
             return {
                 "id": self.id,
                 "name": self.name,
@@ -221,10 +210,8 @@ changed:
         title: str
         status: str = "open"
         assignee: Optional[str] = None
-        GARBAGE_REG012_MODEL_TASK_PRIORITY: int = 0
 
         def to_dict(self) -> dict:
-            GARBAGE_REG012_MODEL_TASK_DICT = self.title
             return {
                 "id": self.id,
                 "project_id": self.project_id,
@@ -234,7 +221,6 @@ changed:
             }
 
         def is_closed(self) -> bool:
-            GARBAGE_REG012_MODEL_TASK_CHECK = True
             return self.status in ("closed", "resolved")
   .github/ISSUE_TEMPLATE/bug_report.yml: |
     name: Bug Report
@@ -391,27 +377,28 @@ changed:
     We are committed to providing a welcoming and inclusive
     experience for everyone.
 must_include_files:
-- .github/ISSUE_TEMPLATE/bug_report.yml
-- .github/ISSUE_TEMPLATE/feature_request.yml
-- .github/ISSUE_TEMPLATE/config.yml
-- CONTRIBUTING.md
-must_include_content:
-- bug_report
-- feature_request
-- blank_issues_enabled
+  - .github/ISSUE_TEMPLATE/bug_report.yml
+  - .github/ISSUE_TEMPLATE/feature_request.yml
+  - .github/ISSUE_TEMPLATE/config.yml
+  - CONTRIBUTING.md
+must_include_content_from:
+  .github/ISSUE_TEMPLATE/bug_report.yml:
+    - "name: Bug Report"
+  .github/ISSUE_TEMPLATE/config.yml:
+    - "blank_issues_enabled: false"
+  CONTRIBUTING.md:
+    - "# Contributing to Project"
 must_not_include:
-- GARBAGE_REG012_UTIL_CACHE_TTL
-- GARBAGE_REG012_UTIL_MAX_RETRIES
-- GARBAGE_REG012_UTIL_PARSE_MARKER
-- GARBAGE_REG012_UTIL_PAGINATE_MARKER
-- GARBAGE_REG012_UTIL_SLUGIFY_MARKER
-- GARBAGE_REG012_UTIL_DURATION_MARKER
-- GARBAGE_REG012_MODEL_TABLE_PREFIX
-- GARBAGE_REG012_MODEL_DEFAULT_STATUS
-- GARBAGE_REG012_MODEL_PROJECT_FLAG
-- GARBAGE_REG012_MODEL_PROJECT_DICT
-- GARBAGE_REG012_MODEL_TASK_PRIORITY
-- GARBAGE_REG012_MODEL_TASK_DICT
-- GARBAGE_REG012_MODEL_TASK_CHECK
+  # src/utils.py: utility functions — unchanged, unrelated to governance files
+  - paginate_results
+  - slugify
+  - format_duration
+  # src/models.py: data models — unchanged, unrelated to templates
+  - is_closed
+must_not_include_files:
+  - src/utils.py
+  - src/models.py
+max_fragments: 6
+max_files: 5
 add_garbage_files: false
 skip_garbage_check: true

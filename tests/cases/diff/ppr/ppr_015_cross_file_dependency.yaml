@@ -1,3 +1,31 @@
+# Scenario: main() changes return value from helper() to helper() + 1.
+#   main.py imports helper from utils. Only main.py is changed.
+#
+# Diff shows:
+#   - return helper()
+#   + return helper() + 1
+#
+# Reviewer questions:
+#   Q1: "What does helper() return — is adding 1 to it meaningful?"
+#       -> Returns 42 (int). Adding 1 gives 43. Reviewer must verify
+#         helper() returns a numeric type that supports addition.
+#
+#   Q2: "Could helper() return None and cause a TypeError?"
+#       -> No, helper() always returns 42. But reviewer needs to see
+#         the implementation to confirm no None path exists.
+#
+# Not needed for comprehension:
+#   - analytics.py: Also imports helper from utils, calls helper() * 10.
+#     HARDEST TRAP: same import statement (`from utils import helper`),
+#     same function call. But how analytics multiplies doesn't help
+#     review whether main.py's addition is correct.
+#
+#   - alt_utils.py: Defines its own helper() returning 99. Name collision
+#     trap. Also has helper_v2() = helper() + 1 — nearly identical logic
+#     to the diff. But different module, not the imported one.
+#
+#   - db_pool.py: Completely unrelated infrastructure module.
+
 initial:
   utils.py: |
     def helper():
@@ -10,12 +38,16 @@ initial:
   unrelated.py: |
     def unrelated_func():
         pass
+  analytics.py: |
+    from utils import helper
 
-  # --- Tricky garbage: also defines helper() like utils.py ---
-  garbage_alt_helper.py: |
-    GARBAGE_PPR_015_ALT_HELPER_A = "alt_helper_module"
-    GARBAGE_PPR_015_ALT_RETURN_B = 42
+    class AnalyticsEngine:
+        def compute_metric(self):
+            return helper() * 10
 
+        def validate_result(self):
+            return True
+  alt_utils.py: |
     def helper():
         return 99
 
@@ -23,29 +55,11 @@ initial:
         return helper() + 1
 
     class HelperRegistry:
-        GARBAGE_PPR_015_ALT_REGISTRY_C = True
-
         def get_helper(self):
             return helper()
-
-  # --- Tricky garbage: imports from utils like main.py does ---
-  garbage_utils_consumer.py: |
-    from utils import helper
-    GARBAGE_PPR_015_CONSUMER_INIT_D = "consumer"
-    GARBAGE_PPR_015_CONSUMER_FLAG_E = 500
-
-    class UtilsConsumer:
-        def process(self):
-            return helper() * 10
-
-        def validate(self):
-            GARBAGE_PPR_015_CONSUMER_VALID_F = True
-            return True
-
-  # --- Plain garbage: no overlap ---
-  garbage_database.py: |
-    GARBAGE_PPR_015_DB_CONN_G = "postgresql://localhost"
-    GARBAGE_PPR_015_DB_POOL_H = 10
+  db_pool.py: |
+    DB_CONNECTION = "postgresql://localhost"
+    POOL_SIZE = 10
 
     class DatabasePool:
         def connect(self):
@@ -63,11 +77,16 @@ changed:
   unrelated.py: |
     def unrelated_func():
         pass
+  analytics.py: |
+    from utils import helper
 
-  garbage_alt_helper.py: |
-    GARBAGE_PPR_015_ALT_HELPER_A = "alt_helper_module"
-    GARBAGE_PPR_015_ALT_RETURN_B = 42
+    class AnalyticsEngine:
+        def compute_metric(self):
+            return helper() * 10
 
+        def validate_result(self):
+            return True
+  alt_utils.py: |
     def helper():
         return 99
 
@@ -75,65 +94,46 @@ changed:
         return helper() + 1
 
     class HelperRegistry:
-        GARBAGE_PPR_015_ALT_REGISTRY_C = True
-
         def get_helper(self):
             return helper()
-
-  garbage_utils_consumer.py: |
-    from utils import helper
-    GARBAGE_PPR_015_CONSUMER_INIT_D = "consumer"
-    GARBAGE_PPR_015_CONSUMER_FLAG_E = 500
-
-    class UtilsConsumer:
-        def process(self):
-            return helper() * 10
-
-        def validate(self):
-            GARBAGE_PPR_015_CONSUMER_VALID_F = True
-            return True
-
-  garbage_database.py: |
-    GARBAGE_PPR_015_DB_CONN_G = "postgresql://localhost"
-    GARBAGE_PPR_015_DB_POOL_H = 10
+  db_pool.py: |
+    DB_CONNECTION = "postgresql://localhost"
+    POOL_SIZE = 10
 
     class DatabasePool:
         def connect(self):
             pass
 
-# === Assertions ===
-
 must_include:
-- main
-- helper
+  - main
+  - helper
 
 must_include_files:
-- main.py
+  - main.py
 
 must_include_content_from:
   main.py:
-    - 'def main():'
-    - return helper() + 1
+    - "def main():"
+    - "return helper() + 1"
 
 must_not_include:
-- unrelated_func
-# Plain garbage markers
-- GARBAGE_PPR_015_DB_CONN_G
-- GARBAGE_PPR_015_DB_POOL_H
-# Tricky: also defines helper() function
-- GARBAGE_PPR_015_ALT_HELPER_A
-- GARBAGE_PPR_015_ALT_RETURN_B
-- GARBAGE_PPR_015_ALT_REGISTRY_C
-# Tricky: imports from utils just like main.py
-- GARBAGE_PPR_015_CONSUMER_INIT_D
-- GARBAGE_PPR_015_CONSUMER_FLAG_E
-- GARBAGE_PPR_015_CONSUMER_VALID_F
+  # --- analytics.py: HARDEST TRAP — same `from utils import helper` ---
+  - AnalyticsEngine
+  - compute_metric
+  - validate_result
+  # --- alt_utils.py: name collision + helper_v2() = helper() + 1 ---
+  - HelperRegistry
+  - helper_v2
+  # --- unrelated.py / db_pool.py: no structural edges ---
+  - unrelated_func
+  - DatabasePool
+  - DB_CONNECTION
 
 must_not_include_files:
-- unrelated.py
-- garbage_alt_helper.py
-- garbage_utils_consumer.py
-- garbage_database.py
+  - analytics.py
+  - alt_utils.py
+  - unrelated.py
+  - db_pool.py
 
 max_fragments: 6
 max_files: 3

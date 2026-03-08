@@ -1,3 +1,31 @@
+# Scenario: application.properties gains Redis cache configuration (4 new lines).
+#   DataSourceConfig and OrderApplication are unchanged.
+#
+# Diff shows:
+#   + spring.cache.type=redis
+#   + spring.data.redis.host=${REDIS_HOST:localhost}
+#   + spring.data.redis.port=${REDIS_PORT:6379}
+#   + spring.data.redis.timeout=2000
+#
+# Reviewer questions:
+#   Q1: "Does DataSourceConfig reference any of the new Redis properties?"
+#       -> DataSourceConfig.java (UNCHANGED) only injects spring.datasource.url
+#          and server.port via @Value. It does NOT reference Redis properties.
+#          Reviewer must see the config class to verify no injection conflicts.
+#
+#   Q2: "Is there a @Configuration class that creates Redis beans?"
+#       -> No Redis config class exists yet in the codebase. Reviewer needs
+#          to see existing config classes to identify this gap.
+#
+# Not needed for comprehension:
+#   - OrderApplication.java: @SpringBootApplication main class. Standard
+#     Spring Boot entry point. Does not reference any properties directly.
+#     Auto-scans components but doesn't help review config additions.
+#
+#   - OrderController.java: REST controller for orders. Same package,
+#     uses @Value for unrelated properties. STRUCTURAL TRAP: another
+#     Spring component in the same package with @Value annotation.
+
 initial:
   src/main/resources/application.properties: |
     server.port=8080
@@ -43,57 +71,30 @@ initial:
             SpringApplication.run(OrderApplication.class, args);
         }
     }
-  src/main/java/com/example/orders/unrelated/NotificationScheduler.java: |
-    package com.example.orders.unrelated;
+  src/main/java/com/example/orders/controller/OrderController.java: |
+    package com.example.orders.controller;
 
-    import java.time.LocalTime;
-    import java.util.ArrayDeque;
-    import java.util.Deque;
+    import org.springframework.beans.factory.annotation.Value;
+    import org.springframework.web.bind.annotation.*;
+    import java.util.Map;
 
-    public class NotificationScheduler {
-        public static final String GARBAGE_JAVA_023_NOTIFY_A = "notify_scheduler_marker";
-        private static final String GARBAGE_JAVA_023_NOTIFY_B = "notify_internal_marker";
+    @RestController
+    @RequestMapping("/api/orders")
+    public class OrderController {
+        @Value("${spring.application.name}")
+        private String appName;
 
-        private final Deque<String> pendingNotifications = new ArrayDeque<>();
-
-        public void schedule(String message) {
-            pendingNotifications.addLast(LocalTime.now() + ": " + message);
+        @GetMapping("/health")
+        public Map<String, String> health() {
+            return Map.of("service", appName, "status", "UP");
         }
 
-        public String nextNotification() {
-            return pendingNotifications.pollFirst();
-        }
-
-        public void cancelAll() {
-            pendingNotifications.clear();
-            System.out.println(GARBAGE_JAVA_023_NOTIFY_A + GARBAGE_JAVA_023_NOTIFY_B);
+        @PostMapping
+        public Map<String, String> createOrder(@RequestBody Map<String, Object> body) {
+            return Map.of("orderId", "ORD-" + System.currentTimeMillis());
         }
     }
-  src/main/java/com/example/orders/unrelated/RateLimiter.java: |
-    package com.example.orders.unrelated;
 
-    import java.util.concurrent.atomic.AtomicInteger;
-
-    public class RateLimiter {
-        public static final String GARBAGE_JAVA_023_RATE_C = "rate_limiter_marker";
-        private static final String GARBAGE_JAVA_023_RATE_D = "rate_internal_tag";
-
-        private final int maxRequests;
-        private final AtomicInteger currentCount = new AtomicInteger(0);
-
-        public RateLimiter(int maxRequests) {
-            this.maxRequests = maxRequests;
-        }
-
-        public boolean tryAcquire() {
-            return currentCount.incrementAndGet() <= maxRequests;
-        }
-
-        public void reset() {
-            currentCount.set(0);
-            System.out.println(GARBAGE_JAVA_023_RATE_C + GARBAGE_JAVA_023_RATE_D);
-        }
-    }
 changed:
   src/main/resources/application.properties: |
     server.port=8080
@@ -143,67 +144,63 @@ changed:
             SpringApplication.run(OrderApplication.class, args);
         }
     }
-  src/main/java/com/example/orders/unrelated/NotificationScheduler.java: |
-    package com.example.orders.unrelated;
+  src/main/java/com/example/orders/controller/OrderController.java: |
+    package com.example.orders.controller;
 
-    import java.time.LocalTime;
-    import java.util.ArrayDeque;
-    import java.util.Deque;
+    import org.springframework.beans.factory.annotation.Value;
+    import org.springframework.web.bind.annotation.*;
+    import java.util.Map;
 
-    public class NotificationScheduler {
-        public static final String GARBAGE_JAVA_023_NOTIFY_A = "notify_scheduler_marker";
-        private static final String GARBAGE_JAVA_023_NOTIFY_B = "notify_internal_marker";
+    @RestController
+    @RequestMapping("/api/orders")
+    public class OrderController {
+        @Value("${spring.application.name}")
+        private String appName;
 
-        private final Deque<String> pendingNotifications = new ArrayDeque<>();
-
-        public void schedule(String message) {
-            pendingNotifications.addLast(LocalTime.now() + ": " + message);
+        @GetMapping("/health")
+        public Map<String, String> health() {
+            return Map.of("service", appName, "status", "UP");
         }
 
-        public String nextNotification() {
-            return pendingNotifications.pollFirst();
-        }
-
-        public void cancelAll() {
-            pendingNotifications.clear();
-            System.out.println(GARBAGE_JAVA_023_NOTIFY_A + GARBAGE_JAVA_023_NOTIFY_B);
+        @PostMapping
+        public Map<String, String> createOrder(@RequestBody Map<String, Object> body) {
+            return Map.of("orderId", "ORD-" + System.currentTimeMillis());
         }
     }
-  src/main/java/com/example/orders/unrelated/RateLimiter.java: |
-    package com.example.orders.unrelated;
 
-    import java.util.concurrent.atomic.AtomicInteger;
-
-    public class RateLimiter {
-        public static final String GARBAGE_JAVA_023_RATE_C = "rate_limiter_marker";
-        private static final String GARBAGE_JAVA_023_RATE_D = "rate_internal_tag";
-
-        private final int maxRequests;
-        private final AtomicInteger currentCount = new AtomicInteger(0);
-
-        public RateLimiter(int maxRequests) {
-            this.maxRequests = maxRequests;
-        }
-
-        public boolean tryAcquire() {
-            return currentCount.incrementAndGet() <= maxRequests;
-        }
-
-        public void reset() {
-            currentCount.set(0);
-            System.out.println(GARBAGE_JAVA_023_RATE_C + GARBAGE_JAVA_023_RATE_D);
-        }
-    }
 must_include_files:
-- src/main/resources/application.properties
-must_include_content:
-- spring.cache.type=redis
+  - src/main/resources/application.properties
+
+must_include_content_from:
+  src/main/resources/application.properties:
+    - "spring.cache.type=redis"
+    - "spring.data.redis.host"
+    - "spring.data.redis.port"
+
 must_not_include:
-- GARBAGE_JAVA_023_NOTIFY_A
-- GARBAGE_JAVA_023_NOTIFY_B
-- GARBAGE_JAVA_023_RATE_C
-- GARBAGE_JAVA_023_RATE_D
-- NotificationScheduler.java
-- RateLimiter.java
+  # --- OrderApplication.java: standard Spring Boot main class ---
+  # Does not reference properties. Auto-scanning doesn't help review config.
+  - OrderApplication
+  - SpringApplication.run
+  # --- DataSourceConfig.java: injects datasource/port, NOT Redis ---
+  # Could be relevant for Q1 but reviewer doesn't strictly need it.
+  # It only uses spring.datasource.url and server.port.
+  - DataSourceConfig
+  - getDatasourceUrl
+  - getServerPort
+  # --- OrderController.java: REST controller with @Value ---
+  # STRUCTURAL TRAP: uses @Value annotation like config classes.
+  # But references spring.application.name, not Redis properties.
+  - OrderController
+  - createOrder
+  - "/api/orders"
+
+must_not_include_files:
+  - src/main/java/com/example/orders/OrderApplication.java
+  - src/main/java/com/example/orders/config/DataSourceConfig.java
+  - src/main/java/com/example/orders/controller/OrderController.java
+
+max_fragments: 5
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

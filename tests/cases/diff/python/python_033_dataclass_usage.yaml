@@ -1,3 +1,8 @@
+# Scenario: Service layer uses dataclass models for structured data operations
+# Changed: models.py adds new dataclass fields; service.py uses updated model structure
+# Reviewer questions: Are new fields used consistently? Does priority ordering work correctly?
+# Trap 1: notification_service.py — sends notifications about tasks, shares "task" vocabulary but independent
+# Trap 2: analytics_tracker.py — tracks task analytics, shares "task/service" domain but no dep on models
 initial:
   models.py: |
     from dataclasses import dataclass, field
@@ -60,42 +65,54 @@ initial:
 
         def find_by_id(self, user_id: int):
             return self._users.get(user_id)
-  unrelated/payment_gateway.py: |
-    GARBAGE_PYTHON_033_001 = "payment gateway marker"
-    GARBAGE_PYTHON_033_002 = "payment processing constant"
+  notification_service.py: |
+    from typing import List, Dict, Any, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class PaymentGateway:
-        GARBAGE_PYTHON_033_003 = "gateway class constant"
+    @dataclass
+    class TaskNotification:
+        task_id: str
+        recipient: str
+        message: str
+        sent_at: Optional[datetime] = None
 
-        def __init__(self, api_key: str):
-            self.api_key = api_key
+    class TaskNotificationService:
+        def __init__(self):
+            self._sent: List[TaskNotification] = []
 
-        def charge(self, amount: float) -> dict:
-            return {"status": "completed"}
-  unrelated/email_service.py: |
-    GARBAGE_PYTHON_033_004 = "email service marker"
-    GARBAGE_PYTHON_033_005 = "smtp configuration constant"
-
-    class EmailSender:
-        GARBAGE_PYTHON_033_006 = "sender class marker"
-
-        def __init__(self, smtp_host: str):
-            self.smtp_host = smtp_host
-
-        def send(self, to: str, subject: str, body: str) -> bool:
+        def notify_assignee(self, task_id: str, assignee: str, message: str) -> bool:
+            self._sent.append(TaskNotification(
+                task_id=task_id, recipient=assignee, message=message, sent_at=datetime.now()
+            ))
             return True
-  unrelated/file_storage.py: |
-    GARBAGE_PYTHON_033_007 = "file storage marker"
-    GARBAGE_PYTHON_033_008 = "storage bucket constant"
 
-    class FileStorage:
-        GARBAGE_PYTHON_033_009 = "storage class marker"
+        def get_notifications_for(self, recipient: str) -> List[TaskNotification]:
+            return [n for n in self._sent if n.recipient == recipient]
+  analytics_tracker.py: |
+    from typing import Dict, Any, List
+    from dataclasses import dataclass
+    from datetime import datetime
 
-        def __init__(self, base_path: str = "/tmp"):
-            self.base_path = base_path
+    @dataclass
+    class TaskMetric:
+        task_id: str
+        event: str
+        value: float
+        timestamp: datetime
 
-        def upload(self, filename: str, content: bytes) -> str:
-            return f"{self.base_path}/{filename}"
+    class TaskAnalyticsTracker:
+        def __init__(self):
+            self._metrics: List[TaskMetric] = []
+
+        def track_completion_time(self, task_id: str, seconds: float) -> None:
+            self._metrics.append(TaskMetric(
+                task_id=task_id, event="completion", value=seconds, timestamp=datetime.now()
+            ))
+
+        def get_average_completion_time(self) -> float:
+            times = [m.value for m in self._metrics if m.event == "completion"]
+            return sum(times) / len(times) if times else 0.0
 changed:
   models.py: |
     from dataclasses import dataclass, field
@@ -169,59 +186,72 @@ changed:
 
         def find_by_id(self, user_id: int):
             return self._users.get(user_id)
-  unrelated/payment_gateway.py: |
-    GARBAGE_PYTHON_033_001 = "payment gateway marker"
-    GARBAGE_PYTHON_033_002 = "payment processing constant"
+  notification_service.py: |
+    from typing import List, Dict, Any, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class PaymentGateway:
-        GARBAGE_PYTHON_033_003 = "gateway class constant"
+    @dataclass
+    class TaskNotification:
+        task_id: str
+        recipient: str
+        message: str
+        sent_at: Optional[datetime] = None
 
-        def __init__(self, api_key: str):
-            self.api_key = api_key
+    class TaskNotificationService:
+        def __init__(self):
+            self._sent: List[TaskNotification] = []
 
-        def charge(self, amount: float) -> dict:
-            return {"status": "completed"}
-  unrelated/email_service.py: |
-    GARBAGE_PYTHON_033_004 = "email service marker"
-    GARBAGE_PYTHON_033_005 = "smtp configuration constant"
-
-    class EmailSender:
-        GARBAGE_PYTHON_033_006 = "sender class marker"
-
-        def __init__(self, smtp_host: str):
-            self.smtp_host = smtp_host
-
-        def send(self, to: str, subject: str, body: str) -> bool:
+        def notify_assignee(self, task_id: str, assignee: str, message: str) -> bool:
+            self._sent.append(TaskNotification(
+                task_id=task_id, recipient=assignee, message=message, sent_at=datetime.now()
+            ))
             return True
-  unrelated/file_storage.py: |
-    GARBAGE_PYTHON_033_007 = "file storage marker"
-    GARBAGE_PYTHON_033_008 = "storage bucket constant"
 
-    class FileStorage:
-        GARBAGE_PYTHON_033_009 = "storage class marker"
+        def get_notifications_for(self, recipient: str) -> List[TaskNotification]:
+            return [n for n in self._sent if n.recipient == recipient]
+  analytics_tracker.py: |
+    from typing import Dict, Any, List
+    from dataclasses import dataclass
+    from datetime import datetime
 
-        def __init__(self, base_path: str = "/tmp"):
-            self.base_path = base_path
+    @dataclass
+    class TaskMetric:
+        task_id: str
+        event: str
+        value: float
+        timestamp: datetime
 
-        def upload(self, filename: str, content: bytes) -> str:
-            return f"{self.base_path}/{filename}"
+    class TaskAnalyticsTracker:
+        def __init__(self):
+            self._metrics: List[TaskMetric] = []
+
+        def track_completion_time(self, task_id: str, seconds: float) -> None:
+            self._metrics.append(TaskMetric(
+                task_id=task_id, event="completion", value=seconds, timestamp=datetime.now()
+            ))
+
+        def get_average_completion_time(self) -> float:
+            times = [m.value for m in self._metrics if m.event == "completion"]
+            return sum(times) / len(times) if times else 0.0
 must_include_files:
+- service.py
 - models.py
-must_include_content:
-- PENDING_VERIFICATION = "pending_verification"
-- 'def format_multi_line(self) -> str:'
+must_include_content_from:
+  service.py:
+  - 'from models import User, Address, Preferences, AccountStatus'
+  - 'def save(self, user: User) -> int:'
 must_not_include:
-- GARBAGE_PYTHON_033_001
-- GARBAGE_PYTHON_033_002
-- GARBAGE_PYTHON_033_003
-- GARBAGE_PYTHON_033_004
-- GARBAGE_PYTHON_033_005
-- GARBAGE_PYTHON_033_006
-- GARBAGE_PYTHON_033_007
-- GARBAGE_PYTHON_033_008
-- GARBAGE_PYTHON_033_009
-- email_service.py
-- file_storage.py
-- payment_gateway.py
+- TaskNotificationService
+- TaskNotification
+- notify_assignee
+- TaskAnalyticsTracker
+- TaskMetric
+- track_completion_time
+must_not_include_files:
+- notification_service.py
+- analytics_tracker.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

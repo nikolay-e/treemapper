@@ -1,3 +1,9 @@
+# Scenario: application.yaml database and logging sections changed for production
+# (host, pool_size, ssl_mode, log level).
+# Reviewer asks: "What config values changed for production hardening?"
+# Trap rationale: docker-compose.yaml and terraform.tfvars share config/infra
+# vocabulary but are separate config files with no structural dependency.
+
 initial:
   config/application.yaml: |
     database:
@@ -28,69 +34,39 @@ initial:
       port: 6379
       ttl_seconds: 300
       max_memory: 256MB
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  config/docker-compose.yaml: |
+    version: "3.8"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        environment:
+          POSTGRES_DB: appdb
+          POSTGRES_USER: devuser
+          POSTGRES_PASSWORD: devpass
+        ports:
+          - "5432:5432"
+        volumes:
+          - pgdata:/var/lib/postgresql/data
 
-    class TextSanitizer:
-        GARBAGE_MERGE_007_MARKER_A = "sanitizer_tag"
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+        command: redis-server --maxmemory 256mb
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
-
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
-
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_007_A_CLEAN: {cleaned}"
-
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
-
-    SANITIZER_VERSION = "GARBAGE_MERGE_007_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
-
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    class SystemMonitor:
-        GARBAGE_MERGE_007_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_007_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_007_B_VERSION"
+    volumes:
+      pgdata:
+  config/terraform.tfvars: |
+    region         = "us-east-1"
+    instance_type  = "t3.medium"
+    db_instance    = "db.r6g.large"
+    db_name        = "appdb"
+    db_port        = 5432
+    cache_node     = "cache.r6g.large"
+    cache_port     = 6379
+    environment    = "production"
+    min_instances  = 2
+    max_instances  = 10
 changed:
   config/application.yaml: |
     database:
@@ -121,78 +97,51 @@ changed:
       port: 6379
       ttl_seconds: 300
       max_memory: 256MB
-  unrelated/text_sanitizer.py: |
-    import re
-    from typing import List, Optional
+  config/docker-compose.yaml: |
+    version: "3.8"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        environment:
+          POSTGRES_DB: appdb
+          POSTGRES_USER: devuser
+          POSTGRES_PASSWORD: devpass
+        ports:
+          - "5432:5432"
+        volumes:
+          - pgdata:/var/lib/postgresql/data
 
-    class TextSanitizer:
-        GARBAGE_MERGE_007_MARKER_A = "sanitizer_tag"
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+        command: redis-server --maxmemory 256mb
 
-        def __init__(self, strict_mode: bool = True):
-            self.strict_mode = strict_mode
-            self._rules: List[str] = []
-            self._compiled: Optional[re.Pattern] = None
-
-        def add_rule(self, pattern: str) -> None:
-            self._rules.append(pattern)
-            self._compiled = None
-
-        def sanitize(self, text: str) -> str:
-            if not self._compiled:
-                combined = "|".join(self._rules) if self._rules else "(?!)"
-                self._compiled = re.compile(combined)
-            cleaned = self._compiled.sub("", text)
-            return f"GARBAGE_MERGE_007_A_CLEAN: {cleaned}"
-
-        def validate(self, text: str) -> bool:
-            return len(text) > 0 and text.isprintable()
-
-    SANITIZER_VERSION = "GARBAGE_MERGE_007_A_VERSION"
-  unrelated/health_monitor.py: |
-    from dataclasses import dataclass, field
-    from typing import Dict, Any, List
-
-    @dataclass
-    class HealthStatus:
-        service_name: str
-        status: str = "unknown"
-        latency_ms: float = 0.0
-        metadata: Dict[str, Any] = field(default_factory=dict)
-
-    class SystemMonitor:
-        GARBAGE_MERGE_007_MARKER_B = "monitor_tag"
-
-        def __init__(self, namespace: str = "default"):
-            self.namespace = namespace
-            self._checks: Dict[str, HealthStatus] = {}
-            self._alert_threshold_ms = 500.0
-
-        def register_service(self, name: str) -> None:
-            self._checks[name] = HealthStatus(service_name=name)
-
-        def check_health(self, name: str) -> HealthStatus:
-            result = self._checks.get(name)
-            if result is None:
-                return HealthStatus(name, "not_found", -1.0)
-            return result
-
-        def get_summary(self) -> Dict[str, Any]:
-            return {
-                "tag": "GARBAGE_MERGE_007_B_SUMMARY",
-                "total": len(self._checks),
-                "namespace": self.namespace
-            }
-
-    MONITOR_VERSION = "GARBAGE_MERGE_007_B_VERSION"
+    volumes:
+      pgdata:
+  config/terraform.tfvars: |
+    region         = "us-east-1"
+    instance_type  = "t3.medium"
+    db_instance    = "db.r6g.large"
+    db_name        = "appdb"
+    db_port        = 5432
+    cache_node     = "cache.r6g.large"
+    cache_port     = 6379
+    environment    = "production"
+    min_instances  = 2
+    max_instances  = 10
 must_include_files:
 - config/application.yaml
 must_include_content:
 - 'host: production-db.internal'
 - 'level: WARNING'
 must_not_include:
-- GARBAGE_MERGE_007_MARKER_A
-- GARBAGE_MERGE_007_MARKER_B
-- health_monitor.py
-- text_sanitizer.py
+- docker-compose.yaml
+- terraform.tfvars
+- POSTGRES_USER
+- instance_type
+must_not_include_files:
+- config/docker-compose.yaml
+- config/terraform.tfvars
 add_garbage_files: false
 skip_garbage_check: true

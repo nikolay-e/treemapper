@@ -1,3 +1,33 @@
+# Scenario: Deployment gains DATABASE_HOST/PORT/NAME/USER env vars wired to
+#   direct values and secretKeyRef. Only k8s/apps/backend/deployment.yaml
+#   is changed.
+#
+# Diff shows:
+#   - env: []  ->  + DATABASE_HOST (hardcoded), DATABASE_PORT (hardcoded),
+#     DATABASE_NAME (hardcoded), DATABASE_USER (from secretKeyRef db-credentials)
+#
+# Reviewer questions:
+#   Q1: "Does the application read these exact env var names?"
+#       -> Needs src/config.py: DatabaseConfig reads DATABASE_HOST,
+#          DATABASE_PORT, DATABASE_NAME, DATABASE_USER via os.environ.get().
+#          The env var names must match exactly. Without this, the reviewer
+#          cannot verify the deployment env vars match the app's expectations.
+#
+#   Q2: "Should DATABASE_HOST use a ConfigMap instead of hardcoding?"
+#       -> Pure config review: hardcoding "postgres.database.svc.cluster.local"
+#          in the deployment is brittle. ConfigMap or service discovery
+#          would be more maintainable.
+#
+# Not needed for comprehension:
+#   - k8s/operators/cert-manager.yaml: cert-manager controller deployment
+#     in cert-manager namespace. Shares Deployment kind and similar YAML
+#     structure (containers, image, args). But cert-manager manages TLS
+#     certificates — no relation to backend database env vars.
+#
+#   - k8s/ingress/traefik.yaml: Traefik ingress DaemonSet in kube-system.
+#     Shares port vocabulary (containerPort 80, 443) and cluster namespace.
+#     But ingress controller config doesn't help review whether the
+#     backend's DATABASE_* env vars match the application's expectations.
 initial:
   src/config.py: |
     import os
@@ -64,38 +94,43 @@ initial:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/operators/cert-manager.yaml: |
-    # GARBAGE_K8S_404_CERT_MANAGER
+  k8s/operators/cert-manager.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: GARBAGE_K8S_404_CERT_CONTROLLER
+      name: cert-manager-controller
       namespace: cert-manager
     spec:
       replicas: 1
       selector:
         matchLabels:
-          app: GARBAGE_K8S_404_CERT_APP
+          app: cert-manager
       template:
         spec:
           containers:
           - name: controller
-            image: quay.io/jetstack/cert-manager-controller:GARBAGE_K8S_404_CERT_VERSION
-  k8s/unrelated/ingress/traefik.yaml: |
-    # GARBAGE_K8S_404_TRAEFIK_INGRESS
+            image: quay.io/jetstack/cert-manager-controller:v1.13.0
+            args:
+            - --cluster-resource-namespace=cert-manager
+            - --leader-election-namespace=cert-manager
+  k8s/ingress/traefik.yaml: |
     apiVersion: apps/v1
     kind: DaemonSet
     metadata:
-      name: GARBAGE_K8S_404_TRAEFIK_DS
+      name: traefik-ingress
+      namespace: kube-system
     spec:
       selector:
         matchLabels:
-          app: GARBAGE_K8S_404_TRAEFIK_LABEL
+          app: traefik
       template:
         spec:
           containers:
           - name: traefik
-            image: traefik:GARBAGE_K8S_404_TRAEFIK_TAG
+            image: traefik:v2.10
+            ports:
+            - containerPort: 80
+            - containerPort: 443
 changed:
   src/config.py: |
     import os
@@ -173,50 +208,65 @@ changed:
       ports:
       - port: 80
         targetPort: 8080
-  k8s/unrelated/operators/cert-manager.yaml: |
-    # GARBAGE_K8S_404_CERT_MANAGER
+  k8s/operators/cert-manager.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: GARBAGE_K8S_404_CERT_CONTROLLER
+      name: cert-manager-controller
       namespace: cert-manager
     spec:
       replicas: 1
       selector:
         matchLabels:
-          app: GARBAGE_K8S_404_CERT_APP
+          app: cert-manager
       template:
         spec:
           containers:
           - name: controller
-            image: quay.io/jetstack/cert-manager-controller:GARBAGE_K8S_404_CERT_VERSION
-  k8s/unrelated/ingress/traefik.yaml: |
-    # GARBAGE_K8S_404_TRAEFIK_INGRESS
+            image: quay.io/jetstack/cert-manager-controller:v1.13.0
+            args:
+            - --cluster-resource-namespace=cert-manager
+            - --leader-election-namespace=cert-manager
+  k8s/ingress/traefik.yaml: |
     apiVersion: apps/v1
     kind: DaemonSet
     metadata:
-      name: GARBAGE_K8S_404_TRAEFIK_DS
+      name: traefik-ingress
+      namespace: kube-system
     spec:
       selector:
         matchLabels:
-          app: GARBAGE_K8S_404_TRAEFIK_LABEL
+          app: traefik
       template:
         spec:
           containers:
           - name: traefik
-            image: traefik:GARBAGE_K8S_404_TRAEFIK_TAG
+            image: traefik:v2.10
+            ports:
+            - containerPort: 80
+            - containerPort: 443
 must_include_files:
-- k8s/apps/backend/deployment.yaml
-must_include_content:
-- '- name: DATABASE_HOST'
+  - k8s/apps/backend/deployment.yaml
+must_include_content_from:
+  k8s/apps/backend/deployment.yaml:
+    - '- name: DATABASE_HOST'
+    - 'postgres.database.svc.cluster.local'
+    - '- name: DATABASE_USER'
+    - 'secretKeyRef:'
+    - 'name: db-credentials'
 must_not_include:
-- GARBAGE_K8S_404_CERT_APP
-- GARBAGE_K8S_404_CERT_CONTROLLER
-- GARBAGE_K8S_404_CERT_MANAGER
-- GARBAGE_K8S_404_TRAEFIK_DS
-- GARBAGE_K8S_404_TRAEFIK_INGRESS
-- GARBAGE_K8S_404_TRAEFIK_LABEL
-- cert-manager.yaml
-- traefik.yaml
+  # --- cert-manager.yaml: different namespace, different concern ---
+  - cert-manager-controller
+  - jetstack
+  - "leader-election-namespace"
+  # --- traefik.yaml: ingress controller, not backend env config ---
+  - traefik-ingress
+  - "traefik:v2.10"
+  - DaemonSet
+must_not_include_files:
+  - k8s/operators/cert-manager.yaml
+  - k8s/ingress/traefik.yaml
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 8
+max_files: 5

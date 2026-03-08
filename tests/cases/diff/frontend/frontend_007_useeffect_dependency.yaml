@@ -1,3 +1,18 @@
+# Scenario: React component adds useEffect with an API dependency.
+#
+# Diff: Dashboard.tsx changes from empty to using useEffect with fetchDashboard
+# as dependency. The effect re-runs when `filter` prop changes.
+#
+# Reviewer questions:
+#   Q1: "What does fetchDashboard return?" → src/api.ts (UNCHANGED) defines it with
+#        fetchData helper that calls /api/dashboard endpoint.
+#   Q2: "Is the cleanup correct for stale responses?" → Dashboard.tsx (CHANGED)
+#        uses cancelled flag pattern in the effect.
+#
+# Not needed:
+#   - src/hooks/useDebounce.ts: a custom hook in hooks/ but unrelated to data fetching.
+#   - src/api/auth.ts: another API module but for authentication, not dashboard data.
+
 initial:
   src/api.ts: |
     export async function fetchData(endpoint: string): Promise<any> {
@@ -16,50 +31,43 @@ initial:
     import React from 'react';
 
     export function Dashboard() {
-        return <div>Initial</div>;
+        return <div>TODO</div>;
     }
-  src/unrelated/date_formatter.ts: |
-    // GARBAGE_FE_007_DATE_A
-    export type DateFormat = 'short' | 'long' | 'iso';
+  src/hooks/useDebounce.ts: |
+    import { useState, useEffect } from 'react';
 
-    // GARBAGE_FE_007_DATE_B
-    export function formatDate(date: Date, format: DateFormat): string {
-        switch (format) {
-            case 'short':
-                return date.toLocaleDateString();
-            case 'long':
-                return date.toLocaleDateString('en-US', {
-                    weekday: 'long', year: 'numeric',
-                    month: 'long', day: 'numeric',
-                });
-            case 'iso':
-                return date.toISOString();
-        }
-    }
+    export function useDebounce<T>(value: T, delay: number): T {
+        const [debouncedValue, setDebouncedValue] = useState(value);
 
-    // GARBAGE_FE_007_RELATIVE_C
-    export function relativeTime(date: Date): string {
-        const diff = Date.now() - date.getTime();
-        const minutes = Math.floor(diff / 60000);
-        if (minutes < 60) return `${minutes}m ago`;
-        return `${Math.floor(minutes / 60)}h ago`;
+        useEffect(() => {
+            const timer = setTimeout(() => setDebouncedValue(value), delay);
+            return () => clearTimeout(timer);
+        }, [value, delay]);
+
+        return debouncedValue;
     }
-  src/unrelated/string_utils.ts: |
-    // GARBAGE_FE_007_STRING_D
-    export function capitalize(str: string): string {
-        return str.charAt(0).toUpperCase() + str.slice(1);
+  src/api/auth.ts: |
+    export async function login(email: string, password: string): Promise<{ token: string }> {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+        return response.json();
     }
 
-    // GARBAGE_FE_007_STRING_E
-    export function slugify(str: string): string {
-        return str.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    export async function logout(): Promise<void> {
+        await fetch('/api/auth/logout', { method: 'POST' });
     }
 
-    // GARBAGE_FE_007_TRUNCATE_F
-    export function truncate(str: string, maxLen: number): string {
-        if (str.length <= maxLen) return str;
-        return str.slice(0, maxLen - 3) + '...';
+    export async function refreshToken(token: string): Promise<{ token: string }> {
+        const response = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return response.json();
     }
+
 changed:
   src/api.ts: |
     export async function fetchData(endpoint: string): Promise<any> {
@@ -107,60 +115,65 @@ changed:
             </div>
         );
     }
-  src/unrelated/date_formatter.ts: |
-    // GARBAGE_FE_007_DATE_A
-    export type DateFormat = 'short' | 'long' | 'iso';
+  src/hooks/useDebounce.ts: |
+    import { useState, useEffect } from 'react';
 
-    // GARBAGE_FE_007_DATE_B
-    export function formatDate(date: Date, format: DateFormat): string {
-        switch (format) {
-            case 'short':
-                return date.toLocaleDateString();
-            case 'long':
-                return date.toLocaleDateString('en-US', {
-                    weekday: 'long', year: 'numeric',
-                    month: 'long', day: 'numeric',
-                });
-            case 'iso':
-                return date.toISOString();
-        }
-    }
+    export function useDebounce<T>(value: T, delay: number): T {
+        const [debouncedValue, setDebouncedValue] = useState(value);
 
-    // GARBAGE_FE_007_RELATIVE_C
-    export function relativeTime(date: Date): string {
-        const diff = Date.now() - date.getTime();
-        const minutes = Math.floor(diff / 60000);
-        if (minutes < 60) return `${minutes}m ago`;
-        return `${Math.floor(minutes / 60)}h ago`;
+        useEffect(() => {
+            const timer = setTimeout(() => setDebouncedValue(value), delay);
+            return () => clearTimeout(timer);
+        }, [value, delay]);
+
+        return debouncedValue;
     }
-  src/unrelated/string_utils.ts: |
-    // GARBAGE_FE_007_STRING_D
-    export function capitalize(str: string): string {
-        return str.charAt(0).toUpperCase() + str.slice(1);
+  src/api/auth.ts: |
+    export async function login(email: string, password: string): Promise<{ token: string }> {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+        return response.json();
     }
 
-    // GARBAGE_FE_007_STRING_E
-    export function slugify(str: string): string {
-        return str.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+    export async function logout(): Promise<void> {
+        await fetch('/api/auth/logout', { method: 'POST' });
     }
 
-    // GARBAGE_FE_007_TRUNCATE_F
-    export function truncate(str: string, maxLen: number): string {
-        if (str.length <= maxLen) return str;
-        return str.slice(0, maxLen - 3) + '...';
+    export async function refreshToken(token: string): Promise<{ token: string }> {
+        const response = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return response.json();
     }
+
+# === Assertions ===
+
 must_include_files:
-- src/Dashboard.tsx
-must_include_content:
-- 'function Dashboard({ filter }: DashboardProps) {'
+  - src/Dashboard.tsx
+
+must_include_content_from:
+  # Reviewer needs to see what fetchDashboard does — it calls fetchData('dashboard?filter=...')
+  src/api.ts:
+    - "async function fetchDashboard(filter: string)"
+    - "fetchData(`dashboard?filter=${filter}`)"
+
 must_not_include:
-- GARBAGE_FE_007_DATE_A
-- GARBAGE_FE_007_DATE_B
-- GARBAGE_FE_007_RELATIVE_C
-- GARBAGE_FE_007_STRING_D
-- GARBAGE_FE_007_STRING_E
-- GARBAGE_FE_007_TRUNCATE_F
-- date_formatter.ts
-- string_utils.ts
+  # useDebounce.ts: custom hook with useEffect but for debouncing, not data fetching
+  - useDebounce
+  - debouncedValue
+  # auth.ts: API module but for auth, not dashboard
+  - refreshToken
+  - logout
+
+must_not_include_files:
+  - src/hooks/useDebounce.ts
+  - src/api/auth.ts
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

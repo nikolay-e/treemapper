@@ -1,3 +1,8 @@
+# Scenario: UserService uses User type hint as parameter type in service methods
+# Changed: services/user_service.py imports User and uses it as parameter/return type
+# Reviewer questions: Is User type used correctly in method signatures? Are Optional cases handled?
+# Trap 1: services/audit_service.py — audit logging service, shares "user/service" vocabulary but independent
+# Trap 2: services/permission_service.py — permission checking, shares "user" domain but no dep on models
 initial:
   models/user.py: |
     from dataclasses import dataclass
@@ -41,46 +46,50 @@ initial:
                 if user.email == email:
                     return user
             return None
-  garbage_reporting.py: |
-    GARBAGE_PY_027_REPORTING_A = "reporting module marker"
-    GARBAGE_PY_027_METRICS_B = "metrics tracking marker"
+  services/audit_service.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class ReportGenerator:
-        GARBAGE_PY_027_GENERATOR_C = "generator class marker"
+    @dataclass
+    class AuditRecord:
+        user_id: int
+        action: str
+        resource: str
+        timestamp: datetime
 
+    class AuditService:
         def __init__(self):
-            self.reports = []
+            self._records: List[AuditRecord] = []
 
-        def generate_monthly_report(self, month: int, year: int) -> dict:
-            return {"month": month, "year": year, "total": 0}
+        def log_action(self, user_id: int, action: str, resource: str) -> None:
+            self._records.append(AuditRecord(
+                user_id=user_id, action=action, resource=resource, timestamp=datetime.now()
+            ))
 
-        def export_to_csv(self, report: dict) -> str:
-            return ",".join(f"{k}:{v}" for k, v in report.items())
+        def get_user_actions(self, user_id: int) -> List[AuditRecord]:
+            return [r for r in self._records if r.user_id == user_id]
+  services/permission_service.py: |
+    from typing import Dict, Set, Optional
 
-    def calculate_retention_rate(active: int, total: int) -> float:
-        GARBAGE_PY_027_RETENTION_D = "retention marker"
-        if total == 0:
-            return 0.0
-        return active / total
-  garbage_migration.py: |
-    GARBAGE_PY_027_MIGRATION_E = "migration module marker"
-    GARBAGE_PY_027_SCHEMA_F = "schema version marker"
+    class PermissionService:
+        def __init__(self):
+            self._user_permissions: Dict[int, Set[str]] = {}
 
-    class DatabaseMigrator:
-        GARBAGE_PY_027_MIGRATOR_G = True
+        def grant(self, user_id: int, permission: str) -> None:
+            if user_id not in self._user_permissions:
+                self._user_permissions[user_id] = set()
+            self._user_permissions[user_id].add(permission)
 
-        def __init__(self, connection_string: str):
-            self.connection = connection_string
+        def has_permission(self, user_id: int, permission: str) -> bool:
+            return permission in self._user_permissions.get(user_id, set())
 
-        def run_migration(self, version: int) -> bool:
-            return True
-
-        def rollback(self, version: int) -> bool:
+        def revoke(self, user_id: int, permission: str) -> bool:
+            perms = self._user_permissions.get(user_id, set())
+            if permission in perms:
+                perms.discard(permission)
+                return True
             return False
-
-    def get_current_schema_version() -> int:
-        GARBAGE_PY_027_VERSION_H = 42
-        return 1
 changed:
   models/user.py: |
     from dataclasses import dataclass
@@ -126,60 +135,68 @@ changed:
                 if user.email == email:
                     return user
             return None
-  garbage_reporting.py: |
-    GARBAGE_PY_027_REPORTING_A = "reporting module marker"
-    GARBAGE_PY_027_METRICS_B = "metrics tracking marker"
+  services/audit_service.py: |
+    from typing import Dict, Any, List, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class ReportGenerator:
-        GARBAGE_PY_027_GENERATOR_C = "generator class marker"
+    @dataclass
+    class AuditRecord:
+        user_id: int
+        action: str
+        resource: str
+        timestamp: datetime
 
+    class AuditService:
         def __init__(self):
-            self.reports = []
+            self._records: List[AuditRecord] = []
 
-        def generate_monthly_report(self, month: int, year: int) -> dict:
-            return {"month": month, "year": year, "total": 0}
+        def log_action(self, user_id: int, action: str, resource: str) -> None:
+            self._records.append(AuditRecord(
+                user_id=user_id, action=action, resource=resource, timestamp=datetime.now()
+            ))
 
-        def export_to_csv(self, report: dict) -> str:
-            return ",".join(f"{k}:{v}" for k, v in report.items())
+        def get_user_actions(self, user_id: int) -> List[AuditRecord]:
+            return [r for r in self._records if r.user_id == user_id]
+  services/permission_service.py: |
+    from typing import Dict, Set, Optional
 
-    def calculate_retention_rate(active: int, total: int) -> float:
-        GARBAGE_PY_027_RETENTION_D = "retention marker"
-        if total == 0:
-            return 0.0
-        return active / total
-  garbage_migration.py: |
-    GARBAGE_PY_027_MIGRATION_E = "migration module marker"
-    GARBAGE_PY_027_SCHEMA_F = "schema version marker"
+    class PermissionService:
+        def __init__(self):
+            self._user_permissions: Dict[int, Set[str]] = {}
 
-    class DatabaseMigrator:
-        GARBAGE_PY_027_MIGRATOR_G = True
+        def grant(self, user_id: int, permission: str) -> None:
+            if user_id not in self._user_permissions:
+                self._user_permissions[user_id] = set()
+            self._user_permissions[user_id].add(permission)
 
-        def __init__(self, connection_string: str):
-            self.connection = connection_string
+        def has_permission(self, user_id: int, permission: str) -> bool:
+            return permission in self._user_permissions.get(user_id, set())
 
-        def run_migration(self, version: int) -> bool:
-            return True
-
-        def rollback(self, version: int) -> bool:
+        def revoke(self, user_id: int, permission: str) -> bool:
+            perms = self._user_permissions.get(user_id, set())
+            if permission in perms:
+                perms.discard(permission)
+                return True
             return False
-
-    def get_current_schema_version() -> int:
-        GARBAGE_PY_027_VERSION_H = 42
-        return 1
 must_include_files:
 - services/user_service.py
-must_include_content:
-- 'def process(self, user: UserProfile) -> dict:'
+- models/user.py
+must_include_content_from:
+  services/user_service.py:
+  - 'from models.user import UserProfile'
+  - 'def process(self, user: UserProfile) -> dict:'
 must_not_include:
-- GARBAGE_PY_027_GENERATOR_C
-- GARBAGE_PY_027_METRICS_B
-- GARBAGE_PY_027_MIGRATION_E
-- GARBAGE_PY_027_MIGRATOR_G
-- GARBAGE_PY_027_REPORTING_A
-- GARBAGE_PY_027_RETENTION_D
-- GARBAGE_PY_027_SCHEMA_F
-- GARBAGE_PY_027_VERSION_H
-- garbage_migration.py
-- garbage_reporting.py
+- AuditService
+- AuditRecord
+- log_action
+- PermissionService
+- has_permission
+- revoke
+must_not_include_files:
+- services/audit_service.py
+- services/permission_service.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

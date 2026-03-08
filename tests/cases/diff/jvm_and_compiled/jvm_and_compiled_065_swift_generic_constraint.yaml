@@ -1,3 +1,21 @@
+# Scenario: CacheService is implemented as a generic class with Comparable
+# & Hashable constraints, plus additional generic methods with Numeric
+# and Collection constraints.
+#
+# Diff: CacheService.swift goes from empty class to generic class with
+# store, retrieve, process<U: Numeric>, and filter<C: Collection> methods.
+#
+# Reviewer questions:
+#   Q1: "What protocol does the existing Repository use?"
+#       -> Repository.swift (UNCHANGED) defines Repository protocol with
+#          associatedtype Entity and CRUD methods.
+#
+# Not needed:
+#   - TypeErasedBox.swift: type-erased wrapper for protocol types.
+#     Generics-adjacent vocabulary but no dependency from CacheService.
+#   - KeyValueStore.swift: protocol for key-value storage.
+#     Similar generic cache pattern but CacheService doesn't conform to it.
+
 initial:
   Repository.swift: |
     protocol Repository {
@@ -9,18 +27,32 @@ initial:
   CacheService.swift: |
     // Initial
     class CacheService {}
-  GarbageAssocType.swift: |
-    class GarbageAssocType {
-        static let GARBAGE_JVM_065_ASSOC_MARKER_A = "marker"
-        static let GARBAGE_JVM_065_TYPE_MARKER_B = "marker"
-        func noop() {}
+  TypeErasedBox.swift: |
+    class AnyRepository<T> {
+        private let _save: (T) -> Void
+        private let _find: (String) -> T?
+        private let _delete: (String) -> Void
+
+        init<R: Repository>(_ repository: R) where R.Entity == T {
+            _save = repository.save
+            _find = repository.find
+            _delete = repository.delete
+        }
+
+        func save(_ entity: T) { _save(entity) }
+        func find(id: String) -> T? { _find(id) }
+        func delete(id: String) { _delete(id) }
     }
-  GarbageOpaqueWrapper.swift: |
-    class GarbageOpaqueWrapper {
-        static let GARBAGE_JVM_065_OPAQUE_MARKER_C = "marker"
-        static let GARBAGE_JVM_065_SOME_MARKER_D = "marker"
-        func noop() {}
+  KeyValueStore.swift: |
+    protocol KeyValueStore {
+        associatedtype Value
+
+        func get(forKey key: String) -> Value?
+        func set(_ value: Value, forKey key: String)
+        func remove(forKey key: String)
+        var count: Int { get }
     }
+
 changed:
   Repository.swift: |
     protocol Repository {
@@ -50,28 +82,47 @@ changed:
             return items.filter(predicate).sorted()
         }
     }
-  GarbageAssocType.swift: |
-    class GarbageAssocType {
-        static let GARBAGE_JVM_065_ASSOC_MARKER_A = "marker"
-        static let GARBAGE_JVM_065_TYPE_MARKER_B = "marker"
-        func noop() {}
+  TypeErasedBox.swift: |
+    class AnyRepository<T> {
+        private let _save: (T) -> Void
+        private let _find: (String) -> T?
+        private let _delete: (String) -> Void
+
+        init<R: Repository>(_ repository: R) where R.Entity == T {
+            _save = repository.save
+            _find = repository.find
+            _delete = repository.delete
+        }
+
+        func save(_ entity: T) { _save(entity) }
+        func find(id: String) -> T? { _find(id) }
+        func delete(id: String) { _delete(id) }
     }
-  GarbageOpaqueWrapper.swift: |
-    class GarbageOpaqueWrapper {
-        static let GARBAGE_JVM_065_OPAQUE_MARKER_C = "marker"
-        static let GARBAGE_JVM_065_SOME_MARKER_D = "marker"
-        func noop() {}
+  KeyValueStore.swift: |
+    protocol KeyValueStore {
+        associatedtype Value
+
+        func get(forKey key: String) -> Value?
+        func set(_ value: Value, forKey key: String)
+        func remove(forKey key: String)
+        var count: Int { get }
     }
+
 must_include_files:
-- CacheService.swift
-must_include_content:
-- 'class CacheService<T: Comparable & Hashable> {'
+  - CacheService.swift
+must_include_content_from:
+  CacheService.swift:
+    - "class CacheService<T: Comparable & Hashable> {"
 must_not_include:
-- GARBAGE_JVM_065_ASSOC_MARKER_A
-- GARBAGE_JVM_065_OPAQUE_MARKER_C
-- GARBAGE_JVM_065_SOME_MARKER_D
-- GARBAGE_JVM_065_TYPE_MARKER_B
-- GarbageAssocType.swift
-- GarbageOpaqueWrapper.swift
+  # TypeErasedBox.swift: type erasure wrapper, no dependency from CacheService
+  - AnyRepository
+  - TypeErasedBox
+  # KeyValueStore.swift: protocol CacheService doesn't conform to
+  - KeyValueStore
+must_not_include_files:
+  - TypeErasedBox.swift
+  - KeyValueStore.swift
+max_fragments: 4
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

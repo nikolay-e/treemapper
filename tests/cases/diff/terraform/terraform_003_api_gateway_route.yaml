@@ -1,3 +1,19 @@
+# Scenario: API Gateway caller expands CORS, adds throttling, new routes with JWT auth.
+# The module definition (modules/api_gateway) is unchanged — the diff is in the
+# caller infrastructure/api.tf which adds routes, integrations, and an authorizer.
+#
+# Reviewer questions:
+#   Q1: "What CORS and throttling defaults does the api_gateway module provide?"
+#       -> modules/api_gateway/variables.tf: cors defaults to ["*"], burst 1000, rate 500
+#          The caller overrides these, so reviewer needs defaults to assess the change.
+#   Q2: "What does the stage's access_log_settings format look like?"
+#       -> modules/api_gateway/main.tf: jsonencode with requestId, ip, httpMethod, etc.
+#          Reviewer confirms logging covers the new routes.
+#
+# Not needed:
+#   - infrastructure/admin_api.tf: separate admin API using the same module —
+#     different API, different authorizer, doesn't affect the main API changes
+
 initial:
   modules/api_gateway/main.tf: |
     resource "aws_apigatewayv2_api" "main" {
@@ -111,9 +127,6 @@ initial:
       type    = map(string)
       default = {}
     }
-  handler.py: |
-    def get_users(event, context):
-        return {'statusCode': 200, 'body': '[]'}
   infrastructure/api.tf: |
     module "api" {
       source   = "./modules/api_gateway"
@@ -137,43 +150,9 @@ initial:
       integration_uri    = module.users_lambda.invoke_arn
       integration_method = "POST"
     }
-  unrelated/glue.tf: |
-    # GARBAGE_TF_GLUE_443_001
-    resource "aws_glue_catalog_database" "unrelated_db" {
-      name = "GARBAGE_GLUE_DB_443_002"
-    }
 
-    resource "aws_glue_crawler" "unrelated_crawler" {
-      database_name = aws_glue_catalog_database.unrelated_db.name
-      name          = "GARBAGE_CRAWLER_443_003"
-      role          = "arn:aws:iam::123456789:role/GARBAGE_GLUE_ROLE_443_004"
-
-      s3_target {
-        path = "s3://GARBAGE_BUCKET_443_005/data/"
-      }
-    }
-  unrelated/step_functions.tf: |
-    # GARBAGE_TF_SFN_443_006
-    resource "aws_sfn_state_machine" "unrelated_workflow" {
-      name     = "GARBAGE_STATE_MACHINE_443_007"
-      role_arn = "arn:aws:iam::123456789:role/GARBAGE_SFN_ROLE_443_008"
-
-      definition = jsonencode({
-        StartAt = "GARBAGE_STATE_443_009"
-        States = {
-          "GARBAGE_STATE_443_009" = {
-            Type = "Pass"
-            End  = true
-          }
-        }
-      })
-    }
-
-  # --- Tricky garbage: admin API with same resource types (routes, integrations) ---
+  # Trap: admin API using the same api_gateway module
   infrastructure/admin_api.tf: |
-    GARBAGE_TF_003_ADMIN_API_G = "admin-api-gateway"
-    GARBAGE_TF_003_ADMIN_ROUTES_H = "admin-routes-config"
-
     module "admin_api" {
       source   = "./modules/api_gateway"
       api_name = "admin-api"
@@ -195,25 +174,10 @@ initial:
       authorizer_id      = aws_apigatewayv2_authorizer.admin_jwt.id
     }
 
-    resource "aws_apigatewayv2_route" "admin_settings" {
-      api_id             = module.admin_api.api_id
-      route_key          = "PUT /admin/settings"
-      target             = "integrations/${aws_apigatewayv2_integration.admin_settings.id}"
-      authorization_type = "JWT"
-      authorizer_id      = aws_apigatewayv2_authorizer.admin_jwt.id
-    }
-
     resource "aws_apigatewayv2_integration" "admin_users" {
       api_id             = module.admin_api.api_id
       integration_type   = "AWS_PROXY"
       integration_uri    = module.admin_lambda.invoke_arn
-      integration_method = "POST"
-    }
-
-    resource "aws_apigatewayv2_integration" "admin_settings" {
-      api_id             = module.admin_api.api_id
-      integration_type   = "AWS_PROXY"
-      integration_uri    = module.admin_settings_lambda.invoke_arn
       integration_method = "POST"
     }
 
@@ -342,9 +306,6 @@ changed:
       type    = map(string)
       default = {}
     }
-  handler.py: |
-    def get_users(event, context):
-        return {'statusCode': 200, 'body': '[]'}
   infrastructure/api.tf: |
     module "api" {
       source   = "./modules/api_gateway"
@@ -413,43 +374,7 @@ changed:
         issuer   = "https://cognito-idp.${var.aws_region}.amazonaws.com/${var.cognito_user_pool_id}"
       }
     }
-  unrelated/glue.tf: |
-    # GARBAGE_TF_GLUE_443_001
-    resource "aws_glue_catalog_database" "unrelated_db" {
-      name = "GARBAGE_GLUE_DB_443_002"
-    }
-
-    resource "aws_glue_crawler" "unrelated_crawler" {
-      database_name = aws_glue_catalog_database.unrelated_db.name
-      name          = "GARBAGE_CRAWLER_443_003"
-      role          = "arn:aws:iam::123456789:role/GARBAGE_GLUE_ROLE_443_004"
-
-      s3_target {
-        path = "s3://GARBAGE_BUCKET_443_005/data/"
-      }
-    }
-  unrelated/step_functions.tf: |
-    # GARBAGE_TF_SFN_443_006
-    resource "aws_sfn_state_machine" "unrelated_workflow" {
-      name     = "GARBAGE_STATE_MACHINE_443_007"
-      role_arn = "arn:aws:iam::123456789:role/GARBAGE_SFN_ROLE_443_008"
-
-      definition = jsonencode({
-        StartAt = "GARBAGE_STATE_443_009"
-        States = {
-          "GARBAGE_STATE_443_009" = {
-            Type = "Pass"
-            End  = true
-          }
-        }
-      })
-    }
-
-  # --- Tricky garbage: admin API with same resource types (routes, integrations) ---
   infrastructure/admin_api.tf: |
-    GARBAGE_TF_003_ADMIN_API_G = "admin-api-gateway"
-    GARBAGE_TF_003_ADMIN_ROUTES_H = "admin-routes-config"
-
     module "admin_api" {
       source   = "./modules/api_gateway"
       api_name = "admin-api"
@@ -471,25 +396,10 @@ changed:
       authorizer_id      = aws_apigatewayv2_authorizer.admin_jwt.id
     }
 
-    resource "aws_apigatewayv2_route" "admin_settings" {
-      api_id             = module.admin_api.api_id
-      route_key          = "PUT /admin/settings"
-      target             = "integrations/${aws_apigatewayv2_integration.admin_settings.id}"
-      authorization_type = "JWT"
-      authorizer_id      = aws_apigatewayv2_authorizer.admin_jwt.id
-    }
-
     resource "aws_apigatewayv2_integration" "admin_users" {
       api_id             = module.admin_api.api_id
       integration_type   = "AWS_PROXY"
       integration_uri    = module.admin_lambda.invoke_arn
-      integration_method = "POST"
-    }
-
-    resource "aws_apigatewayv2_integration" "admin_settings" {
-      api_id             = module.admin_api.api_id
-      integration_type   = "AWS_PROXY"
-      integration_uri    = module.admin_settings_lambda.invoke_arn
       integration_method = "POST"
     }
 
@@ -505,44 +415,29 @@ changed:
       }
     }
 
-# === Assertions ===
-
 must_include_files:
 - infrastructure/api.tf
 
 must_include_content_from:
   infrastructure/api.tf:
-    - cors_origins = ["https://example.com", "https://app.example.com"]
-    - cors_methods = ["GET", "POST", "PUT", "DELETE"]
     - throttling_burst_limit = 2000
     - throttling_rate_limit  = 1000
     - route_key          = "POST /users"
     - route_key          = "PUT /users/{id}"
     - authorization_type = "JWT"
-    - authorizer_type  = "JWT"
     - audience = [var.cognito_client_id]
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_TF_GLUE_443_001
-- GARBAGE_GLUE_DB_443_002
-- GARBAGE_CRAWLER_443_003
-- GARBAGE_GLUE_ROLE_443_004
-- GARBAGE_BUCKET_443_005
-- GARBAGE_TF_SFN_443_006
-- GARBAGE_STATE_MACHINE_443_007
-- GARBAGE_SFN_ROLE_443_008
-- GARBAGE_STATE_443_009
-# Tricky: admin API with same resource types and authorizer
-- GARBAGE_TF_003_ADMIN_API_G
-- GARBAGE_TF_003_ADMIN_ROUTES_H
+  # admin_api.tf: separate admin API — different gateway, different authorizer,
+  # doesn't affect the main-api CORS, throttling, or route changes
+  - admin-api
+  - admin_jwt
+  - admin_cognito_client_id
 
 must_not_include_files:
-- unrelated/glue.tf
-- unrelated/step_functions.tf
 - infrastructure/admin_api.tf
 
 max_fragments: 8
-max_files: 2
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

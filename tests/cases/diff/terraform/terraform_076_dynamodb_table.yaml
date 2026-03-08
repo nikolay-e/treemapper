@@ -1,3 +1,12 @@
+# Scenario: Adding a range_key (created_at) to a DynamoDB users table for
+#   time-based querying.
+# Reviewer questions:
+#   1. What application code queries this table? (src/users.py)
+#   2. Are there GSIs that need updating? (indexes.tf)
+# Traps:
+#   - sessions/table.tf: another DynamoDB table for sessions (same resource type, different table)
+#   - email/service.py: email service (unrelated to DynamoDB schema changes)
+
 initial:
   dynamodb.tf: |
     resource "aws_dynamodb_table" "users" {
@@ -17,12 +26,15 @@ initial:
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.Table("users")
         return table.get_item(Key={"id": user_id})
-
-  # --- Tricky garbage: sibling .tf with same aws_dynamodb_table resource type ---
-  garbage_dynamo_sessions.tf: |
-    GARBAGE_TF_076_SESSION_MARKER_A = "session-store"
-    GARBAGE_TF_076_TTL_ATTR_MARKER_B = "expires_at"
-
+  indexes.tf: |
+    resource "aws_dynamodb_table" "users" {
+      global_secondary_index {
+        name            = "email-index"
+        hash_key        = "email"
+        projection_type = "ALL"
+      }
+    }
+  sessions/table.tf: |
     resource "aws_dynamodb_table" "sessions" {
       name         = "sessions"
       billing_mode = "PAY_PER_REQUEST"
@@ -38,15 +50,8 @@ initial:
         enabled        = true
       }
     }
-
-  # --- Plain garbage: no overlap ---
-  garbage_email.py: |
-    GARBAGE_TF_076_EMAIL_MARKER_C = "smtp-sender"
-    GARBAGE_TF_076_TEMPLATE_MARKER_D = "welcome"
-
+  email/service.py: |
     class EmailService:
-        GARBAGE_TF_076_MAILER_MARKER_E = True
-
         def send(self, to: str, subject: str, body: str) -> bool:
             return True
 
@@ -68,71 +73,31 @@ changed:
         type = "N"
       }
     }
-  src/users.py: |
-    import boto3
-
-    def get_user(user_id: str):
-        dynamodb = boto3.resource("dynamodb")
-        table = dynamodb.Table("users")
-        return table.get_item(Key={"id": user_id})
-
-  garbage_dynamo_sessions.tf: |
-    GARBAGE_TF_076_SESSION_MARKER_A = "session-store"
-    GARBAGE_TF_076_TTL_ATTR_MARKER_B = "expires_at"
-
-    resource "aws_dynamodb_table" "sessions" {
-      name         = "sessions"
-      billing_mode = "PAY_PER_REQUEST"
-      hash_key     = "session_id"
-
-      attribute {
-        name = "session_id"
-        type = "S"
-      }
-
-      ttl {
-        attribute_name = "expires_at"
-        enabled        = true
-      }
-    }
-
-  garbage_email.py: |
-    GARBAGE_TF_076_EMAIL_MARKER_C = "smtp-sender"
-    GARBAGE_TF_076_TEMPLATE_MARKER_D = "welcome"
-
-    class EmailService:
-        GARBAGE_TF_076_MAILER_MARKER_E = True
-
-        def send(self, to: str, subject: str, body: str) -> bool:
-            return True
-
-# === Assertions ===
 
 must_include_files:
-- dynamodb.tf
+  - dynamodb.tf
+  - src/users.py
 
 must_include_content_from:
   dynamodb.tf:
     - range_key    = "created_at"
     - name = "created_at"
     - type = "N"
-    - 'resource "aws_dynamodb_table" "users"'
+  src/users.py:
+    - table.get_item
 
 must_not_include:
-# Tricky garbage: sibling .tf with same resource type
-- GARBAGE_TF_076_SESSION_MARKER_A
-- GARBAGE_TF_076_TTL_ATTR_MARKER_B
-# Plain garbage
-- GARBAGE_TF_076_EMAIL_MARKER_C
-- GARBAGE_TF_076_TEMPLATE_MARKER_D
-- GARBAGE_TF_076_MAILER_MARKER_E
+  # Sessions table - same resource type but a different table with different schema
+  - session_id
+  - expires_at
+  # Email service - application code unrelated to database schema
+  - class EmailService
 
 must_not_include_files:
-- garbage_dynamo_sessions.tf
-- garbage_email.py
-- src/users.py
+  - sessions/table.tf
+  - email/service.py
 
-max_fragments: 3
-max_files: 1
+max_fragments: 4
+max_files: 2
 add_garbage_files: false
 skip_garbage_check: true

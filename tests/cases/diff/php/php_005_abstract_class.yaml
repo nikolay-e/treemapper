@@ -1,3 +1,22 @@
+# Test 005: ProductController extends BaseController abstract class
+#           — reviewer needs BaseController to verify abstract method implementations
+#
+# Scenario: ProductController changes from standalone to extending BaseController.
+# It implements getModelName(), getValidationRules(), and adds store()/show()
+# that use inherited validate() and respond() methods.
+#
+# Reviewer questions:
+#   Q1: "What abstract methods must ProductController implement?"
+#       -> getModelName(): string and getValidationRules(): array.
+#   Q2: "What do the inherited validate() and respond() methods do?"
+#       -> validate() checks required fields from rules, respond() wraps status+data.
+#
+# Trap files (plausible but unrelated):
+#   - src/Controllers/CategoryController.php: another controller that could
+#     extend BaseController, but is independent of this change.
+#   - src/Models/Product.php: shares "Product" naming but is a data model,
+#     not imported or referenced by ProductController.
+
 initial:
   src/Controllers/BaseController.php: |
     <?php
@@ -34,32 +53,43 @@ initial:
             return [];
         }
     }
-  src/garbage_smtp_transport.php: |
+  src/Controllers/CategoryController.php: |
     <?php
-    GARBAGE_PHP_005_SMTP_HOST_A = "localhost";
-    GARBAGE_PHP_005_SMTP_PORT_B = 587;
+    namespace App\Controllers;
 
-    class GarbageSmtpTransport {
-        GARBAGE_PHP_005_ENCRYPTION_C = "tls";
+    class CategoryController {
+        private array $categories = [];
 
-        public function send(string $to, string $body): bool {
-            GARBAGE_PHP_005_TIMEOUT_D = 30;
-            return true;
+        public function index(): array {
+            return $this->categories;
+        }
+
+        public function create(string $name, ?string $parentId = null): array {
+            $category = ['name' => $name, 'parent' => $parentId];
+            $this->categories[] = $category;
+            return $category;
         }
     }
-  src/garbage_image_resize.php: |
+  src/Models/Product.php: |
     <?php
-    GARBAGE_PHP_005_MAX_WIDTH_E = 1920;
-    GARBAGE_PHP_005_QUALITY_F = 85;
+    namespace App\Models;
 
-    class GarbageImageResize {
-        GARBAGE_PHP_005_FORMAT_G = "jpeg";
+    class Product {
+        public string $name;
+        public float $price;
+        public string $sku;
 
-        public function resize(string $path, int $width): string {
-            GARBAGE_PHP_005_INTERPOLATION_H = "bicubic";
-            return $path;
+        public function __construct(string $name, float $price, string $sku) {
+            $this->name = $name;
+            $this->price = $price;
+            $this->sku = $sku;
+        }
+
+        public function isAvailable(): bool {
+            return $this->price > 0;
         }
     }
+
 changed:
   src/Controllers/BaseController.php: |
     <?php
@@ -111,49 +141,70 @@ changed:
             return $this->respond(200, ['id' => $id, 'model' => $this->getModelName()]);
         }
     }
-  src/garbage_smtp_transport.php: |
+  src/Controllers/CategoryController.php: |
     <?php
-    GARBAGE_PHP_005_SMTP_HOST_A = "localhost";
-    GARBAGE_PHP_005_SMTP_PORT_B = 587;
+    namespace App\Controllers;
 
-    class GarbageSmtpTransport {
-        GARBAGE_PHP_005_ENCRYPTION_C = "tls";
+    class CategoryController {
+        private array $categories = [];
 
-        public function send(string $to, string $body): bool {
-            GARBAGE_PHP_005_TIMEOUT_D = 30;
-            return true;
+        public function index(): array {
+            return $this->categories;
+        }
+
+        public function create(string $name, ?string $parentId = null): array {
+            $category = ['name' => $name, 'parent' => $parentId];
+            $this->categories[] = $category;
+            return $category;
         }
     }
-  src/garbage_image_resize.php: |
+  src/Models/Product.php: |
     <?php
-    GARBAGE_PHP_005_MAX_WIDTH_E = 1920;
-    GARBAGE_PHP_005_QUALITY_F = 85;
+    namespace App\Models;
 
-    class GarbageImageResize {
-        GARBAGE_PHP_005_FORMAT_G = "jpeg";
+    class Product {
+        public string $name;
+        public float $price;
+        public string $sku;
 
-        public function resize(string $path, int $width): string {
-            GARBAGE_PHP_005_INTERPOLATION_H = "bicubic";
-            return $path;
+        public function __construct(string $name, float $price, string $sku) {
+            $this->name = $name;
+            $this->price = $price;
+            $this->sku = $sku;
+        }
+
+        public function isAvailable(): bool {
+            return $this->price > 0;
         }
     }
+
 must_include_files:
-- src/Controllers/ProductController.php
-must_include_content:
-- |
-  extends BaseController
+  - src/Controllers/ProductController.php
+  # Q1/Q2: Reviewer needs BaseController to verify abstract contract and inherited behavior
+  - src/Controllers/BaseController.php
+
+must_include_content_from:
+  src/Controllers/ProductController.php:
+    - "extends BaseController"
+    - "$this->validate($data)"
+    - "$this->respond(201"
+  src/Controllers/BaseController.php:
+    - "abstract protected function getModelName(): string"
+    - "abstract protected function getValidationRules(): array"
+
 must_not_include:
-- GARBAGE_PHP_005_SMTP_HOST_A
-- GARBAGE_PHP_005_SMTP_PORT_B
-- GARBAGE_PHP_005_ENCRYPTION_C
-- GARBAGE_PHP_005_TIMEOUT_D
-- GARBAGE_PHP_005_MAX_WIDTH_E
-- GARBAGE_PHP_005_QUALITY_F
-- GARBAGE_PHP_005_FORMAT_G
-- GARBAGE_PHP_005_INTERPOLATION_H
-- GarbageSmtpTransport
-- GarbageImageResize
-- garbage_smtp_transport.php
-- garbage_image_resize.php
+  # --- CategoryController.php: sibling controller, could extend BaseController but doesn't ---
+  - "class CategoryController"
+  - "parentId"
+  # --- Models/Product.php: shares "Product" name but is a data model, not referenced ---
+  - "class Product"
+  - "isAvailable"
+
+must_not_include_files:
+  - src/Controllers/CategoryController.php
+  - src/Models/Product.php
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

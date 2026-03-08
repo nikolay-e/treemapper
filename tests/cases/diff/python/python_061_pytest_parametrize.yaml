@@ -1,3 +1,16 @@
+# Scenario: test_validators.py adds parametrized tests for validate_email,
+#   validate_phone, and validate_password using @pytest.mark.parametrize.
+#
+# Reviewer questions:
+#   - Do the parametrize test cases cover all edge cases for each validator?
+#   - Are the expected values correct for boundary inputs?
+#
+# Trap files:
+#   - utils/number_formatter.py: formatting utility with currency and percentage
+#     methods, uses "format" and "value" vocabulary but no validator connection
+#   - utils/html_sanitizer.py: HTML tag sanitization with strip methods,
+#     mentions "valid" in tag context but has no pytest or validator dependency
+
 initial:
   validators.py: |
     import re
@@ -28,13 +41,8 @@ initial:
   test_validators.py: |
     def test_placeholder():
         assert True
-  garbage_formatter.py: |
-    GARBAGE_PY_061_FORMAT_A = "formatter registry marker"
-    GARBAGE_PY_061_LOCALE_B = "locale handler marker"
-
+  utils/number_formatter.py: |
     class NumberFormatter:
-        GARBAGE_PY_061_DECIMAL_C = "decimal precision marker"
-
         def __init__(self, locale: str = "en_US"):
             self.locale = locale
 
@@ -42,25 +50,39 @@ initial:
             return f"{symbol}{amount:,.2f}"
 
         def format_percentage(self, value: float) -> str:
-            GARBAGE_PY_061_PERCENT_D = "percent format marker"
             return f"{value * 100:.1f}%"
-  garbage_sanitizer.py: |
-    GARBAGE_PY_061_SANITIZE_E = "html sanitizer marker"
-    GARBAGE_PY_061_XSS_F = "xss prevention marker"
+
+        def format_integer(self, value: int, grouping: bool = True) -> str:
+            if grouping:
+                return f"{value:,}"
+            return str(value)
+
+        def parse_currency(self, text: str) -> float:
+            cleaned = text.replace(",", "").replace("$", "")
+            return float(cleaned)
+  utils/html_sanitizer.py: |
+    import re
 
     class HtmlSanitizer:
-        GARBAGE_PY_061_TAG_G = True
-
         def __init__(self, allowed_tags: list[str] | None = None):
             self.allowed_tags = allowed_tags or ["p", "br", "strong", "em"]
 
         def sanitize(self, html: str) -> str:
+            for tag in self.allowed_tags:
+                html = html.replace(f"<{tag}>", f"[{tag}]")
             return html
 
         def strip_all_tags(self, html: str) -> str:
-            GARBAGE_PY_061_STRIP_H = "strip tags marker"
-            import re
             return re.sub(r'<[^>]+>', '', html)
+
+        def escape_entities(self, text: str) -> str:
+            return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        def is_valid_html(self, html: str) -> bool:
+            open_tags = re.findall(r'<([a-z]+)[^>]*>', html)
+            close_tags = re.findall(r'</([a-z]+)>', html)
+            return open_tags == close_tags
+
 changed:
   validators.py: |
     import re
@@ -122,13 +144,8 @@ changed:
         is_valid, msg = validate_password(password)
         assert is_valid == valid
         assert msg == reason
-  garbage_formatter.py: |
-    GARBAGE_PY_061_FORMAT_A = "formatter registry marker"
-    GARBAGE_PY_061_LOCALE_B = "locale handler marker"
-
+  utils/number_formatter.py: |
     class NumberFormatter:
-        GARBAGE_PY_061_DECIMAL_C = "decimal precision marker"
-
         def __init__(self, locale: str = "en_US"):
             self.locale = locale
 
@@ -136,40 +153,58 @@ changed:
             return f"{symbol}{amount:,.2f}"
 
         def format_percentage(self, value: float) -> str:
-            GARBAGE_PY_061_PERCENT_D = "percent format marker"
             return f"{value * 100:.1f}%"
-  garbage_sanitizer.py: |
-    GARBAGE_PY_061_SANITIZE_E = "html sanitizer marker"
-    GARBAGE_PY_061_XSS_F = "xss prevention marker"
+
+        def format_integer(self, value: int, grouping: bool = True) -> str:
+            if grouping:
+                return f"{value:,}"
+            return str(value)
+
+        def parse_currency(self, text: str) -> float:
+            cleaned = text.replace(",", "").replace("$", "")
+            return float(cleaned)
+  utils/html_sanitizer.py: |
+    import re
 
     class HtmlSanitizer:
-        GARBAGE_PY_061_TAG_G = True
-
         def __init__(self, allowed_tags: list[str] | None = None):
             self.allowed_tags = allowed_tags or ["p", "br", "strong", "em"]
 
         def sanitize(self, html: str) -> str:
+            for tag in self.allowed_tags:
+                html = html.replace(f"<{tag}>", f"[{tag}]")
             return html
 
         def strip_all_tags(self, html: str) -> str:
-            GARBAGE_PY_061_STRIP_H = "strip tags marker"
-            import re
             return re.sub(r'<[^>]+>', '', html)
+
+        def escape_entities(self, text: str) -> str:
+            return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        def is_valid_html(self, html: str) -> bool:
+            open_tags = re.findall(r'<([a-z]+)[^>]*>', html)
+            close_tags = re.findall(r'</([a-z]+)>', html)
+            return open_tags == close_tags
+
 must_include_files:
 - test_validators.py
 must_include_content:
 - import pytest
 - '@pytest.mark.parametrize("email,expected", ['
+must_include_content_from:
+  validators.py:
+  - def validate_email(email
 must_not_include:
-- GARBAGE_PY_061_DECIMAL_C
-- GARBAGE_PY_061_FORMAT_A
-- GARBAGE_PY_061_LOCALE_B
-- GARBAGE_PY_061_PERCENT_D
-- GARBAGE_PY_061_SANITIZE_E
-- GARBAGE_PY_061_STRIP_H
-- GARBAGE_PY_061_TAG_G
-- GARBAGE_PY_061_XSS_F
-- garbage_formatter.py
-- garbage_sanitizer.py
+- NumberFormatter
+- format_currency
+- parse_currency
+- HtmlSanitizer
+- strip_all_tags
+- is_valid_html
+must_not_include_files:
+- utils/number_formatter.py
+- utils/html_sanitizer.py
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

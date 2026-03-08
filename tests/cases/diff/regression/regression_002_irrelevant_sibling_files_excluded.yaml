@@ -1,3 +1,30 @@
+# Test: Sibling page components must be excluded when only StatisticsPage changes
+#
+# Scenario: StatisticsPage.tsx adds a trends section by importing
+# useTrendsData from the useAnalytics hook. The hook module gains
+# the new useTrendsData export. Other page components in the same
+# directory (DashboardPage, SettingsPage, ProfilePage) are unchanged
+# and must NOT be included — they are sibling files with lexical
+# overlap (React, useState, useEffect) but no import relationship
+# to the changed code.
+#
+# Reviewer questions:
+#   Q1: "What is useTrendsData? What API does it expose?"
+#       -> frontend/src/hooks/useAnalytics.ts: the new useTrendsData()
+#          hook returns { trends, loadTrends, trendError }. Reviewer
+#          verifies the hook's contract matches how StatisticsPage uses it.
+#   Q2: "What was the original useAnalytics hook providing?"
+#       -> Same file shows fetchOverview (existing) alongside the new
+#          useTrendsData. Both are used in the updated StatisticsPage.
+#
+# Not needed:
+#   - frontend/src/pages/DashboardPage.tsx: sibling page in same directory.
+#     Different page that doesn't import useAnalytics or useTrendsData.
+#   - frontend/src/pages/SettingsPage.tsx: sibling page for user preferences.
+#     Uses useState/useEffect like StatisticsPage but has no import overlap.
+#   - frontend/src/pages/ProfilePage.tsx: sibling page for user profile.
+#     Takes userId prop like StatisticsPage but fetches different data.
+
 initial:
   frontend/src/pages/StatisticsPage.tsx: |
     import React, { useState, useEffect } from 'react';
@@ -38,132 +65,6 @@ initial:
         </div>
       );
     };
-  frontend/src/pages/DashboardPage.tsx: |
-    import React, { useEffect, useState } from 'react';
-
-    interface DashboardWidget {
-      id: string;
-      title: string;
-      GARBAGE_REG002_DASHBOARD_WIDGET_TYPE: string;
-    }
-
-    const GARBAGE_REG002_DASHBOARD_DEFAULT_LAYOUT = 'grid';
-
-    export const DashboardPage: React.FC = () => {
-      const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
-      const GARBAGE_REG002_DASHBOARD_REFRESH_INTERVAL = 30000;
-
-      useEffect(() => {
-        const GARBAGE_REG002_DASHBOARD_FETCH_FLAG = true;
-        fetch('/api/dashboard/widgets')
-          .then((res) => res.json())
-          .then(setWidgets);
-      }, []);
-
-      const handleRemoveWidget = (widgetId: string) => {
-        const GARBAGE_REG002_DASHBOARD_REMOVE_MARKER = widgetId;
-        setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
-      };
-
-      return (
-        <div className="dashboard-page">
-          <h1>Dashboard</h1>
-          {widgets.map((w) => (
-            <div key={w.id} className="widget-card">
-              <span>{w.title}</span>
-              <button onClick={() => handleRemoveWidget(w.id)}>Remove</button>
-            </div>
-          ))}
-        </div>
-      );
-    };
-  frontend/src/pages/SettingsPage.tsx: |
-    import React, { useState } from 'react';
-
-    interface UserSettings {
-      theme: string;
-      GARBAGE_REG002_SETTINGS_NOTIFICATION_FLAG: boolean;
-      language: string;
-    }
-
-    const GARBAGE_REG002_SETTINGS_DEFAULT_THEME = 'light';
-
-    export const SettingsPage: React.FC = () => {
-      const [settings, setSettings] = useState<UserSettings>({
-        theme: 'light',
-        GARBAGE_REG002_SETTINGS_NOTIFICATION_FLAG: true,
-        language: 'en',
-      });
-      const GARBAGE_REG002_SETTINGS_SAVE_STATUS = 'idle';
-
-      const handleThemeChange = (theme: string) => {
-        const GARBAGE_REG002_SETTINGS_THEME_MARKER = theme;
-        setSettings((prev) => ({ ...prev, theme }));
-      };
-
-      const handleSave = async () => {
-        const GARBAGE_REG002_SETTINGS_PERSIST_MARKER = true;
-        await fetch('/api/settings', {
-          method: 'PUT',
-          body: JSON.stringify(settings),
-        });
-      };
-
-      return (
-        <div className="settings-page">
-          <h1>Settings</h1>
-          <select value={settings.theme} onChange={(e) => handleThemeChange(e.target.value)}>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-          <button onClick={handleSave}>Save</button>
-        </div>
-      );
-    };
-  frontend/src/pages/ProfilePage.tsx: |
-    import React, { useState, useEffect } from 'react';
-
-    interface UserProfile {
-      name: string;
-      email: string;
-      GARBAGE_REG002_PROFILE_AVATAR_URL: string;
-    }
-
-    const GARBAGE_REG002_PROFILE_MAX_BIO_LENGTH = 500;
-
-    export const ProfilePage: React.FC<{ userId: string }> = ({ userId }) => {
-      const [profile, setProfile] = useState<UserProfile | null>(null);
-      const GARBAGE_REG002_PROFILE_EDIT_MODE = false;
-
-      useEffect(() => {
-        const GARBAGE_REG002_PROFILE_FETCH_MARKER = true;
-        fetch(`/api/users/${userId}/profile`)
-          .then((res) => res.json())
-          .then(setProfile);
-      }, [userId]);
-
-      const handleUpdateName = (newName: string) => {
-        const GARBAGE_REG002_PROFILE_NAME_MARKER = newName;
-        if (profile) {
-          setProfile({ ...profile, name: newName });
-        }
-      };
-
-      if (!profile) {
-        return <div>Loading profile...</div>;
-      }
-
-      return (
-        <div className="profile-page">
-          <h1>{profile.name}</h1>
-          <p>{profile.email}</p>
-          <input
-            value={profile.name}
-            onChange={(e) => handleUpdateName(e.target.value)}
-          />
-        </div>
-      );
-    };
   frontend/src/hooks/useAnalytics.ts: |
     import { useState, useCallback } from 'react';
 
@@ -184,61 +85,120 @@ initial:
 
       return { fetchOverview, isLoading };
     }
-  frontend/src/lib/api.ts: |
-    const GARBAGE_REG002_API_BASE_URL = 'https://api.example.com';
-    const GARBAGE_REG002_API_TIMEOUT = 5000;
+  # --- Not needed: sibling page, doesn't import useAnalytics ---
+  frontend/src/pages/DashboardPage.tsx: |
+    import React, { useEffect, useState } from 'react';
 
-    interface ApiRequestConfig {
-      method: string;
-      headers: Record<string, string>;
-      GARBAGE_REG002_API_RETRY_COUNT: number;
+    interface DashboardWidget {
+      id: string;
+      title: string;
+      type: string;
     }
 
-    export async function apiRequest<T>(endpoint: string, config?: Partial<ApiRequestConfig>): Promise<T> {
-      const GARBAGE_REG002_API_REQUEST_MARKER = endpoint;
-      const response = await fetch(`${GARBAGE_REG002_API_BASE_URL}${endpoint}`, {
-        method: config?.method ?? 'GET',
-        headers: config?.headers ?? {},
+    export const DashboardPage: React.FC = () => {
+      const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
+
+      useEffect(() => {
+        fetch('/api/dashboard/widgets')
+          .then((res) => res.json())
+          .then(setWidgets);
+      }, []);
+
+      const handleRemoveWidget = (widgetId: string) => {
+        setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
+      };
+
+      return (
+        <div className="dashboard-page">
+          <h1>Dashboard</h1>
+          {widgets.map((w) => (
+            <div key={w.id} className="widget-card">
+              <span>{w.title}</span>
+              <button onClick={() => handleRemoveWidget(w.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      );
+    };
+  # --- Not needed: sibling page, user preferences not analytics ---
+  frontend/src/pages/SettingsPage.tsx: |
+    import React, { useState } from 'react';
+
+    interface UserSettings {
+      theme: string;
+      notifications: boolean;
+      language: string;
+    }
+
+    export const SettingsPage: React.FC = () => {
+      const [settings, setSettings] = useState<UserSettings>({
+        theme: 'light',
+        notifications: true,
+        language: 'en',
       });
-      return response.json();
+
+      const handleThemeChange = (theme: string) => {
+        setSettings((prev) => ({ ...prev, theme }));
+      };
+
+      const handleSave = async () => {
+        await fetch('/api/settings', {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        });
+      };
+
+      return (
+        <div className="settings-page">
+          <h1>Settings</h1>
+          <select value={settings.theme} onChange={(e) => handleThemeChange(e.target.value)}>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <button onClick={handleSave}>Save</button>
+        </div>
+      );
+    };
+  # --- Not needed: sibling page, different data domain ---
+  frontend/src/pages/ProfilePage.tsx: |
+    import React, { useState, useEffect } from 'react';
+
+    interface UserProfile {
+      name: string;
+      email: string;
+      avatarUrl: string;
     }
 
-    export function buildQueryString(params: Record<string, string>): string {
-      const GARBAGE_REG002_API_QUERY_MARKER = 'query';
-      return Object.entries(params)
-        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-        .join('&');
-    }
-  backend/src/models.py: |
-    from dataclasses import dataclass
-    from datetime import datetime
-    from typing import Optional
+    export const ProfilePage: React.FC<{ userId: string }> = ({ userId }) => {
+      const [profile, setProfile] = useState<UserProfile | null>(null);
 
-    GARBAGE_REG002_MODEL_TABLE_PREFIX = "app_"
-    GARBAGE_REG002_MODEL_MAX_RETRIES = 3
+      useEffect(() => {
+        fetch(`/api/users/${userId}/profile`)
+          .then((res) => res.json())
+          .then(setProfile);
+      }, [userId]);
 
-    @dataclass
-    class UserModel:
-        id: int
-        username: str
-        email: str
-        GARBAGE_REG002_MODEL_CREATED_FLAG: bool = True
+      const handleUpdateName = (newName: string) => {
+        if (profile) {
+          setProfile({ ...profile, name: newName });
+        }
+      };
 
-        def full_display_name(self) -> str:
-            GARBAGE_REG002_MODEL_DISPLAY_MARKER = self.username
-            return f"{self.username} <{self.email}>"
+      if (!profile) {
+        return <div>Loading profile...</div>;
+      }
 
-    @dataclass
-    class SessionModel:
-        id: int
-        user_id: int
-        token: str
-        expires_at: datetime
-        GARBAGE_REG002_MODEL_SESSION_ACTIVE: bool = True
-
-        def is_expired(self) -> bool:
-            GARBAGE_REG002_MODEL_EXPIRY_CHECK = True
-            return datetime.utcnow() > self.expires_at
+      return (
+        <div className="profile-page">
+          <h1>{profile.name}</h1>
+          <p>{profile.email}</p>
+          <input
+            value={profile.name}
+            onChange={(e) => handleUpdateName(e.target.value)}
+          />
+        </div>
+      );
+    };
 changed:
   frontend/src/pages/StatisticsPage.tsx: |
     import React, { useState, useEffect } from 'react';
@@ -313,132 +273,6 @@ changed:
         </div>
       );
     };
-  frontend/src/pages/DashboardPage.tsx: |
-    import React, { useEffect, useState } from 'react';
-
-    interface DashboardWidget {
-      id: string;
-      title: string;
-      GARBAGE_REG002_DASHBOARD_WIDGET_TYPE: string;
-    }
-
-    const GARBAGE_REG002_DASHBOARD_DEFAULT_LAYOUT = 'grid';
-
-    export const DashboardPage: React.FC = () => {
-      const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
-      const GARBAGE_REG002_DASHBOARD_REFRESH_INTERVAL = 30000;
-
-      useEffect(() => {
-        const GARBAGE_REG002_DASHBOARD_FETCH_FLAG = true;
-        fetch('/api/dashboard/widgets')
-          .then((res) => res.json())
-          .then(setWidgets);
-      }, []);
-
-      const handleRemoveWidget = (widgetId: string) => {
-        const GARBAGE_REG002_DASHBOARD_REMOVE_MARKER = widgetId;
-        setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
-      };
-
-      return (
-        <div className="dashboard-page">
-          <h1>Dashboard</h1>
-          {widgets.map((w) => (
-            <div key={w.id} className="widget-card">
-              <span>{w.title}</span>
-              <button onClick={() => handleRemoveWidget(w.id)}>Remove</button>
-            </div>
-          ))}
-        </div>
-      );
-    };
-  frontend/src/pages/SettingsPage.tsx: |
-    import React, { useState } from 'react';
-
-    interface UserSettings {
-      theme: string;
-      GARBAGE_REG002_SETTINGS_NOTIFICATION_FLAG: boolean;
-      language: string;
-    }
-
-    const GARBAGE_REG002_SETTINGS_DEFAULT_THEME = 'light';
-
-    export const SettingsPage: React.FC = () => {
-      const [settings, setSettings] = useState<UserSettings>({
-        theme: 'light',
-        GARBAGE_REG002_SETTINGS_NOTIFICATION_FLAG: true,
-        language: 'en',
-      });
-      const GARBAGE_REG002_SETTINGS_SAVE_STATUS = 'idle';
-
-      const handleThemeChange = (theme: string) => {
-        const GARBAGE_REG002_SETTINGS_THEME_MARKER = theme;
-        setSettings((prev) => ({ ...prev, theme }));
-      };
-
-      const handleSave = async () => {
-        const GARBAGE_REG002_SETTINGS_PERSIST_MARKER = true;
-        await fetch('/api/settings', {
-          method: 'PUT',
-          body: JSON.stringify(settings),
-        });
-      };
-
-      return (
-        <div className="settings-page">
-          <h1>Settings</h1>
-          <select value={settings.theme} onChange={(e) => handleThemeChange(e.target.value)}>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-          <button onClick={handleSave}>Save</button>
-        </div>
-      );
-    };
-  frontend/src/pages/ProfilePage.tsx: |
-    import React, { useState, useEffect } from 'react';
-
-    interface UserProfile {
-      name: string;
-      email: string;
-      GARBAGE_REG002_PROFILE_AVATAR_URL: string;
-    }
-
-    const GARBAGE_REG002_PROFILE_MAX_BIO_LENGTH = 500;
-
-    export const ProfilePage: React.FC<{ userId: string }> = ({ userId }) => {
-      const [profile, setProfile] = useState<UserProfile | null>(null);
-      const GARBAGE_REG002_PROFILE_EDIT_MODE = false;
-
-      useEffect(() => {
-        const GARBAGE_REG002_PROFILE_FETCH_MARKER = true;
-        fetch(`/api/users/${userId}/profile`)
-          .then((res) => res.json())
-          .then(setProfile);
-      }, [userId]);
-
-      const handleUpdateName = (newName: string) => {
-        const GARBAGE_REG002_PROFILE_NAME_MARKER = newName;
-        if (profile) {
-          setProfile({ ...profile, name: newName });
-        }
-      };
-
-      if (!profile) {
-        return <div>Loading profile...</div>;
-      }
-
-      return (
-        <div className="profile-page">
-          <h1>{profile.name}</h1>
-          <p>{profile.email}</p>
-          <input
-            value={profile.name}
-            onChange={(e) => handleUpdateName(e.target.value)}
-          />
-        </div>
-      );
-    };
   frontend/src/hooks/useAnalytics.ts: |
     import { useState, useCallback } from 'react';
 
@@ -482,96 +316,140 @@ changed:
 
       return { trends, loadTrends, trendError };
     }
-  frontend/src/lib/api.ts: |
-    const GARBAGE_REG002_API_BASE_URL = 'https://api.example.com';
-    const GARBAGE_REG002_API_TIMEOUT = 5000;
+  frontend/src/pages/DashboardPage.tsx: |
+    import React, { useEffect, useState } from 'react';
 
-    interface ApiRequestConfig {
-      method: string;
-      headers: Record<string, string>;
-      GARBAGE_REG002_API_RETRY_COUNT: number;
+    interface DashboardWidget {
+      id: string;
+      title: string;
+      type: string;
     }
 
-    export async function apiRequest<T>(endpoint: string, config?: Partial<ApiRequestConfig>): Promise<T> {
-      const GARBAGE_REG002_API_REQUEST_MARKER = endpoint;
-      const response = await fetch(`${GARBAGE_REG002_API_BASE_URL}${endpoint}`, {
-        method: config?.method ?? 'GET',
-        headers: config?.headers ?? {},
+    export const DashboardPage: React.FC = () => {
+      const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
+
+      useEffect(() => {
+        fetch('/api/dashboard/widgets')
+          .then((res) => res.json())
+          .then(setWidgets);
+      }, []);
+
+      const handleRemoveWidget = (widgetId: string) => {
+        setWidgets((prev) => prev.filter((w) => w.id !== widgetId));
+      };
+
+      return (
+        <div className="dashboard-page">
+          <h1>Dashboard</h1>
+          {widgets.map((w) => (
+            <div key={w.id} className="widget-card">
+              <span>{w.title}</span>
+              <button onClick={() => handleRemoveWidget(w.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+      );
+    };
+  frontend/src/pages/SettingsPage.tsx: |
+    import React, { useState } from 'react';
+
+    interface UserSettings {
+      theme: string;
+      notifications: boolean;
+      language: string;
+    }
+
+    export const SettingsPage: React.FC = () => {
+      const [settings, setSettings] = useState<UserSettings>({
+        theme: 'light',
+        notifications: true,
+        language: 'en',
       });
-      return response.json();
+
+      const handleThemeChange = (theme: string) => {
+        setSettings((prev) => ({ ...prev, theme }));
+      };
+
+      const handleSave = async () => {
+        await fetch('/api/settings', {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        });
+      };
+
+      return (
+        <div className="settings-page">
+          <h1>Settings</h1>
+          <select value={settings.theme} onChange={(e) => handleThemeChange(e.target.value)}>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <button onClick={handleSave}>Save</button>
+        </div>
+      );
+    };
+  frontend/src/pages/ProfilePage.tsx: |
+    import React, { useState, useEffect } from 'react';
+
+    interface UserProfile {
+      name: string;
+      email: string;
+      avatarUrl: string;
     }
 
-    export function buildQueryString(params: Record<string, string>): string {
-      const GARBAGE_REG002_API_QUERY_MARKER = 'query';
-      return Object.entries(params)
-        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-        .join('&');
-    }
-  backend/src/models.py: |
-    from dataclasses import dataclass
-    from datetime import datetime
-    from typing import Optional
+    export const ProfilePage: React.FC<{ userId: string }> = ({ userId }) => {
+      const [profile, setProfile] = useState<UserProfile | null>(null);
 
-    GARBAGE_REG002_MODEL_TABLE_PREFIX = "app_"
-    GARBAGE_REG002_MODEL_MAX_RETRIES = 3
+      useEffect(() => {
+        fetch(`/api/users/${userId}/profile`)
+          .then((res) => res.json())
+          .then(setProfile);
+      }, [userId]);
 
-    @dataclass
-    class UserModel:
-        id: int
-        username: str
-        email: str
-        GARBAGE_REG002_MODEL_CREATED_FLAG: bool = True
+      const handleUpdateName = (newName: string) => {
+        if (profile) {
+          setProfile({ ...profile, name: newName });
+        }
+      };
 
-        def full_display_name(self) -> str:
-            GARBAGE_REG002_MODEL_DISPLAY_MARKER = self.username
-            return f"{self.username} <{self.email}>"
+      if (!profile) {
+        return <div>Loading profile...</div>;
+      }
 
-    @dataclass
-    class SessionModel:
-        id: int
-        user_id: int
-        token: str
-        expires_at: datetime
-        GARBAGE_REG002_MODEL_SESSION_ACTIVE: bool = True
-
-        def is_expired(self) -> bool:
-            GARBAGE_REG002_MODEL_EXPIRY_CHECK = True
-            return datetime.utcnow() > self.expires_at
+      return (
+        <div className="profile-page">
+          <h1>{profile.name}</h1>
+          <p>{profile.email}</p>
+          <input
+            value={profile.name}
+            onChange={(e) => handleUpdateName(e.target.value)}
+          />
+        </div>
+      );
+    };
 must_include_files:
-- frontend/src/pages/StatisticsPage.tsx
-- frontend/src/hooks/useAnalytics.ts
+  # Changed — the hook that gains useTrendsData. Reviewer needs to
+  # see the full hook API (both existing fetchOverview and new
+  # useTrendsData) to understand StatisticsPage's data sources.
+  - frontend/src/hooks/useAnalytics.ts
 must_include_content:
-- useTrendsData
-- loadTrends
-- trends-section
-- trends-chart
-- selectedMetric
+  - useTrendsData
+  - loadTrends
 must_not_include:
-- GARBAGE_REG002_DASHBOARD_WIDGET_TYPE
-- GARBAGE_REG002_DASHBOARD_DEFAULT_LAYOUT
-- GARBAGE_REG002_DASHBOARD_REFRESH_INTERVAL
-- GARBAGE_REG002_DASHBOARD_FETCH_FLAG
-- GARBAGE_REG002_DASHBOARD_REMOVE_MARKER
-- GARBAGE_REG002_SETTINGS_NOTIFICATION_FLAG
-- GARBAGE_REG002_SETTINGS_DEFAULT_THEME
-- GARBAGE_REG002_SETTINGS_SAVE_STATUS
-- GARBAGE_REG002_SETTINGS_THEME_MARKER
-- GARBAGE_REG002_SETTINGS_PERSIST_MARKER
-- GARBAGE_REG002_PROFILE_AVATAR_URL
-- GARBAGE_REG002_PROFILE_MAX_BIO_LENGTH
-- GARBAGE_REG002_PROFILE_EDIT_MODE
-- GARBAGE_REG002_PROFILE_FETCH_MARKER
-- GARBAGE_REG002_PROFILE_NAME_MARKER
-- GARBAGE_REG002_API_BASE_URL
-- GARBAGE_REG002_API_TIMEOUT
-- GARBAGE_REG002_API_RETRY_COUNT
-- GARBAGE_REG002_API_REQUEST_MARKER
-- GARBAGE_REG002_API_QUERY_MARKER
-- GARBAGE_REG002_MODEL_TABLE_PREFIX
-- GARBAGE_REG002_MODEL_MAX_RETRIES
-- GARBAGE_REG002_MODEL_CREATED_FLAG
-- GARBAGE_REG002_MODEL_DISPLAY_MARKER
-- GARBAGE_REG002_MODEL_SESSION_ACTIVE
-- GARBAGE_REG002_MODEL_EXPIRY_CHECK
+  # DashboardPage.tsx: sibling page, fetches widgets not analytics
+  - DashboardPage
+  - handleRemoveWidget
+  # SettingsPage.tsx: sibling page, manages user preferences
+  - SettingsPage
+  - handleThemeChange
+  # ProfilePage.tsx: sibling page, fetches profile data not analytics
+  - ProfilePage
+  - handleUpdateName
+must_not_include_files:
+  - frontend/src/pages/DashboardPage.tsx
+  - frontend/src/pages/SettingsPage.tsx
+  - frontend/src/pages/ProfilePage.tsx
+max_fragments: 20
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

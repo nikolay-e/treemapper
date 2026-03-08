@@ -1,3 +1,21 @@
+# Test: Worker includes Logging module to gain structured log methods
+#
+# Scenario: lib/worker.rb is rewritten to include Logging, calling log(),
+# log_error(), and log_debug() within perform/execute. The Logging module
+# (UNCHANGED) provides these methods with timestamp formatting.
+#
+# Reviewer questions:
+#   Q1: "What format does log() produce? What levels are supported?"
+#       -> lib/logging.rb (UNCHANGED) defines log/log_error/log_debug/log_warn
+#   Q2: "Does log_error raise or just print?"
+#       -> Logging.log_error delegates to log(level: :error), just prints
+#
+# Trap files (plausible but unrelated):
+#   - lib/json_serializer.rb: serializes objects to JSON — same lib/ directory,
+#     both deal with output formatting, but Worker never imports or uses it.
+#   - lib/task_queue.rb: background task queue — similar domain to Worker
+#     (both process tasks), but no dependency from Worker.
+
 initial:
   lib/logging.rb: |
     module Logging
@@ -26,26 +44,48 @@ initial:
         "done"
       end
     end
-  lib/garbage_serializer.rb: |
-    GARBAGE_RUBY_003_FORMAT_TYPE_A = "json_serializer"
-    GARBAGE_RUBY_003_ENCODING_MODE_B = "utf8_strict"
+  lib/json_serializer.rb: |
+    require 'json'
 
-    class GarbageSerializerEngine
-      GARBAGE_RUBY_003_MAX_DEPTH_C = 10
+    class JsonSerializer
+      def initialize(pretty: false)
+        @pretty = pretty
+      end
 
       def serialize(object)
-        GARBAGE_RUBY_003_FORMAT_TYPE_A
+        if @pretty
+          JSON.pretty_generate(object)
+        else
+          JSON.generate(object)
+        end
+      end
+
+      def deserialize(json_string)
+        JSON.parse(json_string, symbolize_names: true)
       end
     end
-  lib/garbage_compressor.rb: |
-    GARBAGE_RUBY_003_ALGORITHM_TYPE_D = "gzip_fast"
-    GARBAGE_RUBY_003_COMPRESSION_LEVEL_E = "high"
+  lib/task_queue.rb: |
+    class TaskQueue
+      def initialize
+        @queue = []
+        @completed = []
+      end
 
-    class GarbageCompressorService
-      GARBAGE_RUBY_003_BUFFER_SIZE_F = 4096
+      def enqueue(task_name, priority: 0)
+        @queue << { name: task_name, priority: priority, enqueued_at: Time.now }
+        @queue.sort_by! { |t| -t[:priority] }
+      end
 
-      def compress(data)
-        GARBAGE_RUBY_003_ALGORITHM_TYPE_D
+      def dequeue
+        @queue.shift
+      end
+
+      def complete(task_name)
+        @completed << { name: task_name, completed_at: Time.now }
+      end
+
+      def pending_count
+        @queue.size
       end
     end
 changed:
@@ -94,43 +134,73 @@ changed:
         "completed"
       end
     end
-  lib/garbage_serializer.rb: |
-    GARBAGE_RUBY_003_FORMAT_TYPE_A = "json_serializer"
-    GARBAGE_RUBY_003_ENCODING_MODE_B = "utf8_strict"
+  lib/json_serializer.rb: |
+    require 'json'
 
-    class GarbageSerializerEngine
-      GARBAGE_RUBY_003_MAX_DEPTH_C = 10
+    class JsonSerializer
+      def initialize(pretty: false)
+        @pretty = pretty
+      end
 
       def serialize(object)
-        GARBAGE_RUBY_003_FORMAT_TYPE_A
+        if @pretty
+          JSON.pretty_generate(object)
+        else
+          JSON.generate(object)
+        end
+      end
+
+      def deserialize(json_string)
+        JSON.parse(json_string, symbolize_names: true)
       end
     end
-  lib/garbage_compressor.rb: |
-    GARBAGE_RUBY_003_ALGORITHM_TYPE_D = "gzip_fast"
-    GARBAGE_RUBY_003_COMPRESSION_LEVEL_E = "high"
+  lib/task_queue.rb: |
+    class TaskQueue
+      def initialize
+        @queue = []
+        @completed = []
+      end
 
-    class GarbageCompressorService
-      GARBAGE_RUBY_003_BUFFER_SIZE_F = 4096
+      def enqueue(task_name, priority: 0)
+        @queue << { name: task_name, priority: priority, enqueued_at: Time.now }
+        @queue.sort_by! { |t| -t[:priority] }
+      end
 
-      def compress(data)
-        GARBAGE_RUBY_003_ALGORITHM_TYPE_D
+      def dequeue
+        @queue.shift
+      end
+
+      def complete(task_name)
+        @completed << { name: task_name, completed_at: Time.now }
+      end
+
+      def pending_count
+        @queue.size
       end
     end
 must_include_files:
-- lib/worker.rb
-must_include_content:
-- |
-  include Logging
+  - lib/worker.rb
+  # Q1/Q2: Logging defines the log methods Worker calls
+  - lib/logging.rb
+must_include_content_from:
+  lib/worker.rb:
+    - "include Logging"
+    - 'log_error("Task #{task_name} failed'
+  lib/logging.rb:
+    - "def log(message, level: :info)"
 must_not_include:
-- GARBAGE_RUBY_003_FORMAT_TYPE_A
-- GARBAGE_RUBY_003_ENCODING_MODE_B
-- GARBAGE_RUBY_003_MAX_DEPTH_C
-- GARBAGE_RUBY_003_ALGORITHM_TYPE_D
-- GARBAGE_RUBY_003_COMPRESSION_LEVEL_E
-- GARBAGE_RUBY_003_BUFFER_SIZE_F
-- GarbageSerializerEngine
-- GarbageCompressorService
-- garbage_serializer.rb
-- garbage_compressor.rb
+  # lib/json_serializer.rb: serialization — no dependency edge from Worker
+  - JsonSerializer
+  - pretty_generate
+  - deserialize
+  # lib/task_queue.rb: task queue — different responsibility, not imported
+  - TaskQueue
+  - enqueue
+  - pending_count
+must_not_include_files:
+  - lib/json_serializer.rb
+  - lib/task_queue.rb
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

@@ -1,3 +1,17 @@
+# Scenario: TypeScript file adds generic functions constrained by base interfaces.
+#
+# Diff: repository.ts adds findById<T extends BaseEntity>, updateEntity, and
+# Repository<T extends Identifiable> — all constrained by interfaces from entities.ts.
+#
+# Reviewer questions:
+#   Q1: "What does BaseEntity require?" → entities.ts (UNCHANGED) defines id, createdAt, updatedAt.
+#   Q2: "What is Identifiable vs BaseEntity?" → entities.ts shows Identifiable has
+#        only id, while BaseEntity adds timestamps.
+#
+# Not needed:
+#   - src/validators.ts: uses generics but for validation, not entity storage.
+#   - src/types/serializable.ts: another interface constraint but for JSON serialization.
+
 initial:
   src/entities.ts: |
     export interface BaseEntity {
@@ -16,56 +30,43 @@ initial:
     }
   src/repository.ts: |
     console.log('initial');
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_018_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/validators.ts: |
+    export interface Validatable {
+        validate(): boolean;
     }
 
-    // GARBAGE_FE_018_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function validateAll<T extends Validatable>(items: T[]): boolean {
+        return items.every(item => item.validate());
     }
 
-    // GARBAGE_FE_018_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
+    export function findInvalid<T extends Validatable>(items: T[]): T[] {
+        return items.filter(item => !item.validate());
     }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_018_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
+
+    export class ValidationError extends Error {
+        constructor(public field: string, message: string) {
+            super(message);
+        }
+    }
+  src/types/serializable.ts: |
+    export interface Serializable {
+        toJSON(): Record<string, unknown>;
+        fromJSON(data: Record<string, unknown>): void;
+    }
+
+    export function serialize<T extends Serializable>(item: T): string {
+        return JSON.stringify(item.toJSON());
+    }
+
+    export function deserialize<T extends Serializable>(
+        json: string,
+        factory: () => T
     ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+        const instance = factory();
+        instance.fromJSON(JSON.parse(json));
+        return instance;
     }
 
-    // GARBAGE_FE_018_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 changed:
   src/entities.ts: |
     export interface BaseEntity {
@@ -114,68 +115,65 @@ changed:
             return this.items.get(id);
         }
     }
-  src/unrelated/color_utils.ts: |
-    // GARBAGE_FE_018_COLOR_A
-    export interface HSL {
-        h: number;
-        s: number;
-        l: number;
+  src/validators.ts: |
+    export interface Validatable {
+        validate(): boolean;
     }
 
-    // GARBAGE_FE_018_COLOR_B
-    export function hslToHex(hsl: HSL): string {
-        const { h, s, l } = hsl;
-        const a = s * Math.min(l, 1 - l);
-        const f = (n: number) => {
-            const k = (n + h / 30) % 12;
-            return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-        };
-        return '#' + [f(0), f(8), f(4)]
-            .map(x => Math.round(x * 255).toString(16).padStart(2, '0'))
-            .join('');
+    export function validateAll<T extends Validatable>(items: T[]): boolean {
+        return items.every(item => item.validate());
     }
 
-    // GARBAGE_FE_018_CONTRAST_C
-    export function contrastRatio(fg: HSL, bg: HSL): number {
-        return Math.abs(fg.l - bg.l);
+    export function findInvalid<T extends Validatable>(items: T[]): T[] {
+        return items.filter(item => !item.validate());
     }
-  src/unrelated/debounce_utils.ts: |
-    // GARBAGE_FE_018_DEBOUNCE_D
-    export function debounce<T extends (...args: any[]) => void>(
-        fn: T, delay: number
+
+    export class ValidationError extends Error {
+        constructor(public field: string, message: string) {
+            super(message);
+        }
+    }
+  src/types/serializable.ts: |
+    export interface Serializable {
+        toJSON(): Record<string, unknown>;
+        fromJSON(data: Record<string, unknown>): void;
+    }
+
+    export function serialize<T extends Serializable>(item: T): string {
+        return JSON.stringify(item.toJSON());
+    }
+
+    export function deserialize<T extends Serializable>(
+        json: string,
+        factory: () => T
     ): T {
-        let timer: ReturnType<typeof setTimeout>;
-        return ((...args: any[]) => {
-            clearTimeout(timer);
-            timer = setTimeout(() => fn(...args), delay);
-        }) as T;
+        const instance = factory();
+        instance.fromJSON(JSON.parse(json));
+        return instance;
     }
 
-    // GARBAGE_FE_018_THROTTLE_E
-    export function throttle<T extends (...args: any[]) => void>(
-        fn: T, limit: number
-    ): T {
-        let inThrottle = false;
-        return ((...args: any[]) => {
-            if (!inThrottle) {
-                fn(...args);
-                inThrottle = true;
-                setTimeout(() => { inThrottle = false; }, limit);
-            }
-        }) as T;
-    }
 must_include_files:
-- src/repository.ts
-must_include_content:
-- import { BaseEntity, Identifiable } from './entities';
-- function findById<T extends BaseEntity>(
+  - src/repository.ts
+
+must_include_content_from:
+  src/repository.ts:
+    - "import { BaseEntity, Identifiable } from './entities'"
+    - "function findById<T extends BaseEntity>("
+
 must_not_include:
-- GARBAGE_FE_018_COLOR_A
-- GARBAGE_FE_018_COLOR_B
-- GARBAGE_FE_018_CONTRAST_C
-- GARBAGE_FE_018_DEBOUNCE_D
-- GARBAGE_FE_018_THROTTLE_E
-- color_utils.ts
-- debounce_utils.ts
+  # validators.ts: generic constraints but for validation, not storage
+  - Validatable
+  - validateAll
+  - ValidationError
+  # serializable.ts: interface constraint but for serialization
+  - Serializable
+  - deserialize
+
+must_not_include_files:
+  - src/validators.ts
+  - src/types/serializable.ts
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

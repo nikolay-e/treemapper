@@ -54,8 +54,10 @@ class SiblingConfig:
 @dataclass(frozen=True)
 class UtilityConfig:
     eta: float = 0.20
-    gamma: float = 0.0
+    gamma: float = 0.10
     r_cap_sigma: float = 2.0
+    proximity_decay: float = 0.30
+    peripheral_cap: float = 0.15
 
 
 LIMITS = AlgorithmLimits()

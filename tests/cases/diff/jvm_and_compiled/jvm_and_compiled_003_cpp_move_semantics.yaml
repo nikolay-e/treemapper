@@ -1,5 +1,39 @@
+# Scenario: processor.cpp goes from empty main to using Buffer's move semantics
+#   — createBuffer returns Buffer by value (NRVO/move), processBuffer takes
+#   Buffer by value, main uses std::move to transfer ownership.
+#
+# Reviewer questions:
+#   Q1: "What are Buffer's move operations? Is std::move(b) safe here?"
+#       -> include/buffer.h: Buffer has move ctor and move assignment that
+#          transfer data_/size_ and null out the source. Copy is deleted.
+#          After std::move(b), b.data_ == nullptr.
+#
+#   Q2: "Does createBuffer trigger copy elision (NRVO) or move?"
+#       -> include/buffer.h: Copy is deleted, so NRVO must apply. If NRVO
+#          fails, move ctor is used. Reviewer must verify Buffer has
+#          move constructor.
+#
+#   Q3: "Is Buffer properly RAII — no leaks on move?"
+#       -> include/buffer.h: Destructor deletes data_. Move ctor nulls source.
+#          Move assignment deletes existing data_ before transfer.
+#
+# Not needed:
+#   - src/string_buffer.cpp: Another move-only class. IDENTICAL pattern
+#     (deleted copy, move ctor/assign, RAII destructor). Different resource.
+#
+#   - include/buffer_pool.h: Pool of Buffer objects. Uses std::move to
+#     transfer Buffers. Direct structural edge. But pool management
+#     doesn't help review the move semantics themselves.
+#
+#   - src/io_handler.cpp: Also creates and moves Buffers. Same types.
+#     But another consumer doesn't help review this usage.
+#
+#   - tests/buffer_test.cpp: Tests Buffer move ctor and assignment.
+#     Verifies post-move state. But tests don't help review whether
+#     processor.cpp's usage is correct.
+
 initial:
-  buffer.h: |
+  include/buffer.h: |
     #pragma once
     #include <cstddef>
     #include <utility>
@@ -32,84 +66,116 @@ initial:
         Buffer(const Buffer&) = delete;
         Buffer& operator=(const Buffer&) = delete;
     };
-  processor.cpp: |
+
+  src/processor.cpp: |
     #include <iostream>
     int main() { return 0; }
-  garbage_config.cpp: |
-    #include <map>
-    #include <string>
-    const char* GARBAGE_JVM_003_CFGLOAD_MARKER_A = "config_load";
-    const char* GARBAGE_JVM_003_CFGSAVE_MARKER_B = "config_save";
 
-    class GarbageConfigStore {
-        std::map<std::string, std::string> entries_;
-    public:
-        void set(const std::string& key, const std::string& val) { entries_[key] = val; }
-        std::string get(const std::string& key) { return entries_[key]; }
-    };
-  garbage_hasher.cpp: |
-    #include <string>
-    #include <cstdint>
-    const char* GARBAGE_JVM_003_HASH_MARKER_C = "fnv_hash";
-    const char* GARBAGE_JVM_003_DIGEST_MARKER_D = "digest_out";
-
-    class GarbageFnvHasher {
-        uint64_t state_ = 14695981039346656037ULL;
-    public:
-        void update(const std::string& data) {
-            for (char c : data) { state_ ^= c; state_ *= 1099511628211ULL; }
-        }
-        uint64_t digest() const { return state_; }
-    };
-  garbage_arena.cpp: |
-    const char* GARBAGE_JVM_003_ARENA_MARKER_A = "marker";
-    const char* GARBAGE_JVM_003_SLAB_MARKER_B = "marker";
-
-    class GarbageArenaAllocator {
-        void noop() {}
-    };
-  garbage_ringbuf.cpp: |
-    const char* GARBAGE_JVM_003_RING_MARKER_C = "marker";
-    const char* GARBAGE_JVM_003_CIRC_MARKER_D = "marker";
-
-    class GarbageRingBuffer {
-        void noop() {}
-    };
-changed:
-  buffer.h: |
-    #pragma once
+  src/string_buffer.cpp: |
     #include <cstddef>
-    #include <utility>
+    #include <cstring>
 
-    class Buffer {
+    class StringBuffer {
         char* data_;
-        size_t size_;
-
+        size_t length_;
+        size_t capacity_;
     public:
-        Buffer(size_t size) : data_(new char[size]), size_(size) {}
-        ~Buffer() { delete[] data_; }
-
-        Buffer(Buffer&& other) noexcept
-            : data_(other.data_), size_(other.size_) {
-            other.data_ = nullptr;
-            other.size_ = 0;
+        StringBuffer(size_t cap = 64)
+            : data_(new char[cap]), length_(0), capacity_(cap) {
+            data_[0] = '\0';
         }
 
-        Buffer& operator=(Buffer&& other) noexcept {
+        ~StringBuffer() { delete[] data_; }
+
+        StringBuffer(StringBuffer&& other) noexcept
+            : data_(other.data_), length_(other.length_), capacity_(other.capacity_) {
+            other.data_ = nullptr;
+            other.length_ = 0;
+            other.capacity_ = 0;
+        }
+
+        StringBuffer& operator=(StringBuffer&& other) noexcept {
             if (this != &other) {
                 delete[] data_;
                 data_ = other.data_;
-                size_ = other.size_;
+                length_ = other.length_;
+                capacity_ = other.capacity_;
                 other.data_ = nullptr;
-                other.size_ = 0;
+                other.length_ = 0;
+                other.capacity_ = 0;
             }
             return *this;
         }
 
-        Buffer(const Buffer&) = delete;
-        Buffer& operator=(const Buffer&) = delete;
+        StringBuffer(const StringBuffer&) = delete;
+        StringBuffer& operator=(const StringBuffer&) = delete;
     };
-  processor.cpp: |
+
+  include/buffer_pool.h: |
+    #pragma once
+    #include "buffer.h"
+    #include <vector>
+
+    class BufferPool {
+        std::vector<Buffer> available_;
+    public:
+        Buffer acquire(size_t size) {
+            if (!available_.empty()) {
+                Buffer buf = std::move(available_.back());
+                available_.pop_back();
+                return buf;
+            }
+            return Buffer(size);
+        }
+
+        void release(Buffer buf) {
+            available_.push_back(std::move(buf));
+        }
+
+        size_t availableCount() const { return available_.size(); }
+    };
+
+  src/io_handler.cpp: |
+    #include "buffer.h"
+    #include <utility>
+
+    class IoHandler {
+    public:
+        Buffer readChunk(size_t size) {
+            Buffer buf(size);
+            return buf;
+        }
+
+        void writeChunk(Buffer buf) {
+            // write buffer contents
+        }
+
+        void transfer(size_t size) {
+            Buffer data = readChunk(size);
+            writeChunk(std::move(data));
+        }
+    };
+
+  tests/buffer_test.cpp: |
+    #include "buffer.h"
+    #include <cassert>
+    #include <utility>
+
+    void test_move_constructor() {
+        Buffer a(100);
+        Buffer b(std::move(a));
+        // a should be in moved-from state
+    }
+
+    void test_move_assignment() {
+        Buffer a(100);
+        Buffer b(200);
+        b = std::move(a);
+        // a should be in moved-from state
+    }
+
+changed:
+  src/processor.cpp: |
     #include "buffer.h"
     #include <utility>
 
@@ -126,63 +192,51 @@ changed:
         processBuffer(std::move(b));
         return 0;
     }
-  garbage_config.cpp: |
-    #include <map>
-    #include <string>
-    const char* GARBAGE_JVM_003_CFGLOAD_MARKER_A = "config_load";
-    const char* GARBAGE_JVM_003_CFGSAVE_MARKER_B = "config_save";
 
-    class GarbageConfigStore {
-        std::map<std::string, std::string> entries_;
-    public:
-        void set(const std::string& key, const std::string& val) { entries_[key] = val; }
-        std::string get(const std::string& key) { return entries_[key]; }
-    };
-  garbage_hasher.cpp: |
-    #include <string>
-    #include <cstdint>
-    const char* GARBAGE_JVM_003_HASH_MARKER_C = "fnv_hash";
-    const char* GARBAGE_JVM_003_DIGEST_MARKER_D = "digest_out";
-
-    class GarbageFnvHasher {
-        uint64_t state_ = 14695981039346656037ULL;
-    public:
-        void update(const std::string& data) {
-            for (char c : data) { state_ ^= c; state_ *= 1099511628211ULL; }
-        }
-        uint64_t digest() const { return state_; }
-    };
-  garbage_arena.cpp: |
-    const char* GARBAGE_JVM_003_ARENA_MARKER_A = "marker";
-    const char* GARBAGE_JVM_003_SLAB_MARKER_B = "marker";
-
-    class GarbageArenaAllocator {
-        void noop() {}
-    };
-  garbage_ringbuf.cpp: |
-    const char* GARBAGE_JVM_003_RING_MARKER_C = "marker";
-    const char* GARBAGE_JVM_003_CIRC_MARKER_D = "marker";
-
-    class GarbageRingBuffer {
-        void noop() {}
-    };
 must_include_files:
-- processor.cpp
-must_include_content:
-- Buffer buf(size);
-- void processBuffer(Buffer buf) {
+  - src/processor.cpp
+  # Q1+Q2+Q3: Reviewer needs Buffer to verify move operations, deleted copy,
+  # and destructor behavior for correct ownership transfer.
+  - include/buffer.h
+
+must_include_content_from:
+  src/processor.cpp:
+    - "Buffer createBuffer(size_t size)"
+    - "processBuffer(std::move(b))"
+    - "Buffer buf(size)"
+  include/buffer.h:
+    - "Buffer(Buffer&& other) noexcept"
+    - "Buffer& operator=(Buffer&& other) noexcept"
+    - "Buffer(const Buffer&) = delete"
+    - "other.data_ = nullptr"
+    - "delete[] data_"
+
 must_not_include:
-- GARBAGE_JVM_003_ARENA_MARKER_A
-- GARBAGE_JVM_003_CFGLOAD_MARKER_A
-- GARBAGE_JVM_003_CFGSAVE_MARKER_B
-- GARBAGE_JVM_003_CIRC_MARKER_D
-- GARBAGE_JVM_003_DIGEST_MARKER_D
-- GARBAGE_JVM_003_HASH_MARKER_C
-- GARBAGE_JVM_003_RING_MARKER_C
-- GARBAGE_JVM_003_SLAB_MARKER_B
-- garbage_arena.cpp
-- garbage_config.cpp
-- garbage_hasher.cpp
-- garbage_ringbuf.cpp
+  # --- string_buffer.cpp: identical move-only pattern, different type ---
+  - StringBuffer
+  - capacity_
+  - length_
+  # --- buffer_pool.h: manages Buffers, different concern ---
+  - BufferPool
+  - acquire
+  - release
+  - availableCount
+  # --- io_handler.cpp: another Buffer consumer ---
+  - IoHandler
+  - readChunk
+  - writeChunk
+  - transfer
+  # --- tests ---
+  - test_move_constructor
+  - test_move_assignment
+
+must_not_include_files:
+  - src/string_buffer.cpp
+  - include/buffer_pool.h
+  - src/io_handler.cpp
+  - tests/buffer_test.cpp
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

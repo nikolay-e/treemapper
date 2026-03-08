@@ -1,10 +1,44 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 from tests.framework.types import YamlTestCase
+
+
+def _normalize_snippet(snippet: Any) -> str:
+    if isinstance(snippet, str):
+        return snippet.rstrip("\n")
+    if isinstance(snippet, bool):
+        return ("true" if snippet else "false").rstrip("\n")
+    if snippet is None:
+        return "null"
+    if isinstance(snippet, (int, float)):
+        return str(snippet).rstrip("\n")
+    if isinstance(snippet, dict) and len(snippet) == 1:
+        key, value = next(iter(snippet.items()))
+        return f"{_normalize_snippet(key)}: {_normalize_snippet(value)}".rstrip("\n")
+    raise TypeError(f"Unsupported assertion snippet type: {type(snippet).__name__}")
+
+
+def _normalize_snippet_list(values: Any) -> list[str]:
+    if values is None:
+        return []
+    if isinstance(values, list):
+        raw_items = values
+    else:
+        raw_items = [values]
+    return [_normalize_snippet(item) for item in raw_items]
+
+
+def _normalize_content_from(value: Any) -> dict[str, list[str]]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise TypeError(f"must_include_content_from must be a mapping, got {type(value).__name__}")
+    return {str(path): _normalize_snippet_list(snippets) for path, snippets in value.items()}
 
 
 def _parse_yaml_test(data: dict, source_file: Path | None = None) -> YamlTestCase:
@@ -19,10 +53,10 @@ def _parse_yaml_test(data: dict, source_file: Path | None = None) -> YamlTestCas
     must_not_include = assertions.get("must_not_include", data.get("must_not_include", []))
 
     raw_content = assertions.get("must_include_content", data.get("must_include_content", []))
-    must_include_content = [s.rstrip("\n") for s in raw_content]
+    must_include_content = _normalize_snippet_list(raw_content)
 
     raw_content_from = assertions.get("must_include_content_from", data.get("must_include_content_from", {}))
-    must_include_content_from = {path: [s.rstrip("\n") for s in snippets] for path, snippets in raw_content_from.items()}
+    must_include_content_from = _normalize_content_from(raw_content_from)
 
     must_not_include_files = assertions.get("must_not_include_files", data.get("must_not_include_files", []))
 

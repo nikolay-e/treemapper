@@ -1,3 +1,22 @@
+# Test 045: test_api_handlers adds JSON snapshot tests for API responses
+#           — reviewer needs api_handlers module for response structure
+#
+# Scenario: test_api_handlers.py adds snapshot tests that serialize ApiResponse
+# to JSON and verify exact field values for success, not-found, and list
+# responses. Imports expand to include ApiResponse and json.
+#
+# Reviewer questions:
+#   Q1: "What does ApiResponse.to_json() include/exclude?"
+#       -> Only includes non-None fields (data, error, meta conditionally).
+#   Q2: "What meta fields does get_user return?"
+#       -> request_id and cached for success, just request_id for error.
+#
+# Trap files (plausible but unrelated):
+#   - src/product_api_handler.py: sibling API handler with similar get/list
+#     methods returning ApiResponse, but for products.
+#   - tests/test_product_api.py: snapshot tests for product API with similar
+#     JSON assertion patterns but different handler.
+
 initial:
   src/api_handlers.py: |
     from dataclasses import dataclass
@@ -55,6 +74,48 @@ initial:
         handler = UserApiHandler()
         response = handler.get_user(1)
         assert response.status == "success"
+  src/product_api_handler.py: |
+    from src.api_handlers import ApiResponse
+
+    class ProductApiHandler:
+        def __init__(self):
+            self.products = {
+                1: {"id": 1, "name": "Widget", "price": 9.99},
+                2: {"id": 2, "name": "Gadget", "price": 24.99},
+            }
+
+        def get_product(self, product_id: int) -> ApiResponse:
+            if product_id not in self.products:
+                return ApiResponse(
+                    status="error",
+                    error=f"Product {product_id} not found"
+                )
+            return ApiResponse(
+                status="success",
+                data=self.products[product_id]
+            )
+
+        def list_products(self) -> ApiResponse:
+            return ApiResponse(
+                status="success",
+                data={"products": list(self.products.values())}
+            )
+  tests/test_product_api.py: |
+    import json
+    from src.product_api_handler import ProductApiHandler
+
+    def test_get_product_success():
+        handler = ProductApiHandler()
+        response = handler.get_product(1)
+        result = json.loads(response.to_json())
+        assert result["data"]["name"] == "Widget"
+
+    def test_list_products():
+        handler = ProductApiHandler()
+        response = handler.list_products()
+        result = json.loads(response.to_json())
+        assert len(result["data"]["products"]) == 2
+
 changed:
   src/api_handlers.py: |
     from dataclasses import dataclass
@@ -146,10 +207,74 @@ changed:
         assert len(result["data"]["users"]) == 2
         assert result["meta"]["page"] == 1
         assert result["meta"]["limit"] == 10
+  src/product_api_handler.py: |
+    from src.api_handlers import ApiResponse
+
+    class ProductApiHandler:
+        def __init__(self):
+            self.products = {
+                1: {"id": 1, "name": "Widget", "price": 9.99},
+                2: {"id": 2, "name": "Gadget", "price": 24.99},
+            }
+
+        def get_product(self, product_id: int) -> ApiResponse:
+            if product_id not in self.products:
+                return ApiResponse(
+                    status="error",
+                    error=f"Product {product_id} not found"
+                )
+            return ApiResponse(
+                status="success",
+                data=self.products[product_id]
+            )
+
+        def list_products(self) -> ApiResponse:
+            return ApiResponse(
+                status="success",
+                data={"products": list(self.products.values())}
+            )
+  tests/test_product_api.py: |
+    import json
+    from src.product_api_handler import ProductApiHandler
+
+    def test_get_product_success():
+        handler = ProductApiHandler()
+        response = handler.get_product(1)
+        result = json.loads(response.to_json())
+        assert result["data"]["name"] == "Widget"
+
+    def test_list_products():
+        handler = ProductApiHandler()
+        response = handler.list_products()
+        result = json.loads(response.to_json())
+        assert len(result["data"]["products"]) == 2
+
 must_include_files:
-- tests/test_api_handlers.py
-must_include_content:
-- from src.api_handlers import UserApiHandler, ApiResponse
-- 'def test_get_user_success_snapshot():'
+  - tests/test_api_handlers.py
+  # Q1/Q2: Reviewer needs api_handlers for ApiResponse structure and handler logic
+  - src/api_handlers.py
+
+must_include_content_from:
+  tests/test_api_handlers.py:
+    - "from src.api_handlers import UserApiHandler, ApiResponse"
+    - "def test_get_user_success_snapshot():"
+  src/api_handlers.py:
+    - "def to_json(self) -> str:"
+
+must_not_include:
+  # --- product_api_handler.py: sibling handler using same ApiResponse ---
+  - "class ProductApiHandler"
+  - "Widget"
+  - "Gadget"
+  # --- test_product_api.py: similar JSON snapshot tests for products ---
+  - "test_get_product_success"
+  - "test_list_products"
+
+must_not_include_files:
+  - src/product_api_handler.py
+  - tests/test_product_api.py
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

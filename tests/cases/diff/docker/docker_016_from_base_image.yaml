@@ -1,3 +1,30 @@
+# Test 016: Dockerfile migrates from alpine to python:3.12-slim-bookworm with gunicorn
+#           — reviewer needs requirements.txt for native dep compatibility
+#
+# Scenario: Python Dockerfile migrated from alpine:3.14 (manual python install) to
+# python:3.12-slim-bookworm with multi-stage. Base image change is the core of the diff.
+# CMD switches from "python3 main.py" to gunicorn with workers.
+#
+# Reviewer questions:
+#   Q1: "What does requirements.txt contain — are there native dependencies?"
+#       -> requirements.txt has psycopg2-binary which needs libpq. Reviewer
+#       needs this to verify slim-bookworm includes the necessary C libraries.
+#   Q2: "Does config/settings.py reference env vars the Dockerfile should set?"
+#       -> settings.py has DATABASE_URL, REDIS_URL, CELERY_BROKER_URL.
+#       The Dockerfile sets none of these — reviewer needs to verify whether
+#       they're expected to come from runtime env only.
+#   Q3: "Is there an app entrypoint matching gunicorn's 'app:create_app()' target?"
+#       -> The Dockerfile CMD uses `app:create_app()` but no app.py is present
+#       in the test files. This is caught by the gunicorn target reference.
+#
+# Not needed:
+#   - scripts/backup.sh: uses DATABASE_URL but is an ops utility for pg_dump,
+#     not relevant to base image change review.
+#   - tests/conftest.py: references create_app but is test infrastructure,
+#     does not help reviewer assess base image compatibility.
+#   - docs/deployment.md: static documentation mentioning Docker commands,
+#     adds nothing beyond what the Dockerfile itself shows.
+
 initial:
   requirements.txt: |
     flask==2.3.0
@@ -20,11 +47,18 @@ initial:
   scripts/backup.sh: |
     #!/bin/bash
     pg_dump $DATABASE_URL > backup.sql
-  docs/deployment.md: |
-    # Deployment Guide
-    This is unrelated documentation.
+    gzip backup.sql
   tests/conftest.py: |
     import pytest
+    @pytest.fixture
+    def app():
+        from main import create_app
+        return create_app()
+  docs/deployment.md: |
+    # Deployment Guide
+    Build with: docker build -t app .
+    Run with: docker run -p 8000:8000 app
+
 changed:
   requirements.txt: |
     flask==2.3.0
@@ -57,14 +91,47 @@ changed:
   scripts/backup.sh: |
     #!/bin/bash
     pg_dump $DATABASE_URL > backup.sql
-  docs/deployment.md: |
-    # Deployment Guide
-    This is unrelated documentation.
+    gzip backup.sql
   tests/conftest.py: |
     import pytest
+    @pytest.fixture
+    def app():
+        from main import create_app
+        return create_app()
+  docs/deployment.md: |
+    # Deployment Guide
+    Build with: docker build -t app .
+    Run with: docker run -p 8000:8000 app
+
 must_include_files:
-- Dockerfile
-must_include_content:
-- FROM base AS dependencies
+  - Dockerfile
+  # Q1: Does requirements.txt have native deps that need slim-bookworm libs?
+  - requirements.txt
+
+must_include_content_from:
+  Dockerfile:
+    - FROM python:3.12-slim-bookworm AS base
+    - FROM base AS dependencies
+    - 'CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "app:create_app()"]'
+  requirements.txt:
+    - gunicorn==21.2.0
+    - psycopg2-binary==2.9.9
+
+must_not_include:
+  # --- backup.sh: ops utility, uses DATABASE_URL but not build-relevant ---
+  - pg_dump
+  - gzip backup.sql
+  # --- tests/conftest.py: test infrastructure, not base image review ---
+  - "@pytest.fixture"
+  # --- docs: static guide, doesn't add info beyond what Dockerfile shows ---
+  - "Deployment Guide"
+  - "docker run -p 8000:8000"
+must_not_include_files:
+  - scripts/backup.sh
+  - tests/conftest.py
+  - docs/deployment.md
+
+max_fragments: 6
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

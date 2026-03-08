@@ -1,25 +1,51 @@
+# Reviewer sees: form.cy.ts imports FORM_SELECTORS and uses them in
+# Cypress test assertions for a contact form.
+# Q: "What selectors does FORM_SELECTORS define?"
+#    -> selectors/form.ts: nameInput, emailInput, submitButton —
+#       data-testid selectors. Reviewer verifies the test uses all
+#       three and they match real DOM attributes.
+#
+# Not needed:
+#   - api-handler.ts: server-side form submission handler. Cypress
+#     tests the UI layer, not backend processing.
+#   - form.config.ts: form configuration (max lengths, debounce).
+#     Config not referenced in the Cypress test.
+
 initial:
-  form.ts: |
+  selectors/form.ts: |
     export const FORM_SELECTORS = {
         nameInput: '[data-testid=name-input]',
         emailInput: '[data-testid=email-input]',
         submitButton: '[data-testid=submit-btn]',
     };
-
-    // cypress_garbage_marker_001
-  form.cy.ts: |
-    console.log('initial');
+  cypress/e2e/form.cy.ts: |
+    console.log('placeholder');
+  api/api-handler.ts: |
+    export async function handleFormSubmit(data: { name: string; email: string }) {
+        const response = await fetch('/api/forms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Submit failed');
+        return response.json();
+    }
+  config/form.config.ts: |
+    export const FORM_CONFIG = {
+        maxNameLength: 100,
+        maxEmailLength: 255,
+        requiredFields: ['name', 'email'],
+        submitDebounceMs: 300,
+    };
 changed:
-  form.ts: |
+  selectors/form.ts: |
     export const FORM_SELECTORS = {
         nameInput: '[data-testid=name-input]',
         emailInput: '[data-testid=email-input]',
         submitButton: '[data-testid=submit-btn]',
     };
-
-    // cypress_garbage_marker_001
-  form.cy.ts: |
-    import { FORM_SELECTORS } from './form';
+  cypress/e2e/form.cy.ts: |
+    import { FORM_SELECTORS } from '../../selectors/form';
 
     describe('Contact Form', () => {
         it('should submit form', () => {
@@ -30,9 +56,38 @@ changed:
             cy.contains('Thank you').should('be.visible');
         });
     });
+  api/api-handler.ts: |
+    export async function handleFormSubmit(data: { name: string; email: string }) {
+        const response = await fetch('/api/forms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Submit failed');
+        return response.json();
+    }
+  config/form.config.ts: |
+    export const FORM_CONFIG = {
+        maxNameLength: 100,
+        maxEmailLength: 255,
+        requiredFields: ['name', 'email'],
+        submitDebounceMs: 300,
+    };
 must_include_files:
-- form.cy.ts
-must_include_content:
-- it('should submit form', () => {
+  # Unchanged file — the imported selectors. Reviewer needs to see
+  # the actual data-testid values to verify test correctness.
+  - selectors/form.ts
+must_include_content_from:
+  selectors/form.ts:
+    - "FORM_SELECTORS"
+    - "data-testid=name-input"
+must_not_include:
+  # api-handler.ts: server-side handler, Cypress tests UI
+  - handleFormSubmit
+  # form.config.ts: form configuration not used by test
+  - FORM_CONFIG
+  - maxNameLength
+max_fragments: 5
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

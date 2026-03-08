@@ -1,20 +1,78 @@
+# Scenario: React component is wrapped with memo() and custom comparison function.
+#
+# Diff: ExpensiveComponent.tsx adds memo() with areEqual comparator.
+# ParentComponent.tsx adds useCallback to stabilize the callback prop.
+#
+# Reviewer questions:
+#   Q1: "What does the custom areEqual check?" → ExpensiveComponent.tsx (CHANGED)
+#        compares items array element-by-element.
+#   Q2: "Does the parent stabilize props to avoid re-renders?" →
+#        ParentComponent.tsx (CHANGED) uses useCallback for handleItemClick.
+#
+# Not needed:
+#   - src/components/ItemCounter.tsx: sibling component rendering items
+#     but not memoized, different optimization concern.
+#   - src/utils/deepEqual.ts: utility for deep comparison but the memo uses
+#     its own inline areEqual, not this utility.
+
 initial:
-  ExpensiveComponent.tsx: |
+  src/components/ExpensiveComponent.tsx: |
     import React from 'react';
 
     export function ExpensiveComponent() {
-        return <div>Initial</div>;
+        return <div>TODO</div>;
     }
-
-    // react_garbage_marker_008
-  ParentComponent.tsx: |
+  src/components/ParentComponent.tsx: |
     import React from 'react';
 
     export function ParentComponent() {
-        return <div>Initial</div>;
+        return <div>TODO</div>;
     }
+  src/components/ItemCounter.tsx: |
+    import React from 'react';
+
+    interface ItemCounterProps {
+        items: string[];
+        label: string;
+    }
+
+    export function ItemCounter({ items, label }: ItemCounterProps) {
+        const total = items.length;
+        const uniqueCount = new Set(items).size;
+        return (
+            <div className="item-counter">
+                <h3>{label}</h3>
+                <p>Total: {total}</p>
+                <p>Unique: {uniqueCount}</p>
+                <p>Duplicates: {total - uniqueCount}</p>
+            </div>
+        );
+    }
+  src/utils/deepEqual.ts: |
+    export function deepEqual(a: unknown, b: unknown): boolean {
+        if (a === b) return true;
+        if (typeof a !== typeof b) return false;
+        if (a === null || b === null) return false;
+        if (typeof a !== 'object') return false;
+
+        const keysA = Object.keys(a as object);
+        const keysB = Object.keys(b as object);
+        if (keysA.length !== keysB.length) return false;
+
+        return keysA.every(key =>
+            deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+        );
+    }
+
+    export function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        return keysA.every(key => a[key] === b[key]);
+    }
+
 changed:
-  ExpensiveComponent.tsx: |
+  src/components/ExpensiveComponent.tsx: |
     import React, { memo } from 'react';
 
     interface ExpensiveComponentProps {
@@ -46,7 +104,7 @@ changed:
             </ul>
         );
     }, areEqual);
-  ParentComponent.tsx: |
+  src/components/ParentComponent.tsx: |
     import React, { useState, useCallback } from 'react';
     import { ExpensiveComponent } from './ExpensiveComponent';
 
@@ -66,11 +124,77 @@ changed:
             </div>
         );
     }
+  src/components/ItemCounter.tsx: |
+    import React from 'react';
+
+    interface ItemCounterProps {
+        items: string[];
+        label: string;
+    }
+
+    export function ItemCounter({ items, label }: ItemCounterProps) {
+        const total = items.length;
+        const uniqueCount = new Set(items).size;
+        return (
+            <div className="item-counter">
+                <h3>{label}</h3>
+                <p>Total: {total}</p>
+                <p>Unique: {uniqueCount}</p>
+                <p>Duplicates: {total - uniqueCount}</p>
+            </div>
+        );
+    }
+  src/utils/deepEqual.ts: |
+    export function deepEqual(a: unknown, b: unknown): boolean {
+        if (a === b) return true;
+        if (typeof a !== typeof b) return false;
+        if (a === null || b === null) return false;
+        if (typeof a !== 'object') return false;
+
+        const keysA = Object.keys(a as object);
+        const keysB = Object.keys(b as object);
+        if (keysA.length !== keysB.length) return false;
+
+        return keysA.every(key =>
+            deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+        );
+    }
+
+    export function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        return keysA.every(key => a[key] === b[key]);
+    }
+
+# === Assertions ===
+
 must_include_files:
-- ExpensiveComponent.tsx
-- ParentComponent.tsx
-must_include_content:
-- function areEqual(
-- () => onItemClick(item)
+  - src/components/ExpensiveComponent.tsx
+  - src/components/ParentComponent.tsx
+
+must_include_content_from:
+  src/components/ExpensiveComponent.tsx:
+    - "function areEqual("
+    - "memo(function ExpensiveComponent"
+  src/components/ParentComponent.tsx:
+    - "useCallback((item: string)"
+    - "<ExpensiveComponent items={items} onItemClick={handleItemClick} />"
+
+must_not_include:
+  # ItemCounter.tsx: renders items array but not memoized, different concern
+  - ItemCounter
+  - ItemCounterProps
+  - uniqueCount
+  # deepEqual.ts: comparison utility but areEqual is inline, not from this file
+  - deepEqual
+  - shallowEqual
+
+must_not_include_files:
+  - src/components/ItemCounter.tsx
+  - src/utils/deepEqual.ts
+
+max_fragments: 8
+max_files: 3
 add_garbage_files: false
 skip_garbage_check: true

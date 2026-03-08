@@ -1,3 +1,28 @@
+# Test 002: Node.js Dockerfile rewritten with precise COPY paths — reviewer needs
+#           package.json and source to verify paths match
+#
+# Scenario: Node.js Dockerfile rewritten from flat COPY to multi-stage with separate
+# dependency, builder, and production stages. COPY paths become precise: package*.json,
+# then src/ with --chown. HEALTHCHECK added targeting /api/health endpoint.
+#
+# Reviewer questions:
+#   Q1: "Does package.json define the scripts (start) referenced in CMD?"
+#       -> package.json has `"start": "node src/index.js"`. Reviewer needs
+#       this to verify CMD matches the declared entry point.
+#   Q2: "Does src/index.js expose the /api/health endpoint the HEALTHCHECK expects?"
+#       -> src/index.js has `app.get('/api/health', ...)`. Reviewer needs
+#       to confirm the endpoint exists and returns 200.
+#   Q3: "Does the app listen on port 3000 matching EXPOSE?"
+#       -> src/index.js has `const PORT = process.env.PORT || 3000`.
+#
+# Not needed:
+#   - scripts/deploy.sh: runs `docker build` and `docker push` — mentions
+#     Dockerfile but is an ops script, not relevant to COPY path review.
+#   - tests/api.test.js: shares /api/health endpoint name with HEALTHCHECK
+#     but test infrastructure adds nothing to build review.
+#   - terraform/main.tf: defines ECS task with same image — different
+#     infrastructure layer entirely.
+
 initial:
   src/index.js: |
     const express = require('express');
@@ -57,17 +82,26 @@ initial:
   scripts/deploy.sh: |
     #!/bin/bash
     docker build -t api:latest .
+    docker push registry.example.com/api:latest
   tests/api.test.js: |
+    const request = require('supertest');
     describe('API', () => {
-        it('should return health', () => {});
+        it('should return health', async () => {
+            const res = await request(app).get('/api/health');
+            expect(res.status).toBe(200);
+        });
     });
-  docs/api.md: |
-    # API Documentation
   terraform/main.tf: |
     provider "aws" {
+      region = "us-east-1"
     }
-  .github/workflows/build.yml: |
-    name: Build
+    resource "aws_ecs_task_definition" "api" {
+      container_definitions = jsonencode([{
+        image = "api:latest"
+        portMappings = [{ containerPort = 3000 }]
+      }])
+    }
+
 changed:
   src/index.js: |
     const express = require('express');
@@ -160,20 +194,60 @@ changed:
   scripts/deploy.sh: |
     #!/bin/bash
     docker build -t api:latest .
+    docker push registry.example.com/api:latest
   tests/api.test.js: |
+    const request = require('supertest');
     describe('API', () => {
-        it('should return health', () => {});
+        it('should return health', async () => {
+            const res = await request(app).get('/api/health');
+            expect(res.status).toBe(200);
+        });
     });
-  docs/api.md: |
-    # API Documentation
   terraform/main.tf: |
     provider "aws" {
+      region = "us-east-1"
     }
-  .github/workflows/build.yml: |
-    name: Build
+    resource "aws_ecs_task_definition" "api" {
+      container_definitions = jsonencode([{
+        image = "api:latest"
+        portMappings = [{ containerPort = 3000 }]
+      }])
+    }
+
 must_include_files:
-- Dockerfile
-must_include_content:
-- FROM node:20-alpine AS deps
+  - Dockerfile
+  # Q1: Does "start" script match CMD? Does the app have needed entry point?
+  - package.json
+  # Q2+Q3: Does /api/health exist for HEALTHCHECK? Does app bind port 3000?
+  - src/index.js
+
+must_include_content_from:
+  Dockerfile:
+    - COPY package*.json ./
+    - COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
+    - CMD ["node", "src/index.js"]
+  package.json:
+    - '"start": "node src/index.js"'
+  src/index.js:
+    - "/api/health"
+    - "process.env.PORT || 3000"
+
+must_not_include:
+  # --- deploy.sh: ops script, does not inform COPY path review ---
+  - docker push registry.example.com
+  - docker build -t api
+  # --- tests: shares /api/health URL but is test infrastructure ---
+  - supertest
+  - expect(res.status).toBe(200)
+  # --- terraform: different infrastructure layer ---
+  - aws_ecs_task_definition
+  - containerPort
+must_not_include_files:
+  - scripts/deploy.sh
+  - tests/api.test.js
+  - terraform/main.tf
+
+max_fragments: 8
+max_files: 4
 add_garbage_files: false
 skip_garbage_check: true

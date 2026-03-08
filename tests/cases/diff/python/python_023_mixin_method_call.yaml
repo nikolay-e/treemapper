@@ -1,3 +1,8 @@
+# Scenario: UserService uses mixin methods (TimestampMixin, SerializableMixin)
+# Changed: service.py imports mixins and creates classes that use mixin functionality
+# Reviewer questions: Is MRO correct? Does to_dict() include timestamp fields?
+# Trap 1: event_tracker.py — tracks events with timestamps, shares "timestamp" vocabulary but independent
+# Trap 2: json_encoder.py — encodes objects to JSON, shares "serialize/to_dict" domain but no dep
 initial:
   mixins.py: |
     import logging
@@ -58,20 +63,46 @@ initial:
   service.py: |
     class UserService:
         pass
-  garbage_analytics.py: |
-    GARBAGE_PY_ANALYTICS_827364 = "analytics tracking garbage"
-    UNRELATED_ANALYTICS_MARKER_918273 = "unused segment config"
+  event_tracker.py: |
+    from typing import List, Dict, Any, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class GarbageAnalyticsTracker:
-        def garbage_track_event(self, event_name):
-            return f"Garbage event: {event_name}"
-  garbage_ab_testing.py: |
-    GARBAGE_PY_ABTEST_918273 = "ab testing garbage"
-    UNRELATED_ABTEST_MARKER_827163 = "unused optimizely config"
+    @dataclass
+    class TrackedEvent:
+        name: str
+        timestamp: datetime
+        data: Dict[str, Any]
 
-    class GarbageABTestManager:
-        def garbage_get_variant(self, user_id):
-            return "garbage_control"
+    class EventTracker:
+        def __init__(self):
+            self._events: List[TrackedEvent] = []
+
+        def track(self, name: str, data: Dict[str, Any]) -> None:
+            self._events.append(TrackedEvent(name=name, timestamp=datetime.now(), data=data))
+
+        def get_events(self, name: Optional[str] = None) -> List[TrackedEvent]:
+            if name:
+                return [e for e in self._events if e.name == name]
+            return self._events.copy()
+  json_encoder.py: |
+    import json
+    from typing import Any, Dict
+    from datetime import datetime
+
+    class CustomJsonEncoder(json.JSONEncoder):
+        def default(self, obj: Any) -> Any:
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if hasattr(obj, 'to_dict'):
+                return obj.to_dict()
+            return super().default(obj)
+
+    def serialize_to_json(obj: Any) -> str:
+        return json.dumps(obj, cls=CustomJsonEncoder, indent=2)
+
+    def deserialize_from_json(data: str) -> Dict[str, Any]:
+        return json.loads(data)
 changed:
   mixins.py: |
     import logging
@@ -157,29 +188,63 @@ changed:
             if user is None:
                 self.log_error(f"User not found: {user_id}")
             return user
-  garbage_analytics.py: |
-    GARBAGE_PY_ANALYTICS_827364 = "analytics tracking garbage"
-    UNRELATED_ANALYTICS_MARKER_918273 = "unused segment config"
+  event_tracker.py: |
+    from typing import List, Dict, Any, Optional
+    from dataclasses import dataclass
+    from datetime import datetime
 
-    class GarbageAnalyticsTracker:
-        def garbage_track_event(self, event_name):
-            return f"Garbage event: {event_name}"
-  garbage_ab_testing.py: |
-    GARBAGE_PY_ABTEST_918273 = "ab testing garbage"
-    UNRELATED_ABTEST_MARKER_827163 = "unused optimizely config"
+    @dataclass
+    class TrackedEvent:
+        name: str
+        timestamp: datetime
+        data: Dict[str, Any]
 
-    class GarbageABTestManager:
-        def garbage_get_variant(self, user_id):
-            return "garbage_control"
+    class EventTracker:
+        def __init__(self):
+            self._events: List[TrackedEvent] = []
+
+        def track(self, name: str, data: Dict[str, Any]) -> None:
+            self._events.append(TrackedEvent(name=name, timestamp=datetime.now(), data=data))
+
+        def get_events(self, name: Optional[str] = None) -> List[TrackedEvent]:
+            if name:
+                return [e for e in self._events if e.name == name]
+            return self._events.copy()
+  json_encoder.py: |
+    import json
+    from typing import Any, Dict
+    from datetime import datetime
+
+    class CustomJsonEncoder(json.JSONEncoder):
+        def default(self, obj: Any) -> Any:
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if hasattr(obj, 'to_dict'):
+                return obj.to_dict()
+            return super().default(obj)
+
+    def serialize_to_json(obj: Any) -> str:
+        return json.dumps(obj, cls=CustomJsonEncoder, indent=2)
+
+    def deserialize_from_json(data: str) -> Dict[str, Any]:
+        return json.loads(data)
 must_include_files:
 - service.py
-must_include_content:
-- from mixins import LoggingMixin, LogEntry, LogLevel
-- 'active: bool = True'
+- mixins.py
+must_include_content_from:
+  service.py:
+  - 'from mixins import LoggingMixin, LogEntry, LogLevel'
+  - 'class UserService(LoggingMixin):'
 must_not_include:
-- GARBAGE_PY_ABTEST_918273
-- GARBAGE_PY_ANALYTICS_827364
-- garbage_ab_testing.py
-- garbage_analytics.py
+- EventTracker
+- TrackedEvent
+- CustomJsonEncoder
+- serialize_to_json
+- deserialize_from_json
+must_not_include_files:
+- event_tracker.py
+- json_encoder.py
 add_garbage_files: false
 skip_garbage_check: true
+max_fragments: 10
+max_files: 5

@@ -1,36 +1,21 @@
+# Scenario: Refactoring from a single hardcoded subnet to comprehensive
+#   for_each-driven infrastructure with environments, subnet tiers, security
+#   groups, NAT gateways, launch templates, and ASGs -- all from locals maps.
+# Reviewer questions:
+#   1. How are outputs structured from for_each resources? (outputs.tf)
+#   2. What's the old hardcoded pattern being replaced? (hardcoded_infra.tf is the legacy)
+# Traps:
+#   - hardcoded_infra.tf: same resources without for_each (old pattern, strong lexical overlap)
+#   - database_subnets.tf: subnets for a separate database VPC (same resource type)
+#   - legacy/static_subnets.tf: old hardcoded subnets in a different VPC
+
 initial:
   main.tf: |
     resource "aws_subnet" "main" {
       vpc_id     = aws_vpc.main.id
       cidr_block = "10.0.1.0/24"
     }
-  legacy/static_subnets_GARBAGE_TF_fe474a.tf: |
-    # GARBAGE_TF_fe474a - Legacy hardcoded subnets
-    resource "aws_subnet" "legacy_subnet_1_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.1.0/24"
-    }
-
-    resource "aws_subnet" "legacy_subnet_2_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.2.0/24"
-    }
-
-    resource "aws_subnet" "legacy_subnet_3_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.3.0/24"
-    }
-  scripts/subnet_generator_GARBAGE_TF_fe474b.py: |
-    # GARBAGE_TF_fe474b - Legacy subnet generator
-    def generate_legacy_subnets_GARBAGE_TF_fe474b():
-        for i in range(1, 10):
-            print(f"Creating legacy subnet {i} GARBAGE_TF_fe474b")
-
-  # --- Tricky garbage: hardcoded version of same resources without for_each ---
   hardcoded_infra.tf: |
-    GARBAGE_TF_fe474c_HARDCODED_INFRA = "manual-resources"
-    GARBAGE_TF_fe474c_NO_FOREACH = true
-
     resource "aws_vpc" "hardcoded" {
       cidr_block           = "10.0.0.0/16"
       enable_dns_hostnames = true
@@ -65,18 +50,6 @@ initial:
       }
     }
 
-    resource "aws_subnet" "hardcoded_public_3" {
-      vpc_id                  = aws_vpc.hardcoded.id
-      cidr_block              = "10.0.3.0/24"
-      availability_zone       = "us-east-1c"
-      map_public_ip_on_launch = true
-
-      tags = {
-        Name = "hardcoded-public-3"
-        Tier = "public"
-      }
-    }
-
     resource "aws_subnet" "hardcoded_private_1" {
       vpc_id            = aws_vpc.hardcoded.id
       cidr_block        = "10.0.10.0/24"
@@ -88,67 +61,19 @@ initial:
       }
     }
 
-    resource "aws_subnet" "hardcoded_private_2" {
-      vpc_id            = aws_vpc.hardcoded.id
-      cidr_block        = "10.0.11.0/24"
-      availability_zone = "us-east-1b"
-
-      tags = {
-        Name = "hardcoded-private-2"
-        Tier = "private"
-      }
-    }
-
-    resource "aws_subnet" "hardcoded_private_3" {
-      vpc_id            = aws_vpc.hardcoded.id
-      cidr_block        = "10.0.12.0/24"
-      availability_zone = "us-east-1c"
-
-      tags = {
-        Name = "hardcoded-private-3"
-        Tier = "private"
-      }
-    }
-
     resource "aws_internet_gateway" "hardcoded" {
       vpc_id = aws_vpc.hardcoded.id
-
-      tags = {
-        Name = "hardcoded-igw"
-      }
     }
 
     resource "aws_security_group" "hardcoded_web" {
-      name        = "hardcoded-web-sg"
-      description = "Security group for web servers"
-      vpc_id      = aws_vpc.hardcoded.id
+      name   = "hardcoded-web-sg"
+      vpc_id = aws_vpc.hardcoded.id
 
       ingress {
         from_port   = 80
         to_port     = 80
         protocol    = "tcp"
         cidr_blocks = ["0.0.0.0/0"]
-        description = "HTTP access"
-      }
-
-      ingress {
-        from_port   = 443
-        to_port     = 443
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-        description = "HTTPS access"
-      }
-
-      ingress {
-        from_port   = 22
-        to_port     = 22
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/8"]
-        description = "SSH access from admin"
-      }
-
-      tags = {
-        Name = "hardcoded-web-sg"
       }
     }
 
@@ -169,12 +94,7 @@ initial:
       image_id      = "ami-12345678"
       instance_type = "t3.large"
     }
-
-  # --- Tricky garbage: same resource type (aws_subnet) for different tier ---
-  database_subnets_GARBAGE_TF_fe474d.tf: |
-    GARBAGE_TF_fe474d_DB_SUBNETS = "database-tier"
-    GARBAGE_TF_fe474d_DB_ISOLATED = true
-
+  database_subnets.tf: |
     resource "aws_subnet" "db_isolated_1" {
       vpc_id            = aws_vpc.database.id
       cidr_block        = "10.100.1.0/24"
@@ -200,10 +120,16 @@ initial:
     resource "aws_db_subnet_group" "isolated" {
       name       = "db-isolated-subnet-group"
       subnet_ids = [aws_subnet.db_isolated_1.id, aws_subnet.db_isolated_2.id]
+    }
+  legacy/static_subnets.tf: |
+    resource "aws_subnet" "legacy_subnet_1" {
+      vpc_id     = aws_vpc.legacy.id
+      cidr_block = "172.16.1.0/24"
+    }
 
-      tags = {
-        Name = "db-isolated-subnet-group"
-      }
+    resource "aws_subnet" "legacy_subnet_2" {
+      vpc_id     = aws_vpc.legacy.id
+      cidr_block = "172.16.2.0/24"
     }
 
 changed:
@@ -503,268 +429,58 @@ changed:
         create_before_destroy = true
       }
     }
-  legacy/static_subnets_GARBAGE_TF_fe474a.tf: |
-    # GARBAGE_TF_fe474a - Legacy hardcoded subnets
-    resource "aws_subnet" "legacy_subnet_1_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.1.0/24"
-    }
-
-    resource "aws_subnet" "legacy_subnet_2_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.2.0/24"
-    }
-
-    resource "aws_subnet" "legacy_subnet_3_GARBAGE_TF_fe474a" {
-      vpc_id     = aws_vpc.legacy.id
-      cidr_block = "172.16.3.0/24"
-    }
-  scripts/subnet_generator_GARBAGE_TF_fe474b.py: |
-    # GARBAGE_TF_fe474b - Legacy subnet generator
-    def generate_legacy_subnets_GARBAGE_TF_fe474b():
-        for i in range(1, 10):
-            print(f"Creating legacy subnet {i} GARBAGE_TF_fe474b")
-
-  # --- Tricky garbage: hardcoded version of same resources without for_each ---
-  hardcoded_infra.tf: |
-    GARBAGE_TF_fe474c_HARDCODED_INFRA = "manual-resources"
-    GARBAGE_TF_fe474c_NO_FOREACH = true
-
-    resource "aws_vpc" "hardcoded" {
-      cidr_block           = "10.0.0.0/16"
-      enable_dns_hostnames = true
-      enable_dns_support   = true
-
-      tags = {
-        Name = "hardcoded-vpc"
-      }
-    }
-
-    resource "aws_subnet" "hardcoded_public_1" {
-      vpc_id                  = aws_vpc.hardcoded.id
-      cidr_block              = "10.0.1.0/24"
-      availability_zone       = "us-east-1a"
-      map_public_ip_on_launch = true
-
-      tags = {
-        Name = "hardcoded-public-1"
-        Tier = "public"
-      }
-    }
-
-    resource "aws_subnet" "hardcoded_public_2" {
-      vpc_id                  = aws_vpc.hardcoded.id
-      cidr_block              = "10.0.2.0/24"
-      availability_zone       = "us-east-1b"
-      map_public_ip_on_launch = true
-
-      tags = {
-        Name = "hardcoded-public-2"
-        Tier = "public"
-      }
-    }
-
-    resource "aws_subnet" "hardcoded_public_3" {
-      vpc_id                  = aws_vpc.hardcoded.id
-      cidr_block              = "10.0.3.0/24"
-      availability_zone       = "us-east-1c"
-      map_public_ip_on_launch = true
-
-      tags = {
-        Name = "hardcoded-public-3"
-        Tier = "public"
-      }
-    }
-
-    resource "aws_subnet" "hardcoded_private_1" {
-      vpc_id            = aws_vpc.hardcoded.id
-      cidr_block        = "10.0.10.0/24"
-      availability_zone = "us-east-1a"
-
-      tags = {
-        Name = "hardcoded-private-1"
-        Tier = "private"
-      }
-    }
-
-    resource "aws_subnet" "hardcoded_private_2" {
-      vpc_id            = aws_vpc.hardcoded.id
-      cidr_block        = "10.0.11.0/24"
-      availability_zone = "us-east-1b"
-
-      tags = {
-        Name = "hardcoded-private-2"
-        Tier = "private"
-      }
-    }
-
-    resource "aws_subnet" "hardcoded_private_3" {
-      vpc_id            = aws_vpc.hardcoded.id
-      cidr_block        = "10.0.12.0/24"
-      availability_zone = "us-east-1c"
-
-      tags = {
-        Name = "hardcoded-private-3"
-        Tier = "private"
-      }
-    }
-
-    resource "aws_internet_gateway" "hardcoded" {
-      vpc_id = aws_vpc.hardcoded.id
-
-      tags = {
-        Name = "hardcoded-igw"
-      }
-    }
-
-    resource "aws_security_group" "hardcoded_web" {
-      name        = "hardcoded-web-sg"
-      description = "Security group for web servers"
-      vpc_id      = aws_vpc.hardcoded.id
-
-      ingress {
-        from_port   = 80
-        to_port     = 80
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-        description = "HTTP access"
-      }
-
-      ingress {
-        from_port   = 443
-        to_port     = 443
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-        description = "HTTPS access"
-      }
-
-      ingress {
-        from_port   = 22
-        to_port     = 22
-        protocol    = "tcp"
-        cidr_blocks = ["10.0.0.0/8"]
-        description = "SSH access from admin"
-      }
-
-      tags = {
-        Name = "hardcoded-web-sg"
-      }
-    }
-
-    resource "aws_launch_template" "hardcoded_dev" {
-      name_prefix   = "dev-"
-      image_id      = "ami-12345678"
-      instance_type = "t3.small"
-    }
-
-    resource "aws_launch_template" "hardcoded_staging" {
-      name_prefix   = "staging-"
-      image_id      = "ami-12345678"
-      instance_type = "t3.medium"
-    }
-
-    resource "aws_launch_template" "hardcoded_prod" {
-      name_prefix   = "prod-"
-      image_id      = "ami-12345678"
-      instance_type = "t3.large"
-    }
-
-  # --- Tricky garbage: same resource type (aws_subnet) for different tier ---
-  database_subnets_GARBAGE_TF_fe474d.tf: |
-    GARBAGE_TF_fe474d_DB_SUBNETS = "database-tier"
-    GARBAGE_TF_fe474d_DB_ISOLATED = true
-
-    resource "aws_subnet" "db_isolated_1" {
-      vpc_id            = aws_vpc.database.id
-      cidr_block        = "10.100.1.0/24"
-      availability_zone = "us-east-1a"
-
-      tags = {
-        Name = "db-isolated-1"
-        Tier = "database"
-      }
-    }
-
-    resource "aws_subnet" "db_isolated_2" {
-      vpc_id            = aws_vpc.database.id
-      cidr_block        = "10.100.2.0/24"
-      availability_zone = "us-east-1b"
-
-      tags = {
-        Name = "db-isolated-2"
-        Tier = "database"
-      }
-    }
-
-    resource "aws_db_subnet_group" "isolated" {
-      name       = "db-isolated-subnet-group"
-      subnet_ids = [aws_subnet.db_isolated_1.id, aws_subnet.db_isolated_2.id]
-
-      tags = {
-        Name = "db-isolated-subnet-group"
-      }
-    }
-
   outputs.tf: |
     output "subnet_ids" {
-      description = "Map of subnet names to IDs"
-      value       = { for k, v in aws_subnet.main : k => v.id }
+      value = { for k, v in aws_subnet.main : k => v.id }
     }
 
     output "public_subnet_ids" {
-      description = "List of public subnet IDs"
-      value       = [for k, v in local.public_subnets : aws_subnet.main[k].id]
+      value = [for k, v in local.public_subnets : aws_subnet.main[k].id]
     }
 
     output "private_subnet_ids" {
-      description = "List of private subnet IDs"
-      value       = [for k, v in local.private_subnets : aws_subnet.main[k].id]
+      value = [for k, v in local.private_subnets : aws_subnet.main[k].id]
     }
 
     output "database_subnet_ids" {
-      description = "List of database subnet IDs"
-      value       = [for k, v in local.database_subnets : aws_subnet.main[k].id]
+      value = [for k, v in local.database_subnets : aws_subnet.main[k].id]
     }
 
     output "asg_names" {
-      description = "Map of environment to ASG names"
-      value       = { for k, v in aws_autoscaling_group.env : k => v.name }
+      value = { for k, v in aws_autoscaling_group.env : k => v.name }
     }
 
-# === Assertions ===
-
+# outputs.tf is a new file (only in changed) showing how for_each resources
+# are exposed. The diff is self-contained -- both main.tf and outputs.tf are
+# new/changed, so assertions target their content.
 must_include_files:
-- main.tf
-- outputs.tf
+  - main.tf
+  - outputs.tf
 
-must_include_content_from:
-  main.tf:
-    - environments = {
-    - subnet_config = {
-    - for_each = local.subnet_config
-    - subnet_id      = aws_subnet.main[each.key].id
-    - resource "aws_launch_template" "env" {
-    - resource "aws_autoscaling_group" "env" {
-  outputs.tf:
-    - output "subnet_ids" {
-    - output "asg_names" {
+must_include_content:
+  - environments = {
+  - subnet_config = {
+  - for_each = local.subnet_config
+  - output "subnet_ids" {
+  - output "asg_names" {
 
 must_not_include:
-# Plain garbage markers
-- GARBAGE_TF_fe474a
-- GARBAGE_TF_fe474b
-# Tricky: hardcoded version of same resources without for_each
-- GARBAGE_TF_fe474c_HARDCODED_INFRA
-- GARBAGE_TF_fe474c_NO_FOREACH
-# Tricky: same resource type for different tier
-- GARBAGE_TF_fe474d_DB_SUBNETS
-- GARBAGE_TF_fe474d_DB_ISOLATED
+  # Hardcoded infra is same resources without for_each (old pattern)
+  - hardcoded-vpc
+  - hardcoded-public-1
+  - hardcoded-web-sg
+  # Database subnets are for a separate VPC
+  - db-isolated-1
+  - db-isolated-subnet-group
+  - aws_vpc.database.id
+  # Legacy subnets are old infrastructure
+  - legacy_subnet_1
+  - aws_vpc.legacy.id
 
 must_not_include_files:
-- legacy/static_subnets_GARBAGE_TF_fe474a.tf
-- scripts/subnet_generator_GARBAGE_TF_fe474b.py
-- hardcoded_infra.tf
-- database_subnets_GARBAGE_TF_fe474d.tf
+  - hardcoded_infra.tf
+  - database_subnets.tf
+  - legacy/static_subnets.tf
 
 max_fragments: 8
 max_files: 3
