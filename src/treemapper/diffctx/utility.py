@@ -177,7 +177,7 @@ _INVARIANT_RE = re.compile(r"\b(?:assert|require|ensure|precondition|postconditi
 _COMMENT_PREFIXES = ("#", "//", "*", "/*", "--", '"""', "'''", "<!--")
 
 _EXTERNAL_IMPORT_RE = re.compile(
-    r"""(?:import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]""" r"""|from\s+(\S+)\s+import\s+(.+))""",
+    r"""(?:import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]|from\s+(\S+)\s+import\s+(.+))""",
 )
 
 

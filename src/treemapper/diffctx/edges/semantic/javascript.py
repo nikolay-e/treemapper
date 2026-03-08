@@ -13,7 +13,7 @@ _JS_EXTS = {".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"}
 _TS_EXTS = {".ts", ".tsx", ".mts", ".cts"}
 
 _EXPORT_DECL_RE = re.compile(
-    r"export\s+(?:(?:const|let|var|function\*?|class|async\s+function|" r"interface|type|enum|abstract\s+class)\s+)(\w+)",
+    r"export\s+(?:(?:const|let|var|function\*?|class|async\s+function|interface|type|enum|abstract\s+class)\s+)(\w+)",
     re.MULTILINE,
 )
 _EXPORT_DEFAULT_NAME_RE = re.compile(

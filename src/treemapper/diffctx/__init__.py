@@ -588,6 +588,11 @@ def _resolve_changed_files(
     return changed_files
 
 
+def _assign_token_counts(fragments: list[Fragment]) -> None:
+    for frag in fragments:
+        frag.token_count = count_tokens(frag.content).count + _OVERHEAD_PER_FRAGMENT
+
+
 def build_diff_context(
     root_dir: Path,
     diff_range: str,
@@ -652,14 +657,12 @@ def build_diff_context(
     else:
         logger.debug("diffctx: skipping rare-identifier expansion for large repo")
 
-    for frag in all_fragments:
-        frag.token_count = count_tokens(frag.content).count + _OVERHEAD_PER_FRAGMENT
+    _assign_token_counts(all_fragments)
 
     core_ids = _identify_core_fragments(hunks, all_fragments)
 
     signature_frags = _generate_signature_variants(all_fragments)
-    for frag in signature_frags:
-        frag.token_count = count_tokens(frag.content).count + _OVERHEAD_PER_FRAGMENT
+    _assign_token_counts(signature_frags)
     all_fragments.extend(signature_frags)
 
     if full:
