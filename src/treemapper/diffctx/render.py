@@ -11,11 +11,11 @@ _SYMBOL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(", re.MULTILINE),  # Python
         re.compile(r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[\(<]", re.MULTILINE),  # JS/TS
         re.compile(
-            r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[^=])\s*=>", re.MULTILINE
+            r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)|\w)\s*=>", re.MULTILINE
         ),  # Arrow
         re.compile(r"^func\s+(?:\([^)]+\)\s+)?(\w+)\s*[\(\[]", re.MULTILINE),  # Go
         re.compile(r"^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*[\(<]", re.MULTILINE),  # Rust
-        re.compile(r"^\s*(?:public|private|protected|static|\s)*\s+\w[\w<>\[\],\s]*\s+(\w+)\s*\(", re.MULTILINE),  # Java/C#
+        re.compile(r"^\s*(?:(?:public|private|protected|static)\s+)*\w[\w<>\[\],]*\s+(\w+)\s*\(", re.MULTILINE),  # Java/C#
     ],
     "class": [
         re.compile(r"^\s*class\s+(\w+)\s*[:\({\s]", re.MULTILINE),  # Python/JS/TS/Java
@@ -46,7 +46,7 @@ _SYMBOL_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         re.compile(r"^\s*package\s+(\w+)", re.MULTILINE),  # Go/Java
     ],
     "section": [
-        re.compile(r"^#{1,6}\s+([^\n]+)$", re.MULTILINE),
+        re.compile(r"^#{1,6}\s+(\S[^\n]*)$", re.MULTILINE),
     ],
 }
 

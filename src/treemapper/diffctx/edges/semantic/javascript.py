@@ -26,6 +26,23 @@ _NAMED_IMPORT_NAMES_RE = re.compile(
     re.MULTILINE,
 )
 
+
+def _add_name_if_valid(name: str, target: set[str]) -> None:
+    if name and len(name) >= 2:
+        target.add(name.lower())
+
+
+def _extract_exports_from_content(content: str, exported: set[str]) -> None:
+    for m in _EXPORT_DECL_RE.finditer(content):
+        _add_name_if_valid(m.group(1), exported)
+    for m in _EXPORT_DEFAULT_NAME_RE.finditer(content):
+        _add_name_if_valid(m.group(1), exported)
+    for m in _EXPORT_LIST_RE.finditer(content):
+        for part in m.group(1).split(","):
+            part = part.strip().split(" as ")[0].strip()
+            _add_name_if_valid(part, exported)
+
+
 _JS_WEIGHTS = LANG_WEIGHTS["javascript"]
 _TS_WEIGHTS = LANG_WEIGHTS["typescript"]
 
@@ -253,19 +270,7 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
                 content = f.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 continue
-            for m in _EXPORT_DECL_RE.finditer(content):
-                name = m.group(1)
-                if name and len(name) >= 2:
-                    exported.add(name.lower())
-            for m in _EXPORT_DEFAULT_NAME_RE.finditer(content):
-                name = m.group(1)
-                if name and len(name) >= 2:
-                    exported.add(name.lower())
-            for m in _EXPORT_LIST_RE.finditer(content):
-                for part in m.group(1).split(","):
-                    part = part.strip().split(" as ")[0].strip()
-                    if part and len(part) >= 2:
-                        exported.add(part.lower())
+            _extract_exports_from_content(content, exported)
         return exported
 
     def _find_files_importing_names(

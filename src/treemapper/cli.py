@@ -42,7 +42,7 @@ def _validate_budget(budget: int | None) -> None:
 
 
 def _validate_alpha(alpha: float) -> None:
-    if alpha <= 0 or alpha >= 1:
+    if not (0 < alpha < 1):
         _exit_error(f"--alpha must be between 0 and 1 (exclusive), got {alpha}")
 
 
@@ -106,9 +106,9 @@ def _warn_diff_only_flags(args: argparse.Namespace) -> None:
     used = []
     if args.budget is not None:
         used.append("--budget")
-    if args.alpha != 0.60:
+    if abs(args.alpha - 0.60) > 1e-9:
         used.append("--alpha/--context-precision")
-    if args.tau != 0.08:
+    if abs(args.tau - 0.08) > 1e-9:
         used.append("--tau/--min-relevance")
     if args.full:
         used.append("--full")

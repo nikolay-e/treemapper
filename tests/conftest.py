@@ -679,78 +679,52 @@ def pytest_sessionfinish(session, exitstatus):
         session.exitstatus = 1
 
 
-def pytest_terminal_summary(terminalreporter, exitstatus, config):
-    results = getattr(config, "_diffctx_results", None)
-    if results is None:
-        results = _extract_scores_from_reports(terminalreporter)
-    if not results:
-        return
-
+def _compute_score_stats(results, config):
     scores = [p["score"] for _, p in results]
-    diff_fails = sum(1 for _, p in results if not p.get("diff_covered", True))
-    perfect = sum(1 for s in scores if s == 100.0)
-    above_90 = sum(1 for s in scores if s >= 90.0)
-    above_70 = sum(1 for s in scores if s >= 70.0)
-    below_50 = sum(1 for s in scores if s < 50.0)
-    avg_score = getattr(config, "_diffctx_avg", sum(scores) / len(scores) if scores else 0)
+    return {
+        "scores": scores,
+        "diff_fails": sum(1 for _, p in results if not p.get("diff_covered", True)),
+        "perfect": sum(1 for s in scores if s >= 100.0),
+        "above_90": sum(1 for s in scores if s >= 90.0),
+        "above_70": sum(1 for s in scores if s >= 70.0),
+        "below_50": sum(1 for s in scores if s < 50.0),
+        "avg_score": getattr(config, "_diffctx_avg", sum(scores) / len(scores) if scores else 0),
+    }
 
+
+def _compute_enrichment_stats(results):
     enrichments = [p["enrichment"] for _, p in results if p.get("enrichment", 0) > 0]
-    avg_enrichment = sum(enrichments) / len(enrichments) if enrichments else 0
     total_diff_tok = sum(p.get("diff_tokens", 0) for _, p in results)
     total_ctx_tok = sum(p.get("context_tokens", 0) for _, p in results)
-    global_enrichment = (total_ctx_tok / total_diff_tok * 100) if total_diff_tok > 0 else 0
+    return {
+        "avg_enrichment": sum(enrichments) / len(enrichments) if enrichments else 0,
+        "total_diff_tok": total_diff_tok,
+        "total_ctx_tok": total_ctx_tok,
+        "global_enrichment": (total_ctx_tok / total_diff_tok * 100) if total_diff_tok > 0 else 0,
+    }
 
-    terminalreporter.write_sep("=", "DIFFCTX QUALITY SCORES")
-    terminalreporter.write_line(f"  Cases scored:    {len(results)}")
-    terminalreporter.write_line(f"  Average score:   {avg_score:.1f}% (min: {MINIMUM_AVERAGE_SCORE}%)")
-    terminalreporter.write_line(f"  Perfect (100%):  {perfect}")
-    terminalreporter.write_line(f"  Above 90%:       {above_90}")
-    terminalreporter.write_line(f"  Above 70%:       {above_70}")
-    terminalreporter.write_line(f"  Below 50%:       {below_50}")
-    terminalreporter.write_line(f"  Diff hard fails: {diff_fails}")
-    terminalreporter.write_line("")
-    terminalreporter.write_line(f"  Context enrichment (avg per-case):  {avg_enrichment:.0f}%")
-    terminalreporter.write_line(f"  Context enrichment (global):        {global_enrichment:.0f}%")
-    terminalreporter.write_line(f"  Total diff tokens:    {total_diff_tok:,}")
-    terminalreporter.write_line(f"  Total context tokens: {total_ctx_tok:,}")
 
-    if avg_score < MINIMUM_AVERAGE_SCORE:
-        terminalreporter.write_sep("!", "SCORE REGRESSION")
-        terminalreporter.write_line(f"  Average score {avg_score:.1f}% dropped below minimum {MINIMUM_AVERAGE_SCORE}%")
+def _format_entry(case_id, props):
+    flags = []
+    if not props.get("diff_covered", True):
+        flags.append("DIFF_MISS")
+    noise = props.get("noise_rate", 0)
+    if noise > 0:
+        flags.append(f"noise={noise}%")
+    garbage = props.get("garbage_rate", 0)
+    if garbage > 0:
+        flags.append(f"garbage={garbage}%")
+    recall = props.get("recall", 100)
+    if recall < 100:
+        flags.append(f"recall={recall}%")
+    enrich = props.get("enrichment", 0)
+    if enrich > 0:
+        flags.append(f"ctx={enrich}%")
+    flag_str = f" [{', '.join(flags)}]" if flags else ""
+    return f"  {props['score']:5.1f}%  {case_id}{flag_str}"
 
-    sorted_results = sorted(results, key=lambda r: r[1]["score"])
 
-    def _format_entry(case_id, props):
-        flags = []
-        if not props.get("diff_covered", True):
-            flags.append("DIFF_MISS")
-        noise = props.get("noise_rate", 0)
-        if noise > 0:
-            flags.append(f"noise={noise}%")
-        garbage = props.get("garbage_rate", 0)
-        if garbage > 0:
-            flags.append(f"garbage={garbage}%")
-        recall = props.get("recall", 100)
-        if recall < 100:
-            flags.append(f"recall={recall}%")
-        enrich = props.get("enrichment", 0)
-        if enrich > 0:
-            flags.append(f"ctx={enrich}%")
-        flag_str = f" [{', '.join(flags)}]" if flags else ""
-        return f"  {props['score']:5.1f}%  {case_id}{flag_str}"
-
-    worst = [r for r in sorted_results if r[1]["score"] < 100.0][:300]
-    if worst:
-        terminalreporter.write_sep("-", f"LOWEST SCORES ({len(worst)})")
-        for case_id, props in worst:
-            terminalreporter.write_line(_format_entry(case_id, props))
-
-    best = [r for r in reversed(sorted_results) if r[1]["score"] > 0.0][:300]
-    if best:
-        terminalreporter.write_sep("-", f"HIGHEST SCORES ({len(best)})")
-        for case_id, props in best:
-            terminalreporter.write_line(_format_entry(case_id, props))
-
+def _write_scores_report(results, stats, enrich):
     import json
     import time
 
@@ -759,14 +733,14 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     report = {
         "timestamp": time.time(),
         "total_cases": len(results),
-        "average_score": round(avg_score, 2),
+        "average_score": round(stats["avg_score"], 2),
         "minimum_score": MINIMUM_AVERAGE_SCORE,
-        "perfect_count": perfect,
-        "diff_hard_fails": diff_fails,
-        "avg_enrichment": round(avg_enrichment),
-        "global_enrichment": round(global_enrichment),
-        "total_diff_tokens": total_diff_tok,
-        "total_context_tokens": total_ctx_tok,
+        "perfect_count": stats["perfect"],
+        "diff_hard_fails": stats["diff_fails"],
+        "avg_enrichment": round(enrich["avg_enrichment"]),
+        "global_enrichment": round(enrich["global_enrichment"]),
+        "total_diff_tokens": enrich["total_diff_tok"],
+        "total_context_tokens": enrich["total_ctx_tok"],
         "cases": {
             case_id: {
                 "score": p["score"],
@@ -782,3 +756,48 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         },
     }
     (scores_dir / "latest.json").write_text(json.dumps(report, indent=2))
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    results = getattr(config, "_diffctx_results", None)
+    if results is None:
+        results = _extract_scores_from_reports(terminalreporter)
+    if not results:
+        return
+
+    stats = _compute_score_stats(results, config)
+    enrich = _compute_enrichment_stats(results)
+
+    terminalreporter.write_sep("=", "DIFFCTX QUALITY SCORES")
+    terminalreporter.write_line(f"  Cases scored:    {len(results)}")
+    terminalreporter.write_line(f"  Average score:   {stats['avg_score']:.1f}% (min: {MINIMUM_AVERAGE_SCORE}%)")
+    terminalreporter.write_line(f"  Perfect (100%):  {stats['perfect']}")
+    terminalreporter.write_line(f"  Above 90%:       {stats['above_90']}")
+    terminalreporter.write_line(f"  Above 70%:       {stats['above_70']}")
+    terminalreporter.write_line(f"  Below 50%:       {stats['below_50']}")
+    terminalreporter.write_line(f"  Diff hard fails: {stats['diff_fails']}")
+    terminalreporter.write_line("")
+    terminalreporter.write_line(f"  Context enrichment (avg per-case):  {enrich['avg_enrichment']:.0f}%")
+    terminalreporter.write_line(f"  Context enrichment (global):        {enrich['global_enrichment']:.0f}%")
+    terminalreporter.write_line(f"  Total diff tokens:    {enrich['total_diff_tok']:,}")
+    terminalreporter.write_line(f"  Total context tokens: {enrich['total_ctx_tok']:,}")
+
+    if stats["avg_score"] < MINIMUM_AVERAGE_SCORE:
+        terminalreporter.write_sep("!", "SCORE REGRESSION")
+        terminalreporter.write_line(f"  Average score {stats['avg_score']:.1f}% dropped below minimum {MINIMUM_AVERAGE_SCORE}%")
+
+    sorted_results = sorted(results, key=lambda r: r[1]["score"])
+
+    worst = [r for r in sorted_results if r[1]["score"] < 100.0][:300]
+    if worst:
+        terminalreporter.write_sep("-", f"LOWEST SCORES ({len(worst)})")
+        for case_id, props in worst:
+            terminalreporter.write_line(_format_entry(case_id, props))
+
+    best = [r for r in reversed(sorted_results) if r[1]["score"] > 0.0][:300]
+    if best:
+        terminalreporter.write_sep("-", f"HIGHEST SCORES ({len(best)})")
+        for case_id, props in best:
+            terminalreporter.write_line(_format_entry(case_id, props))
+
+    _write_scores_report(results, stats, enrich)

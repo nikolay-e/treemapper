@@ -63,6 +63,29 @@ def _match_path_loose(candidate: str, target: str) -> bool:
     return candidate == target or candidate.endswith(f"/{target}") or target.endswith(f"/{candidate}") or target in candidate
 
 
+def _should_skip_file(
+    path: str,
+    expected_files: set[str] | None,
+    excluded_files: set[str] | None,
+) -> bool:
+    if excluded_files and any(_match_path_loose(path, ex) for ex in excluded_files):
+        return True
+    if expected_files and not any(_match_path_loose(path, ef) for ef in expected_files):
+        return True
+    return False
+
+
+def _extract_added_lines(initial_content: str, changed_content: str) -> list[str]:
+    initial_lines = initial_content.splitlines()
+    changed_lines = changed_content.splitlines()
+    matcher = difflib.SequenceMatcher(None, initial_lines, changed_lines)
+    added = []
+    for tag, _, _, j1, j2 in matcher.get_opcodes():
+        if tag in ("replace", "insert"):
+            added.extend(changed_lines[j1:j2])
+    return [line.strip() for line in added if line.strip()]
+
+
 def compute_diff_lines(
     initial_files: dict[str, str],
     changed_files: dict[str, str],
@@ -71,21 +94,12 @@ def compute_diff_lines(
 ) -> dict[str, list[str]]:
     result: dict[str, list[str]] = {}
     for path, changed_content in changed_files.items():
-        if excluded_files and any(_match_path_loose(path, ex) for ex in excluded_files):
-            continue
-        if expected_files and not any(_match_path_loose(path, ef) for ef in expected_files):
+        if _should_skip_file(path, expected_files, excluded_files):
             continue
         initial_content = initial_files.get(path, "")
         if initial_content == changed_content:
             continue
-        initial_lines = initial_content.splitlines()
-        changed_lines = changed_content.splitlines()
-        matcher = difflib.SequenceMatcher(None, initial_lines, changed_lines)
-        added = []
-        for tag, _, _, j1, j2 in matcher.get_opcodes():
-            if tag in ("replace", "insert"):
-                added.extend(changed_lines[j1:j2])
-        significant = [line.strip() for line in added if line.strip()]
+        significant = _extract_added_lines(initial_content, changed_content)
         if significant:
             result[path] = significant
     return result

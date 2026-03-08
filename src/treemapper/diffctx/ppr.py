@@ -33,11 +33,11 @@ def _init_seed_residuals(
         epsilon = 0.1
         total_sw = sum(seed_weights.get(s, epsilon) for s in valid_seeds)
         if total_sw <= 0:
-            return {s: 0.0 for s in valid_seeds}
+            return dict.fromkeys(valid_seeds, 0.0)
         return {s: seed_weights.get(s, epsilon) / total_sw for s in valid_seeds}
 
     weight = 1.0 / len(valid_seeds)
-    return {s: weight for s in valid_seeds}
+    return dict.fromkeys(valid_seeds, weight)
 
 
 def _propagate_residual(

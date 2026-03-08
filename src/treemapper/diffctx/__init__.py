@@ -193,6 +193,27 @@ def _is_generated_file(path: Path, content: str) -> bool:
     return False
 
 
+def _truncate_generated_fragments(file_frags: list[Fragment]) -> list[Fragment]:
+    truncated: list[Fragment] = []
+    for frag in file_frags:
+        if frag.line_count <= _MAX_GENERATED_LINES:
+            truncated.append(frag)
+            continue
+        lines = frag.content.splitlines()
+        remaining = len(lines) - _MAX_GENERATED_LINES
+        lines = lines[:_MAX_GENERATED_LINES]
+        truncated_content = "\n".join(lines) + f"\n# ... [{remaining} more lines]"
+        truncated.append(
+            Fragment(
+                id=FragmentId(frag.path, frag.start_line, frag.start_line + len(lines) - 1),
+                kind=frag.kind,
+                content=truncated_content,
+                identifiers=extract_identifiers(truncated_content),
+            )
+        )
+    return truncated
+
+
 def _process_files_for_fragments(
     files: list[Path],
     root_dir: Path,
@@ -221,24 +242,7 @@ def _process_files_for_fragments(
             )
 
         if is_generated:
-            truncated: list[Fragment] = []
-            for frag in file_frags:
-                if frag.line_count > _MAX_GENERATED_LINES:
-                    lines = frag.content.splitlines()
-                    remaining = len(lines) - _MAX_GENERATED_LINES
-                    lines = lines[:_MAX_GENERATED_LINES]
-                    truncated_content = "\n".join(lines) + f"\n# ... [{remaining} more lines]"
-                    truncated.append(
-                        Fragment(
-                            id=FragmentId(frag.path, frag.start_line, frag.start_line + len(lines) - 1),
-                            kind=frag.kind,
-                            content=truncated_content,
-                            identifiers=extract_identifiers(truncated_content),
-                        )
-                    )
-                else:
-                    truncated.append(frag)
-            file_frags = truncated
+            file_frags = _truncate_generated_fragments(file_frags)
 
         for frag in file_frags:
             fragments.append(frag)
@@ -303,10 +307,10 @@ def _apply_same_file_floor(
 _HUB_REVERSE_THRESHOLD = 3
 
 
-def _find_hub_noise_paths(
+def _classify_semantic_edges(
     graph: Graph,
     changed_paths: set[Path],
-) -> set[Path]:
+) -> tuple[dict[Path, set[Path]], set[Path]]:
     reverse_deps: dict[Path, set[Path]] = defaultdict(set)
     direct_edge_paths: set[Path] = set()
     for (src, dst), category in graph.edge_categories.items():
@@ -327,6 +331,14 @@ def _find_hub_noise_paths(
             reverse_deps[changed_frag.path].add(other_frag.path)
         else:
             direct_edge_paths.add(other_frag.path)
+    return reverse_deps, direct_edge_paths
+
+
+def _find_hub_noise_paths(
+    graph: Graph,
+    changed_paths: set[Path],
+) -> set[Path]:
+    reverse_deps, direct_edge_paths = _classify_semantic_edges(graph, changed_paths)
 
     noise_counts: dict[Path, int] = {}
     for deps in reverse_deps.values():
@@ -440,6 +452,44 @@ def _filter_low_relevance_fragments(
     return kept
 
 
+def _create_whole_file_fragment(
+    path: Path,
+    root_dir: Path,
+    preferred_revs: list[str],
+) -> Fragment | None:
+    content = _read_file_content(path, root_dir, preferred_revs)
+    if not content or not content.strip():
+        return None
+    if _is_generated_file(path, content):
+        lines = content.splitlines()
+        if len(lines) > _MAX_GENERATED_LINES:
+            remaining = len(lines) - _MAX_GENERATED_LINES
+            content = "\n".join(lines[:_MAX_GENERATED_LINES]) + f"\n# ... [{remaining} more lines]"
+    lines = content.splitlines()
+    frag = Fragment(
+        id=FragmentId(path=path, start_line=1, end_line=len(lines)),
+        kind="chunk",
+        content=content,
+        identifiers=extract_identifiers(content),
+    )
+    frag.token_count = count_tokens(content).count + _OVERHEAD_PER_FRAGMENT
+    return frag
+
+
+def _pick_smallest_fitting(
+    candidates: list[Fragment],
+    selected_ids: set[FragmentId],
+    budget_left: int,
+) -> Fragment | None:
+    ranked = sorted(candidates, key=lambda f: f.token_count)
+    for cand in ranked:
+        if cand.token_count <= 0 or cand.id in selected_ids:
+            continue
+        if cand.token_count <= budget_left:
+            return cand
+    return None
+
+
 def _ensure_changed_files_represented(
     selected: list[Fragment],
     all_fragments: list[Fragment],
@@ -449,8 +499,7 @@ def _ensure_changed_files_represented(
     preferred_revs: list[str],
 ) -> list[Fragment]:
     selected_paths = {f.path for f in selected}
-    changed_paths = set(changed_files)
-    missing_paths = changed_paths - selected_paths
+    missing_paths = set(changed_files) - selected_paths
 
     if not missing_paths:
         return selected
@@ -466,37 +515,11 @@ def _ensure_changed_files_represented(
 
     for path in sorted(missing_paths):
         candidates = frags_by_path.get(path, [])
-
         if not candidates:
-            content = _read_file_content(path, root_dir, preferred_revs)
-            if content and content.strip():
-                if _is_generated_file(path, content):
-                    lines = content.splitlines()
-                    if len(lines) > _MAX_GENERATED_LINES:
-                        remaining = len(lines) - _MAX_GENERATED_LINES
-                        content = "\n".join(lines[:_MAX_GENERATED_LINES]) + f"\n# ... [{remaining} more lines]"
-                    lines = content.splitlines()
-                else:
-                    lines = content.splitlines()
-                frag = Fragment(
-                    id=FragmentId(path=path, start_line=1, end_line=len(lines)),
-                    kind="chunk",
-                    content=content,
-                    identifiers=extract_identifiers(content),
-                )
-                frag.token_count = count_tokens(content).count + _OVERHEAD_PER_FRAGMENT
-                candidates = [frag]
+            fallback = _create_whole_file_fragment(path, root_dir, preferred_revs)
+            candidates = [fallback] if fallback else []
 
-        if not candidates:
-            continue
-        ranked = sorted(candidates, key=lambda f: f.token_count)
-        picked = None
-        for cand in ranked:
-            if cand.token_count <= 0 or cand.id in selected_ids:
-                continue
-            if cand.token_count <= budget_left:
-                picked = cand
-                break
+        picked = _pick_smallest_fitting(candidates, selected_ids, budget_left)
         if picked is not None:
             added.append(picked)
             selected_ids.add(picked.id)
@@ -546,6 +569,25 @@ def _select_with_ppr(
     return selected.selected, selected
 
 
+def _resolve_changed_files(
+    root_dir: Path,
+    diff_range: str,
+    untracked: list[Path],
+    combined_spec: pathspec.PathSpec,
+    wl_spec: pathspec.PathSpec | None,
+) -> list[Path]:
+    changed_files = get_changed_files(root_dir, diff_range)
+    changed_files = [_normalize_path(p, root_dir) for p in changed_files]
+    changed_files.extend(untracked)
+    changed_files = _filter_ignored(changed_files, root_dir, combined_spec)
+    changed_files = _filter_whitelist(changed_files, root_dir, wl_spec)
+
+    excluded_paths = get_deleted_files(root_dir, diff_range) | get_renamed_old_paths(root_dir, diff_range)
+    if excluded_paths:
+        changed_files = [f for f in changed_files if f.resolve() not in excluded_paths]
+    return changed_files
+
+
 def build_diff_context(
     root_dir: Path,
     diff_range: str,
@@ -568,9 +610,8 @@ def build_diff_context(
     combined_spec = get_ignore_specs(root_dir, ignore_file, no_default_ignores, None)
     wl_spec = get_whitelist_spec(whitelist_file, root_dir)
 
-    untracked: list[Path] = []
-    if is_working_tree_diff:
-        untracked = _discover_untracked_files(root_dir, combined_spec)
+    untracked = _discover_untracked_files(root_dir, combined_spec) if is_working_tree_diff else []
+    if untracked:
         hunks.extend(_synthetic_hunks(untracked))
 
     if not hunks:
@@ -581,15 +622,7 @@ def build_diff_context(
     if untracked:
         expansion_concepts = _enrich_concepts(expansion_concepts, untracked)
 
-    changed_files = get_changed_files(root_dir, diff_range)
-    changed_files = [_normalize_path(p, root_dir) for p in changed_files]
-    changed_files.extend(untracked)
-    changed_files = _filter_ignored(changed_files, root_dir, combined_spec)
-    changed_files = _filter_whitelist(changed_files, root_dir, wl_spec)
-
-    excluded_paths = get_deleted_files(root_dir, diff_range) | get_renamed_old_paths(root_dir, diff_range)
-    if excluded_paths:
-        changed_files = [f for f in changed_files if f.resolve() not in excluded_paths]
+    changed_files = _resolve_changed_files(root_dir, diff_range, untracked, combined_spec, wl_spec)
 
     preferred_revs = _build_preferred_revs(base_rev, head_rev)
 
@@ -736,12 +769,12 @@ def _coherence_post_pass(
     )
 
 
-def _compute_seed_weights(
+def _map_hunks_to_fragments(
     hunks: list[DiffHunk],
     core_ids: set[FragmentId],
     all_fragments: list[Fragment],
 ) -> dict[FragmentId, float]:
-    frag_hunk_lines: dict[FragmentId, float] = {}
+    result: dict[FragmentId, float] = {}
     for h in hunks:
         h_start, h_end = h.core_selection_range
         hunk_size = max(1, h_end - h_start + 1)
@@ -749,31 +782,62 @@ def _compute_seed_weights(
             if frag.id not in core_ids or frag.path != h.path:
                 continue
             if frag.start_line <= h_end and frag.end_line >= h_start:
-                frag_hunk_lines[frag.id] = frag_hunk_lines.get(frag.id, 0) + hunk_size
-    if not frag_hunk_lines:
-        return {}
+                result[frag.id] = result.get(frag.id, 0) + hunk_size
+    return result
 
+
+def _add_container_weights(
+    frag_hunk_lines: dict[FragmentId, float],
+    core_ids: set[FragmentId],
+    all_fragments: list[Fragment],
+) -> None:
     for frag in all_fragments:
         if frag.id not in core_ids or frag.id in frag_hunk_lines:
             continue
-        if frag.kind in _CONTAINER_FRAGMENT_KINDS:
-            contained_weight = sum(
-                w
-                for fid, w in frag_hunk_lines.items()
-                if fid.path == frag.path and frag.start_line <= fid.start_line and fid.end_line <= frag.end_line
-            )
-            if contained_weight > 0:
-                frag_hunk_lines[frag.id] = contained_weight
+        if frag.kind not in _CONTAINER_FRAGMENT_KINDS:
+            continue
+        contained_weight = sum(
+            w
+            for fid, w in frag_hunk_lines.items()
+            if fid.path == frag.path and frag.start_line <= fid.start_line and fid.end_line <= frag.end_line
+        )
+        if contained_weight > 0:
+            frag_hunk_lines[frag.id] = contained_weight
 
+
+def _best_hunk_size_for_path(hunks: list[DiffHunk], path: Path) -> int:
+    best = 0
+    for h in hunks:
+        if h.path == path:
+            h_start, h_end = h.core_selection_range
+            best = max(best, h_end - h_start + 1)
+    return best
+
+
+def _fill_missing_core_weights(
+    frag_hunk_lines: dict[FragmentId, float],
+    core_ids: set[FragmentId],
+    hunks: list[DiffHunk],
+) -> None:
     for fid in core_ids:
-        if fid not in frag_hunk_lines:
-            best_hunk_size = 0
-            for h in hunks:
-                if h.path == fid.path:
-                    h_start, h_end = h.core_selection_range
-                    best_hunk_size = max(best_hunk_size, h_end - h_start + 1)
-            if best_hunk_size > 0:
-                frag_hunk_lines[fid] = best_hunk_size
+        if fid in frag_hunk_lines:
+            continue
+        best = _best_hunk_size_for_path(hunks, fid.path)
+        if best > 0:
+            frag_hunk_lines[fid] = best
+
+
+def _compute_seed_weights(
+    hunks: list[DiffHunk],
+    core_ids: set[FragmentId],
+    all_fragments: list[Fragment],
+) -> dict[FragmentId, float]:
+    frag_hunk_lines = _map_hunks_to_fragments(hunks, core_ids, all_fragments)
+    if not frag_hunk_lines:
+        return {}
+
+    _add_container_weights(frag_hunk_lines, core_ids, all_fragments)
+    _fill_missing_core_weights(frag_hunk_lines, core_ids, hunks)
 
     return frag_hunk_lines
 

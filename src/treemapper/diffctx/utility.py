@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 _CONCEPT_RE = re.compile(r"[A-Za-z_]\w*")
 _CALL_RE = re.compile(r"(\w+)\s*\(")
 _TYPE_REF_RE = re.compile(r"(?::|->)\s*([A-Z]\w+)")
-_GENERIC_TYPE_RE = re.compile(r"[\[<,]\s*([A-Z][A-Za-z0-9_]*)")
+_GENERIC_TYPE_RE = re.compile(r"[\[<,]\s*([A-Z]\w*)")
 
 _LANGUAGE_BUILTINS: frozenset[str] = frozenset(
     {
@@ -181,21 +181,25 @@ _EXTERNAL_IMPORT_RE = re.compile(
 )
 
 
+def _parse_import_names(names_str: str) -> set[str]:
+    result: set[str] = set()
+    for name in names_str.split(","):
+        name = name.strip().split(" as ")[0].strip()
+        if name:
+            result.add(name.lower())
+    return result
+
+
 def _collect_external_symbols(diff_text: str) -> frozenset[str]:
     symbols: set[str] = set()
     for line in _extract_changed_lines(diff_text):
         for m in _EXTERNAL_IMPORT_RE.finditer(line):
-            js_names, js_source, py_module, py_names = m.group(1), m.group(2), m.group(3), m.group(4)
+            js_names, js_source = m.group(1), m.group(2)
+            py_module, py_names = m.group(3), m.group(4)
             if js_names and js_source and not js_source.startswith("."):
-                for name in js_names.split(","):
-                    name = name.strip().split(" as ")[0].strip()
-                    if name:
-                        symbols.add(name.lower())
+                symbols.update(_parse_import_names(js_names))
             if py_module and py_names and not py_module.startswith("."):
-                for name in py_names.split(","):
-                    name = name.strip().split(" as ")[0].strip()
-                    if name:
-                        symbols.add(name.lower())
+                symbols.update(_parse_import_names(py_names))
     return frozenset(symbols)
 
 
@@ -212,35 +216,37 @@ class InformationNeed:
     priority: float
 
 
+def _defines_strength(scope_match: bool, has_scope: bool) -> float:
+    if scope_match:
+        return 1.0
+    return 0.5 if not has_scope else 0.3
+
+
+def _is_test_fragment(frag: Fragment) -> bool:
+    if _is_test_file(frag.path):
+        return True
+    return frag.symbol_name is not None and frag.symbol_name.lower().startswith("test_")
+
+
 def _match_strength_typed(frag: Fragment, need: InformationNeed) -> float:
     sym = need.symbol
-    defines = frag.symbol_name is not None and frag.symbol_name.lower() == sym
-    is_signature = "_signature" in frag.kind
+    frag_sym = frag.symbol_name.lower() if frag.symbol_name else ""
+    defines = frag_sym == sym and frag_sym != ""
     mentions = sym in frag.identifiers
-    is_test_frag = _is_test_file(frag.path) or (frag.symbol_name is not None and frag.symbol_name.lower().startswith("test_"))
-
     scope_match = need.scope is not None and need.scope == frag.path
+    nt = need.need_type
 
-    if need.need_type == "impact" and scope_match:
+    if nt == "impact" and scope_match:
         return 0.0
-
-    if defines and not is_signature:
-        if scope_match:
-            return 1.0
-        if need.scope is None:
-            return 0.5
-        return 0.3
-    if need.need_type == "impact" and not defines and mentions:
+    if defines and "_signature" not in frag.kind:
+        return _defines_strength(scope_match, need.scope is not None)
+    if nt == "impact" and mentions and not defines:
         return 0.8
-    if is_signature and defines:
+    if defines and ("_signature" in frag.kind or nt == "signature"):
         return 0.7
-    if need.need_type == "signature" and defines:
-        return 0.7
-    if need.need_type == "test" and is_test_frag and mentions:
+    if nt == "test" and mentions and _is_test_fragment(frag):
         return 0.6
-    if mentions:
-        return 0.3
-    return 0.0
+    return 0.3 if mentions else 0.0
 
 
 def _extract_changed_lines(diff_text: str) -> list[str]:
@@ -293,7 +299,7 @@ def _build_sigma(
     sigma.update(_extract_diff_symbols(diff_text))
 
     for frag in all_fragments:
-        if not _is_test_file(frag.path) and (not frag.symbol_name or not frag.symbol_name.lower().startswith("test_")):
+        if not _is_test_fragment(frag):
             continue
         sym_lower = frag.symbol_name.lower() if frag.symbol_name else None
         tested = sym_lower.removeprefix("test_") if sym_lower else None
@@ -306,6 +312,25 @@ def _build_sigma(
 _CLOSURE_EDGE_CATEGORIES = frozenset({"structural", "semantic"})
 
 
+def _eligible_neighbor_symbols(
+    frag: Fragment,
+    graph: Graph,
+    frag_by_id: dict[FragmentId, Fragment],
+    closure: set[str],
+) -> set[str]:
+    result: set[str] = set()
+    for nbr_id, weight in graph.neighbors(frag.id).items():
+        if weight < _CLOSURE_MIN_EDGE_WEIGHT:
+            continue
+        cat = graph.edge_categories.get((frag.id, nbr_id), "")
+        if cat and cat not in _CLOSURE_EDGE_CATEGORIES:
+            continue
+        nbr = frag_by_id.get(nbr_id)
+        if nbr and nbr.symbol_name and nbr.symbol_name.lower() not in closure:
+            result.add(nbr.symbol_name.lower())
+    return result
+
+
 def _closure_expand_step(
     closure: set[str],
     frag_by_symbol: dict[str, list[Fragment]],
@@ -315,15 +340,7 @@ def _closure_expand_step(
     new_symbols: set[str] = set()
     for sym in closure:
         for frag in frag_by_symbol.get(sym, []):
-            for nbr_id, weight in graph.neighbors(frag.id).items():
-                if weight < _CLOSURE_MIN_EDGE_WEIGHT:
-                    continue
-                cat = graph.edge_categories.get((frag.id, nbr_id), "")
-                if cat and cat not in _CLOSURE_EDGE_CATEGORIES:
-                    continue
-                nbr = frag_by_id.get(nbr_id)
-                if nbr and nbr.symbol_name and nbr.symbol_name.lower() not in closure:
-                    new_symbols.add(nbr.symbol_name.lower())
+            new_symbols.update(_eligible_neighbor_symbols(frag, graph, frag_by_id, closure))
     return new_symbols
 
 
@@ -383,28 +400,35 @@ def _collect_core_needs(
     return core_symbol_names
 
 
+def _process_line_for_needs(
+    line: str,
+    external_syms: frozenset[str],
+    needs: dict[tuple[str, str], InformationNeed],
+) -> None:
+    for m in _CALL_RE.finditer(line):
+        name = m.group(1)
+        low = name.lower()
+        if len(name) < 3 or low in CODE_STOPWORDS or low in _LANGUAGE_BUILTINS:
+            continue
+        if low in external_syms:
+            continue
+        needs.setdefault(("definition", low), InformationNeed("definition", low, None, 1.0))
+    for m in _TYPE_REF_RE.finditer(line):
+        sym = m.group(1).lower()
+        needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, 0.7))
+    for m in _GENERIC_TYPE_RE.finditer(line):
+        sym = m.group(1).lower()
+        needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, 0.7))
+
+
 def _collect_diff_line_needs(
     diff_text: str,
     needs: dict[tuple[str, str], InformationNeed],
 ) -> None:
     external_syms = _collect_external_symbols(diff_text)
     for line in _extract_changed_lines(diff_text):
-        if _is_comment_line(line):
-            continue
-        for m in _CALL_RE.finditer(line):
-            name = m.group(1)
-            low = name.lower()
-            if len(name) < 3 or low in CODE_STOPWORDS or low in _LANGUAGE_BUILTINS:
-                continue
-            if low in external_syms:
-                continue
-            needs.setdefault(("definition", low), InformationNeed("definition", low, None, 1.0))
-        for m in _TYPE_REF_RE.finditer(line):
-            sym = m.group(1).lower()
-            needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, 0.7))
-        for m in _GENERIC_TYPE_RE.finditer(line):
-            sym = m.group(1).lower()
-            needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, 0.7))
+        if not _is_comment_line(line):
+            _process_line_for_needs(line, external_syms, needs)
 
 
 def _collect_test_needs(
@@ -413,7 +437,7 @@ def _collect_test_needs(
     needs: dict[tuple[str, str], InformationNeed],
 ) -> None:
     for frag in all_fragments:
-        if not _is_test_file(frag.path) and (not frag.symbol_name or not frag.symbol_name.lower().startswith("test_")):
+        if not _is_test_fragment(frag):
             continue
         tested = frag.symbol_name.lower().removeprefix("test_") if frag.symbol_name else None
         if tested and (tested in core_symbol_names or ("definition", tested) in needs):

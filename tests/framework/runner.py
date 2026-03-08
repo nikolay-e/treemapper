@@ -88,7 +88,7 @@ class YamlTestRunner:
 
         return context
 
-    def score_test_case(self, context: dict, case: YamlTestCase) -> ScoreBreakdown:  # noqa: C901
+    def score_test_case(self, context: dict, case: YamlTestCase) -> ScoreBreakdown:
         fragment_paths = self._extract_fragment_paths(context)
         all_content = self._extract_all_content(context)
         content_by_file = self._extract_content_by_file(context)
@@ -103,61 +103,9 @@ class YamlTestRunner:
         )
         diff_covered, uncovered = check_diff_coverage(all_content, diff_lines)
 
-        expected_details: list[tuple[str, bool]] = []
-
-        for pattern in case.must_include:
-            hit = pattern in all_content
-            expected_details.append((f"pattern: {pattern[:80]}", hit))
-
-        for file_path in case.must_include_files:
-            hit = any(_match_path(p, file_path) for p in fragment_paths)
-            expected_details.append((f"file: {file_path}", hit))
-
-        for content_block in case.must_include_content:
-            normalized = content_block.rstrip("\n")
-            hit = normalized in all_content
-            expected_details.append((f"content: {normalized[:80]}", hit))
-
-        for file_path, snippets in case.must_include_content_from.items():
-            file_content = self._find_file_content(content_by_file, file_path)
-            for snippet in snippets:
-                normalized = snippet.rstrip("\n")
-                if file_content is not None:
-                    hit = normalized in file_content
-                else:
-                    hit = False
-                expected_details.append((f"from {file_path}: {normalized[:60]}", hit))
-
-        noise_details: list[tuple[str, bool]] = []
-
-        for pattern in case.must_not_include:
-            leaked = pattern in all_content
-            noise_details.append((f"noise: {pattern[:80]}", leaked))
-
-        for file_path in case.must_not_include_files:
-            leaked = any(_match_path(p, file_path) for p in fragment_paths)
-            noise_details.append((f"noise_file: {file_path}", leaked))
-
-        garbage_hits = 0
-        garbage_total = 0
-        if case.add_garbage_files and not case.skip_garbage_check:
-            for marker in GARBAGE_MARKERS:
-                garbage_total += 1
-                if marker in all_content:
-                    garbage_hits += 1
-
-        if case.max_fragments is not None:
-            frag_count = len(context.get("fragments", []))
-            if frag_count > case.max_fragments:
-                noise_details.append((f"excess_fragments: {frag_count}/{case.max_fragments}", True))
-
-        if case.max_files is not None:
-            unique_files = len(set(fragment_paths))
-            if unique_files > case.max_files:
-                noise_details.append((f"excess_files: {unique_files}/{case.max_files}", True))
-
-        diff_tokens = compute_diff_token_count(case.initial_files, case.changed_files)
-        context_tokens = compute_context_token_count(context)
+        expected_details = self._check_expected(case, fragment_paths, all_content, content_by_file)
+        noise_details = self._check_noise(case, fragment_paths, all_content, context)
+        garbage_hits, garbage_total = self._check_garbage(case, all_content)
 
         return ScoreBreakdown(
             diff_covered=diff_covered,
@@ -170,9 +118,62 @@ class YamlTestRunner:
             noise_details=noise_details,
             garbage_hits=garbage_hits,
             garbage_total=garbage_total,
-            diff_tokens=diff_tokens,
-            context_tokens=context_tokens,
+            diff_tokens=compute_diff_token_count(case.initial_files, case.changed_files),
+            context_tokens=compute_context_token_count(context),
         )
+
+    def _check_expected(
+        self,
+        case: YamlTestCase,
+        fragment_paths: list[str],
+        all_content: str,
+        content_by_file: dict[str, str],
+    ) -> list[tuple[str, bool]]:
+        details: list[tuple[str, bool]] = []
+        for pattern in case.must_include:
+            details.append((f"pattern: {pattern[:80]}", pattern in all_content))
+        for file_path in case.must_include_files:
+            hit = any(_match_path(p, file_path) for p in fragment_paths)
+            details.append((f"file: {file_path}", hit))
+        for content_block in case.must_include_content:
+            normalized = content_block.rstrip("\n")
+            details.append((f"content: {normalized[:80]}", normalized in all_content))
+        for file_path, snippets in case.must_include_content_from.items():
+            file_content = self._find_file_content(content_by_file, file_path)
+            for snippet in snippets:
+                normalized = snippet.rstrip("\n")
+                hit = file_content is not None and normalized in file_content
+                details.append((f"from {file_path}: {normalized[:60]}", hit))
+        return details
+
+    def _check_noise(
+        self,
+        case: YamlTestCase,
+        fragment_paths: list[str],
+        all_content: str,
+        context: dict,
+    ) -> list[tuple[str, bool]]:
+        details: list[tuple[str, bool]] = []
+        for pattern in case.must_not_include:
+            details.append((f"noise: {pattern[:80]}", pattern in all_content))
+        for file_path in case.must_not_include_files:
+            leaked = any(_match_path(p, file_path) for p in fragment_paths)
+            details.append((f"noise_file: {file_path}", leaked))
+        if case.max_fragments is not None:
+            frag_count = len(context.get("fragments", []))
+            if frag_count > case.max_fragments:
+                details.append((f"excess_fragments: {frag_count}/{case.max_fragments}", True))
+        if case.max_files is not None:
+            unique_files = len(set(fragment_paths))
+            if unique_files > case.max_files:
+                details.append((f"excess_files: {unique_files}/{case.max_files}", True))
+        return details
+
+    def _check_garbage(self, case: YamlTestCase, all_content: str) -> tuple[int, int]:
+        if not case.add_garbage_files or case.skip_garbage_check:
+            return 0, 0
+        garbage_hits = sum(1 for marker in GARBAGE_MARKERS if marker in all_content)
+        return garbage_hits, len(GARBAGE_MARKERS)
 
     def verify_assertions(self, context: dict, case: YamlTestCase) -> None:
         breakdown = self.score_test_case(context, case)
