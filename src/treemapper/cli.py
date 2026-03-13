@@ -109,9 +109,9 @@ def _warn_diff_only_flags(args: argparse.Namespace) -> None:
     if args.budget is not None:
         used.append("--budget")
     if abs(args.alpha - 0.60) > 1e-9:
-        used.append("--alpha/--context-precision")
+        used.append("--alpha")
     if abs(args.tau - 0.08) > 1e-9:
-        used.append("--tau/--min-relevance")
+        used.append("--tau")
     if args.full:
         used.append("--full")
     if used:
@@ -147,6 +147,8 @@ project-level .gitignore and .treemapper/ignore still apply):
   .git/, .svn/, .hg/    Version control directories
   __pycache__/, *.py[cod], *.so, venv/, .venv/, .tox/, .nox/  Python
   node_modules/, .npm/  JavaScript/Node
+  package-lock.json, yarn.lock, pnpm-lock.yaml  JS lock files
+  Pipfile.lock, poetry.lock, Cargo.lock, Gemfile.lock  Other lock files
   target/, .gradle/     Java/Maven/Gradle
   bin/, obj/            .NET
   vendor/               Go/PHP
@@ -158,12 +160,10 @@ project-level .gitignore and .treemapper/ignore still apply):
 
 Ignore files (hierarchical, like git):
   .gitignore            Standard git ignore patterns
-  .treemapper/ignore    TreeMapper-specific patterns (preferred)
-  .treemapperignore     TreeMapper-specific patterns (legacy)
+  .treemapper/ignore    TreeMapper-specific patterns
 
 Whitelist files (auto-discovered):
-  .treemapper/whitelist  Include-only filter (preferred)
-  .treemapperwhitelist   Include-only filter (legacy)
+  .treemapper/whitelist  Include-only filter
 
 Examples:
   treemapper .                    Map current directory to YAML
@@ -212,7 +212,7 @@ def parse_args() -> ParsedArgs:
     parser.add_argument(
         "-f",
         "--format",
-        choices=["yaml", "yml", "json", "txt", "md"],
+        choices=["yaml", "json", "txt", "md"],
         default="yaml",
         help="Output format (default: yaml)",
     )
@@ -265,7 +265,6 @@ def parse_args() -> ParsedArgs:
     )
     diff_group.add_argument(
         "--alpha",
-        "--context-precision",
         type=float,
         default=0.60,
         metavar="F",
@@ -273,7 +272,6 @@ def parse_args() -> ParsedArgs:
     )
     diff_group.add_argument(
         "--tau",
-        "--min-relevance",
         type=float,
         default=0.08,
         metavar="F",
@@ -295,7 +293,7 @@ def parse_args() -> ParsedArgs:
     _warn_diff_only_flags(args)
 
     root_dir = _resolve_root_dir(args.directory)
-    output_format = "yaml" if args.format == "yml" else args.format
+    output_format = args.format
     output_file, force_stdout = _resolve_output_file(args.output_file, args.save, output_format)
     ignore_file = _resolve_ignore_file(args.ignore_file)
     whitelist_file = _resolve_whitelist_file(args.whitelist_file)

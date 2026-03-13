@@ -307,7 +307,7 @@ def test_output_file_without_argument_respects_format(temp_project):
 
     import json
 
-    for fmt, ext in [("json", "tree.json"), ("txt", "tree.txt"), ("md", "tree.md"), ("yaml", "tree.yaml"), ("yml", "tree.yaml")]:
+    for fmt, ext in [("json", "tree.json"), ("txt", "tree.txt"), ("md", "tree.md"), ("yaml", "tree.yaml")]:
         expected_file = temp_project / ext
         if expected_file.exists():
             expected_file.unlink()
@@ -320,26 +320,11 @@ def test_output_file_without_argument_respects_format(temp_project):
         if fmt == "json":
             parsed = json.loads(content)
             assert parsed["name"] == temp_project.name
-        elif fmt in ("yaml", "yml"):
+        elif fmt == "yaml":
             tree = load_yaml(expected_file)
             assert tree["name"] == temp_project.name
 
         expected_file.unlink()
-
-
-def test_yml_format_alias(temp_project):
-    """Test yml format is treated same as yaml."""
-    (temp_project / "test.txt").write_text("content", encoding="utf-8")
-
-    output_file = temp_project / "output.yml"
-
-    result = run_treemapper_subprocess([str(temp_project), "-o", str(output_file), "-f", "yml"])
-    assert result.returncode == 0
-    assert output_file.exists()
-
-    tree = load_yaml(output_file)
-    assert tree["name"] == temp_project.name
-    assert tree["type"] == "directory"
 
 
 def test_max_safe_file_size_constant():

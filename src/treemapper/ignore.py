@@ -225,6 +225,15 @@ DEFAULT_IGNORE_PATTERNS = [
     # JavaScript/Node
     "**/node_modules/",
     "**/.npm/",
+    # Lock files (large, auto-generated, low signal for LLM analysis)
+    "**/package-lock.json",
+    "**/yarn.lock",
+    "**/pnpm-lock.yaml",
+    "**/Pipfile.lock",
+    "**/poetry.lock",
+    "**/Cargo.lock",
+    "**/composer.lock",
+    "**/Gemfile.lock",
     # Java/JVM
     "**/target/",
     "**/.gradle/",
@@ -247,7 +256,6 @@ DEFAULT_IGNORE_PATTERNS = [
     # TreeMapper config and output files
     "**/.treemapper/",
     "**/tree.yaml",
-    "**/tree.yml",
     "**/tree.json",
     "**/tree.md",
     "**/tree.txt",
@@ -264,8 +272,8 @@ def get_ignore_specs(
 
     if not no_default_ignores:
         patterns.extend(DEFAULT_IGNORE_PATTERNS)
-        patterns.extend(_collect_parent_ignore_patterns(root_dir, [".gitignore", ".treemapperignore"]))
-        patterns.extend(_aggregate_all_ignore_patterns(root_dir, [".gitignore", ".treemapperignore"]))
+        patterns.extend(_collect_parent_ignore_patterns(root_dir, [".gitignore"]))
+        patterns.extend(_aggregate_all_ignore_patterns(root_dir, [".gitignore"]))
 
     if custom_ignore_file:
         patterns.extend(read_ignore_file(custom_ignore_file))
@@ -287,19 +295,12 @@ def should_ignore(relative_path_str: str, combined_spec: pathspec.PathSpec) -> b
     return is_ignored
 
 
-DEFAULT_WHITELIST_FILENAME = ".treemapperwhitelist"
-
-
 def get_whitelist_spec(whitelist_file: Path | None, root_dir: Path | None = None) -> pathspec.PathSpec | None:
     effective_file = whitelist_file
     if not effective_file and root_dir:
         config_whitelist = root_dir / TREEMAPPER_CONFIG_DIR / TREEMAPPER_DIR_WHITELIST
         if config_whitelist.is_file():
             effective_file = config_whitelist
-        else:
-            default = root_dir / DEFAULT_WHITELIST_FILENAME
-            if default.is_file():
-                effective_file = default
     if not effective_file:
         return None
     patterns = read_ignore_file(effective_file)

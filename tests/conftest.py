@@ -70,9 +70,7 @@ def _verify_no_garbage_in_context(context: dict) -> None:
 PROJECT_ROOT = Path(__file__).parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 
-# Constants for ignore file names
 GITIGNORE = ".gitignore"
-TREEMAPPERIGNORE = ".treemapperignore"
 
 # WSL detection with proper file handle cleanup (shared across test files)
 _PROC_VERSION = Path("/proc/version")
@@ -94,7 +92,9 @@ def temp_project(tmp_path):
     (temp_dir / ".git").mkdir()
     (temp_dir / ".git" / "config").write_text("git config file", encoding="utf-8")
     (temp_dir / GITIGNORE).write_text("*.pyc\n__pycache__/\n", encoding="utf-8")
-    (temp_dir / TREEMAPPERIGNORE).write_text("output/\n.git/\n", encoding="utf-8")
+    config_dir = temp_dir / ".treemapper"
+    config_dir.mkdir()
+    (config_dir / "ignore").write_text("output/\n.git/\n", encoding="utf-8")
     yield temp_dir
 
 
@@ -241,8 +241,10 @@ def project_builder(tmp_path):
             path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
             return path
 
-        def add_treemapperignore(self, patterns: list[str]) -> Path:
-            path = self.root / TREEMAPPERIGNORE
+        def add_treemapper_ignore(self, patterns: list[str]) -> Path:
+            config_dir = self.root / ".treemapper"
+            config_dir.mkdir(exist_ok=True)
+            path = config_dir / "ignore"
             path.write_text("\n".join(patterns) + "\n", encoding="utf-8")
             return path
 

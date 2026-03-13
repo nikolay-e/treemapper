@@ -96,7 +96,3 @@ def to_markdown(tree: dict[str, Any]) -> str:
     buf = io.StringIO()
     write_tree_markdown(buf, tree)
     return buf.getvalue()
-
-
-to_md = to_markdown
-to_txt = to_text

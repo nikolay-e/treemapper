@@ -47,12 +47,9 @@ _MAX_MARKDOWN_HEADING_DEPTH = 5  # depth 0-5 → ## to ###### (6 levels), deeper
 
 _FORMAT_ALIASES = {
     "yaml": "yaml",
-    "yml": "yaml",
     "json": "json",
     "txt": "txt",
-    "text": "txt",
     "md": "md",
-    "markdown": "md",
 }
 
 PLACEHOLDER_PATTERNS = [

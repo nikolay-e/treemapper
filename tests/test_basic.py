@@ -23,7 +23,7 @@ def test_basic_mapping(temp_project, run_mapper):
     assert "main.py" in all_files
     assert "test.py" in all_files
     assert "docs" in all_files
-    assert ".git" not in all_files, ".git should be ignored by default .treemapperignore"
+    assert ".git" not in all_files, ".git should be ignored by default .treemapper/ignore"
     assert "output" not in all_files
     assert "directory_tree.yaml" not in all_files
 
