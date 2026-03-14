@@ -82,9 +82,13 @@ def _resolve_output_file(output_file_arg: str | None, save: bool, output_format:
     return output_file, False
 
 
-def _find_in_treemapper_dir(arg: str, root_dir: Path) -> Path | None:
-    if Path(arg).parent == Path("."):
-        candidate = root_dir / ".treemapper" / arg
+def _find_in_treemapper_dir(arg: str, root_dir: Path, extra_exts: tuple[str, ...]) -> Path | None:
+    if Path(arg).parent != Path("."):
+        return None
+    stem = Path(arg).stem if Path(arg).suffix else arg
+    base = root_dir / ".treemapper"
+    for name in (arg, *(f"{stem}{ext}" for ext in extra_exts if f"{stem}{ext}" != arg)):
+        candidate = base / name
         if candidate.is_file():
             return candidate
     return None
@@ -93,7 +97,7 @@ def _find_in_treemapper_dir(arg: str, root_dir: Path) -> Path | None:
 def _resolve_ignore_file(ignore_file_arg: str | None, root_dir: Path) -> Path | None:
     if not ignore_file_arg:
         return None
-    found = _find_in_treemapper_dir(ignore_file_arg, root_dir)
+    found = _find_in_treemapper_dir(ignore_file_arg, root_dir, (".ignore", ".txt"))
     if found:
         return found
     resolved = Path(ignore_file_arg).resolve()
@@ -105,7 +109,7 @@ def _resolve_ignore_file(ignore_file_arg: str | None, root_dir: Path) -> Path | 
 def _resolve_whitelist_file(whitelist_file_arg: str | None, root_dir: Path) -> Path | None:
     if not whitelist_file_arg:
         return None
-    found = _find_in_treemapper_dir(whitelist_file_arg, root_dir)
+    found = _find_in_treemapper_dir(whitelist_file_arg, root_dir, (".whitelist", ".txt"))
     if found:
         return found
     resolved = Path(whitelist_file_arg).resolve()
