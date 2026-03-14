@@ -82,22 +82,37 @@ def _resolve_output_file(output_file_arg: str | None, save: bool, output_format:
     return output_file, False
 
 
-def _resolve_ignore_file(ignore_file_arg: str | None) -> Path | None:
+def _find_in_treemapper_dir(arg: str, root_dir: Path) -> Path | None:
+    if Path(arg).parent == Path("."):
+        candidate = root_dir / ".treemapper" / arg
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _resolve_ignore_file(ignore_file_arg: str | None, root_dir: Path) -> Path | None:
     if not ignore_file_arg:
         return None
-    ignore_file = Path(ignore_file_arg).resolve()
-    if not ignore_file.is_file():
+    found = _find_in_treemapper_dir(ignore_file_arg, root_dir)
+    if found:
+        return found
+    resolved = Path(ignore_file_arg).resolve()
+    if not resolved.is_file():
         _exit_error(f"Ignore file '{ignore_file_arg}' does not exist")
-    return ignore_file
+    return resolved
 
 
-def _resolve_whitelist_file(whitelist_file_arg: str | None) -> Path | None:
+def _resolve_whitelist_file(whitelist_file_arg: str | None, root_dir: Path) -> Path | None:
     if not whitelist_file_arg:
         return None
-    whitelist_file = Path(whitelist_file_arg).resolve()
-    if not whitelist_file.is_file():
-        _exit_error(f"Whitelist file '{whitelist_file_arg}' does not exist")
-    return whitelist_file
+    found = _find_in_treemapper_dir(whitelist_file_arg, root_dir)
+    if found:
+        return found
+    resolved = Path(whitelist_file_arg).resolve()
+    if not resolved.is_file():
+        logger.warning("Whitelist file '%s' does not exist, skipping", whitelist_file_arg)
+        return None
+    return resolved
 
 
 def _warn_diff_only_flags(args: argparse.Namespace) -> None:
@@ -293,8 +308,8 @@ def parse_args() -> ParsedArgs:
     root_dir = _resolve_root_dir(args.directory)
     output_format = args.format
     output_file, force_stdout = _resolve_output_file(args.output_file, args.save, output_format)
-    ignore_file = _resolve_ignore_file(args.ignore)
-    whitelist_file = _resolve_whitelist_file(args.whitelist)
+    ignore_file = _resolve_ignore_file(args.ignore, root_dir)
+    whitelist_file = _resolve_whitelist_file(args.whitelist, root_dir)
 
     log_level_map = {"error": 0, "warning": 1, "info": 2, "debug": 3}
     verbosity = log_level_map[args.log_level]
