@@ -14,6 +14,18 @@ repos:
         stages: [post-commit]
 
   # ============================================================================
+  # README AUTO-GENERATION
+  # ============================================================================
+  - repo: local
+    hooks:
+      - id: update-readme-usage
+        name: Auto-generate README usage section
+        language: python
+        entry: python scripts/update_readme_usage.py
+        pass_filenames: false
+        always_run: true
+
+  # ============================================================================
   # BASIC FILE QUALITY CHECKS (baseline hygiene)
   # ============================================================================
   - repo: https://github.com/pre-commit/pre-commit-hooks
