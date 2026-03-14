@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from ..types import Fragment, FragmentId, extract_identifiers
-from .base import GENERIC_MAX_LINES, MIN_FRAGMENT_WORDS, check_library_available, create_snippet, find_sentence_boundary
+from .base import GENERIC_MAX_LINES, check_library_available, create_snippet, find_sentence_boundary
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +96,6 @@ class PySBDTextStrategy:
         fragments: list[Fragment],
     ) -> None:
         if not para_sentences:
-            return
-        combined = " ".join(para_sentences)
-        if len(combined.split()) < MIN_FRAGMENT_WORDS:
             return
         frag = self._create_paragraph_fragment(path, lines, para_start, end_line)
         if frag:

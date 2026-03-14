@@ -176,9 +176,8 @@ _INVARIANT_RE = re.compile(r"\b(?:assert|require|ensure|precondition|postconditi
 
 _COMMENT_PREFIXES = ("#", "//", "*", "/*", "--", '"""', "'''", "<!--")
 
-_EXTERNAL_IMPORT_RE = re.compile(
-    r"""(?:import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]|from\s+(\S+)\s+import\s+(.+))""",
-)
+_JS_IMPORT_RE = re.compile(r"""import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]""")
+_PY_IMPORT_RE = re.compile(r"""from\s+(\S+)\s+import\s+(.+)""")
 
 
 def _parse_import_names(names_str: str) -> set[str]:
@@ -193,12 +192,13 @@ def _parse_import_names(names_str: str) -> set[str]:
 def _collect_external_symbols(diff_text: str) -> frozenset[str]:
     symbols: set[str] = set()
     for line in _extract_changed_lines(diff_text):
-        for m in _EXTERNAL_IMPORT_RE.finditer(line):
+        for m in _JS_IMPORT_RE.finditer(line):
             js_names, js_source = m.group(1), m.group(2)
-            py_module, py_names = m.group(3), m.group(4)
-            if js_names and js_source and not js_source.startswith("."):
+            if not js_source.startswith("."):
                 symbols.update(_parse_import_names(js_names))
-            if py_module and py_names and not py_module.startswith("."):
+        for m in _PY_IMPORT_RE.finditer(line):
+            py_module, py_names = m.group(1), m.group(2)
+            if not py_module.startswith("."):
                 symbols.update(_parse_import_names(py_names))
     return frozenset(symbols)
 
