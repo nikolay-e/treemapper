@@ -1,6 +1,7 @@
 # TreeMapper
 
 [![CI](https://github.com/nikolay-e/treemapper/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolay-e/treemapper/actions/workflows/ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nikolay-e_TreeMapper&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nikolay-e_TreeMapper)
 [![codecov](https://codecov.io/gh/nikolay-e/treemapper/branch/main/graph/badge.svg)](https://codecov.io/gh/nikolay-e/treemapper)
 [![PyPI](https://img.shields.io/pypi/v/treemapper)](https://pypi.org/project/treemapper/)
 [![Python versions](https://img.shields.io/pypi/pyversions/treemapper)](https://pypi.org/project/treemapper/)
