@@ -205,6 +205,7 @@ module = [
   "spacy.cli",
   "spacy.cli.download",
   "spacy.language",
+  "numpy",
 ]
 ignore_missing_imports = true
 
