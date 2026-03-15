@@ -21,6 +21,11 @@ _CALL_RE = re.compile(r"(\w+)\s*\(")
 _TYPE_REF_RE = re.compile(r"(?::|->)\s*([A-Z]\w+)")
 _GENERIC_TYPE_RE = re.compile(r"[\[<,]\s*([A-Z]\w*)")
 
+_TF_EXTENSIONS = frozenset({".tf", ".tfvars", ".hcl"})
+_TF_VAR_NEED_RE = re.compile(r"var\.(\w+)")
+_TF_RES_REF_NEED_RE = re.compile(r"(?<![.\w])(\w+)\.(\w+)\.\w+")
+_TF_SKIP_REF_TYPES = frozenset({"var", "local", "data", "module", "path", "terraform", "count", "each", "self"})
+
 _LANGUAGE_BUILTINS: frozenset[str] = frozenset(
     {
         "range",
@@ -401,6 +406,27 @@ def _collect_invariant_needs(
                 needs.setdefault(("invariant", sym), InformationNeed("invariant", sym, None, 0.85))
 
 
+def _is_terraform_diff(all_fragments: list[Fragment], core_ids: set[FragmentId]) -> bool:
+    return any(f.path.suffix.lower() in _TF_EXTENSIONS for f in all_fragments if f.id in core_ids)
+
+
+def _collect_terraform_needs(
+    diff_text: str,
+    needs: dict[tuple[str, str], InformationNeed],
+) -> None:
+    for line in _extract_changed_lines(diff_text):
+        for m in _TF_VAR_NEED_RE.finditer(line):
+            sym = m.group(1).lower()
+            if len(sym) >= 3 and sym not in CODE_STOPWORDS:
+                needs.setdefault(("definition", sym), InformationNeed("definition", sym, None, 1.0))
+        for m in _TF_RES_REF_NEED_RE.finditer(line):
+            ref_type, ref_name = m.group(1).lower(), m.group(2).lower()
+            if ref_type in _TF_SKIP_REF_TYPES:
+                continue
+            if len(ref_name) >= 3 and ref_name not in CODE_STOPWORDS:
+                needs.setdefault(("definition", ref_name), InformationNeed("definition", ref_name, None, 0.9))
+
+
 def needs_from_diff(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
@@ -414,6 +440,8 @@ def needs_from_diff(
     _collect_diff_line_needs(diff_text, needs)
     _collect_invariant_needs(diff_text, needs)
     _collect_test_needs(all_fragments, core_symbol_names, needs)
+    if _is_terraform_diff(all_fragments, core_ids):
+        _collect_terraform_needs(diff_text, needs)
 
     base_symbols = {n.symbol for n in needs.values()}
     closure = _apply_closure(base_symbols, all_fragments, graph, closure_depth)
