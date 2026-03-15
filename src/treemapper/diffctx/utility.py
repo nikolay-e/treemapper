@@ -22,6 +22,7 @@ _TYPE_REF_RE = re.compile(r"(?::|->)\s*([A-Z]\w+)")
 _GENERIC_TYPE_RE = re.compile(r"[\[<,]\s*([A-Z]\w*)")
 
 _TF_EXTENSIONS = frozenset({".tf", ".tfvars", ".hcl"})
+_CONFIG_EXTENSIONS_FOR_DIFF = frozenset({".yaml", ".yml", ".json", ".toml", ".ini"})
 _TF_VAR_NEED_RE = re.compile(r"var\.(\w+)")
 _TF_RES_REF_NEED_RE = re.compile(r"(?<![.\w])(\w+)\.(\w+)\.\w+")
 _TF_SKIP_REF_TYPES = frozenset({"var", "local", "data", "module", "path", "terraform", "count", "each", "self"})
@@ -410,6 +411,27 @@ def _is_terraform_diff(all_fragments: list[Fragment], core_ids: set[FragmentId])
     return any(f.path.suffix.lower() in _TF_EXTENSIONS for f in all_fragments if f.id in core_ids)
 
 
+def _is_config_only_diff(all_fragments: list[Fragment], core_ids: set[FragmentId]) -> bool:
+    core_frags = [f for f in all_fragments if f.id in core_ids]
+    return bool(core_frags) and all(f.path.suffix.lower() in _CONFIG_EXTENSIONS_FOR_DIFF for f in core_frags)
+
+
+def _collect_config_context_needs(
+    all_fragments: list[Fragment],
+    core_ids: set[FragmentId],
+    needs: dict[tuple[str, str], InformationNeed],
+) -> None:
+    covered = {n.symbol for n in needs.values()}
+    for frag in all_fragments:
+        if frag.id not in core_ids:
+            continue
+        for ident in frag.identifiers:
+            if len(ident) >= 5 and ident not in covered:
+                key = ("background", ident)
+                if key not in needs:
+                    needs[key] = InformationNeed("background", ident, None, 0.2)
+
+
 def _collect_terraform_needs(
     diff_text: str,
     needs: dict[tuple[str, str], InformationNeed],
@@ -442,6 +464,8 @@ def needs_from_diff(
     _collect_test_needs(all_fragments, core_symbol_names, needs)
     if _is_terraform_diff(all_fragments, core_ids):
         _collect_terraform_needs(diff_text, needs)
+    if _is_config_only_diff(all_fragments, core_ids):
+        _collect_config_context_needs(all_fragments, core_ids, needs)
 
     base_symbols = {n.symbol for n in needs.values()}
     closure = _apply_closure(base_symbols, all_fragments, graph, closure_depth)
