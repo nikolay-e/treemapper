@@ -9,6 +9,61 @@ from .base import MIN_FRAGMENT_LINES, YAML_EXTENSIONS, check_library_available, 
 
 logger = logging.getLogger(__name__)
 
+_TF_EXTENSIONS = {".tf", ".hcl"}
+_TF_BLOCK_START_RE = re.compile(r"^(?:resource|variable|data|output|module|locals|terraform|provider)\b")
+_TF_RESOURCE_RE = re.compile(r'^resource\s+"[^"]+"\s+"([^"]+)"')
+_TF_NAMED_BLOCK_RE = re.compile(r'^(?:variable|data\s+"[^"]+"|output|module|provider)\s+"([^"]+)"')
+
+
+def _tf_block_symbol(line: str) -> str | None:
+    m = _TF_RESOURCE_RE.match(line)
+    if m:
+        return m.group(1)
+    m = _TF_NAMED_BLOCK_RE.match(line)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _tf_find_block_end(lines: list[str], start: int) -> int:
+    depth = 0
+    for i in range(start, len(lines)):
+        for ch in lines[i]:
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return i
+    return len(lines) - 1
+
+
+class TerraformStrategy:
+    priority = 46
+
+    def can_handle(self, path: Path, _content: str) -> bool:
+        return path.suffix.lower() in _TF_EXTENSIONS
+
+    def fragment(self, path: Path, content: str) -> list[Fragment]:
+        lines = content.splitlines()
+        if not lines:
+            return []
+
+        fragments: list[Fragment] = []
+        i = 0
+        while i < len(lines):
+            if _TF_BLOCK_START_RE.match(lines[i].strip()):
+                end_i = _tf_find_block_end(lines, i)
+                sym = _tf_block_symbol(lines[i].strip())
+                frag = create_fragment_from_lines(path, lines, i + 1, end_i + 1, "config", "data", symbol_name=sym)
+                if frag:
+                    fragments.append(frag)
+                i = end_i + 1
+            else:
+                i += 1
+
+        return fragments
+
 
 def _import_ruamel_yaml() -> None:
     from ruamel.yaml import YAML  # noqa: F401
