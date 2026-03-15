@@ -10,4 +10,4 @@ build_partial_tree
 detect_profile
 is_nlp_available
 Graph.add_node
-_.preserve_quotes
+_.preserve_quotes  # NOSONAR - intentional vulture whitelist pattern
