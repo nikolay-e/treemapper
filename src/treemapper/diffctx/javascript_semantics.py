@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from treemapper.diffctx.semantic_types import EMPTY_JS_SEMANTIC_INFO, JsSemanticInfo
+from .semantic_types import EMPTY_JS_SEMANTIC_INFO, JsSemanticInfo
 
 JsFragmentInfo = JsSemanticInfo
 

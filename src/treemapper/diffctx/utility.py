@@ -269,46 +269,6 @@ def concepts_from_diff_text(diff_text: str, profile: str = "code", *, use_nlp: b
     return frozenset(ident.lower() for ident in raw if len(ident) >= 3 and ident.lower() not in CODE_STOPWORDS)
 
 
-def _extract_diff_symbols(diff_text: str) -> set[str]:
-    symbols: set[str] = set()
-    for line in _extract_changed_lines(diff_text):
-        if _is_comment_line(line):
-            continue
-        for m in _CALL_RE.finditer(line):
-            name = m.group(1)
-            if len(name) >= 3 and name.lower() not in CODE_STOPWORDS and name.lower() not in _LANGUAGE_BUILTINS:
-                symbols.add(name.lower())
-        for m in _TYPE_REF_RE.finditer(line):
-            symbols.add(m.group(1).lower())
-        for m in _GENERIC_TYPE_RE.finditer(line):
-            symbols.add(m.group(1).lower())
-    return symbols
-
-
-def _build_sigma(
-    all_fragments: list[Fragment],
-    core_ids: set[FragmentId],
-    diff_text: str,
-) -> set[str]:
-    sigma: set[str] = set()
-
-    for frag in all_fragments:
-        if frag.id in core_ids and frag.symbol_name:
-            sigma.add(frag.symbol_name.lower())
-
-    sigma.update(_extract_diff_symbols(diff_text))
-
-    for frag in all_fragments:
-        if not _is_test_fragment(frag):
-            continue
-        sym_lower = frag.symbol_name.lower() if frag.symbol_name else None
-        tested = sym_lower.removeprefix("test_") if sym_lower else None
-        if tested and tested in sigma and sym_lower:
-            sigma.add(sym_lower)
-
-    return sigma
-
-
 _CLOSURE_EDGE_CATEGORIES = frozenset({"structural", "semantic"})
 
 
@@ -365,22 +325,6 @@ def _apply_closure(
         closure |= new_symbols
 
     return closure
-
-
-def concepts_from_diff(
-    all_fragments: list[Fragment],
-    core_ids: set[FragmentId],
-    graph: Graph,
-    diff_text: str,
-    closure_depth: int = 1,
-) -> frozenset[str]:
-    sigma = _build_sigma(all_fragments, core_ids, diff_text)
-    closure = _apply_closure(sigma, all_fragments, graph, closure_depth)
-
-    if not closure:
-        return concepts_from_diff_text(diff_text)
-
-    return frozenset(closure)
 
 
 def _collect_core_needs(
