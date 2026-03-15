@@ -17,6 +17,15 @@ _TF_BLOCK_HEADER_RE = re.compile(r'^\w[\w-]*(?:\s+"[^"]*")*\s*\{')
 
 
 def _tf_block_symbol(header_line: str) -> str | None:
+    m = re.match(r'^resource\s+"([^"]+)"\s+"([^"]+)"', header_line)
+    if m:
+        return f"{m.group(1)}.{m.group(2)}"
+    m = re.match(r'^data\s+"([^"]+)"\s+"([^"]+)"', header_line)
+    if m:
+        return f"data.{m.group(1)}.{m.group(2)}"
+    m = re.match(r'^variable\s+"([^"]+)"', header_line)
+    if m:
+        return m.group(1)
     names = re.findall(r'"([^"]+)"', header_line)
     return names[-1] if names else None
 

@@ -423,8 +423,8 @@ def _collect_terraform_needs(
             ref_type, ref_name = m.group(1).lower(), m.group(2).lower()
             if ref_type in _TF_SKIP_REF_TYPES:
                 continue
-            if len(ref_name) >= 3 and ref_name not in CODE_STOPWORDS:
-                needs.setdefault(("definition", ref_name), InformationNeed("definition", ref_name, None, 0.9))
+            full_ref = f"{ref_type}.{ref_name}"
+            needs.setdefault(("definition", full_ref), InformationNeed("definition", full_ref, None, 0.9))
 
 
 def needs_from_diff(
