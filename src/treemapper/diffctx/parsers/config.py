@@ -15,6 +15,9 @@ _TF_EXTENSIONS = {".tf", ".hcl"}
 #         moved, import, check, removed, and any future HCL block types.
 _TF_BLOCK_HEADER_RE = re.compile(r'^\w[\w-]*(?:\s+"[^"]*")*\s*\{')
 
+_TF_COMPOUND_REF_RE = re.compile(r"(?<![.\w])(\w+)\.(\w+)\.\w+")
+_TF_COMPOUND_REF_SKIP = frozenset({"var", "local", "data", "module", "path", "terraform", "count", "each", "self"})
+
 
 def _tf_block_symbol(header_line: str) -> str | None:
     m = re.match(r'^resource\s+"([^"]+)"\s+"([^"]+)"', header_line)
@@ -41,6 +44,15 @@ def _tf_find_block_end(lines: list[str], start: int) -> int:
                 if depth == 0:
                     return i
     return len(lines) - 1
+
+
+def _extract_compound_tf_refs(content: str) -> frozenset[str]:
+    refs: set[str] = set()
+    for m in _TF_COMPOUND_REF_RE.finditer(content):
+        ref_type = m.group(1).lower()
+        if ref_type not in _TF_COMPOUND_REF_SKIP:
+            refs.add(f"{m.group(1).lower()}.{m.group(2).lower()}")
+    return frozenset(refs)
 
 
 class TerraformStrategy:
@@ -80,6 +92,9 @@ class TerraformStrategy:
                     fragments.append(frag)
             frag = create_fragment_from_lines(path, lines, start_i + 1, end_i + 1, "config", "data", symbol_name=sym)
             if frag:
+                compound_refs = _extract_compound_tf_refs(frag.content)
+                if compound_refs:
+                    frag.identifiers = frag.identifiers | compound_refs
                 fragments.append(frag)
             prev_end = end_i
 
