@@ -45,13 +45,6 @@ _MD_SPECIAL_CHARS = re.compile(r"([\\`*_\[\]()#>+\-~|{}!])")
 
 _MAX_MARKDOWN_HEADING_DEPTH = 5  # depth 0-5 → ## to ###### (6 levels), deeper uses list items
 
-_FORMAT_ALIASES = {
-    "yaml": "yaml",
-    "json": "json",
-    "txt": "txt",
-    "md": "md",
-}
-
 PLACEHOLDER_PATTERNS = [
     "<unreadable content>",
     "<unreadable content: not utf-8>",
@@ -326,13 +319,12 @@ def write_tree_markdown(file: TextIO, tree: dict[str, Any]) -> None:
 
 
 def tree_to_string(tree: dict[str, Any], output_format: str = "yaml") -> str:
-    canonical = _FORMAT_ALIASES.get(output_format, output_format)
     buf = io.StringIO()
-    if canonical == "json":
+    if output_format == "json":
         write_tree_json(buf, tree)
-    elif canonical == "txt":
+    elif output_format == "txt":
         write_tree_text(buf, tree)
-    elif canonical == "md":
+    elif output_format == "md":
         write_tree_markdown(buf, tree)
     else:
         write_tree_yaml(buf, tree)

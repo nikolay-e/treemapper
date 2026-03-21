@@ -10,14 +10,7 @@ from ..types import Fragment, FragmentId
 EdgeDict = dict[tuple[FragmentId, FragmentId], float]
 
 
-_STRIP_EXTENSIONS = CODE_EXTENSIONS | frozenset(
-    {
-        ".sc",
-        ".fs",
-        ".fsi",
-        ".fsx",
-    }
-)
+_STRIP_EXTENSIONS = CODE_EXTENSIONS
 
 _INDEX_FILE_STEMS = frozenset({"__init__", "index", "mod"})
 

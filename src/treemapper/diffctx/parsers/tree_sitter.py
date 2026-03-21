@@ -348,7 +348,7 @@ class TreeSitterStrategy:
         if node.type != "decorated_definition":
             return node
         for child in node.children:
-            if child.type in {"function_definition", "class_definition"}:
+            if child.type in {"function_definition", "class_definition", "async_function_definition"}:
                 return child
         return node
 

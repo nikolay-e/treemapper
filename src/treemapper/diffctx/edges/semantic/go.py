@@ -14,7 +14,6 @@ _GO_IMPORT_LINE_RE = re.compile(r'^\s*(?:\w+\s+)?"([^"]+)"', re.MULTILINE)
 
 _GO_FUNC_RE = re.compile(r"^func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(", re.MULTILINE)
 _GO_TYPE_RE = re.compile(r"^type\s+(\w+)\s+", re.MULTILINE)
-_GO_CONST_VAR_RE = re.compile(r"^(?:const|var)\s+(\w+)\s+", re.MULTILINE)
 
 _GO_FUNC_CALL_RE = re.compile(r"\b([a-zA-Z_]\w*)\s*\(")
 _GO_KEYWORDS = frozenset(
@@ -49,6 +48,7 @@ _GO_KEYWORDS = frozenset(
 _GO_TYPE_REF_RE = re.compile(r"\*?([A-Z]\w*)\b")
 _GO_PKG_CALL_RE = re.compile(r"\b(\w+)\.([A-Z]\w*)")
 _GO_EMBED_RE = re.compile(r"//go:embed\s+(\S+)", re.MULTILINE)
+_GO_PKG_DECL_RE = re.compile(r"^package\s+(\w+)", re.MULTILINE)
 
 
 def _extract_imports(content: str) -> set[str]:
@@ -65,11 +65,10 @@ def _extract_imports(content: str) -> set[str]:
     return imports
 
 
-def _extract_definitions(content: str) -> tuple[set[str], set[str], set[str]]:
+def _extract_definitions(content: str) -> tuple[set[str], set[str]]:
     funcs = {m.group(1) for m in _GO_FUNC_RE.finditer(content)}
     types = {m.group(1) for m in _GO_TYPE_RE.finditer(content)}
-    consts_vars = {m.group(1) for m in _GO_CONST_VAR_RE.finditer(content)}
-    return funcs, types, consts_vars
+    return funcs, types
 
 
 def _extract_references(content: str) -> tuple[set[str], set[str], set[tuple[str, str]]]:
@@ -83,7 +82,10 @@ def _is_go_file(path: Path) -> bool:
     return path.suffix.lower() == ".go"
 
 
-def _get_package_name(path: Path) -> str:
+def _get_package_name_from_content(content: str, path: Path) -> str:
+    match = _GO_PKG_DECL_RE.search(content)
+    if match:
+        return match.group(1)
     return path.parent.name
 
 
@@ -207,7 +209,7 @@ class GoEdgeBuilder(EdgeBuilder):
         func_defs: dict[str, list[FragmentId]] = defaultdict(list)
 
         for f in go_frags:
-            pkg = _get_package_name(f.path).lower()
+            pkg = _get_package_name_from_content(f.content, f.path).lower()
             pkg_to_frags[pkg].append(f.id)
 
             if repo_root:
@@ -217,7 +219,7 @@ class GoEdgeBuilder(EdgeBuilder):
                 except ValueError:
                     pass
 
-            funcs, types, _ = _extract_definitions(f.content)
+            funcs, types = _extract_definitions(f.content)
             for t in types:
                 type_defs[t.lower()].append(f.id)
             for fn in funcs:
@@ -275,7 +277,7 @@ class GoEdgeBuilder(EdgeBuilder):
         edges: EdgeDict,
     ) -> None:
         for path_str, frag_ids in path_to_frags.items():
-            if path_str in imp or imp.endswith(path_str):
+            if f"/{path_str}" in imp or imp == path_str or imp.endswith(f"/{path_str}"):
                 self.add_edges_from_ids(gf_id, frag_ids, self.import_weight, edges)
 
     def _link_refs(
@@ -309,7 +311,7 @@ class GoEdgeBuilder(EdgeBuilder):
         pkg_to_frags: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        current_pkg = _get_package_name(gf.path).lower()
+        current_pkg = _get_package_name_from_content(gf.content, gf.path).lower()
         for fid in pkg_to_frags.get(current_pkg, []):
             if fid != gf.id:
                 self.add_edge(edges, gf.id, fid, self.same_package_weight)

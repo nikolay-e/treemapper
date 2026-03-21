@@ -117,6 +117,3 @@ def build_diff_context_output(repo_root: Path, selected: list[Fragment]) -> dict
         "fragment_count": len(fragments_out),
         "fragments": fragments_out,
     }
-
-
-build_partial_tree = build_diff_context_output

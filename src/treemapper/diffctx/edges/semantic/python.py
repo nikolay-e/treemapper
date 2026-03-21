@@ -8,7 +8,7 @@ from pathlib import Path
 from ...config.weights import LANG_WEIGHTS
 from ...python_semantics import PyFragmentInfo, analyze_python_fragment
 from ...types import Fragment, FragmentId
-from ..base import EdgeBuilder, EdgeDict, add_semantic_edges, path_to_module
+from ..base import EdgeBuilder, EdgeDict, _strip_source_prefix, add_semantic_edges, path_to_module
 
 _PYTHON_EXTS = {".py", ".pyi", ".pyw"}
 
@@ -26,13 +26,6 @@ def _is_python_file(path: Path) -> bool:
 
 def _count_leading_dots(s: str) -> int:
     return len(s) - len(s.lstrip("."))
-
-
-def _strip_source_prefix(parts: list[str]) -> list[str]:
-    for i, part in enumerate(parts):
-        if part in ("src", "lib", "packages"):
-            return parts[i + 1 :]
-    return parts
 
 
 def _resolve_relative_import(imported: str, source_path: Path, repo_root: Path | None = None) -> str | None:

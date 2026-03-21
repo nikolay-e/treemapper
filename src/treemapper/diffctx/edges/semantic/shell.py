@@ -13,7 +13,7 @@ _ALL_SHELL = _SHELL_EXTS | _POWERSHELL_EXTS
 
 _SOURCE_RE = re.compile(r"^\s{0,20}(?:source|\.)\s{1,10}['\"]?([^'\"#\s]{1,300})", re.MULTILINE)
 
-_SCRIPT_CALL_RE = re.compile(r"(?:bash|sh|zsh|python|python3|node|ruby|perl)\s{1,10}['\"]?([^\s'\"]{1,300})", re.MULTILINE)
+_SCRIPT_CALL_RE = re.compile(r"\b(?:bash|sh|zsh|python|python3|node|ruby|perl)\s{1,10}['\"]?([^\s'\"]{1,300})", re.MULTILINE)
 _EXEC_CALL_RE = re.compile(r"(?:\./|scripts/|bin/)([a-zA-Z0-9_.-]{1,100}(?:\.(?:sh|py|rb|pl))?)", re.MULTILINE)
 _ENV_FILE_RE = re.compile(r"^\s{0,20}(?:source|\.)\s{1,10}[^\n]{0,500}\.env", re.MULTILINE)
 
@@ -34,7 +34,7 @@ def _is_powershell(path: Path) -> bool:
 
 def _has_shebang(content: str) -> bool:
     first_line = content.split("\n")[0] if content else ""
-    return first_line.startswith("#!") and any(sh in first_line for sh in ["bash", "sh", "zsh", "fish", "python", "ruby", "perl"])
+    return first_line.startswith("#!") and any(sh in first_line for sh in ["bash", "sh", "zsh", "fish"])
 
 
 def _extract_bash_refs(content: str) -> tuple[set[str], set[str]]:

@@ -11,7 +11,7 @@ from ..base import EdgeBuilder, EdgeDict
 _RUBY_EXTS = {".rb", ".rake", ".gemspec"}
 _RUBY_FILES = {"rakefile", "gemfile", "guardfile", "vagrantfile", "capfile", "podfile"}
 
-_RUBY_REQUIRE_RE = re.compile(r"^\s*require(?:_relative)?[\s(]+['\"]([^'\"]+)['\"]", re.MULTILINE)
+_RUBY_REQUIRE_RE = re.compile(r"^\s*require[\s(]+['\"]([^'\"]+)['\"]", re.MULTILINE)
 _RUBY_REQUIRE_RELATIVE_RE = re.compile(r"^\s*require_relative[\s(]+['\"]([^'\"]+)['\"]", re.MULTILINE)
 _RUBY_LOAD_RE = re.compile(r"^\s*load[\s(]+['\"]([^'\"]+)['\"]", re.MULTILINE)
 
@@ -35,9 +35,7 @@ def _extract_requires(content: str) -> tuple[set[str], set[str]]:
     relative_requires: set[str] = set()
 
     for m in _RUBY_REQUIRE_RE.finditer(content):
-        req = m.group(1)
-        if "require_relative" not in m.group(0):
-            requires.add(req)
+        requires.add(m.group(1))
 
     for m in _RUBY_REQUIRE_RELATIVE_RE.finditer(content):
         relative_requires.add(m.group(1))

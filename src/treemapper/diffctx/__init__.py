@@ -205,7 +205,7 @@ def _truncate_generated_fragments(file_frags: list[Fragment]) -> list[Fragment]:
         truncated_content = "\n".join(lines) + f"\n# ... [{remaining} more lines]"
         truncated.append(
             Fragment(
-                id=FragmentId(frag.path, frag.start_line, frag.start_line + len(lines)),
+                id=FragmentId(frag.path, frag.start_line, frag.start_line + len(lines) - 1),
                 kind=frag.kind,
                 content=truncated_content,
                 identifiers=extract_identifiers(truncated_content),
@@ -871,16 +871,19 @@ def _count_brackets_outside_strings(line: str) -> tuple[int, int, int, int]:
     open_braces = 0
     close_braces = 0
     in_string: str | None = None
-    prev = ""
+    escaped = False
     for ch in line:
         if in_string is not None:
-            if ch == in_string and prev != "\\":
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == in_string:
                 in_string = None
-            prev = ch
             continue
         if ch in ("'", '"', "`"):
             in_string = ch
-            prev = ch
+            escaped = False
             continue
         if ch == "(":
             open_parens += 1
@@ -890,7 +893,6 @@ def _count_brackets_outside_strings(line: str) -> tuple[int, int, int, int]:
             open_braces += 1
         elif ch == "}":
             close_braces += 1
-        prev = ch
     return open_parens, close_parens, open_braces, close_braces
 
 
@@ -965,16 +967,12 @@ def _add_container_headers(core_ids: set[FragmentId], frags_by_path: dict[Path, 
 
 
 def _log_full_mode(selected: list[Fragment]) -> None:
-    try:
-        used = sum(f.token_count for f in selected)
-        logger.info(
-            "diffctx: full mode selected=%d from changed files used=%d tokens",
-            len(selected),
-            used,
-        )
-    except (TypeError, AttributeError) as e:
-        # nosemgrep: python-logger-credential-disclosure
-        logger.debug("diffctx: failed to compute token count: %s", e)
+    used = sum(f.token_count for f in selected)
+    logger.info(
+        "diffctx: full mode selected=%d from changed files used=%d tokens",
+        len(selected),
+        used,
+    )
 
 
 def _log_ppr_mode(
@@ -985,23 +983,19 @@ def _log_ppr_mode(
     alpha: float,
     tau: float,
 ) -> None:
-    try:
-        used = sum(f.token_count for f in selected)
-        budget_str = str(budget_tokens) if budget_tokens is not None else "unlimited"
-        logger.info(
-            "diffctx: selected=%d core=%d used=%d/%s reason=%s utility=%.4f alpha=%.3f tau=%.3f",
-            len(selected),
-            len(core_ids),
-            used,
-            budget_str,
-            result.reason,
-            result.utility,
-            alpha,
-            tau,
-        )
-    except (TypeError, AttributeError) as e:
-        # nosemgrep: python-logger-credential-disclosure
-        logger.debug("diffctx: failed to compute token count: %s", e)
+    used = sum(f.token_count for f in selected)
+    budget_str = str(budget_tokens) if budget_tokens is not None else "unlimited"
+    logger.info(
+        "diffctx: selected=%d core=%d used=%d/%s reason=%s utility=%.4f alpha=%.3f tau=%.3f",
+        len(selected),
+        len(core_ids),
+        used,
+        budget_str,
+        result.reason,
+        result.utility,
+        alpha,
+        tau,
+    )
 
 
 _MAX_FILE_SIZE = LIMITS.max_file_size
