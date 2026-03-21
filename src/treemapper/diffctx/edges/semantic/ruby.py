@@ -22,7 +22,6 @@ _RUBY_INCLUDE_RE = re.compile(r"^\s*(?:include|extend|prepend)\s+([A-Z]\w*(?:::[
 _RUBY_INHERIT_RE = re.compile(r"class\s+\w+\s*<\s*([A-Z]\w*(?:::[A-Z]\w*)*)")
 
 _RUBY_CONST_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*(?:::[A-Z]\w*)*)")
-_RUBY_METHOD_CALL_RE = re.compile(r"\.([a-z_]\w*)\s*(?:$|[^a-z_])")
 
 
 def _is_ruby_file(path: Path) -> bool:

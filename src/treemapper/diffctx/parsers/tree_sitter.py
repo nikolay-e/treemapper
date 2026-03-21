@@ -34,9 +34,20 @@ _DEFINITION_NODE_TYPES = {
         "enum_declaration",
         "variable_declarator",
     },
-    "go": {"function_declaration", "method_declaration", "type_declaration"},
-    "rust": {"function_item", "impl_item", "struct_item", "enum_item", "trait_item"},
-    "java": {"method_declaration", "class_declaration", "interface_declaration", "enum_declaration"},
+    "go": {"function_declaration", "method_declaration", "type_declaration", "const_declaration", "var_declaration"},
+    "rust": {
+        "function_item",
+        "impl_item",
+        "struct_item",
+        "enum_item",
+        "trait_item",
+        "mod_item",
+        "const_item",
+        "static_item",
+        "macro_definition",
+        "type_item",
+    },
+    "java": {"method_declaration", "class_declaration", "interface_declaration", "enum_declaration", "constructor_declaration"},
     "c": {"function_definition", "struct_specifier", "enum_specifier", "declaration", "type_definition"},
     "cpp": {
         "function_definition",
@@ -48,7 +59,7 @@ _DEFINITION_NODE_TYPES = {
         "using_declaration",
         "alias_declaration",
     },
-    "ruby": {"method", "class", "module"},
+    "ruby": {"method", "class", "module", "singleton_method"},
     "c_sharp": {
         "method_declaration",
         "class_declaration",
@@ -57,6 +68,7 @@ _DEFINITION_NODE_TYPES = {
         "enum_declaration",
         "record_declaration",
         "property_declaration",
+        "constructor_declaration",
     },
 }
 
@@ -75,7 +87,7 @@ _NODE_TYPE_KEYWORDS = [
     (("declaration", "using_declaration"), "declaration"),
 ]
 
-_CONTAINER_KINDS = frozenset({"class", "interface", "struct"})
+_CONTAINER_KINDS = frozenset({"class", "interface", "struct", "impl"})
 
 _MAX_RECURSION_DEPTH = 500
 
@@ -210,6 +222,8 @@ class TreeSitterStrategy:
             return
 
         self._add_leaf_definition(path, lines, start, end, kind, sym_name, fragments, covered, added_ends)
+        if node.type == "variable_declarator" and self._has_function_child(node):
+            return
         self._recurse_children(node, code_bytes, path, lines, definition_types, fragments, covered, added_ends, depth)
 
     def _try_container_split(
@@ -320,6 +334,15 @@ class TreeSitterStrategy:
                 return "class"
         return "function"
 
+    _FUNCTION_CHILD_TYPES = frozenset({"arrow_function", "function", "generator_function"})
+
+    @staticmethod
+    def _has_function_child(node: Node) -> bool:
+        for child in node.children:
+            if child.type in TreeSitterStrategy._FUNCTION_CHILD_TYPES:
+                return True
+        return False
+
     @staticmethod
     def _unwrap_decorated(node: Node) -> Node:
         if node.type != "decorated_definition":
@@ -341,7 +364,7 @@ class TreeSitterStrategy:
     @classmethod
     def _extract_symbol_name(cls, node: Node) -> str | None:
         node = cls._unwrap_decorated(node)
-        for field_name in ("name", "declarator"):
+        for field_name in ("name", "declarator", "type"):
             name_node = node.child_by_field_name(field_name)
             if name_node is None:
                 continue

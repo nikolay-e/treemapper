@@ -94,7 +94,7 @@ def _personalized_pagerank_sparse(
     visited: set[FragmentId] = set(queue)
 
     pushes = 0
-    max_pushes = min(n * 50, 500_000)
+    max_pushes = min(n * 100, 2_000_000)
     while queue and pushes < max_pushes:
         u = queue.popleft()
         visited.discard(u)

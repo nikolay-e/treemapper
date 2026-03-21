@@ -243,7 +243,7 @@ def _match_strength_typed(frag: Fragment, need: InformationNeed) -> float:
     nt = need.need_type
 
     if nt == "impact" and scope_match:
-        return 0.0
+        return 0.15
     if defines and "_signature" not in frag.kind:
         return _defines_strength(scope_match, need.scope is not None)
     if nt == "impact" and mentions and not defines:

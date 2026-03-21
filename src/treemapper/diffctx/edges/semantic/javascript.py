@@ -27,6 +27,30 @@ _NAMED_IMPORT_NAMES_RE = re.compile(
 )
 
 
+_JS_KEYWORDS = frozenset(
+    {
+        "new",
+        "class",
+        "function",
+        "async",
+        "await",
+        "return",
+        "throw",
+        "delete",
+        "typeof",
+        "instanceof",
+        "void",
+        "yield",
+        "super",
+        "this",
+        "null",
+        "undefined",
+        "true",
+        "false",
+    }
+)
+
+
 def _add_name_if_valid(name: str, target: set[str]) -> None:
     if name and len(name) >= 2:
         target.add(name.lower())
@@ -36,7 +60,10 @@ def _extract_exports_from_content(content: str, exported: set[str]) -> None:
     for m in _EXPORT_DECL_RE.finditer(content):
         _add_name_if_valid(m.group(1), exported)
     for m in _EXPORT_DEFAULT_NAME_RE.finditer(content):
-        _add_name_if_valid(m.group(1), exported)
+        captured = m.group(1)
+        if captured in _JS_KEYWORDS:
+            continue
+        _add_name_if_valid(captured, exported)
     for m in _EXPORT_LIST_RE.finditer(content):
         for part in m.group(1).split(","):
             part = part.strip().split(" as ")[0].strip()
@@ -68,6 +95,9 @@ def _normalize_import(imp: str, source_path: Path) -> set[str]:
                 resolved_parts.append(part)
 
         if resolved_parts:
+            base_parts = list(base_dir.parts)
+            full_resolved = base_parts + resolved_parts
+            names.add("/".join(full_resolved))
             names.add("/".join(resolved_parts))
             names.add(resolved_parts[-1])
     else:
@@ -196,7 +226,7 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
 
             for imp in imports:
                 imp_lower = imp.lower()
-                if any(name in imp_lower or imp_lower.endswith(name) for name in changed_names):
+                if any((name in imp_lower or imp_lower.endswith(name)) for name in changed_names if len(name) >= 3):
                     return True
         except (OSError, UnicodeDecodeError):
             pass

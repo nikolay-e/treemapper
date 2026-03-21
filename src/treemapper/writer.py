@@ -71,7 +71,7 @@ def _escape_yaml_content(s: str) -> str:
 
 
 def _has_problematic_chars(s: str) -> bool:
-    return any(c in s for c in YAML_PROBLEMATIC_CHARS)
+    return any(c in YAML_PROBLEMATIC_CHARS for c in s)
 
 
 def _escape_markdown(s: str) -> str:
@@ -347,12 +347,14 @@ def _write_to_stdout_with_wrapper(writer: Callable[[TextIO], None]) -> bool:
 
     try:
         if buf:
+            original_encoding = sys.stdout.encoding or sys.getdefaultencoding()
             utf8_stdout = io.TextIOWrapper(buf, encoding="utf-8", newline="")
             try:
                 writer(utf8_stdout)
                 utf8_stdout.flush()
             finally:
                 utf8_stdout.detach()
+                sys.stdout = io.TextIOWrapper(buf, encoding=original_encoding)
         else:
             writer(sys.stdout)
             sys.stdout.flush()

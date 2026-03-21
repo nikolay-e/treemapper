@@ -17,8 +17,6 @@ _DOCKERFILE_ARG_RE = re.compile(r"^ARG\s+(\w+)", re.MULTILINE | re.IGNORECASE)
 _COMPOSE_BUILD_RE = re.compile(r"^\s+build:\s*['\"]?([^'\"#\n]+)", re.MULTILINE)
 _COMPOSE_CONTEXT_RE = re.compile(r"^\s+context:\s*['\"]?([^'\"#\n]+)", re.MULTILINE)
 _COMPOSE_DOCKERFILE_RE = re.compile(r"^\s+dockerfile:\s*['\"]?([^'\"#\n]+)", re.MULTILINE)
-_COMPOSE_DEPENDS_RE = re.compile(r"depends_on:\s*\n((?:\s+-\s*\w+\s*\n)+)", re.MULTILINE)
-_COMPOSE_SERVICE_RE = re.compile(r"^(\w+):\s*$", re.MULTILINE)
 _COMPOSE_VOLUME_RE = re.compile(r"^\s+-\s*['\"]?([./][^:'\"\n]+):", re.MULTILINE)
 
 

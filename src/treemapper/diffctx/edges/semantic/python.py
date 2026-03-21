@@ -109,7 +109,7 @@ class PythonEdgeBuilder(EdgeBuilder):
         # Backward dependencies: files that import the changed modules
         changed_modules = self._collect_changed_modules(py_changed, repo_root)
         if changed_modules:
-            discovered.update(self._find_files_importing_modules(all_candidate_files, changed_set, changed_modules))
+            discovered.update(self._find_files_importing_modules(all_candidate_files, changed_set, changed_modules, repo_root))
 
         return list(discovered)
 
@@ -148,20 +148,20 @@ class PythonEdgeBuilder(EdgeBuilder):
         return changed_modules
 
     def _find_files_importing_modules(
-        self, all_candidate_files: list[Path], changed_set: set[Path], changed_modules: set[str]
+        self, all_candidate_files: list[Path], changed_set: set[Path], changed_modules: set[str], repo_root: Path | None = None
     ) -> list[Path]:
         discovered: list[Path] = []
         for candidate in all_candidate_files:
             if candidate in changed_set or not _is_python_file(candidate):
                 continue
-            if self._imports_any_module(candidate, changed_modules):
+            if self._imports_any_module(candidate, changed_modules, repo_root):
                 discovered.append(candidate)
         return discovered
 
-    def _imports_any_module(self, candidate: Path, changed_modules: set[str]) -> bool:
+    def _imports_any_module(self, candidate: Path, changed_modules: set[str], repo_root: Path | None = None) -> bool:
         try:
             content = candidate.read_text(encoding="utf-8")
-            imports = _extract_imports_from_content(content, candidate)
+            imports = _extract_imports_from_content(content, candidate, repo_root)
             return any(imp in changed_modules for imp in imports)
         except (OSError, UnicodeDecodeError):
             return False

@@ -26,7 +26,10 @@ def read_ignore_file(file_path: Path) -> list[str]:
                     continue
                 if stripped.startswith("#"):
                     continue
-                ignore_patterns.append(stripped.rstrip())
+                if stripped.endswith("\\ "):
+                    ignore_patterns.append(stripped)
+                else:
+                    ignore_patterns.append(stripped.rstrip())
         logger.info("Using ignore patterns from %s", file_path)
         logger.debug("Read ignore patterns from %s: %s", file_path, ignore_patterns)
     except PermissionError:

@@ -168,7 +168,9 @@ class ShellEdgeBuilder(EdgeBuilder):
         ref_base = ref_name.split(".")[0] if ref_name else ""
         found = False
         for name, frag_ids in idx.by_name.items():
-            if name == ref_name or (ref_base and name.startswith(ref_base)):
+            if name == ref_name or (
+                ref_base and (name == ref_base or name.startswith(ref_base + ".") or name.startswith(ref_base + "_"))
+            ):
                 for fid in frag_ids:
                     if fid != src_id:
                         self.add_edge(edges, src_id, fid, weight)

@@ -9,6 +9,7 @@ from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict
 
 _RUST_USE_RE = re.compile(r"^\s*use\s+(?:crate::)?([a-zA-Z_]\w*(?:::[a-zA-Z_]\w*)*)", re.MULTILINE)
+_RUST_USE_BRACED_RE = re.compile(r"use\s+(?:crate::)?([\w:]+)::\{([^}]+)\}", re.MULTILINE)
 _RUST_MOD_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+([a-z_][a-z0-9_]*)\s*[;{]", re.MULTILINE)
 _RUST_EXTERN_CRATE_RE = re.compile(r"^\s*extern\s+crate\s+([a-z_][a-z0-9_]*)", re.MULTILINE)
 
@@ -23,6 +24,45 @@ _RUST_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
 _RUST_FN_CALL_RE = re.compile(r"(?<!\w)([a-z_][a-z0-9_]*)\s?!?\s?\(")
 _RUST_PATH_CALL_RE = re.compile(r"([a-z_][a-z0-9_]*)::([a-z_][a-z0-9_]*|[A-Z]\w*)")
 
+_RUST_KEYWORDS = frozenset(
+    {
+        "if",
+        "for",
+        "while",
+        "match",
+        "return",
+        "unsafe",
+        "loop",
+        "break",
+        "continue",
+        "else",
+        "where",
+        "as",
+        "in",
+        "ref",
+        "mut",
+        "pub",
+        "fn",
+        "let",
+        "const",
+        "static",
+        "move",
+        "async",
+        "await",
+        "dyn",
+        "impl",
+        "trait",
+        "struct",
+        "enum",
+        "type",
+        "use",
+        "mod",
+        "crate",
+        "self",
+        "super",
+    }
+)
+
 
 def _is_rust_file(path: Path) -> bool:
     return path.suffix.lower() == ".rs"
@@ -36,6 +76,16 @@ def _extract_uses(content: str) -> set[str]:
         parts = path.split("::")
         if len(parts) > 1:
             uses.add(parts[0])
+    for match in _RUST_USE_BRACED_RE.finditer(content):
+        base_path = match.group(1)
+        uses.add(base_path)
+        base_parts = base_path.split("::")
+        if len(base_parts) > 1:
+            uses.add(base_parts[0])
+        for name in match.group(2).split(","):
+            name = name.strip()
+            if name:
+                uses.add(name)
     return uses
 
 
@@ -43,7 +93,7 @@ def _extract_mods(content: str) -> set[str]:
     return {m.group(1) for m in _RUST_MOD_RE.finditer(content)}
 
 
-def _extract_definitions(content: str) -> tuple[set[str], set[str], set[str]]:
+def _extract_definitions(content: str) -> tuple[set[str], set[str]]:
     funcs = {m.group(1) for m in _RUST_FN_RE.finditer(content)}
     types: set[str] = set()
     types.update(m.group(1) for m in _RUST_STRUCT_RE.finditer(content))
@@ -55,13 +105,12 @@ def _extract_definitions(content: str) -> tuple[set[str], set[str], set[str]]:
         if m.group(1):
             types.add(m.group(1))
 
-    traits = {m.group(1) for m in _RUST_TRAIT_RE.finditer(content)}
-    return funcs, types, traits
+    return funcs, types
 
 
 def _extract_references(content: str) -> tuple[set[str], set[str], set[tuple[str, str]]]:
     type_refs = {m.group(1) for m in _RUST_TYPE_REF_RE.finditer(content)}
-    fn_calls = {m.group(1) for m in _RUST_FN_CALL_RE.finditer(content)}
+    fn_calls = {m.group(1) for m in _RUST_FN_CALL_RE.finditer(content) if m.group(1) not in _RUST_KEYWORDS}
     path_calls = {(m.group(1), m.group(2)) for m in _RUST_PATH_CALL_RE.finditer(content)}
     return type_refs, fn_calls, path_calls
 
@@ -133,7 +182,7 @@ class RustEdgeBuilder(EdgeBuilder):
             else:
                 mod_to_frags[stem].append(f.id)
 
-            funcs, types, _ = _extract_definitions(f.content)
+            funcs, types = _extract_definitions(f.content)
             for t in types:
                 type_defs[t.lower()].append(f.id)
             for fn in funcs:

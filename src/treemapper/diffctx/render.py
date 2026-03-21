@@ -88,7 +88,7 @@ def _create_fragment_entry(frag: Fragment, path_str: str) -> dict[str, Any]:
         "lines": f"{frag.start_line}-{frag.end_line}",
         "kind": frag.kind,
     }
-    symbol = _extract_symbol(frag)
+    symbol = frag.symbol_name or _extract_symbol(frag)
     if symbol:
         entry["symbol"] = symbol
     if frag.content:

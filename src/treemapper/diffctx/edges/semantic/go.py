@@ -13,10 +13,39 @@ _GO_IMPORT_BLOCK_RE = re.compile(r"import\s*\((.*?)\)", re.DOTALL)
 _GO_IMPORT_LINE_RE = re.compile(r'^\s*(?:\w+\s+)?"([^"]+)"', re.MULTILINE)
 
 _GO_FUNC_RE = re.compile(r"^func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(", re.MULTILINE)
-_GO_TYPE_RE = re.compile(r"^type\s+(\w+)\s+(?:struct|interface|func)", re.MULTILINE)
+_GO_TYPE_RE = re.compile(r"^type\s+(\w+)\s+", re.MULTILINE)
 _GO_CONST_VAR_RE = re.compile(r"^(?:const|var)\s+(\w+)\s+", re.MULTILINE)
 
-_GO_FUNC_CALL_RE = re.compile(r"\b([A-Z]\w+)\s*\(")
+_GO_FUNC_CALL_RE = re.compile(r"\b([a-zA-Z_]\w*)\s*\(")
+_GO_KEYWORDS = frozenset(
+    {
+        "if",
+        "for",
+        "range",
+        "switch",
+        "select",
+        "return",
+        "go",
+        "defer",
+        "func",
+        "type",
+        "var",
+        "const",
+        "map",
+        "make",
+        "new",
+        "append",
+        "len",
+        "cap",
+        "copy",
+        "delete",
+        "close",
+        "panic",
+        "recover",
+        "print",
+        "println",
+    }
+)
 _GO_TYPE_REF_RE = re.compile(r"\*?([A-Z]\w*)\b")
 _GO_PKG_CALL_RE = re.compile(r"\b(\w+)\.([A-Z]\w*)")
 _GO_EMBED_RE = re.compile(r"//go:embed\s+(\S+)", re.MULTILINE)
@@ -44,7 +73,7 @@ def _extract_definitions(content: str) -> tuple[set[str], set[str], set[str]]:
 
 
 def _extract_references(content: str) -> tuple[set[str], set[str], set[tuple[str, str]]]:
-    func_calls = {m.group(1) for m in _GO_FUNC_CALL_RE.finditer(content) if m.group(1)[0].isupper()}
+    func_calls = {m.group(1) for m in _GO_FUNC_CALL_RE.finditer(content) if m.group(1) not in _GO_KEYWORDS}
     type_refs = {m.group(1) for m in _GO_TYPE_REF_RE.finditer(content) if m.group(1)[0].isupper()}
     pkg_calls = {(m.group(1), m.group(2)) for m in _GO_PKG_CALL_RE.finditer(content)}
     return func_calls, type_refs, pkg_calls
@@ -246,7 +275,7 @@ class GoEdgeBuilder(EdgeBuilder):
         edges: EdgeDict,
     ) -> None:
         for path_str, frag_ids in path_to_frags.items():
-            if imp in path_str or imp.endswith(path_str):
+            if path_str in imp or imp.endswith(path_str):
                 self.add_edges_from_ids(gf_id, frag_ids, self.import_weight, edges)
 
     def _link_refs(

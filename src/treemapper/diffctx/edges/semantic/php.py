@@ -24,7 +24,7 @@ _PHP_EXTENDS_RE = re.compile(r"class\s+\w+\s+extends\s+([A-Z]\w*)")
 _PHP_IMPLEMENTS_RE = re.compile(r"implements\s+([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)")
 _PHP_USE_TRAIT_RE = re.compile(r"^\s*use\s+([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)\s*;", re.MULTILINE)
 
-_PHP_TYPE_HINT_RE = re.compile(r"(?::|->)\s*([A-Z]\w*)\b")
+_PHP_TYPE_HINT_RE = re.compile(r":\s*\??([A-Z]\w*)\b")
 _PHP_NEW_RE = re.compile(r"new\s+([A-Z]\w*)")
 _PHP_STATIC_CALL_RE = re.compile(r"([A-Z]\w*)::(?!\$)")
 _PHP_INSTANCEOF_RE = re.compile(r"instanceof\s+([A-Z]\w*)")
