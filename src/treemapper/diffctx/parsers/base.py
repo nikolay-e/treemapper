@@ -104,35 +104,23 @@ def _find_first_balanced_point(lines: list[str], start_idx: int, target_end_idx:
     return None
 
 
-def find_balanced_end_line(
-    lines: list[str], start_idx: int, target_end_idx: int, max_extension: int = _GENERIC_MAX_EXTENSION
-) -> int:
-    if target_end_idx >= len(lines):
-        target_end_idx = len(lines) - 1
-
-    state = _BracketState()
-    target_state: _BracketState | None = None
-    for idx in range(start_idx, target_end_idx + 1):
+def _feed_lines(state: _BracketState, lines: list[str], start_idx: int, end_idx: int) -> None:
+    for idx in range(start_idx, end_idx + 1):
         if idx > start_idx:
             state.feed("\n")
         state.feed(lines[idx])
-    target_state = state
 
-    if target_state.depth == 0:
-        first_balanced = _find_first_balanced_point(lines, start_idx, target_end_idx)
-        if first_balanced is not None and first_balanced < target_end_idx:
-            return first_balanced
-        return target_end_idx
 
-    max_end = min(len(lines) - 1, target_end_idx + max_extension)
-
-    state = target_state.copy()
-    for end_idx in range(target_end_idx + 1, max_end + 1):
+def _scan_forward_for_balance(state: _BracketState, lines: list[str], start: int, end: int) -> int | None:
+    for end_idx in range(start, end + 1):
         state.feed("\n")
         state.feed(lines[end_idx])
         if state.depth == 0:
             return end_idx
+    return None
 
+
+def _scan_backward_for_balance(lines: list[str], start_idx: int, target_end_idx: int) -> int | None:
     state = _BracketState()
     last_balanced_idx = None
     for idx in range(start_idx, target_end_idx):
@@ -141,11 +129,30 @@ def find_balanced_end_line(
         state.feed(lines[idx])
         if state.depth == 0:
             last_balanced_idx = idx
+    return last_balanced_idx
 
-    if last_balanced_idx is not None:
-        return last_balanced_idx
 
-    return target_end_idx
+def find_balanced_end_line(
+    lines: list[str], start_idx: int, target_end_idx: int, max_extension: int = _GENERIC_MAX_EXTENSION
+) -> int:
+    if target_end_idx >= len(lines):
+        target_end_idx = len(lines) - 1
+
+    target_state = _BracketState()
+    _feed_lines(target_state, lines, start_idx, target_end_idx)
+
+    if target_state.depth == 0:
+        first_balanced = _find_first_balanced_point(lines, start_idx, target_end_idx)
+        if first_balanced is not None and first_balanced < target_end_idx:
+            return first_balanced
+        return target_end_idx
+
+    max_end = min(len(lines) - 1, target_end_idx + max_extension)
+    forward = _scan_forward_for_balance(target_state.copy(), lines, target_end_idx + 1, max_end)
+    if forward is not None:
+        return forward
+
+    return _scan_backward_for_balance(lines, start_idx, target_end_idx) or target_end_idx
 
 
 _SENTENCE_ENDINGS = (".", "?", "!", '."', '?"', '!"', ".'", "?'", "!'")

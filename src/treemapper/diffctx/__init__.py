@@ -214,6 +214,30 @@ def _truncate_generated_fragments(file_frags: list[Fragment]) -> list[Fragment]:
     return truncated
 
 
+def _dedup_fragments(raw_frags: list[Fragment]) -> list[Fragment]:
+    seen: set[FragmentId] = set()
+    result: list[Fragment] = []
+    for f in raw_frags:
+        if f.id not in seen:
+            result.append(f)
+            seen.add(f.id)
+    return result
+
+
+def _cap_fragments(file_frags: list[Fragment], cap: int, file_path: Path, is_generated: bool) -> list[Fragment]:
+    if len(file_frags) <= cap:
+        return file_frags
+    file_frags.sort(key=lambda f: f.line_count, reverse=True)
+    file_frags = file_frags[:cap]
+    logger.debug(
+        "diffctx: capped %s to %d fragments%s",
+        file_path.name,
+        cap,
+        " (generated)" if is_generated else "",
+    )
+    return file_frags
+
+
 def _process_files_for_fragments(
     files: list[Path],
     root_dir: Path,
@@ -227,25 +251,11 @@ def _process_files_for_fragments(
         if content is None:
             continue
         raw_frags = [f for f in fragment_file(file_path, content) if f.id not in seen_frag_ids]
-        local_seen: set[FragmentId] = set()
-        file_frags = []
-        for f in raw_frags:
-            if f.id not in local_seen:
-                file_frags.append(f)
-                local_seen.add(f.id)
+        file_frags = _dedup_fragments(raw_frags)
 
         is_generated = _is_generated_file(file_path, content)
         cap = _MAX_GENERATED_FRAGMENTS if is_generated else max_frags
-
-        if len(file_frags) > cap:
-            file_frags.sort(key=lambda f: f.line_count, reverse=True)
-            file_frags = file_frags[:cap]
-            logger.debug(
-                "diffctx: capped %s to %d fragments%s",
-                file_path.name,
-                cap,
-                " (generated)" if is_generated else "",
-            )
+        file_frags = _cap_fragments(file_frags, cap, file_path, is_generated)
 
         if is_generated:
             file_frags = _truncate_generated_fragments(file_frags)

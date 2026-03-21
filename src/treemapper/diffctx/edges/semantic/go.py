@@ -113,6 +113,31 @@ def _get_package_name_from_content(content: str, path: Path) -> str:
     return path.parent.name
 
 
+def _resolve_bases(pattern_str: str, parent: Path, repo_root: Path | None) -> list[Path]:
+    base_pattern = pattern_str.split("*")[0].rstrip("/")
+    candidate_bases = [parent / base_pattern]
+    if repo_root:
+        candidate_bases.append(repo_root / base_pattern)
+    dirs: list[Path] = []
+    for base in candidate_bases:
+        try:
+            dirs.append(base.resolve())
+        except (OSError, ValueError):
+            pass
+    return dirs
+
+
+def _any_dir_matches(dirs_to_check: set[Path], embed_dirs: list[Path]) -> bool:
+    for d in dirs_to_check:
+        try:
+            resolved = d.resolve()
+            if any(resolved == ed or resolved.is_relative_to(ed) for ed in embed_dirs):
+                return True
+        except (ValueError, OSError):
+            continue
+    return False
+
+
 class GoEdgeBuilder(EdgeBuilder):
     weight = 0.75
     import_weight = EDGE_WEIGHTS["go_import"].forward
@@ -127,31 +152,45 @@ class GoEdgeBuilder(EdgeBuilder):
         all_candidate_files: list[Path],
         repo_root: Path | None = None,
     ) -> list[Path]:
-        go_changed = [f for f in changed_files if _is_go_file(f)]
         changed_set = set(changed_files)
         discovered: set[Path] = set()
+        candidates = [c for c in all_candidate_files if c not in changed_set and _is_go_file(c)]
 
+        go_changed = [f for f in changed_files if _is_go_file(f)]
         if go_changed:
-            changed_pkg_dirs = {f.parent for f in go_changed}
-            for candidate in all_candidate_files:
-                if candidate not in changed_set and _is_go_file(candidate) and candidate.parent in changed_pkg_dirs:
-                    discovered.add(candidate)
+            self._discover_same_package(go_changed, candidates, discovered)
 
-        changed_dirs = {f.parent for f in changed_files}
-        embed_go_files: set[Path] = set()
-        for candidate in all_candidate_files:
-            if candidate not in changed_set and _is_go_file(candidate):
-                if self._embeds_any_changed_dir(candidate, changed_dirs, repo_root):
-                    discovered.add(candidate)
-                    embed_go_files.add(candidate)
-
-        embed_dirs = {f.parent for f in embed_go_files}
-        for candidate in all_candidate_files:
-            if candidate not in changed_set and _is_go_file(candidate) and candidate not in discovered:
-                if candidate.parent in embed_dirs:
-                    discovered.add(candidate)
+        embed_go_files = self._discover_embed_files(changed_files, candidates, discovered, repo_root)
+        self._discover_package_peers(embed_go_files, candidates, discovered)
 
         return list(discovered)
+
+    def _discover_same_package(self, go_changed: list[Path], candidates: list[Path], discovered: set[Path]) -> None:
+        pkg_dirs = {f.parent for f in go_changed}
+        for c in candidates:
+            if c.parent in pkg_dirs:
+                discovered.add(c)
+
+    def _discover_embed_files(
+        self,
+        changed_files: list[Path],
+        candidates: list[Path],
+        discovered: set[Path],
+        repo_root: Path | None,
+    ) -> set[Path]:
+        changed_dirs = {f.parent for f in changed_files}
+        embed_go_files: set[Path] = set()
+        for c in candidates:
+            if self._embeds_any_changed_dir(c, changed_dirs, repo_root):
+                discovered.add(c)
+                embed_go_files.add(c)
+        return embed_go_files
+
+    def _discover_package_peers(self, embed_go_files: set[Path], candidates: list[Path], discovered: set[Path]) -> None:
+        embed_dirs = {f.parent for f in embed_go_files}
+        for c in candidates:
+            if c not in discovered and c.parent in embed_dirs:
+                discovered.add(c)
 
     def _embeds_any_changed_dir(self, go_file: Path, changed_dirs: set[Path], repo_root: Path | None = None) -> bool:
         try:
@@ -159,23 +198,9 @@ class GoEdgeBuilder(EdgeBuilder):
         except (OSError, UnicodeDecodeError):
             return False
         for match in _GO_EMBED_RE.finditer(content):
-            embed_pattern = match.group(1)
-            base_pattern = embed_pattern.split("*")[0].rstrip("/")
-            candidate_bases = [go_file.parent / base_pattern]
-            if repo_root:
-                candidate_bases.append(repo_root / base_pattern)
-            for base in candidate_bases:
-                try:
-                    embed_dir = base.resolve()
-                except (OSError, ValueError):
-                    continue
-                for changed_dir in changed_dirs:
-                    try:
-                        resolved = changed_dir.resolve()
-                        if resolved == embed_dir or resolved.is_relative_to(embed_dir):
-                            return True
-                    except (ValueError, OSError):
-                        continue
+            embed_dirs = _resolve_bases(match.group(1), go_file.parent, repo_root)
+            if _any_dir_matches(changed_dirs, embed_dirs):
+                return True
         return False
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
@@ -199,28 +224,26 @@ class GoEdgeBuilder(EdgeBuilder):
         edges: EdgeDict,
         repo_root: Path | None = None,
     ) -> None:
+        non_go_frags = [f for f in all_frags if not _is_go_file(f.path)]
         for gf in go_frags:
             for match in _GO_EMBED_RE.finditer(gf.content):
-                embed_pattern = match.group(1)
-                base_pattern = embed_pattern.split("*")[0].rstrip("/")
-                candidate_bases = [gf.path.parent / base_pattern]
-                if repo_root:
-                    candidate_bases.append(repo_root / base_pattern)
-                embed_dirs: list[Path] = []
-                for base in candidate_bases:
-                    try:
-                        embed_dirs.append(base.resolve())
-                    except (OSError, ValueError):
-                        pass
-                for frag in all_frags:
-                    if _is_go_file(frag.path):
-                        continue
-                    try:
-                        frag_resolved = frag.path.resolve()
-                        if any(frag_resolved.is_relative_to(ed) for ed in embed_dirs):
-                            self.add_edge(edges, gf.id, frag.id, self.weight * 0.8)
-                    except (ValueError, OSError):
-                        continue
+                embed_dirs = _resolve_bases(match.group(1), gf.path.parent, repo_root)
+                self._link_embed_targets(gf, non_go_frags, embed_dirs, edges)
+
+    def _link_embed_targets(
+        self,
+        gf: Fragment,
+        non_go_frags: list[Fragment],
+        embed_dirs: list[Path],
+        edges: EdgeDict,
+    ) -> None:
+        for frag in non_go_frags:
+            try:
+                frag_resolved = frag.path.resolve()
+                if any(frag_resolved.is_relative_to(ed) for ed in embed_dirs):
+                    self.add_edge(edges, gf.id, frag.id, self.weight * 0.8)
+            except (ValueError, OSError):
+                continue
 
     def _build_indices(
         self, go_frags: list[Fragment], repo_root: Path | None

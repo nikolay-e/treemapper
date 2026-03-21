@@ -16,7 +16,7 @@ _RUST_FN_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([a-z_
 _RUST_STRUCT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+([A-Z]\w*)", re.MULTILINE)
 _RUST_ENUM_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?enum\s+([A-Z]\w*)", re.MULTILINE)
 _RUST_TRAIT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?trait\s+([A-Z]\w*)", re.MULTILINE)
-_RUST_IMPL_RE = re.compile(r"^\s*impl(?:<[^<>]*(?:<[^<>]*>)*[^<>]*>)?\s+(?:\w+\s+for\s+)?([A-Z]\w*)", re.MULTILINE)
+_RUST_IMPL_RE = re.compile(r"^\s*impl(?:<[^>\n]*>)?\s+(?:\w+\s+for\s+)?([A-Z]\w*)", re.MULTILINE)
 _RUST_TYPE_ALIAS_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?type\s+([A-Z]\w*)", re.MULTILINE)
 
 _RUST_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")

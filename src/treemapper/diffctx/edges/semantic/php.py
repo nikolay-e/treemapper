@@ -10,8 +10,8 @@ from ..base import EdgeBuilder, EdgeDict, discover_files_by_refs
 
 _PHP_EXTS = {".php", ".phtml", ".php3", ".php4", ".php5", ".php7", ".phps"}
 
-_PHP_USE_RE = re.compile(r"^\s*use\s+([A-Z][a-zA-Z0-9_]*\\[a-zA-Z0-9_\\]*(?:\s+as\s+\w+)?)\s*;", re.MULTILINE)
-_PHP_NAMESPACE_RE = re.compile(r"^\s*namespace\s+([A-Z][a-zA-Z0-9_\\]*)\s*;", re.MULTILINE)
+_PHP_USE_RE = re.compile(r"^\s*use\s+([A-Z]\w*\\[\w\\]*(?:\s+as\s+\w+)?)\s*;", re.MULTILINE)
+_PHP_NAMESPACE_RE = re.compile(r"^\s*namespace\s+([A-Z][\w\\]*)\s*;", re.MULTILINE)
 _PHP_REQUIRE_RE = re.compile(r"^\s*(?:require|require_once|include|include_once)\s*\(?['\"]([^'\"]+)['\"]", re.MULTILINE)
 
 _PHP_CLASS_RE = re.compile(r"^\s*(?:abstract\s+)?(?:final\s+)?class\s+([A-Z]\w*)", re.MULTILINE)
