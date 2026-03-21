@@ -115,8 +115,7 @@ def split_diff_range(diff_range: str) -> tuple[str | None, str | None]:
 
 
 def get_untracked_files(repo_root: Path) -> list[Path]:
-    output = run_git(repo_root, ["ls-files", "--others", "--exclude-standard"])
-    return [repo_root / line.strip() for line in output.splitlines() if line.strip()]
+    return [repo_root / p for p in _run_git_z(repo_root, ["ls-files", "--others", "--exclude-standard", "-z"])]
 
 
 def get_deleted_files(repo_root: Path, diff_range: str) -> set[Path]:
