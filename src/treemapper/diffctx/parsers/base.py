@@ -12,8 +12,6 @@ MIN_FRAGMENT_LINES = _MIN_FRAGMENT_LINES
 _GENERIC_MAX_LINES = 200
 GENERIC_MAX_LINES = _GENERIC_MAX_LINES
 _GENERIC_MAX_EXTENSION = 100
-_MIN_FRAGMENT_WORDS = 10
-MIN_FRAGMENT_WORDS = _MIN_FRAGMENT_WORDS
 
 _BRACKET_PAIRS = {"{": "}", "[": "]", "(": ")"}
 
@@ -91,8 +89,7 @@ def _is_comment_or_blank(line: str) -> bool:
 
 
 def _is_top_level_close(line: str) -> bool:
-    stripped = line.strip()
-    return stripped == "}" or stripped == "};" or stripped.startswith("}")
+    return line.strip().startswith("}")
 
 
 def _find_first_balanced_point(lines: list[str], start_idx: int, target_end_idx: int) -> int | None:

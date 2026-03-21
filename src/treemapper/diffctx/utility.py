@@ -531,7 +531,7 @@ class UtilityState:
             r_cap=self.r_cap,
             changed_dirs=self.changed_dirs,
             proximity_decay=self.proximity_decay,
-            file_importance=self.file_importance,
+            file_importance=dict(self.file_importance),
         )
 
 

@@ -46,6 +46,28 @@ _GO_KEYWORDS = frozenset(
     }
 )
 _GO_TYPE_REF_RE = re.compile(r"\*?([A-Z]\w*)\b")
+_GO_COMMON_TYPES = frozenset(
+    {
+        "Bool",
+        "String",
+        "Error",
+        "Reader",
+        "Writer",
+        "Handler",
+        "Server",
+        "Client",
+        "Request",
+        "Response",
+        "Context",
+        "Logger",
+        "Config",
+        "Options",
+        "Result",
+        "Status",
+        "Mutex",
+        "Group",
+    }
+)
 _GO_PKG_CALL_RE = re.compile(r"\b(\w+)\.([A-Z]\w*)")
 _GO_EMBED_RE = re.compile(r"//go:embed\s+(\S+)", re.MULTILINE)
 _GO_PKG_DECL_RE = re.compile(r"^package\s+(\w+)", re.MULTILINE)
@@ -73,7 +95,9 @@ def _extract_definitions(content: str) -> tuple[set[str], set[str]]:
 
 def _extract_references(content: str) -> tuple[set[str], set[str], set[tuple[str, str]]]:
     func_calls = {m.group(1) for m in _GO_FUNC_CALL_RE.finditer(content) if m.group(1) not in _GO_KEYWORDS}
-    type_refs = {m.group(1) for m in _GO_TYPE_REF_RE.finditer(content) if m.group(1)[0].isupper()}
+    type_refs = {
+        m.group(1) for m in _GO_TYPE_REF_RE.finditer(content) if m.group(1)[0].isupper() and m.group(1) not in _GO_COMMON_TYPES
+    }
     pkg_calls = {(m.group(1), m.group(2)) for m in _GO_PKG_CALL_RE.finditer(content)}
     return func_calls, type_refs, pkg_calls
 

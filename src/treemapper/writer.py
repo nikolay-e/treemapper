@@ -13,7 +13,7 @@ from .languages import get_language_for_file
 
 logger = logging.getLogger(__name__)
 
-YAML_PROBLEMATIC_CHARS = frozenset({"\r", "\x00", "\x85", "\u2028", "\u2029"})
+_YAML_PROBLEMATIC_RE = re.compile(r"[\r\x00\x85\u2028\u2029]")
 
 _YAML_STRING_ESCAPE_PATTERN = re.compile(r'[\\"\n\r\x00\x85\u2028\u2029]')
 _YAML_STRING_ESCAPE_MAP = {
@@ -64,7 +64,7 @@ def _escape_yaml_content(s: str) -> str:
 
 
 def _has_problematic_chars(s: str) -> bool:
-    return any(c in YAML_PROBLEMATIC_CHARS for c in s)
+    return _YAML_PROBLEMATIC_RE.search(s) is not None
 
 
 def _escape_markdown(s: str) -> str:

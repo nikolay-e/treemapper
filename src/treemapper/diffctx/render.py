@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -73,12 +74,9 @@ def _get_relative_path(frag: Fragment, repo_root: Path) -> Path:
 
 
 def _group_by_path(selected: list[Fragment], repo_root: Path) -> dict[Path, list[Fragment]]:
-    by_path: dict[Path, list[Fragment]] = {}
+    by_path: dict[Path, list[Fragment]] = defaultdict(list)
     for frag in selected:
-        rel_path = _get_relative_path(frag, repo_root)
-        if rel_path not in by_path:
-            by_path[rel_path] = []
-        by_path[rel_path].append(frag)
+        by_path[_get_relative_path(frag, repo_root)].append(frag)
     return by_path
 
 

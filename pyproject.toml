@@ -62,7 +62,6 @@ optional-dependencies.dev = [
   "coverage>=7.0,<8.0",
   "hypothesis>=6.0,<7.0",
   "import-linter>=2.0,<3.0",
-  "isort>=5.12,<9.0",
   "lxml>=5.0,<7.0",
   "mistune>=3.0,<4.0",
   "mutmut>=3.5,<4.0",
@@ -131,10 +130,6 @@ lint.select = [ "C901", "E", "F", "I", "N", "RUF", "UP", "W" ]
 lint.ignore = [ "E501" ]  # Line length handled by black
 lint.per-file-ignores."whitelist_vulture.py" = [ "F401", "F821" ]
 lint.mccabe.max-complexity = 15
-
-[tool.isort]
-profile = "black"
-line_length = 130
 
 [tool.pyproject-fmt]
 column_width = 130

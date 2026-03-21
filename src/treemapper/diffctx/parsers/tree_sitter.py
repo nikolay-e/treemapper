@@ -8,8 +8,6 @@ from ..languages import TREE_SITTER_LANGUAGES
 from ..types import Fragment, FragmentId, extract_identifiers
 from .base import MIN_FRAGMENT_LINES, create_code_gap_fragments, create_snippet
 
-_TREE_SITTER_LANGS = TREE_SITTER_LANGUAGES
-
 _DEFINITION_NODE_TYPES = {
     "python": {"function_definition", "class_definition", "decorated_definition"},
     "javascript": {"function_declaration", "class_declaration", "method_definition", "arrow_function", "variable_declarator"},
@@ -144,11 +142,11 @@ class TreeSitterStrategy:
 
     def can_handle(self, path: Path, _content: str) -> bool:
         suffix = path.suffix.lower()
-        return suffix in _TREE_SITTER_LANGS
+        return suffix in TREE_SITTER_LANGUAGES
 
     def fragment(self, path: Path, content: str) -> list[Fragment]:
         suffix = path.suffix.lower()
-        lang = _TREE_SITTER_LANGS[suffix]
+        lang = TREE_SITTER_LANGUAGES[suffix]
         parser = self._get_parser(lang)
 
         code_bytes = content.encode("utf-8")
@@ -164,7 +162,7 @@ class TreeSitterStrategy:
         gap_frags = create_code_gap_fragments(path, lines, list(covered))
         fragments.extend(gap_frags)
 
-        return fragments if fragments else []
+        return fragments
 
     def _extract_definitions(
         self,
