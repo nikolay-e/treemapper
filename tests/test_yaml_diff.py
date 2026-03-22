@@ -25,7 +25,9 @@ MIN_INDIVIDUAL_SCORE = 10.0
 
 
 @pytest.mark.parametrize("case", ALL_CASES, ids=lambda c: c.id)
-def test_diff_yaml(yaml_test_runner: YamlTestRunner, case: YamlTestCase, record_property):
+def test_diff_yaml(yaml_test_runner: YamlTestRunner, case: YamlTestCase, record_property, request):
+    if case.xfail:
+        request.node.add_marker(pytest.mark.xfail(reason=case.xfail, strict=True))
     context = yaml_test_runner.run_test_case(case)
     breakdown = yaml_test_runner.score_test_case(context, case)
 
@@ -38,9 +40,8 @@ def test_diff_yaml(yaml_test_runner: YamlTestRunner, case: YamlTestCase, record_
     record_property("diff_tokens", breakdown.diff_tokens)
     record_property("context_tokens", breakdown.context_tokens)
 
-    assert (
-        breakdown.score >= MIN_INDIVIDUAL_SCORE
-    ), f"[{case.id}] score {breakdown.score:.1f}% below minimum {MIN_INDIVIDUAL_SCORE}%"
+    effective_min = case.min_score if case.min_score is not None else MIN_INDIVIDUAL_SCORE
+    assert breakdown.score >= effective_min, f"[{case.id}] score {breakdown.score:.1f}% below minimum {effective_min}%"
     if case.must_include_files:
         assert breakdown.diff_covered, f"[{case.id}] diff lines not covered by context"
 

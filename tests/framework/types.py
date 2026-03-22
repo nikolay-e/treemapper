@@ -29,6 +29,8 @@ class YamlTestCase:
     min_budget: int | None = None
     add_garbage_files: bool = True
     skip_garbage_check: bool = False
+    xfail: str | None = None
+    min_score: float | None = None
     source_file: Path | None = None
 
     def calculate_budget(self) -> int:

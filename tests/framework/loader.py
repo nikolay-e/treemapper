@@ -78,6 +78,8 @@ def _parse_yaml_test(data: dict, source_file: Path | None = None) -> YamlTestCas
         min_budget=options.get("min_budget", data.get("min_budget")),
         add_garbage_files=options.get("add_garbage", data.get("add_garbage_files", True)),
         skip_garbage_check=options.get("skip_garbage_check", data.get("skip_garbage_check", False)),
+        xfail=data.get("xfail"),
+        min_score=options.get("min_score", data.get("min_score")),
         source_file=source_file,
     )
 
