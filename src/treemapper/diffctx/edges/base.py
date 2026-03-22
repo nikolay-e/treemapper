@@ -244,6 +244,21 @@ class EdgeBuilder(ABC):
                     if fid != src_id:
                         self.add_edge(edges, src_id, fid, w)
 
+    def link_by_stem(
+        self,
+        src_id: FragmentId,
+        ref_name: str,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+        weight: float,
+    ) -> None:
+        ref_no_slash = ref_name.replace("/", "")
+        ref_base = ref_name.split(".")[0] if "." in ref_name else ""
+        for name, frag_ids in idx.by_name.items():
+            stem = name.split(".")[0]
+            if stem == ref_name or stem == ref_no_slash or (ref_base and stem == ref_base):
+                self.add_edges_from_ids(src_id, frag_ids, weight, edges)
+
     @staticmethod
     def index_paths_for_fragment(
         f: Fragment,

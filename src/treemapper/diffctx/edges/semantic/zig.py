@@ -254,7 +254,7 @@ class ZigEdgeBuilder(EdgeBuilder):
         imports = _extract_imports(zf.content)
         for imp in imports:
             ref_name = _import_to_name(imp)
-            self._link_by_name(zf.id, ref_name, idx, edges)
+            self.link_by_stem(zf.id, ref_name, idx, edges, self.import_weight)
             self.link_by_path_match(zf.id, imp, idx, edges, self.import_weight)
 
         type_refs, func_calls = _extract_references(zf.content)
@@ -273,11 +273,3 @@ class ZigEdgeBuilder(EdgeBuilder):
                 for fid in fn_defs.get(func_call.lower(), []):
                     if fid != zf.id:
                         self.add_edge(edges, zf.id, fid, self.fn_weight)
-
-    def _link_by_name(self, src_id: FragmentId, ref_name: str, idx: FragmentIndex, edges: EdgeDict) -> None:
-        for name, frag_ids in idx.by_name.items():
-            stem = name.split(".")[0]
-            if stem == ref_name:
-                for fid in frag_ids:
-                    if fid != src_id:
-                        self.add_edge(edges, src_id, fid, self.import_weight)

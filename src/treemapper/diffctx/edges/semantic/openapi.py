@@ -26,18 +26,31 @@ _COMPONENTS_SECTION_RE = re.compile(r"^\s{0,4}components\s*:", re.MULTILINE)
 _SCHEMAS_SECTION_RE = re.compile(r"^\s{2,6}schemas\s*:", re.MULTILINE)
 
 
+_openapi_file_cache: dict[Path, bool] = {}
+
+
 def _is_openapi_file(path: Path) -> bool:
+    resolved = path.resolve()
+    cached = _openapi_file_cache.get(resolved)
+    if cached is not None:
+        return cached
+
     if path.suffix.lower() not in _OPENAPI_EXTS:
+        _openapi_file_cache[resolved] = False
         return False
     name_lower = path.name.lower()
     openapi_name_hints = ("openapi", "swagger", "api-spec", "api_spec", "apispec")
     if any(hint in name_lower for hint in openapi_name_hints):
+        _openapi_file_cache[resolved] = True
         return True
     try:
-        content = path.read_text(encoding="utf-8")
-        return bool(_OPENAPI_MARKER_RE.search(content[:2000]))
+        with open(path, encoding="utf-8") as fh:
+            head = fh.read(2048)
+        result = bool(_OPENAPI_MARKER_RE.search(head))
     except (OSError, UnicodeDecodeError):
-        return False
+        result = False
+    _openapi_file_cache[resolved] = result
+    return result
 
 
 def _is_openapi_content(content: str) -> bool:

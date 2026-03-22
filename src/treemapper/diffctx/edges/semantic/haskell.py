@@ -275,7 +275,7 @@ class HaskellEdgeBuilder(EdgeBuilder):
 
     def _add_import_edges(self, hf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
         for module in _extract_imports(hf.content):
-            self._link_by_name(hf.id, _module_leaf(module), idx, edges)
+            self.link_by_stem(hf.id, _module_leaf(module), idx, edges, self.import_weight)
             self.link_by_path_match(hf.id, _module_to_path(module), idx, edges, self.import_weight)
 
     def _add_instance_edges(
@@ -324,11 +324,3 @@ class HaskellEdgeBuilder(EdgeBuilder):
                 for fid in fn_defs.get(func_ref.lower(), []):
                     if fid != hf.id:
                         self.add_edge(edges, hf.id, fid, self.fn_weight)
-
-    def _link_by_name(self, src_id: FragmentId, ref_name: str, idx: FragmentIndex, edges: EdgeDict) -> None:
-        for name, frag_ids in idx.by_name.items():
-            stem = name.split(".")[0]
-            if stem == ref_name:
-                for fid in frag_ids:
-                    if fid != src_id:
-                        self.add_edge(edges, src_id, fid, self.import_weight)

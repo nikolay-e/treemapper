@@ -306,13 +306,13 @@ class JuliaEdgeBuilder(EdgeBuilder):
 
         for module in usings:
             leaf = _module_leaf(module)
-            self._link_by_name(jf.id, leaf, idx, edges, self.using_weight)
+            self.link_by_stem(jf.id, leaf, idx, edges, self.using_weight)
             path_ref = _module_to_path(module)
             self.link_by_path_match(jf.id, path_ref, idx, edges, self.using_weight)
 
         for inc in includes:
             inc_name = Path(inc).stem.lower()
-            self._link_by_name(jf.id, inc_name, idx, edges, self.include_weight)
+            self.link_by_stem(jf.id, inc_name, idx, edges, self.include_weight)
             self.link_by_path_match(jf.id, inc, idx, edges, self.include_weight)
 
         supertypes = _extract_supertypes(jf.content)
@@ -337,11 +337,3 @@ class JuliaEdgeBuilder(EdgeBuilder):
                 for fid in fn_defs.get(func_call.lower(), []):
                     if fid != jf.id:
                         self.add_edge(edges, jf.id, fid, self.fn_weight)
-
-    def _link_by_name(self, src_id: FragmentId, ref_name: str, idx: FragmentIndex, edges: EdgeDict, weight: float) -> None:
-        for name, frag_ids in idx.by_name.items():
-            stem = name.split(".")[0]
-            if stem == ref_name:
-                for fid in frag_ids:
-                    if fid != src_id:
-                        self.add_edge(edges, src_id, fid, weight)

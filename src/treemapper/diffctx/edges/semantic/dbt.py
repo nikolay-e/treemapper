@@ -15,7 +15,6 @@ _SOURCE_RE = re.compile(r"""\{\{\s*source\(\s*['"]([^'"]{1,200})['"]\s*,\s*['"](
 _MACRO_CALL_RE = re.compile(r"""\{\{\s*([a-zA-Z_]\w{0,200})\s*\(""")
 _MACRO_DEF_RE = re.compile(r"""\{%[-\s]*macro\s+([a-zA-Z_]\w{0,200})\s*\(""")
 _SCHEMA_MODEL_NAME_RE = re.compile(r"^\s*-\s*name:\s*(\w{1,200})", re.MULTILINE)
-_SOURCE_TABLE_NAME_RE = re.compile(r"^\s*-\s*name:\s*(\w{1,200})", re.MULTILINE)
 
 _DBT_JINJA_BUILTINS = frozenset(
     {
@@ -128,19 +127,28 @@ def _extract_schema_model_names(content: str) -> set[str]:
 def _extract_source_table_names(content: str) -> set[str]:
     in_sources = False
     in_tables = False
+    tables_indent = 0
     tables: set[str] = set()
     for line in content.splitlines():
         stripped = line.strip()
+        if not stripped:
+            continue
+        indent = len(line) - len(line.lstrip())
         if stripped.startswith("sources:"):
             in_sources = True
+            in_tables = False
             continue
         if in_sources and stripped.startswith("tables:"):
             in_tables = True
+            tables_indent = indent
             continue
         if in_tables:
-            m = _SOURCE_TABLE_NAME_RE.match(line)
-            if m:
-                tables.add(m.group(1))
+            if indent <= tables_indent:
+                in_tables = False
+            else:
+                m = _SCHEMA_MODEL_NAME_RE.match(line)
+                if m:
+                    tables.add(m.group(1))
     return tables
 
 

@@ -254,11 +254,11 @@ class RLangEdgeBuilder(EdgeBuilder):
 
         for src in sources:
             src_name = src.split("/")[-1].lower()
-            self._link_by_name(rf.id, src_name, idx, edges, self.source_weight)
+            self.link_by_stem(rf.id, src_name, idx, edges, self.source_weight)
             self.link_by_path_match(rf.id, src, idx, edges, self.source_weight)
 
         for lib in libraries:
-            self._link_by_name(rf.id, lib.lower(), idx, edges, self.library_weight)
+            self.link_by_stem(rf.id, lib.lower(), idx, edges, self.library_weight)
 
         inheritance = _extract_inheritance(rf.content)
         for parent in inheritance:
@@ -275,12 +275,3 @@ class RLangEdgeBuilder(EdgeBuilder):
                 for fid in fn_defs.get(func_call.lower(), []):
                     if fid != rf.id:
                         self.add_edge(edges, rf.id, fid, self.fn_weight)
-
-    def _link_by_name(self, src_id: FragmentId, ref_name: str, idx: FragmentIndex, edges: EdgeDict, weight: float) -> None:
-        ref_base = ref_name.split(".")[0] if ref_name else ""
-        for name, frag_ids in idx.by_name.items():
-            stem = name.split(".")[0]
-            if stem == ref_name or stem == ref_base:
-                for fid in frag_ids:
-                    if fid != src_id:
-                        self.add_edge(edges, src_id, fid, weight)

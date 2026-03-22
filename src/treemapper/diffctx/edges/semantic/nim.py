@@ -12,7 +12,7 @@ _NIM_EXTS = {".nim", ".nims"}
 
 _NIM_IMPORT_RE = re.compile(r"^\s*import\s+([\w/]+)", re.MULTILINE)
 _NIM_FROM_IMPORT_RE = re.compile(r"^\s*from\s+([\w/]+)\s+import", re.MULTILINE)
-_NIM_INCLUDE_RE = re.compile(r'^\s*include\s+["\']([^"\']{1,300})["\']', re.MULTILINE)
+_NIM_INCLUDE_RE = re.compile(r"^\s*include\s+([\w/]+)", re.MULTILINE)
 
 _PROC_RE = re.compile(
     r"^\s*(?:proc|func|method|iterator|converter|template|macro)\s+([a-zA-Z_]\w*)\s*[\*]?\s*[\(\[]",
@@ -155,7 +155,7 @@ _NIM_COMMON_TYPES = frozenset(
 
 _DIFF_IMPORT_RE = re.compile(r"^\+\s*import\s+([\w/]+)", re.MULTILINE)
 _DIFF_FROM_IMPORT_RE = re.compile(r"^\+\s*from\s+([\w/]+)\s+import", re.MULTILINE)
-_DIFF_INCLUDE_RE = re.compile(r"""^\+\s*include\s+['"]([\w/]+)['"]""", re.MULTILINE)
+_DIFF_INCLUDE_RE = re.compile(r"^\+\s*include\s+([\w/]+)", re.MULTILINE)
 
 
 def _is_nim_file(path: Path) -> bool:
@@ -287,7 +287,7 @@ class NimEdgeBuilder(EdgeBuilder):
         refs = _extract_refs(nf.content)
         for ref in refs:
             ref_name = ref.split("/")[-1].lower()
-            self._link_by_name(nf.id, ref_name, idx, edges)
+            self.link_by_stem(nf.id, ref_name, idx, edges, self.import_weight)
             self.link_by_path_match(nf.id, ref, idx, edges, self.import_weight)
 
         inheritance = _extract_inheritance(nf.content)
@@ -312,11 +312,3 @@ class NimEdgeBuilder(EdgeBuilder):
                 for fid in fn_defs.get(func_call.lower(), []):
                     if fid != nf.id:
                         self.add_edge(edges, nf.id, fid, self.fn_weight)
-
-    def _link_by_name(self, src_id: FragmentId, ref_name: str, idx: FragmentIndex, edges: EdgeDict) -> None:
-        for name, frag_ids in idx.by_name.items():
-            stem = name.split(".")[0]
-            if stem == ref_name or stem == ref_name.replace("/", ""):
-                for fid in frag_ids:
-                    if fid != src_id:
-                        self.add_edge(edges, src_id, fid, self.import_weight)

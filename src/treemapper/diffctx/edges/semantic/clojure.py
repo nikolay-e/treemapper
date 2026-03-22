@@ -244,7 +244,7 @@ class ClojureEdgeBuilder(EdgeBuilder):
         requires = _extract_requires(cf.content)
         for ns in requires:
             leaf = _namespace_leaf(ns)
-            self._link_by_name(cf.id, leaf, idx, edges)
+            self.link_by_stem(cf.id, leaf, idx, edges, self.require_weight)
             path_ref = _namespace_to_path(ns)
             self.link_by_path_match(cf.id, path_ref, idx, edges, self.require_weight)
 
@@ -273,12 +273,4 @@ class ClojureEdgeBuilder(EdgeBuilder):
 
         for ns in qualified_ns:
             leaf = _namespace_leaf(ns)
-            self._link_by_name(cf.id, leaf, idx, edges)
-
-    def _link_by_name(self, src_id: FragmentId, ref_name: str, idx: FragmentIndex, edges: EdgeDict) -> None:
-        for name, frag_ids in idx.by_name.items():
-            stem = name.split(".")[0]
-            if stem == ref_name:
-                for fid in frag_ids:
-                    if fid != src_id:
-                        self.add_edge(edges, src_id, fid, self.require_weight)
+            self.link_by_stem(cf.id, leaf, idx, edges, self.require_weight)

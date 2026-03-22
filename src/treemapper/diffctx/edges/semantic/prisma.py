@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ...config.weights import EDGE_WEIGHTS
 from ...types import Fragment, FragmentId
-from ..base import EdgeBuilder, EdgeDict, FragmentIndex, discover_files_by_refs
+from ..base import EdgeBuilder, EdgeDict, discover_files_by_refs
 
 _PRISMA_EXTS = {".prisma"}
 _CLIENT_EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs"}
@@ -183,7 +183,6 @@ class PrismaEdgeBuilder(EdgeBuilder):
             return {}
 
         edges: EdgeDict = {}
-        FragmentIndex(fragments, repo_root)
 
         model_index = self._build_model_index(prisma_frags)
 
