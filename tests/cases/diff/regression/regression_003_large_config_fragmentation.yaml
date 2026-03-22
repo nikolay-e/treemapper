@@ -157,4 +157,5 @@ assertions:
 options:
   max_fragments: 8
   max_files: 3
+  max_fragments_per_file: 3
   min_score: 90
