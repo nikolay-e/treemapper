@@ -15,7 +15,7 @@ _INCLUDE_VARS_RE = re.compile(
     re.MULTILINE,
 )
 _INCLUDE_TASKS_RE = re.compile(
-    r"^\s*(?:include_tasks|import_tasks|include_role|import_role|import_playbook)" r"\s*:\s*[\"']?([^\s\"']{1,300})[\"']?",
+    r"^\s*(?:include_tasks|import_tasks|include_role|import_role|import_playbook)\s*:\s*[\"']?([^\s\"']{1,300})[\"']?",
     re.MULTILINE,
 )
 _TEMPLATE_SRC_RE = re.compile(
@@ -65,6 +65,10 @@ def _extract_refs(content: str, file_path: Path) -> set[str]:
     return refs
 
 
+def _is_roles_block_terminator(stripped: str) -> bool:
+    return bool(stripped) and not stripped.startswith("#") and not stripped.startswith("-") and ":" in stripped
+
+
 def _extract_role_refs(content: str) -> set[str]:
     roles: set[str] = set()
     in_roles_block = False
@@ -73,14 +77,14 @@ def _extract_role_refs(content: str) -> set[str]:
         if stripped.startswith("roles:"):
             in_roles_block = True
             continue
-        if in_roles_block:
-            if stripped.startswith("- "):
-                m = _ROLES_LIST_RE.match(line)
-                if m:
-                    roles.add(m.group(1))
-            elif stripped and not stripped.startswith("#"):
-                if not stripped.startswith("-") and ":" in stripped:
-                    in_roles_block = False
+        if not in_roles_block:
+            continue
+        if stripped.startswith("- "):
+            m = _ROLES_LIST_RE.match(line)
+            if m:
+                roles.add(m.group(1))
+        elif _is_roles_block_terminator(stripped):
+            in_roles_block = False
     return roles
 
 
@@ -132,6 +136,34 @@ class AnsibleEdgeBuilder(EdgeBuilder):
 
         return discover_files_by_refs(refs, changed_files, all_candidate_files, repo_root)
 
+    def _scan_group_host_vars_refs(
+        self,
+        f: Path,
+        all_candidate_files: list[Path],
+        refs: set[str],
+    ) -> None:
+        fname = f.name
+        fstr = str(f)
+        for candidate in all_candidate_files:
+            try:
+                content = candidate.read_text(encoding="utf-8")
+                if fname in content or fstr in content:
+                    refs.add(candidate.name.lower())
+            except (OSError, UnicodeDecodeError):
+                continue
+
+    def _scan_vars_file_refs(self, f: Path, refs: set[str]) -> None:
+        try:
+            content = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return
+        if "vars_files:" not in content and "include_vars" not in content:
+            return
+        for m in _VARS_FILES_LIST_RE.finditer(content):
+            refs.add(m.group(1))
+        for m in _INCLUDE_VARS_RE.finditer(content):
+            refs.add(m.group(1))
+
     def _add_group_vars_refs(
         self,
         ansible_changed: list[Path],
@@ -142,23 +174,8 @@ class AnsibleEdgeBuilder(EdgeBuilder):
         for f in ansible_changed:
             rel = str(f)
             if "group_vars/" in rel or "host_vars/" in rel:
-                for candidate in all_candidate_files:
-                    try:
-                        content = candidate.read_text(encoding="utf-8")
-                        fname = f.name
-                        if fname in content or str(f) in content:
-                            refs.add(candidate.name.lower())
-                    except (OSError, UnicodeDecodeError):
-                        continue
-            try:
-                content = f.read_text(encoding="utf-8")
-                if "vars_files:" in content or "include_vars" in content:
-                    for m in _VARS_FILES_LIST_RE.finditer(content):
-                        refs.add(m.group(1))
-                    for m in _INCLUDE_VARS_RE.finditer(content):
-                        refs.add(m.group(1))
-            except (OSError, UnicodeDecodeError):
-                continue
+                self._scan_group_host_vars_refs(f, all_candidate_files, refs)
+            self._scan_vars_file_refs(f, refs)
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         ansible_frags = [f for f in fragments if _is_ansible_file(f.path)]
@@ -194,7 +211,7 @@ class AnsibleEdgeBuilder(EdgeBuilder):
                 role_frags.setdefault(role, []).append(f)
 
         sibling_weight = self.weight * 0.6
-        for _, frags in role_frags.items():
+        for frags in role_frags.values():
             for i, f1 in enumerate(frags):
                 for f2 in frags[i + 1 :]:
                     self.add_edge(edges, f1.id, f2.id, sibling_weight)

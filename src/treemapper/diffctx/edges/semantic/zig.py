@@ -24,11 +24,11 @@ _ZIG_STD_MODULES = frozenset(
 
 _FN_DEF_RE = re.compile(r"^\s*(?:pub\s+|export\s+)?fn\s+([a-zA-Z_]\w*)\s*\(", re.MULTILINE)
 _STRUCT_RE = re.compile(
-    r"^\s*(?:pub\s+|export\s+)?const\s+([A-Z]\w*)\s*=\s*(?:extern\s+|packed\s+)?struct\b",
+    r"^\s*(?:(?:pub|export)\s+)?const\s+([A-Z]\w*)\s*=\s*(?:(?:extern|packed)\s+)?struct\b",
     re.MULTILINE,
 )
 _UNION_RE = re.compile(
-    r"^\s*(?:pub\s+|export\s+)?const\s+([A-Z]\w*)\s*=\s*(?:extern\s+|packed\s+)?union\b",
+    r"^\s*(?:(?:pub|export)\s+)?const\s+([A-Z]\w*)\s*=\s*(?:(?:extern|packed)\s+)?union\b",
     re.MULTILINE,
 )
 _ENUM_RE = re.compile(
@@ -243,6 +243,21 @@ class ZigEdgeBuilder(EdgeBuilder):
 
         return type_defs, fn_defs
 
+    def _link_symbol_edges(
+        self,
+        frag_id: FragmentId,
+        symbols: set[str],
+        self_symbols: set[str],
+        defs: dict[str, list[FragmentId]],
+        weight: float,
+        edges: EdgeDict,
+    ) -> None:
+        for sym in symbols:
+            if sym.lower() not in self_symbols:
+                for fid in defs.get(sym.lower(), []):
+                    if fid != frag_id:
+                        self.add_edge(edges, frag_id, fid, weight)
+
     def _add_fragment_edges(
         self,
         zf: Fragment,
@@ -262,14 +277,5 @@ class ZigEdgeBuilder(EdgeBuilder):
         self_type_lower = {t.lower() for t in self_types}
         self_fn_lower = {fn.lower() for fn in self_funcs}
 
-        for type_ref in type_refs:
-            if type_ref.lower() not in self_type_lower:
-                for fid in type_defs.get(type_ref.lower(), []):
-                    if fid != zf.id:
-                        self.add_edge(edges, zf.id, fid, self.type_weight)
-
-        for func_call in func_calls:
-            if func_call.lower() not in self_fn_lower:
-                for fid in fn_defs.get(func_call.lower(), []):
-                    if fid != zf.id:
-                        self.add_edge(edges, zf.id, fid, self.fn_weight)
+        self._link_symbol_edges(zf.id, type_refs, self_type_lower, type_defs, self.type_weight, edges)
+        self._link_symbol_edges(zf.id, func_calls, self_fn_lower, fn_defs, self.fn_weight, edges)

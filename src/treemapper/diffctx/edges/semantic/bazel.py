@@ -101,28 +101,31 @@ class BazelEdgeBuilder(EdgeBuilder):
 
         refs: set[str] = set()
         for f in bazel_changed:
-            try:
-                content = f.read_text(encoding="utf-8")
-                for label in _extract_labels(content):
-                    path = _label_to_path(label)
-                    if path:
-                        refs.add(path)
-                        refs.add(f"{path}/BUILD")
-                        refs.add(f"{path}/BUILD.bazel")
-                for load in _extract_loads(content):
-                    path = _label_to_path(load)
-                    if path:
-                        refs.add(path)
-                    refs.add(_ref_to_filename(load))
-                for src in _extract_srcs(content):
-                    refs.add(src)
-                    refs.add(str(f.parent / src))
-            except (OSError, UnicodeDecodeError):
-                continue
+            self._collect_refs_from_file(f, refs)
 
         self._discover_reverse_load_refs(bazel_changed, all_candidate_files, refs)
 
         return discover_files_by_refs(refs, changed_files, all_candidate_files, repo_root)
+
+    def _collect_refs_from_file(self, f: Path, refs: set[str]) -> None:
+        try:
+            content = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return
+        for label in _extract_labels(content):
+            path = _label_to_path(label)
+            if path:
+                refs.add(path)
+                refs.add(f"{path}/BUILD")
+                refs.add(f"{path}/BUILD.bazel")
+        for load in _extract_loads(content):
+            path = _label_to_path(load)
+            if path:
+                refs.add(path)
+            refs.add(_ref_to_filename(load))
+        for src in _extract_srcs(content):
+            refs.add(src)
+            refs.add(str(f.parent / src))
 
     def _discover_reverse_load_refs(
         self,
@@ -131,26 +134,37 @@ class BazelEdgeBuilder(EdgeBuilder):
         refs: set[str],
     ) -> None:
         changed_names = {f.name.lower() for f in bazel_changed}
-        changed_paths = set()
-        for f in bazel_changed:
-            changed_paths.add(str(f))
-            if f.suffix == ".bzl":
-                changed_paths.add(f.stem)
+        changed_paths = self._build_changed_paths(bazel_changed)
 
         for candidate in all_candidate_files:
             if not _is_bazel_file(candidate):
                 continue
-            try:
-                content = candidate.read_text(encoding="utf-8")
-                for load in _extract_loads(content):
-                    load_file = _ref_to_filename(load)
-                    if load_file in changed_names:
-                        refs.add(candidate.name.lower())
-                    for cp in changed_paths:
-                        if cp in load:
-                            refs.add(candidate.name.lower())
-            except (OSError, UnicodeDecodeError):
-                continue
+            self._check_candidate_loads(candidate, changed_names, changed_paths, refs)
+
+    @staticmethod
+    def _build_changed_paths(bazel_changed: list[Path]) -> set[str]:
+        changed_paths: set[str] = set()
+        for f in bazel_changed:
+            changed_paths.add(str(f))
+            if f.suffix == ".bzl":
+                changed_paths.add(f.stem)
+        return changed_paths
+
+    @staticmethod
+    def _check_candidate_loads(
+        candidate: Path,
+        changed_names: set[str],
+        changed_paths: set[str],
+        refs: set[str],
+    ) -> None:
+        try:
+            content = candidate.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return
+        for load in _extract_loads(content):
+            load_file = _ref_to_filename(load)
+            if load_file in changed_names or any(cp in load for cp in changed_paths):
+                refs.add(candidate.name.lower())
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         bazel_frags = [f for f in fragments if _is_bazel_file(f.path)]
@@ -226,14 +240,31 @@ class BazelEdgeBuilder(EdgeBuilder):
         all_fragments: list[Fragment],
     ) -> None:
         src_lower = src.lower()
-        for name, frag_ids in idx.by_name.items():
-            if name == src_lower:
-                for fid in frag_ids:
-                    if fid != src_id:
-                        for frag in all_fragments:
-                            if frag.id == fid and frag.path.parent == build_path.parent:
-                                self.add_edge(edges, src_id, fid, self.srcs_weight)
-                                return
-
+        if self._try_link_src_by_name(src_id, src_lower, build_path, idx, edges, all_fragments):
+            return
         rel_path = str(build_path.parent / src)
         self.link_by_path_match(src_id, rel_path, idx, edges, self.srcs_weight)
+
+    def _try_link_src_by_name(
+        self,
+        src_id: FragmentId,
+        src_lower: str,
+        build_path: Path,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+        all_fragments: list[Fragment],
+    ) -> bool:
+        frag_ids = idx.by_name.get(src_lower)
+        if not frag_ids:
+            return False
+        for fid in frag_ids:
+            if fid == src_id:
+                continue
+            if self._is_sibling_fragment(fid, build_path, all_fragments):
+                self.add_edge(edges, src_id, fid, self.srcs_weight)
+                return True
+        return False
+
+    @staticmethod
+    def _is_sibling_fragment(fid: FragmentId, build_path: Path, all_fragments: list[Fragment]) -> bool:
+        return any(frag.id == fid and frag.path.parent == build_path.parent for frag in all_fragments)

@@ -251,6 +251,58 @@ class DartEdgeBuilder(EdgeBuilder):
 
         return type_defs, fn_defs
 
+    def _link_imports_exports_parts(
+        self,
+        df: Fragment,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+    ) -> None:
+        imports, exports, parts = _extract_refs(df.content)
+        for ref in imports:
+            self._link_ref(df.id, ref, idx, edges, self.import_weight)
+        for ref in exports:
+            self._link_ref(df.id, ref, idx, edges, self.export_weight)
+        for ref in parts:
+            self._link_ref(df.id, ref, idx, edges, self.import_weight)
+
+    def _link_inheritance(
+        self,
+        df: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for parent in _extract_inheritance(df.content):
+            for fid in type_defs.get(parent.lower(), []):
+                if fid != df.id:
+                    self.add_edge(edges, df.id, fid, self.inheritance_weight)
+
+    def _link_type_refs(
+        self,
+        df: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        self_type_lower: set[str],
+        edges: EdgeDict,
+    ) -> None:
+        type_refs, _ = _extract_references(df.content)
+        for type_ref in type_refs:
+            if type_ref.lower() in self_type_lower:
+                continue
+            for fid in type_defs.get(type_ref.lower(), []):
+                if fid != df.id:
+                    self.add_edge(edges, df.id, fid, self.type_weight)
+
+    def _link_fn_calls(
+        self,
+        df: Fragment,
+        fn_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        _, func_calls = _extract_references(df.content)
+        for func_call in func_calls:
+            for fid in fn_defs.get(func_call.lower(), []):
+                if fid != df.id:
+                    self.add_edge(edges, df.id, fid, self.fn_weight)
+
     def _add_fragment_edges(
         self,
         df: Fragment,
@@ -259,35 +311,14 @@ class DartEdgeBuilder(EdgeBuilder):
         fn_defs: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        imports, exports, parts = _extract_refs(df.content)
+        self._link_imports_exports_parts(df, idx, edges)
+        self._link_inheritance(df, type_defs, edges)
 
-        for ref in imports:
-            self._link_ref(df.id, ref, idx, edges, self.import_weight)
-        for ref in exports:
-            self._link_ref(df.id, ref, idx, edges, self.export_weight)
-        for ref in parts:
-            self._link_ref(df.id, ref, idx, edges, self.import_weight)
-
-        inheritance = _extract_inheritance(df.content)
-        for parent in inheritance:
-            for fid in type_defs.get(parent.lower(), []):
-                if fid != df.id:
-                    self.add_edge(edges, df.id, fid, self.inheritance_weight)
-
-        type_refs, func_calls = _extract_references(df.content)
         _, self_types = _extract_definitions(df.content)
         self_type_lower = {t.lower() for t in self_types}
 
-        for type_ref in type_refs:
-            if type_ref.lower() not in self_type_lower:
-                for fid in type_defs.get(type_ref.lower(), []):
-                    if fid != df.id:
-                        self.add_edge(edges, df.id, fid, self.type_weight)
-
-        for func_call in func_calls:
-            for fid in fn_defs.get(func_call.lower(), []):
-                if fid != df.id:
-                    self.add_edge(edges, df.id, fid, self.fn_weight)
+        self._link_type_refs(df, type_defs, self_type_lower, edges)
+        self._link_fn_calls(df, fn_defs, edges)
 
     def _link_ref(
         self,

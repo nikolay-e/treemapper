@@ -7,10 +7,17 @@ from ...config.weights import EDGE_WEIGHTS
 from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict, FragmentIndex, discover_files_by_refs
 
-_CSS_EXTS = frozenset({".css", ".scss", ".less", ".sass"})
+_SCSS = ".scss"
+_LESS = ".less"
+_SASS = ".sass"
+_CSS_EXTS = frozenset({".css", _SCSS, _LESS, _SASS})
 
-_CSS_IMPORT_RE = re.compile(
-    r"""^\s*@import\s+(?:url\(\s*['"]?([^'")]{1,300})['"]?\s*\)|['"]([^'"]{1,300})['"])""",
+_CSS_IMPORT_URL_RE = re.compile(
+    r"""^\s*@import\s+url\(\s*['"]?([^'")]{1,300})['"]?\s*\)""",
+    re.MULTILINE,
+)
+_CSS_IMPORT_STR_RE = re.compile(
+    r"""^\s*@import\s+['"]([^'"]{1,300})['"]""",
     re.MULTILINE,
 )
 _SCSS_USE_RE = re.compile(r"^\s*@use\s+['\"]([^'\"]{1,300})['\"]", re.MULTILINE)
@@ -25,10 +32,11 @@ def _is_css_file(path: Path) -> bool:
 def _extract_refs(content: str) -> set[str]:
     refs: set[str] = set()
 
-    for m in _CSS_IMPORT_RE.finditer(content):
-        ref = m.group(1) or m.group(2)
-        if ref:
-            refs.add(ref)
+    for m in _CSS_IMPORT_URL_RE.finditer(content):
+        refs.add(m.group(1))
+
+    for m in _CSS_IMPORT_STR_RE.finditer(content):
+        refs.add(m.group(1))
 
     for m in _SCSS_USE_RE.finditer(content):
         refs.add(m.group(1))
@@ -42,20 +50,23 @@ def _extract_refs(content: str) -> set[str]:
     return refs
 
 
+_PARTIAL_EXTS = (_SCSS, _SASS, _LESS, ".css")
+
+
 def _resolve_partial_candidates(ref: str) -> list[str]:
     candidates = [ref]
     base = ref.rsplit("/", 1)
     if len(base) == 2:
         directory, name = base
         if not name.startswith("_"):
-            for ext in (".scss", ".sass", ".less", ".css"):
+            for ext in _PARTIAL_EXTS:
                 candidates.append(f"{directory}/_{name}{ext}")
                 candidates.append(f"{directory}/_{name}")
             candidates.append(f"{directory}/_index")
     else:
         name = base[0]
         if not name.startswith("_"):
-            for ext in (".scss", ".sass", ".less", ".css"):
+            for ext in _PARTIAL_EXTS:
                 candidates.append(f"_{name}{ext}")
                 candidates.append(f"_{name}")
     return candidates
@@ -63,7 +74,7 @@ def _resolve_partial_candidates(ref: str) -> list[str]:
 
 def _ref_to_filename(ref: str) -> str:
     name = ref.split("/")[-1].lower()
-    for ext in (".css", ".scss", ".less", ".sass"):
+    for ext in _PARTIAL_EXTS:
         if name.endswith(ext):
             return name
     return name
@@ -114,6 +125,21 @@ class CssEdgeBuilder(EdgeBuilder):
         for ref in _extract_refs(cf.content):
             self._link_ref(cf.id, ref, idx, edges)
 
+    def _try_link_candidate(
+        self,
+        src_id: FragmentId,
+        filename: str,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+    ) -> bool:
+        for name, frag_ids in idx.by_name.items():
+            if name == filename or _strip_css_ext(name) == _strip_css_ext(filename):
+                for fid in frag_ids:
+                    if fid != src_id:
+                        self.add_edge(edges, src_id, fid, self.import_weight)
+                        return True
+        return False
+
     def _link_ref(
         self,
         src_id: FragmentId,
@@ -121,21 +147,15 @@ class CssEdgeBuilder(EdgeBuilder):
         idx: FragmentIndex,
         edges: EdgeDict,
     ) -> None:
-        all_candidates = _resolve_partial_candidates(ref)
-        for candidate in all_candidates:
-            filename = _ref_to_filename(candidate)
-            for name, frag_ids in idx.by_name.items():
-                if name == filename or _strip_css_ext(name) == _strip_css_ext(filename):
-                    for fid in frag_ids:
-                        if fid != src_id:
-                            self.add_edge(edges, src_id, fid, self.import_weight)
-                            return
+        for candidate in _resolve_partial_candidates(ref):
+            if self._try_link_candidate(src_id, _ref_to_filename(candidate), idx, edges):
+                return
 
         self.link_by_path_match(src_id, ref, idx, edges, self.import_weight)
 
 
 def _strip_css_ext(name: str) -> str:
-    for ext in (".css", ".scss", ".less", ".sass"):
+    for ext in _PARTIAL_EXTS:
         if name.endswith(ext):
             return name[: -len(ext)]
     return name

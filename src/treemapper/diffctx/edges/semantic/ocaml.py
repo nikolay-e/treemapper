@@ -247,6 +247,40 @@ class OCamlEdgeBuilder(EdgeBuilder):
 
         return fn_defs, type_defs, module_defs
 
+    def _link_opens(self, ocaml_frag: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
+        for opened in _extract_opens(ocaml_frag.content):
+            module_name = opened.split(".")[0].lower()
+            self._link_by_module(ocaml_frag.id, module_name, idx, edges)
+
+    def _link_module_refs(self, ocaml_frag: Fragment, module_defs: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
+        module_refs, _, _ = _extract_references(ocaml_frag.content)
+        for mod_ref in module_refs:
+            for fid in module_defs.get(mod_ref.lower(), []):
+                if fid != ocaml_frag.id:
+                    self.add_edge(edges, ocaml_frag.id, fid, self.module_ref_weight)
+
+    def _link_external_func_refs(
+        self, ocaml_frag: Fragment, fn_defs: dict[str, list[FragmentId]], self_fn_lower: set[str], edges: EdgeDict
+    ) -> None:
+        _, func_refs, _ = _extract_references(ocaml_frag.content)
+        for func_ref in func_refs:
+            if func_ref.lower() in self_fn_lower:
+                continue
+            for fid in fn_defs.get(func_ref.lower(), []):
+                if fid != ocaml_frag.id:
+                    self.add_edge(edges, ocaml_frag.id, fid, self.fn_weight)
+
+    def _link_external_type_refs(
+        self, ocaml_frag: Fragment, type_defs: dict[str, list[FragmentId]], self_type_lower: set[str], edges: EdgeDict
+    ) -> None:
+        _, _, type_refs = _extract_references(ocaml_frag.content)
+        for type_ref in type_refs:
+            if type_ref.lower() in self_type_lower:
+                continue
+            for fid in type_defs.get(type_ref.lower(), []):
+                if fid != ocaml_frag.id:
+                    self.add_edge(edges, ocaml_frag.id, fid, self.type_weight)
+
     def _add_fragment_edges(
         self,
         ocaml_frag: Fragment,
@@ -256,32 +290,15 @@ class OCamlEdgeBuilder(EdgeBuilder):
         module_defs: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        opens = _extract_opens(ocaml_frag.content)
-        for opened in opens:
-            module_name = opened.split(".")[0].lower()
-            self._link_by_module(ocaml_frag.id, module_name, idx, edges)
+        self._link_opens(ocaml_frag, idx, edges)
+        self._link_module_refs(ocaml_frag, module_defs, edges)
 
-        module_refs, func_refs, type_refs = _extract_references(ocaml_frag.content)
-        self_funcs, self_types, _self_modules = _extract_definitions(ocaml_frag.content)
+        self_funcs, self_types, _ = _extract_definitions(ocaml_frag.content)
         self_fn_lower = {fn.lower() for fn in self_funcs}
         self_type_lower = {t.lower() for t in self_types}
 
-        for mod_ref in module_refs:
-            for fid in module_defs.get(mod_ref.lower(), []):
-                if fid != ocaml_frag.id:
-                    self.add_edge(edges, ocaml_frag.id, fid, self.module_ref_weight)
-
-        for func_ref in func_refs:
-            if func_ref.lower() not in self_fn_lower:
-                for fid in fn_defs.get(func_ref.lower(), []):
-                    if fid != ocaml_frag.id:
-                        self.add_edge(edges, ocaml_frag.id, fid, self.fn_weight)
-
-        for type_ref in type_refs:
-            if type_ref.lower() not in self_type_lower:
-                for fid in type_defs.get(type_ref.lower(), []):
-                    if fid != ocaml_frag.id:
-                        self.add_edge(edges, ocaml_frag.id, fid, self.type_weight)
+        self._link_external_func_refs(ocaml_frag, fn_defs, self_fn_lower, edges)
+        self._link_external_type_refs(ocaml_frag, type_defs, self_type_lower, edges)
 
     def _link_by_module(self, src_id: FragmentId, module_name: str, idx: FragmentIndex, edges: EdgeDict) -> None:
         for name, frag_ids in idx.by_name.items():

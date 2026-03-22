@@ -173,32 +173,34 @@ class ProtobufEdgeBuilder(EdgeBuilder):
         for imp in _extract_imports(pf.content):
             self.link_by_path_match(pf.id, imp, idx, edges, self.import_weight)
 
+    def _add_resolved_type_edges(
+        self,
+        pf: Fragment,
+        type_names: set[str],
+        message_defs: dict[str, list[FragmentId]],
+        own_defs_lower: set[str],
+        weight: float,
+        edges: EdgeDict,
+    ) -> None:
+        for type_name in type_names:
+            if type_name in _PROTO_BUILTIN_TYPES:
+                continue
+            type_lower = type_name.lower()
+            if type_lower in own_defs_lower:
+                continue
+            for fid in message_defs.get(type_lower, []):
+                if fid != pf.id:
+                    self.add_edge(edges, pf.id, fid, weight)
+
     def _add_type_ref_edges(self, pf: Fragment, message_defs: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
-        own_defs = _extract_message_names(pf.content)
-        own_defs_lower = {n.lower() for n in own_defs}
+        own_defs_lower = {n.lower() for n in _extract_message_names(pf.content)}
 
-        field_types = _extract_field_types(pf.content)
-        rpc_types = _extract_rpc_types(pf.content)
-
-        for type_name in field_types:
-            if type_name in _PROTO_BUILTIN_TYPES:
-                continue
-            type_lower = type_name.lower()
-            if type_lower in own_defs_lower:
-                continue
-            for fid in message_defs.get(type_lower, []):
-                if fid != pf.id:
-                    self.add_edge(edges, pf.id, fid, self.message_ref_weight)
-
-        for type_name in rpc_types:
-            if type_name in _PROTO_BUILTIN_TYPES:
-                continue
-            type_lower = type_name.lower()
-            if type_lower in own_defs_lower:
-                continue
-            for fid in message_defs.get(type_lower, []):
-                if fid != pf.id:
-                    self.add_edge(edges, pf.id, fid, self.service_rpc_weight)
+        self._add_resolved_type_edges(
+            pf, _extract_field_types(pf.content), message_defs, own_defs_lower, self.message_ref_weight, edges
+        )
+        self._add_resolved_type_edges(
+            pf, _extract_rpc_types(pf.content), message_defs, own_defs_lower, self.service_rpc_weight, edges
+        )
 
     def _add_option_path_edges(self, pf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
         for ref in _extract_option_paths(pf.content):

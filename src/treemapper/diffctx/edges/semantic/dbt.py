@@ -124,6 +124,22 @@ def _extract_schema_model_names(content: str) -> set[str]:
     return names
 
 
+def _process_source_table_line(
+    line: str, stripped: str, indent: int, in_sources: bool, in_tables: bool, tables_indent: int, tables: set[str]
+) -> tuple[bool, bool, int]:
+    if stripped.startswith("sources:"):
+        return True, False, tables_indent
+    if in_sources and stripped.startswith("tables:"):
+        return in_sources, True, indent
+    if in_tables:
+        if indent <= tables_indent:
+            return in_sources, False, tables_indent
+        m = _SCHEMA_MODEL_NAME_RE.match(line)
+        if m:
+            tables.add(m.group(1))
+    return in_sources, in_tables, tables_indent
+
+
 def _extract_source_table_names(content: str) -> set[str]:
     in_sources = False
     in_tables = False
@@ -134,21 +150,9 @@ def _extract_source_table_names(content: str) -> set[str]:
         if not stripped:
             continue
         indent = len(line) - len(line.lstrip())
-        if stripped.startswith("sources:"):
-            in_sources = True
-            in_tables = False
-            continue
-        if in_sources and stripped.startswith("tables:"):
-            in_tables = True
-            tables_indent = indent
-            continue
-        if in_tables:
-            if indent <= tables_indent:
-                in_tables = False
-            else:
-                m = _SCHEMA_MODEL_NAME_RE.match(line)
-                if m:
-                    tables.add(m.group(1))
+        in_sources, in_tables, tables_indent = _process_source_table_line(
+            line, stripped, indent, in_sources, in_tables, tables_indent, tables
+        )
     return tables
 
 
@@ -158,6 +162,24 @@ class DbtEdgeBuilder(EdgeBuilder):
     source_weight = EDGE_WEIGHTS["dbt_source"].forward
     macro_weight = EDGE_WEIGHTS["dbt_macro"].forward
     reverse_weight_factor = EDGE_WEIGHTS["dbt_ref"].reverse_factor
+
+    def _collect_refs_from_sql(
+        self, content: str, refs: set[str], macro_names: set[str], source_tables: set[str], model_names: set[str]
+    ) -> None:
+        for ref_name in _extract_refs_from_sql(content):
+            refs.add(ref_name.lower())
+            refs.add(f"{ref_name}.sql")
+        for _, table in _extract_sources_from_sql(content):
+            source_tables.add(table)
+        macro_names.update(_extract_macro_calls(content))
+        for macro_def in _extract_macro_defs(content):
+            model_names.add(macro_def)
+
+    def _collect_refs_from_yaml(self, content: str, refs: set[str], source_tables: set[str]) -> None:
+        for name in _extract_schema_model_names(content):
+            refs.add(name.lower())
+            refs.add(f"{name}.sql")
+        source_tables.update(_extract_source_table_names(content))
 
     def discover_related_files(
         self,
@@ -178,21 +200,9 @@ class DbtEdgeBuilder(EdgeBuilder):
             try:
                 content = f.read_text(encoding="utf-8")
                 if _is_dbt_sql(f):
-                    for ref_name in _extract_refs_from_sql(content):
-                        refs.add(ref_name.lower())
-                        refs.add(f"{ref_name}.sql")
-                    for _, table in _extract_sources_from_sql(content):
-                        source_tables.add(table)
-                    macro_names.update(_extract_macro_calls(content))
-                    for macro_def in _extract_macro_defs(content):
-                        model_names.add(macro_def)
-
+                    self._collect_refs_from_sql(content, refs, macro_names, source_tables, model_names)
                 if _is_dbt_yaml(f):
-                    for name in _extract_schema_model_names(content):
-                        refs.add(name.lower())
-                        refs.add(f"{name}.sql")
-                    for table in _extract_source_table_names(content):
-                        source_tables.add(table)
+                    self._collect_refs_from_yaml(content, refs, source_tables)
             except (OSError, UnicodeDecodeError):
                 continue
 
@@ -221,6 +231,15 @@ class DbtEdgeBuilder(EdgeBuilder):
             except (OSError, UnicodeDecodeError):
                 continue
 
+    def _candidate_references_changed_model(self, content: str, changed_model_names: set[str]) -> bool:
+        for ref_name in _extract_refs_from_sql(content):
+            if ref_name.lower() in changed_model_names:
+                return True
+        for macro_call in _extract_macro_calls(content):
+            if macro_call.lower() in changed_model_names:
+                return True
+        return False
+
     def _discover_reverse_refs(
         self,
         dbt_changed: list[Path],
@@ -228,8 +247,7 @@ class DbtEdgeBuilder(EdgeBuilder):
         refs: set[str],
         model_names: set[str],
     ) -> None:
-        changed_model_names: set[str] = set()
-        changed_model_names.update(model_names)
+        changed_model_names: set[str] = set(model_names)
         for f in dbt_changed:
             if _is_dbt_sql(f):
                 changed_model_names.add(f.stem.lower())
@@ -242,14 +260,8 @@ class DbtEdgeBuilder(EdgeBuilder):
                 continue
             try:
                 content = candidate.read_text(encoding="utf-8")
-                for ref_name in _extract_refs_from_sql(content):
-                    if ref_name.lower() in changed_model_names:
-                        refs.add(candidate.name.lower())
-                        break
-                for macro_call in _extract_macro_calls(content):
-                    if macro_call.lower() in changed_model_names:
-                        refs.add(candidate.name.lower())
-                        break
+                if self._candidate_references_changed_model(content, changed_model_names):
+                    refs.add(candidate.name.lower())
             except (OSError, UnicodeDecodeError):
                 continue
 
@@ -314,6 +326,42 @@ class DbtEdgeBuilder(EdgeBuilder):
                     index.setdefault(name.lower(), []).append(f.id)
         return index
 
+    def _add_sql_fragment_edges(
+        self,
+        df: Fragment,
+        edges: EdgeDict,
+        macro_index: dict[str, list[FragmentId]],
+        model_index: dict[str, list[FragmentId]],
+        schema_model_index: dict[str, list[FragmentId]],
+    ) -> None:
+        for ref_name in _extract_refs_from_sql(df.content):
+            self._link_model_ref(df.id, ref_name, model_index, edges, self.ref_weight)
+
+        for macro_name in _extract_macro_calls(df.content):
+            for fid in macro_index.get(macro_name.lower(), []):
+                if fid != df.id:
+                    self.add_edge(edges, df.id, fid, self.macro_weight)
+
+        model_name = df.path.stem.lower()
+        for fid in schema_model_index.get(model_name, []):
+            if fid != df.id:
+                self.add_edge(edges, df.id, fid, self.ref_weight)
+
+    def _add_yaml_fragment_edges(
+        self,
+        df: Fragment,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+        model_index: dict[str, list[FragmentId]],
+    ) -> None:
+        for name in _extract_schema_model_names(df.content):
+            for fid in model_index.get(name.lower(), []):
+                if fid != df.id:
+                    self.add_edge(edges, df.id, fid, self.ref_weight)
+
+        for table in _extract_source_table_names(df.content):
+            self._link_source_table(df.id, table, idx, edges)
+
     def _add_fragment_edges(
         self,
         df: Fragment,
@@ -324,27 +372,9 @@ class DbtEdgeBuilder(EdgeBuilder):
         schema_model_index: dict[str, list[FragmentId]],
     ) -> None:
         if _is_dbt_sql(df.path):
-            for ref_name in _extract_refs_from_sql(df.content):
-                self._link_model_ref(df.id, ref_name, model_index, edges, self.ref_weight)
-
-            for macro_name in _extract_macro_calls(df.content):
-                for fid in macro_index.get(macro_name.lower(), []):
-                    if fid != df.id:
-                        self.add_edge(edges, df.id, fid, self.macro_weight)
-
-            model_name = df.path.stem.lower()
-            for fid in schema_model_index.get(model_name, []):
-                if fid != df.id:
-                    self.add_edge(edges, df.id, fid, self.ref_weight)
-
+            self._add_sql_fragment_edges(df, edges, macro_index, model_index, schema_model_index)
         if _is_dbt_yaml(df.path):
-            for name in _extract_schema_model_names(df.content):
-                for fid in model_index.get(name.lower(), []):
-                    if fid != df.id:
-                        self.add_edge(edges, df.id, fid, self.ref_weight)
-
-            for table in _extract_source_table_names(df.content):
-                self._link_source_table(df.id, table, idx, edges)
+            self._add_yaml_fragment_edges(df, idx, edges, model_index)
 
     def _link_model_ref(
         self,

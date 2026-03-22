@@ -241,6 +241,31 @@ class RLangEdgeBuilder(EdgeBuilder):
 
         return fn_defs, class_defs
 
+    def _add_source_edges(self, rf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
+        for src in _extract_sources(rf.content):
+            src_name = src.split("/")[-1].lower()
+            self.link_by_stem(rf.id, src_name, idx, edges, self.source_weight)
+            self.link_by_path_match(rf.id, src, idx, edges, self.source_weight)
+
+    def _add_inheritance_edges(self, rf: Fragment, class_defs: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
+        for parent in _extract_inheritance(rf.content):
+            for fid in class_defs.get(parent.lower(), []):
+                if fid != rf.id:
+                    self.add_edge(edges, rf.id, fid, self.s4_weight)
+
+    def _add_fn_call_edges(self, rf: Fragment, fn_defs: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
+        func_calls, _ns_refs = _extract_references(rf.content)
+        self_funcs, _self_classes = _extract_definitions(rf.content)
+        self_fn_lower = {fn.lower() for fn in self_funcs}
+
+        for func_call in func_calls:
+            func_lower = func_call.lower()
+            if func_lower in self_fn_lower:
+                continue
+            for fid in fn_defs.get(func_lower, []):
+                if fid != rf.id:
+                    self.add_edge(edges, rf.id, fid, self.fn_weight)
+
     def _add_fragment_edges(
         self,
         rf: Fragment,
@@ -249,29 +274,10 @@ class RLangEdgeBuilder(EdgeBuilder):
         class_defs: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        sources = _extract_sources(rf.content)
-        libraries = _extract_libraries(rf.content)
+        self._add_source_edges(rf, idx, edges)
 
-        for src in sources:
-            src_name = src.split("/")[-1].lower()
-            self.link_by_stem(rf.id, src_name, idx, edges, self.source_weight)
-            self.link_by_path_match(rf.id, src, idx, edges, self.source_weight)
-
-        for lib in libraries:
+        for lib in _extract_libraries(rf.content):
             self.link_by_stem(rf.id, lib.lower(), idx, edges, self.library_weight)
 
-        inheritance = _extract_inheritance(rf.content)
-        for parent in inheritance:
-            for fid in class_defs.get(parent.lower(), []):
-                if fid != rf.id:
-                    self.add_edge(edges, rf.id, fid, self.s4_weight)
-
-        func_calls, _ns_refs = _extract_references(rf.content)
-        self_funcs, _self_classes = _extract_definitions(rf.content)
-        self_fn_lower = {fn.lower() for fn in self_funcs}
-
-        for func_call in func_calls:
-            if func_call.lower() not in self_fn_lower:
-                for fid in fn_defs.get(func_call.lower(), []):
-                    if fid != rf.id:
-                        self.add_edge(edges, rf.id, fid, self.fn_weight)
+        self._add_inheritance_edges(rf, class_defs, edges)
+        self._add_fn_call_edges(rf, fn_defs, edges)

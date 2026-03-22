@@ -222,6 +222,57 @@ class ElixirEdgeBuilder(EdgeBuilder):
 
         return module_defs, fn_defs
 
+    def _link_uses_and_aliases(
+        self,
+        ef: Fragment,
+        idx: FragmentIndex,
+        edges: EdgeDict,
+    ) -> None:
+        uses, aliases = _extract_refs(ef.content)
+        for module in uses:
+            self._link_module(ef.id, module, idx, edges, self.use_weight)
+        for module in aliases:
+            self._link_module(ef.id, module, idx, edges, self.alias_weight)
+
+    def _link_behaviours(
+        self,
+        ef: Fragment,
+        module_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        _, _, behaviours = _extract_definitions(ef.content)
+        for behaviour in behaviours:
+            for fid in module_defs.get(_module_to_filename(behaviour), []):
+                if fid != ef.id:
+                    self.add_edge(edges, ef.id, fid, self.behaviour_weight)
+
+    def _link_module_refs(
+        self,
+        ef: Fragment,
+        module_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        module_refs, _ = _extract_references(ef.content)
+        for ref in module_refs:
+            for fid in module_defs.get(_module_to_filename(ref), []):
+                if fid != ef.id:
+                    self.add_edge(edges, ef.id, fid, self.use_weight)
+
+    def _link_fn_calls(
+        self,
+        ef: Fragment,
+        fn_defs: dict[str, list[FragmentId]],
+        self_fn_lower: set[str],
+        edges: EdgeDict,
+    ) -> None:
+        _, func_calls = _extract_references(ef.content)
+        for func_call in func_calls:
+            if func_call.lower() in self_fn_lower:
+                continue
+            for fid in fn_defs.get(func_call.lower(), []):
+                if fid != ef.id:
+                    self.add_edge(edges, ef.id, fid, self.fn_weight)
+
     def _add_fragment_edges(
         self,
         ef: Fragment,
@@ -230,35 +281,13 @@ class ElixirEdgeBuilder(EdgeBuilder):
         fn_defs: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        uses, aliases = _extract_refs(ef.content)
+        self._link_uses_and_aliases(ef, idx, edges)
+        self._link_behaviours(ef, module_defs, edges)
+        self._link_module_refs(ef, module_defs, edges)
 
-        for module in uses:
-            self._link_module(ef.id, module, idx, edges, self.use_weight)
-        for module in aliases:
-            self._link_module(ef.id, module, idx, edges, self.alias_weight)
-
-        _, _, behaviours = _extract_definitions(ef.content)
-        for behaviour in behaviours:
-            filename = _module_to_filename(behaviour)
-            for fid in module_defs.get(filename, []):
-                if fid != ef.id:
-                    self.add_edge(edges, ef.id, fid, self.behaviour_weight)
-
-        module_refs, func_calls = _extract_references(ef.content)
-        self_funcs, _self_modules, _ = _extract_definitions(ef.content)
+        self_funcs, _, _ = _extract_definitions(ef.content)
         self_fn_lower = {fn.lower() for fn in self_funcs}
-
-        for ref in module_refs:
-            ref_lower = _module_to_filename(ref)
-            for fid in module_defs.get(ref_lower, []):
-                if fid != ef.id:
-                    self.add_edge(edges, ef.id, fid, self.use_weight)
-
-        for func_call in func_calls:
-            if func_call.lower() not in self_fn_lower:
-                for fid in fn_defs.get(func_call.lower(), []):
-                    if fid != ef.id:
-                        self.add_edge(edges, ef.id, fid, self.fn_weight)
+        self._link_fn_calls(ef, fn_defs, self_fn_lower, edges)
 
     def _link_module(
         self,

@@ -91,32 +91,39 @@ class CargoEdgeBuilder(EdgeBuilder):
 
         changed_set = set(changed_files)
         discovered: list[Path] = []
-
         for cargo_file in cargo_changed:
-            try:
-                content = cargo_file.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
-
-            parent = cargo_file.parent
-
-            for entry in _get_default_entry_points(content):
-                candidate = parent / entry
-                if candidate not in changed_set:
-                    discovered.append(candidate)
-
-            for _, rel_path in _extract_path_deps(content):
-                dep_cargo = (parent / rel_path / "Cargo.toml").resolve()
-                if dep_cargo not in changed_set:
-                    discovered.append(dep_cargo)
-
-            for member in _extract_workspace_members(content):
-                member_cargo = (parent / member / "Cargo.toml").resolve()
-                if member_cargo not in changed_set:
-                    discovered.append(member_cargo)
+            self._discover_from_cargo_file(cargo_file, changed_set, discovered)
 
         valid = set(all_candidate_files)
         return [d for d in discovered if d in valid]
+
+    def _discover_from_cargo_file(
+        self,
+        cargo_file: Path,
+        changed_set: set[Path],
+        discovered: list[Path],
+    ) -> None:
+        try:
+            content = cargo_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return
+
+        parent = cargo_file.parent
+
+        for entry in _get_default_entry_points(content):
+            candidate = parent / entry
+            if candidate not in changed_set:
+                discovered.append(candidate)
+
+        for _, rel_path in _extract_path_deps(content):
+            dep_cargo = (parent / rel_path / "Cargo.toml").resolve()
+            if dep_cargo not in changed_set:
+                discovered.append(dep_cargo)
+
+        for member in _extract_workspace_members(content):
+            member_cargo = (parent / member / "Cargo.toml").resolve()
+            if member_cargo not in changed_set:
+                discovered.append(member_cargo)
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         cargo_frags = [f for f in fragments if _is_cargo_toml(f.path)]
@@ -204,16 +211,28 @@ class CargoEdgeBuilder(EdgeBuilder):
         edges: EdgeDict,
     ) -> None:
         feature_deps = _extract_feature_deps(cf.content)
+        path_deps = _extract_path_deps(cf.content)
         for dep_name in feature_deps:
-            for name, rel_path in _extract_path_deps(cf.content):
-                if name == dep_name:
-                    try:
-                        dep_dir = str((cf.path.parent / rel_path).resolve())
-                    except (OSError, ValueError):
-                        continue
-                    for fid in cargo_by_dir.get(dep_dir, []):
-                        if fid != cf.id:
-                            self.add_edge(edges, cf.id, fid, self.path_dep_weight)
+            self._link_feature_dep_by_name(cf, dep_name, path_deps, cargo_by_dir, edges)
+
+    def _link_feature_dep_by_name(
+        self,
+        cf: Fragment,
+        dep_name: str,
+        path_deps: list[tuple[str, str]],
+        cargo_by_dir: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for name, rel_path in path_deps:
+            if name != dep_name:
+                continue
+            try:
+                dep_dir = str((cf.path.parent / rel_path).resolve())
+            except (OSError, ValueError):
+                continue
+            for fid in cargo_by_dir.get(dep_dir, []):
+                if fid != cf.id:
+                    self.add_edge(edges, cf.id, fid, self.path_dep_weight)
 
 
 def _get_default_entry_points(content: str) -> list[str]:

@@ -103,7 +103,7 @@ class LatexEdgeBuilder(EdgeBuilder):
             except (OSError, UnicodeDecodeError):
                 continue
 
-        self._discover_reverse_refs(latex_changed, all_candidate_files, refs, repo_root)
+        self._discover_reverse_refs(latex_changed, all_candidate_files, refs)
 
         return discover_files_by_refs(refs, changed_files, all_candidate_files, repo_root)
 
@@ -112,7 +112,6 @@ class LatexEdgeBuilder(EdgeBuilder):
         latex_changed: list[Path],
         all_candidate_files: list[Path],
         refs: set[str],
-        repo_root: Path | None,
     ) -> None:
         changed_stems: set[str] = set()
         for f in latex_changed:
@@ -124,19 +123,28 @@ class LatexEdgeBuilder(EdgeBuilder):
                 continue
             try:
                 content = candidate.read_text(encoding="utf-8")
-                for inp in _extract_input_refs(content):
-                    inp_stem = inp.split("/")[-1].replace(".tex", "").lower()
-                    if inp_stem in changed_stems:
-                        refs.add(candidate.name.lower())
-                for pkg in _extract_package_refs(content):
-                    if pkg.lower() in changed_stems:
-                        refs.add(candidate.name.lower())
-                for bib in _extract_bib_refs(content):
-                    bib_name = bib.strip().lower()
-                    if bib_name in changed_stems or f"{bib_name}.bib" in changed_stems:
-                        refs.add(candidate.name.lower())
+                self._check_candidate_refs(content, candidate, changed_stems, refs)
             except (OSError, UnicodeDecodeError):
                 continue
+
+    def _check_candidate_refs(
+        self,
+        content: str,
+        candidate: Path,
+        changed_stems: set[str],
+        refs: set[str],
+    ) -> None:
+        for inp in _extract_input_refs(content):
+            inp_stem = inp.split("/")[-1].replace(".tex", "").lower()
+            if inp_stem in changed_stems:
+                refs.add(candidate.name.lower())
+        for pkg in _extract_package_refs(content):
+            if pkg.lower() in changed_stems:
+                refs.add(candidate.name.lower())
+        for bib in _extract_bib_refs(content):
+            bib_name = bib.strip().lower()
+            if bib_name in changed_stems or f"{bib_name}.bib" in changed_stems:
+                refs.add(candidate.name.lower())
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         latex_frags = [f for f in fragments if _is_latex_file(f.path)]

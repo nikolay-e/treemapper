@@ -187,7 +187,7 @@ class PrismaEdgeBuilder(EdgeBuilder):
         model_index = self._build_model_index(prisma_frags)
 
         self._link_prisma_internals(prisma_frags, model_index, edges)
-        self._link_client_to_schema(client_frags, prisma_frags, model_index, edges)
+        self._link_client_to_schema(client_frags, model_index, edges)
         self._link_migration_to_schema(migration_frags, prisma_frags, edges)
 
         return edges
@@ -217,7 +217,6 @@ class PrismaEdgeBuilder(EdgeBuilder):
     def _link_client_to_schema(
         self,
         client_frags: list[Fragment],
-        prisma_frags: list[Fragment],
         model_index: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:

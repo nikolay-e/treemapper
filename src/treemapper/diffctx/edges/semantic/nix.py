@@ -8,7 +8,9 @@ from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict, FragmentIndex, discover_files_by_refs
 
 _NIX_EXTS = {".nix"}
-_NIX_LOCK = {"flake.lock"}
+_FLAKE_NIX = "flake.nix"
+_FLAKE_LOCK = "flake.lock"
+_NIX_LOCK = {_FLAKE_LOCK}
 
 _IMPORT_RE = re.compile(r"import\s+(\.{0,2}/[^\s;{]{1,300})", re.MULTILINE)
 _CALL_PACKAGE_RE = re.compile(r"callPackage\s+(\.{0,2}/[^\s;{]{1,300})", re.MULTILINE)
@@ -63,10 +65,10 @@ class NixEdgeBuilder(EdgeBuilder):
                     refs.add(_ref_to_filename(imp))
                     refs.add(imp)
 
-                if f.name == "flake.nix":
-                    refs.add("flake.lock")
-                if f.name == "flake.lock":
-                    refs.add("flake.nix")
+                if f.name == _FLAKE_NIX:
+                    refs.add(_FLAKE_LOCK)
+                if f.name == _FLAKE_LOCK:
+                    refs.add(_FLAKE_NIX)
             except (OSError, UnicodeDecodeError):
                 continue
 
@@ -81,6 +83,19 @@ class NixEdgeBuilder(EdgeBuilder):
         refs: set[str],
         repo_root: Path | None,
     ) -> None:
+        changed_paths = self._collect_changed_paths(nix_changed, repo_root)
+        for candidate in all_candidate_files:
+            if not _is_nix_file(candidate):
+                continue
+            try:
+                content = candidate.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if self._candidate_imports_changed_path(content, changed_paths):
+                refs.add(candidate.name.lower())
+
+    @staticmethod
+    def _collect_changed_paths(nix_changed: list[Path], repo_root: Path | None) -> set[str]:
         changed_paths: set[str] = set()
         for f in nix_changed:
             changed_paths.add(f.name.lower())
@@ -91,19 +106,16 @@ class NixEdgeBuilder(EdgeBuilder):
                     changed_paths.add(rel.as_posix())
                 except ValueError:
                     pass
+        return changed_paths
 
-        for candidate in all_candidate_files:
-            if not _is_nix_file(candidate):
-                continue
-            try:
-                content = candidate.read_text(encoding="utf-8")
-                for imp in _extract_import_paths(content):
-                    imp_name = _ref_to_filename(imp)
-                    for cp in changed_paths:
-                        if cp == imp_name or cp in imp:
-                            refs.add(candidate.name.lower())
-            except (OSError, UnicodeDecodeError):
-                continue
+    @staticmethod
+    def _candidate_imports_changed_path(content: str, changed_paths: set[str]) -> bool:
+        for imp in _extract_import_paths(content):
+            imp_name = _ref_to_filename(imp)
+            for cp in changed_paths:
+                if cp == imp_name or cp in imp:
+                    return True
+        return False
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         nix_frags = [f for f in fragments if _is_nix_file(f.path)]
@@ -149,9 +161,9 @@ class NixEdgeBuilder(EdgeBuilder):
         flake_nix: list[Fragment] = []
         flake_lock: list[Fragment] = []
         for f in nix_frags:
-            if f.path.name == "flake.nix":
+            if f.path.name == _FLAKE_NIX:
                 flake_nix.append(f)
-            elif f.path.name == "flake.lock":
+            elif f.path.name == _FLAKE_LOCK:
                 flake_lock.append(f)
 
         for fn in flake_nix:

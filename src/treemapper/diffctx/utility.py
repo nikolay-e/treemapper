@@ -552,6 +552,21 @@ class _GainResult:
     structural_bonus: float = 0.0
 
 
+def _diversity_bonus(
+    needs: tuple[InformationNeed, ...],
+    rel_score: float,
+    gain: float,
+    state: UtilityState,
+) -> float:
+    if not needs or rel_score < _MIN_REL_FOR_BONUS:
+        return 0.0
+    if gain <= 0 and rel_score < _STRONG_REL_THRESHOLD:
+        return 0.0
+    total_covered = sum(min(state.max_rel.get((n.need_type, n.symbol), 0.0), 1.0) for n in needs)
+    unsatisfied = max(0.0, 1.0 - total_covered / max(1, len(needs)))
+    return rel_score * _RELATEDNESS_BONUS * unsatisfied
+
+
 def _compute_gain_core(
     frag: Fragment,
     rel_score: float,
@@ -579,11 +594,7 @@ def _compute_gain_core(
         result.gain += priority * (_phi(new_max) - _phi(old_max))
         result.need_updates.append((nkey, new_max, need.priority))
 
-    # Diversity bonus: additive to preserve submodularity.
-    if needs and rel_score >= _MIN_REL_FOR_BONUS and (result.gain > 0 or rel_score >= _STRONG_REL_THRESHOLD):
-        total_covered = sum(min(state.max_rel.get((n.need_type, n.symbol), 0.0), 1.0) for n in needs)
-        unsatisfied = max(0.0, 1.0 - total_covered / max(1, len(needs)))
-        result.diversity_bonus = rel_score * _RELATEDNESS_BONUS * unsatisfied
+    result.diversity_bonus = _diversity_bonus(needs, rel_score, result.gain, state)
 
     # Structural proximity layer (U2): gamma * min(R/R_cap, 1).
     if result.has_match:

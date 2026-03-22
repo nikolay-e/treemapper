@@ -10,13 +10,13 @@ from ..base import EdgeBuilder, EdgeDict, discover_files_by_refs
 
 _ERLANG_EXTS = frozenset({".erl", ".hrl"})
 
-_MODULE_RE = re.compile(r"^-module\(([a-z_][a-zA-Z0-9_]{0,200})\)\.", re.MULTILINE)
+_MODULE_RE = re.compile(r"^-module\(([a-z_][\w]{0,200})\)\.", re.MULTILINE)
 _INCLUDE_RE = re.compile(r'^-include\("([^"]{1,300})"\)\.', re.MULTILINE)
 _INCLUDE_LIB_RE = re.compile(r'^-include_lib\("([^"]{1,300})"\)\.', re.MULTILINE)
-_BEHAVIOUR_RE = re.compile(r"^-behaviou?r\(([a-z_][a-zA-Z0-9_]{0,200})\)\.", re.MULTILINE)
-_IMPORT_RE = re.compile(r"^-import\(([a-z_][a-zA-Z0-9_]{0,200})\s*,", re.MULTILINE)
-_REMOTE_CALL_RE = re.compile(r"\b([a-z_][a-zA-Z0-9_]{0,100}):([a-z_][a-zA-Z0-9_]{0,100})\s*\(")
-_FUNCTION_DEF_RE = re.compile(r"^([a-z_][a-zA-Z0-9_]{0,100})\s*\(", re.MULTILINE)
+_BEHAVIOUR_RE = re.compile(r"^-behaviou?r\(([a-z_][\w]{0,200})\)\.", re.MULTILINE)
+_IMPORT_RE = re.compile(r"^-import\(([a-z_][\w]{0,200})\s*,", re.MULTILINE)
+_REMOTE_CALL_RE = re.compile(r"\b([a-z_][\w]{0,100}):([a-z_][\w]{0,100})\s*\(")
+_FUNCTION_DEF_RE = re.compile(r"^([a-z_][\w]{0,100})\s*\(", re.MULTILINE)
 
 _ERLANG_STDLIB_MODULES = frozenset(
     {

@@ -233,6 +233,57 @@ class ClojureEdgeBuilder(EdgeBuilder):
 
         return fn_defs, type_defs
 
+    def _link_requires(self, cf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
+        for ns in _extract_requires(cf.content):
+            self.link_by_stem(cf.id, _namespace_leaf(ns), idx, edges, self.require_weight)
+            self.link_by_path_match(cf.id, _namespace_to_path(ns), idx, edges, self.require_weight)
+
+    def _link_protocol_refs(
+        self,
+        cf: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for proto in _extract_protocol_refs(cf.content):
+            for fid in type_defs.get(proto.lower(), []):
+                if fid != cf.id:
+                    self.add_edge(edges, cf.id, fid, self.protocol_weight)
+
+    def _link_fn_calls(
+        self,
+        cf: Fragment,
+        fn_defs: dict[str, list[FragmentId]],
+        self_fn_lower: set[str],
+        edges: EdgeDict,
+    ) -> None:
+        func_calls, _, _ = _extract_references(cf.content)
+        for func_call in func_calls:
+            if func_call.lower() in self_fn_lower:
+                continue
+            for fid in fn_defs.get(func_call.lower(), []):
+                if fid != cf.id:
+                    self.add_edge(edges, cf.id, fid, self.fn_weight)
+
+    def _link_type_refs(
+        self,
+        cf: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        self_type_lower: set[str],
+        edges: EdgeDict,
+    ) -> None:
+        _, type_refs, _ = _extract_references(cf.content)
+        for type_ref in type_refs:
+            if type_ref.lower() in self_type_lower:
+                continue
+            for fid in type_defs.get(type_ref.lower(), []):
+                if fid != cf.id:
+                    self.add_edge(edges, cf.id, fid, self.protocol_weight)
+
+    def _link_qualified_ns(self, cf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
+        _, _, qualified_ns = _extract_references(cf.content)
+        for ns in qualified_ns:
+            self.link_by_stem(cf.id, _namespace_leaf(ns), idx, edges, self.require_weight)
+
     def _add_fragment_edges(
         self,
         cf: Fragment,
@@ -241,36 +292,13 @@ class ClojureEdgeBuilder(EdgeBuilder):
         type_defs: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        requires = _extract_requires(cf.content)
-        for ns in requires:
-            leaf = _namespace_leaf(ns)
-            self.link_by_stem(cf.id, leaf, idx, edges, self.require_weight)
-            path_ref = _namespace_to_path(ns)
-            self.link_by_path_match(cf.id, path_ref, idx, edges, self.require_weight)
+        self._link_requires(cf, idx, edges)
+        self._link_protocol_refs(cf, type_defs, edges)
 
-        protocol_refs = _extract_protocol_refs(cf.content)
-        for proto in protocol_refs:
-            for fid in type_defs.get(proto.lower(), []):
-                if fid != cf.id:
-                    self.add_edge(edges, cf.id, fid, self.protocol_weight)
-
-        func_calls, type_refs, qualified_ns = _extract_references(cf.content)
         self_funcs, self_types = _extract_definitions(cf.content)
         self_fn_lower = {fn.lower() for fn in self_funcs}
         self_type_lower = {t.lower() for t in self_types}
 
-        for func_call in func_calls:
-            if func_call.lower() not in self_fn_lower:
-                for fid in fn_defs.get(func_call.lower(), []):
-                    if fid != cf.id:
-                        self.add_edge(edges, cf.id, fid, self.fn_weight)
-
-        for type_ref in type_refs:
-            if type_ref.lower() not in self_type_lower:
-                for fid in type_defs.get(type_ref.lower(), []):
-                    if fid != cf.id:
-                        self.add_edge(edges, cf.id, fid, self.protocol_weight)
-
-        for ns in qualified_ns:
-            leaf = _namespace_leaf(ns)
-            self.link_by_stem(cf.id, leaf, idx, edges, self.require_weight)
+        self._link_fn_calls(cf, fn_defs, self_fn_lower, edges)
+        self._link_type_refs(cf, type_defs, self_type_lower, edges)
+        self._link_qualified_ns(cf, idx, edges)

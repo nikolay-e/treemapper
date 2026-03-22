@@ -293,6 +293,46 @@ class JuliaEdgeBuilder(EdgeBuilder):
 
         return type_defs, fn_defs
 
+    def _link_usings(self, jf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
+        for module in _extract_usings(jf.content):
+            leaf = _module_leaf(module)
+            self.link_by_stem(jf.id, leaf, idx, edges, self.using_weight)
+            self.link_by_path_match(jf.id, _module_to_path(module), idx, edges, self.using_weight)
+
+    def _link_includes(self, jf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
+        for inc in _extract_includes(jf.content):
+            inc_name = Path(inc).stem.lower()
+            self.link_by_stem(jf.id, inc_name, idx, edges, self.include_weight)
+            self.link_by_path_match(jf.id, inc, idx, edges, self.include_weight)
+
+    def _link_supertypes(self, jf: Fragment, type_defs: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
+        for supertype in _extract_supertypes(jf.content):
+            for fid in type_defs.get(supertype.lower(), []):
+                if fid != jf.id:
+                    self.add_edge(edges, jf.id, fid, self.type_weight)
+
+    def _link_external_type_refs(
+        self, jf: Fragment, type_defs: dict[str, list[FragmentId]], self_type_lower: set[str], edges: EdgeDict
+    ) -> None:
+        type_refs, _ = _extract_references(jf.content)
+        for type_ref in type_refs:
+            if type_ref.lower() in self_type_lower:
+                continue
+            for fid in type_defs.get(type_ref.lower(), []):
+                if fid != jf.id:
+                    self.add_edge(edges, jf.id, fid, self.type_weight)
+
+    def _link_external_func_calls(
+        self, jf: Fragment, fn_defs: dict[str, list[FragmentId]], self_fn_lower: set[str], edges: EdgeDict
+    ) -> None:
+        _, func_calls = _extract_references(jf.content)
+        for func_call in func_calls:
+            if func_call.lower() in self_fn_lower:
+                continue
+            for fid in fn_defs.get(func_call.lower(), []):
+                if fid != jf.id:
+                    self.add_edge(edges, jf.id, fid, self.fn_weight)
+
     def _add_fragment_edges(
         self,
         jf: Fragment,
@@ -301,39 +341,13 @@ class JuliaEdgeBuilder(EdgeBuilder):
         fn_defs: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        usings = _extract_usings(jf.content)
-        includes = _extract_includes(jf.content)
+        self._link_usings(jf, idx, edges)
+        self._link_includes(jf, idx, edges)
+        self._link_supertypes(jf, type_defs, edges)
 
-        for module in usings:
-            leaf = _module_leaf(module)
-            self.link_by_stem(jf.id, leaf, idx, edges, self.using_weight)
-            path_ref = _module_to_path(module)
-            self.link_by_path_match(jf.id, path_ref, idx, edges, self.using_weight)
-
-        for inc in includes:
-            inc_name = Path(inc).stem.lower()
-            self.link_by_stem(jf.id, inc_name, idx, edges, self.include_weight)
-            self.link_by_path_match(jf.id, inc, idx, edges, self.include_weight)
-
-        supertypes = _extract_supertypes(jf.content)
-        for supertype in supertypes:
-            for fid in type_defs.get(supertype.lower(), []):
-                if fid != jf.id:
-                    self.add_edge(edges, jf.id, fid, self.type_weight)
-
-        type_refs, func_calls = _extract_references(jf.content)
         self_funcs, self_types = _extract_definitions(jf.content)
         self_type_lower = {t.lower() for t in self_types}
         self_fn_lower = {fn.lower() for fn in self_funcs}
 
-        for type_ref in type_refs:
-            if type_ref.lower() not in self_type_lower:
-                for fid in type_defs.get(type_ref.lower(), []):
-                    if fid != jf.id:
-                        self.add_edge(edges, jf.id, fid, self.type_weight)
-
-        for func_call in func_calls:
-            if func_call.lower() not in self_fn_lower:
-                for fid in fn_defs.get(func_call.lower(), []):
-                    if fid != jf.id:
-                        self.add_edge(edges, jf.id, fid, self.fn_weight)
+        self._link_external_type_refs(jf, type_defs, self_type_lower, edges)
+        self._link_external_func_calls(jf, fn_defs, self_fn_lower, edges)

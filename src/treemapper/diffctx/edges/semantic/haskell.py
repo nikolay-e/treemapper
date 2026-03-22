@@ -16,7 +16,7 @@ _HASKELL_IMPORT_RE = re.compile(
 )
 
 _FUNC_DEF_RE = re.compile(r"^([a-z_]\w*)\s*::", re.MULTILINE)
-_FUNC_BIND_RE = re.compile(r"^([a-z_]\w*)\s+(?:[a-z_]\w*|\(|_)", re.MULTILINE)
+_FUNC_BIND_RE = re.compile(r"^([a-z_]\w*)\s+(?:[a-z_]\w*|\()", re.MULTILINE)
 _DATA_RE = re.compile(r"^\s*data\s+([A-Z]\w*)", re.MULTILINE)
 _NEWTYPE_RE = re.compile(r"^\s*newtype\s+([A-Z]\w*)", re.MULTILINE)
 _TYPE_RE = re.compile(r"^\s*type\s+([A-Z]\w*)", re.MULTILINE)
@@ -301,6 +301,38 @@ class HaskellEdgeBuilder(EdgeBuilder):
                 if fid != hf.id:
                     self.add_edge(edges, hf.id, fid, self.instance_weight)
 
+    def _add_type_ref_edges(
+        self,
+        hf: Fragment,
+        type_refs: set[str],
+        type_defs: dict[str, list[FragmentId]],
+        self_type_lower: set[str],
+        edges: EdgeDict,
+    ) -> None:
+        for type_ref in type_refs:
+            type_lower = type_ref.lower()
+            if type_lower in self_type_lower:
+                continue
+            for fid in type_defs.get(type_lower, []):
+                if fid != hf.id:
+                    self.add_edge(edges, hf.id, fid, self.type_weight)
+
+    def _add_fn_ref_edges(
+        self,
+        hf: Fragment,
+        func_refs: set[str],
+        fn_defs: dict[str, list[FragmentId]],
+        self_fn_lower: set[str],
+        edges: EdgeDict,
+    ) -> None:
+        for func_ref in func_refs:
+            func_lower = func_ref.lower()
+            if func_lower in self_fn_lower:
+                continue
+            for fid in fn_defs.get(func_lower, []):
+                if fid != hf.id:
+                    self.add_edge(edges, hf.id, fid, self.fn_weight)
+
     def _add_reference_edges(
         self,
         hf: Fragment,
@@ -313,14 +345,5 @@ class HaskellEdgeBuilder(EdgeBuilder):
         self_type_lower = {t.lower() for t in self_types}
         self_fn_lower = {fn.lower() for fn in self_funcs}
 
-        for type_ref in type_refs:
-            if type_ref.lower() not in self_type_lower:
-                for fid in type_defs.get(type_ref.lower(), []):
-                    if fid != hf.id:
-                        self.add_edge(edges, hf.id, fid, self.type_weight)
-
-        for func_ref in func_refs:
-            if func_ref.lower() not in self_fn_lower:
-                for fid in fn_defs.get(func_ref.lower(), []):
-                    if fid != hf.id:
-                        self.add_edge(edges, hf.id, fid, self.fn_weight)
+        self._add_type_ref_edges(hf, type_refs, type_defs, self_type_lower, edges)
+        self._add_fn_ref_edges(hf, func_refs, fn_defs, self_fn_lower, edges)

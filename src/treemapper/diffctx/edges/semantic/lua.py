@@ -10,7 +10,7 @@ from ..base import EdgeBuilder, EdgeDict, FragmentIndex, discover_files_by_refs
 
 _LUA_EXTS = {".lua"}
 
-_REQUIRE_RE = re.compile(r"""require\s*[\(]?\s*['"]([^'"]{1,300})['"]""", re.MULTILINE)
+_REQUIRE_RE = re.compile(r"""require\s*\(?\s*['"]([^'"]{1,300})['"]""", re.MULTILINE)
 _DOFILE_RE = re.compile(r"""dofile\s*\(\s*['"]([^'"]{1,300})['"]""", re.MULTILINE)
 
 _FUNC_DEF_RE = re.compile(r"^\s*(?:local\s+)?function\s+([a-zA-Z_]\w*(?:[.:]\w+)*)\s*\(", re.MULTILINE)
@@ -75,7 +75,7 @@ _LUA_KEYWORDS = frozenset(
     }
 )
 
-_DIFF_REQUIRE_RE = re.compile(r"""^\+.*require\s*[\(]?\s*['"]([^'"]{1,300})['"]""", re.MULTILINE)
+_DIFF_REQUIRE_RE = re.compile(r"""^\+.*require\s*\(?\s*['"]([^'"]{1,300})['"]""", re.MULTILINE)
 _DIFF_DOFILE_RE = re.compile(r"""^\+.*dofile\s*\(\s*['"]([^'"]{1,300})['"]""", re.MULTILINE)
 
 
