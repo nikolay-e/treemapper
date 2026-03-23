@@ -25,7 +25,7 @@ _GQL_EXTEND_INTERFACE_RE = re.compile(r"^\s{0,20}extend\s{1,10}interface\s{1,10}
 _GQL_IMPLEMENTS_RE = re.compile(r"implements\s{1,10}([A-Z][\w\s&]{0,300}?)(?:\s*\{|\s*@)", re.MULTILINE)
 _GQL_UNION_RE = re.compile(r"^\s{0,20}union\s{1,10}([A-Z]\w{0,100})\s*=\s*([A-Z][\w\s|]{0,500})", re.MULTILINE)
 
-_GQL_FIELD_TYPE_RE = re.compile(r":\s*\[?\s*([A-Z]\w{0,100})")
+_GQL_FIELD_TYPE_RE = re.compile(r":\s*(?:\[\s*)?([A-Z]\w{0,100})")
 
 _GQL_BUILTIN_TYPES = frozenset(
     {
@@ -69,8 +69,8 @@ def _extract_implemented_interfaces(content: str) -> set[str]:
     interfaces: set[str] = set()
     for m in _GQL_IMPLEMENTS_RE.finditer(content):
         raw = m.group(1)
-        for name in re.split(r"\s*&\s*", raw):
-            name = name.strip()
+        for part in raw.split("&"):
+            name = part.strip()
             if name and name[0].isupper():
                 interfaces.add(name)
     return interfaces
@@ -80,8 +80,8 @@ def _extract_union_members(content: str) -> set[str]:
     members: set[str] = set()
     for m in _GQL_UNION_RE.finditer(content):
         raw = m.group(2)
-        for name in re.split(r"\s*\|\s*", raw):
-            name = name.strip()
+        for part in raw.split("|"):
+            name = part.strip()
             if name and name[0].isupper():
                 members.add(name)
     return members

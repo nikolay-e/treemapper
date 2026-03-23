@@ -15,15 +15,15 @@ _NIM_FROM_IMPORT_RE = re.compile(r"^\s*from\s+([\w/]+)\s+import", re.MULTILINE)
 _NIM_INCLUDE_RE = re.compile(r"^\s*include\s+([\w/]+)", re.MULTILINE)
 
 _PROC_RE = re.compile(
-    r"^\s*(?:proc|func|method|iterator|converter|template|macro)\s+([a-zA-Z_]\w*)\s*\*?\s*[(\[]",
+    r"^\s*(?:proc|func|method|iterator|converter|template|macro)\s+([a-zA-Z_]\w*)\s*(?:\*\s*)?[(\[]",
     re.MULTILINE,
 )
 _TYPE_DEF_RE = re.compile(
-    r"^\s*([A-Z]\w*)\s*\*?\s*=\s*(?:object|ref\s+object|enum|tuple|concept|distinct)",
+    r"^\s*([A-Z]\w*)\s*(?:\*\s*)?=\s*(?:object|ref\s+object|enum|tuple|concept|distinct)",
     re.MULTILINE,
 )
 _TYPE_IN_SECTION_RE = re.compile(
-    r"^\s{2,}([A-Z]\w*)\s*\*?\s*(?:\[[^\]]*\])?\s*=\s*(?:object|ref\s+object|enum|tuple|concept|distinct|ref|ptr)",
+    r"^\s{2,}([A-Z]\w*)\s*(?:\*\s*)?(?:\[[^\]]*\]\s*)?=\s*(?:object|ref\s+object|enum|tuple|concept|distinct|ref|ptr)",
     re.MULTILINE,
 )
 _OBJECT_OF_RE = re.compile(r"of\s+([A-Z]\w*)", re.MULTILINE)
@@ -283,18 +283,29 @@ class NimEdgeBuilder(EdgeBuilder):
         fn_defs: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
-        refs = _extract_refs(nf.content)
-        for ref in refs:
+        self._add_import_edges(nf, idx, edges)
+        self._add_inheritance_edges(nf, type_defs, edges)
+        self._add_reference_edges(nf, type_defs, fn_defs, edges)
+
+    def _add_import_edges(self, nf: Fragment, idx: FragmentIndex, edges: EdgeDict) -> None:
+        for ref in _extract_refs(nf.content):
             ref_name = ref.split("/")[-1].lower()
             self.link_by_stem(nf.id, ref_name, idx, edges, self.import_weight)
             self.link_by_path_match(nf.id, ref, idx, edges, self.import_weight)
 
-        inheritance = _extract_inheritance(nf.content)
-        for parent in inheritance:
+    def _add_inheritance_edges(self, nf: Fragment, type_defs: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
+        for parent in _extract_inheritance(nf.content):
             for fid in type_defs.get(parent.lower(), []):
                 if fid != nf.id:
                     self.add_edge(edges, nf.id, fid, self.type_weight)
 
+    def _add_reference_edges(
+        self,
+        nf: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        fn_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
         type_refs, func_calls = _extract_references(nf.content)
         self_funcs, self_types = _extract_definitions(nf.content)
         self_type_lower = {t.lower() for t in self_types}

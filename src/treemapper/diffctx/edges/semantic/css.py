@@ -22,7 +22,7 @@ _CSS_IMPORT_STR_RE = re.compile(
 )
 _SCSS_USE_RE = re.compile(r"^\s*@use\s+['\"]([^'\"]{1,300})['\"]", re.MULTILINE)
 _SCSS_FORWARD_RE = re.compile(r"^\s*@forward\s+['\"]([^'\"]{1,300})['\"]", re.MULTILINE)
-_CSS_COMPOSES_RE = re.compile(r"composes\s*:\s*[^;]*\bfrom\s+['\"]([^'\"]{1,300})['\"]", re.MULTILINE)
+_CSS_COMPOSES_RE = re.compile(r"composes\s*:\s*[^;\n]{0,300}\bfrom\s+['\"]([^'\"]{1,300})['\"]", re.MULTILINE)
 
 
 def _is_css_file(path: Path) -> bool:

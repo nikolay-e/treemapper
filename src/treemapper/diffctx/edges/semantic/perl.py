@@ -15,8 +15,8 @@ _REQUIRE_RE = re.compile(r"""^\s*require\s+['"]([^'"]{1,300})['"]""", re.MULTILI
 
 _SUB_RE = re.compile(r"^\s*sub\s+([a-zA-Z_]\w*)", re.MULTILINE)
 _PACKAGE_RE = re.compile(r"^\s*package\s+([\w:]+)", re.MULTILINE)
-_ISA_RE = re.compile(r"our\s+@ISA\s*=\s*(?:qw)?\s*[\(\[]([^)\]]+)", re.MULTILINE)
-_USE_BASE_RE = re.compile(r"^\s*use\s+(?:base|parent)\s+(?:qw)?\s*[\('\[]([^)\]']+)", re.MULTILINE)
+_ISA_RE = re.compile(r"our\s+@ISA\s*=\s*(?:qw\s*)?[\(\[]([^)\]]+)", re.MULTILINE)
+_USE_BASE_RE = re.compile(r"^\s*use\s+(?:base|parent)\s+(?:qw\s*)?[\('\[]([^)\]']+)", re.MULTILINE)
 _EXTENDS_RE = re.compile(r"^\s*extends\s+['\"]?([\w:]+)", re.MULTILINE)
 
 _METHOD_CALL_RE = re.compile(r"(\w+)->(\w+)\s*\(")

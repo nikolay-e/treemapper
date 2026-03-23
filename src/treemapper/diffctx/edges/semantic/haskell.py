@@ -20,9 +20,9 @@ _FUNC_BIND_RE = re.compile(r"^([a-z_]\w*)\s+(?:[a-z_]\w*|\()", re.MULTILINE)
 _DATA_RE = re.compile(r"^\s*data\s+([A-Z]\w*)", re.MULTILINE)
 _NEWTYPE_RE = re.compile(r"^\s*newtype\s+([A-Z]\w*)", re.MULTILINE)
 _TYPE_RE = re.compile(r"^\s*type\s+([A-Z]\w*)", re.MULTILINE)
-_CLASS_RE = re.compile(r"^\s*class\s+(?:\([^)]*\)\s*=>)?\s*([A-Z]\w*)", re.MULTILINE)
+_CLASS_RE = re.compile(r"^\s*class\s+(?:\([^)]*\)\s*=>\s*)?([A-Z]\w*)", re.MULTILINE)
 _INSTANCE_RE = re.compile(
-    r"^\s*instance\s+(?:\([^)]*\)\s*=>)?\s*([A-Z]\w*)\s+([A-Z]\w*)",
+    r"^\s*instance\s+(?:\([^)]*\)\s*=>\s*)?([A-Z]\w*)\s+([A-Z]\w*)",
     re.MULTILINE,
 )
 _DERIVING_RE = re.compile(r"deriving\s*\(([^)]+)\)", re.MULTILINE)

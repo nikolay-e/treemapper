@@ -20,7 +20,7 @@ _MIXIN_RE = re.compile(r"^\s*mixin\s+(\w+)", re.MULTILINE)
 _ENUM_RE = re.compile(r"^\s*enum\s+(\w+)", re.MULTILINE)
 _TYPEDEF_RE = re.compile(r"^\s*typedef\s+(\w+)", re.MULTILINE)
 _EXTENSION_RE = re.compile(r"^\s*extension\s+(\w+)\s+on\s+(\w+)", re.MULTILINE)
-_TOP_FUNC_RE = re.compile(r"^(?:[\w<>?,\s]+\s+)?([a-z_]\w*)\s*\(", re.MULTILINE)
+_TOP_FUNC_RE = re.compile(r"^(?:(?:[\w<>?,]+\s+)+)?([a-z_]\w*)\s*\(", re.MULTILINE)
 
 _EXTENDS_RE = re.compile(r"\bextends\s+(\w+)")
 _IMPLEMENTS_RE = re.compile(r"\bimplements\s+([^{]+)")
