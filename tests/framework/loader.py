@@ -22,6 +22,7 @@ _VALID_TOP_LEVEL_KEYS = frozenset(
         "must_not_include",
         "must_include_content_from",
         "must_not_include_files",
+        "must_not_include_content_from",
         "max_fragments",
         "max_files",
         "max_fragments_per_file",
@@ -48,6 +49,7 @@ _VALID_ASSERTION_KEYS = frozenset(
         "must_not_include",
         "must_include_content_from",
         "must_not_include_files",
+        "must_not_include_content_from",
     }
 )
 
@@ -143,6 +145,9 @@ def _parse_yaml_test(data: dict, source_file: Path | None = None) -> YamlTestCas
 
     must_not_include_files = assertions.get("must_not_include_files", data.get("must_not_include_files", []))
 
+    raw_not_content_from = assertions.get("must_not_include_content_from", data.get("must_not_include_content_from", {}))
+    must_not_include_content_from = _normalize_content_from(raw_not_content_from)
+
     options = data.get("options", {})
 
     return YamlTestCase(
@@ -155,6 +160,7 @@ def _parse_yaml_test(data: dict, source_file: Path | None = None) -> YamlTestCas
         must_not_include=must_not_include,
         must_include_content_from=must_include_content_from,
         must_not_include_files=must_not_include_files,
+        must_not_include_content_from=must_not_include_content_from,
         max_fragments=options.get("max_fragments", data.get("max_fragments")),
         max_files=options.get("max_files", data.get("max_files")),
         max_fragments_per_file=options.get("max_fragments_per_file", data.get("max_fragments_per_file")),

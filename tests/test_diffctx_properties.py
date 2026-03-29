@@ -204,9 +204,7 @@ class TestGarbageExclusionProperty:
         assert "feature" in all_content, "Changed function must be in context"
 
         for marker in markers:
-            assert marker not in all_content, (
-                f"Garbage marker '{marker}' leaked into context — " f"algorithm included unrelated code"
-            )
+            assert marker not in all_content, f"Garbage marker '{marker}' leaked into context — algorithm included unrelated code"
 
     def test_standard_garbage_files_excluded(self, tmp_path: Path) -> None:
         g = Pygit2Repo(tmp_path / "repo")
@@ -229,6 +227,6 @@ class TestGarbageExclusionProperty:
         assert "target" in all_content, "Changed function must be in context"
 
         for marker in GARBAGE_MARKERS:
-            assert marker not in all_content, (
-                f"Standard garbage marker '{marker}' found in context — " f"algorithm is including known unrelated code"
-            )
+            assert (
+                marker not in all_content
+            ), f"Standard garbage marker '{marker}' found in context — algorithm is including known unrelated code"
