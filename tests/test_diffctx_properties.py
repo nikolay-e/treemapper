@@ -11,6 +11,8 @@ from tests.framework.pygit2_backend import Pygit2Repo
 from treemapper.diffctx import build_diff_context
 from treemapper.tokens import count_tokens
 
+pytestmark = pytest.mark.timeout(120)
+
 
 def _extract_content(context: dict) -> str:
     parts = []
