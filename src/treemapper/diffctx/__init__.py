@@ -80,6 +80,12 @@ def _looks_binary(content: str) -> bool:
     return bool(_BINARY_CTRL_RE.search(content[:8192]))
 
 
+def _show_at_revision(root_dir: Path, rev: str, rel: Path, batch_reader: CatFileBatch | None) -> str:
+    if batch_reader is not None:
+        return batch_reader.get(rev, rel)
+    return show_file_at_revision(root_dir, rev, rel)
+
+
 def _read_file_content(
     file_path: Path,
     root_dir: Path,
@@ -98,10 +104,7 @@ def _read_file_content(
 
     for rev in preferred_revs:
         try:
-            if batch_reader is not None:
-                content = batch_reader.get(rev, rel)
-            else:
-                content = show_file_at_revision(root_dir, rev, rel)
+            content = _show_at_revision(root_dir, rev, rel, batch_reader)
             if _looks_binary(content):
                 return None
             return content
