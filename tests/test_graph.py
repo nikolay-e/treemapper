@@ -361,8 +361,13 @@ class TestGraphCycles:
 
 
 class TestGraphCLI:
-    def test_default_json_export(self, graph_git_project):
+    def test_default_mermaid_export(self, graph_git_project):
         result = _run_graph_cli([".", "-q"], cwd=graph_git_project)
+        assert result.returncode == 0
+        assert result.stdout.startswith("graph LR")
+
+    def test_json_format(self, graph_git_project):
+        result = _run_graph_cli([".", "-f", "json", "-q"], cwd=graph_git_project)
         assert result.returncode == 0
         data = json.loads(result.stdout)
         assert data["type"] == "project_graph"
@@ -401,7 +406,7 @@ class TestGraphCLI:
 
     def test_output_file(self, graph_git_project):
         out_file = graph_git_project / "graph.json"
-        result = _run_graph_cli([".", "-o", str(out_file), "-q"], cwd=graph_git_project)
+        result = _run_graph_cli([".", "-f", "json", "-o", str(out_file), "-q"], cwd=graph_git_project)
         assert result.returncode == 0
         assert out_file.exists()
         data = json.loads(out_file.read_text())

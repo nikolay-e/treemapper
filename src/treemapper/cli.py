@@ -176,9 +176,9 @@ def _warn_diff_only_flags(args: argparse.Namespace) -> None:
 
 @dataclass
 class GraphArgs:
-    format: str = "json"
+    format: str = "mermaid"
     summary: bool = False
-    level: str = "fragment"
+    level: str = "directory"
     edge_types: list[str] | None = None
     mermaid: bool = False
     cycles: bool = False
@@ -264,16 +264,16 @@ def _build_graph_parser() -> argparse.ArgumentParser:
     graph_parser.add_argument(
         "-f",
         "--format",
-        choices=["json", "graphml"],
-        default="json",
-        help="Graph output format (default: json)",
+        choices=["mermaid", "json", "graphml"],
+        default="mermaid",
+        help="Graph output format (default: mermaid)",
     )
     graph_parser.add_argument("--summary", action="store_true", help="Print graph summary statistics")
     graph_parser.add_argument(
         "--level",
         choices=["fragment", "file", "directory"],
-        default="fragment",
-        help="Granularity level for graph operations (default: fragment)",
+        default="directory",
+        help="Granularity level for graph operations (default: directory)",
     )
     graph_parser.add_argument(
         "--edge-types",

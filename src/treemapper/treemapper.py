@@ -187,11 +187,15 @@ def _format_blast_radius(g: GraphArgs, pg: Any) -> str:
     return "\n".join(lines)
 
 
-def _graph_to_string(pg: Any, fmt: str) -> str:
+def _graph_to_string(pg: Any, fmt: str, level: str = "directory") -> str:
+    from .diffctx.graph_analytics import quotient_graph, to_mermaid
     from .diffctx.graph_export import graph_to_graphml_string, graph_to_json_string
 
     if fmt == "graphml":
         return graph_to_graphml_string(pg)
+    if fmt == "mermaid":
+        qg = quotient_graph(pg, level=level)
+        return to_mermaid(qg)
     return graph_to_json_string(pg)
 
 
@@ -230,7 +234,7 @@ def _handle_graph_mode(args: ParsedArgs) -> str:
 
     has_analysis_flag = any([g.summary, g.cycles, g.hotspots is not None, g.metrics, g.impact, g.blast_radius, g.mermaid])
     if not has_analysis_flag:
-        parts.append(_graph_to_string(pg, g.format))
+        parts.append(_graph_to_string(pg, g.format, level=g.level))
 
     return "\n".join(parts) + "\n" if parts else ""
 
