@@ -143,7 +143,7 @@ class ParsedArgs:
     whitelist_file: Path | None
     output_file: Path | None
     no_default_ignores: bool
-    verbosity: int
+    verbosity: int | str
     output_format: str
     max_depth: int | None
     no_content: bool
@@ -315,11 +315,7 @@ def parse_args() -> ParsedArgs:
     ignore_file = _resolve_ignore_file(args.ignore, root_dir)
     whitelist_file = _resolve_whitelist_file(args.whitelist, root_dir)
 
-    log_level_map = {"error": 0, "warning": 1, "info": 2, "debug": 3}
-    verbosity = log_level_map[args.log_level]
-
-    if args.quiet:
-        verbosity = 0
+    verbosity = "error" if args.quiet else args.log_level
 
     return ParsedArgs(
         root_dir=root_dir,

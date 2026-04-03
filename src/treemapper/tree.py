@@ -212,12 +212,35 @@ def _detect_binary_in_sample(file_path: Path, file_size: int) -> tuple[bytes | N
     return raw_bytes, None
 
 
+def _try_charset_normalizer(raw_bytes: bytes, file_path: Path) -> str | None:
+    try:
+        from charset_normalizer import from_bytes
+
+        matches = from_bytes(raw_bytes)
+        best = matches.best()
+        if best is not None:
+            logger.info("Decoded %s as %s via charset-normalizer", file_path.name, best.encoding)
+            return str(best)
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    return None
+
+
 def _decode_file_content(raw_bytes: bytes, file_path: Path, file_size: int) -> str:
     if b"\x00" in raw_bytes[BINARY_DETECTION_SAMPLE_SIZE:]:
         logger.debug("Detected binary file %s (null in remainder)", file_path.name)
         return _format_binary_placeholder(file_size)
 
-    content = raw_bytes.decode("utf-8")
+    try:
+        content = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        fallback = _try_charset_normalizer(raw_bytes, file_path)
+        if fallback is None:
+            raise
+        content = fallback
+
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     if not content:
         return ""
