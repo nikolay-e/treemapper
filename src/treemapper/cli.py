@@ -142,16 +142,18 @@ def _build_graph_parsed_args(args: argparse.Namespace) -> ParsedArgs:
         force_stdout=False,
         quiet=args.quiet,
         command="graph",
-        format=args.format,
-        summary=args.summary,
-        level=args.level,
-        edge_types=edge_types,
-        mermaid=args.mermaid,
-        cycles=args.cycles,
-        hotspots=args.hotspots,
-        metrics=args.metrics,
-        impact=args.impact,
-        blast_radius=args.blast_radius,
+        graph=GraphArgs(
+            format=args.format,
+            summary=args.summary,
+            level=args.level,
+            edge_types=edge_types,
+            mermaid=args.mermaid,
+            cycles=args.cycles,
+            hotspots=args.hotspots,
+            metrics=args.metrics,
+            impact=args.impact,
+            blast_radius=args.blast_radius,
+        ),
     )
 
 
@@ -170,6 +172,20 @@ def _warn_diff_only_flags(args: argparse.Namespace) -> None:
     if used:
         flags = ", ".join(used)
         print(f"Warning: diff-mode flags ignored without --diff: {flags}", file=sys.stderr)
+
+
+@dataclass
+class GraphArgs:
+    format: str = "json"
+    summary: bool = False
+    level: str = "fragment"
+    edge_types: list[str] | None = None
+    mermaid: bool = False
+    cycles: bool = False
+    hotspots: int | None = None
+    metrics: bool = False
+    impact: str | None = None
+    blast_radius: str | None = None
 
 
 @dataclass
@@ -193,16 +209,7 @@ class ParsedArgs:
     tau: float = 0.08
     full_diff: bool = False
     command: str | None = None
-    format: str = "json"
-    summary: bool = False
-    level: str = "fragment"
-    edge_types: list[str] | None = None
-    mermaid: bool = False
-    cycles: bool = False
-    hotspots: int | None = None
-    metrics: bool = False
-    impact: str | None = None
-    blast_radius: str | None = None
+    graph: GraphArgs | None = None
 
 
 DEFAULT_IGNORES_HELP = """

@@ -5,7 +5,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .cli import ParsedArgs
+    from .cli import GraphArgs, ParsedArgs
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +99,11 @@ def _is_graph_mode(args: ParsedArgs) -> bool:
     return args.command == "graph"
 
 
-def _format_cycles(args: ParsedArgs, pg: Any) -> str:
+def _format_cycles(g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import detect_cycles
 
-    edge_filter = set(args.edge_types) if args.edge_types else None
-    cycles = detect_cycles(pg, level=args.level, edge_types=edge_filter)
+    edge_filter = set(g.edge_types) if g.edge_types else None
+    cycles = detect_cycles(pg, level=g.level, edge_types=edge_filter)
     if not cycles:
         return "No dependency cycles detected."
     lines = [f"{len(cycles)} dependency cycle(s) detected:\n"]
@@ -113,21 +113,21 @@ def _format_cycles(args: ParsedArgs, pg: Any) -> str:
     return "\n".join(lines)
 
 
-def _format_hotspots(args: ParsedArgs, pg: Any) -> str:
+def _format_hotspots(g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import hotspots
 
-    hot = hotspots(pg, top=args.hotspots or 10)
+    hot = hotspots(pg, top=g.hotspots or 10)
     lines = [f"Top {len(hot)} hotspots:"]
     for rank, (name, score, details) in enumerate(hot, 1):
         lines.append(f"  {rank}. {name}  score={score}  degree={details['degree']}  churn={details['churn']}")
     return "\n".join(lines)
 
 
-def _format_metrics(args: ParsedArgs, pg: Any) -> str:
+def _format_metrics(g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import coupling_metrics
 
-    metrics = coupling_metrics(pg, level=args.level)
-    lines = [f"Module metrics ({args.level} level):"]
+    metrics = coupling_metrics(pg, level=g.level)
+    lines = [f"Module metrics ({g.level} level):"]
     for m in metrics:
         flags = ""
         if m.coupling > 0.7:
@@ -141,23 +141,23 @@ def _format_metrics(args: ParsedArgs, pg: Any) -> str:
     return "\n".join(lines)
 
 
-def _format_impact(args: ParsedArgs, pg: Any) -> str:
+def _format_impact(g: GraphArgs, pg: Any) -> str:
     from pathlib import Path
 
     from .diffctx.ppr import personalized_pagerank
     from .diffctx.project_graph import _relative_path
 
-    assert args.impact is not None
-    seed_path = Path(args.impact).resolve()
+    assert g.impact is not None
+    seed_path = Path(g.impact).resolve()
     seed_fids = {fid for fid in pg.fragments if fid.path.resolve() == seed_path}
     if not seed_fids:
-        logger.error("File '%s' not found in project graph", args.impact)
+        logger.error("File '%s' not found in project graph", g.impact)
         sys.exit(1)
     scores = personalized_pagerank(
         pg.graph, seeds=set(seed_fids), alpha=0.5, seed_weights={fid: 1.0 / len(seed_fids) for fid in seed_fids}
     )
     ranked = sorted(scores.items(), key=lambda x: -x[1])
-    lines = [f"Impact subgraph for {args.impact}:"]
+    lines = [f"Impact subgraph for {g.impact}:"]
     seen_files: set[str] = set()
     for fid, score in ranked[:30]:
         rel = _relative_path(fid.path, pg.root_dir)
@@ -167,15 +167,15 @@ def _format_impact(args: ParsedArgs, pg: Any) -> str:
     return "\n".join(lines)
 
 
-def _format_blast_radius(args: ParsedArgs, pg: Any) -> str:
+def _format_blast_radius(g: GraphArgs, pg: Any) -> str:
     from pathlib import Path
 
     from .diffctx.graph_analytics import blast_radius
 
-    assert args.blast_radius is not None
-    seed_path = Path(args.blast_radius).resolve()
+    assert g.blast_radius is not None
+    seed_path = Path(g.blast_radius).resolve()
     result = blast_radius(pg, seed_files=[seed_path])
-    lines = [f"Blast radius for {args.blast_radius}:"]
+    lines = [f"Blast radius for {g.blast_radius}:"]
     for key, entries in result.items():
         if key == "summary":
             lines.append(f"\n  Summary: {', '.join(e[0] for e in entries)}")
@@ -200,6 +200,9 @@ def _handle_graph_mode(args: ParsedArgs) -> str:
     from .diffctx.graph_export import graph_summary
     from .diffctx.project_graph import build_project_graph
 
+    assert args.graph is not None
+    g = args.graph
+
     pg = build_project_graph(
         args.root_dir,
         ignore_file=args.ignore_file,
@@ -209,27 +212,25 @@ def _handle_graph_mode(args: ParsedArgs) -> str:
 
     parts: list[str] = []
 
-    if args.summary:
+    if g.summary:
         parts.append(graph_summary(pg))
-    if args.cycles:
-        parts.append(_format_cycles(args, pg))
-    if args.hotspots is not None:
-        parts.append(_format_hotspots(args, pg))
-    if args.metrics:
-        parts.append(_format_metrics(args, pg))
-    if args.impact:
-        parts.append(_format_impact(args, pg))
-    if args.blast_radius:
-        parts.append(_format_blast_radius(args, pg))
-    if args.mermaid:
-        qg = quotient_graph(pg, level=args.level)
+    if g.cycles:
+        parts.append(_format_cycles(g, pg))
+    if g.hotspots is not None:
+        parts.append(_format_hotspots(g, pg))
+    if g.metrics:
+        parts.append(_format_metrics(g, pg))
+    if g.impact:
+        parts.append(_format_impact(g, pg))
+    if g.blast_radius:
+        parts.append(_format_blast_radius(g, pg))
+    if g.mermaid:
+        qg = quotient_graph(pg, level=g.level)
         parts.append(to_mermaid(qg))
 
-    has_analysis_flag = any(
-        [args.summary, args.cycles, args.hotspots is not None, args.metrics, args.impact, args.blast_radius, args.mermaid]
-    )
+    has_analysis_flag = any([g.summary, g.cycles, g.hotspots is not None, g.metrics, g.impact, g.blast_radius, g.mermaid])
     if not has_analysis_flag:
-        parts.append(_graph_to_string(pg, args.format))
+        parts.append(_graph_to_string(pg, g.format))
 
     return "\n".join(parts) + "\n" if parts else ""
 
