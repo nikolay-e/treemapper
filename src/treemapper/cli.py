@@ -119,6 +119,42 @@ def _resolve_whitelist_file(whitelist_file_arg: str | None, root_dir: Path) -> P
     return resolved
 
 
+def _build_graph_parsed_args(args: argparse.Namespace) -> ParsedArgs:
+    root_dir = _resolve_root_dir(args.directory)
+    output_file_path = Path(args.output_file).resolve() if args.output_file else None
+    ignore_file = _resolve_ignore_file(args.ignore, root_dir)
+    whitelist_file = _resolve_whitelist_file(args.whitelist, root_dir)
+    verbosity = "error" if args.quiet else args.log_level
+    edge_types = [t.strip() for t in args.edge_types.split(",")] if args.edge_types else None
+
+    return ParsedArgs(
+        root_dir=root_dir,
+        ignore_file=ignore_file,
+        whitelist_file=whitelist_file,
+        output_file=output_file_path,
+        no_default_ignores=args.no_default_ignores,
+        verbosity=verbosity,
+        output_format="yaml",
+        max_depth=None,
+        no_content=False,
+        max_file_bytes=None,
+        copy=args.copy,
+        force_stdout=False,
+        quiet=args.quiet,
+        command="graph",
+        format=args.format,
+        summary=args.summary,
+        level=args.level,
+        edge_types=edge_types,
+        mermaid=args.mermaid,
+        cycles=args.cycles,
+        hotspots=args.hotspots,
+        metrics=args.metrics,
+        impact=args.impact,
+        blast_radius=args.blast_radius,
+    )
+
+
 def _warn_diff_only_flags(args: argparse.Namespace) -> None:
     if args.diff_range:
         return
@@ -156,6 +192,17 @@ class ParsedArgs:
     alpha: float = 0.60
     tau: float = 0.08
     full_diff: bool = False
+    command: str | None = None
+    format: str = "json"
+    summary: bool = False
+    level: str = "fragment"
+    edge_types: list[str] | None = None
+    mermaid: bool = False
+    cycles: bool = False
+    hotspots: int | None = None
+    metrics: bool = False
+    impact: str | None = None
+    blast_radius: str | None = None
 
 
 DEFAULT_IGNORES_HELP = """
@@ -200,12 +247,72 @@ Output routing:
 """
 
 
-def parse_args() -> ParsedArgs:
+def _build_graph_parser() -> argparse.ArgumentParser:
+    graph_parser = argparse.ArgumentParser(
+        prog="treemapper graph",
+        description="Build and analyze the project dependency graph",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    graph_parser.add_argument("directory", nargs="?", default=".", help="The directory to analyze")
+    graph_parser.add_argument(
+        "-f",
+        "--format",
+        choices=["json", "graphml"],
+        default="json",
+        help="Graph output format (default: json)",
+    )
+    graph_parser.add_argument("--summary", action="store_true", help="Print graph summary statistics")
+    graph_parser.add_argument(
+        "--level",
+        choices=["fragment", "file", "directory"],
+        default="fragment",
+        help="Granularity level for graph operations (default: fragment)",
+    )
+    graph_parser.add_argument(
+        "--edge-types",
+        default=None,
+        help="Comma-separated edge types to include (e.g., semantic,config)",
+    )
+    graph_parser.add_argument("--mermaid", action="store_true", help="Output graph as Mermaid diagram")
+    graph_parser.add_argument("--cycles", action="store_true", help="Detect dependency cycles")
+    graph_parser.add_argument(
+        "--hotspots", type=int, nargs="?", const=10, default=None, metavar="N", help="Show top N hotspots (default: 10)"
+    )
+    graph_parser.add_argument("--metrics", action="store_true", help="Show coupling/cohesion metrics per module")
+    graph_parser.add_argument("--impact", default=None, metavar="FILE", help="Show impact subgraph for a file")
+    graph_parser.add_argument("--blast-radius", default=None, metavar="FILE", help="Estimate blast radius for a file")
+    graph_parser.add_argument("-o", "--output-file", default=None, help="Write output to FILE")
+    graph_parser.add_argument("-i", "--ignore", default=None, help="Path to custom ignore file")
+    graph_parser.add_argument("-w", "--whitelist", default=None, help="Path to whitelist file")
+    graph_parser.add_argument(
+        "--no-default-ignores",
+        action="store_true",
+        help="Disable built-in ignore patterns",
+    )
+    graph_parser.add_argument("-c", "--copy", action="store_true", help="Copy to clipboard")
+    graph_parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress all non-error output",
+    )
+    graph_parser.add_argument(
+        "--log-level",
+        choices=["error", "warning", "info", "debug"],
+        default="error",
+        help="Log level (default: error)",
+    )
+    return graph_parser
+
+
+def _build_main_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="treemapper",
         description=(
             "Generate a structured representation of a directory tree (YAML, JSON, text, or Markdown). "
-            "Supports diff context mode (--diff) for intelligent code change analysis."
+            "Supports diff context mode (--diff) for intelligent code change analysis.\n\n"
+            "Subcommands:\n"
+            "  graph    Build and analyze the project dependency graph"
         ),
         epilog=DEFAULT_IGNORES_HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -299,8 +406,19 @@ def parse_args() -> ParsedArgs:
         action="store_true",
         help="Include all changed code (skip smart selection algorithm)",
     )
+    return parser
 
-    args = parser.parse_args()
+
+def parse_args(argv: list[str] | None = None) -> ParsedArgs:
+    raw_args = sys.argv[1:] if argv is None else argv
+
+    if raw_args and raw_args[0] == "graph":
+        graph_parser = _build_graph_parser()
+        args = graph_parser.parse_args(raw_args[1:])
+        return _build_graph_parsed_args(args)
+
+    parser = _build_main_parser()
+    args = parser.parse_args(raw_args)
 
     _validate_max_depth(args.max_depth)
     max_file_bytes = _validate_max_file_bytes(args.max_file_bytes, args.no_file_size_limit)
