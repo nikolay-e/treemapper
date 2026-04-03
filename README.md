@@ -50,23 +50,9 @@ pip install 'treemapper[tree-sitter]'      # + AST parsing for smarter diff cont
 
 **Paper:** [Context-Selection for Git Diff (Zenodo, 2026)](https://doi.org/10.5281/zenodo.18824580)
 
-Smart context selection for git diffs — automatically finds the
-minimal set of code fragments needed to understand a change:
-
-```bash
-treemapper . --diff HEAD~1..HEAD      # recent changes
-treemapper . --diff main..feature     # feature branch
-treemapper . --diff HEAD~1 --budget 30000  # limit tokens
-treemapper . --diff HEAD~1 --full     # all changed code
-```
-
-Uses graph-based relevance propagation (Personalized PageRank)
-to select the most important context. Output size is controlled
-by algorithm convergence (τ-stopping) by default, or an explicit
-`--budget` token limit. Understands imports, type references,
-config dependencies, and co-change patterns across 50+ file types.
-
-Output format:
+Automatically finds the minimal set of code fragments needed to understand
+a change — imports, callers, type definitions, config dependencies — without
+dumping entire files. Understands 50+ file types.
 
 ```yaml
 name: myproject
@@ -82,42 +68,35 @@ fragments:
           ...
 ```
 
-| Flag       | Default       | Description                                    |
-|------------|---------------|------------------------------------------------|
-| `--budget` | none          | Token limit (convergence-based by default)     |
-| `--alpha`  | 0.60          | PPR damping factor                             |
-| `--tau`    | 0.08          | Stopping threshold                             |
-| `--full`   | false         | Include all changed code                       |
+### How it works
+
+Uses Personalized PageRank on a code graph (imports, co-changes, type refs)
+to propagate relevance from changed lines outward. Stops when signal decays
+below threshold τ, or at an explicit `--budget` token limit.
+
+| Flag       | Default | Description                              |
+|------------|---------|------------------------------------------|
+| `--budget` | none    | Token limit (convergence-based by default) |
+| `--full`   | false   | Include all changed code, skip selection |
+| `--alpha`  | 0.60    | PPR damping factor                       |
+| `--tau`    | 0.08    | Convergence threshold                    |
 
 ## Usage
 
 <!-- BEGIN USAGE -->
 ```bash
-treemapper                                  # current dir, YAML to stdout
+# full codebase export:
 treemapper .                                # YAML to stdout + token count
-treemapper . -o tree.yaml                   # save to file
-treemapper . --save                         # save to tree.yaml (default name)
-treemapper . -o -                           # explicit stdout
-treemapper . -f json                        # JSON format
-treemapper . -f txt                         # plain text with indentation
-treemapper . -f md                          # Markdown with fenced code blocks
+treemapper . -f md -c                       # Markdown → clipboard
+treemapper . -f json -o tree.json           # JSON → file
 treemapper . --no-content                   # structure only, no file contents
-treemapper . --max-depth 3                  # limit depth (0=root only)
-treemapper . --max-file-bytes 10000         # skip files > 10KB (default: 10 MB)
-treemapper . --no-file-size-limit           # include all files regardless of size
+treemapper . --max-depth 3                  # limit depth
 treemapper . -i custom.ignore               # custom ignore patterns
-treemapper . -w whitelist                   # include-only filter
-treemapper . --no-default-ignores           # disable built-in ignore patterns
-treemapper . --log-level info               # log level (default: error)
-treemapper . -c                             # copy to clipboard
-treemapper . -c -o tree.yaml                # clipboard + save to file
-treemapper -v                               # show version
 
 # diff context mode (requires git repo):
 treemapper . --diff HEAD~1                  # context for last commit
 treemapper . --diff main..feature           # context for feature branch
-treemapper . --diff HEAD~1 --budget 30000   # limit diff context to ~30k tokens
-treemapper . --diff HEAD~1 --full           # all changed code, no smart selection
+treemapper . --diff HEAD~1 --budget 30000   # limit to ~30k tokens
 treemapper . --diff HEAD~1 -c               # diff context to clipboard
 ```
 <!-- END USAGE -->
