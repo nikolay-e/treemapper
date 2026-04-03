@@ -35,8 +35,8 @@ detect_profile
 is_nlp_available
 Graph.add_node
 QuotientNode.fragment_count
-ProjectGraph.edges_of_type
-ProjectGraph.subgraph
+ProjectGraph.edges_of_type  # NOSONAR(python:S905)
+ProjectGraph.subgraph  # NOSONAR(python:S905)
 AnsibleEdgeBuilder
 BazelEdgeBuilder
 CargoEdgeBuilder
