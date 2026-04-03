@@ -305,7 +305,8 @@ def _resolve_changed_files(
     changed_files = _filter_ignored(changed_files, root_dir, combined_spec)
     changed_files = _filter_whitelist(changed_files, root_dir, wl_spec)
 
-    excluded_paths = _git.get_deleted_files(root_dir, diff_range) | _git.get_renamed_old_paths(root_dir, diff_range)
+    renamed_old, pure_rename_new = _git.get_renamed_paths(root_dir, diff_range)
+    excluded_paths = _git.get_deleted_files(root_dir, diff_range) | renamed_old | pure_rename_new
     if excluded_paths:
         changed_files = [f for f in changed_files if f.resolve() not in excluded_paths]
     return changed_files

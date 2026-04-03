@@ -129,19 +129,26 @@ def get_deleted_files(repo_root: Path, diff_range: str) -> set[Path]:
     }
 
 
-def get_renamed_old_paths(repo_root: Path, diff_range: str) -> set[Path]:
+def get_renamed_paths(repo_root: Path, diff_range: str, min_similarity: int = 95) -> tuple[set[Path], set[Path]]:
     output = run_git(repo_root, ["diff", "--diff-filter=R", "--name-status", "-M", "-z", diff_range])
     parts = output.split("\0")
     old_paths: set[Path] = set()
+    pure_new_paths: set[Path] = set()
     i = 0
     while i < len(parts):
         if parts[i].startswith("R"):
-            if i + 2 < len(parts) and parts[i + 1]:
+            try:
+                sim = int(parts[i][1:])
+            except ValueError:
+                sim = 0
+            if i + 1 < len(parts) and parts[i + 1]:
                 old_paths.add((repo_root / parts[i + 1]).resolve())
+            if sim >= min_similarity and i + 2 < len(parts) and parts[i + 2]:
+                pure_new_paths.add((repo_root / parts[i + 2]).resolve())
             i += 3
         else:
             i += 1
-    return old_paths
+    return old_paths, pure_new_paths
 
 
 def show_file_at_revision(repo_root: Path, rev: str, rel_path: Path) -> str:
