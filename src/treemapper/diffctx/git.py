@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
 from pathlib import Path
+from types import TracebackType
 
 from .types import DiffHunk
+
+logger = logging.getLogger(__name__)
 
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 _RANGE_RE = re.compile(r"^\s*(\S+?)(\.\.\.?)(\S*?)\s*$")  # NOSONAR(S5852)
@@ -143,3 +147,66 @@ def get_renamed_old_paths(repo_root: Path, diff_range: str) -> set[Path]:
 def show_file_at_revision(repo_root: Path, rev: str, rel_path: Path) -> str:
     spec = f"{rev}:{rel_path.as_posix()}"
     return run_git(repo_root, ["show", spec])
+
+
+class CatFileBatch:
+    def __init__(self, repo_root: Path) -> None:
+        self._proc: subprocess.Popen[bytes] | None = None
+        self._repo_root = repo_root
+
+    def _ensure_started(self) -> subprocess.Popen[bytes]:
+        if self._proc is None or self._proc.poll() is not None:
+            self._proc = subprocess.Popen(
+                ["git", "-C", str(self._repo_root), "cat-file", "--batch"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        return self._proc
+
+    def get(self, rev: str, rel_path: Path) -> str:
+        spec = f"{rev}:{rel_path.as_posix()}\n"
+        proc = self._ensure_started()
+        assert proc.stdin is not None and proc.stdout is not None
+        proc.stdin.write(spec.encode())
+        proc.stdin.flush()
+
+        header = proc.stdout.readline()
+        if not header:
+            raise GitError(f"cat-file: unexpected EOF for {spec.strip()}")
+
+        header_str = header.decode("utf-8", errors="replace").strip()
+        if header_str.endswith("missing"):
+            raise GitError(f"Path not found: {spec.strip()}")
+
+        parts = header_str.split()
+        if len(parts) < 3:
+            raise GitError(f"cat-file: malformed header: {header_str}")
+
+        size = int(parts[2])
+        content = proc.stdout.read(size)
+        proc.stdout.read(1)  # trailing LF
+
+        return content.decode("utf-8", errors="replace")
+
+    def close(self) -> None:
+        if self._proc is not None and self._proc.poll() is None:
+            assert self._proc.stdin is not None
+            self._proc.stdin.close()
+            try:
+                self._proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+                self._proc.wait()
+            self._proc = None
+
+    def __enter__(self) -> CatFileBatch:
+        return self
+
+    def __exit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()

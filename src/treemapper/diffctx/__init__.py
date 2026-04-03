@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ from .edges import discover_all_related_files
 from .file_importance import compute_file_importance
 from .fragments import fragment_file  # type: ignore[attr-defined]
 from .git import (
+    CatFileBatch,
     GitError,
     get_changed_files,
     get_deleted_files,
@@ -82,6 +84,7 @@ def _read_file_content(
     file_path: Path,
     root_dir: Path,
     preferred_revs: list[str],
+    batch_reader: CatFileBatch | None = None,
 ) -> str | None:
     if file_path.suffix.lower() in KNOWN_BINARY_EXTENSIONS:
         return None
@@ -95,7 +98,10 @@ def _read_file_content(
 
     for rev in preferred_revs:
         try:
-            content = show_file_at_revision(root_dir, rev, rel)
+            if batch_reader is not None:
+                content = batch_reader.get(rev, rel)
+            else:
+                content = show_file_at_revision(root_dir, rev, rel)
             if _looks_binary(content):
                 return None
             return content
@@ -248,11 +254,12 @@ def _process_files_for_fragments(
     root_dir: Path,
     preferred_revs: list[str],
     seen_frag_ids: set[FragmentId],
+    batch_reader: CatFileBatch | None = None,
 ) -> list[Fragment]:
     max_frags = LIMITS.max_fragments
     fragments: list[Fragment] = []
     for file_path in files:
-        content = _read_file_content(file_path, root_dir, preferred_revs)
+        content = _read_file_content(file_path, root_dir, preferred_revs, batch_reader)
         if content is None:
             continue
         raw_frags = [f for f in fragment_file(file_path, content) if f.id not in seen_frag_ids]
@@ -477,8 +484,9 @@ def _create_whole_file_fragment(
     path: Path,
     root_dir: Path,
     preferred_revs: list[str],
+    batch_reader: CatFileBatch | None = None,
 ) -> Fragment | None:
-    content = _read_file_content(path, root_dir, preferred_revs)
+    content = _read_file_content(path, root_dir, preferred_revs, batch_reader)
     if not content or not content.strip():
         return None
     if _is_generated_file(path, content):
@@ -518,6 +526,7 @@ def _ensure_changed_files_represented(
     remaining_budget: int,
     root_dir: Path,
     preferred_revs: list[str],
+    batch_reader: CatFileBatch | None = None,
 ) -> list[Fragment]:
     selected_paths = {f.path for f in selected}
     missing_paths = set(changed_files) - selected_paths
@@ -537,7 +546,7 @@ def _ensure_changed_files_represented(
     for path in sorted(missing_paths):
         candidates = frags_by_path.get(path, [])
         if not candidates:
-            fallback = _create_whole_file_fragment(path, root_dir, preferred_revs)
+            fallback = _create_whole_file_fragment(path, root_dir, preferred_revs, batch_reader)
             candidates = [fallback] if fallback else []
 
         picked = _pick_smallest_fitting(candidates, selected_ids, budget_left)
@@ -652,36 +661,55 @@ def build_diff_context(
 
     preferred_revs = _build_preferred_revs(base_rev, head_rev)
 
-    seen_frag_ids: set[FragmentId] = set()
-    all_fragments = _process_files_for_fragments(changed_files, root_dir, preferred_revs, seen_frag_ids)
+    t0 = time.perf_counter()
 
-    all_candidate_files, is_large_repo = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
-    all_candidate_files = _filter_whitelist(all_candidate_files, root_dir, wl_spec)
+    with CatFileBatch(root_dir) as batch_reader:
+        seen_frag_ids: set[FragmentId] = set()
+        all_fragments = _process_files_for_fragments(changed_files, root_dir, preferred_revs, seen_frag_ids, batch_reader)
 
-    edge_discovered = discover_all_related_files(changed_files, all_candidate_files, root_dir)
-    if len(edge_discovered) > _MAX_DISCOVERED_FILES:
-        logger.debug(
-            "diffctx: capping edge-discovered files from %d to %d",
-            len(edge_discovered),
-            _MAX_DISCOVERED_FILES,
-        )
-        edge_discovered = edge_discovered[:_MAX_DISCOVERED_FILES]
-    edge_discovered = [_normalize_path(p, root_dir) for p in edge_discovered]
-    all_fragments.extend(_process_files_for_fragments(edge_discovered, root_dir, preferred_revs, seen_frag_ids))
+        all_candidate_files, is_large_repo = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
+        all_candidate_files = _filter_whitelist(all_candidate_files, root_dir, wl_spec)
 
-    if not is_large_repo:
-        expanded_files = _expand_universe_by_rare_identifiers(
-            root_dir,
-            expansion_concepts,
-            changed_files + edge_discovered,
-            combined_spec,
-            candidate_files=all_candidate_files,
-            changed_files=changed_files,
-        )
-        expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
-        all_fragments.extend(_process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids))
-    else:
-        logger.debug("diffctx: skipping rare-identifier expansion for large repo")
+        t1 = time.perf_counter()
+
+        edge_discovered = discover_all_related_files(changed_files, all_candidate_files, root_dir)
+        if len(edge_discovered) > _MAX_DISCOVERED_FILES:
+            logger.debug(
+                "diffctx: capping edge-discovered files from %d to %d",
+                len(edge_discovered),
+                _MAX_DISCOVERED_FILES,
+            )
+            edge_discovered = edge_discovered[:_MAX_DISCOVERED_FILES]
+        edge_discovered = [_normalize_path(p, root_dir) for p in edge_discovered]
+        all_fragments.extend(_process_files_for_fragments(edge_discovered, root_dir, preferred_revs, seen_frag_ids, batch_reader))
+
+        t2 = time.perf_counter()
+
+        if not is_large_repo:
+            expanded_files = _expand_universe_by_rare_identifiers(
+                root_dir,
+                expansion_concepts,
+                changed_files + edge_discovered,
+                combined_spec,
+                candidate_files=all_candidate_files,
+                changed_files=changed_files,
+            )
+            expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
+            all_fragments.extend(
+                _process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids, batch_reader)
+            )
+        else:
+            logger.debug("diffctx: skipping rare-identifier expansion for large repo")
+
+        t3 = time.perf_counter()
+
+    logger.debug(
+        "diffctx: timing — changed_files %.3fs, edge_discovery %.3fs, expansion %.3fs, total_io %.3fs",
+        t1 - t0,
+        t2 - t1,
+        t3 - t2,
+        t3 - t0,
+    )
 
     _assign_token_counts(all_fragments)
 
@@ -690,6 +718,8 @@ def build_diff_context(
     signature_frags = _generate_signature_variants(all_fragments)
     _assign_token_counts(signature_frags)
     all_fragments.extend(signature_frags)
+
+    t4 = time.perf_counter()
 
     if full:
         selected = _select_full_mode(all_fragments, changed_files)
@@ -708,8 +738,14 @@ def build_diff_context(
         )
         effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
         remaining = effective_budget - result.used_tokens
-        selected = _ensure_changed_files_represented(selected, all_fragments, changed_files, remaining, root_dir, preferred_revs)
+        with CatFileBatch(root_dir) as batch_reader:
+            selected = _ensure_changed_files_represented(
+                selected, all_fragments, changed_files, remaining, root_dir, preferred_revs, batch_reader
+            )
         _log_ppr_mode(selected, core_ids, budget_tokens, result, alpha, tau)
+
+    t5 = time.perf_counter()
+    logger.debug("diffctx: timing — graph+select %.3fs", t5 - t4)
 
     if no_content:
         for frag in selected:
