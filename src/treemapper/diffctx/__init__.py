@@ -181,30 +181,30 @@ _GENERATED_CONTENT_MARKERS = (
 )
 
 
-def _is_generated_file(path: Path, content: str) -> bool:
-    name = path.name
-    for pattern in _GENERATED_FILENAME_PATTERNS:
-        if name.endswith(pattern):
-            return True
-    for suffix in _GENERATED_FILENAME_SUFFIXES:
-        if name.endswith(suffix):
-            return True
+def _has_generated_filename(name: str) -> bool:
+    return any(name.endswith(p) for p in _GENERATED_FILENAME_PATTERNS) or any(
+        name.endswith(s) for s in _GENERATED_FILENAME_SUFFIXES
+    )
 
-    for part in path.parts:
-        if part.lower() in _GENERATED_PATH_SEGMENTS:
-            return True
 
+def _has_generated_path_segment(path: Path) -> bool:
+    return any(part.lower() in _GENERATED_PATH_SEGMENTS for part in path.parts)
+
+
+def _has_generated_content_marker(content: str) -> bool:
     header_lower = "\n".join(content.splitlines()[:10]).lower()
     for marker in _GENERATED_CONTENT_MARKERS:
         if marker not in header_lower:
             continue
-        if marker == "@generated":
-            if re.search(r"@generated(?![a-z])", header_lower):
-                return True
-        else:
+        if marker != "@generated":
             return True
-
+        if re.search(r"@generated(?![a-z])", header_lower):
+            return True
     return False
+
+
+def _is_generated_file(path: Path, content: str) -> bool:
+    return _has_generated_filename(path.name) or _has_generated_path_segment(path) or _has_generated_content_marker(content)
 
 
 def _truncate_generated_fragments(file_frags: list[Fragment]) -> list[Fragment]:
