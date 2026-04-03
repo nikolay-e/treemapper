@@ -125,7 +125,7 @@ def _format_hotspots(g: GraphArgs, pg: Any) -> str:
     hot = hotspots(pg, top=g.hotspots or 10, edge_types=edge_filter)
     lines = [f"Top {len(hot)} hotspots:"]
     for rank, (name, score, details) in enumerate(hot, 1):
-        lines.append(f"  {rank}. {name}  score={score}  degree={details['degree']}  churn={details['churn']}")
+        lines.append(f"  {rank}. {name}  score={score}  out_degree={details['out_degree']}  churn={details['churn']}")
     return "\n".join(lines)
 
 

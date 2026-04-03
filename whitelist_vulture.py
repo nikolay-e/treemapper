@@ -61,4 +61,3 @@ ProtobufEdgeBuilder
 RLangEdgeBuilder
 SqlEdgeBuilder
 ZigEdgeBuilder
-_.preserve_quotes  # NOSONAR - intentional vulture whitelist pattern

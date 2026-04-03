@@ -203,13 +203,13 @@ def _format_size_placeholder(file_size: int) -> str:
     return f"<file too large: {file_size} bytes>\n"
 
 
-def _detect_binary_in_sample(file_path: Path, file_size: int) -> tuple[bytes | None, str | None]:
+def _detect_binary_in_sample(file_path: Path, file_size: int) -> str | None:
     with file_path.open("rb") as f:
-        raw_bytes = f.read()
-    if b"\x00" in raw_bytes[:BINARY_DETECTION_SAMPLE_SIZE]:
+        sample = f.read(BINARY_DETECTION_SAMPLE_SIZE)
+    if b"\x00" in sample:
         logger.debug("Detected binary file %s", file_path.name)
-        return None, _format_binary_placeholder(file_size)
-    return raw_bytes, None
+        return _format_binary_placeholder(file_size)
+    return None
 
 
 def _try_charset_normalizer(raw_bytes: bytes, file_path: Path) -> str | None:
@@ -260,11 +260,12 @@ def _read_file_content(file_path: Path, max_file_bytes: int | None) -> str:
             logger.info("Skipping large file %s: %d bytes > %d bytes", file_path.name, file_size, effective_limit)
             return _format_size_placeholder(file_size)
 
-        raw_bytes, binary_result = _detect_binary_in_sample(file_path, file_size)
+        binary_result = _detect_binary_in_sample(file_path, file_size)
         if binary_result is not None:
             return binary_result
 
-        assert raw_bytes is not None
+        with file_path.open("rb") as f:
+            raw_bytes = f.read()
         return _decode_file_content(raw_bytes, file_path, file_size)
 
     except PermissionError:

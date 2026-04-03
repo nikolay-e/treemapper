@@ -37,7 +37,7 @@ def count_tokens(text: str, encoding: str = "o200k_base") -> TokenCountResult:
         logger.debug("tiktoken unavailable, using char/4 approximation")
         return TokenCountResult(len(text) // 4, False, "approximation")
 
-    return TokenCountResult(len(encoder.encode(text)), True, encoding)
+    return TokenCountResult(len(encoder.encode_ordinary(text)), True, encoding)
 
 
 def _format_size(byte_size: int) -> str:

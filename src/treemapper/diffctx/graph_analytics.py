@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import subprocess
 from collections import defaultdict
 from collections.abc import Iterator
@@ -9,8 +8,6 @@ from pathlib import Path
 
 from .project_graph import ProjectGraph, _relative_path
 from .types import Fragment, FragmentId
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -229,7 +226,7 @@ def hotspots(
 ) -> list[tuple[str, float, dict[str, float]]]:
     root = pg.root_dir
 
-    in_deg: dict[str, int] = defaultdict(int)
+    out_deg: dict[str, int] = defaultdict(int)
     file_frag_count: dict[str, int] = defaultdict(int)
     for fid in pg.fragments:
         rel = _relative_path(fid.path, root)
@@ -238,20 +235,20 @@ def hotspots(
         if edge_types is not None and cat not in edge_types:
             continue
         rel = _relative_path(src.path, root)
-        in_deg[rel] += 1
+        out_deg[rel] += 1
 
     churn = _compute_churn(root) if root else {}
 
     all_files = set(file_frag_count.keys())
-    max_deg = max(in_deg.values()) if in_deg else 1
+    max_deg = max(out_deg.values()) if out_deg else 1
     max_churn = max(churn.values()) if churn else 1
 
     scored: list[tuple[str, float, dict[str, float]]] = []
     for f in all_files:
-        deg_norm = in_deg.get(f, 0) / max(max_deg, 1)
+        deg_norm = out_deg.get(f, 0) / max(max_deg, 1)
         churn_norm = churn.get(f, 0) / max(max_churn, 1)
         score = 0.5 * deg_norm + 0.5 * churn_norm
-        scored.append((f, round(score, 4), {"degree": in_deg.get(f, 0), "churn": churn.get(f, 0)}))
+        scored.append((f, round(score, 4), {"out_degree": out_deg.get(f, 0), "churn": churn.get(f, 0)}))
 
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:top]

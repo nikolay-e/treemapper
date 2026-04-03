@@ -449,7 +449,7 @@ class TestGraphHotspots:
         pg = _build_graph(graph_git_project)
         hot = hotspots(pg, top=5)
         for _, _, details in hot:
-            assert "degree" in details
+            assert "out_degree" in details
             assert "churn" in details
 
     def test_high_churn_file_ranks_higher(self, graph_git_project):

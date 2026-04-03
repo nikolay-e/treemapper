@@ -84,9 +84,13 @@ class ProjectGraph:
         nodes = []
         for fid, frag in sorted(self.fragments.items(), key=lambda x: (x[0].path, x[0].start_line)):
             rel_path = _relative_path(fid.path, self.root_dir) if self.root_dir else str(fid.path)
+            basename = fid.path.name
+            loc = f"{basename}:{fid.start_line}-{fid.end_line}"
+            label = f"{frag.symbol_name} ({loc})" if frag.symbol_name else loc
             nodes.append(
                 {
                     "id": f"{rel_path}:{fid.start_line}-{fid.end_line}",
+                    "label": label,
                     "path": rel_path,
                     "lines": f"{fid.start_line}-{fid.end_line}",
                     "kind": frag.kind,
@@ -100,10 +104,14 @@ class ProjectGraph:
             weight = self.graph.adjacency.get(src, {}).get(dst, 0.0)
             src_path = _relative_path(src.path, self.root_dir) if self.root_dir else str(src.path)
             dst_path = _relative_path(dst.path, self.root_dir) if self.root_dir else str(dst.path)
+            src_frag = self.fragments.get(src)
+            dst_frag = self.fragments.get(dst)
             edges.append(
                 {
                     "source": f"{src_path}:{src.start_line}-{src.end_line}",
+                    "source_symbol": (src_frag.symbol_name or "") if src_frag else "",
                     "target": f"{dst_path}:{dst.start_line}-{dst.end_line}",
+                    "target_symbol": (dst_frag.symbol_name or "") if dst_frag else "",
                     "weight": round(weight, 4),
                     "category": cat,
                 }
