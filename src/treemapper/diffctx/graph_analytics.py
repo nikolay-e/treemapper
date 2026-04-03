@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .project_graph import ProjectGraph, _relative_path
-from .types import FragmentId
+from .types import Fragment, FragmentId
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class QuotientNode:
     key: str
+    label: str = ""
     fragment_count: int = 0
     token_count: int = 0
     self_weight: float = 0.0
@@ -36,6 +37,17 @@ class QuotientGraph:
     level: str = "directory"
 
 
+def _node_label(fid: FragmentId, frag: Fragment, level: str) -> str:
+    if level == "fragment":
+        basename = fid.path.name
+        if frag.symbol_name:
+            return f"{frag.symbol_name} ({basename}:{fid.start_line})"
+        return f"{basename}:{fid.start_line}-{fid.end_line}"
+    if level == "file":
+        return fid.path.name
+    return Path(_group_key(fid, level, None)).name or "."
+
+
 def _group_key(fid: FragmentId, level: str, root_dir: Path | None) -> str:
     if level == "fragment":
         rel = _relative_path(fid.path, root_dir)
@@ -54,7 +66,7 @@ def quotient_graph(pg: ProjectGraph, level: str = "directory") -> QuotientGraph:
         key = _group_key(fid, level, root)
         fid_to_group[fid] = key
         if key not in qg.nodes:
-            qg.nodes[key] = QuotientNode(key=key)
+            qg.nodes[key] = QuotientNode(key=key, label=_node_label(fid, frag, level))
         qg.nodes[key].fragment_count += 1
         qg.nodes[key].token_count += frag.token_count
 
@@ -97,7 +109,7 @@ def to_mermaid(qg: QuotientGraph, top_n: int = 20) -> str:
     lines = ["graph LR"]
     for node in sorted_nodes:
         nid = node_ids[node.key]
-        label = node.key.rstrip("/") or "root"
+        label = node.label or node.key.rstrip("/") or "root"
         lines.append(f'    {nid}["{label}"]')
 
     sorted_edges = sorted(qg.edges.values(), key=lambda e: e.weight, reverse=True)
@@ -213,6 +225,7 @@ def _compute_churn(root_dir: Path, max_commits: int = 200) -> dict[str, int]:
 def hotspots(
     pg: ProjectGraph,
     top: int = 10,
+    edge_types: set[str] | None = None,
 ) -> list[tuple[str, float, dict[str, float]]]:
     root = pg.root_dir
 
@@ -221,10 +234,11 @@ def hotspots(
     for fid in pg.fragments:
         rel = _relative_path(fid.path, root)
         file_frag_count[rel] += 1
-    for nbrs in pg.graph.reverse_adjacency.values():
-        for fid in nbrs:
-            rel = _relative_path(fid.path, root)
-            in_deg[rel] += 1
+    for (src, _dst), cat in pg.graph.edge_categories.items():
+        if edge_types is not None and cat not in edge_types:
+            continue
+        rel = _relative_path(src.path, root)
+        in_deg[rel] += 1
 
     churn = _compute_churn(root) if root else {}
 
@@ -253,7 +267,11 @@ class ModuleMetrics:
     fan_out: int = 0
 
 
-def coupling_metrics(pg: ProjectGraph, level: str = "directory") -> list[ModuleMetrics]:
+def coupling_metrics(
+    pg: ProjectGraph,
+    level: str = "directory",
+    edge_types: set[str] | None = None,
+) -> list[ModuleMetrics]:
     qg = quotient_graph(pg, level=level)
 
     out_weight: dict[str, float] = defaultdict(float)
@@ -262,6 +280,10 @@ def coupling_metrics(pg: ProjectGraph, level: str = "directory") -> list[ModuleM
     fan_out_set: dict[str, set[str]] = defaultdict(set)
 
     for (src, dst), edge in qg.edges.items():
+        if edge_types is not None:
+            matching = sum(c for cat, c in edge.categories.items() if cat in edge_types)
+            if matching == 0:
+                continue
         out_weight[src] += edge.weight
         in_weight[dst] += edge.weight
         fan_out_set[src].add(dst)

@@ -99,10 +99,15 @@ def _is_graph_mode(args: ParsedArgs) -> bool:
     return args.command == "graph"
 
 
+_ARCHITECTURAL_EDGE_TYPES: frozenset[str] = frozenset(
+    {"semantic", "structural", "config_generic", "document", "sibling", "test_edge", "history"}
+)
+
+
 def _format_cycles(g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import detect_cycles
 
-    edge_filter = set(g.edge_types) if g.edge_types else None
+    edge_filter = set(g.edge_types) if g.edge_types else {"semantic"}
     cycles = detect_cycles(pg, level=g.level, edge_types=edge_filter)
     if not cycles:
         return "No dependency cycles detected."
@@ -116,7 +121,8 @@ def _format_cycles(g: GraphArgs, pg: Any) -> str:
 def _format_hotspots(g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import hotspots
 
-    hot = hotspots(pg, top=g.hotspots or 10)
+    edge_filter = set(g.edge_types) if g.edge_types else set(_ARCHITECTURAL_EDGE_TYPES)
+    hot = hotspots(pg, top=g.hotspots or 10, edge_types=edge_filter)
     lines = [f"Top {len(hot)} hotspots:"]
     for rank, (name, score, details) in enumerate(hot, 1):
         lines.append(f"  {rank}. {name}  score={score}  degree={details['degree']}  churn={details['churn']}")
@@ -126,7 +132,8 @@ def _format_hotspots(g: GraphArgs, pg: Any) -> str:
 def _format_metrics(g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import coupling_metrics
 
-    metrics = coupling_metrics(pg, level=g.level)
+    edge_filter = set(g.edge_types) if g.edge_types else set(_ARCHITECTURAL_EDGE_TYPES)
+    metrics = coupling_metrics(pg, level=g.level, edge_types=edge_filter)
     lines = [f"Module metrics ({g.level} level):"]
     for m in metrics:
         flags = ""
