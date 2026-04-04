@@ -383,26 +383,9 @@ class TestGraphCLI:
         out = result.stdout.lower()
         assert "nodes" in out
         assert "edges" in out
-
-    def test_mermaid(self, graph_git_project):
-        result = _run_graph_cli([".", "--mermaid", "-q"], cwd=graph_git_project)
-        assert result.returncode == 0
-        assert result.stdout.strip().startswith("graph LR")
-
-    def test_cycles(self, graph_git_project):
-        result = _run_graph_cli([".", "--cycles", "-q"], cwd=graph_git_project)
-        assert result.returncode == 0
-        assert "cycle" in result.stdout.lower()
-
-    def test_hotspots(self, graph_git_project):
-        result = _run_graph_cli([".", "--hotspots", "3", "-q"], cwd=graph_git_project)
-        assert result.returncode == 0
-        assert "hotspot" in result.stdout.lower()
-
-    def test_metrics(self, graph_git_project):
-        result = _run_graph_cli([".", "--metrics", "-q"], cwd=graph_git_project)
-        assert result.returncode == 0
-        assert "cohesion" in result.stdout.lower()
+        assert "cycle" in out
+        assert "hotspot" in out
+        assert "cohesion" in out
 
     def test_output_file(self, graph_git_project):
         out_file = graph_git_project / "graph.json"
@@ -413,7 +396,7 @@ class TestGraphCLI:
         assert data["type"] == "project_graph"
 
     def test_level_directory_mermaid(self, graph_git_project):
-        result = _run_graph_cli([".", "--mermaid", "--level", "directory", "-q"], cwd=graph_git_project)
+        result = _run_graph_cli([".", "-f", "mermaid", "--level", "directory", "-q"], cwd=graph_git_project)
         assert result.returncode == 0
         out = result.stdout
         assert out.strip().startswith("graph LR")

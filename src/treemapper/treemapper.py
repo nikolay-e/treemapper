@@ -122,7 +122,7 @@ def _format_hotspots(g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import hotspots
 
     edge_filter = set(g.edge_types) if g.edge_types else set(_ARCHITECTURAL_EDGE_TYPES)
-    hot = hotspots(pg, top=g.hotspots or 10, edge_types=edge_filter)
+    hot = hotspots(pg, top=10, edge_types=edge_filter)
     lines = [f"Top {len(hot)} hotspots:"]
     for rank, (name, score, details) in enumerate(hot, 1):
         lines.append(f"  {rank}. {name}  score={score}  out_degree={details['out_degree']}  churn={details['churn']}")
@@ -207,7 +207,6 @@ def _graph_to_string(pg: Any, fmt: str, level: str = "directory") -> str:
 
 
 def _handle_graph_mode(args: ParsedArgs) -> str:
-    from .diffctx.graph_analytics import quotient_graph, to_mermaid
     from .diffctx.graph_export import graph_summary
     from .diffctx.project_graph import build_project_graph
 
@@ -225,21 +224,15 @@ def _handle_graph_mode(args: ParsedArgs) -> str:
 
     if g.summary:
         parts.append(graph_summary(pg))
-    if g.cycles:
         parts.append(_format_cycles(g, pg))
-    if g.hotspots is not None:
         parts.append(_format_hotspots(g, pg))
-    if g.metrics:
         parts.append(_format_metrics(g, pg))
     if g.impact:
         parts.append(_format_impact(g, pg))
     if g.blast_radius:
         parts.append(_format_blast_radius(g, pg))
-    if g.mermaid:
-        qg = quotient_graph(pg, level=g.level)
-        parts.append(to_mermaid(qg))
 
-    has_analysis_flag = any([g.summary, g.cycles, g.hotspots is not None, g.metrics, g.impact, g.blast_radius, g.mermaid])
+    has_analysis_flag = any([g.summary, g.impact, g.blast_radius])
     if not has_analysis_flag:
         parts.append(_graph_to_string(pg, g.format, level=g.level))
 

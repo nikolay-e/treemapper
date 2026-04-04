@@ -125,10 +125,6 @@ class GraphArgs:
     summary: bool = False
     level: str = "directory"
     edge_types: list[str] | None = None
-    mermaid: bool = False
-    cycles: bool = False
-    hotspots: int | None = None
-    metrics: bool = False
     impact: str | None = None
     blast_radius: str | None = None
 
@@ -235,7 +231,9 @@ def _build_graph_parser() -> argparse.ArgumentParser:
         default="mermaid",
         help="Graph output format (default: mermaid)",
     )
-    graph_parser.add_argument("--summary", action="store_true", help="Print graph summary statistics")
+    graph_parser.add_argument(
+        "--summary", action="store_true", help="Print graph statistics (cycles, hotspots, coupling metrics)"
+    )
     graph_parser.add_argument(
         "--level",
         choices=["fragment", "file", "directory"],
@@ -247,12 +245,6 @@ def _build_graph_parser() -> argparse.ArgumentParser:
         default=None,
         help="Comma-separated edge types to include (e.g., semantic,config)",
     )
-    graph_parser.add_argument("--mermaid", action="store_true", help="Output graph as Mermaid diagram")
-    graph_parser.add_argument("--cycles", action="store_true", help="Detect dependency cycles")
-    graph_parser.add_argument(
-        "--hotspots", type=int, nargs="?", const=10, default=None, metavar="N", help="Show top N hotspots (default: 10)"
-    )
-    graph_parser.add_argument("--metrics", action="store_true", help="Show coupling/cohesion metrics per module")
     graph_parser.add_argument("--impact", default=None, metavar="FILE", help="Show impact subgraph for a file")
     graph_parser.add_argument("--blast-radius", default=None, metavar="FILE", help="Estimate blast radius for a file")
     return graph_parser
@@ -382,10 +374,6 @@ def _build_graph_parsed_args(args: argparse.Namespace) -> ParsedArgs:
             summary=args.summary,
             level=args.level,
             edge_types=edge_types,
-            mermaid=args.mermaid,
-            cycles=args.cycles,
-            hotspots=args.hotspots,
-            metrics=args.metrics,
             impact=args.impact,
             blast_radius=args.blast_radius,
         ),
