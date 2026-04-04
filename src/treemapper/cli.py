@@ -124,9 +124,6 @@ class GraphArgs:
     format: str = "mermaid"
     summary: bool = False
     level: str = "directory"
-    edge_types: list[str] | None = None
-    impact: str | None = None
-    blast_radius: str | None = None
 
 
 @dataclass
@@ -240,13 +237,6 @@ def _build_graph_parser() -> argparse.ArgumentParser:
         default="directory",
         help="Granularity level for graph operations (default: directory)",
     )
-    graph_parser.add_argument(
-        "--edge-types",
-        default=None,
-        help="Comma-separated edge types to include (e.g., semantic,config)",
-    )
-    graph_parser.add_argument("--impact", default=None, metavar="FILE", help="Show impact subgraph for a file")
-    graph_parser.add_argument("--blast-radius", default=None, metavar="FILE", help="Estimate blast radius for a file")
     return graph_parser
 
 
@@ -352,7 +342,6 @@ def _build_graph_parsed_args(args: argparse.Namespace) -> ParsedArgs:
     ignore_file = _resolve_ignore_file(args.ignore, root_dir)
     whitelist_file = _resolve_whitelist_file(args.whitelist, root_dir)
     verbosity = "error" if args.quiet else args.log_level
-    edge_types = [t.strip() for t in args.edge_types.split(",")] if args.edge_types else None
 
     return ParsedArgs(
         root_dir=root_dir,
@@ -373,9 +362,6 @@ def _build_graph_parsed_args(args: argparse.Namespace) -> ParsedArgs:
             format=args.format,
             summary=args.summary,
             level=args.level,
-            edge_types=edge_types,
-            impact=args.impact,
-            blast_radius=args.blast_radius,
         ),
     )
 
