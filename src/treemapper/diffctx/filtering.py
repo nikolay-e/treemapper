@@ -183,8 +183,7 @@ def _filter_low_relevance_fragments(
     core_ids: set[FragmentId],
     rel: dict[FragmentId, float],
 ) -> list[Fragment]:
-    changed_paths = {fid.path for fid in core_ids}
-    kept = [f for f in fragments if f.path in changed_paths or rel.get(f.id, 0.0) >= _LOW_RELEVANCE_THRESHOLD]
+    kept = [f for f in fragments if f.id in core_ids or rel.get(f.id, 0.0) >= _LOW_RELEVANCE_THRESHOLD]
     removed = len(fragments) - len(kept)
     if removed:
         logger.debug("diffctx: filtered %d low-relevance fragments (threshold=%.4f)", removed, _LOW_RELEVANCE_THRESHOLD)
