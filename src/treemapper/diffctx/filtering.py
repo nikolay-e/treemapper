@@ -6,26 +6,50 @@ from pathlib import Path
 
 from .config.extensions import CODE_EXTENSIONS
 from .graph import Graph
-from .types import Fragment, FragmentId
+from .types import DiffHunk, Fragment, FragmentId
 
 logger = logging.getLogger(__name__)
 
-_SAME_FILE_FLOOR = 0.01
+_PROXIMITY_FLOOR_MAX = 0.01
+_PROXIMITY_HALF_DECAY = 50
 _HUB_REVERSE_THRESHOLD = 3
 _MAX_CONTEXT_FRAGMENTS_PER_FILE = 10
 _LOW_RELEVANCE_THRESHOLD = 0.005
 
 
-def _apply_same_file_floor(
+def _fragment_hunk_gap(frag_start: int, frag_end: int, hunk_start: int, hunk_end: int) -> int:
+    if frag_end < hunk_start:
+        return hunk_start - frag_end
+    if frag_start > hunk_end:
+        return frag_start - hunk_end
+    return 0
+
+
+def _proximity_score(frag: Fragment, file_hunks: list[tuple[int, int]]) -> float:
+    min_gap = min(_fragment_hunk_gap(frag.start_line, frag.end_line, h_start, h_end) for h_start, h_end in file_hunks)
+    return _PROXIMITY_FLOOR_MAX / (1.0 + min_gap / _PROXIMITY_HALF_DECAY)
+
+
+def _apply_hunk_proximity_bonus(
     rel: dict[FragmentId, float],
     core_ids: set[FragmentId],
     fragments: list[Fragment],
+    hunks: list[DiffHunk],
 ) -> None:
-    core_paths = {fid.path for fid in core_ids}
+    hunks_by_path: dict[Path, list[tuple[int, int]]] = defaultdict(list)
+    for h in hunks:
+        h_start, h_end = h.core_selection_range
+        hunks_by_path[h.path].append((h_start, h_end))
+
     for frag in fragments:
-        if frag.id not in core_ids and frag.path in core_paths:
-            if rel.get(frag.id, 0.0) < _SAME_FILE_FLOOR:
-                rel[frag.id] = _SAME_FILE_FLOOR
+        if frag.id in core_ids:
+            continue
+        file_hunks = hunks_by_path.get(frag.path)
+        if not file_hunks:
+            continue
+        bonus = _proximity_score(frag, file_hunks)
+        if rel.get(frag.id, 0.0) < bonus:
+            rel[frag.id] = bonus
 
 
 def _classify_semantic_edges(
