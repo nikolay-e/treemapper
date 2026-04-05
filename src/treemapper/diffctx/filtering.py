@@ -12,9 +12,12 @@ logger = logging.getLogger(__name__)
 
 _PROXIMITY_FLOOR_MAX = 0.01
 _PROXIMITY_HALF_DECAY = 50
+_DEFINITION_PROXIMITY_HALF_DECAY = 5
 _HUB_REVERSE_THRESHOLD = 3
 _MAX_CONTEXT_FRAGMENTS_PER_FILE = 10
 _LOW_RELEVANCE_THRESHOLD = 0.005
+_SIZE_PENALTY_BASE_TOKENS = 100
+_SIZE_PENALTY_EXPONENT = 0.5
 
 
 def _fragment_hunk_gap(frag_start: int, frag_end: int, hunk_start: int, hunk_end: int) -> int:
@@ -27,7 +30,13 @@ def _fragment_hunk_gap(frag_start: int, frag_end: int, hunk_start: int, hunk_end
 
 def _proximity_score(frag: Fragment, file_hunks: list[tuple[int, int]]) -> float:
     min_gap = min(_fragment_hunk_gap(frag.start_line, frag.end_line, h_start, h_end) for h_start, h_end in file_hunks)
-    return _PROXIMITY_FLOOR_MAX / (1.0 + min_gap / _PROXIMITY_HALF_DECAY)
+    half_decay = _DEFINITION_PROXIMITY_HALF_DECAY if frag.kind == "definition" else _PROXIMITY_HALF_DECAY
+    return _PROXIMITY_FLOOR_MAX / (1.0 + min_gap / half_decay)
+
+
+def _effective_relevance_threshold(token_count: int) -> float:
+    size_factor: float = max(1.0, token_count / _SIZE_PENALTY_BASE_TOKENS) ** _SIZE_PENALTY_EXPONENT
+    return _LOW_RELEVANCE_THRESHOLD * size_factor
 
 
 def _apply_hunk_proximity_bonus(
@@ -183,7 +192,7 @@ def _filter_low_relevance_fragments(
     core_ids: set[FragmentId],
     rel: dict[FragmentId, float],
 ) -> list[Fragment]:
-    kept = [f for f in fragments if f.id in core_ids or rel.get(f.id, 0.0) >= _LOW_RELEVANCE_THRESHOLD]
+    kept = [f for f in fragments if f.id in core_ids or rel.get(f.id, 0.0) >= _effective_relevance_threshold(f.token_count)]
     removed = len(fragments) - len(kept)
     if removed:
         logger.debug("diffctx: filtered %d low-relevance fragments (threshold=%.4f)", removed, _LOW_RELEVANCE_THRESHOLD)
