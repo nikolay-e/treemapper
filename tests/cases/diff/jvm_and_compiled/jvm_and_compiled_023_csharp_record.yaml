@@ -1,367 +1,396 @@
-# Scenario: Program.Main is implemented to create, copy, and compare
-#   Person and Employee record instances, using `with` expressions and
-#   structural equality from C# records.
-#
-# Diff shows:
-#   - class Program { }  (empty)
-#   + Main method creating Person, using `with { Age = 31 }`, creating
-#     Employee, testing structural equality, accessing Department.
-#
-# Reviewer questions:
-#   Q1: "What fields does Person record have — does Age exist?"
-#       -> Needs Person.cs: record Person(string Name, int Age) with
-#          IsAdult property. The `with { Age = 31 }` needs Age field.
-#
-#   Q2: "What is Employee — does Department exist, does it inherit from Person?"
-#       -> Same file: record Employee(string Name, int Age, string Department)
-#          extends Person. Reviewer must verify Department property exists.
-#
-#   Q3: "Does structural equality work for Person — new Person('John', 30) == person?"
-#       -> Records provide structural equality by default.
-#
-# Not needed for comprehension:
-#   - Address.cs: Another record with similar positional parameters.
-#     Same record syntax. But completely independent type hierarchy.
-#
-#   - PersonService.cs: Creates and manages Person instances. Direct
-#     consumer of Person type. But service operations don't help review
-#     whether the with-expression and equality usage is correct.
-#
-#   - PersonSerializer.cs: Serializes Person records to JSON. References
-#     Person.Name and Person.Age properties. Same field accesses but
-#     serialization doesn't help review record feature usage.
-#
-#   - EmployeeRepository.cs: Stores Employee records. Uses Employee type
-#     directly. But persistence doesn't help review record construction.
-#
-#   - RecordComparer.cs: Generic comparer for record types. Same equality
-#     vocabulary. Not called by Program.
+name: jvm_and_compiled_023_csharp_record
+repo:
+  initial_files:
+    Models/Person.cs: |
+      namespace App.Models
+      {
+          public record Person(string Name, int Age)
+          {
+              public bool IsAdult => Age >= 18;
+          }
 
-max_enrichment: 10.1
-initial:
-  Models/Person.cs: |
-    namespace App.Models
-    {
-        public record Person(string Name, int Age)
-        {
-            public bool IsAdult => Age >= 18;
-        }
+          public record Employee(string Name, int Age, string Department) : Person(Name, Age);
+      }
+    Program.cs: |
+      namespace App
+      {
+          class Program { }
+      }
+    Models/Address.cs: |
+      namespace App.Models
+      {
+          public record Address(string Street, string City, string ZipCode)
+          {
+              public string FullAddress => $"{Street}, {City} {ZipCode}";
+          }
 
-        public record Employee(string Name, int Age, string Department) : Person(Name, Age);
-    }
-  Program.cs: |
-    namespace App
-    {
-        class Program { }
-    }
-  Models/Address.cs: |
-    namespace App.Models
-    {
-        public record Address(string Street, string City, string ZipCode)
-        {
-            public string FullAddress => $"{Street}, {City} {ZipCode}";
-        }
+          public record BusinessAddress(string Street, string City, string ZipCode, string Suite)
+              : Address(Street, City, ZipCode);
+      }
+    Services/PersonService.cs: |
+      using System.Collections.Generic;
+      using System.Linq;
 
-        public record BusinessAddress(string Street, string City, string ZipCode, string Suite)
-            : Address(Street, City, ZipCode);
-    }
-  Services/PersonService.cs: |
-    using System.Collections.Generic;
-    using System.Linq;
+      namespace App.Services
+      {
+          class PersonService
+          {
+              private readonly List<Person> _people = new();
 
-    namespace App.Services
-    {
-        class PersonService
-        {
-            private readonly List<Person> _people = new();
+              public void Add(Person person)
+              {
+                  _people.Add(person);
+              }
 
-            public void Add(Person person)
-            {
-                _people.Add(person);
-            }
+              public Person FindByName(string name)
+              {
+                  return _people.FirstOrDefault(p => p.Name == name);
+              }
 
-            public Person FindByName(string name)
-            {
-                return _people.FirstOrDefault(p => p.Name == name);
-            }
+              public List<Person> GetAdults()
+              {
+                  return _people.Where(p => p.IsAdult).ToList();
+              }
 
-            public List<Person> GetAdults()
-            {
-                return _people.Where(p => p.IsAdult).ToList();
-            }
+              public Person UpdateAge(Person person, int newAge)
+              {
+                  return person with { Age = newAge };
+              }
+          }
+      }
+    Serializers/PersonSerializer.cs: |
+      using System.Text.Json;
 
-            public Person UpdateAge(Person person, int newAge)
-            {
-                return person with { Age = newAge };
-            }
-        }
-    }
-  Serializers/PersonSerializer.cs: |
-    using System.Text.Json;
+      namespace App.Serializers
+      {
+          class PersonSerializer
+          {
+              public string Serialize(Person person)
+              {
+                  return JsonSerializer.Serialize(new
+                  {
+                      name = person.Name,
+                      age = person.Age,
+                      isAdult = person.IsAdult
+                  });
+              }
 
-    namespace App.Serializers
-    {
-        class PersonSerializer
-        {
-            public string Serialize(Person person)
-            {
-                return JsonSerializer.Serialize(new
-                {
-                    name = person.Name,
-                    age = person.Age,
-                    isAdult = person.IsAdult
-                });
-            }
+              public string SerializeEmployee(Employee employee)
+              {
+                  return JsonSerializer.Serialize(new
+                  {
+                      name = employee.Name,
+                      age = employee.Age,
+                      department = employee.Department
+                  });
+              }
+          }
+      }
+    Repositories/EmployeeRepository.cs: |
+      using System.Collections.Generic;
+      using System.Linq;
 
-            public string SerializeEmployee(Employee employee)
-            {
-                return JsonSerializer.Serialize(new
-                {
-                    name = employee.Name,
-                    age = employee.Age,
-                    department = employee.Department
-                });
-            }
-        }
-    }
-  Repositories/EmployeeRepository.cs: |
-    using System.Collections.Generic;
-    using System.Linq;
+      namespace App.Repositories
+      {
+          class EmployeeRepository
+          {
+              private readonly List<Employee> _employees = new();
 
-    namespace App.Repositories
-    {
-        class EmployeeRepository
-        {
-            private readonly List<Employee> _employees = new();
+              public void Add(Employee employee)
+              {
+                  _employees.Add(employee);
+              }
 
-            public void Add(Employee employee)
-            {
-                _employees.Add(employee);
-            }
+              public List<Employee> GetByDepartment(string department)
+              {
+                  return _employees.Where(e => e.Department == department).ToList();
+              }
 
-            public List<Employee> GetByDepartment(string department)
-            {
-                return _employees.Where(e => e.Department == department).ToList();
-            }
+              public Employee FindByName(string name)
+              {
+                  return _employees.FirstOrDefault(e => e.Name == name);
+              }
+          }
+      }
+    Utils/RecordComparer.cs: |
+      namespace App.Utils
+      {
+          class RecordComparer
+          {
+              public bool AreEqual<T>(T a, T b) where T : IEquatable<T>
+              {
+                  return a.Equals(b);
+              }
 
-            public Employee FindByName(string name)
-            {
-                return _employees.FirstOrDefault(e => e.Name == name);
-            }
-        }
-    }
-  Utils/RecordComparer.cs: |
-    namespace App.Utils
-    {
-        class RecordComparer
-        {
-            public bool AreEqual<T>(T a, T b) where T : IEquatable<T>
-            {
-                return a.Equals(b);
-            }
+              public int GetHashCodeOf<T>(T record)
+              {
+                  return record.GetHashCode();
+              }
 
-            public int GetHashCodeOf<T>(T record)
-            {
-                return record.GetHashCode();
-            }
+              public string Describe<T>(T record)
+              {
+                  return record.ToString();
+              }
+          }
+      }
+  changed_files:
+    Models/Person.cs: |
+      namespace App.Models
+      {
+          public record Person(string Name, int Age)
+          {
+              public bool IsAdult => Age >= 18;
+          }
 
-            public string Describe<T>(T record)
-            {
-                return record.ToString();
-            }
-        }
-    }
+          public record Employee(string Name, int Age, string Department) : Person(Name, Age);
+      }
+    Program.cs: |
+      namespace App
+      {
+          class Program
+          {
+              static void Main()
+              {
+                  var person = new Person("John", 30);
+                  var updated = person with { Age = 31 };
 
-changed:
-  Models/Person.cs: |
-    namespace App.Models
-    {
-        public record Person(string Name, int Age)
-        {
-            public bool IsAdult => Age >= 18;
-        }
+                  var employee = new Employee("Jane", 25, "IT");
 
-        public record Employee(string Name, int Age, string Department) : Person(Name, Age);
-    }
-  Program.cs: |
-    namespace App
-    {
-        class Program
-        {
-            static void Main()
-            {
-                var person = new Person("John", 30);
-                var updated = person with { Age = 31 };
+                  Console.WriteLine(person == new Person("John", 30));
+                  Console.WriteLine(employee.Department);
+              }
+          }
+      }
+    Models/Address.cs: |
+      namespace App.Models
+      {
+          public record Address(string Street, string City, string ZipCode)
+          {
+              public string FullAddress => $"{Street}, {City} {ZipCode}";
+          }
 
-                var employee = new Employee("Jane", 25, "IT");
+          public record BusinessAddress(string Street, string City, string ZipCode, string Suite)
+              : Address(Street, City, ZipCode);
+      }
+    Services/PersonService.cs: |
+      using System.Collections.Generic;
+      using System.Linq;
 
-                Console.WriteLine(person == new Person("John", 30));
-                Console.WriteLine(employee.Department);
-            }
-        }
-    }
-  Models/Address.cs: |
-    namespace App.Models
-    {
-        public record Address(string Street, string City, string ZipCode)
-        {
-            public string FullAddress => $"{Street}, {City} {ZipCode}";
-        }
+      namespace App.Services
+      {
+          class PersonService
+          {
+              private readonly List<Person> _people = new();
 
-        public record BusinessAddress(string Street, string City, string ZipCode, string Suite)
-            : Address(Street, City, ZipCode);
-    }
-  Services/PersonService.cs: |
-    using System.Collections.Generic;
-    using System.Linq;
+              public void Add(Person person)
+              {
+                  _people.Add(person);
+              }
 
-    namespace App.Services
-    {
-        class PersonService
-        {
-            private readonly List<Person> _people = new();
+              public Person FindByName(string name)
+              {
+                  return _people.FirstOrDefault(p => p.Name == name);
+              }
 
-            public void Add(Person person)
-            {
-                _people.Add(person);
-            }
+              public List<Person> GetAdults()
+              {
+                  return _people.Where(p => p.IsAdult).ToList();
+              }
 
-            public Person FindByName(string name)
-            {
-                return _people.FirstOrDefault(p => p.Name == name);
-            }
+              public Person UpdateAge(Person person, int newAge)
+              {
+                  return person with { Age = newAge };
+              }
+          }
+      }
+    Serializers/PersonSerializer.cs: |
+      using System.Text.Json;
 
-            public List<Person> GetAdults()
-            {
-                return _people.Where(p => p.IsAdult).ToList();
-            }
+      namespace App.Serializers
+      {
+          class PersonSerializer
+          {
+              public string Serialize(Person person)
+              {
+                  return JsonSerializer.Serialize(new
+                  {
+                      name = person.Name,
+                      age = person.Age,
+                      isAdult = person.IsAdult
+                  });
+              }
 
-            public Person UpdateAge(Person person, int newAge)
-            {
-                return person with { Age = newAge };
-            }
-        }
-    }
-  Serializers/PersonSerializer.cs: |
-    using System.Text.Json;
+              public string SerializeEmployee(Employee employee)
+              {
+                  return JsonSerializer.Serialize(new
+                  {
+                      name = employee.Name,
+                      age = employee.Age,
+                      department = employee.Department
+                  });
+              }
+          }
+      }
+    Repositories/EmployeeRepository.cs: |
+      using System.Collections.Generic;
+      using System.Linq;
 
-    namespace App.Serializers
-    {
-        class PersonSerializer
-        {
-            public string Serialize(Person person)
-            {
-                return JsonSerializer.Serialize(new
-                {
-                    name = person.Name,
-                    age = person.Age,
-                    isAdult = person.IsAdult
-                });
-            }
+      namespace App.Repositories
+      {
+          class EmployeeRepository
+          {
+              private readonly List<Employee> _employees = new();
 
-            public string SerializeEmployee(Employee employee)
-            {
-                return JsonSerializer.Serialize(new
-                {
-                    name = employee.Name,
-                    age = employee.Age,
-                    department = employee.Department
-                });
-            }
-        }
-    }
-  Repositories/EmployeeRepository.cs: |
-    using System.Collections.Generic;
-    using System.Linq;
+              public void Add(Employee employee)
+              {
+                  _employees.Add(employee);
+              }
 
-    namespace App.Repositories
-    {
-        class EmployeeRepository
-        {
-            private readonly List<Employee> _employees = new();
+              public List<Employee> GetByDepartment(string department)
+              {
+                  return _employees.Where(e => e.Department == department).ToList();
+              }
 
-            public void Add(Employee employee)
-            {
-                _employees.Add(employee);
-            }
+              public Employee FindByName(string name)
+              {
+                  return _employees.FirstOrDefault(e => e.Name == name);
+              }
+          }
+      }
+    Utils/RecordComparer.cs: |
+      namespace App.Utils
+      {
+          class RecordComparer
+          {
+              public bool AreEqual<T>(T a, T b) where T : IEquatable<T>
+              {
+                  return a.Equals(b);
+              }
 
-            public List<Employee> GetByDepartment(string department)
-            {
-                return _employees.Where(e => e.Department == department).ToList();
-            }
+              public int GetHashCodeOf<T>(T record)
+              {
+                  return record.GetHashCode();
+              }
 
-            public Employee FindByName(string name)
-            {
-                return _employees.FirstOrDefault(e => e.Name == name);
-            }
-        }
-    }
-  Utils/RecordComparer.cs: |
-    namespace App.Utils
-    {
-        class RecordComparer
-        {
-            public bool AreEqual<T>(T a, T b) where T : IEquatable<T>
-            {
-                return a.Equals(b);
-            }
-
-            public int GetHashCodeOf<T>(T record)
-            {
-                return record.GetHashCode();
-            }
-
-            public string Describe<T>(T record)
-            {
-                return record.ToString();
-            }
-        }
-    }
-
-must_include_files:
-  - Program.cs
-  - Models/Person.cs
-
-must_include_content_from:
-  Program.cs:
-    - "person with { Age = 31 }"
-    - 'new Employee("Jane", 25, "IT")'
-    - "employee.Department"
-  Models/Person.cs:
-    - "public record Person(string Name, int Age)"
-    - "public record Employee(string Name, int Age, string Department) : Person(Name, Age)"
-    - "public bool IsAdult => Age >= 18"
-
-must_not_include:
-  # Address.cs: another record hierarchy, independent type
-  - Address
-  - BusinessAddress
-  - FullAddress
-  - ZipCode
-  # PersonService.cs: manages Person instances, consumer not needed
-  - PersonService
-  - GetAdults
-  - UpdateAge
-  # PersonSerializer.cs: serializes Person, references same fields
-  - PersonSerializer
-  - JsonSerializer
-  - SerializeEmployee
-  # EmployeeRepository.cs: stores Employees, independent of Program
-  - EmployeeRepository
-  - GetByDepartment
-  # RecordComparer.cs: generic comparer, not called by Program
-  - RecordComparer
-  - AreEqual
-  - GetHashCodeOf
-
-must_not_include_files:
-  - Models/Address.cs
-  - Services/PersonService.cs
-  - Serializers/PersonSerializer.cs
-  - Repositories/EmployeeRepository.cs
-  - Utils/RecordComparer.cs
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+              public string Describe<T>(T record)
+              {
+                  return record.ToString();
+              }
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: program
+  selector:
+    path: Program.cs
+    anchor: person with { Age = 31 }
+- id: program_1
+  selector:
+    path: Program.cs
+    anchor: new Employee("Jane", 25, "IT")
+- id: program_2
+  selector:
+    path: Program.cs
+    anchor: employee.Department
+- id: person
+  selector:
+    path: Models/Person.cs
+    anchor: public record Person(string Name, int Age)
+- id: person_1
+  selector:
+    path: Models/Person.cs
+    anchor: 'public record Employee(string Name, int Age, string Department) : Person(Name, Age)'
+- id: person_2
+  selector:
+    path: Models/Person.cs
+    anchor: public bool IsAdult => Age >= 18
+- id: no_address
+  selector:
+    path: Models/Address.cs
+- id: no_personservice
+  selector:
+    path: Services/PersonService.cs
+- id: no_personserializer
+  selector:
+    path: Serializers/PersonSerializer.cs
+- id: no_employeerepository
+  selector:
+    path: Repositories/EmployeeRepository.cs
+- id: no_recordcomparer
+  selector:
+    path: Utils/RecordComparer.cs
+- id: no_global_0
+  selector:
+    anchor: Address
+- id: no_global_1
+  selector:
+    anchor: BusinessAddress
+- id: no_global_2
+  selector:
+    anchor: FullAddress
+- id: no_global_3
+  selector:
+    anchor: ZipCode
+- id: no_global_4
+  selector:
+    anchor: PersonService
+- id: no_global_5
+  selector:
+    anchor: GetAdults
+- id: no_global_6
+  selector:
+    anchor: UpdateAge
+- id: no_global_7
+  selector:
+    anchor: PersonSerializer
+- id: no_global_8
+  selector:
+    anchor: JsonSerializer
+- id: no_global_9
+  selector:
+    anchor: SerializeEmployee
+- id: no_global_10
+  selector:
+    anchor: EmployeeRepository
+- id: no_global_11
+  selector:
+    anchor: GetByDepartment
+- id: no_global_12
+  selector:
+    anchor: RecordComparer
+- id: no_global_13
+  selector:
+    anchor: AreEqual
+- id: no_global_14
+  selector:
+    anchor: GetHashCodeOf
+oracle:
+  required:
+  - program
+  - program_1
+  - program_2
+  - person
+  - person_1
+  - person_2
+  allowed: []
+  forbidden:
+  - no_address
+  - no_personservice
+  - no_personserializer
+  - no_employeerepository
+  - no_recordcomparer
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13
+  - no_global_14

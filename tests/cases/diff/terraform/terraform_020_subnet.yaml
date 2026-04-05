@@ -1,102 +1,95 @@
-# Scenario: Add private subnets referencing existing VPC
-#
-# Reviewer questions:
-#   1. What VPC CIDR do the subnets carve from? (variables.tf defines vpc_cidr)
-#   2. Are there other subnets that might have CIDR overlap? (db_network.tf)
-#
-# The diff adds aws_subnet "private" to network.tf using cidrsubnet from
-# the VPC CIDR. variables.tf (unchanged) defines the vpc_cidr variable that
-# controls the address space.
-#
-# Traps: db_network.tf has same aws_subnet type but for the database tier.
-
-max_enrichment: 5.9
-initial:
-  network.tf: |
-    resource "aws_vpc" "main" {
-      cidr_block = var.vpc_cidr
-    }
-  variables.tf: |
-    variable "vpc_cidr" {
-      type    = string
-      default = "10.0.0.0/16"
-    }
-
-    variable "environment" {
-      type    = string
-      default = "dev"
-    }
-  db_network.tf: |
-    resource "aws_subnet" "database" {
-      count             = 2
-      vpc_id            = aws_vpc.main.id
-      cidr_block        = cidrsubnet("10.0.200.0/24", 2, count.index)
-      availability_zone = data.aws_availability_zones.available.names[count.index]
-
-      tags = {
-        Name = "database-subnet-${count.index}"
-        Tier = "database"
+name: terraform_020_subnet
+repo:
+  initial_files:
+    network.tf: |
+      resource "aws_vpc" "main" {
+        cidr_block = var.vpc_cidr
       }
-    }
-
-changed:
-  network.tf: |
-    resource "aws_vpc" "main" {
-      cidr_block = var.vpc_cidr
-    }
-
-    resource "aws_subnet" "private" {
-      count             = 2
-      vpc_id            = aws_vpc.main.id
-      cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-      availability_zone = data.aws_availability_zones.available.names[count.index]
-
-      tags = {
-        Name = "private-subnet-${count.index}"
+    variables.tf: |
+      variable "vpc_cidr" {
+        type    = string
+        default = "10.0.0.0/16"
       }
-    }
-  variables.tf: |
-    variable "vpc_cidr" {
-      type    = string
-      default = "10.0.0.0/16"
-    }
 
-    variable "environment" {
-      type    = string
-      default = "dev"
-    }
-  db_network.tf: |
-    resource "aws_subnet" "database" {
-      count             = 2
-      vpc_id            = aws_vpc.main.id
-      cidr_block        = cidrsubnet("10.0.200.0/24", 2, count.index)
-      availability_zone = data.aws_availability_zones.available.names[count.index]
-
-      tags = {
-        Name = "database-subnet-${count.index}"
-        Tier = "database"
+      variable "environment" {
+        type    = string
+        default = "dev"
       }
-    }
+    db_network.tf: |
+      resource "aws_subnet" "database" {
+        count             = 2
+        vpc_id            = aws_vpc.main.id
+        cidr_block        = cidrsubnet("10.0.200.0/24", 2, count.index)
+        availability_zone = data.aws_availability_zones.available.names[count.index]
 
-must_include_files:
-# Unchanged variables file that defines the VPC CIDR used by cidrsubnet
-- variables.tf
+        tags = {
+          Name = "database-subnet-${count.index}"
+          Tier = "database"
+        }
+      }
+  changed_files:
+    network.tf: |
+      resource "aws_vpc" "main" {
+        cidr_block = var.vpc_cidr
+      }
 
-must_include_content_from:
-  variables.tf:
-    # Reviewer needs the VPC CIDR default to understand the address space
-    - variable "vpc_cidr" {
-    - default = "10.0.0.0/16"
+      resource "aws_subnet" "private" {
+        count             = 2
+        vpc_id            = aws_vpc.main.id
+        cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
+        availability_zone = data.aws_availability_zones.available.names[count.index]
 
-must_not_include:
-# Database subnets are same type but different tier, not affected
-- database-subnet
-- Tier = "database"
+        tags = {
+          Name = "private-subnet-${count.index}"
+        }
+      }
+    variables.tf: |
+      variable "vpc_cidr" {
+        type    = string
+        default = "10.0.0.0/16"
+      }
 
-must_not_include_files:
-- db_network.tf  # same resource type, different tier (database)
+      variable "environment" {
+        type    = string
+        default = "dev"
+      }
+    db_network.tf: |
+      resource "aws_subnet" "database" {
+        count             = 2
+        vpc_id            = aws_vpc.main.id
+        cidr_block        = cidrsubnet("10.0.200.0/24", 2, count.index)
+        availability_zone = data.aws_availability_zones.available.names[count.index]
 
-max_fragments: 4
-max_files: 2
-add_garbage_files: false
-skip_garbage_check: true
+        tags = {
+          Name = "database-subnet-${count.index}"
+          Tier = "database"
+        }
+      }
+  commit_message: Update files
+fragments:
+- id: variables
+  selector:
+    path: variables.tf
+    anchor: variable "vpc_cidr" {
+- id: variables_1
+  selector:
+    path: variables.tf
+    anchor: default = "10.0.0.0/16"
+- id: no_db_network
+  selector:
+    path: db_network.tf
+- id: no_global_0
+  selector:
+    anchor: database-subnet
+- id: no_global_1
+  selector:
+    anchor: Tier = "database"
+oracle:
+  required:
+  - variables
+  - variables_1
+  allowed: []
+  forbidden:
+  - no_db_network
+  - no_global_0
+  - no_global_1

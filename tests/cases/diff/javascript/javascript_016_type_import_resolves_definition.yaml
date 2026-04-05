@@ -1,183 +1,194 @@
-# Scenario: service.ts is rewritten to import User and UserRole types from
-#   types.ts and use them in function signatures. Only service.ts is changed.
-#
-# Diff shows:
-#   - console.log('initial');
-#   + import type { User, UserRole } from './types';
-#   + function getUser(id: string): User { ... }
-#   + function checkRole(role: UserRole): boolean { ... }
-#
-# Reviewer questions:
-#   Q1: "What fields does User have — does the return value match?"
-#       -> types.ts (UNCHANGED) defines User with id: string, name: string,
-#          email: string. Reviewer must verify getUser returns matching shape.
-#
-#   Q2: "What values can UserRole take — is 'admin' comparison valid?"
-#       -> Same file: UserRole = 'admin' | 'user' | 'guest'. Reviewer needs
-#          the type to verify checkRole's comparison is exhaustive.
-#
-# Not needed for comprehension:
-#   - user-repository.ts: Database layer returning User objects. DIRECT TYPE
-#     OVERLAP: imports User, returns User from queries. But persistence logic
-#     doesn't help review service.ts's type usage.
-#
-#   - role-guard.ts: Authorization guard checking UserRole. DIRECT TYPE OVERLAP:
-#     imports UserRole, checks role values. But guard logic doesn't help
-#     review service.ts's checkRole implementation.
+name: javascript_016_type_import_resolves_definition
+repo:
+  initial_files:
+    types.ts: |
+      export interface User {
+          id: string;
+          name: string;
+          email: string;
+      }
 
-max_enrichment: 9.4
-initial:
-  types.ts: |
-    export interface User {
-        id: string;
-        name: string;
-        email: string;
-    }
+      export type UserRole = 'admin' | 'user' | 'guest';
+    service.ts: |
+      console.log('initial');
+    user-repository.ts: |
+      import type { User } from './types';
 
-    export type UserRole = 'admin' | 'user' | 'guest';
-  service.ts: |
-    console.log('initial');
-  user-repository.ts: |
-    import type { User } from './types';
+      export class UserRepository {
+          private users: Map<string, User> = new Map();
 
-    export class UserRepository {
-        private users: Map<string, User> = new Map();
+          findById(id: string): User | undefined {
+              return this.users.get(id);
+          }
 
-        findById(id: string): User | undefined {
-            return this.users.get(id);
-        }
+          findByEmail(email: string): User | undefined {
+              return [...this.users.values()].find(u => u.email === email);
+          }
 
-        findByEmail(email: string): User | undefined {
-            return [...this.users.values()].find(u => u.email === email);
-        }
+          save(user: User): void {
+              this.users.set(user.id, user);
+          }
 
-        save(user: User): void {
-            this.users.set(user.id, user);
-        }
+          deleteById(id: string): boolean {
+              return this.users.delete(id);
+          }
+      }
+    role-guard.ts: |
+      import type { UserRole } from './types';
 
-        deleteById(id: string): boolean {
-            return this.users.delete(id);
-        }
-    }
-  role-guard.ts: |
-    import type { UserRole } from './types';
+      export class RoleGuard {
+          private allowedRoles: Set<UserRole>;
 
-    export class RoleGuard {
-        private allowedRoles: Set<UserRole>;
+          constructor(roles: UserRole[]) {
+              this.allowedRoles = new Set(roles);
+          }
 
-        constructor(roles: UserRole[]) {
-            this.allowedRoles = new Set(roles);
-        }
+          canAccess(role: UserRole): boolean {
+              return this.allowedRoles.has(role);
+          }
 
-        canAccess(role: UserRole): boolean {
-            return this.allowedRoles.has(role);
-        }
+          requireAdmin(role: UserRole): void {
+              if (role !== 'admin') {
+                  throw new Error('Admin access required');
+              }
+          }
+      }
+  changed_files:
+    types.ts: |
+      export interface User {
+          id: string;
+          name: string;
+          email: string;
+      }
 
-        requireAdmin(role: UserRole): void {
-            if (role !== 'admin') {
-                throw new Error('Admin access required');
-            }
-        }
-    }
+      export type UserRole = 'admin' | 'user' | 'guest';
+    service.ts: |
+      import type { User, UserRole } from './types';
 
-changed:
-  types.ts: |
-    export interface User {
-        id: string;
-        name: string;
-        email: string;
-    }
+      function getUser(id: string): User {
+          return { id, name: 'Test', email: 'test@example.com' };
+      }
 
-    export type UserRole = 'admin' | 'user' | 'guest';
-  service.ts: |
-    import type { User, UserRole } from './types';
+      function checkRole(role: UserRole): boolean {
+          return role === 'admin';
+      }
+    user-repository.ts: |
+      import type { User } from './types';
 
-    function getUser(id: string): User {
-        return { id, name: 'Test', email: 'test@example.com' };
-    }
+      export class UserRepository {
+          private users: Map<string, User> = new Map();
 
-    function checkRole(role: UserRole): boolean {
-        return role === 'admin';
-    }
-  user-repository.ts: |
-    import type { User } from './types';
+          findById(id: string): User | undefined {
+              return this.users.get(id);
+          }
 
-    export class UserRepository {
-        private users: Map<string, User> = new Map();
+          findByEmail(email: string): User | undefined {
+              return [...this.users.values()].find(u => u.email === email);
+          }
 
-        findById(id: string): User | undefined {
-            return this.users.get(id);
-        }
+          save(user: User): void {
+              this.users.set(user.id, user);
+          }
 
-        findByEmail(email: string): User | undefined {
-            return [...this.users.values()].find(u => u.email === email);
-        }
+          deleteById(id: string): boolean {
+              return this.users.delete(id);
+          }
+      }
+    role-guard.ts: |
+      import type { UserRole } from './types';
 
-        save(user: User): void {
-            this.users.set(user.id, user);
-        }
+      export class RoleGuard {
+          private allowedRoles: Set<UserRole>;
 
-        deleteById(id: string): boolean {
-            return this.users.delete(id);
-        }
-    }
-  role-guard.ts: |
-    import type { UserRole } from './types';
+          constructor(roles: UserRole[]) {
+              this.allowedRoles = new Set(roles);
+          }
 
-    export class RoleGuard {
-        private allowedRoles: Set<UserRole>;
+          canAccess(role: UserRole): boolean {
+              return this.allowedRoles.has(role);
+          }
 
-        constructor(roles: UserRole[]) {
-            this.allowedRoles = new Set(roles);
-        }
-
-        canAccess(role: UserRole): boolean {
-            return this.allowedRoles.has(role);
-        }
-
-        requireAdmin(role: UserRole): void {
-            if (role !== 'admin') {
-                throw new Error('Admin access required');
-            }
-        }
-    }
-
-must_include_files:
-  - service.ts
-  # Q1+Q2: types.ts defines User fields and UserRole union
-  - types.ts
-
-must_include_content_from:
-  service.ts:
-    - "import type { User, UserRole } from './types'"
-    - "function getUser(id: string): User"
-    - "function checkRole(role: UserRole): boolean"
-  types.ts:
-    - "interface User"
-    - "id: string"
-    - "name: string"
-    - "email: string"
-    - "'admin' | 'user' | 'guest'"
-
-must_not_include:
-  # --- user-repository.ts: persistence layer using User type ---
-  # DIRECT TYPE OVERLAP: imports and returns User. But database operations
-  # don't help review service.ts's type usage.
-  - UserRepository
-  - findById
-  - findByEmail
-  # --- role-guard.ts: authorization guard using UserRole ---
-  # DIRECT TYPE OVERLAP: imports UserRole, checks 'admin'. But guard
-  # logic doesn't help review service.ts's checkRole.
-  - RoleGuard
-  - canAccess
-  - requireAdmin
-
-must_not_include_files:
-  - user-repository.ts
-  - role-guard.ts
-
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          requireAdmin(role: UserRole): void {
+              if (role !== 'admin') {
+                  throw new Error('Admin access required');
+              }
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: service
+  selector:
+    path: service.ts
+    anchor: import type { User, UserRole } from './types'
+- id: service_1
+  selector:
+    path: service.ts
+    anchor: 'function getUser(id: string): User'
+- id: service_2
+  selector:
+    path: service.ts
+    anchor: 'function checkRole(role: UserRole): boolean'
+- id: types
+  selector:
+    path: types.ts
+    anchor: interface User
+- id: types_1
+  selector:
+    path: types.ts
+    anchor: 'id: string'
+- id: types_2
+  selector:
+    path: types.ts
+    anchor: 'name: string'
+- id: types_3
+  selector:
+    path: types.ts
+    anchor: 'email: string'
+- id: types_4
+  selector:
+    path: types.ts
+    anchor: '''admin'' | ''user'' | ''guest'''
+- id: no_user_repository
+  selector:
+    path: user-repository.ts
+- id: no_role_guard
+  selector:
+    path: role-guard.ts
+- id: no_global_0
+  selector:
+    anchor: UserRepository
+- id: no_global_1
+  selector:
+    anchor: findById
+- id: no_global_2
+  selector:
+    anchor: findByEmail
+- id: no_global_3
+  selector:
+    anchor: RoleGuard
+- id: no_global_4
+  selector:
+    anchor: canAccess
+- id: no_global_5
+  selector:
+    anchor: requireAdmin
+oracle:
+  required:
+  - service
+  - service_1
+  - service_2
+  - types
+  - types_1
+  - types_2
+  - types_3
+  - types_4
+  allowed: []
+  forbidden:
+  - no_user_repository
+  - no_role_guard
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

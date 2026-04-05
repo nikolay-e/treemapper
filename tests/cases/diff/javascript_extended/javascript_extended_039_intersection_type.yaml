@@ -1,232 +1,236 @@
-# Scenario: person.ts goes from stub to a module that imports Named, Aged,
-#   Contactable, and formatName from ./types, then builds Person as an
-#   intersection type Named & Aged & Contactable.
-#
-# Diff shows:
-#   - console.log('initial')
-#   + import { Named, Aged, Contactable, formatName } from './types';
-#   + type Person = Named & Aged & Contactable;
-#   + createPerson(), describePerson() functions
-#
-# Reviewer questions:
-#   Q1: "What fields does Person have — are name, age, email all present?"
-#       -> src/types.ts: Named = { name: string }, Aged = { age: number },
-#          Contactable = { email: string; phone?: string }. Intersection
-#          yields { name, age, email, phone? }. createPerson({ name, age, email })
-#          satisfies Named & Aged & Contactable because phone is optional.
-#
-#   Q2: "What does formatName do — is the call in describePerson correct?"
-#       -> src/types.ts: formatName(entity: Named) returns entity.name.trim().
-#          Person extends Named (via intersection), so passing a Person is valid.
-#
-# Not needed for comprehension:
-#   - src/services/personService.ts: CRUD operations for Person. Imports Named
-#     and Contactable from the same types module. Direct structural edge: same
-#     import source. But service operations don't help review whether the
-#     intersection type correctly merges the constituent types.
-#
-#   - src/services/contactValidator.ts: Validates Contactable fields (email
-#     format, phone format). Imports Contactable from types.ts. Same import
-#     source, same Contactable type. But validation logic is irrelevant to
-#     understanding the intersection type definition.
-#
-#   - src/formatters/nameFormatter.ts: Formats names for display. Imports
-#     Named from types.ts. Same Named type used in the diff. But additional
-#     formatting functions don't help review createPerson or describePerson.
+name: javascript_extended_039_intersection_type
+repo:
+  initial_files:
+    src/types.ts: |
+      export type Named = { name: string };
 
-max_enrichment: 8.9
-initial:
-  src/types.ts: |
-    export type Named = { name: string };
+      export type Aged = { age: number };
 
-    export type Aged = { age: number };
+      export type Contactable = { email: string; phone?: string };
 
-    export type Contactable = { email: string; phone?: string };
+      export function formatName(entity: Named): string {
+          return entity.name.trim();
+      }
+    src/person.ts: |
+      console.log('initial');
+    src/services/personService.ts: |
+      import { Named, Contactable } from '../types';
 
-    export function formatName(entity: Named): string {
-        return entity.name.trim();
-    }
-  src/person.ts: |
-    console.log('initial');
-  # --- Not needed: CRUD using Named + Contactable, same import source ---
-  src/services/personService.ts: |
-    import { Named, Contactable } from '../types';
+      type PersonRecord = Named & Contactable & { id: string };
 
-    type PersonRecord = Named & Contactable & { id: string };
+      const store: PersonRecord[] = [];
 
-    const store: PersonRecord[] = [];
+      export function savePerson(name: string, email: string): PersonRecord {
+          const record: PersonRecord = { id: Date.now().toString(), name, email };
+          store.push(record);
+          return record;
+      }
 
-    export function savePerson(name: string, email: string): PersonRecord {
-        const record: PersonRecord = { id: Date.now().toString(), name, email };
-        store.push(record);
-        return record;
-    }
+      export function findByEmail(email: string): PersonRecord | undefined {
+          return store.find(p => p.email === email);
+      }
 
-    export function findByEmail(email: string): PersonRecord | undefined {
-        return store.find(p => p.email === email);
-    }
+      export function listPersons(): PersonRecord[] {
+          return [...store];
+      }
+    src/services/contactValidator.ts: |
+      import { Contactable } from '../types';
 
-    export function listPersons(): PersonRecord[] {
-        return [...store];
-    }
-  # --- Not needed: validates Contactable, same import but validation concern ---
-  src/services/contactValidator.ts: |
-    import { Contactable } from '../types';
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const PHONE_RE = /^\+?[\d\s-]{7,15}$/;
 
-    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const PHONE_RE = /^\+?[\d\s-]{7,15}$/;
+      export function validateContact(contact: Contactable): string[] {
+          const errors: string[] = [];
+          if (!EMAIL_RE.test(contact.email)) {
+              errors.push('Invalid email format');
+          }
+          if (contact.phone && !PHONE_RE.test(contact.phone)) {
+              errors.push('Invalid phone format');
+          }
+          return errors;
+      }
 
-    export function validateContact(contact: Contactable): string[] {
-        const errors: string[] = [];
-        if (!EMAIL_RE.test(contact.email)) {
-            errors.push('Invalid email format');
-        }
-        if (contact.phone && !PHONE_RE.test(contact.phone)) {
-            errors.push('Invalid phone format');
-        }
-        return errors;
-    }
+      export function isValidEmail(email: string): boolean {
+          return EMAIL_RE.test(email);
+      }
+    src/formatters/nameFormatter.ts: |
+      import { Named } from '../types';
 
-    export function isValidEmail(email: string): boolean {
-        return EMAIL_RE.test(email);
-    }
-  # --- Not needed: formats Named, same type but display concern ---
-  src/formatters/nameFormatter.ts: |
-    import { Named } from '../types';
+      export function formatDisplayName(entity: Named): string {
+          return entity.name.charAt(0).toUpperCase() + entity.name.slice(1);
+      }
 
-    export function formatDisplayName(entity: Named): string {
-        return entity.name.charAt(0).toUpperCase() + entity.name.slice(1);
-    }
+      export function formatInitials(entity: Named): string {
+          return entity.name.split(' ').map(w => w[0]).join('').toUpperCase();
+      }
 
-    export function formatInitials(entity: Named): string {
-        return entity.name.split(' ').map(w => w[0]).join('').toUpperCase();
-    }
+      export function truncateName(entity: Named, maxLen: number): string {
+          return entity.name.length > maxLen ? entity.name.slice(0, maxLen) + '...' : entity.name;
+      }
+  changed_files:
+    src/types.ts: |
+      export type Named = { name: string };
 
-    export function truncateName(entity: Named, maxLen: number): string {
-        return entity.name.length > maxLen ? entity.name.slice(0, maxLen) + '...' : entity.name;
-    }
+      export type Aged = { age: number };
 
-changed:
-  src/types.ts: |
-    export type Named = { name: string };
+      export type Contactable = { email: string; phone?: string };
 
-    export type Aged = { age: number };
+      export function formatName(entity: Named): string {
+          return entity.name.trim();
+      }
+    src/person.ts: |
+      import { Named, Aged, Contactable, formatName } from './types';
 
-    export type Contactable = { email: string; phone?: string };
+      type Person = Named & Aged & Contactable;
 
-    export function formatName(entity: Named): string {
-        return entity.name.trim();
-    }
-  src/person.ts: |
-    import { Named, Aged, Contactable, formatName } from './types';
+      function createPerson(name: string, age: number, email: string): Person {
+          return { name, age, email };
+      }
 
-    type Person = Named & Aged & Contactable;
+      function describePerson(person: Person): string {
+          return `${formatName(person)}, age ${person.age}, email: ${person.email}`;
+      }
 
-    function createPerson(name: string, age: number, email: string): Person {
-        return { name, age, email };
-    }
+      export { Person, createPerson, describePerson };
+    src/services/personService.ts: |
+      import { Named, Contactable } from '../types';
 
-    function describePerson(person: Person): string {
-        return `${formatName(person)}, age ${person.age}, email: ${person.email}`;
-    }
+      type PersonRecord = Named & Contactable & { id: string };
 
-    export { Person, createPerson, describePerson };
-  src/services/personService.ts: |
-    import { Named, Contactable } from '../types';
+      const store: PersonRecord[] = [];
 
-    type PersonRecord = Named & Contactable & { id: string };
+      export function savePerson(name: string, email: string): PersonRecord {
+          const record: PersonRecord = { id: Date.now().toString(), name, email };
+          store.push(record);
+          return record;
+      }
 
-    const store: PersonRecord[] = [];
+      export function findByEmail(email: string): PersonRecord | undefined {
+          return store.find(p => p.email === email);
+      }
 
-    export function savePerson(name: string, email: string): PersonRecord {
-        const record: PersonRecord = { id: Date.now().toString(), name, email };
-        store.push(record);
-        return record;
-    }
+      export function listPersons(): PersonRecord[] {
+          return [...store];
+      }
+    src/services/contactValidator.ts: |
+      import { Contactable } from '../types';
 
-    export function findByEmail(email: string): PersonRecord | undefined {
-        return store.find(p => p.email === email);
-    }
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const PHONE_RE = /^\+?[\d\s-]{7,15}$/;
 
-    export function listPersons(): PersonRecord[] {
-        return [...store];
-    }
-  src/services/contactValidator.ts: |
-    import { Contactable } from '../types';
+      export function validateContact(contact: Contactable): string[] {
+          const errors: string[] = [];
+          if (!EMAIL_RE.test(contact.email)) {
+              errors.push('Invalid email format');
+          }
+          if (contact.phone && !PHONE_RE.test(contact.phone)) {
+              errors.push('Invalid phone format');
+          }
+          return errors;
+      }
 
-    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const PHONE_RE = /^\+?[\d\s-]{7,15}$/;
+      export function isValidEmail(email: string): boolean {
+          return EMAIL_RE.test(email);
+      }
+    src/formatters/nameFormatter.ts: |
+      import { Named } from '../types';
 
-    export function validateContact(contact: Contactable): string[] {
-        const errors: string[] = [];
-        if (!EMAIL_RE.test(contact.email)) {
-            errors.push('Invalid email format');
-        }
-        if (contact.phone && !PHONE_RE.test(contact.phone)) {
-            errors.push('Invalid phone format');
-        }
-        return errors;
-    }
+      export function formatDisplayName(entity: Named): string {
+          return entity.name.charAt(0).toUpperCase() + entity.name.slice(1);
+      }
 
-    export function isValidEmail(email: string): boolean {
-        return EMAIL_RE.test(email);
-    }
-  src/formatters/nameFormatter.ts: |
-    import { Named } from '../types';
+      export function formatInitials(entity: Named): string {
+          return entity.name.split(' ').map(w => w[0]).join('').toUpperCase();
+      }
 
-    export function formatDisplayName(entity: Named): string {
-        return entity.name.charAt(0).toUpperCase() + entity.name.slice(1);
-    }
-
-    export function formatInitials(entity: Named): string {
-        return entity.name.split(' ').map(w => w[0]).join('').toUpperCase();
-    }
-
-    export function truncateName(entity: Named, maxLen: number): string {
-        return entity.name.length > maxLen ? entity.name.slice(0, maxLen) + '...' : entity.name;
-    }
-
-must_include_files:
-  - src/person.ts
-  # Q1+Q2: Constituent type definitions and formatName function.
-  # Reviewer must see Named, Aged, Contactable shapes to verify
-  # the intersection yields the right combined type.
-  - src/types.ts
-
-must_include_content_from:
-  src/person.ts:
-    - "import { Named, Aged, Contactable, formatName } from './types'"
-    - "type Person = Named & Aged & Contactable"
-  src/types.ts:
-    - "type Named = { name: string }"
-    - "type Aged = { age: number }"
-    - "type Contactable = { email: string; phone?: string }"
-    - "function formatName"
-
-must_not_include:
-  # --- personService.ts: imports Named + Contactable, same source ---
-  # HARDEST TRAP: builds its own intersection (Named & Contactable & { id })
-  # very similar to Person = Named & Aged & Contactable. Same pattern,
-  # same imports. But CRUD operations don't help review the type definition.
-  - savePerson
-  - findByEmail
-  - listPersons
-  - PersonRecord
-  # --- contactValidator.ts: imports Contactable, validates email/phone ---
-  - validateContact
-  - isValidEmail
-  - EMAIL_RE
-  # --- nameFormatter.ts: imports Named, display formatting ---
-  - formatDisplayName
-  - formatInitials
-  - truncateName
-
-must_not_include_files:
-  - src/services/personService.ts
-  - src/services/contactValidator.ts
-  - src/formatters/nameFormatter.ts
-
-max_fragments: 8
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export function truncateName(entity: Named, maxLen: number): string {
+          return entity.name.length > maxLen ? entity.name.slice(0, maxLen) + '...' : entity.name;
+      }
+  commit_message: Update files
+fragments:
+- id: person
+  selector:
+    path: src/person.ts
+    anchor: import { Named, Aged, Contactable, formatName } from './types'
+- id: person_1
+  selector:
+    path: src/person.ts
+    anchor: type Person = Named & Aged & Contactable
+- id: types
+  selector:
+    path: src/types.ts
+    anchor: 'type Named = { name: string }'
+- id: types_1
+  selector:
+    path: src/types.ts
+    anchor: 'type Aged = { age: number }'
+- id: types_2
+  selector:
+    path: src/types.ts
+    anchor: 'type Contactable = { email: string; phone?: string }'
+- id: types_3
+  selector:
+    path: src/types.ts
+    anchor: function formatName
+- id: no_personservice
+  selector:
+    path: src/services/personService.ts
+- id: no_contactvalidator
+  selector:
+    path: src/services/contactValidator.ts
+- id: no_nameformatter
+  selector:
+    path: src/formatters/nameFormatter.ts
+- id: no_global_0
+  selector:
+    anchor: savePerson
+- id: no_global_1
+  selector:
+    anchor: findByEmail
+- id: no_global_2
+  selector:
+    anchor: listPersons
+- id: no_global_3
+  selector:
+    anchor: PersonRecord
+- id: no_global_4
+  selector:
+    anchor: validateContact
+- id: no_global_5
+  selector:
+    anchor: isValidEmail
+- id: no_global_6
+  selector:
+    anchor: EMAIL_RE
+- id: no_global_7
+  selector:
+    anchor: formatDisplayName
+- id: no_global_8
+  selector:
+    anchor: formatInitials
+- id: no_global_9
+  selector:
+    anchor: truncateName
+oracle:
+  required:
+  - person
+  - person_1
+  - types
+  - types_1
+  - types_2
+  - types_3
+  allowed: []
+  forbidden:
+  - no_personservice
+  - no_contactvalidator
+  - no_nameformatter
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9

@@ -1,16 +1,25 @@
-max_enrichment: 3.0
-initial:
-  mixed_script.py: |
-    def placeholder():
-        pass
-changed:
-  mixed_script.py: |
-    # This has mixed а (cyrillic) and a (latin)
-    def process(а, a):
-        return а + a
-must_include_files:
-- mixed_script.py
-must_include_content:
-- 'def process(а, a):'
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_022_mixed_cyrillic_latin
+repo:
+  initial_files:
+    mixed_script.py: |
+      def placeholder():
+          pass
+  changed_files:
+    mixed_script.py: |
+      # This has mixed а (cyrillic) and a (latin)
+      def process(а, a):
+          return а + a
+  commit_message: Update files
+fragments:
+- id: mixed_script_file
+  selector:
+    path: mixed_script.py
+- id: req_global_0
+  selector:
+    anchor: 'def process(а, a):'
+oracle:
+  required:
+  - mixed_script_file
+  - req_global_0
+  allowed: []
+  forbidden: []

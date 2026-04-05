@@ -1,17 +1,26 @@
-max_enrichment: 3.0
-initial:
-  korean_comments.py: |
-    def placeholder():
-        pass
-changed:
-  korean_comments.py: |
-    # 이것은 한국어 주석입니다
-    def calculate_total(items):
-        # 계산 로직
-        return sum(items)
-must_include_files:
-- korean_comments.py
-must_include_content:
-- 'def calculate_total(items):'
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_025_korean_comments_code
+repo:
+  initial_files:
+    korean_comments.py: |
+      def placeholder():
+          pass
+  changed_files:
+    korean_comments.py: |
+      # 이것은 한국어 주석입니다
+      def calculate_total(items):
+          # 계산 로직
+          return sum(items)
+  commit_message: Update files
+fragments:
+- id: korean_comments_file
+  selector:
+    path: korean_comments.py
+- id: req_global_0
+  selector:
+    anchor: 'def calculate_total(items):'
+oracle:
+  required:
+  - korean_comments_file
+  - req_global_0
+  allowed: []
+  forbidden: []

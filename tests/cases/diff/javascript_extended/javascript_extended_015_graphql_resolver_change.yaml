@@ -1,248 +1,251 @@
-# Scenario: resolvers.ts gains a users query and a createUser mutation.
-#   schema.ts imports resolvers and re-exports it alongside typeDefs.
-#
-# Diff shows:
-#   + users: () => [{ id: '1', name: 'User 1' }, ...]  (new Query resolver)
-#   + Mutation: { createUser: (_: any, { name }) => ... }  (new Mutation block)
-#
-# Reviewer questions:
-#   Q1: "Does the typeDefs schema define a 'users' query and 'createUser' mutation
-#        to match these resolvers?"
-#       -> schema.ts: typeDefs has `type Query { user(id: ID!): User }` but does
-#          NOT define `users: [User]` or `type Mutation`. The resolvers define
-#          handlers that have no matching schema entries — this is a bug the
-#          reviewer should catch.
-#
-#   Q2: "What fields does the User type have in the schema — do the resolver
-#        return objects match?"
-#       -> schema.ts: User { id: ID!, name: String! }. The resolvers return
-#          { id, name } which matches. Reviewer confirms field alignment.
-#
-# Not needed for comprehension:
-#   - src/resolvers/productResolvers.ts: Resolvers for product queries.
-#     Same directory pattern with Query/Mutation structure. Structurally
-#     identical sibling. But product resolvers don't help review user
-#     resolver correctness or schema alignment.
-#
-#   - src/middleware/authResolver.ts: Authentication middleware for resolvers.
-#     Wraps resolvers with auth checks. Same resolver pattern. But auth
-#     logic doesn't help verify the resolver-to-schema mapping.
-#
-#   - src/dataSources/userDataSource.ts: Data source that fetches users from
-#     a database. The resolver currently uses inline data, not this source.
-#     Eventually should use it, but no import exists yet.
+name: javascript_extended_015_graphql_resolver_change
+repo:
+  initial_files:
+    resolvers.ts: |
+      export const resolvers = {
+          Query: {
+              user: (_: any, { id }: { id: string }) => ({ id, name: 'Test' }),
+          },
+      };
+    schema.ts: |
+      import { resolvers } from './resolvers';
 
-max_enrichment: 5.9
-initial:
-  resolvers.ts: |
-    export const resolvers = {
-        Query: {
-            user: (_: any, { id }: { id: string }) => ({ id, name: 'Test' }),
-        },
-    };
-  schema.ts: |
-    import { resolvers } from './resolvers';
+      export const typeDefs = `
+          type User {
+              id: ID!
+              name: String!
+          }
 
-    export const typeDefs = `
-        type User {
-            id: ID!
-            name: String!
-        }
+          type Query {
+              user(id: ID!): User
+          }
+      `;
 
-        type Query {
-            user(id: ID!): User
-        }
-    `;
+      export { resolvers };
+    src/resolvers/productResolvers.ts: |
+      export const productResolvers = {
+          Query: {
+              product: (_: any, { id }: { id: string }) => ({ id, name: 'Widget', price: 9.99 }),
+              products: () => [
+                  { id: '1', name: 'Widget', price: 9.99 },
+                  { id: '2', name: 'Gadget', price: 19.99 },
+              ],
+          },
+          Mutation: {
+              createProduct: (_: any, { name, price }: { name: string; price: number }) =>
+                  ({ id: Date.now().toString(), name, price }),
+          },
+      };
+    src/middleware/authResolver.ts: |
+      type ResolverFn = (parent: any, args: any, context: any) => any;
 
-    export { resolvers };
-  # --- Not needed: product resolvers, same pattern but different domain ---
-  src/resolvers/productResolvers.ts: |
-    export const productResolvers = {
-        Query: {
-            product: (_: any, { id }: { id: string }) => ({ id, name: 'Widget', price: 9.99 }),
-            products: () => [
-                { id: '1', name: 'Widget', price: 9.99 },
-                { id: '2', name: 'Gadget', price: 19.99 },
-            ],
-        },
-        Mutation: {
-            createProduct: (_: any, { name, price }: { name: string; price: number }) =>
-                ({ id: Date.now().toString(), name, price }),
-        },
-    };
-  # --- Not needed: auth middleware, wraps resolvers but different concern ---
-  src/middleware/authResolver.ts: |
-    type ResolverFn = (parent: any, args: any, context: any) => any;
+      export function requireAuth(resolver: ResolverFn): ResolverFn {
+          return (parent, args, context) => {
+              if (!context.user) {
+                  throw new Error('Not authenticated');
+              }
+              return resolver(parent, args, context);
+          };
+      }
 
-    export function requireAuth(resolver: ResolverFn): ResolverFn {
-        return (parent, args, context) => {
-            if (!context.user) {
-                throw new Error('Not authenticated');
-            }
-            return resolver(parent, args, context);
-        };
-    }
+      export function requireRole(role: string, resolver: ResolverFn): ResolverFn {
+          return (parent, args, context) => {
+              if (context.user?.role !== role) {
+                  throw new Error(`Requires role: ${role}`);
+              }
+              return resolver(parent, args, context);
+          };
+      }
+    src/dataSources/userDataSource.ts: |
+      interface UserRecord {
+          id: string;
+          name: string;
+          email: string;
+      }
 
-    export function requireRole(role: string, resolver: ResolverFn): ResolverFn {
-        return (parent, args, context) => {
-            if (context.user?.role !== role) {
-                throw new Error(`Requires role: ${role}`);
-            }
-            return resolver(parent, args, context);
-        };
-    }
-  # --- Not needed: data source, no import from resolvers ---
-  src/dataSources/userDataSource.ts: |
-    interface UserRecord {
-        id: string;
-        name: string;
-        email: string;
-    }
+      const users: UserRecord[] = [
+          { id: '1', name: 'User 1', email: 'user1@example.com' },
+          { id: '2', name: 'User 2', email: 'user2@example.com' },
+      ];
 
-    const users: UserRecord[] = [
-        { id: '1', name: 'User 1', email: 'user1@example.com' },
-        { id: '2', name: 'User 2', email: 'user2@example.com' },
-    ];
+      export function getUserById(id: string): UserRecord | undefined {
+          return users.find(u => u.id === id);
+      }
 
-    export function getUserById(id: string): UserRecord | undefined {
-        return users.find(u => u.id === id);
-    }
+      export function getAllUsers(): UserRecord[] {
+          return [...users];
+      }
 
-    export function getAllUsers(): UserRecord[] {
-        return [...users];
-    }
+      export function createUser(name: string, email: string): UserRecord {
+          const user = { id: Date.now().toString(), name, email };
+          users.push(user);
+          return user;
+      }
+  changed_files:
+    resolvers.ts: |
+      export const resolvers = {
+          Query: {
+              user: (_: any, { id }: { id: string }) => ({ id, name: 'Test' }),
+              users: () => [{ id: '1', name: 'User 1' }, { id: '2', name: 'User 2' }],
+          },
+          Mutation: {
+              createUser: (_: any, { name }: { name: string }) => ({ id: Date.now().toString(), name }),
+          },
+      };
+    schema.ts: |
+      import { resolvers } from './resolvers';
 
-    export function createUser(name: string, email: string): UserRecord {
-        const user = { id: Date.now().toString(), name, email };
-        users.push(user);
-        return user;
-    }
+      export const typeDefs = `
+          type User {
+              id: ID!
+              name: String!
+          }
 
-changed:
-  resolvers.ts: |
-    export const resolvers = {
-        Query: {
-            user: (_: any, { id }: { id: string }) => ({ id, name: 'Test' }),
-            users: () => [{ id: '1', name: 'User 1' }, { id: '2', name: 'User 2' }],
-        },
-        Mutation: {
-            createUser: (_: any, { name }: { name: string }) => ({ id: Date.now().toString(), name }),
-        },
-    };
-  schema.ts: |
-    import { resolvers } from './resolvers';
+          type Query {
+              user(id: ID!): User
+          }
+      `;
 
-    export const typeDefs = `
-        type User {
-            id: ID!
-            name: String!
-        }
+      export { resolvers };
+    src/resolvers/productResolvers.ts: |
+      export const productResolvers = {
+          Query: {
+              product: (_: any, { id }: { id: string }) => ({ id, name: 'Widget', price: 9.99 }),
+              products: () => [
+                  { id: '1', name: 'Widget', price: 9.99 },
+                  { id: '2', name: 'Gadget', price: 19.99 },
+              ],
+          },
+          Mutation: {
+              createProduct: (_: any, { name, price }: { name: string; price: number }) =>
+                  ({ id: Date.now().toString(), name, price }),
+          },
+      };
+    src/middleware/authResolver.ts: |
+      type ResolverFn = (parent: any, args: any, context: any) => any;
 
-        type Query {
-            user(id: ID!): User
-        }
-    `;
+      export function requireAuth(resolver: ResolverFn): ResolverFn {
+          return (parent, args, context) => {
+              if (!context.user) {
+                  throw new Error('Not authenticated');
+              }
+              return resolver(parent, args, context);
+          };
+      }
 
-    export { resolvers };
-  src/resolvers/productResolvers.ts: |
-    export const productResolvers = {
-        Query: {
-            product: (_: any, { id }: { id: string }) => ({ id, name: 'Widget', price: 9.99 }),
-            products: () => [
-                { id: '1', name: 'Widget', price: 9.99 },
-                { id: '2', name: 'Gadget', price: 19.99 },
-            ],
-        },
-        Mutation: {
-            createProduct: (_: any, { name, price }: { name: string; price: number }) =>
-                ({ id: Date.now().toString(), name, price }),
-        },
-    };
-  src/middleware/authResolver.ts: |
-    type ResolverFn = (parent: any, args: any, context: any) => any;
+      export function requireRole(role: string, resolver: ResolverFn): ResolverFn {
+          return (parent, args, context) => {
+              if (context.user?.role !== role) {
+                  throw new Error(`Requires role: ${role}`);
+              }
+              return resolver(parent, args, context);
+          };
+      }
+    src/dataSources/userDataSource.ts: |
+      interface UserRecord {
+          id: string;
+          name: string;
+          email: string;
+      }
 
-    export function requireAuth(resolver: ResolverFn): ResolverFn {
-        return (parent, args, context) => {
-            if (!context.user) {
-                throw new Error('Not authenticated');
-            }
-            return resolver(parent, args, context);
-        };
-    }
+      const users: UserRecord[] = [
+          { id: '1', name: 'User 1', email: 'user1@example.com' },
+          { id: '2', name: 'User 2', email: 'user2@example.com' },
+      ];
 
-    export function requireRole(role: string, resolver: ResolverFn): ResolverFn {
-        return (parent, args, context) => {
-            if (context.user?.role !== role) {
-                throw new Error(`Requires role: ${role}`);
-            }
-            return resolver(parent, args, context);
-        };
-    }
-  src/dataSources/userDataSource.ts: |
-    interface UserRecord {
-        id: string;
-        name: string;
-        email: string;
-    }
+      export function getUserById(id: string): UserRecord | undefined {
+          return users.find(u => u.id === id);
+      }
 
-    const users: UserRecord[] = [
-        { id: '1', name: 'User 1', email: 'user1@example.com' },
-        { id: '2', name: 'User 2', email: 'user2@example.com' },
-    ];
+      export function getAllUsers(): UserRecord[] {
+          return [...users];
+      }
 
-    export function getUserById(id: string): UserRecord | undefined {
-        return users.find(u => u.id === id);
-    }
-
-    export function getAllUsers(): UserRecord[] {
-        return [...users];
-    }
-
-    export function createUser(name: string, email: string): UserRecord {
-        const user = { id: Date.now().toString(), name, email };
-        users.push(user);
-        return user;
-    }
-
-must_include_files:
-  - resolvers.ts
-  # Q1+Q2: Schema defines types and operations that must align with resolvers.
-  # Reviewer needs typeDefs to verify resolver-to-schema mapping.
-  - schema.ts
-
-must_include_content_from:
-  resolvers.ts:
-    - "resolvers = {"
-    - "users:"
-    - "createUser:"
-  schema.ts:
-    - "type User {"
-    - "type Query {"
-
-must_not_include:
-  # --- productResolvers.ts: IDENTICAL resolver structure ---
-  # HARDEST TRAP: same Query/Mutation pattern, same inline object returns,
-  # same Date.now().toString() for IDs. Structurally identical sibling.
-  # But product resolvers don't help review user resolver correctness.
-  - productResolvers
-  - createProduct
-  - "Widget"
-  - "Gadget"
-  # --- authResolver.ts: resolver middleware, different concern ---
-  - requireAuth
-  - requireRole
-  - ResolverFn
-  # --- userDataSource.ts: data source, no import link ---
-  - UserRecord
-  - getUserById
-  - getAllUsers
-
-must_not_include_files:
-  - src/resolvers/productResolvers.ts
-  - src/middleware/authResolver.ts
-  - src/dataSources/userDataSource.ts
-
-max_fragments: 8
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export function createUser(name: string, email: string): UserRecord {
+          const user = { id: Date.now().toString(), name, email };
+          users.push(user);
+          return user;
+      }
+  commit_message: Update files
+fragments:
+- id: resolvers
+  selector:
+    path: resolvers.ts
+    anchor: resolvers = {
+- id: resolvers_1
+  selector:
+    path: resolvers.ts
+    anchor: 'users:'
+- id: resolvers_2
+  selector:
+    path: resolvers.ts
+    anchor: 'createUser:'
+- id: schema
+  selector:
+    path: schema.ts
+    anchor: type User {
+- id: schema_1
+  selector:
+    path: schema.ts
+    anchor: type Query {
+- id: no_productresolvers
+  selector:
+    path: src/resolvers/productResolvers.ts
+- id: no_authresolver
+  selector:
+    path: src/middleware/authResolver.ts
+- id: no_userdatasource
+  selector:
+    path: src/dataSources/userDataSource.ts
+- id: no_global_0
+  selector:
+    anchor: productResolvers
+- id: no_global_1
+  selector:
+    anchor: createProduct
+- id: no_global_2
+  selector:
+    anchor: Widget
+- id: no_global_3
+  selector:
+    anchor: Gadget
+- id: no_global_4
+  selector:
+    anchor: requireAuth
+- id: no_global_5
+  selector:
+    anchor: requireRole
+- id: no_global_6
+  selector:
+    anchor: ResolverFn
+- id: no_global_7
+  selector:
+    anchor: UserRecord
+- id: no_global_8
+  selector:
+    anchor: getUserById
+- id: no_global_9
+  selector:
+    anchor: getAllUsers
+oracle:
+  required:
+  - resolvers
+  - resolvers_1
+  - resolvers_2
+  - schema
+  - schema_1
+  allowed: []
+  forbidden:
+  - no_productresolvers
+  - no_authresolver
+  - no_userdatasource
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9

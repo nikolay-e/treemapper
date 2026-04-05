@@ -1,14 +1,23 @@
-max_enrichment: 3.0
-initial:
-  binary_escape.py: |
-    x = 0
-changed:
-  binary_escape.py: |
-    binary = b"\x00\x01\x02"
-    valid_name = "test"
-must_include_files:
-- binary_escape.py
-must_include_content:
-- binary = b"\x00\x01\x02"
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_036_binary_escape_preserved
+repo:
+  initial_files:
+    binary_escape.py: |
+      x = 0
+  changed_files:
+    binary_escape.py: |
+      binary = b"\x00\x01\x02"
+      valid_name = "test"
+  commit_message: Update files
+fragments:
+- id: binary_escape_file
+  selector:
+    path: binary_escape.py
+- id: req_global_0
+  selector:
+    anchor: binary = b"\x00\x01\x02"
+oracle:
+  required:
+  - binary_escape_file
+  - req_global_0
+  allowed: []
+  forbidden: []

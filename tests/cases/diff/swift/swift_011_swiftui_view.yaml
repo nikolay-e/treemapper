@@ -1,128 +1,122 @@
-# Scenario: UserDetailView gains a body that renders User fields (name, email)
-# in a VStack layout. The reviewer sees `Text(user.name)` and `Text(user.email)`
-# and needs to confirm those properties exist on the User model.
-#
-# Reviewer questions:
-#   Q1: "Does User have a name and email property for the Text views?"
-#       -> Sources/Models/User.swift: let name: String, let email: String
-#   Q2: "Does User conform to Identifiable for potential use in Lists?"
-#       -> Sources/Models/User.swift: struct User: Identifiable — yes
-#
-# Not needed:
-#   - Sources/Models/Post.swift: another Identifiable model — similar
-#     conformance but not rendered by UserDetailView
-#   - Sources/Views/PostListView.swift: another SwiftUI view — same
-#     directory but renders Posts, not Users
+name: swift_011_swiftui_view
+repo:
+  initial_files:
+    Sources/Models/User.swift: |
+      struct User: Identifiable {
+          let id: String
+          let name: String
+          let email: String
+      }
+    Sources/Views/UserDetailView.swift: |
+      import SwiftUI
 
-max_enrichment: 7.1
-initial:
-  Sources/Models/User.swift: |
-    struct User: Identifiable {
-        let id: String
-        let name: String
-        let email: String
-    }
-  Sources/Views/UserDetailView.swift: |
-    import SwiftUI
+      struct UserDetailView: View {
+          var body: some View {
+              Text("placeholder")
+          }
+      }
+    Sources/Models/Post.swift: |
+      struct Post: Identifiable {
+          let id: String
+          let title: String
+          let body: String
+          let authorId: String
+      }
+    Sources/Views/PostListView.swift: |
+      import SwiftUI
 
-    struct UserDetailView: View {
-        var body: some View {
-            Text("placeholder")
-        }
-    }
+      struct PostListView: View {
+          let posts: [Post]
 
-  # Trap: another Identifiable model — same directory, not rendered by UserDetailView
-  Sources/Models/Post.swift: |
-    struct Post: Identifiable {
-        let id: String
-        let title: String
-        let body: String
-        let authorId: String
-    }
+          var body: some View {
+              List(posts) { post in
+                  VStack(alignment: .leading) {
+                      Text(post.title).font(.headline)
+                      Text(post.body).font(.body)
+                  }
+              }
+          }
+      }
+  changed_files:
+    Sources/Models/User.swift: |
+      struct User: Identifiable {
+          let id: String
+          let name: String
+          let email: String
+      }
+    Sources/Views/UserDetailView.swift: |
+      import SwiftUI
 
-  # Trap: sibling SwiftUI view — renders posts, not users
-  Sources/Views/PostListView.swift: |
-    import SwiftUI
+      struct UserDetailView: View {
+          let user: User
 
-    struct PostListView: View {
-        let posts: [Post]
+          var body: some View {
+              VStack(alignment: .leading) {
+                  Text(user.name)
+                      .font(.headline)
+                  Text(user.email)
+                      .font(.subheadline)
+                      .foregroundColor(.gray)
+              }
+          }
+      }
+    Sources/Models/Post.swift: |
+      struct Post: Identifiable {
+          let id: String
+          let title: String
+          let body: String
+          let authorId: String
+      }
+    Sources/Views/PostListView.swift: |
+      import SwiftUI
 
-        var body: some View {
-            List(posts) { post in
-                VStack(alignment: .leading) {
-                    Text(post.title).font(.headline)
-                    Text(post.body).font(.body)
-                }
-            }
-        }
-    }
+      struct PostListView: View {
+          let posts: [Post]
 
-changed:
-  Sources/Models/User.swift: |
-    struct User: Identifiable {
-        let id: String
-        let name: String
-        let email: String
-    }
-  Sources/Views/UserDetailView.swift: |
-    import SwiftUI
-
-    struct UserDetailView: View {
-        let user: User
-
-        var body: some View {
-            VStack(alignment: .leading) {
-                Text(user.name)
-                    .font(.headline)
-                Text(user.email)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-        }
-    }
-  Sources/Models/Post.swift: |
-    struct Post: Identifiable {
-        let id: String
-        let title: String
-        let body: String
-        let authorId: String
-    }
-  Sources/Views/PostListView.swift: |
-    import SwiftUI
-
-    struct PostListView: View {
-        let posts: [Post]
-
-        var body: some View {
-            List(posts) { post in
-                VStack(alignment: .leading) {
-                    Text(post.title).font(.headline)
-                    Text(post.body).font(.body)
-                }
-            }
-        }
-    }
-
-must_include_files:
-- Sources/Views/UserDetailView.swift
-
-must_include_content:
-- Text(user.name)
-
-must_not_include:
-  # Post.swift: another Identifiable model — not referenced by UserDetailView
-  - Post
-  - authorId
-  # PostListView.swift: sibling SwiftUI view — renders Post items,
-  # no relation to UserDetailView or User model
-  - PostListView
-  - post.title
-
-must_not_include_files:
-- Sources/Models/Post.swift
-- Sources/Views/PostListView.swift
-
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          var body: some View {
+              List(posts) { post in
+                  VStack(alignment: .leading) {
+                      Text(post.title).font(.headline)
+                      Text(post.body).font(.body)
+                  }
+              }
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: userdetailview_file
+  selector:
+    path: Sources/Views/UserDetailView.swift
+- id: req_global_0
+  selector:
+    anchor: Text(user.name)
+- id: no_post
+  selector:
+    path: Sources/Models/Post.swift
+- id: no_postlistview
+  selector:
+    path: Sources/Views/PostListView.swift
+- id: no_global_0
+  selector:
+    anchor: Post
+- id: no_global_1
+  selector:
+    anchor: authorId
+- id: no_global_2
+  selector:
+    anchor: PostListView
+- id: no_global_3
+  selector:
+    anchor: post.title
+oracle:
+  required:
+  - userdetailview_file
+  - req_global_0
+  allowed: []
+  forbidden:
+  - no_post
+  - no_postlistview
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

@@ -1,107 +1,127 @@
-# Scenario: A brand new file is added with no existing dependencies.
-# Reviewer should see only the new file, not unrelated modules.
-# Changed: new_file.py is added (defines new_func), no other files changed
-# Reviewer needs: new_file.py (the only change — isolated addition)
-# Trap: item_factory.py — has "new" in naming, create_new_item function
-# Trap: existing_helper.py — structural sibling matching existing_a/existing_b naming
-# Trap: message_queue.py — completely unrelated module
+name: ppr_020_seeds_empty_uniform
+repo:
+  initial_files:
+    existing_a.py: |
+      def existing_a():
+          return "a"
+    existing_b.py: |
+      def existing_b():
+          return "b"
+    item_factory.py: |
+      def create_new_item():
+          return "created"
 
-max_enrichment: 3.0
-initial:
-  existing_a.py: |
-    def existing_a():
-        return "a"
-  existing_b.py: |
-    def existing_b():
-        return "b"
-  item_factory.py: |
-    def create_new_item():
-        return "created"
+      class NewItemHandler:
+          def handle(self):
+              return create_new_item()
 
-    class NewItemHandler:
-        def handle(self):
-            return create_new_item()
+          def validate(self):
+              return True
+    existing_helper.py: |
+      def existing_c():
+          return "c"
 
-        def validate(self):
-            return True
-  existing_helper.py: |
-    def existing_c():
-        return "c"
+      class ExistingCProcessor:
+          def process(self):
+              return existing_c()
+    message_queue.py: |
+      QUEUE_SIZE = 256
+      QUEUE_TYPE = "fifo"
 
-    class ExistingCProcessor:
-        def process(self):
-            return existing_c()
-  message_queue.py: |
-    QUEUE_SIZE = 256
-    QUEUE_TYPE = "fifo"
+      class MessageQueue:
+          def enqueue(self, item):
+              pass
+  changed_files:
+    existing_a.py: |
+      def existing_a():
+          return "a"
+    existing_b.py: |
+      def existing_b():
+          return "b"
+    new_file.py: |
+      def new_func():
+          return "new"
+    item_factory.py: |
+      def create_new_item():
+          return "created"
 
-    class MessageQueue:
-        def enqueue(self, item):
-            pass
+      class NewItemHandler:
+          def handle(self):
+              return create_new_item()
 
-changed:
-  existing_a.py: |
-    def existing_a():
-        return "a"
-  existing_b.py: |
-    def existing_b():
-        return "b"
-  new_file.py: |
-    def new_func():
-        return "new"
-  item_factory.py: |
-    def create_new_item():
-        return "created"
+          def validate(self):
+              return True
+    existing_helper.py: |
+      def existing_c():
+          return "c"
 
-    class NewItemHandler:
-        def handle(self):
-            return create_new_item()
+      class ExistingCProcessor:
+          def process(self):
+              return existing_c()
+    message_queue.py: |
+      QUEUE_SIZE = 256
+      QUEUE_TYPE = "fifo"
 
-        def validate(self):
-            return True
-  existing_helper.py: |
-    def existing_c():
-        return "c"
-
-    class ExistingCProcessor:
-        def process(self):
-            return existing_c()
-  message_queue.py: |
-    QUEUE_SIZE = 256
-    QUEUE_TYPE = "fifo"
-
-    class MessageQueue:
-        def enqueue(self, item):
-            pass
-
-# === Assertions ===
-
-must_include:
-- new_func
-- new
-
-must_include_files:
-- new_file.py
-
-must_include_content_from:
-  new_file.py:
-    - 'def new_func():'
-    - return "new"
-
-must_not_include:
-- NewItemHandler
-- create_new_item
-- ExistingCProcessor
-- existing_c
-- MessageQueue
-- QUEUE_SIZE
-
-must_not_include_files:
-- item_factory.py
-- existing_helper.py
-- message_queue.py
-
-max_fragments: 4
-max_files: 2
-add_garbage_files: false
-skip_garbage_check: true
+      class MessageQueue:
+          def enqueue(self, item):
+              pass
+  commit_message: Update files
+fragments:
+- id: new_file
+  selector:
+    path: new_file.py
+    anchor: 'def new_func():'
+- id: new_file_1
+  selector:
+    path: new_file.py
+    anchor: return "new"
+- id: req_pattern_0
+  selector:
+    anchor: new_func
+- id: req_pattern_1
+  selector:
+    anchor: new
+- id: no_item_factory
+  selector:
+    path: item_factory.py
+- id: no_existing_helper
+  selector:
+    path: existing_helper.py
+- id: no_message_queue
+  selector:
+    path: message_queue.py
+- id: no_global_0
+  selector:
+    anchor: NewItemHandler
+- id: no_global_1
+  selector:
+    anchor: create_new_item
+- id: no_global_2
+  selector:
+    anchor: ExistingCProcessor
+- id: no_global_3
+  selector:
+    anchor: existing_c
+- id: no_global_4
+  selector:
+    anchor: MessageQueue
+- id: no_global_5
+  selector:
+    anchor: QUEUE_SIZE
+oracle:
+  required:
+  - new_file
+  - new_file_1
+  - req_pattern_0
+  - req_pattern_1
+  allowed: []
+  forbidden:
+  - no_item_factory
+  - no_existing_helper
+  - no_message_queue
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

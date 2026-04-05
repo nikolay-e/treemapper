@@ -1,67 +1,79 @@
-max_enrichment: 3.7
-initial:
-  types.ts: |
-    export interface User {
-        id: string;
-        name: string;
-        email: string;
-    }
+name: frontend_006_usestate_hook
+repo:
+  initial_files:
+    types.ts: |
+      export interface User {
+          id: string;
+          name: string;
+          email: string;
+      }
 
-    export interface Post {
-        id: string;
-        title: string;
-        content: string;
-        authorId: string;
-    }
+      export interface Post {
+          id: string;
+          title: string;
+          content: string;
+          authorId: string;
+      }
 
-    // react_garbage_marker_002
-  UserList.tsx: |
-    import React from 'react';
+      // react_garbage_marker_002
+    UserList.tsx: |
+      import React from 'react';
 
-    export function UserList() {
-        return <div>Initial</div>;
-    }
-changed:
-  types.ts: |
-    export interface User {
-        id: string;
-        name: string;
-        email: string;
-    }
+      export function UserList() {
+          return <div>Initial</div>;
+      }
+  changed_files:
+    types.ts: |
+      export interface User {
+          id: string;
+          name: string;
+          email: string;
+      }
 
-    export interface Post {
-        id: string;
-        title: string;
-        content: string;
-        authorId: string;
-    }
+      export interface Post {
+          id: string;
+          title: string;
+          content: string;
+          authorId: string;
+      }
 
-    // react_garbage_marker_002
-  UserList.tsx: |
-    import React, { useState } from 'react';
-    import { User } from './types';
+      // react_garbage_marker_002
+    UserList.tsx: |
+      import React, { useState } from 'react';
+      import { User } from './types';
 
-    export function UserList() {
-        const [users, setUsers] = useState<User[]>([]);
-        const [loading, setLoading] = useState(false);
+      export function UserList() {
+          const [users, setUsers] = useState<User[]>([]);
+          const [loading, setLoading] = useState(false);
 
-        const addUser = (user: User) => {
-            setUsers(prev => [...prev, user]);
-        };
+          const addUser = (user: User) => {
+              setUsers(prev => [...prev, user]);
+          };
 
-        return (
-            <div>
-                {loading ? <p>Loading...</p> : null}
-                {users.map(user => (
-                    <div key={user.id}>{user.name}</div>
-                ))}
-            </div>
-        );
-    }
-must_include_files:
-- UserList.tsx
-must_include_content:
-- import React, { useState } from 'react';
-- '[users, setUsers] = useState<User[]>([])'
-add_garbage_files: false
-skip_garbage_check: true
+          return (
+              <div>
+                  {loading ? <p>Loading...</p> : null}
+                  {users.map(user => (
+                      <div key={user.id}>{user.name}</div>
+                  ))}
+              </div>
+          );
+      }
+  commit_message: Update files
+fragments:
+- id: userlist_file
+  selector:
+    path: UserList.tsx
+- id: req_global_0
+  selector:
+    anchor: import React, { useState } from 'react';
+- id: req_global_1
+  selector:
+    anchor: '[users, setUsers] = useState<User[]>([])'
+oracle:
+  required:
+  - userlist_file
+  - req_global_0
+  - req_global_1
+  allowed: []
+  forbidden: []

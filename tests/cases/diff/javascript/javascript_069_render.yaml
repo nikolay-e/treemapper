@@ -1,100 +1,102 @@
-# Reviewer sees: Greeting.test.tsx renders Greeting with name="World"
-# and asserts "Hello, World!" is in the document.
-# Q: "What does Greeting render with the name prop?"
-#    -> Greeting.tsx: renders <h1>Hello, {name}!</h1>. Test assertion
-#       matches the actual template output.
-#
-# Not needed:
-#   - Farewell.tsx: similar component for goodbye messages. Same
-#     rendering pattern but different component, not under test.
-#   - test-utils.tsx: custom render wrapper with providers. Test
-#     infrastructure not used by this simple test.
+name: javascript_069_render
+repo:
+  initial_files:
+    src/Greeting.tsx: |
+      interface GreetingProps {
+          name: string;
+      }
 
-max_enrichment: 4.2
-initial:
-  src/Greeting.tsx: |
-    interface GreetingProps {
-        name: string;
-    }
+      export function Greeting({ name }: GreetingProps) {
+          return <h1>Hello, {name}!</h1>;
+      }
+    src/Greeting.test.tsx: |
+      console.log('placeholder');
+    src/Farewell.tsx: |
+      interface FarewellProps {
+          name: string;
+      }
 
-    export function Greeting({ name }: GreetingProps) {
-        return <h1>Hello, {name}!</h1>;
-    }
-  src/Greeting.test.tsx: |
-    console.log('placeholder');
-  src/Farewell.tsx: |
-    interface FarewellProps {
-        name: string;
-    }
+      export function Farewell({ name }: FarewellProps) {
+          return <h1>Goodbye, {name}!</h1>;
+      }
+    src/test-utils.tsx: |
+      import { render, RenderOptions } from '@testing-library/react';
+      import { ReactElement } from 'react';
 
-    export function Farewell({ name }: FarewellProps) {
-        return <h1>Goodbye, {name}!</h1>;
-    }
-  src/test-utils.tsx: |
-    import { render, RenderOptions } from '@testing-library/react';
-    import { ReactElement } from 'react';
+      function AllProviders({ children }: { children: React.ReactNode }) {
+          return <>{children}</>;
+      }
 
-    function AllProviders({ children }: { children: React.ReactNode }) {
-        return <>{children}</>;
-    }
+      export function customRender(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
+          return render(ui, { wrapper: AllProviders, ...options });
+      }
+  changed_files:
+    src/Greeting.tsx: |
+      interface GreetingProps {
+          name: string;
+      }
 
-    export function customRender(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
-        return render(ui, { wrapper: AllProviders, ...options });
-    }
-changed:
-  src/Greeting.tsx: |
-    interface GreetingProps {
-        name: string;
-    }
+      export function Greeting({ name }: GreetingProps) {
+          return <h1>Hello, {name}!</h1>;
+      }
+    src/Greeting.test.tsx: |
+      import { render, screen } from '@testing-library/react';
+      import { Greeting } from './Greeting';
 
-    export function Greeting({ name }: GreetingProps) {
-        return <h1>Hello, {name}!</h1>;
-    }
-  src/Greeting.test.tsx: |
-    import { render, screen } from '@testing-library/react';
-    import { Greeting } from './Greeting';
+      describe('Greeting', () => {
+          it('should display name', () => {
+              render(<Greeting name="World" />);
+              expect(screen.getByText('Hello, World!')).toBeInTheDocument();
+          });
+      });
+    src/Farewell.tsx: |
+      interface FarewellProps {
+          name: string;
+      }
 
-    describe('Greeting', () => {
-        it('should display name', () => {
-            render(<Greeting name="World" />);
-            expect(screen.getByText('Hello, World!')).toBeInTheDocument();
-        });
-    });
-  src/Farewell.tsx: |
-    interface FarewellProps {
-        name: string;
-    }
+      export function Farewell({ name }: FarewellProps) {
+          return <h1>Goodbye, {name}!</h1>;
+      }
+    src/test-utils.tsx: |
+      import { render, RenderOptions } from '@testing-library/react';
+      import { ReactElement } from 'react';
 
-    export function Farewell({ name }: FarewellProps) {
-        return <h1>Goodbye, {name}!</h1>;
-    }
-  src/test-utils.tsx: |
-    import { render, RenderOptions } from '@testing-library/react';
-    import { ReactElement } from 'react';
+      function AllProviders({ children }: { children: React.ReactNode }) {
+          return <>{children}</>;
+      }
 
-    function AllProviders({ children }: { children: React.ReactNode }) {
-        return <>{children}</>;
-    }
-
-    export function customRender(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
-        return render(ui, { wrapper: AllProviders, ...options });
-    }
-must_include_files:
-  # Unchanged file — the component under test. Reviewer needs to
-  # see the template to verify test assertion matches actual output.
-  - src/Greeting.tsx
-must_include_content_from:
-  src/Greeting.tsx:
-    - "function Greeting"
-    - "Hello, {name}!"
-must_not_include:
-  # Farewell.tsx: different component, not under test
-  - FarewellProps
-  - Goodbye
-  # test-utils.tsx: custom render wrapper not used by this test
-  - customRender
-  - AllProviders
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export function customRender(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
+          return render(ui, { wrapper: AllProviders, ...options });
+      }
+  commit_message: Update files
+fragments:
+- id: greeting
+  selector:
+    path: src/Greeting.tsx
+    anchor: function Greeting
+- id: greeting_1
+  selector:
+    path: src/Greeting.tsx
+    anchor: Hello, {name}!
+- id: no_global_0
+  selector:
+    anchor: FarewellProps
+- id: no_global_1
+  selector:
+    anchor: Goodbye
+- id: no_global_2
+  selector:
+    anchor: customRender
+- id: no_global_3
+  selector:
+    anchor: AllProviders
+oracle:
+  required:
+  - greeting
+  - greeting_1
+  allowed: []
+  forbidden:
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

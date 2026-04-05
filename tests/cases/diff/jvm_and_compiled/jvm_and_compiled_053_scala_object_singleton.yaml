@@ -1,255 +1,289 @@
-# Scenario: ApiClient is implemented to use Config singleton object for
-#   URL construction, timeouts, and retry configuration.
-#
-# Diff shows:
-#   - class ApiClient {}  (empty)
-#   + fetch() using Config.getFullUrl and Config.timeout,
-#     retry() using Config.maxRetries
-#
-# Reviewer questions:
-#   Q1: "What values does Config provide — do getFullUrl/timeout/maxRetries exist?"
-#       -> Needs Config.scala: object with timeout=30, maxRetries=3,
-#          baseUrl, and getFullUrl(path) method.
-#
-#   Q2: "What does getFullUrl return — is the URL format correct?"
-#       -> Same file: getFullUrl concatenates baseUrl + path.
-#
-# Not needed for comprehension:
-#   - HttpHeaders.scala: Another singleton object with default headers.
-#     Same object pattern. HARDEST TRAP: same singleton design, same
-#     HTTP vocabulary (contentType, accept).
-#
-#   - ResponseParser.scala: Parses API responses. Same API vocabulary.
-#     Not referenced by ApiClient.
-#
-#   - ApiLogger.scala: Logs API requests. Same "Api" namespace.
-#     Not called by ApiClient.
-#
-#   - RateLimiter.scala: Rate limiting for API calls. Same API domain.
-#     Independent of ApiClient.
-#
-#   - ApiConfig.scala: Another config object with API-specific settings.
-#     Same config pattern. Not referenced by ApiClient (uses Config).
+name: jvm_and_compiled_053_scala_object_singleton
+repo:
+  initial_files:
+    Config.scala: |
+      object Config {
+        val timeout: Int = 30
+        val maxRetries: Int = 3
+        val baseUrl: String = "https://api.example.com"
 
-max_enrichment: 4.8
-initial:
-  Config.scala: |
-    object Config {
-      val timeout: Int = 30
-      val maxRetries: Int = 3
-      val baseUrl: String = "https://api.example.com"
+        def getFullUrl(path: String): String = s"$baseUrl$path"
 
-      def getFullUrl(path: String): String = s"$baseUrl$path"
+        def isProduction: Boolean = baseUrl.contains("api.example.com")
 
-      def isProduction: Boolean = baseUrl.contains("api.example.com")
-
-      val connectionPoolSize: Int = 10
-    }
-  ApiClient.scala: |
-    class ApiClient {}
-  HttpHeaders.scala: |
-    object HttpHeaders {
-      val contentType: String = "application/json"
-      val accept: String = "application/json"
-      val userAgent: String = "ScalaClient/1.0"
-
-      def authHeader(token: String): (String, String) = {
-        ("Authorization", s"Bearer $token")
+        val connectionPoolSize: Int = 10
       }
+    ApiClient.scala: |
+      class ApiClient {}
+    HttpHeaders.scala: |
+      object HttpHeaders {
+        val contentType: String = "application/json"
+        val accept: String = "application/json"
+        val userAgent: String = "ScalaClient/1.0"
 
-      def defaults: Map[String, String] = Map(
-        "Content-Type" -> contentType,
-        "Accept" -> accept,
-        "User-Agent" -> userAgent
-      )
-
-      def withAuth(token: String): Map[String, String] = {
-        val (k, v) = authHeader(token)
-        defaults + (k -> v)
-      }
-    }
-  ResponseParser.scala: |
-    object ResponseParser {
-      def parseJson(body: String): Map[String, Any] = {
-        Map("raw" -> body)
-      }
-
-      def extractField(body: String, field: String): Option[String] = {
-        if (body.contains(field)) Some(field) else None
-      }
-
-      def isSuccess(statusCode: Int): Boolean = statusCode >= 200 && statusCode < 300
-
-      def isClientError(statusCode: Int): Boolean = statusCode >= 400 && statusCode < 500
-    }
-  logging/ApiLogger.scala: |
-    object ApiLogger {
-      def logRequest(method: String, url: String): Unit = {
-        println(s"[API] $method $url")
-      }
-
-      def logResponse(statusCode: Int, body: String): Unit = {
-        println(s"[API] Response: $statusCode, body length: ${body.length}")
-      }
-
-      def logError(url: String, error: Throwable): Unit = {
-        println(s"[API] Error for $url: ${error.getMessage}")
-      }
-    }
-  ratelimit/RateLimiter.scala: |
-    object RateLimiter {
-      private var requestCount = 0
-      private val maxPerSecond = 10
-
-      def acquire(): Boolean = {
-        if (requestCount < maxPerSecond) {
-          requestCount += 1
-          true
-        } else false
-      }
-
-      def reset(): Unit = { requestCount = 0 }
-
-      def remaining(): Int = maxPerSecond - requestCount
-    }
-
-changed:
-  Config.scala: |
-    object Config {
-      val timeout: Int = 30
-      val maxRetries: Int = 3
-      val baseUrl: String = "https://api.example.com"
-
-      def getFullUrl(path: String): String = s"$baseUrl$path"
-
-      def isProduction: Boolean = baseUrl.contains("api.example.com")
-
-      val connectionPoolSize: Int = 10
-    }
-  ApiClient.scala: |
-    class ApiClient {
-      def fetch(path: String): String = {
-        val url = Config.getFullUrl(path)
-        val timeout = Config.timeout
-        s"Fetching $url with timeout $timeout"
-      }
-
-      def retry(action: => String): String = {
-        var attempts = 0
-        while (attempts < Config.maxRetries) {
-          attempts += 1
+        def authHeader(token: String): (String, String) = {
+          ("Authorization", s"Bearer $token")
         }
-        action
+
+        def defaults: Map[String, String] = Map(
+          "Content-Type" -> contentType,
+          "Accept" -> accept,
+          "User-Agent" -> userAgent
+        )
+
+        def withAuth(token: String): Map[String, String] = {
+          val (k, v) = authHeader(token)
+          defaults + (k -> v)
+        }
       }
-    }
-  HttpHeaders.scala: |
-    object HttpHeaders {
-      val contentType: String = "application/json"
-      val accept: String = "application/json"
-      val userAgent: String = "ScalaClient/1.0"
+    ResponseParser.scala: |
+      object ResponseParser {
+        def parseJson(body: String): Map[String, Any] = {
+          Map("raw" -> body)
+        }
 
-      def authHeader(token: String): (String, String) = {
-        ("Authorization", s"Bearer $token")
+        def extractField(body: String, field: String): Option[String] = {
+          if (body.contains(field)) Some(field) else None
+        }
+
+        def isSuccess(statusCode: Int): Boolean = statusCode >= 200 && statusCode < 300
+
+        def isClientError(statusCode: Int): Boolean = statusCode >= 400 && statusCode < 500
       }
+    logging/ApiLogger.scala: |
+      object ApiLogger {
+        def logRequest(method: String, url: String): Unit = {
+          println(s"[API] $method $url")
+        }
 
-      def defaults: Map[String, String] = Map(
-        "Content-Type" -> contentType,
-        "Accept" -> accept,
-        "User-Agent" -> userAgent
-      )
+        def logResponse(statusCode: Int, body: String): Unit = {
+          println(s"[API] Response: $statusCode, body length: ${body.length}")
+        }
 
-      def withAuth(token: String): Map[String, String] = {
-        val (k, v) = authHeader(token)
-        defaults + (k -> v)
+        def logError(url: String, error: Throwable): Unit = {
+          println(s"[API] Error for $url: ${error.getMessage}")
+        }
       }
-    }
-  ResponseParser.scala: |
-    object ResponseParser {
-      def parseJson(body: String): Map[String, Any] = {
-        Map("raw" -> body)
+    ratelimit/RateLimiter.scala: |
+      object RateLimiter {
+        private var requestCount = 0
+        private val maxPerSecond = 10
+
+        def acquire(): Boolean = {
+          if (requestCount < maxPerSecond) {
+            requestCount += 1
+            true
+          } else false
+        }
+
+        def reset(): Unit = { requestCount = 0 }
+
+        def remaining(): Int = maxPerSecond - requestCount
       }
+  changed_files:
+    Config.scala: |
+      object Config {
+        val timeout: Int = 30
+        val maxRetries: Int = 3
+        val baseUrl: String = "https://api.example.com"
 
-      def extractField(body: String, field: String): Option[String] = {
-        if (body.contains(field)) Some(field) else None
+        def getFullUrl(path: String): String = s"$baseUrl$path"
+
+        def isProduction: Boolean = baseUrl.contains("api.example.com")
+
+        val connectionPoolSize: Int = 10
       }
+    ApiClient.scala: |
+      class ApiClient {
+        def fetch(path: String): String = {
+          val url = Config.getFullUrl(path)
+          val timeout = Config.timeout
+          s"Fetching $url with timeout $timeout"
+        }
 
-      def isSuccess(statusCode: Int): Boolean = statusCode >= 200 && statusCode < 300
-
-      def isClientError(statusCode: Int): Boolean = statusCode >= 400 && statusCode < 500
-    }
-  logging/ApiLogger.scala: |
-    object ApiLogger {
-      def logRequest(method: String, url: String): Unit = {
-        println(s"[API] $method $url")
+        def retry(action: => String): String = {
+          var attempts = 0
+          while (attempts < Config.maxRetries) {
+            attempts += 1
+          }
+          action
+        }
       }
+    HttpHeaders.scala: |
+      object HttpHeaders {
+        val contentType: String = "application/json"
+        val accept: String = "application/json"
+        val userAgent: String = "ScalaClient/1.0"
 
-      def logResponse(statusCode: Int, body: String): Unit = {
-        println(s"[API] Response: $statusCode, body length: ${body.length}")
+        def authHeader(token: String): (String, String) = {
+          ("Authorization", s"Bearer $token")
+        }
+
+        def defaults: Map[String, String] = Map(
+          "Content-Type" -> contentType,
+          "Accept" -> accept,
+          "User-Agent" -> userAgent
+        )
+
+        def withAuth(token: String): Map[String, String] = {
+          val (k, v) = authHeader(token)
+          defaults + (k -> v)
+        }
       }
+    ResponseParser.scala: |
+      object ResponseParser {
+        def parseJson(body: String): Map[String, Any] = {
+          Map("raw" -> body)
+        }
 
-      def logError(url: String, error: Throwable): Unit = {
-        println(s"[API] Error for $url: ${error.getMessage}")
+        def extractField(body: String, field: String): Option[String] = {
+          if (body.contains(field)) Some(field) else None
+        }
+
+        def isSuccess(statusCode: Int): Boolean = statusCode >= 200 && statusCode < 300
+
+        def isClientError(statusCode: Int): Boolean = statusCode >= 400 && statusCode < 500
       }
-    }
-  ratelimit/RateLimiter.scala: |
-    object RateLimiter {
-      private var requestCount = 0
-      private val maxPerSecond = 10
+    logging/ApiLogger.scala: |
+      object ApiLogger {
+        def logRequest(method: String, url: String): Unit = {
+          println(s"[API] $method $url")
+        }
 
-      def acquire(): Boolean = {
-        if (requestCount < maxPerSecond) {
-          requestCount += 1
-          true
-        } else false
+        def logResponse(statusCode: Int, body: String): Unit = {
+          println(s"[API] Response: $statusCode, body length: ${body.length}")
+        }
+
+        def logError(url: String, error: Throwable): Unit = {
+          println(s"[API] Error for $url: ${error.getMessage}")
+        }
       }
+    ratelimit/RateLimiter.scala: |
+      object RateLimiter {
+        private var requestCount = 0
+        private val maxPerSecond = 10
 
-      def reset(): Unit = { requestCount = 0 }
+        def acquire(): Boolean = {
+          if (requestCount < maxPerSecond) {
+            requestCount += 1
+            true
+          } else false
+        }
 
-      def remaining(): Int = maxPerSecond - requestCount
-    }
+        def reset(): Unit = { requestCount = 0 }
 
-must_include_files:
-  - ApiClient.scala
-  - Config.scala
-
-must_include_content_from:
-  ApiClient.scala:
-    - "Config.getFullUrl(path)"
-    - "Config.timeout"
-    - "Config.maxRetries"
-  Config.scala:
-    - "val timeout: Int = 30"
-    - "val maxRetries: Int = 3"
-    - 'val baseUrl: String = "https://api.example.com"'
-    - "def getFullUrl(path: String): String"
-
-must_not_include:
-  # HttpHeaders.scala: similar singleton, HTTP vocabulary, not referenced
-  - HttpHeaders
-  - userAgent
-  - authHeader
-  - withAuth
-  # ResponseParser.scala: parses responses, not called
-  - ResponseParser
-  - parseJson
-  - extractField
-  - isSuccess
-  # ApiLogger.scala: logs API calls, not called
-  - ApiLogger
-  - logRequest
-  - logResponse
-  # RateLimiter.scala: rate limiting, independent
-  - RateLimiter
-  - acquire
-  - maxPerSecond
-
-must_not_include_files:
-  - HttpHeaders.scala
-  - ResponseParser.scala
-  - logging/ApiLogger.scala
-  - ratelimit/RateLimiter.scala
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+        def remaining(): Int = maxPerSecond - requestCount
+      }
+  commit_message: Update files
+fragments:
+- id: apiclient
+  selector:
+    path: ApiClient.scala
+    anchor: Config.getFullUrl(path)
+- id: apiclient_1
+  selector:
+    path: ApiClient.scala
+    anchor: Config.timeout
+- id: apiclient_2
+  selector:
+    path: ApiClient.scala
+    anchor: Config.maxRetries
+- id: config
+  selector:
+    path: Config.scala
+    anchor: 'val timeout: Int = 30'
+- id: config_1
+  selector:
+    path: Config.scala
+    anchor: 'val maxRetries: Int = 3'
+- id: config_2
+  selector:
+    path: Config.scala
+    anchor: 'val baseUrl: String = "https://api.example.com"'
+- id: config_3
+  selector:
+    path: Config.scala
+    anchor: 'def getFullUrl(path: String): String'
+- id: no_httpheaders
+  selector:
+    path: HttpHeaders.scala
+- id: no_responseparser
+  selector:
+    path: ResponseParser.scala
+- id: no_apilogger
+  selector:
+    path: logging/ApiLogger.scala
+- id: no_ratelimiter
+  selector:
+    path: ratelimit/RateLimiter.scala
+- id: no_global_0
+  selector:
+    anchor: HttpHeaders
+- id: no_global_1
+  selector:
+    anchor: userAgent
+- id: no_global_2
+  selector:
+    anchor: authHeader
+- id: no_global_3
+  selector:
+    anchor: withAuth
+- id: no_global_4
+  selector:
+    anchor: ResponseParser
+- id: no_global_5
+  selector:
+    anchor: parseJson
+- id: no_global_6
+  selector:
+    anchor: extractField
+- id: no_global_7
+  selector:
+    anchor: isSuccess
+- id: no_global_8
+  selector:
+    anchor: ApiLogger
+- id: no_global_9
+  selector:
+    anchor: logRequest
+- id: no_global_10
+  selector:
+    anchor: logResponse
+- id: no_global_11
+  selector:
+    anchor: RateLimiter
+- id: no_global_12
+  selector:
+    anchor: acquire
+- id: no_global_13
+  selector:
+    anchor: maxPerSecond
+oracle:
+  required:
+  - apiclient
+  - apiclient_1
+  - apiclient_2
+  - config
+  - config_1
+  - config_2
+  - config_3
+  allowed: []
+  forbidden:
+  - no_httpheaders
+  - no_responseparser
+  - no_apilogger
+  - no_ratelimiter
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13

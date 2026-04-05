@@ -1,15 +1,24 @@
-max_enrichment: 3.0
-initial:
-  math_diff.py: |
-    x = 1
-changed:
-  math_diff.py: |
-    ∑ = sum
-    ∏ = prod
-    result = calculate(α, β)
-must_include_files:
-- math_diff.py
-must_include_content:
-- result = calculate(α, β)
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_019_math_symbols_in_diff
+repo:
+  initial_files:
+    math_diff.py: |
+      x = 1
+  changed_files:
+    math_diff.py: |
+      ∑ = sum
+      ∏ = prod
+      result = calculate(α, β)
+  commit_message: Update files
+fragments:
+- id: math_diff_file
+  selector:
+    path: math_diff.py
+- id: req_global_0
+  selector:
+    anchor: result = calculate(α, β)
+oracle:
+  required:
+  - math_diff_file
+  - req_global_0
+  allowed: []
+  forbidden: []

@@ -1,30 +1,42 @@
-max_enrichment: 3.0
-initial:
-  hub.py: |
-    pass
-changed:
-  hub.py: |
-    def hub_function():
-        pass
+name: internals_048_hub_suppression
+repo:
+  initial_files:
+    hub.py: |
+      pass
+  changed_files:
+    hub.py: |
+      def hub_function():
+          pass
 
-    def caller_0():
-        hub_function()
+      def caller_0():
+          hub_function()
 
-    def caller_1():
-        hub_function()
+      def caller_1():
+          hub_function()
 
-    def caller_2():
-        hub_function()
+      def caller_2():
+          hub_function()
 
-    def caller_3():
-        hub_function()
+      def caller_3():
+          hub_function()
 
-    def caller_4():
-        hub_function()
-must_include_files:
-- hub.py
-must_include_content:
-- 'def hub_function():'
-- 'def caller_0():'
-add_garbage_files: false
-skip_garbage_check: true
+      def caller_4():
+          hub_function()
+  commit_message: Update files
+fragments:
+- id: hub_file
+  selector:
+    path: hub.py
+- id: req_global_0
+  selector:
+    anchor: 'def hub_function():'
+- id: req_global_1
+  selector:
+    anchor: 'def caller_0():'
+oracle:
+  required:
+  - hub_file
+  - req_global_0
+  - req_global_1
+  allowed: []
+  forbidden: []

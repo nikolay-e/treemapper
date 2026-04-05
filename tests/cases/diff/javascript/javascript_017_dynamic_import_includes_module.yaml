@@ -1,159 +1,153 @@
-# Scenario: main.ts is rewritten to dynamically import lazy.ts and call
-#   heavyComputation(). Only main.ts is changed.
-#
-# Diff shows:
-#   - console.log('initial');
-#   + async function loadModule() { const lazy = await import('./lazy'); ... }
-#
-# Reviewer questions:
-#   Q1: "What does heavyComputation return — is the result meaningful?"
-#       -> lazy.ts (UNCHANGED) loops 1M iterations summing i, returns result.
-#          Reviewer needs the body to understand performance and return value.
-#
-#   Q2: "Is lazy.heavyComputation the correct way to access after dynamic import?"
-#       -> Same file: exports function via `export function`. Dynamic import
-#          produces module namespace, so lazy.heavyComputation is correct.
-#
-# Not needed for comprehension:
-#   - heavy-computation.worker.ts: Web Worker that also calls heavyComputation.
-#     KEYWORD OVERLAP: references heavyComputation. But worker threading
-#     doesn't help review the dynamic import in main.ts.
-#
-#   - module-loader.ts: Generic dynamic module loader utility.
-#     CONCEPT OVERLAP: wraps import() calls. But the utility is not used
-#     by main.ts, which does its own bare import().
+name: javascript_017_dynamic_import_includes_module
+repo:
+  initial_files:
+    lazy.ts: |
+      export function heavyComputation(): number {
+          let result = 0;
+          for (let i = 0; i < 1000000; i++) {
+              result += i;
+          }
+          return result;
+      }
+    main.ts: |
+      console.log('initial');
+    heavy-computation.worker.ts: |
+      import { heavyComputation } from './lazy';
 
-max_enrichment: 6.9
-initial:
-  lazy.ts: |
-    export function heavyComputation(): number {
-        let result = 0;
-        for (let i = 0; i < 1000000; i++) {
-            result += i;
-        }
-        return result;
-    }
-  main.ts: |
-    console.log('initial');
-  heavy-computation.worker.ts: |
-    import { heavyComputation } from './lazy';
+      self.onmessage = (event: MessageEvent) => {
+          const result = heavyComputation();
+          self.postMessage({ type: 'result', data: result });
+      };
 
-    self.onmessage = (event: MessageEvent) => {
-        const result = heavyComputation();
-        self.postMessage({ type: 'result', data: result });
-    };
+      self.onerror = (error: ErrorEvent) => {
+          self.postMessage({ type: 'error', message: error.message });
+      };
+    module-loader.ts: |
+      type ModuleMap = Record<string, () => Promise<unknown>>;
 
-    self.onerror = (error: ErrorEvent) => {
-        self.postMessage({ type: 'error', message: error.message });
-    };
-  module-loader.ts: |
-    type ModuleMap = Record<string, () => Promise<unknown>>;
+      export class ModuleLoader {
+          private cache = new Map<string, unknown>();
+          private loaders: ModuleMap;
 
-    export class ModuleLoader {
-        private cache = new Map<string, unknown>();
-        private loaders: ModuleMap;
+          constructor(loaders: ModuleMap) {
+              this.loaders = loaders;
+          }
 
-        constructor(loaders: ModuleMap) {
-            this.loaders = loaders;
-        }
+          async load<T>(name: string): Promise<T> {
+              if (this.cache.has(name)) return this.cache.get(name) as T;
+              const loader = this.loaders[name];
+              if (!loader) throw new Error(`Unknown module: ${name}`);
+              const mod = await loader();
+              this.cache.set(name, mod);
+              return mod as T;
+          }
 
-        async load<T>(name: string): Promise<T> {
-            if (this.cache.has(name)) return this.cache.get(name) as T;
-            const loader = this.loaders[name];
-            if (!loader) throw new Error(`Unknown module: ${name}`);
-            const mod = await loader();
-            this.cache.set(name, mod);
-            return mod as T;
-        }
+          preload(names: string[]): Promise<unknown[]> {
+              return Promise.all(names.map(name => this.load(name)));
+          }
+      }
+  changed_files:
+    lazy.ts: |
+      export function heavyComputation(): number {
+          let result = 0;
+          for (let i = 0; i < 1000000; i++) {
+              result += i;
+          }
+          return result;
+      }
+    main.ts: |
+      async function loadModule() {
+          const lazy = await import('./lazy');
+          const result = lazy.heavyComputation();
+          console.log(result);
+      }
 
-        preload(names: string[]): Promise<unknown[]> {
-            return Promise.all(names.map(name => this.load(name)));
-        }
-    }
+      loadModule();
+    heavy-computation.worker.ts: |
+      import { heavyComputation } from './lazy';
 
-changed:
-  lazy.ts: |
-    export function heavyComputation(): number {
-        let result = 0;
-        for (let i = 0; i < 1000000; i++) {
-            result += i;
-        }
-        return result;
-    }
-  main.ts: |
-    async function loadModule() {
-        const lazy = await import('./lazy');
-        const result = lazy.heavyComputation();
-        console.log(result);
-    }
+      self.onmessage = (event: MessageEvent) => {
+          const result = heavyComputation();
+          self.postMessage({ type: 'result', data: result });
+      };
 
-    loadModule();
-  heavy-computation.worker.ts: |
-    import { heavyComputation } from './lazy';
+      self.onerror = (error: ErrorEvent) => {
+          self.postMessage({ type: 'error', message: error.message });
+      };
+    module-loader.ts: |
+      type ModuleMap = Record<string, () => Promise<unknown>>;
 
-    self.onmessage = (event: MessageEvent) => {
-        const result = heavyComputation();
-        self.postMessage({ type: 'result', data: result });
-    };
+      export class ModuleLoader {
+          private cache = new Map<string, unknown>();
+          private loaders: ModuleMap;
 
-    self.onerror = (error: ErrorEvent) => {
-        self.postMessage({ type: 'error', message: error.message });
-    };
-  module-loader.ts: |
-    type ModuleMap = Record<string, () => Promise<unknown>>;
+          constructor(loaders: ModuleMap) {
+              this.loaders = loaders;
+          }
 
-    export class ModuleLoader {
-        private cache = new Map<string, unknown>();
-        private loaders: ModuleMap;
+          async load<T>(name: string): Promise<T> {
+              if (this.cache.has(name)) return this.cache.get(name) as T;
+              const loader = this.loaders[name];
+              if (!loader) throw new Error(`Unknown module: ${name}`);
+              const mod = await loader();
+              this.cache.set(name, mod);
+              return mod as T;
+          }
 
-        constructor(loaders: ModuleMap) {
-            this.loaders = loaders;
-        }
-
-        async load<T>(name: string): Promise<T> {
-            if (this.cache.has(name)) return this.cache.get(name) as T;
-            const loader = this.loaders[name];
-            if (!loader) throw new Error(`Unknown module: ${name}`);
-            const mod = await loader();
-            this.cache.set(name, mod);
-            return mod as T;
-        }
-
-        preload(names: string[]): Promise<unknown[]> {
-            return Promise.all(names.map(name => this.load(name)));
-        }
-    }
-
-must_include_files:
-  - main.ts
-  # Q1+Q2: heavyComputation body defines return value and export shape
-  - lazy.ts
-
-must_include_content_from:
-  main.ts:
-    - "await import('./lazy')"
-    - "lazy.heavyComputation()"
-  lazy.ts:
-    - "export function heavyComputation(): number"
-
-must_not_include:
-  # --- heavy-computation.worker.ts: Web Worker calling heavyComputation ---
-  # KEYWORD OVERLAP: imports and calls heavyComputation. But worker threading
-  # doesn't help review the dynamic import in main.ts.
-  - "self.onmessage"
-  - "self.postMessage"
-  - "self.onerror"
-  # --- module-loader.ts: generic dynamic loader utility ---
-  # CONCEPT OVERLAP: wraps import() calls. Not used by main.ts.
-  - ModuleLoader
-  - "await loader()"
-  - preload
-
-must_not_include_files:
-  - heavy-computation.worker.ts
-  - module-loader.ts
-
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          preload(names: string[]): Promise<unknown[]> {
+              return Promise.all(names.map(name => this.load(name)));
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: main
+  selector:
+    path: main.ts
+    anchor: await import('./lazy')
+- id: main_1
+  selector:
+    path: main.ts
+    anchor: lazy.heavyComputation()
+- id: lazy
+  selector:
+    path: lazy.ts
+    anchor: 'export function heavyComputation(): number'
+- id: no_heavy_computation_worker
+  selector:
+    path: heavy-computation.worker.ts
+- id: no_module_loader
+  selector:
+    path: module-loader.ts
+- id: no_global_0
+  selector:
+    anchor: self.onmessage
+- id: no_global_1
+  selector:
+    anchor: self.postMessage
+- id: no_global_2
+  selector:
+    anchor: self.onerror
+- id: no_global_3
+  selector:
+    anchor: ModuleLoader
+- id: no_global_4
+  selector:
+    anchor: await loader()
+- id: no_global_5
+  selector:
+    anchor: preload
+oracle:
+  required:
+  - main
+  - main_1
+  - lazy
+  allowed: []
+  forbidden:
+  - no_heavy_computation_worker
+  - no_module_loader
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

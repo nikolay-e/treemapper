@@ -1,193 +1,190 @@
-# Scenario: consumer.ts is rewritten to import asyncGenerator from generator.ts
-#   and consume it with for-await-of. Only consumer.ts is changed.
-#
-# Diff shows:
-#   - console.log('initial');
-#   + import { asyncGenerator } from './generator';
-#   + async function consume() { for await (const value of asyncGenerator()) { ... } }
-#
-# Reviewer questions:
-#   Q1: "What values does asyncGenerator yield and how fast?"
-#       -> generator.ts (UNCHANGED) yields 0..4 with 100ms delay per value.
-#          Reviewer must see the generator body to understand iteration behavior.
-#
-#   Q2: "Does asyncGenerator ever throw — should consume() handle errors?"
-#       -> Same file: no try/catch, just awaits setTimeout promises. Reviewer
-#          needs the body to assess error handling needs.
-#
-# Not needed for comprehension:
-#   - event-stream.ts: EventEmitter-based async stream using on('data').
-#     Different async pattern (events vs generators). Similar concept of
-#     async data flow but not imported by consumer.ts.
-#
-#   - batch-processor.ts: Processes arrays in batches with async/await.
-#     Uses similar async/await patterns but operates on arrays, not generators.
-#     Not imported by consumer.ts. Trap: async function with iteration.
+name: javascript_026_for_await_async_generator
+repo:
+  initial_files:
+    generator.ts: |
+      export async function* asyncGenerator() {
+          for (let i = 0; i < 5; i++) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+              yield i;
+          }
+      }
+    consumer.ts: |
+      console.log('initial');
+    event-stream.ts: |
+      import { EventEmitter } from 'events';
 
-max_enrichment: 4.5
-initial:
-  generator.ts: |
-    export async function* asyncGenerator() {
-        for (let i = 0; i < 5; i++) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            yield i;
-        }
-    }
-  consumer.ts: |
-    console.log('initial');
-  event-stream.ts: |
-    import { EventEmitter } from 'events';
+      export class EventStream extends EventEmitter {
+          private buffer: unknown[] = [];
 
-    export class EventStream extends EventEmitter {
-        private buffer: unknown[] = [];
+          push(value: unknown): void {
+              this.buffer.push(value);
+              this.emit('data', value);
+          }
 
-        push(value: unknown): void {
-            this.buffer.push(value);
-            this.emit('data', value);
-        }
+          async *[Symbol.asyncIterator]() {
+              while (true) {
+                  if (this.buffer.length > 0) {
+                      yield this.buffer.shift();
+                  } else {
+                      await new Promise(resolve => this.once('data', resolve));
+                  }
+              }
+          }
 
-        async *[Symbol.asyncIterator]() {
-            while (true) {
-                if (this.buffer.length > 0) {
-                    yield this.buffer.shift();
-                } else {
-                    await new Promise(resolve => this.once('data', resolve));
-                }
-            }
-        }
+          close(): void {
+              this.emit('end');
+              this.removeAllListeners();
+          }
+      }
+    batch-processor.ts: |
+      export async function processBatch<T, R>(
+          items: T[],
+          processor: (item: T) => Promise<R>,
+          batchSize: number = 10
+      ): Promise<R[]> {
+          const results: R[] = [];
+          for (let i = 0; i < items.length; i += batchSize) {
+              const batch = items.slice(i, i + batchSize);
+              const batchResults = await Promise.all(batch.map(processor));
+              results.push(...batchResults);
+          }
+          return results;
+      }
 
-        close(): void {
-            this.emit('end');
-            this.removeAllListeners();
-        }
-    }
-  batch-processor.ts: |
-    export async function processBatch<T, R>(
-        items: T[],
-        processor: (item: T) => Promise<R>,
-        batchSize: number = 10
-    ): Promise<R[]> {
-        const results: R[] = [];
-        for (let i = 0; i < items.length; i += batchSize) {
-            const batch = items.slice(i, i + batchSize);
-            const batchResults = await Promise.all(batch.map(processor));
-            results.push(...batchResults);
-        }
-        return results;
-    }
+      export async function processSequential<T, R>(
+          items: T[],
+          processor: (item: T) => Promise<R>
+      ): Promise<R[]> {
+          const results: R[] = [];
+          for (const item of items) {
+              results.push(await processor(item));
+          }
+          return results;
+      }
+  changed_files:
+    generator.ts: |
+      export async function* asyncGenerator() {
+          for (let i = 0; i < 5; i++) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+              yield i;
+          }
+      }
+    consumer.ts: |
+      import { asyncGenerator } from './generator';
 
-    export async function processSequential<T, R>(
-        items: T[],
-        processor: (item: T) => Promise<R>
-    ): Promise<R[]> {
-        const results: R[] = [];
-        for (const item of items) {
-            results.push(await processor(item));
-        }
-        return results;
-    }
+      async function consume() {
+          for await (const value of asyncGenerator()) {
+              console.log(value);
+          }
+      }
 
-changed:
-  generator.ts: |
-    export async function* asyncGenerator() {
-        for (let i = 0; i < 5; i++) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            yield i;
-        }
-    }
-  consumer.ts: |
-    import { asyncGenerator } from './generator';
+      consume();
+    event-stream.ts: |
+      import { EventEmitter } from 'events';
 
-    async function consume() {
-        for await (const value of asyncGenerator()) {
-            console.log(value);
-        }
-    }
+      export class EventStream extends EventEmitter {
+          private buffer: unknown[] = [];
 
-    consume();
-  event-stream.ts: |
-    import { EventEmitter } from 'events';
+          push(value: unknown): void {
+              this.buffer.push(value);
+              this.emit('data', value);
+          }
 
-    export class EventStream extends EventEmitter {
-        private buffer: unknown[] = [];
+          async *[Symbol.asyncIterator]() {
+              while (true) {
+                  if (this.buffer.length > 0) {
+                      yield this.buffer.shift();
+                  } else {
+                      await new Promise(resolve => this.once('data', resolve));
+                  }
+              }
+          }
 
-        push(value: unknown): void {
-            this.buffer.push(value);
-            this.emit('data', value);
-        }
+          close(): void {
+              this.emit('end');
+              this.removeAllListeners();
+          }
+      }
+    batch-processor.ts: |
+      export async function processBatch<T, R>(
+          items: T[],
+          processor: (item: T) => Promise<R>,
+          batchSize: number = 10
+      ): Promise<R[]> {
+          const results: R[] = [];
+          for (let i = 0; i < items.length; i += batchSize) {
+              const batch = items.slice(i, i + batchSize);
+              const batchResults = await Promise.all(batch.map(processor));
+              results.push(...batchResults);
+          }
+          return results;
+      }
 
-        async *[Symbol.asyncIterator]() {
-            while (true) {
-                if (this.buffer.length > 0) {
-                    yield this.buffer.shift();
-                } else {
-                    await new Promise(resolve => this.once('data', resolve));
-                }
-            }
-        }
-
-        close(): void {
-            this.emit('end');
-            this.removeAllListeners();
-        }
-    }
-  batch-processor.ts: |
-    export async function processBatch<T, R>(
-        items: T[],
-        processor: (item: T) => Promise<R>,
-        batchSize: number = 10
-    ): Promise<R[]> {
-        const results: R[] = [];
-        for (let i = 0; i < items.length; i += batchSize) {
-            const batch = items.slice(i, i + batchSize);
-            const batchResults = await Promise.all(batch.map(processor));
-            results.push(...batchResults);
-        }
-        return results;
-    }
-
-    export async function processSequential<T, R>(
-        items: T[],
-        processor: (item: T) => Promise<R>
-    ): Promise<R[]> {
-        const results: R[] = [];
-        for (const item of items) {
-            results.push(await processor(item));
-        }
-        return results;
-    }
-
-must_include_files:
-  - consumer.ts
-  # Q1+Q2: asyncGenerator defines what values are yielded and timing
-  - generator.ts
-
-must_include_content_from:
-  consumer.ts:
-    - "import { asyncGenerator } from './generator'"
-    - "for await (const value of asyncGenerator())"
-  generator.ts:
-    - "export async function* asyncGenerator()"
-    - "yield i"
-
-must_not_include:
-  # --- event-stream.ts: EventEmitter-based async iteration ---
-  # Different async pattern (events + Symbol.asyncIterator). Similar concept
-  # but not imported by consumer.ts.
-  - EventStream
-  - "Symbol.asyncIterator"
-  - "this.emit('data'"
-  # --- batch-processor.ts: array batch processing with async/await ---
-  # Uses async/await loops but processes arrays, not generators.
-  - processBatch
-  - processSequential
-  - "Promise.all(batch.map"
-
-must_not_include_files:
-  - event-stream.ts
-  - batch-processor.ts
-
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export async function processSequential<T, R>(
+          items: T[],
+          processor: (item: T) => Promise<R>
+      ): Promise<R[]> {
+          const results: R[] = [];
+          for (const item of items) {
+              results.push(await processor(item));
+          }
+          return results;
+      }
+  commit_message: Update files
+fragments:
+- id: consumer
+  selector:
+    path: consumer.ts
+    anchor: import { asyncGenerator } from './generator'
+- id: consumer_1
+  selector:
+    path: consumer.ts
+    anchor: for await (const value of asyncGenerator())
+- id: generator
+  selector:
+    path: generator.ts
+    anchor: export async function* asyncGenerator()
+- id: generator_1
+  selector:
+    path: generator.ts
+    anchor: yield i
+- id: no_event_stream
+  selector:
+    path: event-stream.ts
+- id: no_batch_processor
+  selector:
+    path: batch-processor.ts
+- id: no_global_0
+  selector:
+    anchor: EventStream
+- id: no_global_1
+  selector:
+    anchor: Symbol.asyncIterator
+- id: no_global_2
+  selector:
+    anchor: this.emit('data'
+- id: no_global_3
+  selector:
+    anchor: processBatch
+- id: no_global_4
+  selector:
+    anchor: processSequential
+- id: no_global_5
+  selector:
+    anchor: Promise.all(batch.map
+oracle:
+  required:
+  - consumer
+  - consumer_1
+  - generator
+  - generator_1
+  allowed: []
+  forbidden:
+  - no_event_stream
+  - no_batch_processor
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

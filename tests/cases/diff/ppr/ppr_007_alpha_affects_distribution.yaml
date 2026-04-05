@@ -1,235 +1,247 @@
-# Scenario: return_value_propagation_in_chain
-#   A 5-function chain across separate files where each function USES the
-#   return value of the one it calls. base.py's compute_base() changes its
-#   return value from 10 to 25. The chain propagates real data:
-#     base.compute_base -> step1.add_margin -> step2.apply_tax ->
-#     step3.round_total -> step4.format_receipt
-#
-# Diff shows:
-#   base.py:
-#     - return 10
-#     + return 25
-#     The base price changes. Every downstream function receives a
-#     different input, producing different outputs.
-#
-# Reviewer questions:
-#   Q1: "What does add_margin do with base's return value?"
-#       -> step1.py imports compute_base, calls it, adds 5 to the result.
-#         Old: 10 + 5 = 15.  New: 25 + 5 = 30.
-#         Reviewer must see this call site to understand propagation.
-#
-#   Q2: "Does apply_tax break with the new value?"
-#       -> step2.py imports add_margin from step1, multiplies by 1.2.
-#         Pure arithmetic — won't break, but the dollar amount changes
-#         significantly (18.0 -> 36.0). Reviewer may or may not need
-#         this depending on budget, but step1 is essential.
-#
-# Not needed for comprehension:
-#   - alt_base.py: Defines its own compute_base() returning 99. Name
-#     collision trap. Not imported by the chain.
-#
-#   - price_logger.py: Has compute_base-like naming and price-related
-#     functions, but NO real import from base.py. Name similarity trap.
-#
-#   - garbage_parallel_calc.py: Similar arithmetic chain with GARBAGE
-#     markers. Uses add_margin-like naming but different module.
+name: ppr_007_alpha_affects_distribution
+repo:
+  initial_files:
+    base.py: |
+      def compute_base():
+          return 10
+    step1.py: |
+      from base import compute_base
 
-max_enrichment: 25.0
-initial:
-  base.py: |
-    def compute_base():
-        return 10
+      def add_margin():
+          price = compute_base()
+          return price + 5
+    step2.py: |
+      from step1 import add_margin
 
-  step1.py: |
-    from base import compute_base
+      def apply_tax():
+          subtotal = add_margin()
+          return subtotal * 1.2
+    step3.py: |
+      from step2 import apply_tax
 
-    def add_margin():
-        price = compute_base()
-        return price + 5
+      def round_total():
+          total = apply_tax()
+          return round(total, 2)
+    step4.py: |
+      from step3 import round_total
 
-  step2.py: |
-    from step1 import add_margin
+      def format_receipt():
+          amount = round_total()
+          return f"Total: ${amount}"
+    alt_base.py: |
+      GARBAGE_PPR007_ALT_A = "alt_base"
+      GARBAGE_PPR007_ALT_B = 99
 
-    def apply_tax():
-        subtotal = add_margin()
-        return subtotal * 1.2
+      def compute_base():
+          return GARBAGE_PPR007_ALT_B
 
-  step3.py: |
-    from step2 import apply_tax
+      def compute_base_discounted():
+          GARBAGE_PPR007_ALT_C = 0.9
+          return compute_base() * GARBAGE_PPR007_ALT_C
+    price_logger.py: |
+      GARBAGE_PPR007_LOG_D = "logger"
+      GARBAGE_PPR007_LOG_E = True
 
-    def round_total():
-        total = apply_tax()
-        return round(total, 2)
+      def log_base_price(base_price):
+          GARBAGE_PPR007_LOG_F = f"Logged: {base_price}"
+          return GARBAGE_PPR007_LOG_F
 
-  step4.py: |
-    from step3 import round_total
+      class PriceAuditTrail:
+          GARBAGE_PPR007_LOG_G = []
 
-    def format_receipt():
-        amount = round_total()
-        return f"Total: ${amount}"
+          def record(self, price):
+              self.GARBAGE_PPR007_LOG_G.append(price)
+    garbage_parallel_calc.py: |
+      GARBAGE_PPR007_CALC_H = "parallel_calc"
+      GARBAGE_PPR007_CALC_I = 50
 
-  alt_base.py: |
-    GARBAGE_PPR007_ALT_A = "alt_base"
-    GARBAGE_PPR007_ALT_B = 99
+      def parallel_base():
+          return GARBAGE_PPR007_CALC_I
 
-    def compute_base():
-        return GARBAGE_PPR007_ALT_B
+      def parallel_margin():
+          GARBAGE_PPR007_CALC_J = 8
+          return parallel_base() + GARBAGE_PPR007_CALC_J
 
-    def compute_base_discounted():
-        GARBAGE_PPR007_ALT_C = 0.9
-        return compute_base() * GARBAGE_PPR007_ALT_C
+      class ParallelPricing:
+          GARBAGE_PPR007_CALC_K = 1.15
 
-  price_logger.py: |
-    GARBAGE_PPR007_LOG_D = "logger"
-    GARBAGE_PPR007_LOG_E = True
+          def compute(self):
+              return parallel_margin() * self.GARBAGE_PPR007_CALC_K
+  changed_files:
+    base.py: |
+      def compute_base():
+          return 25
+    step1.py: |
+      from base import compute_base
 
-    def log_base_price(base_price):
-        GARBAGE_PPR007_LOG_F = f"Logged: {base_price}"
-        return GARBAGE_PPR007_LOG_F
+      def add_margin():
+          price = compute_base()
+          return price + 5
+    step2.py: |
+      from step1 import add_margin
 
-    class PriceAuditTrail:
-        GARBAGE_PPR007_LOG_G = []
+      def apply_tax():
+          subtotal = add_margin()
+          return subtotal * 1.2
+    step3.py: |
+      from step2 import apply_tax
 
-        def record(self, price):
-            self.GARBAGE_PPR007_LOG_G.append(price)
+      def round_total():
+          total = apply_tax()
+          return round(total, 2)
+    step4.py: |
+      from step3 import round_total
 
-  garbage_parallel_calc.py: |
-    GARBAGE_PPR007_CALC_H = "parallel_calc"
-    GARBAGE_PPR007_CALC_I = 50
+      def format_receipt():
+          amount = round_total()
+          return f"Total: ${amount}"
+    alt_base.py: |
+      GARBAGE_PPR007_ALT_A = "alt_base"
+      GARBAGE_PPR007_ALT_B = 99
 
-    def parallel_base():
-        return GARBAGE_PPR007_CALC_I
+      def compute_base():
+          return GARBAGE_PPR007_ALT_B
 
-    def parallel_margin():
-        GARBAGE_PPR007_CALC_J = 8
-        return parallel_base() + GARBAGE_PPR007_CALC_J
+      def compute_base_discounted():
+          GARBAGE_PPR007_ALT_C = 0.9
+          return compute_base() * GARBAGE_PPR007_ALT_C
+    price_logger.py: |
+      GARBAGE_PPR007_LOG_D = "logger"
+      GARBAGE_PPR007_LOG_E = True
 
-    class ParallelPricing:
-        GARBAGE_PPR007_CALC_K = 1.15
+      def log_base_price(base_price):
+          GARBAGE_PPR007_LOG_F = f"Logged: {base_price}"
+          return GARBAGE_PPR007_LOG_F
 
-        def compute(self):
-            return parallel_margin() * self.GARBAGE_PPR007_CALC_K
+      class PriceAuditTrail:
+          GARBAGE_PPR007_LOG_G = []
 
-changed:
-  base.py: |
-    def compute_base():
-        return 25
+          def record(self, price):
+              self.GARBAGE_PPR007_LOG_G.append(price)
+    garbage_parallel_calc.py: |
+      GARBAGE_PPR007_CALC_H = "parallel_calc"
+      GARBAGE_PPR007_CALC_I = 50
 
-  step1.py: |
-    from base import compute_base
+      def parallel_base():
+          return GARBAGE_PPR007_CALC_I
 
-    def add_margin():
-        price = compute_base()
-        return price + 5
+      def parallel_margin():
+          GARBAGE_PPR007_CALC_J = 8
+          return parallel_base() + GARBAGE_PPR007_CALC_J
 
-  step2.py: |
-    from step1 import add_margin
+      class ParallelPricing:
+          GARBAGE_PPR007_CALC_K = 1.15
 
-    def apply_tax():
-        subtotal = add_margin()
-        return subtotal * 1.2
-
-  step3.py: |
-    from step2 import apply_tax
-
-    def round_total():
-        total = apply_tax()
-        return round(total, 2)
-
-  step4.py: |
-    from step3 import round_total
-
-    def format_receipt():
-        amount = round_total()
-        return f"Total: ${amount}"
-
-  alt_base.py: |
-    GARBAGE_PPR007_ALT_A = "alt_base"
-    GARBAGE_PPR007_ALT_B = 99
-
-    def compute_base():
-        return GARBAGE_PPR007_ALT_B
-
-    def compute_base_discounted():
-        GARBAGE_PPR007_ALT_C = 0.9
-        return compute_base() * GARBAGE_PPR007_ALT_C
-
-  price_logger.py: |
-    GARBAGE_PPR007_LOG_D = "logger"
-    GARBAGE_PPR007_LOG_E = True
-
-    def log_base_price(base_price):
-        GARBAGE_PPR007_LOG_F = f"Logged: {base_price}"
-        return GARBAGE_PPR007_LOG_F
-
-    class PriceAuditTrail:
-        GARBAGE_PPR007_LOG_G = []
-
-        def record(self, price):
-            self.GARBAGE_PPR007_LOG_G.append(price)
-
-  garbage_parallel_calc.py: |
-    GARBAGE_PPR007_CALC_H = "parallel_calc"
-    GARBAGE_PPR007_CALC_I = 50
-
-    def parallel_base():
-        return GARBAGE_PPR007_CALC_I
-
-    def parallel_margin():
-        GARBAGE_PPR007_CALC_J = 8
-        return parallel_base() + GARBAGE_PPR007_CALC_J
-
-    class ParallelPricing:
-        GARBAGE_PPR007_CALC_K = 1.15
-
-        def compute(self):
-            return parallel_margin() * self.GARBAGE_PPR007_CALC_K
-
-# === Assertions ===
-
-must_include_files:
-  - base.py
-  # Q1: step1 is the immediate downstream caller — reviewer must see
-  # how compute_base()'s return value flows into add_margin().
-  - step1.py
-
-must_include_content_from:
-  base.py:
-    - "def compute_base():"
-    - "return 25"
-  step1.py:
-    - "from base import compute_base"
-    - "price = compute_base()"
-    - "return price + 5"
-
-must_not_include:
-  # --- alt_base.py: name collision trap, own compute_base() ---
-  - GARBAGE_PPR007_ALT_A
-  - GARBAGE_PPR007_ALT_B
-  - GARBAGE_PPR007_ALT_C
-  - compute_base_discounted
-  # --- price_logger.py: price-related naming but no real import ---
-  - GARBAGE_PPR007_LOG_D
-  - GARBAGE_PPR007_LOG_E
-  - GARBAGE_PPR007_LOG_F
-  - GARBAGE_PPR007_LOG_G
-  - PriceAuditTrail
-  - log_base_price
-  # --- garbage_parallel_calc.py: similar arithmetic chain structure ---
-  - GARBAGE_PPR007_CALC_H
-  - GARBAGE_PPR007_CALC_I
-  - GARBAGE_PPR007_CALC_J
-  - GARBAGE_PPR007_CALC_K
-  - ParallelPricing
-  - parallel_base
-  - parallel_margin
-
-must_not_include_files:
-  - alt_base.py
-  - price_logger.py
-  - garbage_parallel_calc.py
-
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          def compute(self):
+              return parallel_margin() * self.GARBAGE_PPR007_CALC_K
+  commit_message: Update files
+fragments:
+- id: base
+  selector:
+    path: base.py
+    anchor: 'def compute_base():'
+- id: base_1
+  selector:
+    path: base.py
+    anchor: return 25
+- id: step1
+  selector:
+    path: step1.py
+    anchor: from base import compute_base
+- id: step1_1
+  selector:
+    path: step1.py
+    anchor: price = compute_base()
+- id: step1_2
+  selector:
+    path: step1.py
+    anchor: return price + 5
+- id: no_alt_base
+  selector:
+    path: alt_base.py
+- id: no_price_logger
+  selector:
+    path: price_logger.py
+- id: no_garbage_parallel_calc
+  selector:
+    path: garbage_parallel_calc.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_PPR007_ALT_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_PPR007_ALT_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_PPR007_ALT_C
+- id: no_global_3
+  selector:
+    anchor: compute_base_discounted
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_PPR007_LOG_D
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_PPR007_LOG_E
+- id: no_global_6
+  selector:
+    anchor: GARBAGE_PPR007_LOG_F
+- id: no_global_7
+  selector:
+    anchor: GARBAGE_PPR007_LOG_G
+- id: no_global_8
+  selector:
+    anchor: PriceAuditTrail
+- id: no_global_9
+  selector:
+    anchor: log_base_price
+- id: no_global_10
+  selector:
+    anchor: GARBAGE_PPR007_CALC_H
+- id: no_global_11
+  selector:
+    anchor: GARBAGE_PPR007_CALC_I
+- id: no_global_12
+  selector:
+    anchor: GARBAGE_PPR007_CALC_J
+- id: no_global_13
+  selector:
+    anchor: GARBAGE_PPR007_CALC_K
+- id: no_global_14
+  selector:
+    anchor: ParallelPricing
+- id: no_global_15
+  selector:
+    anchor: parallel_base
+- id: no_global_16
+  selector:
+    anchor: parallel_margin
+oracle:
+  required:
+  - base
+  - base_1
+  - step1
+  - step1_1
+  - step1_2
+  allowed: []
+  forbidden:
+  - no_alt_base
+  - no_price_logger
+  - no_garbage_parallel_calc
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13
+  - no_global_14
+  - no_global_15
+  - no_global_16

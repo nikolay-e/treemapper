@@ -1,123 +1,122 @@
-# Scenario: routes.ts adds POST and DELETE routes to userRouter.
-# middleware.ts imports userRouter and mounts it at /users.
-#
-# Diff: routes.ts adds `userRouter.post('/', ...)` and `userRouter.delete('/:id', ...)`
-# alongside the existing GET /:id route.
-#
-# Reviewer questions:
-#   Q1: "Where is userRouter mounted — what are the full URL paths?"
-#       -> middleware.ts (UNCHANGED) has app.use('/users', userRouter). So the new
-#          POST / becomes POST /users/ and DELETE /:id becomes DELETE /users/:id.
-#          Without seeing the mount point, reviewer cannot determine the full paths.
-#
-# Not needed:
-#   - auth-middleware.ts: authentication middleware (requireAuth, requireAdmin).
-#     Applied globally, not specific to these user routes. Not imported by routes.ts.
-#   - user-validator.ts: request body validation for user endpoints. Validation logic
-#     not imported by routes.ts in this change.
+name: javascript_045_express_route_change
+repo:
+  initial_files:
+    routes.ts: |
+      import { Router } from 'express';
 
-max_enrichment: 5.4
-initial:
-  routes.ts: |
-    import { Router } from 'express';
+      export const userRouter = Router();
 
-    export const userRouter = Router();
+      userRouter.get('/:id', (req, res) => {
+          res.json({ id: req.params.id });
+      });
+    middleware.ts: |
+      import { userRouter } from './routes';
 
-    userRouter.get('/:id', (req, res) => {
-        res.json({ id: req.params.id });
-    });
-  middleware.ts: |
-    import { userRouter } from './routes';
+      export function setupRoutes(app: any) {
+          app.use('/users', userRouter);
+      }
+    auth-middleware.ts: |
+      import { Request, Response, NextFunction } from 'express';
 
-    export function setupRoutes(app: any) {
-        app.use('/users', userRouter);
-    }
-  auth-middleware.ts: |
-    import { Request, Response, NextFunction } from 'express';
+      export function requireAuth(req: Request, res: Response, next: NextFunction) {
+          const token = req.headers.authorization;
+          if (!token) return res.status(401).json({ error: 'Unauthorized' });
+          next();
+      }
 
-    export function requireAuth(req: Request, res: Response, next: NextFunction) {
-        const token = req.headers.authorization;
-        if (!token) return res.status(401).json({ error: 'Unauthorized' });
-        next();
-    }
+      export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+          const role = (req as any).user?.role;
+          if (role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+          next();
+      }
+    user-validator.ts: |
+      export function validateUserBody(body: unknown): { valid: boolean; errors: string[] } {
+          const errors: string[] = [];
+          if (!body || typeof body !== 'object') return { valid: false, errors: ['Body required'] };
+          const obj = body as Record<string, unknown>;
+          if (!obj.name) errors.push('Name required');
+          if (!obj.email) errors.push('Email required');
+          return { valid: errors.length === 0, errors };
+      }
+  changed_files:
+    routes.ts: |
+      import { Router } from 'express';
 
-    export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-        const role = (req as any).user?.role;
-        if (role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-        next();
-    }
-  user-validator.ts: |
-    export function validateUserBody(body: unknown): { valid: boolean; errors: string[] } {
-        const errors: string[] = [];
-        if (!body || typeof body !== 'object') return { valid: false, errors: ['Body required'] };
-        const obj = body as Record<string, unknown>;
-        if (!obj.name) errors.push('Name required');
-        if (!obj.email) errors.push('Email required');
-        return { valid: errors.length === 0, errors };
-    }
-changed:
-  routes.ts: |
-    import { Router } from 'express';
+      export const userRouter = Router();
 
-    export const userRouter = Router();
+      userRouter.get('/:id', (req, res) => {
+          res.json({ id: req.params.id });
+      });
 
-    userRouter.get('/:id', (req, res) => {
-        res.json({ id: req.params.id });
-    });
+      userRouter.post('/', (req, res) => {
+          res.status(201).json(req.body);
+      });
 
-    userRouter.post('/', (req, res) => {
-        res.status(201).json(req.body);
-    });
+      userRouter.delete('/:id', (req, res) => {
+          res.status(204).send();
+      });
+    middleware.ts: |
+      import { userRouter } from './routes';
 
-    userRouter.delete('/:id', (req, res) => {
-        res.status(204).send();
-    });
-  middleware.ts: |
-    import { userRouter } from './routes';
+      export function setupRoutes(app: any) {
+          app.use('/users', userRouter);
+      }
+    auth-middleware.ts: |
+      import { Request, Response, NextFunction } from 'express';
 
-    export function setupRoutes(app: any) {
-        app.use('/users', userRouter);
-    }
-  auth-middleware.ts: |
-    import { Request, Response, NextFunction } from 'express';
+      export function requireAuth(req: Request, res: Response, next: NextFunction) {
+          const token = req.headers.authorization;
+          if (!token) return res.status(401).json({ error: 'Unauthorized' });
+          next();
+      }
 
-    export function requireAuth(req: Request, res: Response, next: NextFunction) {
-        const token = req.headers.authorization;
-        if (!token) return res.status(401).json({ error: 'Unauthorized' });
-        next();
-    }
-
-    export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-        const role = (req as any).user?.role;
-        if (role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-        next();
-    }
-  user-validator.ts: |
-    export function validateUserBody(body: unknown): { valid: boolean; errors: string[] } {
-        const errors: string[] = [];
-        if (!body || typeof body !== 'object') return { valid: false, errors: ['Body required'] };
-        const obj = body as Record<string, unknown>;
-        if (!obj.name) errors.push('Name required');
-        if (!obj.email) errors.push('Email required');
-        return { valid: errors.length === 0, errors };
-    }
-must_include_files:
-  # Q1: middleware.ts imports userRouter — shows the mount point /users
-  - middleware.ts
-must_include_content_from:
-  middleware.ts:
-    - "import { userRouter } from './routes'"
-    - "app.use('/users', userRouter)"
-must_not_include:
-  # auth-middleware.ts: global auth, not imported by routes.ts
-  - requireAuth
-  - requireAdmin
-  # user-validator.ts: validation not imported by routes.ts
-  - validateUserBody
-must_not_include_files:
-  - auth-middleware.ts
-  - user-validator.ts
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+          const role = (req as any).user?.role;
+          if (role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+          next();
+      }
+    user-validator.ts: |
+      export function validateUserBody(body: unknown): { valid: boolean; errors: string[] } {
+          const errors: string[] = [];
+          if (!body || typeof body !== 'object') return { valid: false, errors: ['Body required'] };
+          const obj = body as Record<string, unknown>;
+          if (!obj.name) errors.push('Name required');
+          if (!obj.email) errors.push('Email required');
+          return { valid: errors.length === 0, errors };
+      }
+  commit_message: Update files
+fragments:
+- id: middleware
+  selector:
+    path: middleware.ts
+    anchor: import { userRouter } from './routes'
+- id: middleware_1
+  selector:
+    path: middleware.ts
+    anchor: app.use('/users', userRouter)
+- id: no_auth_middleware
+  selector:
+    path: auth-middleware.ts
+- id: no_user_validator
+  selector:
+    path: user-validator.ts
+- id: no_global_0
+  selector:
+    anchor: requireAuth
+- id: no_global_1
+  selector:
+    anchor: requireAdmin
+- id: no_global_2
+  selector:
+    anchor: validateUserBody
+oracle:
+  required:
+  - middleware
+  - middleware_1
+  allowed: []
+  forbidden:
+  - no_auth_middleware
+  - no_user_validator
+  - no_global_0
+  - no_global_1
+  - no_global_2

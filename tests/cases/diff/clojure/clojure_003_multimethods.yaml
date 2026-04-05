@@ -1,216 +1,231 @@
-# Clojure multimethods: defmulti in one file, defmethod implementations in
-# others. A new defmethod is added. Context must include the defmulti
-# definition. Noise: other defmethod files for different dispatch values.
+name: clojure_003_multimethods
+repo:
+  initial_files:
+    src/myapp/notification.clj: |
+      (ns myapp.notification)
 
-max_enrichment: 3.7
-initial:
-  src/myapp/notification.clj: |
-    (ns myapp.notification)
+      (defmulti send-notification
+        (fn [channel message] (:type channel)))
+    src/myapp/notify_email.clj: |
+      (ns myapp.notify-email
+        (:require [myapp.notification :refer [send-notification]]))
 
-    (defmulti send-notification
-      (fn [channel message] (:type channel)))
+      (defmethod send-notification :email
+        [channel message]
+        (let [to (:address channel)
+              subject (:subject message)
+              body (:body message)]
+          (println (str "Sending email to " to ": " subject))))
+    src/myapp/notify_sms.clj: |
+      (ns myapp.notify-sms
+        (:require [myapp.notification :refer [send-notification]]))
 
-  src/myapp/notify_email.clj: |
-    (ns myapp.notify-email
-      (:require [myapp.notification :refer [send-notification]]))
+      (defmethod send-notification :sms
+        [channel message]
+        (let [phone (:phone-number channel)
+              body (:body message)]
+          (println (str "Sending SMS to " phone ": " body))))
+    src/myapp/notify_push.clj: |
+      (ns myapp.notify-push
+        (:require [myapp.notification :refer [send-notification]]))
 
-    (defmethod send-notification :email
-      [channel message]
-      (let [to (:address channel)
-            subject (:subject message)
-            body (:body message)]
-        (println (str "Sending email to " to ": " subject))))
+      (def GARBAGE_CLJ_003_PUSH_NOTIFY_A "push")
+      (def GARBAGE_CLJ_003_DEVICE_TOKEN_B "token-xyz")
 
-  src/myapp/notify_sms.clj: |
-    (ns myapp.notify-sms
-      (:require [myapp.notification :refer [send-notification]]))
+      (defmethod send-notification :push
+        [channel message]
+        (let [token (:device-token channel)
+              body (:body message)]
+          (println (str "Pushing to device " token ": " body))))
+    src/myapp/formatter.clj: |
+      (ns myapp.formatter)
 
-    (defmethod send-notification :sms
-      [channel message]
-      (let [phone (:phone-number channel)
-            body (:body message)]
-        (println (str "Sending SMS to " phone ": " body))))
+      (def GARBAGE_CLJ_003_FORMATTER_MULTI_C "formatter")
+      (def GARBAGE_CLJ_003_FORMAT_DISPATCH_D :type)
 
-  # --- Tricky garbage: also defines a defmethod for send-notification ---
-  src/myapp/notify_push.clj: |
-    (ns myapp.notify-push
-      (:require [myapp.notification :refer [send-notification]]))
+      (defmulti format-output
+        (fn [data fmt] fmt))
 
-    (def GARBAGE_CLJ_003_PUSH_NOTIFY_A "push")
-    (def GARBAGE_CLJ_003_DEVICE_TOKEN_B "token-xyz")
+      (defmethod format-output :json
+        [data fmt]
+        (str "{\"data\": " (pr-str data) "}"))
 
-    (defmethod send-notification :push
-      [channel message]
-      (let [token (:device-token channel)
-            body (:body message)]
-        (println (str "Pushing to device " token ": " body))))
+      (defmethod format-output :csv
+        [data fmt]
+        (clojure.string/join "," (map str data)))
+    src/myapp/scheduler.clj: |
+      (ns myapp.scheduler
+        (:require [myapp.notification :as notif]))
 
-  # --- Tricky garbage: defines another multimethod ---
-  src/myapp/formatter.clj: |
-    (ns myapp.formatter)
+      (def GARBAGE_CLJ_003_SCHEDULER_MARKER_E "scheduler")
+      (def GARBAGE_CLJ_003_CRON_EXPR_F "0 * * * *")
 
-    (def GARBAGE_CLJ_003_FORMATTER_MULTI_C "formatter")
-    (def GARBAGE_CLJ_003_FORMAT_DISPATCH_D :type)
+      (defn schedule-notification [channel message delay-ms]
+        (future
+          (Thread/sleep delay-ms)
+          (notif/send-notification channel message)))
+    src/myapp/logger.clj: |
+      (ns myapp.logger)
 
-    (defmulti format-output
-      (fn [data fmt] fmt))
+      (def GARBAGE_CLJ_003_LOGGER_MARKER_G "logger")
+      (def GARBAGE_CLJ_003_LOG_LEVEL_H :info)
 
-    (defmethod format-output :json
-      [data fmt]
-      (str "{\"data\": " (pr-str data) "}"))
+      (defn log-info [msg]
+        (println (str "[INFO] " msg)))
+  changed_files:
+    src/myapp/notification.clj: |
+      (ns myapp.notification)
 
-    (defmethod format-output :csv
-      [data fmt]
-      (clojure.string/join "," (map str data)))
+      (defmulti send-notification
+        (fn [channel message] (:type channel)))
+    src/myapp/email.clj: |
+      (ns myapp.notify-email
+        (:require [myapp.notification :refer [send-notification]]))
 
-  # --- Tricky garbage: requires notification namespace ---
-  src/myapp/scheduler.clj: |
-    (ns myapp.scheduler
-      (:require [myapp.notification :as notif]))
+      (defmethod send-notification :email
+        [channel message]
+        (let [to (:address channel)
+              subject (:subject message)
+              body (:body message)]
+          (println (str "Sending email to " to ": " subject))))
+    src/myapp/notify_sms.clj: |
+      (ns myapp.notify-sms
+        (:require [myapp.notification :refer [send-notification]]))
 
-    (def GARBAGE_CLJ_003_SCHEDULER_MARKER_E "scheduler")
-    (def GARBAGE_CLJ_003_CRON_EXPR_F "0 * * * *")
+      (defmethod send-notification :sms
+        [channel message]
+        (let [phone (:phone-number channel)
+              body (:body message)]
+          (println (str "Sending SMS to " phone ": " body))))
+    src/myapp/notify_slack.clj: |
+      (ns myapp.notify-slack
+        (:require [myapp.notification :refer [send-notification]]
+                  [clojure.data.json :as json]))
 
-    (defn schedule-notification [channel message delay-ms]
-      (future
-        (Thread/sleep delay-ms)
-        (notif/send-notification channel message)))
+      (defmethod send-notification :slack
+        [channel message]
+        (let [webhook-url (:webhook-url channel)
+              payload (json/write-str {:text (:body message)
+                                       :channel (:channel-name channel)})]
+          (println (str "Posting to Slack webhook " webhook-url ": " payload))))
+    src/myapp/notify_push.clj: |
+      (ns myapp.notify-push
+        (:require [myapp.notification :refer [send-notification]]))
 
-  # --- Plain garbage ---
-  src/myapp/logger.clj: |
-    (ns myapp.logger)
+      (def GARBAGE_CLJ_003_PUSH_NOTIFY_A "push")
+      (def GARBAGE_CLJ_003_DEVICE_TOKEN_B "token-xyz")
 
-    (def GARBAGE_CLJ_003_LOGGER_MARKER_G "logger")
-    (def GARBAGE_CLJ_003_LOG_LEVEL_H :info)
+      (defmethod send-notification :push
+        [channel message]
+        (let [token (:device-token channel)
+              body (:body message)]
+          (println (str "Pushing to device " token ": " body))))
+    src/myapp/formatter.clj: |
+      (ns myapp.formatter)
 
-    (defn log-info [msg]
-      (println (str "[INFO] " msg)))
+      (def GARBAGE_CLJ_003_FORMATTER_MULTI_C "formatter")
+      (def GARBAGE_CLJ_003_FORMAT_DISPATCH_D :type)
 
-changed:
-  src/myapp/notification.clj: |
-    (ns myapp.notification)
+      (defmulti format-output
+        (fn [data fmt] fmt))
 
-    (defmulti send-notification
-      (fn [channel message] (:type channel)))
+      (defmethod format-output :json
+        [data fmt]
+        (str "{\"data\": " (pr-str data) "}"))
 
-  src/myapp/email.clj: |
-    (ns myapp.notify-email
-      (:require [myapp.notification :refer [send-notification]]))
+      (defmethod format-output :csv
+        [data fmt]
+        (clojure.string/join "," (map str data)))
+    src/myapp/scheduler.clj: |
+      (ns myapp.scheduler
+        (:require [myapp.notification :as notif]))
 
-    (defmethod send-notification :email
-      [channel message]
-      (let [to (:address channel)
-            subject (:subject message)
-            body (:body message)]
-        (println (str "Sending email to " to ": " subject))))
+      (def GARBAGE_CLJ_003_SCHEDULER_MARKER_E "scheduler")
+      (def GARBAGE_CLJ_003_CRON_EXPR_F "0 * * * *")
 
-  src/myapp/notify_sms.clj: |
-    (ns myapp.notify-sms
-      (:require [myapp.notification :refer [send-notification]]))
+      (defn schedule-notification [channel message delay-ms]
+        (future
+          (Thread/sleep delay-ms)
+          (notif/send-notification channel message)))
+    src/myapp/logger.clj: |
+      (ns myapp.logger)
 
-    (defmethod send-notification :sms
-      [channel message]
-      (let [phone (:phone-number channel)
-            body (:body message)]
-        (println (str "Sending SMS to " phone ": " body))))
+      (def GARBAGE_CLJ_003_LOGGER_MARKER_G "logger")
+      (def GARBAGE_CLJ_003_LOG_LEVEL_H :info)
 
-  src/myapp/notify_slack.clj: |
-    (ns myapp.notify-slack
-      (:require [myapp.notification :refer [send-notification]]
-                [clojure.data.json :as json]))
-
-    (defmethod send-notification :slack
-      [channel message]
-      (let [webhook-url (:webhook-url channel)
-            payload (json/write-str {:text (:body message)
-                                     :channel (:channel-name channel)})]
-        (println (str "Posting to Slack webhook " webhook-url ": " payload))))
-
-  src/myapp/notify_push.clj: |
-    (ns myapp.notify-push
-      (:require [myapp.notification :refer [send-notification]]))
-
-    (def GARBAGE_CLJ_003_PUSH_NOTIFY_A "push")
-    (def GARBAGE_CLJ_003_DEVICE_TOKEN_B "token-xyz")
-
-    (defmethod send-notification :push
-      [channel message]
-      (let [token (:device-token channel)
-            body (:body message)]
-        (println (str "Pushing to device " token ": " body))))
-
-  src/myapp/formatter.clj: |
-    (ns myapp.formatter)
-
-    (def GARBAGE_CLJ_003_FORMATTER_MULTI_C "formatter")
-    (def GARBAGE_CLJ_003_FORMAT_DISPATCH_D :type)
-
-    (defmulti format-output
-      (fn [data fmt] fmt))
-
-    (defmethod format-output :json
-      [data fmt]
-      (str "{\"data\": " (pr-str data) "}"))
-
-    (defmethod format-output :csv
-      [data fmt]
-      (clojure.string/join "," (map str data)))
-
-  src/myapp/scheduler.clj: |
-    (ns myapp.scheduler
-      (:require [myapp.notification :as notif]))
-
-    (def GARBAGE_CLJ_003_SCHEDULER_MARKER_E "scheduler")
-    (def GARBAGE_CLJ_003_CRON_EXPR_F "0 * * * *")
-
-    (defn schedule-notification [channel message delay-ms]
-      (future
-        (Thread/sleep delay-ms)
-        (notif/send-notification channel message)))
-
-  src/myapp/logger.clj: |
-    (ns myapp.logger)
-
-    (def GARBAGE_CLJ_003_LOGGER_MARKER_G "logger")
-    (def GARBAGE_CLJ_003_LOG_LEVEL_H :info)
-
-    (defn log-info [msg]
-      (println (str "[INFO] " msg)))
-
-# === Assertions ===
-
-must_include_files:
-- src/myapp/notify_slack.clj
-
-must_include_content_from:
-  src/myapp/notify_slack.clj:
-    - defmethod send-notification :slack
-    - webhook-url
-    - channel-name
-  src/myapp/notification.clj:
-    - defmulti send-notification
-
-must_not_include:
-# Tricky: also defines defmethod for send-notification
-- GARBAGE_CLJ_003_PUSH_NOTIFY_A
-- GARBAGE_CLJ_003_DEVICE_TOKEN_B
-# Tricky: defines another multimethod
-- GARBAGE_CLJ_003_FORMATTER_MULTI_C
-- GARBAGE_CLJ_003_FORMAT_DISPATCH_D
-# Tricky: requires notification namespace
-- GARBAGE_CLJ_003_SCHEDULER_MARKER_E
-- GARBAGE_CLJ_003_CRON_EXPR_F
-# Plain garbage
-- GARBAGE_CLJ_003_LOGGER_MARKER_G
-- GARBAGE_CLJ_003_LOG_LEVEL_H
-
-must_not_include_files:
-- src/myapp/notify_push.clj
-- src/myapp/formatter.clj
-- src/myapp/scheduler.clj
-- src/myapp/logger.clj
-
-max_fragments: 8
-max_files: 2
-add_garbage_files: false
-skip_garbage_check: true
+      (defn log-info [msg]
+        (println (str "[INFO] " msg)))
+  commit_message: Update files
+fragments:
+- id: notify_slack
+  selector:
+    path: src/myapp/notify_slack.clj
+    anchor: defmethod send-notification :slack
+- id: notify_slack_1
+  selector:
+    path: src/myapp/notify_slack.clj
+    anchor: webhook-url
+- id: notify_slack_2
+  selector:
+    path: src/myapp/notify_slack.clj
+    anchor: channel-name
+- id: notification
+  selector:
+    path: src/myapp/notification.clj
+    anchor: defmulti send-notification
+- id: no_notify_push
+  selector:
+    path: src/myapp/notify_push.clj
+- id: no_formatter
+  selector:
+    path: src/myapp/formatter.clj
+- id: no_scheduler
+  selector:
+    path: src/myapp/scheduler.clj
+- id: no_logger
+  selector:
+    path: src/myapp/logger.clj
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_CLJ_003_PUSH_NOTIFY_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_CLJ_003_DEVICE_TOKEN_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_CLJ_003_FORMATTER_MULTI_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_CLJ_003_FORMAT_DISPATCH_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_CLJ_003_SCHEDULER_MARKER_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_CLJ_003_CRON_EXPR_F
+- id: no_global_6
+  selector:
+    anchor: GARBAGE_CLJ_003_LOGGER_MARKER_G
+- id: no_global_7
+  selector:
+    anchor: GARBAGE_CLJ_003_LOG_LEVEL_H
+oracle:
+  required:
+  - notify_slack
+  - notify_slack_1
+  - notify_slack_2
+  - notification
+  allowed: []
+  forbidden:
+  - no_notify_push
+  - no_formatter
+  - no_scheduler
+  - no_logger
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7

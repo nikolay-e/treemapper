@@ -1,194 +1,204 @@
-# Scenario: item-row.component.ts is rewritten to import Item from item.model.ts
-#   and create an Angular component with @Input/@Output. Only item-row.component.ts changed.
-#
-# Diff shows:
-#   - console.log('initial');
-#   + import { Item } from './item.model';
-#   + @Component({ ... }) export class ItemRowComponent { @Input() item!: Item; @Output() deleted = ... }
-#
-# Reviewer questions:
-#   Q1: "What fields does Item have — is item.name valid in the template?"
-#       -> item.model.ts (UNCHANGED) defines Item with id: string and name: string.
-#          Reviewer must verify {{ item.name }} and this.item.id are correct.
-#
-#   Q2: "Is item.id the right type for EventEmitter<string>?"
-#       -> Same file: id is string. deleted emits string. Reviewer needs
-#          the interface to confirm type consistency.
-#
-# Not needed for comprehension:
-#   - item-list.component.ts: Parent component rendering ItemRowComponent.
-#     DIRECT CONSUMER: uses <app-item-row [item]="..." (deleted)="...">.
-#     Direct structural edge. But HOW the parent handles events doesn't
-#     help review ItemRowComponent's correctness.
-#
-#   - item.service.ts: Service providing Item[] via HTTP. Same Item type.
-#     DIRECT TYPE OVERLAP. But service data fetching doesn't help review
-#     the component's template bindings.
+name: javascript_002_output_decorator
+repo:
+  initial_files:
+    item.model.ts: |
+      export interface Item {
+          id: string;
+          name: string;
+      }
+    item-row.component.ts: |
+      console.log('initial');
+    item-list.component.ts: |
+      import { Component } from '@angular/core';
+      import { Item } from './item.model';
 
-max_enrichment: 5.9
-initial:
-  item.model.ts: |
-    export interface Item {
-        id: string;
-        name: string;
-    }
-  item-row.component.ts: |
-    console.log('initial');
-  item-list.component.ts: |
-    import { Component } from '@angular/core';
-    import { Item } from './item.model';
+      @Component({
+          selector: 'app-item-list',
+          template: `
+              <div class="list">
+                  <app-item-row
+                      *ngFor="let item of items"
+                      [item]="item"
+                      (deleted)="onItemDeleted($event)">
+                  </app-item-row>
+              </div>
+          `
+      })
+      export class ItemListComponent {
+          items: Item[] = [];
 
-    @Component({
-        selector: 'app-item-list',
-        template: `
-            <div class="list">
-                <app-item-row
-                    *ngFor="let item of items"
-                    [item]="item"
-                    (deleted)="onItemDeleted($event)">
-                </app-item-row>
-            </div>
-        `
-    })
-    export class ItemListComponent {
-        items: Item[] = [];
+          onItemDeleted(id: string): void {
+              this.items = this.items.filter(item => item.id !== id);
+          }
 
-        onItemDeleted(id: string): void {
-            this.items = this.items.filter(item => item.id !== id);
-        }
+          addItem(name: string): void {
+              this.items.push({ id: Date.now().toString(), name });
+          }
+      }
+    item.service.ts: |
+      import { Injectable } from '@angular/core';
+      import { HttpClient } from '@angular/common/http';
+      import { Observable } from 'rxjs';
+      import { Item } from './item.model';
 
-        addItem(name: string): void {
-            this.items.push({ id: Date.now().toString(), name });
-        }
-    }
-  item.service.ts: |
-    import { Injectable } from '@angular/core';
-    import { HttpClient } from '@angular/common/http';
-    import { Observable } from 'rxjs';
-    import { Item } from './item.model';
+      @Injectable({ providedIn: 'root' })
+      export class ItemService {
+          constructor(private http: HttpClient) {}
 
-    @Injectable({ providedIn: 'root' })
-    export class ItemService {
-        constructor(private http: HttpClient) {}
+          getItems(): Observable<Item[]> {
+              return this.http.get<Item[]>('/api/items');
+          }
 
-        getItems(): Observable<Item[]> {
-            return this.http.get<Item[]>('/api/items');
-        }
+          deleteItem(id: string): Observable<void> {
+              return this.http.delete<void>(`/api/items/${id}`);
+          }
+      }
+  changed_files:
+    item.model.ts: |
+      export interface Item {
+          id: string;
+          name: string;
+      }
+    item-row.component.ts: |
+      import { Component, Input, Output, EventEmitter } from '@angular/core';
+      import { Item } from './item.model';
 
-        deleteItem(id: string): Observable<void> {
-            return this.http.delete<void>(`/api/items/${id}`);
-        }
-    }
+      @Component({
+          selector: 'app-item-row',
+          template: `
+              <div class="row">
+                  <span>{{ item.name }}</span>
+                  <button (click)="onDelete()">Delete</button>
+              </div>
+          `
+      })
+      export class ItemRowComponent {
+          @Input() item!: Item;
+          @Output() deleted = new EventEmitter<string>();
 
-changed:
-  item.model.ts: |
-    export interface Item {
-        id: string;
-        name: string;
-    }
-  item-row.component.ts: |
-    import { Component, Input, Output, EventEmitter } from '@angular/core';
-    import { Item } from './item.model';
+          onDelete() {
+              this.deleted.emit(this.item.id);
+          }
+      }
+    item-list.component.ts: |
+      import { Component } from '@angular/core';
+      import { Item } from './item.model';
 
-    @Component({
-        selector: 'app-item-row',
-        template: `
-            <div class="row">
-                <span>{{ item.name }}</span>
-                <button (click)="onDelete()">Delete</button>
-            </div>
-        `
-    })
-    export class ItemRowComponent {
-        @Input() item!: Item;
-        @Output() deleted = new EventEmitter<string>();
+      @Component({
+          selector: 'app-item-list',
+          template: `
+              <div class="list">
+                  <app-item-row
+                      *ngFor="let item of items"
+                      [item]="item"
+                      (deleted)="onItemDeleted($event)">
+                  </app-item-row>
+              </div>
+          `
+      })
+      export class ItemListComponent {
+          items: Item[] = [];
 
-        onDelete() {
-            this.deleted.emit(this.item.id);
-        }
-    }
-  item-list.component.ts: |
-    import { Component } from '@angular/core';
-    import { Item } from './item.model';
+          onItemDeleted(id: string): void {
+              this.items = this.items.filter(item => item.id !== id);
+          }
 
-    @Component({
-        selector: 'app-item-list',
-        template: `
-            <div class="list">
-                <app-item-row
-                    *ngFor="let item of items"
-                    [item]="item"
-                    (deleted)="onItemDeleted($event)">
-                </app-item-row>
-            </div>
-        `
-    })
-    export class ItemListComponent {
-        items: Item[] = [];
+          addItem(name: string): void {
+              this.items.push({ id: Date.now().toString(), name });
+          }
+      }
+    item.service.ts: |
+      import { Injectable } from '@angular/core';
+      import { HttpClient } from '@angular/common/http';
+      import { Observable } from 'rxjs';
+      import { Item } from './item.model';
 
-        onItemDeleted(id: string): void {
-            this.items = this.items.filter(item => item.id !== id);
-        }
+      @Injectable({ providedIn: 'root' })
+      export class ItemService {
+          constructor(private http: HttpClient) {}
 
-        addItem(name: string): void {
-            this.items.push({ id: Date.now().toString(), name });
-        }
-    }
-  item.service.ts: |
-    import { Injectable } from '@angular/core';
-    import { HttpClient } from '@angular/common/http';
-    import { Observable } from 'rxjs';
-    import { Item } from './item.model';
+          getItems(): Observable<Item[]> {
+              return this.http.get<Item[]>('/api/items');
+          }
 
-    @Injectable({ providedIn: 'root' })
-    export class ItemService {
-        constructor(private http: HttpClient) {}
-
-        getItems(): Observable<Item[]> {
-            return this.http.get<Item[]>('/api/items');
-        }
-
-        deleteItem(id: string): Observable<void> {
-            return this.http.delete<void>(`/api/items/${id}`);
-        }
-    }
-
-must_include_files:
-  - item-row.component.ts
-  # Q1+Q2: Item interface defines fields used in template and EventEmitter
-  - item.model.ts
-
-must_include_content_from:
-  item-row.component.ts:
-    - "import { Item } from './item.model'"
-    - "@Input() item!: Item"
-    - "@Output() deleted = new EventEmitter<string>()"
-    - "this.deleted.emit(this.item.id)"
-  item.model.ts:
-    - "interface Item"
-    - "id: string"
-    - "name: string"
-
-must_not_include:
-  # --- item-list.component.ts: parent component using ItemRowComponent ---
-  # DIRECT CONSUMER: renders <app-item-row> with [item] and (deleted).
-  # But parent's event handling doesn't help review the child component.
-  - ItemListComponent
-  - "app-item-list"
-  - onItemDeleted
-  - addItem
-  # --- item.service.ts: HTTP service for Item CRUD ---
-  # DIRECT TYPE OVERLAP: imports Item, returns Item[]. But service
-  # data fetching doesn't help review component template bindings.
-  - ItemService
-  - getItems
-  - deleteItem
-
-must_not_include_files:
-  - item-list.component.ts
-  - item.service.ts
-
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          deleteItem(id: string): Observable<void> {
+              return this.http.delete<void>(`/api/items/${id}`);
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: item_row_component
+  selector:
+    path: item-row.component.ts
+    anchor: import { Item } from './item.model'
+- id: item_row_component_1
+  selector:
+    path: item-row.component.ts
+    anchor: '@Input() item!: Item'
+- id: item_row_component_2
+  selector:
+    path: item-row.component.ts
+    anchor: '@Output() deleted = new EventEmitter<string>()'
+- id: item_row_component_3
+  selector:
+    path: item-row.component.ts
+    anchor: this.deleted.emit(this.item.id)
+- id: item_model
+  selector:
+    path: item.model.ts
+    anchor: interface Item
+- id: item_model_1
+  selector:
+    path: item.model.ts
+    anchor: 'id: string'
+- id: item_model_2
+  selector:
+    path: item.model.ts
+    anchor: 'name: string'
+- id: no_item_list_component
+  selector:
+    path: item-list.component.ts
+- id: no_item_service
+  selector:
+    path: item.service.ts
+- id: no_global_0
+  selector:
+    anchor: ItemListComponent
+- id: no_global_1
+  selector:
+    anchor: app-item-list
+- id: no_global_2
+  selector:
+    anchor: onItemDeleted
+- id: no_global_3
+  selector:
+    anchor: addItem
+- id: no_global_4
+  selector:
+    anchor: ItemService
+- id: no_global_5
+  selector:
+    anchor: getItems
+- id: no_global_6
+  selector:
+    anchor: deleteItem
+oracle:
+  required:
+  - item_row_component
+  - item_row_component_1
+  - item_row_component_2
+  - item_row_component_3
+  - item_model
+  - item_model_1
+  - item_model_2
+  allowed: []
+  forbidden:
+  - no_item_list_component
+  - no_item_service
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6

@@ -1,19 +1,26 @@
-max_enrichment: 5.0
-initial:
-  single_gap.py: |
-    def func1():
-        pass
+name: merging_008_boundary_single_line_gap
+repo:
+  initial_files:
+    single_gap.py: |
+      def func1():
+          pass
 
-    def func2():
-        pass
-changed:
-  single_gap.py: |
-    def func1():
-        return 1
+      def func2():
+          pass
+  changed_files:
+    single_gap.py: |
+      def func1():
+          return 1
 
-    def func2():
-        return 2
-must_include_files:
-- single_gap.py
-add_garbage_files: false
-skip_garbage_check: true
+      def func2():
+          return 2
+  commit_message: Update files
+fragments:
+- id: single_gap_file
+  selector:
+    path: single_gap.py
+oracle:
+  required:
+  - single_gap_file
+  allowed: []
+  forbidden: []

@@ -1,266 +1,301 @@
-# Scenario: EventHandler implements PartialFunctions for user and order events,
-#   composes them with orElse, and uses lift for safe handling.
-#
-# Diff shows:
-#   - class EventHandler {}  (empty)
-#   + userHandler: PartialFunction[Event, String] for UserCreated/UserDeleted,
-#     orderHandler for OrderPlaced, combinedHandler via orElse,
-#     handle() using combinedHandler.lift(event)
-#
-# Reviewer questions:
-#   Q1: "What event types exist — do UserCreated/UserDeleted/OrderPlaced exist?"
-#       -> Needs Event.scala: sealed trait Event with UserCreated(name),
-#          UserDeleted(id), OrderPlaced(orderId, amount).
-#
-#   Q2: "Is the combinedHandler exhaustive for all Event subtypes?"
-#       -> Same file: three case classes. All covered by userHandler + orderHandler.
-#
-# Not needed for comprehension:
-#   - CommandHandler.scala: IDENTICAL PartialFunction pattern — handlers
-#     for Command types composed with orElse. HARDEST TRAP: same pattern.
-#
-#   - EventLogger.scala: Matches on Event types to log them. Same pattern
-#     match on the same types. But logging doesn't help review handler.
-#
-#   - EventMetrics.scala: Counts events by type. Same "Event" vocabulary.
-#     Independent of EventHandler.
-#
-#   - EventStore.scala: Persists events. Uses Event type. Independent.
-#
-#   - EventSerializer.scala: Serializes events to JSON. Same Event types.
-#     Independent of handler composition logic.
+name: jvm_and_compiled_054_scala_partial_function
+repo:
+  initial_files:
+    Event.scala: |
+      sealed trait Event
 
-max_enrichment: 6.3
-initial:
-  Event.scala: |
-    sealed trait Event
+      case class UserCreated(name: String) extends Event
+      case class UserDeleted(id: String) extends Event
+      case class OrderPlaced(orderId: String, amount: Double) extends Event
 
-    case class UserCreated(name: String) extends Event
-    case class UserDeleted(id: String) extends Event
-    case class OrderPlaced(orderId: String, amount: Double) extends Event
-
-    object Event {
-      def describe(event: Event): String = event match {
-        case UserCreated(name) => s"User $name created"
-        case UserDeleted(id) => s"User $id deleted"
-        case OrderPlaced(id, amt) => s"Order $id for $$$amt"
+      object Event {
+        def describe(event: Event): String = event match {
+          case UserCreated(name) => s"User $name created"
+          case UserDeleted(id) => s"User $id deleted"
+          case OrderPlaced(id, amt) => s"Order $id for $$$amt"
+        }
       }
-    }
-  EventHandler.scala: |
-    class EventHandler {}
-  handlers/CommandHandler.scala: |
-    sealed trait Command
-    case class CreateCommand(name: String) extends Command
-    case class DeleteCommand(id: String) extends Command
-    case class UpdateCommand(id: String, data: String) extends Command
+    EventHandler.scala: |
+      class EventHandler {}
+    handlers/CommandHandler.scala: |
+      sealed trait Command
+      case class CreateCommand(name: String) extends Command
+      case class DeleteCommand(id: String) extends Command
+      case class UpdateCommand(id: String, data: String) extends Command
 
-    class CommandHandler {
-      val createHandler: PartialFunction[Command, String] = {
-        case CreateCommand(name) => s"Created: $name"
+      class CommandHandler {
+        val createHandler: PartialFunction[Command, String] = {
+          case CreateCommand(name) => s"Created: $name"
+        }
+
+        val deleteHandler: PartialFunction[Command, String] = {
+          case DeleteCommand(id) => s"Deleted: $id"
+        }
+
+        val combinedHandler: PartialFunction[Command, String] =
+          createHandler orElse deleteHandler
+
+        def handle(command: Command): Option[String] = {
+          combinedHandler.lift(command)
+        }
       }
+    logging/EventLogger.scala: |
+      object EventLogger {
+        def logEvent(event: Event): Unit = event match {
+          case UserCreated(name) => println(s"[LOG] User created: $name")
+          case UserDeleted(id) => println(s"[LOG] User deleted: $id")
+          case OrderPlaced(id, amt) => println(s"[LOG] Order placed: $id for $$$amt")
+        }
 
-      val deleteHandler: PartialFunction[Command, String] = {
-        case DeleteCommand(id) => s"Deleted: $id"
+        def logBatch(events: List[Event]): Unit = {
+          events.foreach(logEvent)
+        }
+
+        def logWithTimestamp(event: Event): Unit = {
+          println(s"[${System.currentTimeMillis}] ${Event.describe(event)}")
+        }
       }
+    metrics/EventMetrics.scala: |
+      object EventMetrics {
+        private var counts: Map[String, Int] = Map.empty
 
-      val combinedHandler: PartialFunction[Command, String] =
-        createHandler orElse deleteHandler
+        def record(eventType: String): Unit = {
+          counts = counts.updated(eventType, counts.getOrElse(eventType, 0) + 1)
+        }
 
-      def handle(command: Command): Option[String] = {
-        combinedHandler.lift(command)
+        def getCount(eventType: String): Int = counts.getOrElse(eventType, 0)
+
+        def reset(): Unit = { counts = Map.empty }
+
+        def totalEvents(): Int = counts.values.sum
       }
-    }
-  logging/EventLogger.scala: |
-    object EventLogger {
-      def logEvent(event: Event): Unit = event match {
-        case UserCreated(name) => println(s"[LOG] User created: $name")
-        case UserDeleted(id) => println(s"[LOG] User deleted: $id")
-        case OrderPlaced(id, amt) => println(s"[LOG] Order placed: $id for $$$amt")
+    store/EventStore.scala: |
+      class EventStore {
+        private var events: List[Event] = Nil
+
+        def store(event: Event): Unit = {
+          events = event :: events
+        }
+
+        def getAll(): List[Event] = events.reverse
+
+        def getByType[T <: Event](implicit ct: scala.reflect.ClassTag[T]): List[T] = {
+          events.collect { case e: T => e }.reverse
+        }
+
+        def count(): Int = events.size
       }
+  changed_files:
+    Event.scala: |
+      sealed trait Event
 
-      def logBatch(events: List[Event]): Unit = {
-        events.foreach(logEvent)
+      case class UserCreated(name: String) extends Event
+      case class UserDeleted(id: String) extends Event
+      case class OrderPlaced(orderId: String, amount: Double) extends Event
+
+      object Event {
+        def describe(event: Event): String = event match {
+          case UserCreated(name) => s"User $name created"
+          case UserDeleted(id) => s"User $id deleted"
+          case OrderPlaced(id, amt) => s"Order $id for $$$amt"
+        }
       }
+    EventHandler.scala: |
+      class EventHandler {
+        val userHandler: PartialFunction[Event, String] = {
+          case UserCreated(name) => s"Created user: $name"
+          case UserDeleted(id) => s"Deleted user: $id"
+        }
 
-      def logWithTimestamp(event: Event): Unit = {
-        println(s"[${System.currentTimeMillis}] ${Event.describe(event)}")
+        val orderHandler: PartialFunction[Event, String] = {
+          case OrderPlaced(id, amount) => s"Order $id: $$$amount"
+        }
+
+        val combinedHandler: PartialFunction[Event, String] =
+          userHandler orElse orderHandler
+
+        def handle(event: Event): Option[String] = {
+          combinedHandler.lift(event)
+        }
       }
-    }
-  metrics/EventMetrics.scala: |
-    object EventMetrics {
-      private var counts: Map[String, Int] = Map.empty
+    handlers/CommandHandler.scala: |
+      sealed trait Command
+      case class CreateCommand(name: String) extends Command
+      case class DeleteCommand(id: String) extends Command
+      case class UpdateCommand(id: String, data: String) extends Command
 
-      def record(eventType: String): Unit = {
-        counts = counts.updated(eventType, counts.getOrElse(eventType, 0) + 1)
+      class CommandHandler {
+        val createHandler: PartialFunction[Command, String] = {
+          case CreateCommand(name) => s"Created: $name"
+        }
+
+        val deleteHandler: PartialFunction[Command, String] = {
+          case DeleteCommand(id) => s"Deleted: $id"
+        }
+
+        val combinedHandler: PartialFunction[Command, String] =
+          createHandler orElse deleteHandler
+
+        def handle(command: Command): Option[String] = {
+          combinedHandler.lift(command)
+        }
       }
+    logging/EventLogger.scala: |
+      object EventLogger {
+        def logEvent(event: Event): Unit = event match {
+          case UserCreated(name) => println(s"[LOG] User created: $name")
+          case UserDeleted(id) => println(s"[LOG] User deleted: $id")
+          case OrderPlaced(id, amt) => println(s"[LOG] Order placed: $id for $$$amt")
+        }
 
-      def getCount(eventType: String): Int = counts.getOrElse(eventType, 0)
+        def logBatch(events: List[Event]): Unit = {
+          events.foreach(logEvent)
+        }
 
-      def reset(): Unit = { counts = Map.empty }
-
-      def totalEvents(): Int = counts.values.sum
-    }
-  store/EventStore.scala: |
-    class EventStore {
-      private var events: List[Event] = Nil
-
-      def store(event: Event): Unit = {
-        events = event :: events
+        def logWithTimestamp(event: Event): Unit = {
+          println(s"[${System.currentTimeMillis}] ${Event.describe(event)}")
+        }
       }
+    metrics/EventMetrics.scala: |
+      object EventMetrics {
+        private var counts: Map[String, Int] = Map.empty
 
-      def getAll(): List[Event] = events.reverse
+        def record(eventType: String): Unit = {
+          counts = counts.updated(eventType, counts.getOrElse(eventType, 0) + 1)
+        }
 
-      def getByType[T <: Event](implicit ct: scala.reflect.ClassTag[T]): List[T] = {
-        events.collect { case e: T => e }.reverse
+        def getCount(eventType: String): Int = counts.getOrElse(eventType, 0)
+
+        def reset(): Unit = { counts = Map.empty }
+
+        def totalEvents(): Int = counts.values.sum
       }
+    store/EventStore.scala: |
+      class EventStore {
+        private var events: List[Event] = Nil
 
-      def count(): Int = events.size
-    }
+        def store(event: Event): Unit = {
+          events = event :: events
+        }
 
-changed:
-  Event.scala: |
-    sealed trait Event
+        def getAll(): List[Event] = events.reverse
 
-    case class UserCreated(name: String) extends Event
-    case class UserDeleted(id: String) extends Event
-    case class OrderPlaced(orderId: String, amount: Double) extends Event
+        def getByType[T <: Event](implicit ct: scala.reflect.ClassTag[T]): List[T] = {
+          events.collect { case e: T => e }.reverse
+        }
 
-    object Event {
-      def describe(event: Event): String = event match {
-        case UserCreated(name) => s"User $name created"
-        case UserDeleted(id) => s"User $id deleted"
-        case OrderPlaced(id, amt) => s"Order $id for $$$amt"
+        def count(): Int = events.size
       }
-    }
-  EventHandler.scala: |
-    class EventHandler {
-      val userHandler: PartialFunction[Event, String] = {
-        case UserCreated(name) => s"Created user: $name"
-        case UserDeleted(id) => s"Deleted user: $id"
-      }
-
-      val orderHandler: PartialFunction[Event, String] = {
-        case OrderPlaced(id, amount) => s"Order $id: $$$amount"
-      }
-
-      val combinedHandler: PartialFunction[Event, String] =
-        userHandler orElse orderHandler
-
-      def handle(event: Event): Option[String] = {
-        combinedHandler.lift(event)
-      }
-    }
-  handlers/CommandHandler.scala: |
-    sealed trait Command
-    case class CreateCommand(name: String) extends Command
-    case class DeleteCommand(id: String) extends Command
-    case class UpdateCommand(id: String, data: String) extends Command
-
-    class CommandHandler {
-      val createHandler: PartialFunction[Command, String] = {
-        case CreateCommand(name) => s"Created: $name"
-      }
-
-      val deleteHandler: PartialFunction[Command, String] = {
-        case DeleteCommand(id) => s"Deleted: $id"
-      }
-
-      val combinedHandler: PartialFunction[Command, String] =
-        createHandler orElse deleteHandler
-
-      def handle(command: Command): Option[String] = {
-        combinedHandler.lift(command)
-      }
-    }
-  logging/EventLogger.scala: |
-    object EventLogger {
-      def logEvent(event: Event): Unit = event match {
-        case UserCreated(name) => println(s"[LOG] User created: $name")
-        case UserDeleted(id) => println(s"[LOG] User deleted: $id")
-        case OrderPlaced(id, amt) => println(s"[LOG] Order placed: $id for $$$amt")
-      }
-
-      def logBatch(events: List[Event]): Unit = {
-        events.foreach(logEvent)
-      }
-
-      def logWithTimestamp(event: Event): Unit = {
-        println(s"[${System.currentTimeMillis}] ${Event.describe(event)}")
-      }
-    }
-  metrics/EventMetrics.scala: |
-    object EventMetrics {
-      private var counts: Map[String, Int] = Map.empty
-
-      def record(eventType: String): Unit = {
-        counts = counts.updated(eventType, counts.getOrElse(eventType, 0) + 1)
-      }
-
-      def getCount(eventType: String): Int = counts.getOrElse(eventType, 0)
-
-      def reset(): Unit = { counts = Map.empty }
-
-      def totalEvents(): Int = counts.values.sum
-    }
-  store/EventStore.scala: |
-    class EventStore {
-      private var events: List[Event] = Nil
-
-      def store(event: Event): Unit = {
-        events = event :: events
-      }
-
-      def getAll(): List[Event] = events.reverse
-
-      def getByType[T <: Event](implicit ct: scala.reflect.ClassTag[T]): List[T] = {
-        events.collect { case e: T => e }.reverse
-      }
-
-      def count(): Int = events.size
-    }
-
-must_include_files:
-  - EventHandler.scala
-  - Event.scala
-
-must_include_content_from:
-  EventHandler.scala:
-    - "userHandler orElse orderHandler"
-    - "combinedHandler.lift(event)"
-    - 'case UserCreated(name) => s"Created user: $name"'
-    - 'case OrderPlaced(id, amount) => s"Order $id'
-  Event.scala:
-    - "sealed trait Event"
-    - "case class UserCreated(name: String) extends Event"
-    - "case class OrderPlaced(orderId: String, amount: Double) extends Event"
-
-must_not_include:
-  # CommandHandler.scala: identical PartialFunction + orElse pattern
-  - CommandHandler
-  - CreateCommand
-  - DeleteCommand
-  - UpdateCommand
-  # EventLogger.scala: matches on same Event types to log
-  - EventLogger
-  - logEvent
-  - logBatch
-  - logWithTimestamp
-  - "[LOG]"
-  # EventMetrics.scala: counts events, independent
-  - EventMetrics
-  - totalEvents
-  # EventStore.scala: persists events, independent
-  - EventStore
-  - getByType
-  - ClassTag
-
-must_not_include_files:
-  - handlers/CommandHandler.scala
-  - logging/EventLogger.scala
-  - metrics/EventMetrics.scala
-  - store/EventStore.scala
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+  commit_message: Update files
+fragments:
+- id: eventhandler
+  selector:
+    path: EventHandler.scala
+    anchor: userHandler orElse orderHandler
+- id: eventhandler_1
+  selector:
+    path: EventHandler.scala
+    anchor: combinedHandler.lift(event)
+- id: eventhandler_2
+  selector:
+    path: EventHandler.scala
+    anchor: 'case UserCreated(name) => s"Created user: $name"'
+- id: eventhandler_3
+  selector:
+    path: EventHandler.scala
+    anchor: case OrderPlaced(id, amount) => s"Order $id
+- id: event
+  selector:
+    path: Event.scala
+    anchor: sealed trait Event
+- id: event_1
+  selector:
+    path: Event.scala
+    anchor: 'case class UserCreated(name: String) extends Event'
+- id: event_2
+  selector:
+    path: Event.scala
+    anchor: 'case class OrderPlaced(orderId: String, amount: Double) extends Event'
+- id: no_commandhandler
+  selector:
+    path: handlers/CommandHandler.scala
+- id: no_eventlogger
+  selector:
+    path: logging/EventLogger.scala
+- id: no_eventmetrics
+  selector:
+    path: metrics/EventMetrics.scala
+- id: no_eventstore
+  selector:
+    path: store/EventStore.scala
+- id: no_global_0
+  selector:
+    anchor: CommandHandler
+- id: no_global_1
+  selector:
+    anchor: CreateCommand
+- id: no_global_2
+  selector:
+    anchor: DeleteCommand
+- id: no_global_3
+  selector:
+    anchor: UpdateCommand
+- id: no_global_4
+  selector:
+    anchor: EventLogger
+- id: no_global_5
+  selector:
+    anchor: logEvent
+- id: no_global_6
+  selector:
+    anchor: logBatch
+- id: no_global_7
+  selector:
+    anchor: logWithTimestamp
+- id: no_global_8
+  selector:
+    anchor: '[LOG]'
+- id: no_global_9
+  selector:
+    anchor: EventMetrics
+- id: no_global_10
+  selector:
+    anchor: totalEvents
+- id: no_global_11
+  selector:
+    anchor: EventStore
+- id: no_global_12
+  selector:
+    anchor: getByType
+- id: no_global_13
+  selector:
+    anchor: ClassTag
+oracle:
+  required:
+  - eventhandler
+  - eventhandler_1
+  - eventhandler_2
+  - eventhandler_3
+  - event
+  - event_1
+  - event_2
+  allowed: []
+  forbidden:
+  - no_commandhandler
+  - no_eventlogger
+  - no_eventmetrics
+  - no_eventstore
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13

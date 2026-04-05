@@ -1,381 +1,419 @@
-# Scenario: User class is refactored from simple constructor to Builder
-#   pattern, adding age and address fields. UserService is introduced
-#   as a consumer that uses User.builder().
-#
-# Diff shows:
-#   - User with name/email constructor
-#   + Builder inner class with name/email/age/address methods,
-#     private User(Builder) constructor, builder() factory,
-#     and UserService calling User.builder().name().email().age().build()
-#
-# Reviewer questions:
-#   Q1: "What fields did User originally have — is the refactoring backward compatible?"
-#       -> The diff itself shows the before/after of User.java.
-#
-#   Q2: "Who else constructs User — will they break?"
-#       -> Needs UserService.java context showing builder usage pattern.
-#
-# Not needed for comprehension:
-#   - ProductBuilder.java: IDENTICAL builder pattern — inner Builder class
-#     with chained setters and build() method. HARDEST TRAP: same design
-#     pattern, different domain object.
-#
-#   - UserMapper.java: Converts User to UserDto, accesses User.getName()
-#     and User.getEmail(). Same property accesses. But mapping logic
-#     doesn't help review the builder pattern correctness.
-#
-#   - UserValidator.java: Validates User fields. References User.getName(),
-#     User.getEmail(). Same accessor methods. But validation is independent.
-#
-#   - UserRepository.java: Persists User entities. Uses User type. But
-#     persistence doesn't help review builder construction logic.
-#
-#   - UserController.java: REST endpoint creating User via service. Direct
-#     consumer chain but doesn't help review the builder API.
+name: jvm_and_compiled_026_java_builder_pattern
+repo:
+  initial_files:
+    src/main/java/com/example/User.java: |
+      package com.example;
 
-max_enrichment: 4.2
-initial:
-  src/main/java/com/example/User.java: |
-    package com.example;
+      public class User {
+          private final String name;
+          private final String email;
 
-    public class User {
-        private final String name;
-        private final String email;
+          public User(String name, String email) {
+              this.name = name;
+              this.email = email;
+          }
 
-        public User(String name, String email) {
-            this.name = name;
-            this.email = email;
-        }
+          public String getName() { return name; }
+          public String getEmail() { return email; }
+      }
+    src/main/java/com/example/product/ProductBuilder.java: |
+      package com.example.product;
 
-        public String getName() { return name; }
-        public String getEmail() { return email; }
-    }
-  src/main/java/com/example/product/ProductBuilder.java: |
-    package com.example.product;
+      public class ProductBuilder {
+          private String name;
+          private double price;
+          private String category;
+          private boolean inStock = true;
 
-    public class ProductBuilder {
-        private String name;
-        private double price;
-        private String category;
-        private boolean inStock = true;
+          public ProductBuilder name(String name) {
+              this.name = name;
+              return this;
+          }
 
-        public ProductBuilder name(String name) {
-            this.name = name;
-            return this;
-        }
+          public ProductBuilder price(double price) {
+              this.price = price;
+              return this;
+          }
 
-        public ProductBuilder price(double price) {
-            this.price = price;
-            return this;
-        }
+          public ProductBuilder category(String category) {
+              this.category = category;
+              return this;
+          }
 
-        public ProductBuilder category(String category) {
-            this.category = category;
-            return this;
-        }
+          public ProductBuilder inStock(boolean inStock) {
+              this.inStock = inStock;
+              return this;
+          }
 
-        public ProductBuilder inStock(boolean inStock) {
-            this.inStock = inStock;
-            return this;
-        }
+          public Product build() {
+              return new Product(this);
+          }
+      }
+    src/main/java/com/example/UserMapper.java: |
+      package com.example;
 
-        public Product build() {
-            return new Product(this);
-        }
-    }
-  src/main/java/com/example/UserMapper.java: |
-    package com.example;
+      public class UserMapper {
+          public UserDto toDto(User user) {
+              UserDto dto = new UserDto();
+              dto.setName(user.getName());
+              dto.setEmail(user.getEmail());
+              return dto;
+          }
 
-    public class UserMapper {
-        public UserDto toDto(User user) {
-            UserDto dto = new UserDto();
-            dto.setName(user.getName());
-            dto.setEmail(user.getEmail());
-            return dto;
-        }
+          public User fromDto(UserDto dto) {
+              return new User(dto.getName(), dto.getEmail());
+          }
+      }
+    src/main/java/com/example/UserValidator.java: |
+      package com.example;
 
-        public User fromDto(UserDto dto) {
-            return new User(dto.getName(), dto.getEmail());
-        }
-    }
-  src/main/java/com/example/UserValidator.java: |
-    package com.example;
+      import java.util.ArrayList;
+      import java.util.List;
 
-    import java.util.ArrayList;
-    import java.util.List;
+      public class UserValidator {
+          public List<String> validate(User user) {
+              List<String> errors = new ArrayList<>();
+              if (user.getName() == null || user.getName().isBlank()) {
+                  errors.add("Name is required");
+              }
+              if (user.getEmail() == null || !user.getEmail().contains("@")) {
+                  errors.add("Valid email is required");
+              }
+              return errors;
+          }
+      }
+    src/main/java/com/example/UserRepository.java: |
+      package com.example;
 
-    public class UserValidator {
-        public List<String> validate(User user) {
-            List<String> errors = new ArrayList<>();
-            if (user.getName() == null || user.getName().isBlank()) {
-                errors.add("Name is required");
-            }
-            if (user.getEmail() == null || !user.getEmail().contains("@")) {
-                errors.add("Valid email is required");
-            }
-            return errors;
-        }
-    }
-  src/main/java/com/example/UserRepository.java: |
-    package com.example;
+      import java.util.HashMap;
+      import java.util.Map;
+      import java.util.Optional;
 
-    import java.util.HashMap;
-    import java.util.Map;
-    import java.util.Optional;
+      public class UserRepository {
+          private final Map<Long, User> store = new HashMap<>();
+          private long nextId = 1;
 
-    public class UserRepository {
-        private final Map<Long, User> store = new HashMap<>();
-        private long nextId = 1;
+          public User save(User user) {
+              store.put(nextId++, user);
+              return user;
+          }
 
-        public User save(User user) {
-            store.put(nextId++, user);
-            return user;
-        }
+          public Optional<User> findById(Long id) {
+              return Optional.ofNullable(store.get(id));
+          }
+      }
+    src/main/java/com/example/UserController.java: |
+      package com.example;
 
-        public Optional<User> findById(Long id) {
-            return Optional.ofNullable(store.get(id));
-        }
-    }
-  src/main/java/com/example/UserController.java: |
-    package com.example;
+      import org.springframework.web.bind.annotation.*;
 
-    import org.springframework.web.bind.annotation.*;
+      @RestController
+      @RequestMapping("/api/users")
+      public class UserController {
+          private final UserService userService;
 
-    @RestController
-    @RequestMapping("/api/users")
-    public class UserController {
-        private final UserService userService;
+          public UserController(UserService userService) {
+              this.userService = userService;
+          }
 
-        public UserController(UserService userService) {
-            this.userService = userService;
-        }
+          @PostMapping
+          public User createUser(@RequestParam String name, @RequestParam String email) {
+              return userService.createUser(name, email);
+          }
+      }
+  changed_files:
+    src/main/java/com/example/User.java: |
+      package com.example;
 
-        @PostMapping
-        public User createUser(@RequestParam String name, @RequestParam String email) {
-            return userService.createUser(name, email);
-        }
-    }
+      public class User {
+          private final String name;
+          private final String email;
+          private final int age;
+          private final String address;
 
-changed:
-  src/main/java/com/example/User.java: |
-    package com.example;
+          private User(Builder builder) {
+              this.name = builder.name;
+              this.email = builder.email;
+              this.age = builder.age;
+              this.address = builder.address;
+          }
 
-    public class User {
-        private final String name;
-        private final String email;
-        private final int age;
-        private final String address;
+          public String getName() { return name; }
+          public String getEmail() { return email; }
+          public int getAge() { return age; }
+          public String getAddress() { return address; }
 
-        private User(Builder builder) {
-            this.name = builder.name;
-            this.email = builder.email;
-            this.age = builder.age;
-            this.address = builder.address;
-        }
+          public static Builder builder() {
+              return new Builder();
+          }
 
-        public String getName() { return name; }
-        public String getEmail() { return email; }
-        public int getAge() { return age; }
-        public String getAddress() { return address; }
+          public static class Builder {
+              private String name;
+              private String email;
+              private int age;
+              private String address;
 
-        public static Builder builder() {
-            return new Builder();
-        }
+              public Builder name(String name) {
+                  this.name = name;
+                  return this;
+              }
 
-        public static class Builder {
-            private String name;
-            private String email;
-            private int age;
-            private String address;
+              public Builder email(String email) {
+                  this.email = email;
+                  return this;
+              }
 
-            public Builder name(String name) {
-                this.name = name;
-                return this;
-            }
+              public Builder age(int age) {
+                  this.age = age;
+                  return this;
+              }
 
-            public Builder email(String email) {
-                this.email = email;
-                return this;
-            }
+              public Builder address(String address) {
+                  this.address = address;
+                  return this;
+              }
 
-            public Builder age(int age) {
-                this.age = age;
-                return this;
-            }
+              public User build() {
+                  return new User(this);
+              }
+          }
+      }
+    src/main/java/com/example/UserService.java: |
+      package com.example;
 
-            public Builder address(String address) {
-                this.address = address;
-                return this;
-            }
+      public class UserService {
+          public User createUser(String name, String email) {
+              return User.builder()
+                  .name(name)
+                  .email(email)
+                  .age(0)
+                  .build();
+          }
+      }
+    src/main/java/com/example/product/ProductBuilder.java: |
+      package com.example.product;
 
-            public User build() {
-                return new User(this);
-            }
-        }
-    }
-  src/main/java/com/example/UserService.java: |
-    package com.example;
+      public class ProductBuilder {
+          private String name;
+          private double price;
+          private String category;
+          private boolean inStock = true;
 
-    public class UserService {
-        public User createUser(String name, String email) {
-            return User.builder()
-                .name(name)
-                .email(email)
-                .age(0)
-                .build();
-        }
-    }
-  src/main/java/com/example/product/ProductBuilder.java: |
-    package com.example.product;
+          public ProductBuilder name(String name) {
+              this.name = name;
+              return this;
+          }
 
-    public class ProductBuilder {
-        private String name;
-        private double price;
-        private String category;
-        private boolean inStock = true;
+          public ProductBuilder price(double price) {
+              this.price = price;
+              return this;
+          }
 
-        public ProductBuilder name(String name) {
-            this.name = name;
-            return this;
-        }
+          public ProductBuilder category(String category) {
+              this.category = category;
+              return this;
+          }
 
-        public ProductBuilder price(double price) {
-            this.price = price;
-            return this;
-        }
+          public ProductBuilder inStock(boolean inStock) {
+              this.inStock = inStock;
+              return this;
+          }
 
-        public ProductBuilder category(String category) {
-            this.category = category;
-            return this;
-        }
+          public Product build() {
+              return new Product(this);
+          }
+      }
+    src/main/java/com/example/UserMapper.java: |
+      package com.example;
 
-        public ProductBuilder inStock(boolean inStock) {
-            this.inStock = inStock;
-            return this;
-        }
+      public class UserMapper {
+          public UserDto toDto(User user) {
+              UserDto dto = new UserDto();
+              dto.setName(user.getName());
+              dto.setEmail(user.getEmail());
+              return dto;
+          }
 
-        public Product build() {
-            return new Product(this);
-        }
-    }
-  src/main/java/com/example/UserMapper.java: |
-    package com.example;
+          public User fromDto(UserDto dto) {
+              return new User(dto.getName(), dto.getEmail());
+          }
+      }
+    src/main/java/com/example/UserValidator.java: |
+      package com.example;
 
-    public class UserMapper {
-        public UserDto toDto(User user) {
-            UserDto dto = new UserDto();
-            dto.setName(user.getName());
-            dto.setEmail(user.getEmail());
-            return dto;
-        }
+      import java.util.ArrayList;
+      import java.util.List;
 
-        public User fromDto(UserDto dto) {
-            return new User(dto.getName(), dto.getEmail());
-        }
-    }
-  src/main/java/com/example/UserValidator.java: |
-    package com.example;
+      public class UserValidator {
+          public List<String> validate(User user) {
+              List<String> errors = new ArrayList<>();
+              if (user.getName() == null || user.getName().isBlank()) {
+                  errors.add("Name is required");
+              }
+              if (user.getEmail() == null || !user.getEmail().contains("@")) {
+                  errors.add("Valid email is required");
+              }
+              return errors;
+          }
+      }
+    src/main/java/com/example/UserRepository.java: |
+      package com.example;
 
-    import java.util.ArrayList;
-    import java.util.List;
+      import java.util.HashMap;
+      import java.util.Map;
+      import java.util.Optional;
 
-    public class UserValidator {
-        public List<String> validate(User user) {
-            List<String> errors = new ArrayList<>();
-            if (user.getName() == null || user.getName().isBlank()) {
-                errors.add("Name is required");
-            }
-            if (user.getEmail() == null || !user.getEmail().contains("@")) {
-                errors.add("Valid email is required");
-            }
-            return errors;
-        }
-    }
-  src/main/java/com/example/UserRepository.java: |
-    package com.example;
+      public class UserRepository {
+          private final Map<Long, User> store = new HashMap<>();
+          private long nextId = 1;
 
-    import java.util.HashMap;
-    import java.util.Map;
-    import java.util.Optional;
+          public User save(User user) {
+              store.put(nextId++, user);
+              return user;
+          }
 
-    public class UserRepository {
-        private final Map<Long, User> store = new HashMap<>();
-        private long nextId = 1;
+          public Optional<User> findById(Long id) {
+              return Optional.ofNullable(store.get(id));
+          }
+      }
+    src/main/java/com/example/UserController.java: |
+      package com.example;
 
-        public User save(User user) {
-            store.put(nextId++, user);
-            return user;
-        }
+      import org.springframework.web.bind.annotation.*;
 
-        public Optional<User> findById(Long id) {
-            return Optional.ofNullable(store.get(id));
-        }
-    }
-  src/main/java/com/example/UserController.java: |
-    package com.example;
+      @RestController
+      @RequestMapping("/api/users")
+      public class UserController {
+          private final UserService userService;
 
-    import org.springframework.web.bind.annotation.*;
+          public UserController(UserService userService) {
+              this.userService = userService;
+          }
 
-    @RestController
-    @RequestMapping("/api/users")
-    public class UserController {
-        private final UserService userService;
-
-        public UserController(UserService userService) {
-            this.userService = userService;
-        }
-
-        @PostMapping
-        public User createUser(@RequestParam String name, @RequestParam String email) {
-            return userService.createUser(name, email);
-        }
-    }
-
-must_include_files:
-  - src/main/java/com/example/User.java
-  - src/main/java/com/example/UserService.java
-
-must_include_content_from:
-  src/main/java/com/example/User.java:
-    - "private User(Builder builder)"
-    - "public static Builder builder()"
-    - "public int getAge() { return age; }"
-    - "public String getAddress() { return address; }"
-    - "public User build()"
-  src/main/java/com/example/UserService.java:
-    - "User.builder()"
-    - ".name(name)"
-    - ".email(email)"
-
-must_not_include:
-  # ProductBuilder.java: identical builder pattern, different domain
-  - ProductBuilder
-  - "inStock"
-  - "category"
-  # UserMapper.java: maps User fields, doesn't help review builder
-  - UserMapper
-  - toDto
-  - fromDto
-  # UserValidator.java: validates User fields, independent
-  - UserValidator
-  - "Name is required"
-  - "Valid email is required"
-  # UserRepository.java: persistence, independent of builder
-  - UserRepository
-  - nextId
-  # UserController.java: REST endpoint, doesn't help review builder API
-  - UserController
-  - "@PostMapping"
-  - "@RequestParam"
-
-must_not_include_files:
-  - src/main/java/com/example/product/ProductBuilder.java
-  - src/main/java/com/example/UserMapper.java
-  - src/main/java/com/example/UserValidator.java
-  - src/main/java/com/example/UserRepository.java
-  - src/main/java/com/example/UserController.java
-
-max_fragments: 7
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          @PostMapping
+          public User createUser(@RequestParam String name, @RequestParam String email) {
+              return userService.createUser(name, email);
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: user
+  selector:
+    path: src/main/java/com/example/User.java
+    anchor: private User(Builder builder)
+- id: user_1
+  selector:
+    path: src/main/java/com/example/User.java
+    anchor: public static Builder builder()
+- id: user_2
+  selector:
+    path: src/main/java/com/example/User.java
+    anchor: public int getAge() { return age; }
+- id: user_3
+  selector:
+    path: src/main/java/com/example/User.java
+    anchor: public String getAddress() { return address; }
+- id: user_4
+  selector:
+    path: src/main/java/com/example/User.java
+    anchor: public User build()
+- id: userservice
+  selector:
+    path: src/main/java/com/example/UserService.java
+    anchor: User.builder()
+- id: userservice_1
+  selector:
+    path: src/main/java/com/example/UserService.java
+    anchor: .name(name)
+- id: userservice_2
+  selector:
+    path: src/main/java/com/example/UserService.java
+    anchor: .email(email)
+- id: no_productbuilder
+  selector:
+    path: src/main/java/com/example/product/ProductBuilder.java
+- id: no_usermapper
+  selector:
+    path: src/main/java/com/example/UserMapper.java
+- id: no_uservalidator
+  selector:
+    path: src/main/java/com/example/UserValidator.java
+- id: no_userrepository
+  selector:
+    path: src/main/java/com/example/UserRepository.java
+- id: no_usercontroller
+  selector:
+    path: src/main/java/com/example/UserController.java
+- id: no_global_0
+  selector:
+    anchor: ProductBuilder
+- id: no_global_1
+  selector:
+    anchor: inStock
+- id: no_global_2
+  selector:
+    anchor: category
+- id: no_global_3
+  selector:
+    anchor: UserMapper
+- id: no_global_4
+  selector:
+    anchor: toDto
+- id: no_global_5
+  selector:
+    anchor: fromDto
+- id: no_global_6
+  selector:
+    anchor: UserValidator
+- id: no_global_7
+  selector:
+    anchor: Name is required
+- id: no_global_8
+  selector:
+    anchor: Valid email is required
+- id: no_global_9
+  selector:
+    anchor: UserRepository
+- id: no_global_10
+  selector:
+    anchor: nextId
+- id: no_global_11
+  selector:
+    anchor: UserController
+- id: no_global_12
+  selector:
+    anchor: '@PostMapping'
+- id: no_global_13
+  selector:
+    anchor: '@RequestParam'
+oracle:
+  required:
+  - user
+  - user_1
+  - user_2
+  - user_3
+  - user_4
+  - userservice
+  - userservice_1
+  - userservice_2
+  allowed: []
+  forbidden:
+  - no_productbuilder
+  - no_usermapper
+  - no_uservalidator
+  - no_userrepository
+  - no_usercontroller
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13

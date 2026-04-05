@@ -1,180 +1,195 @@
-# Scenario: Adding a filter to an aws_ami data source to restrict to Amazon Linux 2 AMIs.
-#
-# Reviewer questions:
-#   Q1: "What instance uses this AMI?"
-#       -> main.tf references data.aws_ami.amazon_linux.id in the web instance.
-#   Q2: "Are there other AMI lookups that might conflict?"
-#       -> modules/worker/data.tf has an Ubuntu AMI lookup, but it's a different module.
-#   Q3: "What launch template also uses this AMI?"
-#       -> templates.tf (UNCHANGED) references the same AMI data source in a
-#         launch template. Shows a second consumer of the filtered AMI.
-#
-# Not needed:
-#   - modules/worker/data.tf: Another AMI data source but for Ubuntu in a
-#     separate module. HARD TRAP: same data source type (aws_ami), same
-#     structure (most_recent, owners, filter). But different module scope,
-#     different OS, different consumer.
-#
-#   - packer/build.pkr.hcl: Packer template that builds Amazon Linux 2 AMIs.
-#     Contains "amzn2-ami-hvm" string matching the filter value. HARDEST TRAP:
-#     exact same AMI name pattern as the diff. But Packer builds AMIs, it
-#     doesn't consume the Terraform data source.
-#
-#   - variables.tf: Variable definitions including instance_type. Same directory,
-#     infrastructure inputs. But instance_type doesn't affect AMI filtering.
-#
-#   - security/iam.tf: IAM instance profile attached to the web instance. Same
-#     instance, but IAM permissions are orthogonal to AMI selection.
-
-max_enrichment: 14.1
-initial:
-  data.tf: |
-    data "aws_ami" "amazon_linux" {
-      most_recent = true
-      owners      = ["amazon"]
-    }
-  main.tf: |
-    resource "aws_instance" "web" {
-      ami                  = data.aws_ami.amazon_linux.id
-      instance_type        = var.instance_type
-      iam_instance_profile = aws_iam_instance_profile.web.name
-
-      tags = {
-        Name = "web-server"
-      }
-    }
-  templates.tf: |
-    resource "aws_launch_template" "web_fleet" {
-      name_prefix   = "web-fleet-"
-      image_id      = data.aws_ami.amazon_linux.id
-      instance_type = "t3.small"
-
-      tag_specifications {
-        resource_type = "instance"
-        tags = {
-          Name = "web-fleet-instance"
-        }
-      }
-    }
-  modules/worker/data.tf: |
-    data "aws_ami" "ubuntu" {
-      most_recent = true
-      owners      = ["099720109477"]
-
-      filter {
-        name   = "name"
-        values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-*"]
-      }
-    }
-
-    resource "aws_instance" "worker" {
-      ami           = data.aws_ami.ubuntu.id
-      instance_type = "t3.medium"
-    }
-  packer/build.pkr.hcl: |
-    source "amazon-ebs" "amazon_linux" {
-      ami_name      = "custom-amzn2-ami-hvm-{{timestamp}}"
-      instance_type = "t3.micro"
-      region        = "us-east-1"
-
-      source_ami_filter {
-        filters = {
-          name                = "amzn2-ami-hvm-*-x86_64-gp2"
-          root-device-type    = "ebs"
-          virtualization-type = "hvm"
-        }
+name: terraform_066_data_source
+repo:
+  initial_files:
+    data.tf: |
+      data "aws_ami" "amazon_linux" {
         most_recent = true
         owners      = ["amazon"]
       }
-    }
+    main.tf: |
+      resource "aws_instance" "web" {
+        ami                  = data.aws_ami.amazon_linux.id
+        instance_type        = var.instance_type
+        iam_instance_profile = aws_iam_instance_profile.web.name
 
-    build {
-      sources = ["source.amazon-ebs.amazon_linux"]
-
-      provisioner "shell" {
-        script = "scripts/setup.sh"
+        tags = {
+          Name = "web-server"
+        }
       }
-    }
-  variables.tf: |
-    variable "instance_type" {
-      type    = string
-      default = "t3.micro"
-    }
+    templates.tf: |
+      resource "aws_launch_template" "web_fleet" {
+        name_prefix   = "web-fleet-"
+        image_id      = data.aws_ami.amazon_linux.id
+        instance_type = "t3.small"
 
-    variable "key_name" {
-      type    = string
-      default = "web-keypair"
-    }
-  security/iam.tf: |
-    resource "aws_iam_instance_profile" "web" {
-      name = "web-instance-profile"
-      role = aws_iam_role.web.name
-    }
-
-    resource "aws_iam_role" "web" {
-      name = "web-role"
-
-      assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [{
-          Effect    = "Allow"
-          Principal = { Service = "ec2.amazonaws.com" }
-          Action    = "sts:AssumeRole"
-        }]
-      })
-    }
-
-changed:
-  data.tf: |
-    data "aws_ami" "amazon_linux" {
-      most_recent = true
-      owners      = ["amazon"]
-      filter {
-        name   = "name"
-        values = ["amzn2-ami-hvm-*"]
+        tag_specifications {
+          resource_type = "instance"
+          tags = {
+            Name = "web-fleet-instance"
+          }
+        }
       }
-    }
+    modules/worker/data.tf: |
+      data "aws_ami" "ubuntu" {
+        most_recent = true
+        owners      = ["099720109477"]
 
-must_include_files:
-  - data.tf
-  # Q1: Web instance that uses the AMI -- reviewer verifies the consumer
-  - main.tf
-  # Q3: Launch template also uses same AMI data source
-  - templates.tf
+        filter {
+          name   = "name"
+          values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-*"]
+        }
+      }
 
-must_include_content_from:
-  data.tf:
-    - name   = "name"
-    - 'values = ["amzn2-ami-hvm-*"]'
-  main.tf:
-    - data.aws_ami.amazon_linux.id
-  templates.tf:
-    - data.aws_ami.amazon_linux.id
-    - 'resource "aws_launch_template" "web_fleet"'
+      resource "aws_instance" "worker" {
+        ami           = data.aws_ami.ubuntu.id
+        instance_type = "t3.medium"
+      }
+    packer/build.pkr.hcl: |
+      source "amazon-ebs" "amazon_linux" {
+        ami_name      = "custom-amzn2-ami-hvm-{{timestamp}}"
+        instance_type = "t3.micro"
+        region        = "us-east-1"
 
-must_not_include:
-  # --- worker AMI: same data source type but Ubuntu in different module ---
-  - ubuntu
-  - "099720109477"
-  - ubuntu-jammy
-  # --- packer: builds AMIs with same name pattern but is build tooling ---
-  - amazon-ebs
-  - "scripts/setup.sh"
-  - source_ami_filter
-  # --- variables.tf: input definitions unrelated to AMI filtering ---
-  - variable "instance_type" {
-  - web-keypair
-  # --- iam.tf: instance profile attached to same instance but orthogonal ---
-  - web-instance-profile
-  - "sts:AssumeRole"
+        source_ami_filter {
+          filters = {
+            name                = "amzn2-ami-hvm-*-x86_64-gp2"
+            root-device-type    = "ebs"
+            virtualization-type = "hvm"
+          }
+          most_recent = true
+          owners      = ["amazon"]
+        }
+      }
 
-must_not_include_files:
-  - modules/worker/data.tf
-  - packer/build.pkr.hcl
-  - variables.tf
-  - security/iam.tf
+      build {
+        sources = ["source.amazon-ebs.amazon_linux"]
 
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+        provisioner "shell" {
+          script = "scripts/setup.sh"
+        }
+      }
+    variables.tf: |
+      variable "instance_type" {
+        type    = string
+        default = "t3.micro"
+      }
+
+      variable "key_name" {
+        type    = string
+        default = "web-keypair"
+      }
+    security/iam.tf: |
+      resource "aws_iam_instance_profile" "web" {
+        name = "web-instance-profile"
+        role = aws_iam_role.web.name
+      }
+
+      resource "aws_iam_role" "web" {
+        name = "web-role"
+
+        assume_role_policy = jsonencode({
+          Version = "2012-10-17"
+          Statement = [{
+            Effect    = "Allow"
+            Principal = { Service = "ec2.amazonaws.com" }
+            Action    = "sts:AssumeRole"
+          }]
+        })
+      }
+  changed_files:
+    data.tf: |
+      data "aws_ami" "amazon_linux" {
+        most_recent = true
+        owners      = ["amazon"]
+        filter {
+          name   = "name"
+          values = ["amzn2-ami-hvm-*"]
+        }
+      }
+  commit_message: Update files
+fragments:
+- id: data
+  selector:
+    path: data.tf
+    anchor: name   = "name"
+- id: data_1
+  selector:
+    path: data.tf
+    anchor: values = ["amzn2-ami-hvm-*"]
+- id: main
+  selector:
+    path: main.tf
+    anchor: data.aws_ami.amazon_linux.id
+- id: templates
+  selector:
+    path: templates.tf
+    anchor: data.aws_ami.amazon_linux.id
+- id: templates_1
+  selector:
+    path: templates.tf
+    anchor: resource "aws_launch_template" "web_fleet"
+- id: no_data
+  selector:
+    path: modules/worker/data.tf
+- id: no_build_pkr
+  selector:
+    path: packer/build.pkr.hcl
+- id: no_variables
+  selector:
+    path: variables.tf
+- id: no_iam
+  selector:
+    path: security/iam.tf
+- id: no_global_0
+  selector:
+    anchor: ubuntu
+- id: no_global_1
+  selector:
+    anchor: 099720109477
+- id: no_global_2
+  selector:
+    anchor: ubuntu-jammy
+- id: no_global_3
+  selector:
+    anchor: amazon-ebs
+- id: no_global_4
+  selector:
+    anchor: scripts/setup.sh
+- id: no_global_5
+  selector:
+    anchor: source_ami_filter
+- id: no_global_6
+  selector:
+    anchor: variable "instance_type" {
+- id: no_global_7
+  selector:
+    anchor: web-keypair
+- id: no_global_8
+  selector:
+    anchor: web-instance-profile
+- id: no_global_9
+  selector:
+    anchor: sts:AssumeRole
+oracle:
+  required:
+  - data
+  - data_1
+  - main
+  - templates
+  - templates_1
+  allowed: []
+  forbidden:
+  - no_data
+  - no_build_pkr
+  - no_variables
+  - no_iam
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9

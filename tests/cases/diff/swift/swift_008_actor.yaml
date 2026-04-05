@@ -1,306 +1,336 @@
-# Scenario: DataStore changes from a class to an actor that stores and
-# manages Item values. The reviewer sees `items.append(item)` and
-# `items.removeAll { $0.id == id }` and needs to understand Item's shape.
-#
-# Diff: Sources/Storage/DataStore.swift changes from a class with a count()
-# method to an actor with add(_:), remove(id:), getAll(), and count.
-#
-# Reviewer questions:
-#   Q1: "What is the Item type — does it have an id property for removeAll?"
-#       -> Sources/Models/Item.swift: struct Item: Identifiable { let id: String,
-#          let name: String }. Reviewer verifies .id exists for the filter.
-#
-#   Q2: "Does Item conform to Identifiable as the actor methods assume?"
-#       -> Same file: Identifiable conformance — yes.
-#
-# Not needed for comprehension:
-#   - Sources/Models/Category.swift: Another Identifiable model in Models/.
-#     STRUCTURAL TRAP: same Identifiable conformance, same id: String pattern.
-#     But DataStore only stores Item, not Category.
-#
-#   - Sources/Services/SyncService.swift: Data synchronization service.
-#     STRUCTURAL TRAP: data-adjacent domain, async methods. But doesn't
-#     reference Item or interact with DataStore.
-#
-#   - Sources/Storage/CacheStore.swift: Sibling actor in SAME directory.
-#     HARDEST TRAP: identical actor pattern with private var storage,
-#     add/remove/getAll methods. Same file location, same concurrency model.
-#     But stores CachedEntry, not Item.
-#
-#   - Sources/ViewModels/ItemListViewModel.swift: Consumes DataStore.
-#     STRUCTURAL TRAP: calls await dataStore.add(item), await dataStore.getAll().
-#     Direct consumer of every changed method. But HOW the ViewModel uses
-#     the actor doesn't help verify Item's structure.
-#
-#   - Sources/Models/Tag.swift: Another Identifiable model used elsewhere.
-#     STRUCTURAL TRAP: same pattern (struct: Identifiable, id: String).
-#     Different entity entirely.
+name: swift_008_actor
+repo:
+  initial_files:
+    Sources/Models/Item.swift: |
+      struct Item: Identifiable {
+          let id: String
+          let name: String
+      }
+    Sources/Storage/DataStore.swift: |
+      class DataStore {
+          private var items: [Item] = []
 
-max_enrichment: 10.4
-initial:
-  Sources/Models/Item.swift: |
-    struct Item: Identifiable {
-        let id: String
-        let name: String
-    }
-  Sources/Storage/DataStore.swift: |
-    class DataStore {
-        private var items: [Item] = []
+          func count() -> Int {
+              return items.count
+          }
+      }
+    Sources/Models/Category.swift: |
+      struct Category: Identifiable {
+          let id: String
+          let title: String
+          let sortOrder: Int
+          let colorHex: String
+      }
+    Sources/Services/SyncService.swift: |
+      import Foundation
 
-        func count() -> Int {
-            return items.count
-        }
-    }
-  Sources/Models/Category.swift: |
-    struct Category: Identifiable {
-        let id: String
-        let title: String
-        let sortOrder: Int
-        let colorHex: String
-    }
-  Sources/Services/SyncService.swift: |
-    import Foundation
+      class SyncService {
+          private var lastSyncDate: Date?
 
-    class SyncService {
-        private var lastSyncDate: Date?
+          func sync(endpoint: String) async throws {
+              lastSyncDate = Date()
+              print("Synced with \(endpoint)")
+          }
 
-        func sync(endpoint: String) async throws {
-            lastSyncDate = Date()
-            print("Synced with \(endpoint)")
-        }
+          func needsSync(thresholdMinutes: Int) -> Bool {
+              guard let last = lastSyncDate else { return true }
+              return Date().timeIntervalSince(last) > Double(thresholdMinutes * 60)
+          }
+      }
+    Sources/Storage/CacheStore.swift: |
+      import Foundation
 
-        func needsSync(thresholdMinutes: Int) -> Bool {
-            guard let last = lastSyncDate else { return true }
-            return Date().timeIntervalSince(last) > Double(thresholdMinutes * 60)
-        }
-    }
-  Sources/Storage/CacheStore.swift: |
-    import Foundation
+      struct CachedEntry: Identifiable {
+          let id: String
+          let data: Data
+          let expiresAt: Date
+      }
 
-    struct CachedEntry: Identifiable {
-        let id: String
-        let data: Data
-        let expiresAt: Date
-    }
+      actor CacheStore {
+          private var entries: [CachedEntry] = []
 
-    actor CacheStore {
-        private var entries: [CachedEntry] = []
+          func add(_ entry: CachedEntry) {
+              entries.append(entry)
+          }
 
-        func add(_ entry: CachedEntry) {
-            entries.append(entry)
-        }
+          func remove(id: String) {
+              entries.removeAll { $0.id == id }
+          }
 
-        func remove(id: String) {
-            entries.removeAll { $0.id == id }
-        }
+          func getAll() -> [CachedEntry] {
+              return entries
+          }
 
-        func getAll() -> [CachedEntry] {
-            return entries
-        }
+          func evictExpired() {
+              let now = Date()
+              entries.removeAll { $0.expiresAt < now }
+          }
 
-        func evictExpired() {
-            let now = Date()
-            entries.removeAll { $0.expiresAt < now }
-        }
+          var count: Int { entries.count }
+      }
+    Sources/ViewModels/ItemListViewModel.swift: |
+      import Foundation
 
-        var count: Int { entries.count }
-    }
-  Sources/ViewModels/ItemListViewModel.swift: |
-    import Foundation
+      @MainActor
+      class ItemListViewModel: ObservableObject {
+          @Published var items: [Item] = []
+          private let store: DataStore
 
-    @MainActor
-    class ItemListViewModel: ObservableObject {
-        @Published var items: [Item] = []
-        private let store: DataStore
+          init(store: DataStore) {
+              self.store = store
+          }
 
-        init(store: DataStore) {
-            self.store = store
-        }
+          func loadItems() async {
+              items = await store.getAll()
+          }
 
-        func loadItems() async {
-            items = await store.getAll()
-        }
+          func addItem(name: String) async {
+              let item = Item(id: UUID().uuidString, name: name)
+              await store.add(item)
+              await loadItems()
+          }
 
-        func addItem(name: String) async {
-            let item = Item(id: UUID().uuidString, name: name)
-            await store.add(item)
-            await loadItems()
-        }
+          func removeItem(id: String) async {
+              await store.remove(id: id)
+              await loadItems()
+          }
+      }
+    Sources/Models/Tag.swift: |
+      struct Tag: Identifiable, Hashable {
+          let id: String
+          let label: String
 
-        func removeItem(id: String) async {
-            await store.remove(id: id)
-            await loadItems()
-        }
-    }
-  Sources/Models/Tag.swift: |
-    struct Tag: Identifiable, Hashable {
-        let id: String
-        let label: String
+          static let featured = Tag(id: "featured", label: "Featured")
+          static let archived = Tag(id: "archived", label: "Archived")
+      }
+  changed_files:
+    Sources/Models/Item.swift: |
+      struct Item: Identifiable {
+          let id: String
+          let name: String
+      }
+    Sources/Storage/DataStore.swift: |
+      actor DataStore {
+          private var items: [Item] = []
 
-        static let featured = Tag(id: "featured", label: "Featured")
-        static let archived = Tag(id: "archived", label: "Archived")
-    }
+          func add(_ item: Item) {
+              items.append(item)
+          }
 
-changed:
-  Sources/Models/Item.swift: |
-    struct Item: Identifiable {
-        let id: String
-        let name: String
-    }
-  Sources/Storage/DataStore.swift: |
-    actor DataStore {
-        private var items: [Item] = []
+          func remove(id: String) {
+              items.removeAll { $0.id == id }
+          }
 
-        func add(_ item: Item) {
-            items.append(item)
-        }
+          func getAll() -> [Item] {
+              return items
+          }
 
-        func remove(id: String) {
-            items.removeAll { $0.id == id }
-        }
+          var count: Int {
+              items.count
+          }
+      }
+    Sources/Models/Category.swift: |
+      struct Category: Identifiable {
+          let id: String
+          let title: String
+          let sortOrder: Int
+          let colorHex: String
+      }
+    Sources/Services/SyncService.swift: |
+      import Foundation
 
-        func getAll() -> [Item] {
-            return items
-        }
+      class SyncService {
+          private var lastSyncDate: Date?
 
-        var count: Int {
-            items.count
-        }
-    }
-  Sources/Models/Category.swift: |
-    struct Category: Identifiable {
-        let id: String
-        let title: String
-        let sortOrder: Int
-        let colorHex: String
-    }
-  Sources/Services/SyncService.swift: |
-    import Foundation
+          func sync(endpoint: String) async throws {
+              lastSyncDate = Date()
+              print("Synced with \(endpoint)")
+          }
 
-    class SyncService {
-        private var lastSyncDate: Date?
+          func needsSync(thresholdMinutes: Int) -> Bool {
+              guard let last = lastSyncDate else { return true }
+              return Date().timeIntervalSince(last) > Double(thresholdMinutes * 60)
+          }
+      }
+    Sources/Storage/CacheStore.swift: |
+      import Foundation
 
-        func sync(endpoint: String) async throws {
-            lastSyncDate = Date()
-            print("Synced with \(endpoint)")
-        }
+      struct CachedEntry: Identifiable {
+          let id: String
+          let data: Data
+          let expiresAt: Date
+      }
 
-        func needsSync(thresholdMinutes: Int) -> Bool {
-            guard let last = lastSyncDate else { return true }
-            return Date().timeIntervalSince(last) > Double(thresholdMinutes * 60)
-        }
-    }
-  Sources/Storage/CacheStore.swift: |
-    import Foundation
+      actor CacheStore {
+          private var entries: [CachedEntry] = []
 
-    struct CachedEntry: Identifiable {
-        let id: String
-        let data: Data
-        let expiresAt: Date
-    }
+          func add(_ entry: CachedEntry) {
+              entries.append(entry)
+          }
 
-    actor CacheStore {
-        private var entries: [CachedEntry] = []
+          func remove(id: String) {
+              entries.removeAll { $0.id == id }
+          }
 
-        func add(_ entry: CachedEntry) {
-            entries.append(entry)
-        }
+          func getAll() -> [CachedEntry] {
+              return entries
+          }
 
-        func remove(id: String) {
-            entries.removeAll { $0.id == id }
-        }
+          func evictExpired() {
+              let now = Date()
+              entries.removeAll { $0.expiresAt < now }
+          }
 
-        func getAll() -> [CachedEntry] {
-            return entries
-        }
+          var count: Int { entries.count }
+      }
+    Sources/ViewModels/ItemListViewModel.swift: |
+      import Foundation
 
-        func evictExpired() {
-            let now = Date()
-            entries.removeAll { $0.expiresAt < now }
-        }
+      @MainActor
+      class ItemListViewModel: ObservableObject {
+          @Published var items: [Item] = []
+          private let store: DataStore
 
-        var count: Int { entries.count }
-    }
-  Sources/ViewModels/ItemListViewModel.swift: |
-    import Foundation
+          init(store: DataStore) {
+              self.store = store
+          }
 
-    @MainActor
-    class ItemListViewModel: ObservableObject {
-        @Published var items: [Item] = []
-        private let store: DataStore
+          func loadItems() async {
+              items = await store.getAll()
+          }
 
-        init(store: DataStore) {
-            self.store = store
-        }
+          func addItem(name: String) async {
+              let item = Item(id: UUID().uuidString, name: name)
+              await store.add(item)
+              await loadItems()
+          }
 
-        func loadItems() async {
-            items = await store.getAll()
-        }
+          func removeItem(id: String) async {
+              await store.remove(id: id)
+              await loadItems()
+          }
+      }
+    Sources/Models/Tag.swift: |
+      struct Tag: Identifiable, Hashable {
+          let id: String
+          let label: String
 
-        func addItem(name: String) async {
-            let item = Item(id: UUID().uuidString, name: name)
-            await store.add(item)
-            await loadItems()
-        }
-
-        func removeItem(id: String) async {
-            await store.remove(id: id)
-            await loadItems()
-        }
-    }
-  Sources/Models/Tag.swift: |
-    struct Tag: Identifiable, Hashable {
-        let id: String
-        let label: String
-
-        static let featured = Tag(id: "featured", label: "Featured")
-        static let archived = Tag(id: "archived", label: "Archived")
-    }
-
-must_include_files:
-  - Sources/Storage/DataStore.swift
-  - Sources/Models/Item.swift
-
-must_include_content_from:
-  Sources/Storage/DataStore.swift:
-    - "items.removeAll { $0.id == id }"
-    - "actor DataStore"
-    - "items.append(item)"
-  Sources/Models/Item.swift:
-    - "struct Item: Identifiable"
-    - "let id: String"
-    - "let name: String"
-
-must_not_include:
-  # --- Category.swift: parallel Identifiable model ---
-  - Category
-  - sortOrder
-  - colorHex
-  # --- SyncService.swift: data sync, no Item reference ---
-  - SyncService
-  - needsSync
-  # --- CacheStore.swift: HARDEST TRAP, identical actor pattern ---
-  - CacheStore
-  - CachedEntry
-  - evictExpired
-  - expiresAt
-  # --- ItemListViewModel.swift: consumer of DataStore ---
-  - ItemListViewModel
-  - loadItems
-  - addItem
-  # --- Tag.swift: another Identifiable model ---
-  - "struct Tag"
-  - featured
-  - archived
-
-must_not_include_files:
-  - Sources/Models/Category.swift
-  - Sources/Services/SyncService.swift
-  - Sources/Storage/CacheStore.swift
-  - Sources/ViewModels/ItemListViewModel.swift
-  - Sources/Models/Tag.swift
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          static let featured = Tag(id: "featured", label: "Featured")
+          static let archived = Tag(id: "archived", label: "Archived")
+      }
+  commit_message: Update files
+fragments:
+- id: datastore
+  selector:
+    path: Sources/Storage/DataStore.swift
+    anchor: items.removeAll { $0.id == id }
+- id: datastore_1
+  selector:
+    path: Sources/Storage/DataStore.swift
+    anchor: actor DataStore
+- id: datastore_2
+  selector:
+    path: Sources/Storage/DataStore.swift
+    anchor: items.append(item)
+- id: item
+  selector:
+    path: Sources/Models/Item.swift
+    anchor: 'struct Item: Identifiable'
+- id: item_1
+  selector:
+    path: Sources/Models/Item.swift
+    anchor: 'let id: String'
+- id: item_2
+  selector:
+    path: Sources/Models/Item.swift
+    anchor: 'let name: String'
+- id: no_category
+  selector:
+    path: Sources/Models/Category.swift
+- id: no_syncservice
+  selector:
+    path: Sources/Services/SyncService.swift
+- id: no_cachestore
+  selector:
+    path: Sources/Storage/CacheStore.swift
+- id: no_itemlistviewmodel
+  selector:
+    path: Sources/ViewModels/ItemListViewModel.swift
+- id: no_tag
+  selector:
+    path: Sources/Models/Tag.swift
+- id: no_global_0
+  selector:
+    anchor: Category
+- id: no_global_1
+  selector:
+    anchor: sortOrder
+- id: no_global_2
+  selector:
+    anchor: colorHex
+- id: no_global_3
+  selector:
+    anchor: SyncService
+- id: no_global_4
+  selector:
+    anchor: needsSync
+- id: no_global_5
+  selector:
+    anchor: CacheStore
+- id: no_global_6
+  selector:
+    anchor: CachedEntry
+- id: no_global_7
+  selector:
+    anchor: evictExpired
+- id: no_global_8
+  selector:
+    anchor: expiresAt
+- id: no_global_9
+  selector:
+    anchor: ItemListViewModel
+- id: no_global_10
+  selector:
+    anchor: loadItems
+- id: no_global_11
+  selector:
+    anchor: addItem
+- id: no_global_12
+  selector:
+    anchor: struct Tag
+- id: no_global_13
+  selector:
+    anchor: featured
+- id: no_global_14
+  selector:
+    anchor: archived
+oracle:
+  required:
+  - datastore
+  - datastore_1
+  - datastore_2
+  - item
+  - item_1
+  - item_2
+  allowed: []
+  forbidden:
+  - no_category
+  - no_syncservice
+  - no_cachestore
+  - no_itemlistviewmodel
+  - no_tag
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13
+  - no_global_14

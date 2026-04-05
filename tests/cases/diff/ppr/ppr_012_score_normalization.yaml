@@ -1,328 +1,324 @@
-# Scenario: two_changes_in_long_chain
-#   A 10-function chain across separate files with real import/call
-#   relationships. TWO functions at different positions change their
-#   return values:
-#     - parse_input (position 0) changes from returning raw string
-#       to returning a stripped, lowercased string
-#     - enrich_data (position 5) changes from returning dict as-is
-#       to adding a "processed" flag
-#
-#   Chain: parse_input -> validate_format -> normalize_fields ->
-#     extract_keys -> build_record -> enrich_data -> score_record ->
-#     rank_result -> filter_top -> emit_output
-#
-# Diff shows:
-#   stage0_parse.py:
-#     - return raw_text
-#     + return raw_text.strip().lower()
-#     Input sanitization added. Downstream validate_format receives
-#     cleaner strings.
-#
-#   stage5_enrich.py:
-#     - return record
-#     + return {**record, "processed": True}
-#     Adds key to dict. Downstream score_record receives wider dict.
-#
-# Reviewer questions:
-#   Q1: "Who consumes parse_input's return value directly?"
-#       -> stage1_validate.py imports parse_input, passes result to
-#         format checking. Reviewer must see whether validate_format
-#         handles lowercased input correctly (e.g. case-sensitive checks).
-#
-#   Q2: "Who consumes enrich_data's return value?"
-#       -> stage6_score.py imports enrich_data, reads dict keys to
-#         compute a score. Reviewer must check whether the extra
-#         "processed" key affects scoring logic.
-#
-#   Q3: "Is there coupling between the two changed functions?"
-#       -> They're in the same chain but 5 steps apart. The parse
-#         change propagates through intermediate stages before reaching
-#         enrich. Reviewer needs both callers to verify independently.
-#
-# Not needed for comprehension:
-#   - alt_parser.py: Defines its own parse_input() with different logic.
-#     Name collision trap.
-#
-#   - garbage_enrichment_plugin.py: Has enrich_data-like naming with
-#     GARBAGE markers. Different module entirely.
-#
-#   - stage8_filter.py / stage9_emit.py: Far downstream from both
-#     changes. Their logic doesn't help review either change.
+name: ppr_012_score_normalization
+repo:
+  initial_files:
+    stage0_parse.py: |
+      def parse_input(raw_text):
+          return raw_text
+    stage1_validate.py: |
+      from stage0_parse import parse_input
 
-max_enrichment: 22.0
-initial:
-  stage0_parse.py: |
-    def parse_input(raw_text):
-        return raw_text
+      def validate_format(raw_text):
+          parsed = parse_input(raw_text)
+          if not parsed:
+              raise ValueError("empty input")
+          return parsed
+    stage2_normalize.py: |
+      from stage1_validate import validate_format
 
-  stage1_validate.py: |
-    from stage0_parse import parse_input
+      def normalize_fields(raw_text):
+          valid = validate_format(raw_text)
+          return valid.replace(",", ";")
+    stage3_extract.py: |
+      from stage2_normalize import normalize_fields
 
-    def validate_format(raw_text):
-        parsed = parse_input(raw_text)
-        if not parsed:
-            raise ValueError("empty input")
-        return parsed
+      def extract_keys(raw_text):
+          normalized = normalize_fields(raw_text)
+          parts = normalized.split(";")
+          return {f"key_{i}": p.strip() for i, p in enumerate(parts)}
+    stage4_build.py: |
+      from stage3_extract import extract_keys
 
-  stage2_normalize.py: |
-    from stage1_validate import validate_format
+      def build_record(raw_text):
+          keys = extract_keys(raw_text)
+          keys["field_count"] = len(keys)
+          return keys
+    stage5_enrich.py: |
+      from stage4_build import build_record
 
-    def normalize_fields(raw_text):
-        valid = validate_format(raw_text)
-        return valid.replace(",", ";")
+      def enrich_data(raw_text):
+          record = build_record(raw_text)
+          record["source"] = "pipeline"
+          return record
+    stage6_score.py: |
+      from stage5_enrich import enrich_data
 
-  stage3_extract.py: |
-    from stage2_normalize import normalize_fields
+      def score_record(raw_text):
+          enriched = enrich_data(raw_text)
+          return len(enriched) * 10
+    stage7_rank.py: |
+      from stage6_score import score_record
 
-    def extract_keys(raw_text):
-        normalized = normalize_fields(raw_text)
-        parts = normalized.split(";")
-        return {f"key_{i}": p.strip() for i, p in enumerate(parts)}
+      def rank_result(raw_text):
+          score = score_record(raw_text)
+          if score > 50:
+              return "high"
+          return "low"
+    stage8_filter.py: |
+      from stage7_rank import rank_result
+      GARBAGE_PPR012_FILTER_A = "filter_stage"
+      GARBAGE_PPR012_FILTER_B = 0
 
-  stage4_build.py: |
-    from stage3_extract import extract_keys
+      def filter_top(raw_text):
+          rank = rank_result(raw_text)
+          GARBAGE_PPR012_FILTER_C = True
+          return rank == "high"
+    stage9_emit.py: |
+      from stage8_filter import filter_top
+      GARBAGE_PPR012_EMIT_D = "emit_stage"
+      GARBAGE_PPR012_EMIT_E = []
 
-    def build_record(raw_text):
-        keys = extract_keys(raw_text)
-        keys["field_count"] = len(keys)
-        return keys
+      def emit_output(raw_text):
+          accepted = filter_top(raw_text)
+          GARBAGE_PPR012_EMIT_F = "done"
+          return {"accepted": accepted, "text": raw_text}
+    alt_parser.py: |
+      GARBAGE_PPR012_ALT_G = "alt_parser"
+      GARBAGE_PPR012_ALT_H = True
 
-  stage5_enrich.py: |
-    from stage4_build import build_record
+      def parse_input(text):
+          GARBAGE_PPR012_ALT_I = ":"
+          return text.split(GARBAGE_PPR012_ALT_I)
 
-    def enrich_data(raw_text):
-        record = build_record(raw_text)
-        record["source"] = "pipeline"
-        return record
+      class AltParseEngine:
+          GARBAGE_PPR012_ALT_J = "engine"
 
-  stage6_score.py: |
-    from stage5_enrich import enrich_data
+          def run(self, text):
+              return parse_input(text)
+    garbage_enrichment_plugin.py: |
+      GARBAGE_PPR012_PLUG_K = "enrichment_plugin"
+      GARBAGE_PPR012_PLUG_L = False
 
-    def score_record(raw_text):
-        enriched = enrich_data(raw_text)
-        return len(enriched) * 10
+      def enrich_data(record):
+          GARBAGE_PPR012_PLUG_M = "extra"
+          record[GARBAGE_PPR012_PLUG_M] = True
+          return record
 
-  stage7_rank.py: |
-    from stage6_score import score_record
+      class EnrichmentPlugin:
+          GARBAGE_PPR012_PLUG_N = 1
 
-    def rank_result(raw_text):
-        score = score_record(raw_text)
-        if score > 50:
-            return "high"
-        return "low"
+          def apply(self, record):
+              return enrich_data(record)
+  changed_files:
+    stage0_parse.py: |
+      def parse_input(raw_text):
+          return raw_text.strip().lower()
+    stage1_validate.py: |
+      from stage0_parse import parse_input
 
-  stage8_filter.py: |
-    from stage7_rank import rank_result
-    GARBAGE_PPR012_FILTER_A = "filter_stage"
-    GARBAGE_PPR012_FILTER_B = 0
+      def validate_format(raw_text):
+          parsed = parse_input(raw_text)
+          if not parsed:
+              raise ValueError("empty input")
+          return parsed
+    stage2_normalize.py: |
+      from stage1_validate import validate_format
 
-    def filter_top(raw_text):
-        rank = rank_result(raw_text)
-        GARBAGE_PPR012_FILTER_C = True
-        return rank == "high"
+      def normalize_fields(raw_text):
+          valid = validate_format(raw_text)
+          return valid.replace(",", ";")
+    stage3_extract.py: |
+      from stage2_normalize import normalize_fields
 
-  stage9_emit.py: |
-    from stage8_filter import filter_top
-    GARBAGE_PPR012_EMIT_D = "emit_stage"
-    GARBAGE_PPR012_EMIT_E = []
+      def extract_keys(raw_text):
+          normalized = normalize_fields(raw_text)
+          parts = normalized.split(";")
+          return {f"key_{i}": p.strip() for i, p in enumerate(parts)}
+    stage4_build.py: |
+      from stage3_extract import extract_keys
 
-    def emit_output(raw_text):
-        accepted = filter_top(raw_text)
-        GARBAGE_PPR012_EMIT_F = "done"
-        return {"accepted": accepted, "text": raw_text}
+      def build_record(raw_text):
+          keys = extract_keys(raw_text)
+          keys["field_count"] = len(keys)
+          return keys
+    stage5_enrich.py: |
+      from stage4_build import build_record
 
-  alt_parser.py: |
-    GARBAGE_PPR012_ALT_G = "alt_parser"
-    GARBAGE_PPR012_ALT_H = True
+      def enrich_data(raw_text):
+          record = build_record(raw_text)
+          record["source"] = "pipeline"
+          return {**record, "processed": True}
+    stage6_score.py: |
+      from stage5_enrich import enrich_data
 
-    def parse_input(text):
-        GARBAGE_PPR012_ALT_I = ":"
-        return text.split(GARBAGE_PPR012_ALT_I)
+      def score_record(raw_text):
+          enriched = enrich_data(raw_text)
+          return len(enriched) * 10
+    stage7_rank.py: |
+      from stage6_score import score_record
 
-    class AltParseEngine:
-        GARBAGE_PPR012_ALT_J = "engine"
+      def rank_result(raw_text):
+          score = score_record(raw_text)
+          if score > 50:
+              return "high"
+          return "low"
+    stage8_filter.py: |
+      from stage7_rank import rank_result
+      GARBAGE_PPR012_FILTER_A = "filter_stage"
+      GARBAGE_PPR012_FILTER_B = 0
 
-        def run(self, text):
-            return parse_input(text)
+      def filter_top(raw_text):
+          rank = rank_result(raw_text)
+          GARBAGE_PPR012_FILTER_C = True
+          return rank == "high"
+    stage9_emit.py: |
+      from stage8_filter import filter_top
+      GARBAGE_PPR012_EMIT_D = "emit_stage"
+      GARBAGE_PPR012_EMIT_E = []
 
-  garbage_enrichment_plugin.py: |
-    GARBAGE_PPR012_PLUG_K = "enrichment_plugin"
-    GARBAGE_PPR012_PLUG_L = False
+      def emit_output(raw_text):
+          accepted = filter_top(raw_text)
+          GARBAGE_PPR012_EMIT_F = "done"
+          return {"accepted": accepted, "text": raw_text}
+    alt_parser.py: |
+      GARBAGE_PPR012_ALT_G = "alt_parser"
+      GARBAGE_PPR012_ALT_H = True
 
-    def enrich_data(record):
-        GARBAGE_PPR012_PLUG_M = "extra"
-        record[GARBAGE_PPR012_PLUG_M] = True
-        return record
+      def parse_input(text):
+          GARBAGE_PPR012_ALT_I = ":"
+          return text.split(GARBAGE_PPR012_ALT_I)
 
-    class EnrichmentPlugin:
-        GARBAGE_PPR012_PLUG_N = 1
+      class AltParseEngine:
+          GARBAGE_PPR012_ALT_J = "engine"
 
-        def apply(self, record):
-            return enrich_data(record)
+          def run(self, text):
+              return parse_input(text)
+    garbage_enrichment_plugin.py: |
+      GARBAGE_PPR012_PLUG_K = "enrichment_plugin"
+      GARBAGE_PPR012_PLUG_L = False
 
-changed:
-  stage0_parse.py: |
-    def parse_input(raw_text):
-        return raw_text.strip().lower()
+      def enrich_data(record):
+          GARBAGE_PPR012_PLUG_M = "extra"
+          record[GARBAGE_PPR012_PLUG_M] = True
+          return record
 
-  stage1_validate.py: |
-    from stage0_parse import parse_input
+      class EnrichmentPlugin:
+          GARBAGE_PPR012_PLUG_N = 1
 
-    def validate_format(raw_text):
-        parsed = parse_input(raw_text)
-        if not parsed:
-            raise ValueError("empty input")
-        return parsed
-
-  stage2_normalize.py: |
-    from stage1_validate import validate_format
-
-    def normalize_fields(raw_text):
-        valid = validate_format(raw_text)
-        return valid.replace(",", ";")
-
-  stage3_extract.py: |
-    from stage2_normalize import normalize_fields
-
-    def extract_keys(raw_text):
-        normalized = normalize_fields(raw_text)
-        parts = normalized.split(";")
-        return {f"key_{i}": p.strip() for i, p in enumerate(parts)}
-
-  stage4_build.py: |
-    from stage3_extract import extract_keys
-
-    def build_record(raw_text):
-        keys = extract_keys(raw_text)
-        keys["field_count"] = len(keys)
-        return keys
-
-  stage5_enrich.py: |
-    from stage4_build import build_record
-
-    def enrich_data(raw_text):
-        record = build_record(raw_text)
-        record["source"] = "pipeline"
-        return {**record, "processed": True}
-
-  stage6_score.py: |
-    from stage5_enrich import enrich_data
-
-    def score_record(raw_text):
-        enriched = enrich_data(raw_text)
-        return len(enriched) * 10
-
-  stage7_rank.py: |
-    from stage6_score import score_record
-
-    def rank_result(raw_text):
-        score = score_record(raw_text)
-        if score > 50:
-            return "high"
-        return "low"
-
-  stage8_filter.py: |
-    from stage7_rank import rank_result
-    GARBAGE_PPR012_FILTER_A = "filter_stage"
-    GARBAGE_PPR012_FILTER_B = 0
-
-    def filter_top(raw_text):
-        rank = rank_result(raw_text)
-        GARBAGE_PPR012_FILTER_C = True
-        return rank == "high"
-
-  stage9_emit.py: |
-    from stage8_filter import filter_top
-    GARBAGE_PPR012_EMIT_D = "emit_stage"
-    GARBAGE_PPR012_EMIT_E = []
-
-    def emit_output(raw_text):
-        accepted = filter_top(raw_text)
-        GARBAGE_PPR012_EMIT_F = "done"
-        return {"accepted": accepted, "text": raw_text}
-
-  alt_parser.py: |
-    GARBAGE_PPR012_ALT_G = "alt_parser"
-    GARBAGE_PPR012_ALT_H = True
-
-    def parse_input(text):
-        GARBAGE_PPR012_ALT_I = ":"
-        return text.split(GARBAGE_PPR012_ALT_I)
-
-    class AltParseEngine:
-        GARBAGE_PPR012_ALT_J = "engine"
-
-        def run(self, text):
-            return parse_input(text)
-
-  garbage_enrichment_plugin.py: |
-    GARBAGE_PPR012_PLUG_K = "enrichment_plugin"
-    GARBAGE_PPR012_PLUG_L = False
-
-    def enrich_data(record):
-        GARBAGE_PPR012_PLUG_M = "extra"
-        record[GARBAGE_PPR012_PLUG_M] = True
-        return record
-
-    class EnrichmentPlugin:
-        GARBAGE_PPR012_PLUG_N = 1
-
-        def apply(self, record):
-            return enrich_data(record)
-
-# === Assertions ===
-
-must_include_files:
-  # Both changed files must appear
-  - stage0_parse.py
-  - stage5_enrich.py
-  # Q1: immediate caller of parse_input — reviewer checks case sensitivity
-  - stage1_validate.py
-  # Q2: immediate caller of enrich_data — reviewer checks dict key handling
-  - stage6_score.py
-
-must_include_content_from:
-  stage0_parse.py:
-    - "def parse_input(raw_text):"
-    - "return raw_text.strip().lower()"
-  stage1_validate.py:
-    - "from stage0_parse import parse_input"
-    - "parsed = parse_input(raw_text)"
-  stage5_enrich.py:
-    - "def enrich_data(raw_text):"
-    - '"processed": True'
-  stage6_score.py:
-    - "from stage5_enrich import enrich_data"
-    - "enriched = enrich_data(raw_text)"
-
-must_not_include:
-  # --- alt_parser.py: name collision, own parse_input() ---
-  - GARBAGE_PPR012_ALT_G
-  - GARBAGE_PPR012_ALT_H
-  - GARBAGE_PPR012_ALT_I
-  - GARBAGE_PPR012_ALT_J
-  - AltParseEngine
-  # --- garbage_enrichment_plugin.py: name collision, own enrich_data() ---
-  - GARBAGE_PPR012_PLUG_K
-  - GARBAGE_PPR012_PLUG_L
-  - GARBAGE_PPR012_PLUG_M
-  - GARBAGE_PPR012_PLUG_N
-  - EnrichmentPlugin
-  # --- stage8/stage9: far downstream, no direct relevance ---
-  - GARBAGE_PPR012_FILTER_A
-  - GARBAGE_PPR012_FILTER_B
-  - GARBAGE_PPR012_FILTER_C
-  - GARBAGE_PPR012_EMIT_D
-  - GARBAGE_PPR012_EMIT_E
-  - GARBAGE_PPR012_EMIT_F
-
-must_not_include_files:
-  - alt_parser.py
-  - garbage_enrichment_plugin.py
-  - stage8_filter.py
-  - stage9_emit.py
-
-max_fragments: 8
-max_files: 6
-add_garbage_files: false
-skip_garbage_check: true
+          def apply(self, record):
+              return enrich_data(record)
+  commit_message: Update files
+fragments:
+- id: stage0_parse
+  selector:
+    path: stage0_parse.py
+    anchor: 'def parse_input(raw_text):'
+- id: stage0_parse_1
+  selector:
+    path: stage0_parse.py
+    anchor: return raw_text.strip().lower()
+- id: stage1_validate
+  selector:
+    path: stage1_validate.py
+    anchor: from stage0_parse import parse_input
+- id: stage1_validate_1
+  selector:
+    path: stage1_validate.py
+    anchor: parsed = parse_input(raw_text)
+- id: stage5_enrich
+  selector:
+    path: stage5_enrich.py
+    anchor: 'def enrich_data(raw_text):'
+- id: stage5_enrich_1
+  selector:
+    path: stage5_enrich.py
+    anchor: '"processed": True'
+- id: stage6_score
+  selector:
+    path: stage6_score.py
+    anchor: from stage5_enrich import enrich_data
+- id: stage6_score_1
+  selector:
+    path: stage6_score.py
+    anchor: enriched = enrich_data(raw_text)
+- id: no_alt_parser
+  selector:
+    path: alt_parser.py
+- id: no_garbage_enrichment_plugin
+  selector:
+    path: garbage_enrichment_plugin.py
+- id: no_stage8_filter
+  selector:
+    path: stage8_filter.py
+- id: no_stage9_emit
+  selector:
+    path: stage9_emit.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_PPR012_ALT_G
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_PPR012_ALT_H
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_PPR012_ALT_I
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_PPR012_ALT_J
+- id: no_global_4
+  selector:
+    anchor: AltParseEngine
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_PPR012_PLUG_K
+- id: no_global_6
+  selector:
+    anchor: GARBAGE_PPR012_PLUG_L
+- id: no_global_7
+  selector:
+    anchor: GARBAGE_PPR012_PLUG_M
+- id: no_global_8
+  selector:
+    anchor: GARBAGE_PPR012_PLUG_N
+- id: no_global_9
+  selector:
+    anchor: EnrichmentPlugin
+- id: no_global_10
+  selector:
+    anchor: GARBAGE_PPR012_FILTER_A
+- id: no_global_11
+  selector:
+    anchor: GARBAGE_PPR012_FILTER_B
+- id: no_global_12
+  selector:
+    anchor: GARBAGE_PPR012_FILTER_C
+- id: no_global_13
+  selector:
+    anchor: GARBAGE_PPR012_EMIT_D
+- id: no_global_14
+  selector:
+    anchor: GARBAGE_PPR012_EMIT_E
+- id: no_global_15
+  selector:
+    anchor: GARBAGE_PPR012_EMIT_F
+oracle:
+  required:
+  - stage0_parse
+  - stage0_parse_1
+  - stage1_validate
+  - stage1_validate_1
+  - stage5_enrich
+  - stage5_enrich_1
+  - stage6_score
+  - stage6_score_1
+  allowed: []
+  forbidden:
+  - no_alt_parser
+  - no_garbage_enrichment_plugin
+  - no_stage8_filter
+  - no_stage9_emit
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13
+  - no_global_14
+  - no_global_15

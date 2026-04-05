@@ -1,16 +1,25 @@
-max_enrichment: 3.0
-initial:
-  bom.py: |
-    pass
-changed:
-  bom.py: |
-    import os
+name: internals_050_utf8_bom_import
+repo:
+  initial_files:
+    bom.py: |
+      pass
+  changed_files:
+    bom.py: |
+      import os
 
-    def main():
-        return os.getcwd()
-must_include_files:
-- bom.py
-must_include_content:
-- return os.getcwd()
-add_garbage_files: false
-skip_garbage_check: true
+      def main():
+          return os.getcwd()
+  commit_message: Update files
+fragments:
+- id: bom_file
+  selector:
+    path: bom.py
+- id: req_global_0
+  selector:
+    anchor: return os.getcwd()
+oracle:
+  required:
+  - bom_file
+  - req_global_0
+  allowed: []
+  forbidden: []

@@ -1,163 +1,172 @@
-# Test 036: Registry adds _default_handler variable and set_default function
-#           — reviewer needs get_handler which now uses _default_handler fallback
-#
-# Scenario: registry.py adds `_default_handler = None` module variable and
-# set_default() function. get_handler() changes from `.get(name)` to
-# `.get(name, _default_handler)` to use it as fallback.
-#
-# Reviewer questions:
-#   Q1: "Where is _default_handler used as fallback?"
-#       -> get_handler() returns _handlers.get(name, _default_handler).
-#   Q2: "How is _default_handler set?"
-#       -> Via new set_default(handler) function using `global`.
-#
-# Trap files (plausible but unrelated):
-#   - dispatcher.py: event dispatch pattern with similar register/get and
-#     default handler concept but independent module.
-#   - plugin_loader.py: plugin registration with handlers dict and similar
-#     vocabulary but no dependency on registry.py.
+name: patterns_036_intra_private_module_variable
+repo:
+  initial_files:
+    registry.py: |
+      _handlers = {}
+      _initialized = False
 
-max_enrichment: 6.8
-initial:
-  registry.py: |
-    _handlers = {}
-    _initialized = False
+      def register(name, handler):
+          global _initialized
+          if not _initialized:
+              _initialize()
+          _handlers[name] = handler
 
-    def register(name, handler):
-        global _initialized
-        if not _initialized:
-            _initialize()
-        _handlers[name] = handler
+      def get_handler(name):
+          return _handlers.get(name)
 
-    def get_handler(name):
-        return _handlers.get(name)
+      def _initialize():
+          global _initialized
+          _handlers.clear()
+          _initialized = True
 
-    def _initialize():
-        global _initialized
-        _handlers.clear()
-        _initialized = True
+      def list_handlers():
+          return list(_handlers.keys())
+    dispatcher.py: |
+      _listeners = {}
+      _default_listener = None
 
-    def list_handlers():
-        return list(_handlers.keys())
-  dispatcher.py: |
-    _listeners = {}
-    _default_listener = None
+      def on(event, listener):
+          if event not in _listeners:
+              _listeners[event] = []
+          _listeners[event].append(listener)
 
-    def on(event, listener):
-        if event not in _listeners:
-            _listeners[event] = []
-        _listeners[event].append(listener)
+      def emit(event, data=None):
+          handlers = _listeners.get(event, [])
+          if not handlers and _default_listener:
+              return _default_listener(event, data)
+          for handler in handlers:
+              handler(data)
 
-    def emit(event, data=None):
-        handlers = _listeners.get(event, [])
-        if not handlers and _default_listener:
-            return _default_listener(event, data)
-        for handler in handlers:
-            handler(data)
+      def set_default_listener(listener):
+          global _default_listener
+          _default_listener = listener
+    plugin_loader.py: |
+      _plugins = {}
 
-    def set_default_listener(listener):
-        global _default_listener
-        _default_listener = listener
-  plugin_loader.py: |
-    _plugins = {}
+      def register_plugin(name, plugin):
+          _plugins[name] = plugin
 
-    def register_plugin(name, plugin):
-        _plugins[name] = plugin
+      def get_plugin(name):
+          return _plugins.get(name)
 
-    def get_plugin(name):
-        return _plugins.get(name)
+      def list_plugins():
+          return list(_plugins.keys())
 
-    def list_plugins():
-        return list(_plugins.keys())
+      def unload_plugin(name):
+          return _plugins.pop(name, None)
+  changed_files:
+    registry.py: |
+      _handlers = {}
+      _initialized = False
+      _default_handler = None
 
-    def unload_plugin(name):
-        return _plugins.pop(name, None)
+      def register(name, handler):
+          global _initialized
+          if not _initialized:
+              _initialize()
+          _handlers[name] = handler
 
-changed:
-  registry.py: |
-    _handlers = {}
-    _initialized = False
-    _default_handler = None
+      def get_handler(name):
+          return _handlers.get(name, _default_handler)
 
-    def register(name, handler):
-        global _initialized
-        if not _initialized:
-            _initialize()
-        _handlers[name] = handler
+      def _initialize():
+          global _initialized
+          _handlers.clear()
+          _initialized = True
 
-    def get_handler(name):
-        return _handlers.get(name, _default_handler)
+      def list_handlers():
+          return list(_handlers.keys())
 
-    def _initialize():
-        global _initialized
-        _handlers.clear()
-        _initialized = True
+      def set_default(handler):
+          global _default_handler
+          _default_handler = handler
+    dispatcher.py: |
+      _listeners = {}
+      _default_listener = None
 
-    def list_handlers():
-        return list(_handlers.keys())
+      def on(event, listener):
+          if event not in _listeners:
+              _listeners[event] = []
+          _listeners[event].append(listener)
 
-    def set_default(handler):
-        global _default_handler
-        _default_handler = handler
-  dispatcher.py: |
-    _listeners = {}
-    _default_listener = None
+      def emit(event, data=None):
+          handlers = _listeners.get(event, [])
+          if not handlers and _default_listener:
+              return _default_listener(event, data)
+          for handler in handlers:
+              handler(data)
 
-    def on(event, listener):
-        if event not in _listeners:
-            _listeners[event] = []
-        _listeners[event].append(listener)
+      def set_default_listener(listener):
+          global _default_listener
+          _default_listener = listener
+    plugin_loader.py: |
+      _plugins = {}
 
-    def emit(event, data=None):
-        handlers = _listeners.get(event, [])
-        if not handlers and _default_listener:
-            return _default_listener(event, data)
-        for handler in handlers:
-            handler(data)
+      def register_plugin(name, plugin):
+          _plugins[name] = plugin
 
-    def set_default_listener(listener):
-        global _default_listener
-        _default_listener = listener
-  plugin_loader.py: |
-    _plugins = {}
+      def get_plugin(name):
+          return _plugins.get(name)
 
-    def register_plugin(name, plugin):
-        _plugins[name] = plugin
+      def list_plugins():
+          return list(_plugins.keys())
 
-    def get_plugin(name):
-        return _plugins.get(name)
-
-    def list_plugins():
-        return list(_plugins.keys())
-
-    def unload_plugin(name):
-        return _plugins.pop(name, None)
-
-must_include_files:
-  - registry.py
-
-must_include_content_from:
-  registry.py:
-    - "_default_handler = None"
-    - "return _handlers.get(name, _default_handler)"
-    - "def set_default(handler):"
-
-must_not_include:
-  # --- dispatcher.py: similar default handler pattern but event dispatch ---
-  - "_listeners"
-  - "_default_listener"
-  - "set_default_listener"
-  - "def emit"
-  # --- plugin_loader.py: similar register/get pattern but plugins ---
-  - "register_plugin"
-  - "get_plugin"
-  - "unload_plugin"
-
-must_not_include_files:
-  - dispatcher.py
-  - plugin_loader.py
-
-max_fragments: 4
-max_files: 1
-add_garbage_files: false
-skip_garbage_check: true
+      def unload_plugin(name):
+          return _plugins.pop(name, None)
+  commit_message: Update files
+fragments:
+- id: registry
+  selector:
+    path: registry.py
+    anchor: _default_handler = None
+- id: registry_1
+  selector:
+    path: registry.py
+    anchor: return _handlers.get(name, _default_handler)
+- id: registry_2
+  selector:
+    path: registry.py
+    anchor: 'def set_default(handler):'
+- id: no_dispatcher
+  selector:
+    path: dispatcher.py
+- id: no_plugin_loader
+  selector:
+    path: plugin_loader.py
+- id: no_global_0
+  selector:
+    anchor: _listeners
+- id: no_global_1
+  selector:
+    anchor: _default_listener
+- id: no_global_2
+  selector:
+    anchor: set_default_listener
+- id: no_global_3
+  selector:
+    anchor: def emit
+- id: no_global_4
+  selector:
+    anchor: register_plugin
+- id: no_global_5
+  selector:
+    anchor: get_plugin
+- id: no_global_6
+  selector:
+    anchor: unload_plugin
+oracle:
+  required:
+  - registry
+  - registry_1
+  - registry_2
+  allowed: []
+  forbidden:
+  - no_dispatcher
+  - no_plugin_loader
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6

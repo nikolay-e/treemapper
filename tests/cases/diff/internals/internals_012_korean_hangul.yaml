@@ -1,16 +1,25 @@
-max_enrichment: 3.7
-initial:
-  korean.py: |
-    def placeholder():
-        pass
-changed:
-  korean.py: |
-    def handler():
-        message = "안녕하세요"
-        return message
-must_include_files:
-- korean.py
-must_include_content:
-- 'def handler():'
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_012_korean_hangul
+repo:
+  initial_files:
+    korean.py: |
+      def placeholder():
+          pass
+  changed_files:
+    korean.py: |
+      def handler():
+          message = "안녕하세요"
+          return message
+  commit_message: Update files
+fragments:
+- id: korean_file
+  selector:
+    path: korean.py
+- id: req_global_0
+  selector:
+    anchor: 'def handler():'
+oracle:
+  required:
+  - korean_file
+  - req_global_0
+  allowed: []
+  forbidden: []

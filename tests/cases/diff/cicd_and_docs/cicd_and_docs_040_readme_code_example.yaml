@@ -1,288 +1,280 @@
-# Test: README documentation update discovers defining code via rare-identifier expansion
-#
-# Scenario: README.md adds usage documentation and API reference for `wavelet_decompose`.
-# The diff introduces distinctive function names in code examples.
-#
-# Discovery chain under test:
-# 1. concepts_from_diff_text extracts "wavelet_decompose", "chirp_synthesis"
-#    (not in CODE_STOPWORDS, unlike "process"/"transform" from the original test)
-# 2. _expand_universe_by_rare_identifiers builds inverted index of candidate files
-#    - "wavelet_decompose" appears in: __init__.py, analysis.py, CHANGELOG.md = 3 files
-#    - 3 ≤ _RARE_THRESHOLD(3) AND > 0 → expansion triggers
-# 3. analysis.py discovered, fragmented by PythonAstStrategy/TreeSitterStrategy
-#    - Fragment kind="function", symbol_name="wavelet_decompose"
-# 4. _collect_diff_line_needs: `wavelet_decompose(` matches _CALL_RE
-#    → InformationNeed("definition", "wavelet_decompose", None, 1.0)
-# 5. _match_strength_typed: analysis.py defines wavelet_decompose → 1.0
-#    CHANGELOG.md only mentions it → 0.3
-# 6. Greedy selector picks analysis.py. After selection, phi(max_a) is high,
-#    CHANGELOG's marginal gain for same need → ~0 (diminishing returns).
-#
-# Traps (all use natural identifiers, no artificial GARBAGE_ markers):
-# 1. CHANGELOG.md — discovered by same rare expansion (shares wavelet_decompose),
-#    but only MENTIONS it (match_strength 0.3). After analysis.py satisfies the
-#    "definition" need, CHANGELOG's marginal gain drops to ~0.
-# 2. src/spectralkit/signal_filters.py — same package directory creates sibling
-#    edges (weight 0.05 via SiblingEdgeBuilder), but no shared rare identifiers
-#    → NOT discovered by expansion. Low PPR mass from weak sibling edges.
-# 3. docs/architecture.md — markdown file with no shared identifiers → NOT
-#    discovered. No edge builder connects unrelated .md files.
+name: cicd_and_docs_040_readme_code_example
+repo:
+  initial_files:
+    README.md: |
+      # SpectralKit
 
-max_enrichment: 7.7
-initial:
-  README.md: |
-    # SpectralKit
+      A Python library for spectral analysis and signal processing.
 
-    A Python library for spectral analysis and signal processing.
+      ## Installation
 
-    ## Installation
+      ```bash
+      pip install spectralkit
+      ```
 
-    ```bash
-    pip install spectralkit
-    ```
+      ## Quick Start
 
-    ## Quick Start
+      ```python
+      from spectralkit import chirp_synthesis
 
-    ```python
-    from spectralkit import chirp_synthesis
+      signal = chirp_synthesis(duration=1.0, freq_start=20, freq_end=2000)
+      ```
+    src/spectralkit/__init__.py: |
+      from .analysis import chirp_synthesis, wavelet_decompose
 
-    signal = chirp_synthesis(duration=1.0, freq_start=20, freq_end=2000)
-    ```
-  src/spectralkit/__init__.py: |
-    from .analysis import chirp_synthesis, wavelet_decompose
+      __all__ = ['chirp_synthesis', 'wavelet_decompose']
+    src/spectralkit/analysis.py: |
+      import numpy as np
 
-    __all__ = ['chirp_synthesis', 'wavelet_decompose']
-  src/spectralkit/analysis.py: |
-    import numpy as np
+      def chirp_synthesis(duration: float, freq_start: float, freq_end: float) -> np.ndarray:
+          """Generate a linear chirp signal sweeping between two frequencies."""
+          sample_rate = 44100
+          t = np.linspace(0, duration, int(sample_rate * duration))
+          freq = np.linspace(freq_start, freq_end, len(t))
+          return np.sin(2 * np.pi * np.cumsum(freq) / sample_rate)
 
-    def chirp_synthesis(duration: float, freq_start: float, freq_end: float) -> np.ndarray:
-        """Generate a linear chirp signal sweeping between two frequencies."""
-        sample_rate = 44100
-        t = np.linspace(0, duration, int(sample_rate * duration))
-        freq = np.linspace(freq_start, freq_end, len(t))
-        return np.sin(2 * np.pi * np.cumsum(freq) / sample_rate)
+      def wavelet_decompose(signal: np.ndarray, scales: int = 8) -> list:
+          """Perform continuous wavelet transform using Morlet wavelets."""
+          coefficients = []
+          for scale in range(1, scales + 1):
+              wavelet = np.exp(-0.5 * (np.arange(len(signal)) / scale) ** 2)
+              coeff = np.convolve(signal, wavelet, mode='same')
+              coefficients.append(coeff)
+          return coefficients
+    CHANGELOG.md: |
+      # Changelog
 
-    def wavelet_decompose(signal: np.ndarray, scales: int = 8) -> list:
-        """Perform continuous wavelet transform using Morlet wavelets."""
-        coefficients = []
-        for scale in range(1, scales + 1):
-            wavelet = np.exp(-0.5 * (np.arange(len(signal)) / scale) ** 2)
-            coeff = np.convolve(signal, wavelet, mode='same')
-            coefficients.append(coeff)
-        return coefficients
-  # --- Trap 1: CHANGELOG shares rare identifiers but only mentions them ---
-  # Discovered by rare-identifier expansion (wavelet_decompose count ≤ 3),
-  # but _match_strength_typed returns 0.3 (mentions, not defines).
-  # After analysis.py satisfies the need, diminishing returns exclude this.
-  CHANGELOG.md: |
-    # Changelog
+      ## v2.0.0 (2026-01-15)
 
-    ## v2.0.0 (2026-01-15)
+      - Added `wavelet_decompose` for continuous wavelet transform analysis
+      - Improved `chirp_synthesis` frequency sweep accuracy by 15%
+      - Breaking: removed deprecated `fft_analyze` function
+      - Updated NumPy dependency to >=1.26
 
-    - Added `wavelet_decompose` for continuous wavelet transform analysis
-    - Improved `chirp_synthesis` frequency sweep accuracy by 15%
-    - Breaking: removed deprecated `fft_analyze` function
-    - Updated NumPy dependency to >=1.26
+      ## v1.0.0 (2025-06-01)
 
-    ## v1.0.0 (2025-06-01)
+      - Initial release with `chirp_synthesis` signal generation
+    src/spectralkit/signal_filters.py: |
+      import numpy as np
 
-    - Initial release with `chirp_synthesis` signal generation
-  # --- Trap 2: Same package, sibling edges only, no shared rare identifiers ---
-  # SiblingEdgeBuilder creates weight=0.05 edges between files in same dir.
-  # But "butterworth" and "bandpass" don't appear in the diff → no information
-  # need match, no rare-identifier discovery. PPR mass via sibling edges
-  # is negligible (0.05 weight, alpha=0.60 means ~40% restart).
-  src/spectralkit/signal_filters.py: |
-    import numpy as np
+      class ButterworthFilter:
+          """Digital Butterworth filter implementation."""
 
-    class ButterworthFilter:
-        """Digital Butterworth filter implementation."""
+          def __init__(self, order: int, cutoff_freq: float, sample_rate: float):
+              self.order = order
+              self.cutoff_freq = cutoff_freq
+              self.sample_rate = sample_rate
 
-        def __init__(self, order: int, cutoff_freq: float, sample_rate: float):
-            self.order = order
-            self.cutoff_freq = cutoff_freq
-            self.sample_rate = sample_rate
+          def bandpass(self, signal: np.ndarray, low: float, high: float) -> np.ndarray:
+              """Apply bandpass filter between low and high frequencies."""
+              return signal
 
-        def bandpass(self, signal: np.ndarray, low: float, high: float) -> np.ndarray:
-            """Apply bandpass filter between low and high frequencies."""
-            return signal
+          def lowpass(self, signal: np.ndarray) -> np.ndarray:
+              """Apply lowpass filter at cutoff frequency."""
+              return signal
+    docs/architecture.md: |
+      # Architecture
 
-        def lowpass(self, signal: np.ndarray) -> np.ndarray:
-            """Apply lowpass filter at cutoff frequency."""
-            return signal
-  # --- Trap 3: Markdown file with zero identifier overlap ---
-  # No edge builder connects unrelated .md files. DocumentStructureEdgeBuilder
-  # only links sections WITHIN the same file. No shared identifiers means
-  # no lexical edges and no rare-identifier discovery.
-  docs/architecture.md: |
-    # Architecture
+      ## Plugin System
 
-    ## Plugin System
+      SpectralKit uses a modular pipeline architecture where each processing
+      step is a composable plugin registered with the PluginRegistry.
 
-    SpectralKit uses a modular pipeline architecture where each processing
-    step is a composable plugin registered with the PluginRegistry.
+      ## Data Flow
 
-    ## Data Flow
+      Raw input → Preprocessor → AnalysisChain → PostProcessor → Output
 
-    Raw input → Preprocessor → AnalysisChain → PostProcessor → Output
+      Each stage communicates via immutable SignalFrame objects carrying
+      metadata alongside the sample data.
+  changed_files:
+    README.md: |
+      # SpectralKit
 
-    Each stage communicates via immutable SignalFrame objects carrying
-    metadata alongside the sample data.
+      A Python library for spectral analysis and signal processing.
 
-changed:
-  README.md: |
-    # SpectralKit
+      ## Installation
 
-    A Python library for spectral analysis and signal processing.
+      ```bash
+      pip install spectralkit
+      ```
 
-    ## Installation
+      ## Quick Start
 
-    ```bash
-    pip install spectralkit
-    ```
+      ```python
+      from spectralkit import chirp_synthesis, wavelet_decompose
 
-    ## Quick Start
+      # Generate a test signal
+      signal = chirp_synthesis(duration=1.0, freq_start=20, freq_end=2000)
 
-    ```python
-    from spectralkit import chirp_synthesis, wavelet_decompose
+      # Decompose with continuous wavelet transform
+      coefficients = wavelet_decompose(signal, scales=12)
+      ```
 
-    # Generate a test signal
-    signal = chirp_synthesis(duration=1.0, freq_start=20, freq_end=2000)
+      ## API Reference
 
-    # Decompose with continuous wavelet transform
-    coefficients = wavelet_decompose(signal, scales=12)
-    ```
+      See [Quick Start](#quick-start) for basic examples.
 
-    ## API Reference
+      ### chirp_synthesis
 
-    See [Quick Start](#quick-start) for basic examples.
+      Generates a linear chirp signal sweeping from `freq_start` to `freq_end`
+      over the specified duration. Uses 44100 Hz sample rate.
 
-    ### chirp_synthesis
+      ### wavelet_decompose
 
-    Generates a linear chirp signal sweeping from `freq_start` to `freq_end`
-    over the specified duration. Uses 44100 Hz sample rate.
+      Performs continuous wavelet transform decomposition using Morlet wavelets.
+      Returns a list of coefficient arrays, one per scale.
 
-    ### wavelet_decompose
+      Parameters:
+      - `signal`: input signal as numpy array
+      - `scales`: number of wavelet scales (default: 8)
+    src/spectralkit/__init__.py: |
+      from .analysis import chirp_synthesis, wavelet_decompose
 
-    Performs continuous wavelet transform decomposition using Morlet wavelets.
-    Returns a list of coefficient arrays, one per scale.
+      __all__ = ['chirp_synthesis', 'wavelet_decompose']
+    src/spectralkit/analysis.py: |
+      import numpy as np
 
-    Parameters:
-    - `signal`: input signal as numpy array
-    - `scales`: number of wavelet scales (default: 8)
-  src/spectralkit/__init__.py: |
-    from .analysis import chirp_synthesis, wavelet_decompose
+      def chirp_synthesis(duration: float, freq_start: float, freq_end: float) -> np.ndarray:
+          """Generate a linear chirp signal sweeping between two frequencies."""
+          sample_rate = 44100
+          t = np.linspace(0, duration, int(sample_rate * duration))
+          freq = np.linspace(freq_start, freq_end, len(t))
+          return np.sin(2 * np.pi * np.cumsum(freq) / sample_rate)
 
-    __all__ = ['chirp_synthesis', 'wavelet_decompose']
-  src/spectralkit/analysis.py: |
-    import numpy as np
+      def wavelet_decompose(signal: np.ndarray, scales: int = 8) -> list:
+          """Perform continuous wavelet transform using Morlet wavelets."""
+          coefficients = []
+          for scale in range(1, scales + 1):
+              wavelet = np.exp(-0.5 * (np.arange(len(signal)) / scale) ** 2)
+              coeff = np.convolve(signal, wavelet, mode='same')
+              coefficients.append(coeff)
+          return coefficients
+    CHANGELOG.md: |
+      # Changelog
 
-    def chirp_synthesis(duration: float, freq_start: float, freq_end: float) -> np.ndarray:
-        """Generate a linear chirp signal sweeping between two frequencies."""
-        sample_rate = 44100
-        t = np.linspace(0, duration, int(sample_rate * duration))
-        freq = np.linspace(freq_start, freq_end, len(t))
-        return np.sin(2 * np.pi * np.cumsum(freq) / sample_rate)
+      ## v2.0.0 (2026-01-15)
 
-    def wavelet_decompose(signal: np.ndarray, scales: int = 8) -> list:
-        """Perform continuous wavelet transform using Morlet wavelets."""
-        coefficients = []
-        for scale in range(1, scales + 1):
-            wavelet = np.exp(-0.5 * (np.arange(len(signal)) / scale) ** 2)
-            coeff = np.convolve(signal, wavelet, mode='same')
-            coefficients.append(coeff)
-        return coefficients
-  CHANGELOG.md: |
-    # Changelog
+      - Added `wavelet_decompose` for continuous wavelet transform analysis
+      - Improved `chirp_synthesis` frequency sweep accuracy by 15%
+      - Breaking: removed deprecated `fft_analyze` function
+      - Updated NumPy dependency to >=1.26
 
-    ## v2.0.0 (2026-01-15)
+      ## v1.0.0 (2025-06-01)
 
-    - Added `wavelet_decompose` for continuous wavelet transform analysis
-    - Improved `chirp_synthesis` frequency sweep accuracy by 15%
-    - Breaking: removed deprecated `fft_analyze` function
-    - Updated NumPy dependency to >=1.26
+      - Initial release with `chirp_synthesis` signal generation
+    src/spectralkit/signal_filters.py: |
+      import numpy as np
 
-    ## v1.0.0 (2025-06-01)
+      class ButterworthFilter:
+          """Digital Butterworth filter implementation."""
 
-    - Initial release with `chirp_synthesis` signal generation
-  src/spectralkit/signal_filters.py: |
-    import numpy as np
+          def __init__(self, order: int, cutoff_freq: float, sample_rate: float):
+              self.order = order
+              self.cutoff_freq = cutoff_freq
+              self.sample_rate = sample_rate
 
-    class ButterworthFilter:
-        """Digital Butterworth filter implementation."""
+          def bandpass(self, signal: np.ndarray, low: float, high: float) -> np.ndarray:
+              """Apply bandpass filter between low and high frequencies."""
+              return signal
 
-        def __init__(self, order: int, cutoff_freq: float, sample_rate: float):
-            self.order = order
-            self.cutoff_freq = cutoff_freq
-            self.sample_rate = sample_rate
+          def lowpass(self, signal: np.ndarray) -> np.ndarray:
+              """Apply lowpass filter at cutoff frequency."""
+              return signal
+    docs/architecture.md: |
+      # Architecture
 
-        def bandpass(self, signal: np.ndarray, low: float, high: float) -> np.ndarray:
-            """Apply bandpass filter between low and high frequencies."""
-            return signal
+      ## Plugin System
 
-        def lowpass(self, signal: np.ndarray) -> np.ndarray:
-            """Apply lowpass filter at cutoff frequency."""
-            return signal
-  docs/architecture.md: |
-    # Architecture
+      SpectralKit uses a modular pipeline architecture where each processing
+      step is a composable plugin registered with the PluginRegistry.
 
-    ## Plugin System
+      ## Data Flow
 
-    SpectralKit uses a modular pipeline architecture where each processing
-    step is a composable plugin registered with the PluginRegistry.
+      Raw input → Preprocessor → AnalysisChain → PostProcessor → Output
 
-    ## Data Flow
-
-    Raw input → Preprocessor → AnalysisChain → PostProcessor → Output
-
-    Each stage communicates via immutable SignalFrame objects carrying
-    metadata alongside the sample data.
-
-# === Assertions ===
-
-must_include_files:
-  - README.md
-  # Core positive test: analysis.py MUST be discovered via rare-identifier
-  # expansion on "wavelet_decompose" (count=3 in candidate index ≤ threshold)
-  # AND selected by greedy optimizer because it DEFINES the symbol
-  # (match_strength=1.0) satisfying the information need.
-  - src/spectralkit/analysis.py
-must_include_content_from:
-  README.md:
-    - wavelet_decompose
-    - chirp_synthesis
-    - API Reference
-  src/spectralkit/analysis.py:
-    # Verify the defining code is actually included, not just the file
-    - def wavelet_decompose
-    - def chirp_synthesis
-    - Morlet wavelets
-must_not_include:
-  # --- CHANGELOG.md: discovered but not selected ---
-  # Shares "wavelet_decompose" (rare expansion discovers it), but
-  # _match_strength_typed returns 0.3 (mentions, not defines).
-  # After analysis.py satisfies the "definition" need with strength 1.0,
-  # CHANGELOG's marginal gain for the same need is 0 (phi(max) unchanged).
-  - removed deprecated
-  - frequency sweep accuracy
-  - fft_analyze
-  # --- signal_filters.py: not discovered ---
-  # Same directory creates sibling edges (0.05 weight) but no shared
-  # rare identifiers. "butterworth" and "bandpass" are not diff concepts.
-  - ButterworthFilter
-  - bandpass
-  - cutoff_freq
-  # --- docs/architecture.md: not discovered ---
-  # No shared identifiers with the diff. DocumentStructureEdgeBuilder
-  # only links sections within the same file, not across files.
-  - PluginRegistry
-  - SignalFrame
-  - modular pipeline architecture
-must_not_include_files:
-  - CHANGELOG.md
-  - src/spectralkit/signal_filters.py
-  - docs/architecture.md
-max_fragments: 8
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      Each stage communicates via immutable SignalFrame objects carrying
+      metadata alongside the sample data.
+  commit_message: Update files
+fragments:
+- id: readme
+  selector:
+    path: README.md
+    anchor: wavelet_decompose
+- id: readme_1
+  selector:
+    path: README.md
+    anchor: chirp_synthesis
+- id: readme_2
+  selector:
+    path: README.md
+    anchor: API Reference
+- id: analysis
+  selector:
+    path: src/spectralkit/analysis.py
+    anchor: def wavelet_decompose
+- id: analysis_1
+  selector:
+    path: src/spectralkit/analysis.py
+    anchor: def chirp_synthesis
+- id: analysis_2
+  selector:
+    path: src/spectralkit/analysis.py
+    anchor: Morlet wavelets
+- id: no_changelog
+  selector:
+    path: CHANGELOG.md
+- id: no_signal_filters
+  selector:
+    path: src/spectralkit/signal_filters.py
+- id: no_architecture
+  selector:
+    path: docs/architecture.md
+- id: no_global_0
+  selector:
+    anchor: removed deprecated
+- id: no_global_1
+  selector:
+    anchor: frequency sweep accuracy
+- id: no_global_2
+  selector:
+    anchor: fft_analyze
+- id: no_global_3
+  selector:
+    anchor: ButterworthFilter
+- id: no_global_4
+  selector:
+    anchor: bandpass
+- id: no_global_5
+  selector:
+    anchor: cutoff_freq
+- id: no_global_6
+  selector:
+    anchor: PluginRegistry
+- id: no_global_7
+  selector:
+    anchor: SignalFrame
+- id: no_global_8
+  selector:
+    anchor: modular pipeline architecture
+oracle:
+  required:
+  - readme
+  - readme_1
+  - readme_2
+  - analysis
+  - analysis_1
+  - analysis_2
+  allowed: []
+  forbidden:
+  - no_changelog
+  - no_signal_filters
+  - no_architecture
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8

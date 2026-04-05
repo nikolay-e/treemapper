@@ -1,69 +1,82 @@
-# Scenario: Migrating terraform backend from local to S3 with DynamoDB
-#   state locking and encryption.
-# Reviewer questions:
-#   1. What S3 bucket stores the state? (my-terraform-state)
-#   2. Is state locking configured? (dynamodb_table = "terraform-locks")
-# Traps:
-#   - staging/backend.tf: similar S3 backend but for staging environment (different bucket)
-#   - scripts/migrate_state.sh: operational migration script (not config)
-
-max_enrichment: 4.7
-initial:
-  backend.tf: |
-    terraform {
-      backend "local" {}
-    }
-  staging/backend.tf: |
-    terraform {
-      backend "s3" {
-        bucket = "staging-terraform-state"
-        key    = "staging/terraform.tfstate"
-        region = "eu-west-1"
+name: terraform_031_remote_state
+repo:
+  initial_files:
+    backend.tf: |
+      terraform {
+        backend "local" {}
       }
-    }
-  scripts/migrate_state.sh: |
-    #!/bin/bash
-    set -euo pipefail
-    echo "Migrating Terraform state to S3..."
-    terraform init -migrate-state
-    echo "State migration complete"
-
-changed:
-  backend.tf: |
-    terraform {
-      backend "s3" {
-        bucket         = "my-terraform-state"
-        key            = "prod/terraform.tfstate"
-        region         = "us-east-1"
-        encrypt        = true
-        dynamodb_table = "terraform-locks"
+    staging/backend.tf: |
+      terraform {
+        backend "s3" {
+          bucket = "staging-terraform-state"
+          key    = "staging/terraform.tfstate"
+          region = "eu-west-1"
+        }
       }
-    }
-
-# The diff is self-contained: backend.tf changes from local to S3.
-# No unchanged files are needed for understanding the migration.
-must_include_files:
-  - backend.tf
-
-must_include_content:
-  - backend "s3" {
-  - bucket         = "my-terraform-state"
-  - dynamodb_table = "terraform-locks"
-  - encrypt        = true
-
-must_not_include:
-  # Staging backend is same pattern but different environment
-  - staging-terraform-state
-  - staging/terraform.tfstate
-  - eu-west-1
-  # Migration script is operational, not Terraform config
-  - terraform init -migrate-state
-
-must_not_include_files:
-  - staging/backend.tf
-  - scripts/migrate_state.sh
-
-max_fragments: 3
-max_files: 1
-add_garbage_files: false
-skip_garbage_check: true
+    scripts/migrate_state.sh: |
+      #!/bin/bash
+      set -euo pipefail
+      echo "Migrating Terraform state to S3..."
+      terraform init -migrate-state
+      echo "State migration complete"
+  changed_files:
+    backend.tf: |
+      terraform {
+        backend "s3" {
+          bucket         = "my-terraform-state"
+          key            = "prod/terraform.tfstate"
+          region         = "us-east-1"
+          encrypt        = true
+          dynamodb_table = "terraform-locks"
+        }
+      }
+  commit_message: Update files
+fragments:
+- id: backend_file
+  selector:
+    path: backend.tf
+- id: req_global_0
+  selector:
+    anchor: backend "s3" {
+- id: req_global_1
+  selector:
+    anchor: bucket         = "my-terraform-state"
+- id: req_global_2
+  selector:
+    anchor: dynamodb_table = "terraform-locks"
+- id: req_global_3
+  selector:
+    anchor: encrypt        = true
+- id: no_backend
+  selector:
+    path: staging/backend.tf
+- id: no_migrate_state
+  selector:
+    path: scripts/migrate_state.sh
+- id: no_global_0
+  selector:
+    anchor: staging-terraform-state
+- id: no_global_1
+  selector:
+    anchor: staging/terraform.tfstate
+- id: no_global_2
+  selector:
+    anchor: eu-west-1
+- id: no_global_3
+  selector:
+    anchor: terraform init -migrate-state
+oracle:
+  required:
+  - backend_file
+  - req_global_0
+  - req_global_1
+  - req_global_2
+  - req_global_3
+  allowed: []
+  forbidden:
+  - no_backend
+  - no_migrate_state
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

@@ -1,176 +1,189 @@
-# Scenario: schemas.ts is changed to add new validations (uuid, min/max) and
-#   new fields (age, role) to UserSchema. validator.ts imports UserSchema and
-#   User type. Only schemas.ts is changed; validator.ts is unchanged.
-#
-# Diff shows:
-#   - id: z.string(), name: z.string(), email: z.string().email()
-#   + id: z.string().uuid(), name: z.string().min(1).max(100)
-#   + age: z.number().int().positive().optional()
-#   + role: z.enum(['admin', 'user', 'guest'])
-#
-# Reviewer questions:
-#   Q1: "Does validator.ts still work with the updated schema?"
-#       -> validator.ts: calls UserSchema.parse(data) and uses User type.
-#          parse() will now enforce uuid, min/max, and require role.
-#          Reviewer needs to see the validator to check if callers pass role.
-#
-#   Q2: "Will existing data pass the stricter validations?"
-#       -> schemas.ts: id changed from z.string() to z.string().uuid() — any
-#          non-UUID id will now fail. name added min(1).max(100). role is
-#          required (no .optional()). These are breaking changes.
-#
-# Not needed for comprehension:
-#   - product-schemas.ts: Parallel Zod schema for ProductSchema with similar
-#     structure (id, name, price, category). Same z.object pattern.
-#     HARD TRAP: identical Zod schema structure, same validation methods.
-#
-#   - schema-tests.ts: Tests for UserSchema using valid/invalid inputs.
-#     Direct structural edge — imports UserSchema and tests parse.
-#     But test expectations don't help review the schema changes.
-#
-#   - zod-utils.ts: Custom Zod refinements and transforms shared across schemas.
-#     Same Zod ecosystem but utility functions not used by schemas.ts.
+name: javascript_044_zod_schema_change
+repo:
+  initial_files:
+    schemas.ts: |
+      import { z } from 'zod';
 
-max_enrichment: 6.7
-initial:
-  schemas.ts: |
-    import { z } from 'zod';
+      export const UserSchema = z.object({
+          id: z.string(),
+          name: z.string(),
+          email: z.string().email(),
+      });
 
-    export const UserSchema = z.object({
-        id: z.string(),
-        name: z.string(),
-        email: z.string().email(),
-    });
+      export type User = z.infer<typeof UserSchema>;
+    validator.ts: |
+      import { UserSchema, User } from './schemas';
 
-    export type User = z.infer<typeof UserSchema>;
-  validator.ts: |
-    import { UserSchema, User } from './schemas';
+      export function validateUser(data: unknown): User {
+          return UserSchema.parse(data);
+      }
+    product-schemas.ts: |
+      import { z } from 'zod';
 
-    export function validateUser(data: unknown): User {
-        return UserSchema.parse(data);
-    }
-  product-schemas.ts: |
-    import { z } from 'zod';
+      export const ProductSchema = z.object({
+          id: z.string().uuid(),
+          name: z.string().min(1).max(200),
+          price: z.number().positive(),
+          category: z.enum(['electronics', 'clothing', 'food']),
+      });
 
-    export const ProductSchema = z.object({
-        id: z.string().uuid(),
-        name: z.string().min(1).max(200),
-        price: z.number().positive(),
-        category: z.enum(['electronics', 'clothing', 'food']),
-    });
+      export type Product = z.infer<typeof ProductSchema>;
+    schema-tests.ts: |
+      import { UserSchema } from './schemas';
 
-    export type Product = z.infer<typeof ProductSchema>;
-  schema-tests.ts: |
-    import { UserSchema } from './schemas';
+      describe('UserSchema', () => {
+          it('accepts valid user', () => {
+              const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'alice@test.com' });
+              expect(result.success).toBe(true);
+          });
 
-    describe('UserSchema', () => {
-        it('accepts valid user', () => {
-            const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'alice@test.com' });
-            expect(result.success).toBe(true);
-        });
+          it('rejects invalid email', () => {
+              const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'not-email' });
+              expect(result.success).toBe(false);
+          });
+      });
+    zod-utils.ts: |
+      import { z } from 'zod';
 
-        it('rejects invalid email', () => {
-            const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'not-email' });
-            expect(result.success).toBe(false);
-        });
-    });
-  zod-utils.ts: |
-    import { z } from 'zod';
+      export const nonEmptyString = z.string().min(1).trim();
+      export const positiveInt = z.number().int().positive();
+      export const isoDate = z.string().datetime();
+  changed_files:
+    schemas.ts: |
+      import { z } from 'zod';
 
-    export const nonEmptyString = z.string().min(1).trim();
-    export const positiveInt = z.number().int().positive();
-    export const isoDate = z.string().datetime();
+      export const UserSchema = z.object({
+          id: z.string().uuid(),
+          name: z.string().min(1).max(100),
+          email: z.string().email(),
+          age: z.number().int().positive().optional(),
+          role: z.enum(['admin', 'user', 'guest']),
+      });
 
-changed:
-  schemas.ts: |
-    import { z } from 'zod';
+      export type User = z.infer<typeof UserSchema>;
+    validator.ts: |
+      import { UserSchema, User } from './schemas';
 
-    export const UserSchema = z.object({
-        id: z.string().uuid(),
-        name: z.string().min(1).max(100),
-        email: z.string().email(),
-        age: z.number().int().positive().optional(),
-        role: z.enum(['admin', 'user', 'guest']),
-    });
+      export function validateUser(data: unknown): User {
+          return UserSchema.parse(data);
+      }
+    product-schemas.ts: |
+      import { z } from 'zod';
 
-    export type User = z.infer<typeof UserSchema>;
-  validator.ts: |
-    import { UserSchema, User } from './schemas';
+      export const ProductSchema = z.object({
+          id: z.string().uuid(),
+          name: z.string().min(1).max(200),
+          price: z.number().positive(),
+          category: z.enum(['electronics', 'clothing', 'food']),
+      });
 
-    export function validateUser(data: unknown): User {
-        return UserSchema.parse(data);
-    }
-  product-schemas.ts: |
-    import { z } from 'zod';
+      export type Product = z.infer<typeof ProductSchema>;
+    schema-tests.ts: |
+      import { UserSchema } from './schemas';
 
-    export const ProductSchema = z.object({
-        id: z.string().uuid(),
-        name: z.string().min(1).max(200),
-        price: z.number().positive(),
-        category: z.enum(['electronics', 'clothing', 'food']),
-    });
+      describe('UserSchema', () => {
+          it('accepts valid user', () => {
+              const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'alice@test.com' });
+              expect(result.success).toBe(true);
+          });
 
-    export type Product = z.infer<typeof ProductSchema>;
-  schema-tests.ts: |
-    import { UserSchema } from './schemas';
+          it('rejects invalid email', () => {
+              const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'not-email' });
+              expect(result.success).toBe(false);
+          });
+      });
+    zod-utils.ts: |
+      import { z } from 'zod';
 
-    describe('UserSchema', () => {
-        it('accepts valid user', () => {
-            const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'alice@test.com' });
-            expect(result.success).toBe(true);
-        });
-
-        it('rejects invalid email', () => {
-            const result = UserSchema.safeParse({ id: '1', name: 'Alice', email: 'not-email' });
-            expect(result.success).toBe(false);
-        });
-    });
-  zod-utils.ts: |
-    import { z } from 'zod';
-
-    export const nonEmptyString = z.string().min(1).trim();
-    export const positiveInt = z.number().int().positive();
-    export const isoDate = z.string().datetime();
-
-must_include_files:
-  - schemas.ts
-  # Q1: validator.ts imports UserSchema and calls .parse() — reviewer needs
-  # to see the consumer to assess the impact of the schema changes.
-  - validator.ts
-
-must_include_content_from:
-  schemas.ts:
-    - "UserSchema = z.object({"
-    - "z.string().uuid()"
-    - "z.string().min(1).max(100)"
-    - "z.enum(['admin', 'user', 'guest'])"
-    - "type User = z.infer<typeof UserSchema>"
-  validator.ts:
-    - "import { UserSchema, User } from './schemas'"
-    - "UserSchema.parse(data)"
-
-must_not_include:
-  # --- product-schemas.ts: parallel Zod schema ---
-  # HARD TRAP: identical z.object structure with uuid, min/max, enum.
-  - ProductSchema
-  - "'electronics'"
-  - "'clothing'"
-  # --- schema-tests.ts: tests for UserSchema ---
-  # Direct edge: imports UserSchema, calls safeParse.
-  - safeParse
-  - "accepts valid user"
-  - "rejects invalid email"
-  # --- zod-utils.ts: shared Zod refinements ---
-  - nonEmptyString
-  - positiveInt
-  - isoDate
-
-must_not_include_files:
-  - product-schemas.ts
-  - schema-tests.ts
-  - zod-utils.ts
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export const nonEmptyString = z.string().min(1).trim();
+      export const positiveInt = z.number().int().positive();
+      export const isoDate = z.string().datetime();
+  commit_message: Update files
+fragments:
+- id: schemas
+  selector:
+    path: schemas.ts
+    anchor: UserSchema = z.object({
+- id: schemas_1
+  selector:
+    path: schemas.ts
+    anchor: z.string().uuid()
+- id: schemas_2
+  selector:
+    path: schemas.ts
+    anchor: z.string().min(1).max(100)
+- id: schemas_3
+  selector:
+    path: schemas.ts
+    anchor: z.enum(['admin', 'user', 'guest'])
+- id: schemas_4
+  selector:
+    path: schemas.ts
+    anchor: type User = z.infer<typeof UserSchema>
+- id: validator
+  selector:
+    path: validator.ts
+    anchor: import { UserSchema, User } from './schemas'
+- id: validator_1
+  selector:
+    path: validator.ts
+    anchor: UserSchema.parse(data)
+- id: no_product_schemas
+  selector:
+    path: product-schemas.ts
+- id: no_schema_tests
+  selector:
+    path: schema-tests.ts
+- id: no_zod_utils
+  selector:
+    path: zod-utils.ts
+- id: no_global_0
+  selector:
+    anchor: ProductSchema
+- id: no_global_1
+  selector:
+    anchor: '''electronics'''
+- id: no_global_2
+  selector:
+    anchor: '''clothing'''
+- id: no_global_3
+  selector:
+    anchor: safeParse
+- id: no_global_4
+  selector:
+    anchor: accepts valid user
+- id: no_global_5
+  selector:
+    anchor: rejects invalid email
+- id: no_global_6
+  selector:
+    anchor: nonEmptyString
+- id: no_global_7
+  selector:
+    anchor: positiveInt
+- id: no_global_8
+  selector:
+    anchor: isoDate
+oracle:
+  required:
+  - schemas
+  - schemas_1
+  - schemas_2
+  - schemas_3
+  - schemas_4
+  - validator
+  - validator_1
+  allowed: []
+  forbidden:
+  - no_product_schemas
+  - no_schema_tests
+  - no_zod_utils
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8

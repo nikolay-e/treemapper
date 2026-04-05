@@ -1,171 +1,175 @@
-# Scenario: PaymentProcessor is refactored from if/else chain to Strategy pattern
-# with a PaymentStrategy interface and CreditCardPayment implementation.
-#
-# Diff: PaymentProcessor.java replaces string-based dispatch with a strategy field.
-# New files PaymentStrategy.java (interface) and CreditCardPayment.java (implementation).
-#
-# Reviewer questions:
-#   Q1: "What methods must a payment strategy implement?"
-#       -> PaymentStrategy.java (NEW) defines pay() and validate().
-#   Q2: "How does CreditCardPayment validate amounts?"
-#       -> CreditCardPayment.java (NEW) checks amount > 0 && amount < 10000.
-#
-# Not needed:
-#   - src/main/java/com/example/RefundProcessor.java: handles refund logic.
-#     Payment-adjacent vocabulary but no dependency on PaymentStrategy.
-#   - src/main/java/com/example/TransactionLog.java: logs payment transactions.
-#     Shares payment domain terms but not imported by any changed file.
+name: jvm_and_compiled_042_java_strategy_pattern
+repo:
+  initial_files:
+    src/main/java/com/example/PaymentProcessor.java: |
+      package com.example;
 
-max_enrichment: 3.8
-initial:
-  src/main/java/com/example/PaymentProcessor.java: |
-    package com.example;
+      public class PaymentProcessor {
+          public void process(String type, double amount) {
+              if ("credit".equals(type)) {
+                  System.out.println("Credit: " + amount);
+              } else if ("debit".equals(type)) {
+                  System.out.println("Debit: " + amount);
+              }
+          }
+      }
+    src/main/java/com/example/RefundProcessor.java: |
+      package com.example;
 
-    public class PaymentProcessor {
-        public void process(String type, double amount) {
-            if ("credit".equals(type)) {
-                System.out.println("Credit: " + amount);
-            } else if ("debit".equals(type)) {
-                System.out.println("Debit: " + amount);
-            }
-        }
-    }
-  src/main/java/com/example/RefundProcessor.java: |
-    package com.example;
+      public class RefundProcessor {
+          public void processRefund(String transactionId, double amount) {
+              if (amount <= 0) {
+                  throw new IllegalArgumentException("Refund amount must be positive");
+              }
+              System.out.println("Refund " + transactionId + ": " + amount);
+          }
 
-    public class RefundProcessor {
-        public void processRefund(String transactionId, double amount) {
-            if (amount <= 0) {
-                throw new IllegalArgumentException("Refund amount must be positive");
-            }
-            System.out.println("Refund " + transactionId + ": " + amount);
-        }
+          public boolean isRefundable(String status) {
+              return "completed".equals(status) || "partial".equals(status);
+          }
+      }
+    src/main/java/com/example/TransactionLog.java: |
+      package com.example;
 
-        public boolean isRefundable(String status) {
-            return "completed".equals(status) || "partial".equals(status);
-        }
-    }
-  src/main/java/com/example/TransactionLog.java: |
-    package com.example;
+      import java.time.LocalDateTime;
+      import java.util.ArrayList;
+      import java.util.List;
 
-    import java.time.LocalDateTime;
-    import java.util.ArrayList;
-    import java.util.List;
+      public class TransactionLog {
+          private final List<String> entries = new ArrayList<>();
 
-    public class TransactionLog {
-        private final List<String> entries = new ArrayList<>();
+          public void record(String type, double amount) {
+              entries.add(LocalDateTime.now() + " | " + type + " | " + amount);
+          }
 
-        public void record(String type, double amount) {
-            entries.add(LocalDateTime.now() + " | " + type + " | " + amount);
-        }
+          public List<String> getEntries() {
+              return List.copyOf(entries);
+          }
+      }
+  changed_files:
+    src/main/java/com/example/PaymentProcessor.java: |
+      package com.example;
 
-        public List<String> getEntries() {
-            return List.copyOf(entries);
-        }
-    }
+      public class PaymentProcessor {
+          private PaymentStrategy strategy;
 
-changed:
-  src/main/java/com/example/PaymentProcessor.java: |
-    package com.example;
+          public void setStrategy(PaymentStrategy strategy) {
+              this.strategy = strategy;
+          }
 
-    public class PaymentProcessor {
-        private PaymentStrategy strategy;
+          public void process(double amount) {
+              if (strategy.validate(amount)) {
+                  strategy.pay(amount);
+              } else {
+                  throw new IllegalArgumentException("Invalid amount");
+              }
+          }
+      }
+    src/main/java/com/example/PaymentStrategy.java: |
+      package com.example;
 
-        public void setStrategy(PaymentStrategy strategy) {
-            this.strategy = strategy;
-        }
+      public interface PaymentStrategy {
+          void pay(double amount);
+          boolean validate(double amount);
+      }
+    src/main/java/com/example/CreditCardPayment.java: |
+      package com.example;
 
-        public void process(double amount) {
-            if (strategy.validate(amount)) {
-                strategy.pay(amount);
-            } else {
-                throw new IllegalArgumentException("Invalid amount");
-            }
-        }
-    }
-  src/main/java/com/example/PaymentStrategy.java: |
-    package com.example;
+      public class CreditCardPayment implements PaymentStrategy {
+          private final String cardNumber;
 
-    public interface PaymentStrategy {
-        void pay(double amount);
-        boolean validate(double amount);
-    }
-  src/main/java/com/example/CreditCardPayment.java: |
-    package com.example;
+          public CreditCardPayment(String cardNumber) {
+              this.cardNumber = cardNumber;
+          }
 
-    public class CreditCardPayment implements PaymentStrategy {
-        private final String cardNumber;
+          @Override
+          public void pay(double amount) {
+              System.out.println("Credit card " + cardNumber + ": " + amount);
+          }
 
-        public CreditCardPayment(String cardNumber) {
-            this.cardNumber = cardNumber;
-        }
+          @Override
+          public boolean validate(double amount) {
+              return amount > 0 && amount < 10000;
+          }
+      }
+    src/main/java/com/example/RefundProcessor.java: |
+      package com.example;
 
-        @Override
-        public void pay(double amount) {
-            System.out.println("Credit card " + cardNumber + ": " + amount);
-        }
+      public class RefundProcessor {
+          public void processRefund(String transactionId, double amount) {
+              if (amount <= 0) {
+                  throw new IllegalArgumentException("Refund amount must be positive");
+              }
+              System.out.println("Refund " + transactionId + ": " + amount);
+          }
 
-        @Override
-        public boolean validate(double amount) {
-            return amount > 0 && amount < 10000;
-        }
-    }
-  src/main/java/com/example/RefundProcessor.java: |
-    package com.example;
+          public boolean isRefundable(String status) {
+              return "completed".equals(status) || "partial".equals(status);
+          }
+      }
+    src/main/java/com/example/TransactionLog.java: |
+      package com.example;
 
-    public class RefundProcessor {
-        public void processRefund(String transactionId, double amount) {
-            if (amount <= 0) {
-                throw new IllegalArgumentException("Refund amount must be positive");
-            }
-            System.out.println("Refund " + transactionId + ": " + amount);
-        }
+      import java.time.LocalDateTime;
+      import java.util.ArrayList;
+      import java.util.List;
 
-        public boolean isRefundable(String status) {
-            return "completed".equals(status) || "partial".equals(status);
-        }
-    }
-  src/main/java/com/example/TransactionLog.java: |
-    package com.example;
+      public class TransactionLog {
+          private final List<String> entries = new ArrayList<>();
 
-    import java.time.LocalDateTime;
-    import java.util.ArrayList;
-    import java.util.List;
+          public void record(String type, double amount) {
+              entries.add(LocalDateTime.now() + " | " + type + " | " + amount);
+          }
 
-    public class TransactionLog {
-        private final List<String> entries = new ArrayList<>();
-
-        public void record(String type, double amount) {
-            entries.add(LocalDateTime.now() + " | " + type + " | " + amount);
-        }
-
-        public List<String> getEntries() {
-            return List.copyOf(entries);
-        }
-    }
-
-must_include_files:
-  # Q1: PaymentStrategy defines the interface
-  - src/main/java/com/example/CreditCardPayment.java
-  - src/main/java/com/example/PaymentProcessor.java
-  - src/main/java/com/example/PaymentStrategy.java
-must_include_content_from:
-  src/main/java/com/example/CreditCardPayment.java:
-    - "public void pay(double amount) {"
-  src/main/java/com/example/PaymentStrategy.java:
-    - "public interface PaymentStrategy {"
-must_not_include:
-  # RefundProcessor.java: payment-adjacent but no dependency on PaymentStrategy
-  - RefundProcessor
-  - processRefund
-  - isRefundable
-  # TransactionLog.java: logging utility, not referenced by strategy pattern
-  - TransactionLog
-  - getEntries
-must_not_include_files:
-  - src/main/java/com/example/RefundProcessor.java
-  - src/main/java/com/example/TransactionLog.java
-max_fragments: 6
-max_files: 4
-add_garbage_files: false
-skip_garbage_check: true
+          public List<String> getEntries() {
+              return List.copyOf(entries);
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: creditcardpayment
+  selector:
+    path: src/main/java/com/example/CreditCardPayment.java
+    anchor: public void pay(double amount) {
+- id: paymentstrategy
+  selector:
+    path: src/main/java/com/example/PaymentStrategy.java
+    anchor: public interface PaymentStrategy {
+- id: paymentprocessor_file
+  selector:
+    path: src/main/java/com/example/PaymentProcessor.java
+- id: no_refundprocessor
+  selector:
+    path: src/main/java/com/example/RefundProcessor.java
+- id: no_transactionlog
+  selector:
+    path: src/main/java/com/example/TransactionLog.java
+- id: no_global_0
+  selector:
+    anchor: RefundProcessor
+- id: no_global_1
+  selector:
+    anchor: processRefund
+- id: no_global_2
+  selector:
+    anchor: isRefundable
+- id: no_global_3
+  selector:
+    anchor: TransactionLog
+- id: no_global_4
+  selector:
+    anchor: getEntries
+oracle:
+  required:
+  - creditcardpayment
+  - paymentstrategy
+  - paymentprocessor_file
+  allowed: []
+  forbidden:
+  - no_refundprocessor
+  - no_transactionlog
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

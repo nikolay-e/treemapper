@@ -1,17 +1,24 @@
-max_enrichment: 5.0
-initial:
-  no_gap.py: |
-    def func1():
-        pass
-    def func2():
-        pass
-changed:
-  no_gap.py: |
-    def func1():
-        return 1
-    def func2():
-        return 2
-must_include_files:
-- no_gap.py
-add_garbage_files: false
-skip_garbage_check: true
+name: merging_009_boundary_no_gap
+repo:
+  initial_files:
+    no_gap.py: |
+      def func1():
+          pass
+      def func2():
+          pass
+  changed_files:
+    no_gap.py: |
+      def func1():
+          return 1
+      def func2():
+          return 2
+  commit_message: Update files
+fragments:
+- id: no_gap_file
+  selector:
+    path: no_gap.py
+oracle:
+  required:
+  - no_gap_file
+  allowed: []
+  forbidden: []

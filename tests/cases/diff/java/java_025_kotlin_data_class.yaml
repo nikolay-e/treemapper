@@ -1,208 +1,215 @@
-# Scenario: Product data class gains description, category, active fields.
-#   ProductMapper and ProductDto are updated to include category.
-#
-# Diff shows:
-#   Product.kt: + description: String = "", + category: String = "general", + active: Boolean = true
-#   ProductMapper.kt: toDto adds category = product.category, toDomain adds category = dto.category
-#   ProductDto.kt: + val category: String = "general"
-#
-# Reviewer questions:
-#   Q1: "Does ProductMapper correctly map the new category field both ways?"
-#       -> Product.kt defines category: String. ProductDto.kt defines category: String.
-#          ProductMapper maps product.category -> dto and dto.category -> domain.
-#          Reviewer must see all three to verify bidirectional mapping.
-#
-#   Q2: "Are description and active mapped — or intentionally omitted from DTO?"
-#       -> Product.kt has description and active. ProductDto.kt does NOT add them.
-#          ProductMapper does NOT map them. Reviewer needs both classes to assess
-#          whether this is intentional or a bug.
-#
-# Not needed for comprehension:
-#   - ProductRepository.kt: Database access returning Product entities.
-#     DIRECT TYPE OVERLAP: uses Product. But persistence layer doesn't help
-#     review mapper field mapping correctness.
-#
-#   - ProductValidator.kt: Validates Product fields (price > 0, name non-empty).
-#     Uses Product but validates business rules, not field mapping.
+name: java_025_kotlin_data_class
+repo:
+  initial_files:
+    src/main/kotlin/com/example/catalog/model/Product.kt: |
+      package com.example.catalog.model
 
-max_enrichment: 9.2
-initial:
-  src/main/kotlin/com/example/catalog/model/Product.kt: |
-    package com.example.catalog.model
+      data class Product(
+          val id: Long,
+          val name: String,
+          val price: Double
+      )
+    src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt: |
+      package com.example.catalog.mapper
 
-    data class Product(
-        val id: Long,
-        val name: String,
-        val price: Double
-    )
-  src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt: |
-    package com.example.catalog.mapper
+      import com.example.catalog.model.Product
+      import com.example.catalog.dto.ProductDto
 
-    import com.example.catalog.model.Product
-    import com.example.catalog.dto.ProductDto
+      object ProductMapper {
+          fun toDto(product: Product): ProductDto {
+              return ProductDto(
+                  id = product.id,
+                  name = product.name,
+                  displayPrice = "$${product.price}"
+              )
+          }
 
-    object ProductMapper {
-        fun toDto(product: Product): ProductDto {
-            return ProductDto(
-                id = product.id,
-                name = product.name,
-                displayPrice = "$${product.price}"
-            )
-        }
+          fun toDomain(dto: ProductDto): Product {
+              return Product(
+                  id = dto.id,
+                  name = dto.name,
+                  price = dto.displayPrice.removePrefix("$").toDouble()
+              )
+          }
+      }
+    src/main/kotlin/com/example/catalog/dto/ProductDto.kt: |
+      package com.example.catalog.dto
 
-        fun toDomain(dto: ProductDto): Product {
-            return Product(
-                id = dto.id,
-                name = dto.name,
-                price = dto.displayPrice.removePrefix("$").toDouble()
-            )
-        }
-    }
-  src/main/kotlin/com/example/catalog/dto/ProductDto.kt: |
-    package com.example.catalog.dto
+      data class ProductDto(
+          val id: Long,
+          val name: String,
+          val displayPrice: String
+      )
+    src/main/kotlin/com/example/catalog/repository/ProductRepository.kt: |
+      package com.example.catalog.repository
 
-    data class ProductDto(
-        val id: Long,
-        val name: String,
-        val displayPrice: String
-    )
-  src/main/kotlin/com/example/catalog/repository/ProductRepository.kt: |
-    package com.example.catalog.repository
+      import com.example.catalog.model.Product
 
-    import com.example.catalog.model.Product
+      interface ProductRepository {
+          fun findById(id: Long): Product?
+          fun findAll(): List<Product>
+          fun save(product: Product): Product
+          fun deleteById(id: Long)
+          fun findByCategory(category: String): List<Product>
+      }
+    src/main/kotlin/com/example/catalog/validator/ProductValidator.kt: |
+      package com.example.catalog.validator
 
-    interface ProductRepository {
-        fun findById(id: Long): Product?
-        fun findAll(): List<Product>
-        fun save(product: Product): Product
-        fun deleteById(id: Long)
-        fun findByCategory(category: String): List<Product>
-    }
-  src/main/kotlin/com/example/catalog/validator/ProductValidator.kt: |
-    package com.example.catalog.validator
+      import com.example.catalog.model.Product
 
-    import com.example.catalog.model.Product
+      class ProductValidator {
+          fun validate(product: Product): List<String> {
+              val errors = mutableListOf<String>()
+              if (product.name.isBlank()) errors.add("Name must not be blank")
+              if (product.price <= 0) errors.add("Price must be positive")
+              return errors
+          }
 
-    class ProductValidator {
-        fun validate(product: Product): List<String> {
-            val errors = mutableListOf<String>()
-            if (product.name.isBlank()) errors.add("Name must not be blank")
-            if (product.price <= 0) errors.add("Price must be positive")
-            return errors
-        }
+          fun isValid(product: Product): Boolean = validate(product).isEmpty()
+      }
+  changed_files:
+    src/main/kotlin/com/example/catalog/model/Product.kt: |
+      package com.example.catalog.model
 
-        fun isValid(product: Product): Boolean = validate(product).isEmpty()
-    }
+      data class Product(
+          val id: Long,
+          val name: String,
+          val price: Double,
+          val description: String = "",
+          val category: String = "general",
+          val active: Boolean = true
+      )
+    src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt: |
+      package com.example.catalog.mapper
 
-changed:
-  src/main/kotlin/com/example/catalog/model/Product.kt: |
-    package com.example.catalog.model
+      import com.example.catalog.model.Product
+      import com.example.catalog.dto.ProductDto
 
-    data class Product(
-        val id: Long,
-        val name: String,
-        val price: Double,
-        val description: String = "",
-        val category: String = "general",
-        val active: Boolean = true
-    )
-  src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt: |
-    package com.example.catalog.mapper
+      object ProductMapper {
+          fun toDto(product: Product): ProductDto {
+              return ProductDto(
+                  id = product.id,
+                  name = product.name,
+                  displayPrice = "$${product.price}",
+                  category = product.category
+              )
+          }
 
-    import com.example.catalog.model.Product
-    import com.example.catalog.dto.ProductDto
+          fun toDomain(dto: ProductDto): Product {
+              return Product(
+                  id = dto.id,
+                  name = dto.name,
+                  price = dto.displayPrice.removePrefix("$").toDouble(),
+                  category = dto.category
+              )
+          }
+      }
+    src/main/kotlin/com/example/catalog/dto/ProductDto.kt: |
+      package com.example.catalog.dto
 
-    object ProductMapper {
-        fun toDto(product: Product): ProductDto {
-            return ProductDto(
-                id = product.id,
-                name = product.name,
-                displayPrice = "$${product.price}",
-                category = product.category
-            )
-        }
+      data class ProductDto(
+          val id: Long,
+          val name: String,
+          val displayPrice: String,
+          val category: String = "general"
+      )
+    src/main/kotlin/com/example/catalog/repository/ProductRepository.kt: |
+      package com.example.catalog.repository
 
-        fun toDomain(dto: ProductDto): Product {
-            return Product(
-                id = dto.id,
-                name = dto.name,
-                price = dto.displayPrice.removePrefix("$").toDouble(),
-                category = dto.category
-            )
-        }
-    }
-  src/main/kotlin/com/example/catalog/dto/ProductDto.kt: |
-    package com.example.catalog.dto
+      import com.example.catalog.model.Product
 
-    data class ProductDto(
-        val id: Long,
-        val name: String,
-        val displayPrice: String,
-        val category: String = "general"
-    )
-  src/main/kotlin/com/example/catalog/repository/ProductRepository.kt: |
-    package com.example.catalog.repository
+      interface ProductRepository {
+          fun findById(id: Long): Product?
+          fun findAll(): List<Product>
+          fun save(product: Product): Product
+          fun deleteById(id: Long)
+          fun findByCategory(category: String): List<Product>
+      }
+    src/main/kotlin/com/example/catalog/validator/ProductValidator.kt: |
+      package com.example.catalog.validator
 
-    import com.example.catalog.model.Product
+      import com.example.catalog.model.Product
 
-    interface ProductRepository {
-        fun findById(id: Long): Product?
-        fun findAll(): List<Product>
-        fun save(product: Product): Product
-        fun deleteById(id: Long)
-        fun findByCategory(category: String): List<Product>
-    }
-  src/main/kotlin/com/example/catalog/validator/ProductValidator.kt: |
-    package com.example.catalog.validator
+      class ProductValidator {
+          fun validate(product: Product): List<String> {
+              val errors = mutableListOf<String>()
+              if (product.name.isBlank()) errors.add("Name must not be blank")
+              if (product.price <= 0) errors.add("Price must be positive")
+              return errors
+          }
 
-    import com.example.catalog.model.Product
-
-    class ProductValidator {
-        fun validate(product: Product): List<String> {
-            val errors = mutableListOf<String>()
-            if (product.name.isBlank()) errors.add("Name must not be blank")
-            if (product.price <= 0) errors.add("Price must be positive")
-            return errors
-        }
-
-        fun isValid(product: Product): Boolean = validate(product).isEmpty()
-    }
-
-must_include_files:
-  - src/main/kotlin/com/example/catalog/dto/ProductDto.kt
-  - src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt
-  - src/main/kotlin/com/example/catalog/model/Product.kt
-
-must_include_content_from:
-  src/main/kotlin/com/example/catalog/model/Product.kt:
-    - "val description: String"
-    - "val category: String"
-    - "val active: Boolean"
-  src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt:
-    - "category = product.category"
-    - "category = dto.category"
-  src/main/kotlin/com/example/catalog/dto/ProductDto.kt:
-    - "val category: String"
-    - 'val displayPrice: String'
-
-must_not_include:
-  # --- ProductRepository.kt: database layer using Product ---
-  # DIRECT TYPE OVERLAP: uses Product, has findByCategory. But persistence
-  # doesn't help review mapper field mapping correctness.
-  - ProductRepository
-  - findByCategory
-  - deleteById
-  # --- ProductValidator.kt: validates Product business rules ---
-  # Uses Product but validates rules, not field mapping.
-  - ProductValidator
-  - "Name must not be blank"
-  - "Price must be positive"
-
-must_not_include_files:
-  - src/main/kotlin/com/example/catalog/repository/ProductRepository.kt
-  - src/main/kotlin/com/example/catalog/validator/ProductValidator.kt
-
-max_fragments: 8
-max_files: 4
-add_garbage_files: false
-skip_garbage_check: true
+          fun isValid(product: Product): Boolean = validate(product).isEmpty()
+      }
+  commit_message: Update files
+fragments:
+- id: product
+  selector:
+    path: src/main/kotlin/com/example/catalog/model/Product.kt
+    anchor: 'val description: String'
+- id: product_1
+  selector:
+    path: src/main/kotlin/com/example/catalog/model/Product.kt
+    anchor: 'val category: String'
+- id: product_2
+  selector:
+    path: src/main/kotlin/com/example/catalog/model/Product.kt
+    anchor: 'val active: Boolean'
+- id: productmapper
+  selector:
+    path: src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt
+    anchor: category = product.category
+- id: productmapper_1
+  selector:
+    path: src/main/kotlin/com/example/catalog/mapper/ProductMapper.kt
+    anchor: category = dto.category
+- id: productdto
+  selector:
+    path: src/main/kotlin/com/example/catalog/dto/ProductDto.kt
+    anchor: 'val category: String'
+- id: productdto_1
+  selector:
+    path: src/main/kotlin/com/example/catalog/dto/ProductDto.kt
+    anchor: 'val displayPrice: String'
+- id: no_productrepository
+  selector:
+    path: src/main/kotlin/com/example/catalog/repository/ProductRepository.kt
+- id: no_productvalidator
+  selector:
+    path: src/main/kotlin/com/example/catalog/validator/ProductValidator.kt
+- id: no_global_0
+  selector:
+    anchor: ProductRepository
+- id: no_global_1
+  selector:
+    anchor: findByCategory
+- id: no_global_2
+  selector:
+    anchor: deleteById
+- id: no_global_3
+  selector:
+    anchor: ProductValidator
+- id: no_global_4
+  selector:
+    anchor: Name must not be blank
+- id: no_global_5
+  selector:
+    anchor: Price must be positive
+oracle:
+  required:
+  - product
+  - product_1
+  - product_2
+  - productmapper
+  - productmapper_1
+  - productdto
+  - productdto_1
+  allowed: []
+  forbidden:
+  - no_productrepository
+  - no_productvalidator
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

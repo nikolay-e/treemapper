@@ -1,374 +1,408 @@
-# Scenario: PaymentProcessor interface gains a getStatus() method.
-#   StripeProcessor implements PaymentProcessor but hasn't added the
-#   new method yet — a compilation error the reviewer should catch.
-#
-# Diff shows:
-#   - PaymentProcessor with process() and refund()
-#   + PaymentStatus getStatus(String transactionId) added to interface
-#
-# Reviewer questions:
-#   Q1: "Which classes implement PaymentProcessor — do they need updating?"
-#       -> Needs StripeProcessor.java: implements PaymentProcessor but
-#          only has process() and refund(). Reviewer must spot the
-#          missing getStatus() implementation.
-#
-#   Q2: "What is PaymentStatus — the return type of the new method?"
-#       -> Needs PaymentStatus.java to verify the enum exists.
-#
-# Not needed for comprehension:
-#   - ShippingProcessor.java: IDENTICAL implements-interface pattern with
-#     process() and refund(). Same interface shape. HARDEST TRAP: another
-#     processor implementation, but for shipping not payment.
-#
-#   - PaymentService.java: Calls PaymentProcessor methods. Direct consumer.
-#     But how the service uses the interface doesn't help review whether
-#     all implementations satisfy the new contract.
-#
-#   - PaymentGateway.java: HTTP client for payment API. Same "payment"
-#     namespace. But gateway HTTP calls are independent of the interface.
-#
-#   - TransactionLog.java: Records payment transactions. References
-#     PaymentStatus and transactionId. Same vocabulary. But logging
-#     doesn't help review the interface contract change.
-#
-#   - RefundPolicy.java: Business rules for refund eligibility. Same
-#     "payment" domain. Not referenced by the interface.
+name: jvm_and_compiled_034_java_implements_interface
+repo:
+  initial_files:
+    src/main/java/com/example/PaymentProcessor.java: |
+      package com.example;
 
-max_enrichment: 44.1
-initial:
-  src/main/java/com/example/PaymentProcessor.java: |
-    package com.example;
+      public interface PaymentProcessor {
+          boolean process(Payment payment);
+          void refund(String transactionId);
+      }
+    src/main/java/com/example/StripeProcessor.java: |
+      package com.example;
 
-    public interface PaymentProcessor {
-        boolean process(Payment payment);
-        void refund(String transactionId);
-    }
-  src/main/java/com/example/StripeProcessor.java: |
-    package com.example;
+      public class StripeProcessor implements PaymentProcessor {
+          private final String apiKey;
 
-    public class StripeProcessor implements PaymentProcessor {
-        private final String apiKey;
+          public StripeProcessor(String apiKey) {
+              this.apiKey = apiKey;
+          }
 
-        public StripeProcessor(String apiKey) {
-            this.apiKey = apiKey;
-        }
+          @Override
+          public boolean process(Payment payment) {
+              System.out.println("Processing via Stripe: " + payment.getAmount());
+              return true;
+          }
 
-        @Override
-        public boolean process(Payment payment) {
-            System.out.println("Processing via Stripe: " + payment.getAmount());
-            return true;
-        }
+          @Override
+          public void refund(String transactionId) {
+              System.out.println("Refunding via Stripe: " + transactionId);
+          }
+      }
+    src/main/java/com/example/PaymentStatus.java: |
+      package com.example;
 
-        @Override
-        public void refund(String transactionId) {
-            System.out.println("Refunding via Stripe: " + transactionId);
-        }
-    }
-  src/main/java/com/example/PaymentStatus.java: |
-    package com.example;
+      public enum PaymentStatus {
+          PENDING,
+          COMPLETED,
+          FAILED,
+          REFUNDED;
 
-    public enum PaymentStatus {
-        PENDING,
-        COMPLETED,
-        FAILED,
-        REFUNDED;
+          public boolean isTerminal() {
+              return this == COMPLETED || this == FAILED || this == REFUNDED;
+          }
+      }
+    src/main/java/com/example/shipping/ShippingProcessor.java: |
+      package com.example.shipping;
 
-        public boolean isTerminal() {
-            return this == COMPLETED || this == FAILED || this == REFUNDED;
-        }
-    }
-  src/main/java/com/example/shipping/ShippingProcessor.java: |
-    package com.example.shipping;
+      public class ShippingProcessor {
+          public boolean process(ShippingOrder order) {
+              System.out.println("Processing shipment: " + order.getTrackingId());
+              return true;
+          }
 
-    public class ShippingProcessor {
-        public boolean process(ShippingOrder order) {
-            System.out.println("Processing shipment: " + order.getTrackingId());
-            return true;
-        }
+          public void refund(String trackingId) {
+              System.out.println("Cancelling shipment: " + trackingId);
+          }
 
-        public void refund(String trackingId) {
-            System.out.println("Cancelling shipment: " + trackingId);
-        }
+          public String getStatus(String trackingId) {
+              return "IN_TRANSIT";
+          }
+      }
+    src/main/java/com/example/PaymentService.java: |
+      package com.example;
 
-        public String getStatus(String trackingId) {
-            return "IN_TRANSIT";
-        }
-    }
-  src/main/java/com/example/PaymentService.java: |
-    package com.example;
+      public class PaymentService {
+          private final PaymentProcessor processor;
 
-    public class PaymentService {
-        private final PaymentProcessor processor;
+          public PaymentService(PaymentProcessor processor) {
+              this.processor = processor;
+          }
 
-        public PaymentService(PaymentProcessor processor) {
-            this.processor = processor;
-        }
+          public boolean makePayment(Payment payment) {
+              return processor.process(payment);
+          }
 
-        public boolean makePayment(Payment payment) {
-            return processor.process(payment);
-        }
+          public void issueRefund(String transactionId) {
+              processor.refund(transactionId);
+          }
+      }
+    src/main/java/com/example/gateway/PaymentGateway.java: |
+      package com.example.gateway;
 
-        public void issueRefund(String transactionId) {
-            processor.refund(transactionId);
-        }
-    }
-  src/main/java/com/example/gateway/PaymentGateway.java: |
-    package com.example.gateway;
+      import java.net.http.HttpClient;
+      import java.net.http.HttpRequest;
+      import java.net.http.HttpResponse;
+      import java.net.URI;
 
-    import java.net.http.HttpClient;
-    import java.net.http.HttpRequest;
-    import java.net.http.HttpResponse;
-    import java.net.URI;
+      public class PaymentGateway {
+          private final HttpClient client = HttpClient.newHttpClient();
+          private final String baseUrl;
 
-    public class PaymentGateway {
-        private final HttpClient client = HttpClient.newHttpClient();
-        private final String baseUrl;
+          public PaymentGateway(String baseUrl) {
+              this.baseUrl = baseUrl;
+          }
 
-        public PaymentGateway(String baseUrl) {
-            this.baseUrl = baseUrl;
-        }
+          public String charge(String token, double amount) throws Exception {
+              HttpRequest request = HttpRequest.newBuilder()
+                  .uri(URI.create(baseUrl + "/charge"))
+                  .POST(HttpRequest.BodyPublishers.ofString(
+                      "{\"token\":\"" + token + "\",\"amount\":" + amount + "}"))
+                  .build();
+              HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+              return response.body();
+          }
+      }
+    src/main/java/com/example/TransactionLog.java: |
+      package com.example;
 
-        public String charge(String token, double amount) throws Exception {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/charge"))
-                .POST(HttpRequest.BodyPublishers.ofString(
-                    "{\"token\":\"" + token + "\",\"amount\":" + amount + "}"))
-                .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            return response.body();
-        }
-    }
-  src/main/java/com/example/TransactionLog.java: |
-    package com.example;
+      import java.time.LocalDateTime;
+      import java.util.ArrayList;
+      import java.util.List;
 
-    import java.time.LocalDateTime;
-    import java.util.ArrayList;
-    import java.util.List;
+      public class TransactionLog {
+          private final List<LogEntry> entries = new ArrayList<>();
 
-    public class TransactionLog {
-        private final List<LogEntry> entries = new ArrayList<>();
+          public void log(String transactionId, PaymentStatus status) {
+              entries.add(new LogEntry(transactionId, status, LocalDateTime.now()));
+          }
 
-        public void log(String transactionId, PaymentStatus status) {
-            entries.add(new LogEntry(transactionId, status, LocalDateTime.now()));
-        }
+          public List<LogEntry> getEntries() {
+              return List.copyOf(entries);
+          }
 
-        public List<LogEntry> getEntries() {
-            return List.copyOf(entries);
-        }
+          record LogEntry(String transactionId, PaymentStatus status, LocalDateTime timestamp) {}
+      }
+    src/main/java/com/example/RefundPolicy.java: |
+      package com.example;
 
-        record LogEntry(String transactionId, PaymentStatus status, LocalDateTime timestamp) {}
-    }
-  src/main/java/com/example/RefundPolicy.java: |
-    package com.example;
+      import java.time.Duration;
+      import java.time.LocalDateTime;
 
-    import java.time.Duration;
-    import java.time.LocalDateTime;
+      public class RefundPolicy {
+          private static final Duration REFUND_WINDOW = Duration.ofDays(30);
 
-    public class RefundPolicy {
-        private static final Duration REFUND_WINDOW = Duration.ofDays(30);
+          public boolean isRefundable(LocalDateTime purchaseDate) {
+              return Duration.between(purchaseDate, LocalDateTime.now())
+                  .compareTo(REFUND_WINDOW) <= 0;
+          }
 
-        public boolean isRefundable(LocalDateTime purchaseDate) {
-            return Duration.between(purchaseDate, LocalDateTime.now())
-                .compareTo(REFUND_WINDOW) <= 0;
-        }
+          public double calculateRefundAmount(double originalAmount, int daysSincePurchase) {
+              if (daysSincePurchase <= 7) return originalAmount;
+              if (daysSincePurchase <= 14) return originalAmount * 0.9;
+              return originalAmount * 0.5;
+          }
+      }
+  changed_files:
+    src/main/java/com/example/PaymentProcessor.java: |
+      package com.example;
 
-        public double calculateRefundAmount(double originalAmount, int daysSincePurchase) {
-            if (daysSincePurchase <= 7) return originalAmount;
-            if (daysSincePurchase <= 14) return originalAmount * 0.9;
-            return originalAmount * 0.5;
-        }
-    }
+      public interface PaymentProcessor {
+          boolean process(Payment payment);
+          void refund(String transactionId);
+          PaymentStatus getStatus(String transactionId);
+      }
+    src/main/java/com/example/StripeProcessor.java: |
+      package com.example;
 
-changed:
-  src/main/java/com/example/PaymentProcessor.java: |
-    package com.example;
+      public class StripeProcessor implements PaymentProcessor {
+          private final String apiKey;
 
-    public interface PaymentProcessor {
-        boolean process(Payment payment);
-        void refund(String transactionId);
-        PaymentStatus getStatus(String transactionId);
-    }
-  src/main/java/com/example/StripeProcessor.java: |
-    package com.example;
+          public StripeProcessor(String apiKey) {
+              this.apiKey = apiKey;
+          }
 
-    public class StripeProcessor implements PaymentProcessor {
-        private final String apiKey;
+          @Override
+          public boolean process(Payment payment) {
+              System.out.println("Processing via Stripe: " + payment.getAmount());
+              return true;
+          }
 
-        public StripeProcessor(String apiKey) {
-            this.apiKey = apiKey;
-        }
+          @Override
+          public void refund(String transactionId) {
+              System.out.println("Refunding via Stripe: " + transactionId);
+          }
+      }
+    src/main/java/com/example/PaymentStatus.java: |
+      package com.example;
 
-        @Override
-        public boolean process(Payment payment) {
-            System.out.println("Processing via Stripe: " + payment.getAmount());
-            return true;
-        }
+      public enum PaymentStatus {
+          PENDING,
+          COMPLETED,
+          FAILED,
+          REFUNDED;
 
-        @Override
-        public void refund(String transactionId) {
-            System.out.println("Refunding via Stripe: " + transactionId);
-        }
-    }
-  src/main/java/com/example/PaymentStatus.java: |
-    package com.example;
+          public boolean isTerminal() {
+              return this == COMPLETED || this == FAILED || this == REFUNDED;
+          }
+      }
+    src/main/java/com/example/shipping/ShippingProcessor.java: |
+      package com.example.shipping;
 
-    public enum PaymentStatus {
-        PENDING,
-        COMPLETED,
-        FAILED,
-        REFUNDED;
+      public class ShippingProcessor {
+          public boolean process(ShippingOrder order) {
+              System.out.println("Processing shipment: " + order.getTrackingId());
+              return true;
+          }
 
-        public boolean isTerminal() {
-            return this == COMPLETED || this == FAILED || this == REFUNDED;
-        }
-    }
-  src/main/java/com/example/shipping/ShippingProcessor.java: |
-    package com.example.shipping;
+          public void refund(String trackingId) {
+              System.out.println("Cancelling shipment: " + trackingId);
+          }
 
-    public class ShippingProcessor {
-        public boolean process(ShippingOrder order) {
-            System.out.println("Processing shipment: " + order.getTrackingId());
-            return true;
-        }
+          public String getStatus(String trackingId) {
+              return "IN_TRANSIT";
+          }
+      }
+    src/main/java/com/example/PaymentService.java: |
+      package com.example;
 
-        public void refund(String trackingId) {
-            System.out.println("Cancelling shipment: " + trackingId);
-        }
+      public class PaymentService {
+          private final PaymentProcessor processor;
 
-        public String getStatus(String trackingId) {
-            return "IN_TRANSIT";
-        }
-    }
-  src/main/java/com/example/PaymentService.java: |
-    package com.example;
+          public PaymentService(PaymentProcessor processor) {
+              this.processor = processor;
+          }
 
-    public class PaymentService {
-        private final PaymentProcessor processor;
+          public boolean makePayment(Payment payment) {
+              return processor.process(payment);
+          }
 
-        public PaymentService(PaymentProcessor processor) {
-            this.processor = processor;
-        }
+          public void issueRefund(String transactionId) {
+              processor.refund(transactionId);
+          }
+      }
+    src/main/java/com/example/gateway/PaymentGateway.java: |
+      package com.example.gateway;
 
-        public boolean makePayment(Payment payment) {
-            return processor.process(payment);
-        }
+      import java.net.http.HttpClient;
+      import java.net.http.HttpRequest;
+      import java.net.http.HttpResponse;
+      import java.net.URI;
 
-        public void issueRefund(String transactionId) {
-            processor.refund(transactionId);
-        }
-    }
-  src/main/java/com/example/gateway/PaymentGateway.java: |
-    package com.example.gateway;
+      public class PaymentGateway {
+          private final HttpClient client = HttpClient.newHttpClient();
+          private final String baseUrl;
 
-    import java.net.http.HttpClient;
-    import java.net.http.HttpRequest;
-    import java.net.http.HttpResponse;
-    import java.net.URI;
+          public PaymentGateway(String baseUrl) {
+              this.baseUrl = baseUrl;
+          }
 
-    public class PaymentGateway {
-        private final HttpClient client = HttpClient.newHttpClient();
-        private final String baseUrl;
+          public String charge(String token, double amount) throws Exception {
+              HttpRequest request = HttpRequest.newBuilder()
+                  .uri(URI.create(baseUrl + "/charge"))
+                  .POST(HttpRequest.BodyPublishers.ofString(
+                      "{\"token\":\"" + token + "\",\"amount\":" + amount + "}"))
+                  .build();
+              HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+              return response.body();
+          }
+      }
+    src/main/java/com/example/TransactionLog.java: |
+      package com.example;
 
-        public PaymentGateway(String baseUrl) {
-            this.baseUrl = baseUrl;
-        }
+      import java.time.LocalDateTime;
+      import java.util.ArrayList;
+      import java.util.List;
 
-        public String charge(String token, double amount) throws Exception {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/charge"))
-                .POST(HttpRequest.BodyPublishers.ofString(
-                    "{\"token\":\"" + token + "\",\"amount\":" + amount + "}"))
-                .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            return response.body();
-        }
-    }
-  src/main/java/com/example/TransactionLog.java: |
-    package com.example;
+      public class TransactionLog {
+          private final List<LogEntry> entries = new ArrayList<>();
 
-    import java.time.LocalDateTime;
-    import java.util.ArrayList;
-    import java.util.List;
+          public void log(String transactionId, PaymentStatus status) {
+              entries.add(new LogEntry(transactionId, status, LocalDateTime.now()));
+          }
 
-    public class TransactionLog {
-        private final List<LogEntry> entries = new ArrayList<>();
+          public List<LogEntry> getEntries() {
+              return List.copyOf(entries);
+          }
 
-        public void log(String transactionId, PaymentStatus status) {
-            entries.add(new LogEntry(transactionId, status, LocalDateTime.now()));
-        }
+          record LogEntry(String transactionId, PaymentStatus status, LocalDateTime timestamp) {}
+      }
+    src/main/java/com/example/RefundPolicy.java: |
+      package com.example;
 
-        public List<LogEntry> getEntries() {
-            return List.copyOf(entries);
-        }
+      import java.time.Duration;
+      import java.time.LocalDateTime;
 
-        record LogEntry(String transactionId, PaymentStatus status, LocalDateTime timestamp) {}
-    }
-  src/main/java/com/example/RefundPolicy.java: |
-    package com.example;
+      public class RefundPolicy {
+          private static final Duration REFUND_WINDOW = Duration.ofDays(30);
 
-    import java.time.Duration;
-    import java.time.LocalDateTime;
+          public boolean isRefundable(LocalDateTime purchaseDate) {
+              return Duration.between(purchaseDate, LocalDateTime.now())
+                  .compareTo(REFUND_WINDOW) <= 0;
+          }
 
-    public class RefundPolicy {
-        private static final Duration REFUND_WINDOW = Duration.ofDays(30);
-
-        public boolean isRefundable(LocalDateTime purchaseDate) {
-            return Duration.between(purchaseDate, LocalDateTime.now())
-                .compareTo(REFUND_WINDOW) <= 0;
-        }
-
-        public double calculateRefundAmount(double originalAmount, int daysSincePurchase) {
-            if (daysSincePurchase <= 7) return originalAmount;
-            if (daysSincePurchase <= 14) return originalAmount * 0.9;
-            return originalAmount * 0.5;
-        }
-    }
-
-must_include_files:
-  - src/main/java/com/example/PaymentProcessor.java
-  - src/main/java/com/example/StripeProcessor.java
-
-must_include_content_from:
-  src/main/java/com/example/PaymentProcessor.java:
-    - "PaymentStatus getStatus(String transactionId)"
-    - "boolean process(Payment payment)"
-    - "void refund(String transactionId)"
-  src/main/java/com/example/StripeProcessor.java:
-    - "implements PaymentProcessor"
-    - "public boolean process(Payment payment)"
-
-must_not_include:
-  # ShippingProcessor.java: similar method names but different domain, not PaymentProcessor impl
-  - ShippingProcessor
-  - ShippingOrder
-  - "IN_TRANSIT"
-  - getTrackingId
-  # PaymentService.java: consumer, doesn't help review interface contract
-  - PaymentService
-  - makePayment
-  - issueRefund
-  # PaymentGateway.java: HTTP client, independent of interface
-  - PaymentGateway
-  - HttpClient
-  - charge
-  # TransactionLog.java: logging with PaymentStatus, same vocabulary
-  - TransactionLog
-  - LogEntry
-  - getEntries
-  # RefundPolicy.java: refund business rules, independent
-  - RefundPolicy
-  - isRefundable
-  - calculateRefundAmount
-  - REFUND_WINDOW
-
-must_not_include_files:
-  - src/main/java/com/example/shipping/ShippingProcessor.java
-  - src/main/java/com/example/PaymentService.java
-  - src/main/java/com/example/gateway/PaymentGateway.java
-  - src/main/java/com/example/TransactionLog.java
-  - src/main/java/com/example/RefundPolicy.java
-
-max_fragments: 7
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          public double calculateRefundAmount(double originalAmount, int daysSincePurchase) {
+              if (daysSincePurchase <= 7) return originalAmount;
+              if (daysSincePurchase <= 14) return originalAmount * 0.9;
+              return originalAmount * 0.5;
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: paymentprocessor
+  selector:
+    path: src/main/java/com/example/PaymentProcessor.java
+    anchor: PaymentStatus getStatus(String transactionId)
+- id: paymentprocessor_1
+  selector:
+    path: src/main/java/com/example/PaymentProcessor.java
+    anchor: boolean process(Payment payment)
+- id: paymentprocessor_2
+  selector:
+    path: src/main/java/com/example/PaymentProcessor.java
+    anchor: void refund(String transactionId)
+- id: stripeprocessor
+  selector:
+    path: src/main/java/com/example/StripeProcessor.java
+    anchor: implements PaymentProcessor
+- id: stripeprocessor_1
+  selector:
+    path: src/main/java/com/example/StripeProcessor.java
+    anchor: public boolean process(Payment payment)
+- id: no_shippingprocessor
+  selector:
+    path: src/main/java/com/example/shipping/ShippingProcessor.java
+- id: no_paymentservice
+  selector:
+    path: src/main/java/com/example/PaymentService.java
+- id: no_paymentgateway
+  selector:
+    path: src/main/java/com/example/gateway/PaymentGateway.java
+- id: no_transactionlog
+  selector:
+    path: src/main/java/com/example/TransactionLog.java
+- id: no_refundpolicy
+  selector:
+    path: src/main/java/com/example/RefundPolicy.java
+- id: no_global_0
+  selector:
+    anchor: ShippingProcessor
+- id: no_global_1
+  selector:
+    anchor: ShippingOrder
+- id: no_global_2
+  selector:
+    anchor: IN_TRANSIT
+- id: no_global_3
+  selector:
+    anchor: getTrackingId
+- id: no_global_4
+  selector:
+    anchor: PaymentService
+- id: no_global_5
+  selector:
+    anchor: makePayment
+- id: no_global_6
+  selector:
+    anchor: issueRefund
+- id: no_global_7
+  selector:
+    anchor: PaymentGateway
+- id: no_global_8
+  selector:
+    anchor: HttpClient
+- id: no_global_9
+  selector:
+    anchor: charge
+- id: no_global_10
+  selector:
+    anchor: TransactionLog
+- id: no_global_11
+  selector:
+    anchor: LogEntry
+- id: no_global_12
+  selector:
+    anchor: getEntries
+- id: no_global_13
+  selector:
+    anchor: RefundPolicy
+- id: no_global_14
+  selector:
+    anchor: isRefundable
+- id: no_global_15
+  selector:
+    anchor: calculateRefundAmount
+- id: no_global_16
+  selector:
+    anchor: REFUND_WINDOW
+oracle:
+  required:
+  - paymentprocessor
+  - paymentprocessor_1
+  - paymentprocessor_2
+  - stripeprocessor
+  - stripeprocessor_1
+  allowed: []
+  forbidden:
+  - no_shippingprocessor
+  - no_paymentservice
+  - no_paymentgateway
+  - no_transactionlog
+  - no_refundpolicy
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13
+  - no_global_14
+  - no_global_15
+  - no_global_16

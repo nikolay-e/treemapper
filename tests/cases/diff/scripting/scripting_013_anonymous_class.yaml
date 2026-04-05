@@ -1,196 +1,224 @@
-# Scenario: app.php creates an anonymous class implementing Handler interface.
-# Handler.php defines the interface with a handle() method signature.
-#
-# Diff: app.php changes from simple echo to creating an anonymous class that
-# implements Handler, overriding handle() to call strtoupper(), then invoking it.
-#
-# Reviewer questions:
-#   Q1: "What contract does the anonymous class need to satisfy?"
-#       -> Handler.php (UNCHANGED) declares handle(mixed $data): mixed. Reviewer
-#          verifies the anonymous class correctly implements this signature.
-#   Q2: "Is the return type compatible — strtoupper returns string, handle expects mixed?"
-#       -> Handler.php uses mixed return, so string is valid. Reviewer confirms.
-#
-# Not needed:
-#   - Transformer.php: another data transformation class. Similar concept (transforms
-#     data) but doesn't implement Handler and has no import edge.
-#   - Pipeline.php: chains multiple operations. Could theoretically use Handler
-#     instances but doesn't import or reference it.
-#   - Dispatcher.php: also requires Handler.php and creates handlers. DIRECT
-#     structural edge (same interface) but dispatches events — different consumer.
-#   - Processor.php: implements Handler interface with its own handle() method.
-#     Same interface, same method name — but is a named class, not imported by app.php.
-#   - lib/HandlerFactory.php: creates Handler instances by type. References
-#     Handler interface but is a factory utility — no import from app.php.
+name: scripting_013_anonymous_class
+repo:
+  initial_files:
+    src/Handler.php: |
+      <?php
+      interface Handler {
+          public function handle(mixed $data): mixed;
+      }
+    src/app.php: |
+      <?php
+      echo "Hello";
+    src/Transformer.php: |
+      <?php
+      class Transformer {
+          public function lowercase(string $input): string {
+              return strtolower($input);
+          }
 
-max_enrichment: 16.2
-initial:
-  src/Handler.php: |
-    <?php
-    interface Handler {
-        public function handle(mixed $data): mixed;
-    }
-  src/app.php: |
-    <?php
-    echo "Hello";
-  src/Transformer.php: |
-    <?php
-    class Transformer {
-        public function lowercase(string $input): string {
-            return strtolower($input);
-        }
+          public function reverse(string $input): string {
+              return strrev($input);
+          }
 
-        public function reverse(string $input): string {
-            return strrev($input);
-        }
+          public function trim(string $input): string {
+              return trim($input);
+          }
 
-        public function trim(string $input): string {
-            return trim($input);
-        }
+          public function replace(string $input, string $search, string $replace): string {
+              return str_replace($search, $replace, $input);
+          }
+      }
+    src/Pipeline.php: |
+      <?php
+      class Pipeline {
+          private array $stages = [];
 
-        public function replace(string $input, string $search, string $replace): string {
-            return str_replace($search, $replace, $input);
-        }
-    }
-  src/Pipeline.php: |
-    <?php
-    class Pipeline {
-        private array $stages = [];
+          public function pipe(callable $stage): self {
+              $this->stages[] = $stage;
+              return $this;
+          }
 
-        public function pipe(callable $stage): self {
-            $this->stages[] = $stage;
-            return $this;
-        }
+          public function process(mixed $payload): mixed {
+              $result = $payload;
+              foreach ($this->stages as $stage) {
+                  $result = $stage($result);
+              }
+              return $result;
+          }
 
-        public function process(mixed $payload): mixed {
-            $result = $payload;
-            foreach ($this->stages as $stage) {
-                $result = $stage($result);
-            }
-            return $result;
-        }
+          public function count(): int {
+              return count($this->stages);
+          }
+      }
+    src/Dispatcher.php: |
+      <?php
+      require_once 'Handler.php';
 
-        public function count(): int {
-            return count($this->stages);
-        }
-    }
-  src/Dispatcher.php: |
-    <?php
-    require_once 'Handler.php';
+      class Dispatcher {
+          private array $handlers = [];
 
-    class Dispatcher {
-        private array $handlers = [];
+          public function register(string $event, Handler $handler): void {
+              $this->handlers[$event][] = $handler;
+          }
 
-        public function register(string $event, Handler $handler): void {
-            $this->handlers[$event][] = $handler;
-        }
+          public function dispatch(string $event, mixed $data): array {
+              $results = [];
+              foreach ($this->handlers[$event] ?? [] as $handler) {
+                  $results[] = $handler->handle($data);
+              }
+              return $results;
+          }
 
-        public function dispatch(string $event, mixed $data): array {
-            $results = [];
-            foreach ($this->handlers[$event] ?? [] as $handler) {
-                $results[] = $handler->handle($data);
-            }
-            return $results;
-        }
+          public function hasHandlers(string $event): bool {
+              return !empty($this->handlers[$event]);
+          }
+      }
+    src/Processor.php: |
+      <?php
+      require_once 'Handler.php';
 
-        public function hasHandlers(string $event): bool {
-            return !empty($this->handlers[$event]);
-        }
-    }
-  src/Processor.php: |
-    <?php
-    require_once 'Handler.php';
+      class Processor implements Handler {
+          public function handle(mixed $data): mixed {
+              if (is_string($data)) {
+                  return strtolower($data);
+              }
+              if (is_array($data)) {
+                  return array_map('strtolower', $data);
+              }
+              return $data;
+          }
 
-    class Processor implements Handler {
-        public function handle(mixed $data): mixed {
-            if (is_string($data)) {
-                return strtolower($data);
-            }
-            if (is_array($data)) {
-                return array_map('strtolower', $data);
-            }
-            return $data;
-        }
+          public function batchHandle(array $items): array {
+              return array_map([$this, 'handle'], $items);
+          }
+      }
+    src/lib/HandlerFactory.php: |
+      <?php
+      require_once __DIR__ . '/../Handler.php';
 
-        public function batchHandle(array $items): array {
-            return array_map([$this, 'handle'], $items);
-        }
-    }
-  src/lib/HandlerFactory.php: |
-    <?php
-    require_once __DIR__ . '/../Handler.php';
+      class HandlerFactory {
+          private array $registry = [];
 
-    class HandlerFactory {
-        private array $registry = [];
+          public function register(string $type, string $className): void {
+              $this->registry[$type] = $className;
+          }
 
-        public function register(string $type, string $className): void {
-            $this->registry[$type] = $className;
-        }
+          public function create(string $type): Handler {
+              $class = $this->registry[$type] ?? null;
+              if (!$class) {
+                  throw new \RuntimeException("Unknown handler type: $type");
+              }
+              return new $class();
+          }
+      }
+  changed_files:
+    src/Handler.php: |
+      <?php
+      interface Handler {
+          public function handle(mixed $data): mixed;
+      }
+    src/app.php: |
+      <?php
+      require_once 'Handler.php';
 
-        public function create(string $type): Handler {
-            $class = $this->registry[$type] ?? null;
-            if (!$class) {
-                throw new \RuntimeException("Unknown handler type: $type");
-            }
-            return new $class();
-        }
-    }
+      $handler = new class implements Handler {
+          public function handle(mixed $data): mixed {
+              return strtoupper($data);
+          }
+      };
 
-changed:
-  src/Handler.php: |
-    <?php
-    interface Handler {
-        public function handle(mixed $data): mixed;
-    }
-  src/app.php: |
-    <?php
-    require_once 'Handler.php';
-
-    $handler = new class implements Handler {
-        public function handle(mixed $data): mixed {
-            return strtoupper($data);
-        }
-    };
-
-    echo $handler->handle('hello');
-
-must_include_files:
-  # Q1: Handler.php defines the interface the anonymous class implements
-  - src/Handler.php
-must_include_content_from:
-  src/Handler.php:
-    - "interface Handler"
-    - "public function handle(mixed $data): mixed"
-  src/app.php:
-    - "implements Handler"
-    - "strtoupper"
-must_not_include:
-  # Transformer.php: string transforms, doesn't implement Handler
-  - lowercase
-  - strrev
-  - replace
-  # Pipeline.php: callable chaining, no reference to Handler interface
-  - "$this->stages"
-  - pipe
-  # Dispatcher.php: HARDEST TRAP — requires Handler.php, registers Handler
-  # instances. Same interface but is a dispatch system, different consumer.
-  - Dispatcher
-  - dispatch
-  - hasHandlers
-  # Processor.php: implements Handler — same interface, same method name
-  # Name collision trap but separate named class
-  - "class Processor implements"
-  - batchHandle
-  # lib/HandlerFactory.php: creates Handler instances by type
-  - HandlerFactory
-  - "Unknown handler type"
-must_not_include_files:
-  - src/Transformer.php
-  - src/Pipeline.php
-  - src/Dispatcher.php
-  - src/Processor.php
-  - src/lib/HandlerFactory.php
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      echo $handler->handle('hello');
+  commit_message: Update files
+fragments:
+- id: handler
+  selector:
+    path: src/Handler.php
+    anchor: interface Handler
+- id: handler_1
+  selector:
+    path: src/Handler.php
+    anchor: 'public function handle(mixed $data): mixed'
+- id: app
+  selector:
+    path: src/app.php
+    anchor: implements Handler
+- id: app_1
+  selector:
+    path: src/app.php
+    anchor: strtoupper
+- id: no_transformer
+  selector:
+    path: src/Transformer.php
+- id: no_pipeline
+  selector:
+    path: src/Pipeline.php
+- id: no_dispatcher
+  selector:
+    path: src/Dispatcher.php
+- id: no_processor
+  selector:
+    path: src/Processor.php
+- id: no_handlerfactory
+  selector:
+    path: src/lib/HandlerFactory.php
+- id: no_global_0
+  selector:
+    anchor: lowercase
+- id: no_global_1
+  selector:
+    anchor: strrev
+- id: no_global_2
+  selector:
+    anchor: replace
+- id: no_global_3
+  selector:
+    anchor: $this->stages
+- id: no_global_4
+  selector:
+    anchor: pipe
+- id: no_global_5
+  selector:
+    anchor: Dispatcher
+- id: no_global_6
+  selector:
+    anchor: dispatch
+- id: no_global_7
+  selector:
+    anchor: hasHandlers
+- id: no_global_8
+  selector:
+    anchor: class Processor implements
+- id: no_global_9
+  selector:
+    anchor: batchHandle
+- id: no_global_10
+  selector:
+    anchor: HandlerFactory
+- id: no_global_11
+  selector:
+    anchor: Unknown handler type
+oracle:
+  required:
+  - handler
+  - handler_1
+  - app
+  - app_1
+  allowed: []
+  forbidden:
+  - no_transformer
+  - no_pipeline
+  - no_dispatcher
+  - no_processor
+  - no_handlerfactory
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11

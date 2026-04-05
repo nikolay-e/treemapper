@@ -1,202 +1,194 @@
-# Scenario: schemas.ts UserSchema gains stricter validations (uuid(), min/max,
-#   int().positive()) and two new fields (age optional, role required enum).
-#   Only schemas.ts is changed. validator.ts imports and uses UserSchema unchanged.
-#
-# Diff shows:
-#   - id: z.string()         + id: z.string().uuid()
-#   - name: z.string()       + name: z.string().min(1).max(100)
-#   + age: z.number().int().positive().optional()
-#   + role: z.enum(['admin', 'user', 'guest'])
-#
-# Reviewer questions:
-#   Q1: "Who calls validateUser — will existing data that passes validation
-#        now fail with stricter rules?"
-#       -> validator.ts: imports UserSchema and calls UserSchema.parse(data).
-#          Since id now requires UUID format and name has min/max, existing
-#          data with non-UUID ids or empty names will fail. Reviewer verifies
-#          impact on the validator.
-#
-#   Q2: "Is the inferred User type correct — does z.infer produce the right shape?"
-#       -> Same file: type User = z.infer<typeof UserSchema>. After the change,
-#          User = { id: string; name: string; email: string; age?: number;
-#          role: 'admin' | 'user' | 'guest' }. Reviewer confirms the inferred
-#          type matches expectations.
-#
-# Not needed for comprehension:
-#   - src/schemas/productSchema.ts: Product Zod schema. Same directory sibling
-#     with identical pattern (z.object, z.infer, validate function). HARDEST
-#     TRAP: structurally identical pattern. But product validation rules are
-#     irrelevant to reviewing user validation changes.
-#
-#   - src/services/userRepository.ts: Stores validated User objects. Imports
-#     User type from schemas.ts — same import source. But CRUD operations
-#     don't help review whether the Zod schema changes are correct.
-#
-#   - src/controllers/userController.ts: Express handler that calls
-#     validateUser from validator.ts. Imports validateUser — consumer of
-#     the validation chain. But controller HTTP handling doesn't help
-#     review the schema definition itself.
+name: javascript_extended_013_zod_schema_change
+repo:
+  initial_files:
+    schemas.ts: |
+      import { z } from 'zod';
 
-max_enrichment: 8.0
-initial:
-  schemas.ts: |
-    import { z } from 'zod';
+      export const UserSchema = z.object({
+          id: z.string(),
+          name: z.string(),
+          email: z.string().email(),
+      });
 
-    export const UserSchema = z.object({
-        id: z.string(),
-        name: z.string(),
-        email: z.string().email(),
-    });
+      export type User = z.infer<typeof UserSchema>;
+    validator.ts: |
+      import { UserSchema, User } from './schemas';
 
-    export type User = z.infer<typeof UserSchema>;
-  validator.ts: |
-    import { UserSchema, User } from './schemas';
+      export function validateUser(data: unknown): User {
+          return UserSchema.parse(data);
+      }
+    src/schemas/productSchema.ts: |
+      import { z } from 'zod';
 
-    export function validateUser(data: unknown): User {
-        return UserSchema.parse(data);
-    }
-  # --- Not needed: product schema, same pattern but different domain ---
-  src/schemas/productSchema.ts: |
-    import { z } from 'zod';
+      export const ProductSchema = z.object({
+          id: z.string().uuid(),
+          name: z.string().min(1).max(200),
+          price: z.number().positive(),
+          category: z.enum(['electronics', 'clothing', 'food']),
+      });
 
-    export const ProductSchema = z.object({
-        id: z.string().uuid(),
-        name: z.string().min(1).max(200),
-        price: z.number().positive(),
-        category: z.enum(['electronics', 'clothing', 'food']),
-    });
+      export type Product = z.infer<typeof ProductSchema>;
 
-    export type Product = z.infer<typeof ProductSchema>;
+      export function validateProduct(data: unknown): Product {
+          return ProductSchema.parse(data);
+      }
+    src/services/userRepository.ts: |
+      import { User } from '../schemas';
 
-    export function validateProduct(data: unknown): Product {
-        return ProductSchema.parse(data);
-    }
-  # --- Not needed: user storage, imports User but CRUD concern ---
-  src/services/userRepository.ts: |
-    import { User } from '../schemas';
+      const store: User[] = [];
 
-    const store: User[] = [];
+      export function saveUser(user: User): void {
+          store.push(user);
+      }
 
-    export function saveUser(user: User): void {
-        store.push(user);
-    }
+      export function findUserById(id: string): User | undefined {
+          return store.find(u => u.id === id);
+      }
 
-    export function findUserById(id: string): User | undefined {
-        return store.find(u => u.id === id);
-    }
+      export function findUsersByRole(role: string): User[] {
+          return store.filter(u => (u as any).role === role);
+      }
+    src/controllers/userController.ts: |
+      import { Request, Response } from 'express';
+      import { validateUser } from '../validator';
 
-    export function findUsersByRole(role: string): User[] {
-        return store.filter(u => (u as any).role === role);
-    }
-  # --- Not needed: controller calls validateUser, HTTP handling ---
-  src/controllers/userController.ts: |
-    import { Request, Response } from 'express';
-    import { validateUser } from '../validator';
+      export function createUserHandler(req: Request, res: Response): void {
+          try {
+              const user = validateUser(req.body);
+              res.status(201).json(user);
+          } catch (err) {
+              res.status(400).json({ error: 'Validation failed' });
+          }
+      }
+  changed_files:
+    schemas.ts: |
+      import { z } from 'zod';
 
-    export function createUserHandler(req: Request, res: Response): void {
-        try {
-            const user = validateUser(req.body);
-            res.status(201).json(user);
-        } catch (err) {
-            res.status(400).json({ error: 'Validation failed' });
-        }
-    }
+      export const UserSchema = z.object({
+          id: z.string().uuid(),
+          name: z.string().min(1).max(100),
+          email: z.string().email(),
+          age: z.number().int().positive().optional(),
+          role: z.enum(['admin', 'user', 'guest']),
+      });
 
-changed:
-  schemas.ts: |
-    import { z } from 'zod';
+      export type User = z.infer<typeof UserSchema>;
+    validator.ts: |
+      import { UserSchema, User } from './schemas';
 
-    export const UserSchema = z.object({
-        id: z.string().uuid(),
-        name: z.string().min(1).max(100),
-        email: z.string().email(),
-        age: z.number().int().positive().optional(),
-        role: z.enum(['admin', 'user', 'guest']),
-    });
+      export function validateUser(data: unknown): User {
+          return UserSchema.parse(data);
+      }
+    src/schemas/productSchema.ts: |
+      import { z } from 'zod';
 
-    export type User = z.infer<typeof UserSchema>;
-  validator.ts: |
-    import { UserSchema, User } from './schemas';
+      export const ProductSchema = z.object({
+          id: z.string().uuid(),
+          name: z.string().min(1).max(200),
+          price: z.number().positive(),
+          category: z.enum(['electronics', 'clothing', 'food']),
+      });
 
-    export function validateUser(data: unknown): User {
-        return UserSchema.parse(data);
-    }
-  src/schemas/productSchema.ts: |
-    import { z } from 'zod';
+      export type Product = z.infer<typeof ProductSchema>;
 
-    export const ProductSchema = z.object({
-        id: z.string().uuid(),
-        name: z.string().min(1).max(200),
-        price: z.number().positive(),
-        category: z.enum(['electronics', 'clothing', 'food']),
-    });
+      export function validateProduct(data: unknown): Product {
+          return ProductSchema.parse(data);
+      }
+    src/services/userRepository.ts: |
+      import { User } from '../schemas';
 
-    export type Product = z.infer<typeof ProductSchema>;
+      const store: User[] = [];
 
-    export function validateProduct(data: unknown): Product {
-        return ProductSchema.parse(data);
-    }
-  src/services/userRepository.ts: |
-    import { User } from '../schemas';
+      export function saveUser(user: User): void {
+          store.push(user);
+      }
 
-    const store: User[] = [];
+      export function findUserById(id: string): User | undefined {
+          return store.find(u => u.id === id);
+      }
 
-    export function saveUser(user: User): void {
-        store.push(user);
-    }
+      export function findUsersByRole(role: string): User[] {
+          return store.filter(u => (u as any).role === role);
+      }
+    src/controllers/userController.ts: |
+      import { Request, Response } from 'express';
+      import { validateUser } from '../validator';
 
-    export function findUserById(id: string): User | undefined {
-        return store.find(u => u.id === id);
-    }
-
-    export function findUsersByRole(role: string): User[] {
-        return store.filter(u => (u as any).role === role);
-    }
-  src/controllers/userController.ts: |
-    import { Request, Response } from 'express';
-    import { validateUser } from '../validator';
-
-    export function createUserHandler(req: Request, res: Response): void {
-        try {
-            const user = validateUser(req.body);
-            res.status(201).json(user);
-        } catch (err) {
-            res.status(400).json({ error: 'Validation failed' });
-        }
-    }
-
-must_include_files:
-  - schemas.ts
-
-must_include_content_from:
-  schemas.ts:
-    - "UserSchema = z.object({"
-    - "z.string().uuid()"
-    - "z.enum(['admin', 'user', 'guest'])"
-    - "type User = z.infer<typeof UserSchema>"
-
-must_not_include:
-  # --- productSchema.ts: IDENTICAL pattern (z.object, z.infer, validate) ---
-  # HARDEST TRAP: uses the same Zod methods (.uuid(), .min(), .max(),
-  # .positive(), .enum()) as the changes in UserSchema. Structurally
-  # identical sibling. But product validation is a different domain.
-  - ProductSchema
-  - validateProduct
-  - "Product = z.infer"
-  # --- userRepository.ts: imports User, CRUD operations ---
-  - saveUser
-  - findUserById
-  - findUsersByRole
-  # --- userController.ts: calls validateUser, HTTP handler ---
-  - createUserHandler
-  - "Validation failed"
-
-must_not_include_files:
-  - src/schemas/productSchema.ts
-  - src/services/userRepository.ts
-  - src/controllers/userController.ts
-
-max_fragments: 6
-max_files: 2
-add_garbage_files: false
-skip_garbage_check: true
+      export function createUserHandler(req: Request, res: Response): void {
+          try {
+              const user = validateUser(req.body);
+              res.status(201).json(user);
+          } catch (err) {
+              res.status(400).json({ error: 'Validation failed' });
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: schemas
+  selector:
+    path: schemas.ts
+    anchor: UserSchema = z.object({
+- id: schemas_1
+  selector:
+    path: schemas.ts
+    anchor: z.string().uuid()
+- id: schemas_2
+  selector:
+    path: schemas.ts
+    anchor: z.enum(['admin', 'user', 'guest'])
+- id: schemas_3
+  selector:
+    path: schemas.ts
+    anchor: type User = z.infer<typeof UserSchema>
+- id: no_productschema
+  selector:
+    path: src/schemas/productSchema.ts
+- id: no_userrepository
+  selector:
+    path: src/services/userRepository.ts
+- id: no_usercontroller
+  selector:
+    path: src/controllers/userController.ts
+- id: no_global_0
+  selector:
+    anchor: ProductSchema
+- id: no_global_1
+  selector:
+    anchor: validateProduct
+- id: no_global_2
+  selector:
+    anchor: Product = z.infer
+- id: no_global_3
+  selector:
+    anchor: saveUser
+- id: no_global_4
+  selector:
+    anchor: findUserById
+- id: no_global_5
+  selector:
+    anchor: findUsersByRole
+- id: no_global_6
+  selector:
+    anchor: createUserHandler
+- id: no_global_7
+  selector:
+    anchor: Validation failed
+oracle:
+  required:
+  - schemas
+  - schemas_1
+  - schemas_2
+  - schemas_3
+  allowed: []
+  forbidden:
+  - no_productschema
+  - no_userrepository
+  - no_usercontroller
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7

@@ -1,14 +1,23 @@
-max_enrichment: 3.0
-initial:
-  null_byte.py: |
-    x = 0
-changed:
-  null_byte.py: |
-    s = "hello\x00world"
-    result = process(s)
-must_include_files:
-- null_byte.py
-must_include_content:
-- s = "hello\x00world"
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_035_null_byte_in_string_literal
+repo:
+  initial_files:
+    null_byte.py: |
+      x = 0
+  changed_files:
+    null_byte.py: |
+      s = "hello\x00world"
+      result = process(s)
+  commit_message: Update files
+fragments:
+- id: null_byte_file
+  selector:
+    path: null_byte.py
+- id: req_global_0
+  selector:
+    anchor: s = "hello\x00world"
+oracle:
+  required:
+  - null_byte_file
+  - req_global_0
+  allowed: []
+  forbidden: []

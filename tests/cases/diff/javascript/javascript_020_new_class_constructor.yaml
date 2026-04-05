@@ -1,180 +1,183 @@
-# Scenario: main.ts is rewritten to import MyClass from user.ts, construct
-#   an instance with new MyClass(42), and call getValue(). Only main.ts changed.
-#
-# Diff shows:
-#   - console.log('initial');
-#   + import { MyClass } from './user';
-#   + function createInstance() { const instance = new MyClass(42); return instance.getValue(); }
-#
-# Reviewer questions:
-#   Q1: "What does MyClass(42) do — is the constructor parameter valid?"
-#       -> user.ts (UNCHANGED) constructor takes value: number. 42 is valid.
-#          Reviewer must see the constructor to verify.
-#
-#   Q2: "What does getValue() return for value=42?"
-#       -> Same file: getValue() returns this.value. For 42, returns 42.
-#          Reviewer needs the method body to verify.
-#
-# Not needed for comprehension:
-#   - my-class.test.ts: Test file that constructs MyClass instances and
-#     asserts on getValue(). DIRECT STRUCTURAL EDGE: imports MyClass,
-#     calls new MyClass() and getValue(). But test expectations don't help
-#     review main.ts's usage — reviewer needs the class definition.
-#
-#   - my-class-builder.ts: Builder pattern that creates MyClass instances.
-#     Direct reference to MyClass. But builder chaining doesn't help
-#     review the simple constructor call in main.ts.
+name: javascript_020_new_class_constructor
+repo:
+  initial_files:
+    user.ts: |
+      export class MyClass {
+          private value: number;
 
-max_enrichment: 9.6
-initial:
-  user.ts: |
-    export class MyClass {
-        private value: number;
+          constructor(value: number) {
+              this.value = value;
+          }
 
-        constructor(value: number) {
-            this.value = value;
-        }
+          getValue(): number {
+              return this.value;
+          }
+      }
+    main.ts: |
+      console.log('initial');
+    my-class.test.ts: |
+      import { MyClass } from './user';
 
-        getValue(): number {
-            return this.value;
-        }
-    }
-  main.ts: |
-    console.log('initial');
-  my-class.test.ts: |
-    import { MyClass } from './user';
+      describe('MyClass', () => {
+          it('should store value from constructor', () => {
+              const instance = new MyClass(42);
+              expect(instance.getValue()).toBe(42);
+          });
 
-    describe('MyClass', () => {
-        it('should store value from constructor', () => {
-            const instance = new MyClass(42);
-            expect(instance.getValue()).toBe(42);
-        });
+          it('should accept zero', () => {
+              const instance = new MyClass(0);
+              expect(instance.getValue()).toBe(0);
+          });
 
-        it('should accept zero', () => {
-            const instance = new MyClass(0);
-            expect(instance.getValue()).toBe(0);
-        });
+          it('should accept negative values', () => {
+              const instance = new MyClass(-10);
+              expect(instance.getValue()).toBe(-10);
+          });
+      });
+    my-class-builder.ts: |
+      import { MyClass } from './user';
 
-        it('should accept negative values', () => {
-            const instance = new MyClass(-10);
-            expect(instance.getValue()).toBe(-10);
-        });
-    });
-  my-class-builder.ts: |
-    import { MyClass } from './user';
+      export class MyClassBuilder {
+          private value: number = 0;
 
-    export class MyClassBuilder {
-        private value: number = 0;
+          withValue(value: number): MyClassBuilder {
+              this.value = value;
+              return this;
+          }
 
-        withValue(value: number): MyClassBuilder {
-            this.value = value;
-            return this;
-        }
+          build(): MyClass {
+              return new MyClass(this.value);
+          }
+      }
 
-        build(): MyClass {
-            return new MyClass(this.value);
-        }
-    }
+      export function createDefault(): MyClass {
+          return new MyClassBuilder().withValue(1).build();
+      }
+  changed_files:
+    user.ts: |
+      export class MyClass {
+          private value: number;
 
-    export function createDefault(): MyClass {
-        return new MyClassBuilder().withValue(1).build();
-    }
+          constructor(value: number) {
+              this.value = value;
+          }
 
-changed:
-  user.ts: |
-    export class MyClass {
-        private value: number;
+          getValue(): number {
+              return this.value;
+          }
+      }
+    main.ts: |
+      import { MyClass } from './user';
 
-        constructor(value: number) {
-            this.value = value;
-        }
+      function createInstance() {
+          const instance = new MyClass(42);
+          return instance.getValue();
+      }
 
-        getValue(): number {
-            return this.value;
-        }
-    }
-  main.ts: |
-    import { MyClass } from './user';
+      console.log(createInstance());
+    my-class.test.ts: |
+      import { MyClass } from './user';
 
-    function createInstance() {
-        const instance = new MyClass(42);
-        return instance.getValue();
-    }
+      describe('MyClass', () => {
+          it('should store value from constructor', () => {
+              const instance = new MyClass(42);
+              expect(instance.getValue()).toBe(42);
+          });
 
-    console.log(createInstance());
-  my-class.test.ts: |
-    import { MyClass } from './user';
+          it('should accept zero', () => {
+              const instance = new MyClass(0);
+              expect(instance.getValue()).toBe(0);
+          });
 
-    describe('MyClass', () => {
-        it('should store value from constructor', () => {
-            const instance = new MyClass(42);
-            expect(instance.getValue()).toBe(42);
-        });
+          it('should accept negative values', () => {
+              const instance = new MyClass(-10);
+              expect(instance.getValue()).toBe(-10);
+          });
+      });
+    my-class-builder.ts: |
+      import { MyClass } from './user';
 
-        it('should accept zero', () => {
-            const instance = new MyClass(0);
-            expect(instance.getValue()).toBe(0);
-        });
+      export class MyClassBuilder {
+          private value: number = 0;
 
-        it('should accept negative values', () => {
-            const instance = new MyClass(-10);
-            expect(instance.getValue()).toBe(-10);
-        });
-    });
-  my-class-builder.ts: |
-    import { MyClass } from './user';
+          withValue(value: number): MyClassBuilder {
+              this.value = value;
+              return this;
+          }
 
-    export class MyClassBuilder {
-        private value: number = 0;
+          build(): MyClass {
+              return new MyClass(this.value);
+          }
+      }
 
-        withValue(value: number): MyClassBuilder {
-            this.value = value;
-            return this;
-        }
-
-        build(): MyClass {
-            return new MyClass(this.value);
-        }
-    }
-
-    export function createDefault(): MyClass {
-        return new MyClassBuilder().withValue(1).build();
-    }
-
-must_include_files:
-  - main.ts
-  # Q1+Q2: MyClass constructor and getValue() define what main.ts uses
-  - user.ts
-
-must_include_content_from:
-  main.ts:
-    - "import { MyClass } from './user'"
-    - "new MyClass(42)"
-    - "instance.getValue()"
-  user.ts:
-    - "class MyClass"
-    - "constructor(value: number)"
-    - "getValue(): number"
-
-must_not_include:
-  # --- my-class.test.ts: tests for MyClass ---
-  # DIRECT EDGE: imports MyClass, calls new MyClass() and getValue().
-  # But test assertions verify behavior, not help review main.ts usage.
-  - "describe('MyClass'"
-  - "expect(instance.getValue()).toBe"
-  - "should store value"
-  # --- my-class-builder.ts: builder creating MyClass instances ---
-  # Direct reference to MyClass. But builder pattern doesn't help
-  # review the simple constructor call.
-  - MyClassBuilder
-  - withValue
-  - createDefault
-
-must_not_include_files:
-  - my-class.test.ts
-  - my-class-builder.ts
-
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export function createDefault(): MyClass {
+          return new MyClassBuilder().withValue(1).build();
+      }
+  commit_message: Update files
+fragments:
+- id: main
+  selector:
+    path: main.ts
+    anchor: import { MyClass } from './user'
+- id: main_1
+  selector:
+    path: main.ts
+    anchor: new MyClass(42)
+- id: main_2
+  selector:
+    path: main.ts
+    anchor: instance.getValue()
+- id: user
+  selector:
+    path: user.ts
+    anchor: class MyClass
+- id: user_1
+  selector:
+    path: user.ts
+    anchor: 'constructor(value: number)'
+- id: user_2
+  selector:
+    path: user.ts
+    anchor: 'getValue(): number'
+- id: no_my_class_test
+  selector:
+    path: my-class.test.ts
+- id: no_my_class_builder
+  selector:
+    path: my-class-builder.ts
+- id: no_global_0
+  selector:
+    anchor: describe('MyClass'
+- id: no_global_1
+  selector:
+    anchor: expect(instance.getValue()).toBe
+- id: no_global_2
+  selector:
+    anchor: should store value
+- id: no_global_3
+  selector:
+    anchor: MyClassBuilder
+- id: no_global_4
+  selector:
+    anchor: withValue
+- id: no_global_5
+  selector:
+    anchor: createDefault
+oracle:
+  required:
+  - main
+  - main_1
+  - main_2
+  - user
+  - user_1
+  - user_2
+  allowed: []
+  forbidden:
+  - no_my_class_test
+  - no_my_class_builder
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

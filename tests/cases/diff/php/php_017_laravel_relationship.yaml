@@ -1,211 +1,220 @@
-# Scenario: User model gains hasMany relationship to Post (posts(), addPost(), latestPost())
-# Changed: User now imports and references Post class for relationship methods
-# Reviewer needs: User (changed) + Post (unchanged, defines Post shape used by User)
-# Trap: Comment model — also has post_id field and belongs to Post, but User doesn't touch it
-# Trap: Tag model — similar model structure with id/name, but no relationship to User
-# Trap: Category — has similar getPostCount()-like method, same domain vocabulary
+name: php_017_laravel_relationship
+repo:
+  initial_files:
+    app/Models/Post.php: |
+      <?php
+      namespace App\Models;
 
-max_enrichment: 11.0
-initial:
-  app/Models/Post.php: |
-    <?php
-    namespace App\Models;
+      class Post {
+          public int $id;
+          public int $user_id;
+          public string $title;
+          public string $body;
 
-    class Post {
-        public int $id;
-        public int $user_id;
-        public string $title;
-        public string $body;
+          public function __construct(int $id, int $user_id, string $title, string $body) {
+              $this->id = $id;
+              $this->user_id = $user_id;
+              $this->title = $title;
+              $this->body = $body;
+          }
 
-        public function __construct(int $id, int $user_id, string $title, string $body) {
-            $this->id = $id;
-            $this->user_id = $user_id;
-            $this->title = $title;
-            $this->body = $body;
-        }
+          public function getSummary(): string {
+              return substr($this->body, 0, 100);
+          }
+      }
+    app/Models/User.php: |
+      <?php
+      namespace App\Models;
 
-        public function getSummary(): string {
-            return substr($this->body, 0, 100);
-        }
-    }
-  app/Models/User.php: |
-    <?php
-    namespace App\Models;
+      class User {
+          public int $id;
+          public string $name;
+          public string $email;
 
-    class User {
-        public int $id;
-        public string $name;
-        public string $email;
+          public function __construct(int $id, string $name, string $email) {
+              $this->id = $id;
+              $this->name = $name;
+              $this->email = $email;
+          }
+      }
+    app/Models/Comment.php: |
+      <?php
+      namespace App\Models;
 
-        public function __construct(int $id, string $name, string $email) {
-            $this->id = $id;
-            $this->name = $name;
-            $this->email = $email;
-        }
-    }
-  app/Models/Comment.php: |
-    <?php
-    namespace App\Models;
+      class Comment {
+          public int $id;
+          public int $post_id;
+          public string $content;
+          public int $user_id;
 
-    class Comment {
-        public int $id;
-        public int $post_id;
-        public string $content;
-        public int $user_id;
+          public function __construct(int $id, int $post_id, int $user_id, string $content) {
+              $this->id = $id;
+              $this->post_id = $post_id;
+              $this->user_id = $user_id;
+              $this->content = $content;
+          }
 
-        public function __construct(int $id, int $post_id, int $user_id, string $content) {
-            $this->id = $id;
-            $this->post_id = $post_id;
-            $this->user_id = $user_id;
-            $this->content = $content;
-        }
+          public function belongsToPost(Post $post): bool {
+              return $this->post_id === $post->id;
+          }
+      }
+    app/Models/Tag.php: |
+      <?php
+      namespace App\Models;
 
-        public function belongsToPost(Post $post): bool {
-            return $this->post_id === $post->id;
-        }
-    }
-  app/Models/Tag.php: |
-    <?php
-    namespace App\Models;
+      class Tag {
+          public int $id;
+          public string $name;
+          private array $posts = [];
 
-    class Tag {
-        public int $id;
-        public string $name;
-        private array $posts = [];
+          public function __construct(int $id, string $name) {
+              $this->id = $id;
+              $this->name = $name;
+          }
 
-        public function __construct(int $id, string $name) {
-            $this->id = $id;
-            $this->name = $name;
-        }
+          public function addPost(Post $post): void {
+              $this->posts[] = $post;
+          }
 
-        public function addPost(Post $post): void {
-            $this->posts[] = $post;
-        }
+          public function getPostCount(): int {
+              return count($this->posts);
+          }
+      }
+  changed_files:
+    app/Models/Post.php: |
+      <?php
+      namespace App\Models;
 
-        public function getPostCount(): int {
-            return count($this->posts);
-        }
-    }
+      class Post {
+          public int $id;
+          public int $user_id;
+          public string $title;
+          public string $body;
 
-changed:
-  app/Models/Post.php: |
-    <?php
-    namespace App\Models;
+          public function __construct(int $id, int $user_id, string $title, string $body) {
+              $this->id = $id;
+              $this->user_id = $user_id;
+              $this->title = $title;
+              $this->body = $body;
+          }
 
-    class Post {
-        public int $id;
-        public int $user_id;
-        public string $title;
-        public string $body;
+          public function getSummary(): string {
+              return substr($this->body, 0, 100);
+          }
+      }
+    app/Models/User.php: |
+      <?php
+      namespace App\Models;
 
-        public function __construct(int $id, int $user_id, string $title, string $body) {
-            $this->id = $id;
-            $this->user_id = $user_id;
-            $this->title = $title;
-            $this->body = $body;
-        }
+      class User {
+          public int $id;
+          public string $name;
+          public string $email;
+          private array $posts = [];
 
-        public function getSummary(): string {
-            return substr($this->body, 0, 100);
-        }
-    }
-  app/Models/User.php: |
-    <?php
-    namespace App\Models;
+          public function __construct(int $id, string $name, string $email) {
+              $this->id = $id;
+              $this->name = $name;
+              $this->email = $email;
+          }
 
-    class User {
-        public int $id;
-        public string $name;
-        public string $email;
-        private array $posts = [];
+          public function posts(): array {
+              return $this->posts;
+          }
 
-        public function __construct(int $id, string $name, string $email) {
-            $this->id = $id;
-            $this->name = $name;
-            $this->email = $email;
-        }
+          public function addPost(Post $post): void {
+              $this->posts[] = $post;
+          }
 
-        public function posts(): array {
-            return $this->posts;
-        }
+          public function getPostCount(): int {
+              return count($this->posts);
+          }
 
-        public function addPost(Post $post): void {
-            $this->posts[] = $post;
-        }
+          public function latestPost(): ?Post {
+              return end($this->posts) ?: null;
+          }
+      }
+    app/Models/Comment.php: |
+      <?php
+      namespace App\Models;
 
-        public function getPostCount(): int {
-            return count($this->posts);
-        }
+      class Comment {
+          public int $id;
+          public int $post_id;
+          public string $content;
+          public int $user_id;
 
-        public function latestPost(): ?Post {
-            return end($this->posts) ?: null;
-        }
-    }
-  app/Models/Comment.php: |
-    <?php
-    namespace App\Models;
+          public function __construct(int $id, int $post_id, int $user_id, string $content) {
+              $this->id = $id;
+              $this->post_id = $post_id;
+              $this->user_id = $user_id;
+              $this->content = $content;
+          }
 
-    class Comment {
-        public int $id;
-        public int $post_id;
-        public string $content;
-        public int $user_id;
+          public function belongsToPost(Post $post): bool {
+              return $this->post_id === $post->id;
+          }
+      }
+    app/Models/Tag.php: |
+      <?php
+      namespace App\Models;
 
-        public function __construct(int $id, int $post_id, int $user_id, string $content) {
-            $this->id = $id;
-            $this->post_id = $post_id;
-            $this->user_id = $user_id;
-            $this->content = $content;
-        }
+      class Tag {
+          public int $id;
+          public string $name;
+          private array $posts = [];
 
-        public function belongsToPost(Post $post): bool {
-            return $this->post_id === $post->id;
-        }
-    }
-  app/Models/Tag.php: |
-    <?php
-    namespace App\Models;
+          public function __construct(int $id, string $name) {
+              $this->id = $id;
+              $this->name = $name;
+          }
 
-    class Tag {
-        public int $id;
-        public string $name;
-        private array $posts = [];
+          public function addPost(Post $post): void {
+              $this->posts[] = $post;
+          }
 
-        public function __construct(int $id, string $name) {
-            $this->id = $id;
-            $this->name = $name;
-        }
-
-        public function addPost(Post $post): void {
-            $this->posts[] = $post;
-        }
-
-        public function getPostCount(): int {
-            return count($this->posts);
-        }
-    }
-
-must_include_files:
-- app/Models/User.php
-- app/Models/Post.php
-
-must_include_content_from:
-  app/Models/User.php:
-    - 'public function addPost(Post $post): void'
-    - 'public function latestPost(): ?Post'
-  app/Models/Post.php:
-    - 'class Post'
-
-must_not_include:
-- 'class Comment'
-- 'class Tag'
-- belongsToPost
-
-must_not_include_files:
-- app/Models/Comment.php
-- app/Models/Tag.php
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          public function getPostCount(): int {
+              return count($this->posts);
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: user
+  selector:
+    path: app/Models/User.php
+    anchor: 'public function addPost(Post $post): void'
+- id: user_1
+  selector:
+    path: app/Models/User.php
+    anchor: 'public function latestPost(): ?Post'
+- id: post
+  selector:
+    path: app/Models/Post.php
+    anchor: class Post
+- id: no_comment
+  selector:
+    path: app/Models/Comment.php
+- id: no_tag
+  selector:
+    path: app/Models/Tag.php
+- id: no_global_0
+  selector:
+    anchor: class Comment
+- id: no_global_1
+  selector:
+    anchor: class Tag
+- id: no_global_2
+  selector:
+    anchor: belongsToPost
+oracle:
+  required:
+  - user
+  - user_1
+  - post
+  allowed: []
+  forbidden:
+  - no_comment
+  - no_tag
+  - no_global_0
+  - no_global_1
+  - no_global_2

@@ -1,251 +1,258 @@
-# Scenario: Wrapper<T> gains Deref and DerefMut implementations so it transparently
-# delegates to the inner value. A new usage.rs demonstrates auto-deref calling
-# String::len() and Vec::push() through the wrapper.
-#
-# Diff: src/wrapper.rs adds Deref/DerefMut impls; src/usage.rs (NEW) demonstrates
-# transparent access; src/lib.rs adds pub mod usage.
-#
-# Reviewer questions:
-#   Q1: "What does deref return?" -> src/wrapper.rs (CHANGED) shows Deref::Target = T,
-#        deref returns &self.value, DerefMut returns &mut self.value.
-#   Q2: "How does auto-deref work in practice?" -> src/usage.rs (NEW) calls
-#        wrapped.len() and wrapped.push() directly through the Wrapper.
-#
-# Trap files (plausible but no dependency on Wrapper or its Deref impl):
-#   - src/smart_ptr.rs: custom smart pointer with reference counting. Same "wrapper
-#     around a value" pattern but its own type, no Wrapper<T> usage.
-#   - src/newtype.rs: newtype wrappers for domain types (UserId, Email). Similar
-#     "wrapper struct" pattern but no Deref, uses explicit .0 access.
+name: rust_039_deref_trait
+repo:
+  initial_files:
+    src/lib.rs: |
+      pub mod wrapper;
+      pub mod smart_ptr;
+      pub mod newtype;
+    src/wrapper.rs: |
+      pub struct Wrapper<T> {
+          value: T,
+          label: String,
+      }
 
-max_enrichment: 4.7
-initial:
-  src/lib.rs: |
-    pub mod wrapper;
-    pub mod smart_ptr;
-    pub mod newtype;
-  src/wrapper.rs: |
-    pub struct Wrapper<T> {
-        value: T,
-        label: String,
-    }
+      impl<T> Wrapper<T> {
+          pub fn new(value: T, label: &str) -> Self {
+              Self {
+                  value,
+                  label: label.to_string(),
+              }
+          }
 
-    impl<T> Wrapper<T> {
-        pub fn new(value: T, label: &str) -> Self {
-            Self {
-                value,
-                label: label.to_string(),
-            }
-        }
+          pub fn into_inner(self) -> T {
+              self.value
+          }
 
-        pub fn into_inner(self) -> T {
-            self.value
-        }
+          pub fn label(&self) -> &str {
+              &self.label
+          }
 
-        pub fn label(&self) -> &str {
-            &self.label
-        }
+          pub fn set_label(&mut self, label: &str) {
+              self.label = label.to_string();
+          }
+      }
+    src/smart_ptr.rs: |
+      use std::ops::Deref;
 
-        pub fn set_label(&mut self, label: &str) {
-            self.label = label.to_string();
-        }
-    }
-  src/smart_ptr.rs: |
-    use std::ops::Deref;
+      pub struct SharedPtr<T> {
+          data: Box<T>,
+          ref_count: usize,
+      }
 
-    pub struct SharedPtr<T> {
-        data: Box<T>,
-        ref_count: usize,
-    }
+      impl<T> SharedPtr<T> {
+          pub fn new(value: T) -> Self {
+              Self {
+                  data: Box::new(value),
+                  ref_count: 1,
+              }
+          }
 
-    impl<T> SharedPtr<T> {
-        pub fn new(value: T) -> Self {
-            Self {
-                data: Box::new(value),
-                ref_count: 1,
-            }
-        }
+          pub fn ref_count(&self) -> usize {
+              self.ref_count
+          }
+      }
 
-        pub fn ref_count(&self) -> usize {
-            self.ref_count
-        }
-    }
+      impl<T> Deref for SharedPtr<T> {
+          type Target = T;
+          fn deref(&self) -> &Self::Target {
+              &self.data
+          }
+      }
+    src/newtype.rs: |
+      pub struct UserId(pub u64);
+      pub struct Email(pub String);
 
-    impl<T> Deref for SharedPtr<T> {
-        type Target = T;
-        fn deref(&self) -> &Self::Target {
-            &self.data
-        }
-    }
-  src/newtype.rs: |
-    pub struct UserId(pub u64);
-    pub struct Email(pub String);
+      impl UserId {
+          pub fn as_u64(&self) -> u64 {
+              self.0
+          }
+      }
 
-    impl UserId {
-        pub fn as_u64(&self) -> u64 {
-            self.0
-        }
-    }
+      impl Email {
+          pub fn domain(&self) -> &str {
+              self.0.split('@').nth(1).unwrap_or("")
+          }
 
-    impl Email {
-        pub fn domain(&self) -> &str {
-            self.0.split('@').nth(1).unwrap_or("")
-        }
+          pub fn local_part(&self) -> &str {
+              self.0.split('@').next().unwrap_or("")
+          }
+      }
 
-        pub fn local_part(&self) -> &str {
-            self.0.split('@').next().unwrap_or("")
-        }
-    }
+      impl std::fmt::Display for UserId {
+          fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+              write!(f, "user:{}", self.0)
+          }
+      }
+  changed_files:
+    src/lib.rs: |
+      pub mod wrapper;
+      pub mod usage;
+      pub mod smart_ptr;
+      pub mod newtype;
+    src/wrapper.rs: |
+      use std::ops::{Deref, DerefMut};
 
-    impl std::fmt::Display for UserId {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "user:{}", self.0)
-        }
-    }
+      pub struct Wrapper<T> {
+          value: T,
+          label: String,
+      }
 
-changed:
-  src/lib.rs: |
-    pub mod wrapper;
-    pub mod usage;
-    pub mod smart_ptr;
-    pub mod newtype;
-  src/wrapper.rs: |
-    use std::ops::{Deref, DerefMut};
+      impl<T> Wrapper<T> {
+          pub fn new(value: T, label: &str) -> Self {
+              Self {
+                  value,
+                  label: label.to_string(),
+              }
+          }
 
-    pub struct Wrapper<T> {
-        value: T,
-        label: String,
-    }
+          pub fn into_inner(self) -> T {
+              self.value
+          }
 
-    impl<T> Wrapper<T> {
-        pub fn new(value: T, label: &str) -> Self {
-            Self {
-                value,
-                label: label.to_string(),
-            }
-        }
+          pub fn label(&self) -> &str {
+              &self.label
+          }
 
-        pub fn into_inner(self) -> T {
-            self.value
-        }
+          pub fn set_label(&mut self, label: &str) {
+              self.label = label.to_string();
+          }
+      }
 
-        pub fn label(&self) -> &str {
-            &self.label
-        }
+      impl<T> Deref for Wrapper<T> {
+          type Target = T;
 
-        pub fn set_label(&mut self, label: &str) {
-            self.label = label.to_string();
-        }
-    }
+          fn deref(&self) -> &Self::Target {
+              &self.value
+          }
+      }
 
-    impl<T> Deref for Wrapper<T> {
-        type Target = T;
+      impl<T> DerefMut for Wrapper<T> {
+          fn deref_mut(&mut self) -> &mut Self::Target {
+              &mut self.value
+          }
+      }
+    src/usage.rs: |
+      use crate::wrapper::Wrapper;
 
-        fn deref(&self) -> &Self::Target {
-            &self.value
-        }
-    }
+      pub fn use_wrapper() {
+          let wrapped = Wrapper::new(String::from("hello"), "greeting");
+          println!("Length: {}", wrapped.len());
+          println!("Upper: {}", wrapped.to_uppercase());
+      }
 
-    impl<T> DerefMut for Wrapper<T> {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.value
-        }
-    }
-  src/usage.rs: |
-    use crate::wrapper::Wrapper;
+      pub fn modify_wrapper() {
+          let mut wrapped = Wrapper::new(vec![1, 2, 3], "numbers");
+          wrapped.push(4);
+          println!("Label: {}", wrapped.label());
+          println!("Items: {:?}", *wrapped);
+      }
+    src/smart_ptr.rs: |
+      use std::ops::Deref;
 
-    pub fn use_wrapper() {
-        let wrapped = Wrapper::new(String::from("hello"), "greeting");
-        println!("Length: {}", wrapped.len());
-        println!("Upper: {}", wrapped.to_uppercase());
-    }
+      pub struct SharedPtr<T> {
+          data: Box<T>,
+          ref_count: usize,
+      }
 
-    pub fn modify_wrapper() {
-        let mut wrapped = Wrapper::new(vec![1, 2, 3], "numbers");
-        wrapped.push(4);
-        println!("Label: {}", wrapped.label());
-        println!("Items: {:?}", *wrapped);
-    }
-  src/smart_ptr.rs: |
-    use std::ops::Deref;
+      impl<T> SharedPtr<T> {
+          pub fn new(value: T) -> Self {
+              Self {
+                  data: Box::new(value),
+                  ref_count: 1,
+              }
+          }
 
-    pub struct SharedPtr<T> {
-        data: Box<T>,
-        ref_count: usize,
-    }
+          pub fn ref_count(&self) -> usize {
+              self.ref_count
+          }
+      }
 
-    impl<T> SharedPtr<T> {
-        pub fn new(value: T) -> Self {
-            Self {
-                data: Box::new(value),
-                ref_count: 1,
-            }
-        }
+      impl<T> Deref for SharedPtr<T> {
+          type Target = T;
+          fn deref(&self) -> &Self::Target {
+              &self.data
+          }
+      }
+    src/newtype.rs: |
+      pub struct UserId(pub u64);
+      pub struct Email(pub String);
 
-        pub fn ref_count(&self) -> usize {
-            self.ref_count
-        }
-    }
+      impl UserId {
+          pub fn as_u64(&self) -> u64 {
+              self.0
+          }
+      }
 
-    impl<T> Deref for SharedPtr<T> {
-        type Target = T;
-        fn deref(&self) -> &Self::Target {
-            &self.data
-        }
-    }
-  src/newtype.rs: |
-    pub struct UserId(pub u64);
-    pub struct Email(pub String);
+      impl Email {
+          pub fn domain(&self) -> &str {
+              self.0.split('@').nth(1).unwrap_or("")
+          }
 
-    impl UserId {
-        pub fn as_u64(&self) -> u64 {
-            self.0
-        }
-    }
+          pub fn local_part(&self) -> &str {
+              self.0.split('@').next().unwrap_or("")
+          }
+      }
 
-    impl Email {
-        pub fn domain(&self) -> &str {
-            self.0.split('@').nth(1).unwrap_or("")
-        }
-
-        pub fn local_part(&self) -> &str {
-            self.0.split('@').next().unwrap_or("")
-        }
-    }
-
-    impl std::fmt::Display for UserId {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "user:{}", self.0)
-        }
-    }
-
-must_include_files:
-  # Changed: Wrapper gains Deref + DerefMut impls
-  - src/wrapper.rs
-  # New: demonstrates auto-deref usage patterns
-  - src/usage.rs
-  # Changed: lib.rs adds pub mod usage
-  - src/lib.rs
-must_include_content_from:
-  src/wrapper.rs:
-    - "impl<T> Deref for Wrapper<T> {"
-    - "impl<T> DerefMut for Wrapper<T> {"
-  src/usage.rs:
-    - "use crate::wrapper::Wrapper;"
-  src/lib.rs:
-    - "pub mod usage;"
-must_not_include:
-  # smart_ptr.rs: its own Deref impl on SharedPtr, no Wrapper dependency
-  - SharedPtr
-  - ref_count
-  # newtype.rs: wrapper pattern but explicit access, no Deref
-  - UserId
-  - Email
-  - as_u64
-  - domain
-must_not_include_files:
-  - src/smart_ptr.rs
-  - src/newtype.rs
-max_fragments: 8
-max_files: 4
-add_garbage_files: false
-skip_garbage_check: true
+      impl std::fmt::Display for UserId {
+          fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+              write!(f, "user:{}", self.0)
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: wrapper
+  selector:
+    path: src/wrapper.rs
+    anchor: impl<T> Deref for Wrapper<T> {
+- id: wrapper_1
+  selector:
+    path: src/wrapper.rs
+    anchor: impl<T> DerefMut for Wrapper<T> {
+- id: usage
+  selector:
+    path: src/usage.rs
+    anchor: use crate::wrapper::Wrapper;
+- id: lib
+  selector:
+    path: src/lib.rs
+    anchor: pub mod usage;
+- id: no_smart_ptr
+  selector:
+    path: src/smart_ptr.rs
+- id: no_newtype
+  selector:
+    path: src/newtype.rs
+- id: no_global_0
+  selector:
+    anchor: SharedPtr
+- id: no_global_1
+  selector:
+    anchor: ref_count
+- id: no_global_2
+  selector:
+    anchor: UserId
+- id: no_global_3
+  selector:
+    anchor: Email
+- id: no_global_4
+  selector:
+    anchor: as_u64
+- id: no_global_5
+  selector:
+    anchor: domain
+oracle:
+  required:
+  - wrapper
+  - wrapper_1
+  - usage
+  - lib
+  allowed: []
+  forbidden:
+  - no_smart_ptr
+  - no_newtype
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

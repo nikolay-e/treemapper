@@ -1,153 +1,174 @@
-# Scenario: UserController uses optional binding to safely unwrap User from UserRepository
-# Changed: UserController.swift gains if-let binding, references UserRepository.fetchUser
-# Reviewer questions: What happens if repository is empty? Should showUser return an Optional<String> instead?
-# Trap 1: ErrorFormatter.swift — handles error display strings, shares "user not found" vocabulary but no dep
-# Trap 2: CacheManager.swift — caches data by String keys, similar Optional return patterns but unrelated
-max_enrichment: 7.8
-initial:
-  UserRepository.swift: |
-    struct User {
-        let id: String
-        let name: String
-    }
+name: jvm_and_compiled_068_swift_optional_binding
+repo:
+  initial_files:
+    UserRepository.swift: |
+      struct User {
+          let id: String
+          let name: String
+      }
 
-    class UserRepository {
-        private var users: [String: User] = [:]
+      class UserRepository {
+          private var users: [String: User] = [:]
 
-        func fetchUser(id: String) -> User? {
-            return users[id]
-        }
+          func fetchUser(id: String) -> User? {
+              return users[id]
+          }
 
-        func save(user: User) {
-            users[user.id] = user
-        }
-    }
-  UserController.swift: |
-    class UserController {}
-  ErrorFormatter.swift: |
-    import Foundation
+          func save(user: User) {
+              users[user.id] = user
+          }
+      }
+    UserController.swift: |
+      class UserController {}
+    ErrorFormatter.swift: |
+      import Foundation
 
-    struct ErrorFormatter {
-        static func formatNotFound(entity: String, id: String) -> String {
-            return "\(entity) with id '\(id)' was not found"
-        }
+      struct ErrorFormatter {
+          static func formatNotFound(entity: String, id: String) -> String {
+              return "\(entity) with id '\(id)' was not found"
+          }
 
-        static func formatValidation(field: String, reason: String) -> String {
-            return "Validation failed for \(field): \(reason)"
-        }
+          static func formatValidation(field: String, reason: String) -> String {
+              return "Validation failed for \(field): \(reason)"
+          }
 
-        static func formatServerError(code: Int) -> String {
-            return "Internal server error (code: \(code))"
-        }
-    }
-  CacheManager.swift: |
-    import Foundation
+          static func formatServerError(code: Int) -> String {
+              return "Internal server error (code: \(code))"
+          }
+      }
+    CacheManager.swift: |
+      import Foundation
 
-    class CacheManager<T> {
-        private var storage: [String: (value: T, expiry: Date)] = [:]
-        private let defaultTTL: TimeInterval
+      class CacheManager<T> {
+          private var storage: [String: (value: T, expiry: Date)] = [:]
+          private let defaultTTL: TimeInterval
 
-        init(defaultTTL: TimeInterval = 300) {
-            self.defaultTTL = defaultTTL
-        }
+          init(defaultTTL: TimeInterval = 300) {
+              self.defaultTTL = defaultTTL
+          }
 
-        func get(key: String) -> T? {
-            guard let entry = storage[key], entry.expiry > Date() else {
-                storage.removeValue(forKey: key)
-                return nil
-            }
-            return entry.value
-        }
+          func get(key: String) -> T? {
+              guard let entry = storage[key], entry.expiry > Date() else {
+                  storage.removeValue(forKey: key)
+                  return nil
+              }
+              return entry.value
+          }
 
-        func set(key: String, value: T) {
-            storage[key] = (value, Date().addingTimeInterval(defaultTTL))
-        }
-    }
-changed:
-  UserRepository.swift: |
-    struct User {
-        let id: String
-        let name: String
-    }
+          func set(key: String, value: T) {
+              storage[key] = (value, Date().addingTimeInterval(defaultTTL))
+          }
+      }
+  changed_files:
+    UserRepository.swift: |
+      struct User {
+          let id: String
+          let name: String
+      }
 
-    class UserRepository {
-        private var users: [String: User] = [:]
+      class UserRepository {
+          private var users: [String: User] = [:]
 
-        func fetchUser(id: String) -> User? {
-            return users[id]
-        }
+          func fetchUser(id: String) -> User? {
+              return users[id]
+          }
 
-        func save(user: User) {
-            users[user.id] = user
-        }
-    }
-  UserController.swift: |
-    class UserController {
-        let repository = UserRepository()
+          func save(user: User) {
+              users[user.id] = user
+          }
+      }
+    UserController.swift: |
+      class UserController {
+          let repository = UserRepository()
 
-        func showUser(id: String) -> String {
-            if let user = repository.fetchUser(id: id) {
-                return "User: \(user.name)"
-            } else {
-                return "User not found"
-            }
-        }
-    }
-  ErrorFormatter.swift: |
-    import Foundation
+          func showUser(id: String) -> String {
+              if let user = repository.fetchUser(id: id) {
+                  return "User: \(user.name)"
+              } else {
+                  return "User not found"
+              }
+          }
+      }
+    ErrorFormatter.swift: |
+      import Foundation
 
-    struct ErrorFormatter {
-        static func formatNotFound(entity: String, id: String) -> String {
-            return "\(entity) with id '\(id)' was not found"
-        }
+      struct ErrorFormatter {
+          static func formatNotFound(entity: String, id: String) -> String {
+              return "\(entity) with id '\(id)' was not found"
+          }
 
-        static func formatValidation(field: String, reason: String) -> String {
-            return "Validation failed for \(field): \(reason)"
-        }
+          static func formatValidation(field: String, reason: String) -> String {
+              return "Validation failed for \(field): \(reason)"
+          }
 
-        static func formatServerError(code: Int) -> String {
-            return "Internal server error (code: \(code))"
-        }
-    }
-  CacheManager.swift: |
-    import Foundation
+          static func formatServerError(code: Int) -> String {
+              return "Internal server error (code: \(code))"
+          }
+      }
+    CacheManager.swift: |
+      import Foundation
 
-    class CacheManager<T> {
-        private var storage: [String: (value: T, expiry: Date)] = [:]
-        private let defaultTTL: TimeInterval
+      class CacheManager<T> {
+          private var storage: [String: (value: T, expiry: Date)] = [:]
+          private let defaultTTL: TimeInterval
 
-        init(defaultTTL: TimeInterval = 300) {
-            self.defaultTTL = defaultTTL
-        }
+          init(defaultTTL: TimeInterval = 300) {
+              self.defaultTTL = defaultTTL
+          }
 
-        func get(key: String) -> T? {
-            guard let entry = storage[key], entry.expiry > Date() else {
-                storage.removeValue(forKey: key)
-                return nil
-            }
-            return entry.value
-        }
+          func get(key: String) -> T? {
+              guard let entry = storage[key], entry.expiry > Date() else {
+                  storage.removeValue(forKey: key)
+                  return nil
+              }
+              return entry.value
+          }
 
-        func set(key: String, value: T) {
-            storage[key] = (value, Date().addingTimeInterval(defaultTTL))
-        }
-    }
-must_include_files:
-- UserController.swift
-must_include_content_from:
-  UserController.swift:
-  - 'if let user = repository.fetchUser(id: id)'
-  - 'class UserController {'
-must_not_include:
-- ErrorFormatter
-- formatNotFound
-- formatValidation
-- CacheManager
-- defaultTTL
-must_not_include_files:
-- ErrorFormatter.swift
-- CacheManager.swift
-add_garbage_files: false
-skip_garbage_check: true
-max_fragments: 8
-max_files: 4
+          func set(key: String, value: T) {
+              storage[key] = (value, Date().addingTimeInterval(defaultTTL))
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: usercontroller
+  selector:
+    path: UserController.swift
+    anchor: 'if let user = repository.fetchUser(id: id)'
+- id: usercontroller_1
+  selector:
+    path: UserController.swift
+    anchor: class UserController {
+- id: no_errorformatter
+  selector:
+    path: ErrorFormatter.swift
+- id: no_cachemanager
+  selector:
+    path: CacheManager.swift
+- id: no_global_0
+  selector:
+    anchor: ErrorFormatter
+- id: no_global_1
+  selector:
+    anchor: formatNotFound
+- id: no_global_2
+  selector:
+    anchor: formatValidation
+- id: no_global_3
+  selector:
+    anchor: CacheManager
+- id: no_global_4
+  selector:
+    anchor: defaultTTL
+oracle:
+  required:
+  - usercontroller
+  - usercontroller_1
+  allowed: []
+  forbidden:
+  - no_errorformatter
+  - no_cachemanager
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

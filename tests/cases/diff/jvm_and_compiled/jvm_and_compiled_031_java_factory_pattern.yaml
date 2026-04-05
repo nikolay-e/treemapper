@@ -1,355 +1,392 @@
-# Scenario: NotificationFactory is introduced with enum-based creation of
-#   Notification implementations. SmsNotification and PushNotification are
-#   new classes implementing the existing Notification interface.
-#
-# Diff shows:
-#   + NotificationFactory with Type enum (EMAIL, SMS, PUSH) and create()
-#     switch expression, + SmsNotification implements Notification,
-#     + PushNotification implements Notification
-#
-# Reviewer questions:
-#   Q1: "What is the Notification interface — what contract must impls satisfy?"
-#       -> Needs Notification.java: interface with send(String message).
-#
-#   Q2: "Does EmailNotification already exist — is the factory exhaustive?"
-#       -> Needs EmailNotification.java: existing impl of Notification.
-#
-# Not needed for comprehension:
-#   - LoggerFactory.java: IDENTICAL factory pattern — enum Type, create()
-#     switch, returns interface impls. HARDEST TRAP: same design pattern
-#     but for Logger interface, not Notification.
-#
-#   - NotificationService.java: Calls NotificationFactory.create() to
-#     send notifications. Direct consumer. But how the service dispatches
-#     doesn't help review whether the factory returns correct impls.
-#
-#   - NotificationConfig.java: Spring @Configuration for notification
-#     infrastructure. Same namespace. Independent of factory logic.
-#
-#   - NotificationTemplate.java: Template for notification rendering.
-#     Same "Notification" vocabulary. Not referenced by factory.
-#
-#   - AlertNotification.java: Third-party alert implementation. Same
-#     interface pattern. Not part of the factory's Type enum.
+name: jvm_and_compiled_031_java_factory_pattern
+repo:
+  initial_files:
+    src/main/java/com/example/Notification.java: |
+      package com.example;
 
-max_enrichment: 5.0
-initial:
-  src/main/java/com/example/Notification.java: |
-    package com.example;
+      public interface Notification {
+          void send(String message);
+          String getType();
+      }
+    src/main/java/com/example/EmailNotification.java: |
+      package com.example;
 
-    public interface Notification {
-        void send(String message);
-        String getType();
-    }
-  src/main/java/com/example/EmailNotification.java: |
-    package com.example;
+      public class EmailNotification implements Notification {
+          private final String recipient;
 
-    public class EmailNotification implements Notification {
-        private final String recipient;
+          public EmailNotification(String recipient) {
+              this.recipient = recipient;
+          }
 
-        public EmailNotification(String recipient) {
-            this.recipient = recipient;
-        }
+          @Override
+          public void send(String message) {
+              System.out.println("Email to " + recipient + ": " + message);
+          }
 
-        @Override
-        public void send(String message) {
-            System.out.println("Email to " + recipient + ": " + message);
-        }
+          @Override
+          public String getType() { return "EMAIL"; }
+      }
+    src/main/java/com/example/factory/LoggerFactory.java: |
+      package com.example.factory;
 
-        @Override
-        public String getType() { return "EMAIL"; }
-    }
-  src/main/java/com/example/factory/LoggerFactory.java: |
-    package com.example.factory;
+      public class LoggerFactory {
+          public enum Type {
+              CONSOLE, FILE, REMOTE
+          }
 
-    public class LoggerFactory {
-        public enum Type {
-            CONSOLE, FILE, REMOTE
-        }
+          public static Logger create(Type type) {
+              return switch (type) {
+                  case CONSOLE -> new ConsoleLogger();
+                  case FILE -> new FileLogger();
+                  case REMOTE -> new RemoteLogger();
+              };
+          }
+      }
+    src/main/java/com/example/NotificationService.java: |
+      package com.example;
 
-        public static Logger create(Type type) {
-            return switch (type) {
-                case CONSOLE -> new ConsoleLogger();
-                case FILE -> new FileLogger();
-                case REMOTE -> new RemoteLogger();
-            };
-        }
-    }
-  src/main/java/com/example/NotificationService.java: |
-    package com.example;
+      import java.util.List;
 
-    import java.util.List;
+      public class NotificationService {
+          public void notifyAll(List<String> recipients, String message) {
+              for (String recipient : recipients) {
+                  Notification notification = new EmailNotification(recipient);
+                  notification.send(message);
+              }
+          }
 
-    public class NotificationService {
-        public void notifyAll(List<String> recipients, String message) {
-            for (String recipient : recipients) {
-                Notification notification = new EmailNotification(recipient);
-                notification.send(message);
-            }
-        }
+          public void sendBulk(NotificationFactory.Type type, List<String> messages) {
+              Notification notification = NotificationFactory.create(type);
+              messages.forEach(notification::send);
+          }
+      }
+    src/main/java/com/example/config/NotificationConfig.java: |
+      package com.example.config;
 
-        public void sendBulk(NotificationFactory.Type type, List<String> messages) {
-            Notification notification = NotificationFactory.create(type);
-            messages.forEach(notification::send);
-        }
-    }
-  src/main/java/com/example/config/NotificationConfig.java: |
-    package com.example.config;
+      import org.springframework.context.annotation.Bean;
+      import org.springframework.context.annotation.Configuration;
 
-    import org.springframework.context.annotation.Bean;
-    import org.springframework.context.annotation.Configuration;
+      @Configuration
+      public class NotificationConfig {
+          @Bean
+          public String smtpHost() {
+              return "smtp.example.com";
+          }
 
-    @Configuration
-    public class NotificationConfig {
-        @Bean
-        public String smtpHost() {
-            return "smtp.example.com";
-        }
+          @Bean
+          public int smtpPort() {
+              return 587;
+          }
 
-        @Bean
-        public int smtpPort() {
-            return 587;
-        }
+          @Bean
+          public String smsGateway() {
+              return "https://sms.example.com/api";
+          }
+      }
+    src/main/java/com/example/template/NotificationTemplate.java: |
+      package com.example.template;
 
-        @Bean
-        public String smsGateway() {
-            return "https://sms.example.com/api";
-        }
-    }
-  src/main/java/com/example/template/NotificationTemplate.java: |
-    package com.example.template;
+      public class NotificationTemplate {
+          private final String subject;
+          private final String bodyTemplate;
 
-    public class NotificationTemplate {
-        private final String subject;
-        private final String bodyTemplate;
+          public NotificationTemplate(String subject, String bodyTemplate) {
+              this.subject = subject;
+              this.bodyTemplate = bodyTemplate;
+          }
 
-        public NotificationTemplate(String subject, String bodyTemplate) {
-            this.subject = subject;
-            this.bodyTemplate = bodyTemplate;
-        }
+          public String render(String... args) {
+              String body = bodyTemplate;
+              for (int i = 0; i < args.length; i++) {
+                  body = body.replace("{" + i + "}", args[i]);
+              }
+              return subject + ": " + body;
+          }
+      }
+    src/main/java/com/example/AlertNotification.java: |
+      package com.example;
 
-        public String render(String... args) {
-            String body = bodyTemplate;
-            for (int i = 0; i < args.length; i++) {
-                body = body.replace("{" + i + "}", args[i]);
-            }
-            return subject + ": " + body;
-        }
-    }
-  src/main/java/com/example/AlertNotification.java: |
-    package com.example;
+      public class AlertNotification implements Notification {
+          @Override
+          public void send(String message) {
+              System.out.println("ALERT: " + message);
+          }
 
-    public class AlertNotification implements Notification {
-        @Override
-        public void send(String message) {
-            System.out.println("ALERT: " + message);
-        }
+          @Override
+          public String getType() { return "ALERT"; }
+      }
+  changed_files:
+    src/main/java/com/example/Notification.java: |
+      package com.example;
 
-        @Override
-        public String getType() { return "ALERT"; }
-    }
+      public interface Notification {
+          void send(String message);
+          String getType();
+      }
+    src/main/java/com/example/EmailNotification.java: |
+      package com.example;
 
-changed:
-  src/main/java/com/example/Notification.java: |
-    package com.example;
+      public class EmailNotification implements Notification {
+          private final String recipient;
 
-    public interface Notification {
-        void send(String message);
-        String getType();
-    }
-  src/main/java/com/example/EmailNotification.java: |
-    package com.example;
+          public EmailNotification(String recipient) {
+              this.recipient = recipient;
+          }
 
-    public class EmailNotification implements Notification {
-        private final String recipient;
+          @Override
+          public void send(String message) {
+              System.out.println("Email to " + recipient + ": " + message);
+          }
 
-        public EmailNotification(String recipient) {
-            this.recipient = recipient;
-        }
+          @Override
+          public String getType() { return "EMAIL"; }
+      }
+    src/main/java/com/example/SmsNotification.java: |
+      package com.example;
 
-        @Override
-        public void send(String message) {
-            System.out.println("Email to " + recipient + ": " + message);
-        }
+      public class SmsNotification implements Notification {
+          @Override
+          public void send(String message) {
+              System.out.println("SMS: " + message);
+          }
 
-        @Override
-        public String getType() { return "EMAIL"; }
-    }
-  src/main/java/com/example/SmsNotification.java: |
-    package com.example;
+          @Override
+          public String getType() { return "SMS"; }
+      }
+    src/main/java/com/example/NotificationFactory.java: |
+      package com.example;
 
-    public class SmsNotification implements Notification {
-        @Override
-        public void send(String message) {
-            System.out.println("SMS: " + message);
-        }
+      public class NotificationFactory {
+          public enum Type {
+              EMAIL, SMS, PUSH
+          }
 
-        @Override
-        public String getType() { return "SMS"; }
-    }
-  src/main/java/com/example/NotificationFactory.java: |
-    package com.example;
+          public static Notification create(Type type) {
+              return switch (type) {
+                  case EMAIL -> new EmailNotification("default@example.com");
+                  case SMS -> new SmsNotification();
+                  case PUSH -> new PushNotification();
+              };
+          }
+      }
+    src/main/java/com/example/PushNotification.java: |
+      package com.example;
 
-    public class NotificationFactory {
-        public enum Type {
-            EMAIL, SMS, PUSH
-        }
+      public class PushNotification implements Notification {
+          @Override
+          public void send(String message) {
+              System.out.println("Push: " + message);
+          }
 
-        public static Notification create(Type type) {
-            return switch (type) {
-                case EMAIL -> new EmailNotification("default@example.com");
-                case SMS -> new SmsNotification();
-                case PUSH -> new PushNotification();
-            };
-        }
-    }
-  src/main/java/com/example/PushNotification.java: |
-    package com.example;
+          @Override
+          public String getType() { return "PUSH"; }
+      }
+    src/main/java/com/example/factory/LoggerFactory.java: |
+      package com.example.factory;
 
-    public class PushNotification implements Notification {
-        @Override
-        public void send(String message) {
-            System.out.println("Push: " + message);
-        }
+      public class LoggerFactory {
+          public enum Type {
+              CONSOLE, FILE, REMOTE
+          }
 
-        @Override
-        public String getType() { return "PUSH"; }
-    }
-  src/main/java/com/example/factory/LoggerFactory.java: |
-    package com.example.factory;
+          public static Logger create(Type type) {
+              return switch (type) {
+                  case CONSOLE -> new ConsoleLogger();
+                  case FILE -> new FileLogger();
+                  case REMOTE -> new RemoteLogger();
+              };
+          }
+      }
+    src/main/java/com/example/NotificationService.java: |
+      package com.example;
 
-    public class LoggerFactory {
-        public enum Type {
-            CONSOLE, FILE, REMOTE
-        }
+      import java.util.List;
 
-        public static Logger create(Type type) {
-            return switch (type) {
-                case CONSOLE -> new ConsoleLogger();
-                case FILE -> new FileLogger();
-                case REMOTE -> new RemoteLogger();
-            };
-        }
-    }
-  src/main/java/com/example/NotificationService.java: |
-    package com.example;
+      public class NotificationService {
+          public void notifyAll(List<String> recipients, String message) {
+              for (String recipient : recipients) {
+                  Notification notification = new EmailNotification(recipient);
+                  notification.send(message);
+              }
+          }
 
-    import java.util.List;
+          public void sendBulk(NotificationFactory.Type type, List<String> messages) {
+              Notification notification = NotificationFactory.create(type);
+              messages.forEach(notification::send);
+          }
+      }
+    src/main/java/com/example/config/NotificationConfig.java: |
+      package com.example.config;
 
-    public class NotificationService {
-        public void notifyAll(List<String> recipients, String message) {
-            for (String recipient : recipients) {
-                Notification notification = new EmailNotification(recipient);
-                notification.send(message);
-            }
-        }
+      import org.springframework.context.annotation.Bean;
+      import org.springframework.context.annotation.Configuration;
 
-        public void sendBulk(NotificationFactory.Type type, List<String> messages) {
-            Notification notification = NotificationFactory.create(type);
-            messages.forEach(notification::send);
-        }
-    }
-  src/main/java/com/example/config/NotificationConfig.java: |
-    package com.example.config;
+      @Configuration
+      public class NotificationConfig {
+          @Bean
+          public String smtpHost() {
+              return "smtp.example.com";
+          }
 
-    import org.springframework.context.annotation.Bean;
-    import org.springframework.context.annotation.Configuration;
+          @Bean
+          public int smtpPort() {
+              return 587;
+          }
 
-    @Configuration
-    public class NotificationConfig {
-        @Bean
-        public String smtpHost() {
-            return "smtp.example.com";
-        }
+          @Bean
+          public String smsGateway() {
+              return "https://sms.example.com/api";
+          }
+      }
+    src/main/java/com/example/template/NotificationTemplate.java: |
+      package com.example.template;
 
-        @Bean
-        public int smtpPort() {
-            return 587;
-        }
+      public class NotificationTemplate {
+          private final String subject;
+          private final String bodyTemplate;
 
-        @Bean
-        public String smsGateway() {
-            return "https://sms.example.com/api";
-        }
-    }
-  src/main/java/com/example/template/NotificationTemplate.java: |
-    package com.example.template;
+          public NotificationTemplate(String subject, String bodyTemplate) {
+              this.subject = subject;
+              this.bodyTemplate = bodyTemplate;
+          }
 
-    public class NotificationTemplate {
-        private final String subject;
-        private final String bodyTemplate;
+          public String render(String... args) {
+              String body = bodyTemplate;
+              for (int i = 0; i < args.length; i++) {
+                  body = body.replace("{" + i + "}", args[i]);
+              }
+              return subject + ": " + body;
+          }
+      }
+    src/main/java/com/example/AlertNotification.java: |
+      package com.example;
 
-        public NotificationTemplate(String subject, String bodyTemplate) {
-            this.subject = subject;
-            this.bodyTemplate = bodyTemplate;
-        }
+      public class AlertNotification implements Notification {
+          @Override
+          public void send(String message) {
+              System.out.println("ALERT: " + message);
+          }
 
-        public String render(String... args) {
-            String body = bodyTemplate;
-            for (int i = 0; i < args.length; i++) {
-                body = body.replace("{" + i + "}", args[i]);
-            }
-            return subject + ": " + body;
-        }
-    }
-  src/main/java/com/example/AlertNotification.java: |
-    package com.example;
-
-    public class AlertNotification implements Notification {
-        @Override
-        public void send(String message) {
-            System.out.println("ALERT: " + message);
-        }
-
-        @Override
-        public String getType() { return "ALERT"; }
-    }
-
-must_include_files:
-  - src/main/java/com/example/NotificationFactory.java
-  - src/main/java/com/example/Notification.java
-  - src/main/java/com/example/EmailNotification.java
-
-must_include_content_from:
-  src/main/java/com/example/NotificationFactory.java:
-    - "public enum Type"
-    - "EMAIL, SMS, PUSH"
-    - "case EMAIL -> new EmailNotification"
-    - "case SMS -> new SmsNotification()"
-    - "case PUSH -> new PushNotification()"
-  src/main/java/com/example/Notification.java:
-    - "void send(String message)"
-
-must_not_include:
-  # LoggerFactory.java: identical factory pattern, different interface
-  - LoggerFactory
-  - ConsoleLogger
-  - FileLogger
-  - RemoteLogger
-  # NotificationService.java: consumer, doesn't help review factory design
-  - NotificationService
-  - notifyAll
-  - sendBulk
-  # NotificationConfig.java: Spring config, infrastructure
-  - NotificationConfig
-  - smtpHost
-  - smsGateway
-  # NotificationTemplate.java: template rendering, unrelated
-  - NotificationTemplate
-  - bodyTemplate
-  - render
-  # AlertNotification.java: impl not in factory's Type enum
-  - AlertNotification
-  - "ALERT"
-
-must_not_include_files:
-  - src/main/java/com/example/factory/LoggerFactory.java
-  - src/main/java/com/example/NotificationService.java
-  - src/main/java/com/example/config/NotificationConfig.java
-  - src/main/java/com/example/template/NotificationTemplate.java
-  - src/main/java/com/example/AlertNotification.java
-
-max_fragments: 8
-max_files: 4
-add_garbage_files: false
-skip_garbage_check: true
+          @Override
+          public String getType() { return "ALERT"; }
+      }
+  commit_message: Update files
+fragments:
+- id: notificationfactory
+  selector:
+    path: src/main/java/com/example/NotificationFactory.java
+    anchor: public enum Type
+- id: notificationfactory_1
+  selector:
+    path: src/main/java/com/example/NotificationFactory.java
+    anchor: EMAIL, SMS, PUSH
+- id: notificationfactory_2
+  selector:
+    path: src/main/java/com/example/NotificationFactory.java
+    anchor: case EMAIL -> new EmailNotification
+- id: notificationfactory_3
+  selector:
+    path: src/main/java/com/example/NotificationFactory.java
+    anchor: case SMS -> new SmsNotification()
+- id: notificationfactory_4
+  selector:
+    path: src/main/java/com/example/NotificationFactory.java
+    anchor: case PUSH -> new PushNotification()
+- id: notification
+  selector:
+    path: src/main/java/com/example/Notification.java
+    anchor: void send(String message)
+- id: emailnotification_file
+  selector:
+    path: src/main/java/com/example/EmailNotification.java
+- id: no_loggerfactory
+  selector:
+    path: src/main/java/com/example/factory/LoggerFactory.java
+- id: no_notificationservice
+  selector:
+    path: src/main/java/com/example/NotificationService.java
+- id: no_notificationconfig
+  selector:
+    path: src/main/java/com/example/config/NotificationConfig.java
+- id: no_notificationtemplate
+  selector:
+    path: src/main/java/com/example/template/NotificationTemplate.java
+- id: no_alertnotification
+  selector:
+    path: src/main/java/com/example/AlertNotification.java
+- id: no_global_0
+  selector:
+    anchor: LoggerFactory
+- id: no_global_1
+  selector:
+    anchor: ConsoleLogger
+- id: no_global_2
+  selector:
+    anchor: FileLogger
+- id: no_global_3
+  selector:
+    anchor: RemoteLogger
+- id: no_global_4
+  selector:
+    anchor: NotificationService
+- id: no_global_5
+  selector:
+    anchor: notifyAll
+- id: no_global_6
+  selector:
+    anchor: sendBulk
+- id: no_global_7
+  selector:
+    anchor: NotificationConfig
+- id: no_global_8
+  selector:
+    anchor: smtpHost
+- id: no_global_9
+  selector:
+    anchor: smsGateway
+- id: no_global_10
+  selector:
+    anchor: NotificationTemplate
+- id: no_global_11
+  selector:
+    anchor: bodyTemplate
+- id: no_global_12
+  selector:
+    anchor: render
+- id: no_global_13
+  selector:
+    anchor: AlertNotification
+- id: no_global_14
+  selector:
+    anchor: ALERT
+oracle:
+  required:
+  - notificationfactory
+  - notificationfactory_1
+  - notificationfactory_2
+  - notificationfactory_3
+  - notificationfactory_4
+  - notification
+  - emailnotification_file
+  allowed: []
+  forbidden:
+  - no_loggerfactory
+  - no_notificationservice
+  - no_notificationconfig
+  - no_notificationtemplate
+  - no_alertnotification
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13
+  - no_global_14

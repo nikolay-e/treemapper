@@ -1,227 +1,288 @@
-max_enrichment: 9.9
-initial:
-  user.py: |
-    class User:
-        def __init__(self, first, last):
-            self.first = first
-            self.last = last
+name: dependencies_015_backward_method_signature_changed
+repo:
+  initial_files:
+    user.py: |
+      class User:
+          def __init__(self, first, last):
+              self.first = first
+              self.last = last
 
-        def get_full_name(self):
-            return f"{self.first} {self.last}"
-  templates/profile.py: |
-    from user import User
+          def get_full_name(self):
+              return f"{self.first} {self.last}"
+    templates/profile.py: |
+      from user import User
 
-    def render_profile(user):
-        name = user.get_full_name()
-        return f"<h1>{name}</h1>"
-  emails/welcome.py: |
-    from user import User
+      def render_profile(user):
+          name = user.get_full_name()
+          return f"<h1>{name}</h1>"
+    emails/welcome.py: |
+      from user import User
 
-    def send_welcome(recipient):
-        name = recipient.get_full_name()
-        return f"Welcome, {name}!"
+      def send_welcome(recipient):
+          name = recipient.get_full_name()
+          return f"Welcome, {name}!"
+    reports/user_report.py: |
+      from user import User
+      GARBAGE_DEP_015_REPORT_IMPORT_C = "user_report"
+      GARBAGE_DEP_015_REPORT_FMT_D = "pdf"
 
-  # --- Tricky: also imports User and calls get_full_name (same-import consumer) ---
-  reports/user_report.py: |
-    from user import User
-    GARBAGE_DEP_015_REPORT_IMPORT_C = "user_report"
-    GARBAGE_DEP_015_REPORT_FMT_D = "pdf"
+      class UserReport:
+          GARBAGE_DEP_015_REPORT_CLASS_E = True
 
-    class UserReport:
-        GARBAGE_DEP_015_REPORT_CLASS_E = True
+          def generate(self, user: User) -> str:
+              name = user.get_full_name()
+              return f"Report for {name}"
 
-        def generate(self, user: User) -> str:
-            name = user.get_full_name()
-            return f"Report for {name}"
+          def header(self, user: User) -> str:
+              return f"=== {user.get_full_name()} ==="
+    models/customer.py: |
+      GARBAGE_DEP_015_CUST_MODULE_F = "customer_model"
+      GARBAGE_DEP_015_CUST_VER_G = "3.0"
 
-        def header(self, user: User) -> str:
-            return f"=== {user.get_full_name()} ==="
+      class User:
+          GARBAGE_DEP_015_CUST_CLASS_H = True
 
-  # --- Tricky: has own User class with get_full_name method (name collision) ---
-  models/customer.py: |
-    GARBAGE_DEP_015_CUST_MODULE_F = "customer_model"
-    GARBAGE_DEP_015_CUST_VER_G = "3.0"
+          def __init__(self, first, last, title=None):
+              self.first = first
+              self.last = last
+              self.title = title
 
-    class User:
-        GARBAGE_DEP_015_CUST_CLASS_H = True
+          def get_full_name(self, include_title=False):
+              GARBAGE_DEP_015_CUST_NAME_I = True
+              if include_title and self.title:
+                  return f"{self.title} {self.first} {self.last}"
+              return f"{self.first} {self.last}"
+    templates/admin_panel.py: |
+      from user import User
+      GARBAGE_DEP_015_ADMIN_IMPORT_J = "admin_template"
+      GARBAGE_DEP_015_ADMIN_THEME_K = "dark"
 
-        def __init__(self, first, last, title=None):
-            self.first = first
-            self.last = last
-            self.title = title
+      def render_admin(user: User) -> str:
+          name = user.get_full_name()
+          GARBAGE_DEP_015_ADMIN_RENDER_L = True
+          return f"<div class='admin'>{name}</div>"
+    garbage/geology_GARBAGE_DEP_015_GEO_A.py: |
+      GARBAGE_DEP_015_GEO_A = "geology"
 
-        def get_full_name(self, include_title=False):
-            GARBAGE_DEP_015_CUST_NAME_I = True
-            if include_title and self.title:
-                return f"{self.title} {self.first} {self.last}"
-            return f"{self.first} {self.last}"
+      def rock_hardness(mineral: str) -> float:
+          scale = {"talc": 1, "quartz": 7, "diamond": 10}
+          return scale.get(mineral, 5.0)
 
-  # --- Tricky: template file in same directory as profile.py ---
-  templates/admin_panel.py: |
-    from user import User
-    GARBAGE_DEP_015_ADMIN_IMPORT_J = "admin_template"
-    GARBAGE_DEP_015_ADMIN_THEME_K = "dark"
+      class Mineral_GARBAGE_DEP_015_GEO_A:
+          def __init__(self, name: str):
+              self.name = name
+    garbage/astronomy_GARBAGE_DEP_015_ASTRO_B.py: |
+      GARBAGE_DEP_015_ASTRO_B = "astronomy"
 
-    def render_admin(user: User) -> str:
-        name = user.get_full_name()
-        GARBAGE_DEP_015_ADMIN_RENDER_L = True
-        return f"<div class='admin'>{name}</div>"
+      def star_magnitude(luminosity: float) -> float:
+          import math
+          return -2.5 * math.log10(luminosity)
 
-  # --- Plain garbage ---
-  garbage/geology_GARBAGE_DEP_015_GEO_A.py: |
-    GARBAGE_DEP_015_GEO_A = "geology"
+      class Star_GARBAGE_DEP_015_ASTRO_B:
+          def __init__(self, name: str, magnitude: float):
+              self.name = name
+              self.magnitude = magnitude
+  changed_files:
+    user.py: |
+      class User:
+          def __init__(self, first, last, title=None):
+              self.first = first
+              self.last = last
+              self.title = title
 
-    def rock_hardness(mineral: str) -> float:
-        scale = {"talc": 1, "quartz": 7, "diamond": 10}
-        return scale.get(mineral, 5.0)
+          def get_full_name(self, include_title=False):
+              if include_title and self.title:
+                  return f"{self.title} {self.first} {self.last}"
+              return f"{self.first} {self.last}"
+    templates/profile.py: |
+      from user import User
 
-    class Mineral_GARBAGE_DEP_015_GEO_A:
-        def __init__(self, name: str):
-            self.name = name
-  garbage/astronomy_GARBAGE_DEP_015_ASTRO_B.py: |
-    GARBAGE_DEP_015_ASTRO_B = "astronomy"
+      def render_profile(user):
+          name = user.get_full_name()
+          return f"<h1>{name}</h1>"
+    emails/welcome.py: |
+      from user import User
 
-    def star_magnitude(luminosity: float) -> float:
-        import math
-        return -2.5 * math.log10(luminosity)
+      def send_welcome(recipient):
+          name = recipient.get_full_name()
+          return f"Welcome, {name}!"
+    reports/user_report.py: |
+      from user import User
+      GARBAGE_DEP_015_REPORT_IMPORT_C = "user_report"
+      GARBAGE_DEP_015_REPORT_FMT_D = "pdf"
 
-    class Star_GARBAGE_DEP_015_ASTRO_B:
-        def __init__(self, name: str, magnitude: float):
-            self.name = name
-            self.magnitude = magnitude
-changed:
-  user.py: |
-    class User:
-        def __init__(self, first, last, title=None):
-            self.first = first
-            self.last = last
-            self.title = title
+      class UserReport:
+          GARBAGE_DEP_015_REPORT_CLASS_E = True
 
-        def get_full_name(self, include_title=False):
-            if include_title and self.title:
-                return f"{self.title} {self.first} {self.last}"
-            return f"{self.first} {self.last}"
-  templates/profile.py: |
-    from user import User
+          def generate(self, user: User) -> str:
+              name = user.get_full_name()
+              return f"Report for {name}"
 
-    def render_profile(user):
-        name = user.get_full_name()
-        return f"<h1>{name}</h1>"
-  emails/welcome.py: |
-    from user import User
+          def header(self, user: User) -> str:
+              return f"=== {user.get_full_name()} ==="
+    models/customer.py: |
+      GARBAGE_DEP_015_CUST_MODULE_F = "customer_model"
+      GARBAGE_DEP_015_CUST_VER_G = "3.0"
 
-    def send_welcome(recipient):
-        name = recipient.get_full_name()
-        return f"Welcome, {name}!"
-  reports/user_report.py: |
-    from user import User
-    GARBAGE_DEP_015_REPORT_IMPORT_C = "user_report"
-    GARBAGE_DEP_015_REPORT_FMT_D = "pdf"
+      class User:
+          GARBAGE_DEP_015_CUST_CLASS_H = True
 
-    class UserReport:
-        GARBAGE_DEP_015_REPORT_CLASS_E = True
+          def __init__(self, first, last, title=None):
+              self.first = first
+              self.last = last
+              self.title = title
 
-        def generate(self, user: User) -> str:
-            name = user.get_full_name()
-            return f"Report for {name}"
+          def get_full_name(self, include_title=False):
+              GARBAGE_DEP_015_CUST_NAME_I = True
+              if include_title and self.title:
+                  return f"{self.title} {self.first} {self.last}"
+              return f"{self.first} {self.last}"
+    templates/admin_panel.py: |
+      from user import User
+      GARBAGE_DEP_015_ADMIN_IMPORT_J = "admin_template"
+      GARBAGE_DEP_015_ADMIN_THEME_K = "dark"
 
-        def header(self, user: User) -> str:
-            return f"=== {user.get_full_name()} ==="
-  models/customer.py: |
-    GARBAGE_DEP_015_CUST_MODULE_F = "customer_model"
-    GARBAGE_DEP_015_CUST_VER_G = "3.0"
+      def render_admin(user: User) -> str:
+          name = user.get_full_name()
+          GARBAGE_DEP_015_ADMIN_RENDER_L = True
+          return f"<div class='admin'>{name}</div>"
+    garbage/geology_GARBAGE_DEP_015_GEO_A.py: |
+      GARBAGE_DEP_015_GEO_A = "geology"
 
-    class User:
-        GARBAGE_DEP_015_CUST_CLASS_H = True
+      def rock_hardness(mineral: str) -> float:
+          scale = {"talc": 1, "quartz": 7, "diamond": 10}
+          return scale.get(mineral, 5.0)
 
-        def __init__(self, first, last, title=None):
-            self.first = first
-            self.last = last
-            self.title = title
+      class Mineral_GARBAGE_DEP_015_GEO_A:
+          def __init__(self, name: str):
+              self.name = name
+    garbage/astronomy_GARBAGE_DEP_015_ASTRO_B.py: |
+      GARBAGE_DEP_015_ASTRO_B = "astronomy"
 
-        def get_full_name(self, include_title=False):
-            GARBAGE_DEP_015_CUST_NAME_I = True
-            if include_title and self.title:
-                return f"{self.title} {self.first} {self.last}"
-            return f"{self.first} {self.last}"
-  templates/admin_panel.py: |
-    from user import User
-    GARBAGE_DEP_015_ADMIN_IMPORT_J = "admin_template"
-    GARBAGE_DEP_015_ADMIN_THEME_K = "dark"
+      def star_magnitude(luminosity: float) -> float:
+          import math
+          return -2.5 * math.log10(luminosity)
 
-    def render_admin(user: User) -> str:
-        name = user.get_full_name()
-        GARBAGE_DEP_015_ADMIN_RENDER_L = True
-        return f"<div class='admin'>{name}</div>"
-  garbage/geology_GARBAGE_DEP_015_GEO_A.py: |
-    GARBAGE_DEP_015_GEO_A = "geology"
-
-    def rock_hardness(mineral: str) -> float:
-        scale = {"talc": 1, "quartz": 7, "diamond": 10}
-        return scale.get(mineral, 5.0)
-
-    class Mineral_GARBAGE_DEP_015_GEO_A:
-        def __init__(self, name: str):
-            self.name = name
-  garbage/astronomy_GARBAGE_DEP_015_ASTRO_B.py: |
-    GARBAGE_DEP_015_ASTRO_B = "astronomy"
-
-    def star_magnitude(luminosity: float) -> float:
-        import math
-        return -2.5 * math.log10(luminosity)
-
-    class Star_GARBAGE_DEP_015_ASTRO_B:
-        def __init__(self, name: str, magnitude: float):
-            self.name = name
-            self.magnitude = magnitude
-
-# === Assertions ===
-
-must_include_files:
-- user.py
-- templates/profile.py
-- emails/welcome.py
-
-must_include_content_from:
-  user.py:
-    - 'class User:'
-    - 'def __init__(self, first, last, title=None):'
-    - 'def get_full_name(self, include_title=False):'
-    - include_title and self.title
-  templates/profile.py:
-    - from user import User
-    - user.get_full_name()
-    - 'def render_profile(user):'
-  emails/welcome.py:
-    - from user import User
-    - recipient.get_full_name()
-
-must_not_include:
-# Plain garbage
-- GARBAGE_DEP_015_GEO_A
-- GARBAGE_DEP_015_ASTRO_B
-# Tricky: imports User and calls get_full_name
-- GARBAGE_DEP_015_REPORT_IMPORT_C
-- GARBAGE_DEP_015_REPORT_FMT_D
-- GARBAGE_DEP_015_REPORT_CLASS_E
-# Tricky: own User class with identical get_full_name(include_title=False) signature
-- GARBAGE_DEP_015_CUST_MODULE_F
-- GARBAGE_DEP_015_CUST_VER_G
-- GARBAGE_DEP_015_CUST_CLASS_H
-- GARBAGE_DEP_015_CUST_NAME_I
-# Tricky: template sibling that imports User and calls get_full_name
-- GARBAGE_DEP_015_ADMIN_IMPORT_J
-- GARBAGE_DEP_015_ADMIN_THEME_K
-- GARBAGE_DEP_015_ADMIN_RENDER_L
-
-must_not_include_files:
-- reports/user_report.py
-- models/customer.py
-- templates/admin_panel.py
-- garbage/geology_GARBAGE_DEP_015_GEO_A.py
-- garbage/astronomy_GARBAGE_DEP_015_ASTRO_B.py
-
-max_fragments: 8
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      class Star_GARBAGE_DEP_015_ASTRO_B:
+          def __init__(self, name: str, magnitude: float):
+              self.name = name
+              self.magnitude = magnitude
+  commit_message: Update files
+fragments:
+- id: user
+  selector:
+    path: user.py
+    anchor: 'class User:'
+- id: user_1
+  selector:
+    path: user.py
+    anchor: 'def __init__(self, first, last, title=None):'
+- id: user_2
+  selector:
+    path: user.py
+    anchor: 'def get_full_name(self, include_title=False):'
+- id: user_3
+  selector:
+    path: user.py
+    anchor: include_title and self.title
+- id: profile
+  selector:
+    path: templates/profile.py
+    anchor: from user import User
+- id: profile_1
+  selector:
+    path: templates/profile.py
+    anchor: user.get_full_name()
+- id: profile_2
+  selector:
+    path: templates/profile.py
+    anchor: 'def render_profile(user):'
+- id: welcome
+  selector:
+    path: emails/welcome.py
+    anchor: from user import User
+- id: welcome_1
+  selector:
+    path: emails/welcome.py
+    anchor: recipient.get_full_name()
+- id: no_user_report
+  selector:
+    path: reports/user_report.py
+- id: no_customer
+  selector:
+    path: models/customer.py
+- id: no_admin_panel
+  selector:
+    path: templates/admin_panel.py
+- id: no_geology_garbage_dep_015_geo_a
+  selector:
+    path: garbage/geology_GARBAGE_DEP_015_GEO_A.py
+- id: no_astronomy_garbage_dep_015_astro_b
+  selector:
+    path: garbage/astronomy_GARBAGE_DEP_015_ASTRO_B.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_DEP_015_GEO_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_DEP_015_ASTRO_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_DEP_015_REPORT_IMPORT_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_DEP_015_REPORT_FMT_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_DEP_015_REPORT_CLASS_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_DEP_015_CUST_MODULE_F
+- id: no_global_6
+  selector:
+    anchor: GARBAGE_DEP_015_CUST_VER_G
+- id: no_global_7
+  selector:
+    anchor: GARBAGE_DEP_015_CUST_CLASS_H
+- id: no_global_8
+  selector:
+    anchor: GARBAGE_DEP_015_CUST_NAME_I
+- id: no_global_9
+  selector:
+    anchor: GARBAGE_DEP_015_ADMIN_IMPORT_J
+- id: no_global_10
+  selector:
+    anchor: GARBAGE_DEP_015_ADMIN_THEME_K
+- id: no_global_11
+  selector:
+    anchor: GARBAGE_DEP_015_ADMIN_RENDER_L
+oracle:
+  required:
+  - user
+  - user_1
+  - user_2
+  - user_3
+  - profile
+  - profile_1
+  - profile_2
+  - welcome
+  - welcome_1
+  allowed: []
+  forbidden:
+  - no_user_report
+  - no_customer
+  - no_admin_panel
+  - no_geology_garbage_dep_015_geo_a
+  - no_astronomy_garbage_dep_015_astro_b
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11

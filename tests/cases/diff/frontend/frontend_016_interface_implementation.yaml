@@ -1,63 +1,75 @@
-max_enrichment: 4.1
-initial:
-  interfaces.ts: |
-    export interface IService {
-        start(): void;
-        stop(): void;
-        getStatus(): string;
-    }
+name: frontend_016_interface_implementation
+repo:
+  initial_files:
+    interfaces.ts: |
+      export interface IService {
+          start(): void;
+          stop(): void;
+          getStatus(): string;
+      }
 
-    export interface ILogger {
-        log(message: string): void;
-        error(message: string): void;
-    }
+      export interface ILogger {
+          log(message: string): void;
+          error(message: string): void;
+      }
 
-    // ts_garbage_marker_001
-  service.ts: |
-    console.log('initial');
-changed:
-  interfaces.ts: |
-    export interface IService {
-        start(): void;
-        stop(): void;
-        getStatus(): string;
-    }
+      // ts_garbage_marker_001
+    service.ts: |
+      console.log('initial');
+  changed_files:
+    interfaces.ts: |
+      export interface IService {
+          start(): void;
+          stop(): void;
+          getStatus(): string;
+      }
 
-    export interface ILogger {
-        log(message: string): void;
-        error(message: string): void;
-    }
+      export interface ILogger {
+          log(message: string): void;
+          error(message: string): void;
+      }
 
-    // ts_garbage_marker_001
-  service.ts: |
-    import { IService, ILogger } from './interfaces';
+      // ts_garbage_marker_001
+    service.ts: |
+      import { IService, ILogger } from './interfaces';
 
-    export class MyService implements IService {
-        private running = false;
-        private logger: ILogger;
+      export class MyService implements IService {
+          private running = false;
+          private logger: ILogger;
 
-        constructor(logger: ILogger) {
-            this.logger = logger;
-        }
+          constructor(logger: ILogger) {
+              this.logger = logger;
+          }
 
-        start(): void {
-            this.running = true;
-            this.logger.log('Service started');
-        }
+          start(): void {
+              this.running = true;
+              this.logger.log('Service started');
+          }
 
-        stop(): void {
-            this.running = false;
-            this.logger.log('Service stopped');
-        }
+          stop(): void {
+              this.running = false;
+              this.logger.log('Service stopped');
+          }
 
-        getStatus(): string {
-            return this.running ? 'running' : 'stopped';
-        }
-    }
-must_include_files:
-- service.ts
-must_include_content:
-- import { IService, ILogger } from './interfaces';
-- 'constructor(logger: ILogger) {'
-add_garbage_files: false
-skip_garbage_check: true
+          getStatus(): string {
+              return this.running ? 'running' : 'stopped';
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: service_file
+  selector:
+    path: service.ts
+- id: req_global_0
+  selector:
+    anchor: import { IService, ILogger } from './interfaces';
+- id: req_global_1
+  selector:
+    anchor: 'constructor(logger: ILogger) {'
+oracle:
+  required:
+  - service_file
+  - req_global_0
+  - req_global_1
+  allowed: []
+  forbidden: []

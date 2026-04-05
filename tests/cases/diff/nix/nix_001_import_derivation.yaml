@@ -1,249 +1,255 @@
-# Scenario: default.nix imports a package derivation from packages/myapp.nix,
-# and the package derivation adds a new build dependency.
-# The reviewer needs to see default.nix to understand how the package is integrated.
-#
-# Reviewer questions:
-#   Q1: "How is myapp.nix consumed by the top-level derivation?"
-#       -> default.nix: imports ./packages/myapp.nix and passes pkgs
-#   Q2: "What new dependency was added to myapp?"
-#       -> packages/myapp.nix: adds pkgs.openssl to buildInputs
-#
-# Not needed:
-#   - packages/utils.nix: sibling package, unrelated derivation
-#   - packages/cli.nix: another sibling package, not imported by changed code
+name: nix_001_import_derivation
+repo:
+  initial_files:
+    default.nix: |
+      { pkgs ? import <nixpkgs> {} }:
 
-max_enrichment: 15.8
-initial:
-  default.nix: |
-    { pkgs ? import <nixpkgs> {} }:
+      let
+        myapp = import ./packages/myapp.nix { inherit pkgs; };
+        utils = import ./packages/utils.nix { inherit pkgs; };
+      in
+      pkgs.buildEnv {
+        name = "myproject-env";
+        paths = [
+          myapp
+          utils
+        ];
+      }
+    packages/myapp.nix: |
+      { pkgs }:
 
-    let
-      myapp = import ./packages/myapp.nix { inherit pkgs; };
-      utils = import ./packages/utils.nix { inherit pkgs; };
-    in
-    pkgs.buildEnv {
-      name = "myproject-env";
-      paths = [
-        myapp
-        utils
-      ];
-    }
-  packages/myapp.nix: |
-    { pkgs }:
+      pkgs.stdenv.mkDerivation {
+        pname = "myapp";
+        version = "1.0.0";
 
-    pkgs.stdenv.mkDerivation {
-      pname = "myapp";
-      version = "1.0.0";
+        src = ../src/myapp;
 
-      src = ../src/myapp;
+        buildInputs = [
+          pkgs.python3
+          pkgs.zlib
+        ];
 
-      buildInputs = [
-        pkgs.python3
-        pkgs.zlib
-      ];
+        buildPhase = ''
+          python3 setup.py build
+        '';
 
-      buildPhase = ''
-        python3 setup.py build
-      '';
+        installPhase = ''
+          mkdir -p $out/bin
+          cp -r build/lib/* $out/bin/
+        '';
+      }
+    packages/utils.nix: |
+      { pkgs }:
 
-      installPhase = ''
-        mkdir -p $out/bin
-        cp -r build/lib/* $out/bin/
-      '';
-    }
-  packages/utils.nix: |
-    { pkgs }:
+      GARBAGE_NIX_001_A = "noise_utils_nix";
 
-    GARBAGE_NIX_001_A = "noise_utils_nix";
+      pkgs.stdenv.mkDerivation {
+        pname = "utils";
+        version = "0.5.0";
 
-    pkgs.stdenv.mkDerivation {
-      pname = "utils";
-      version = "0.5.0";
+        src = ../src/utils;
 
-      src = ../src/utils;
+        buildInputs = [
+          pkgs.python3
+        ];
 
-      buildInputs = [
-        pkgs.python3
-      ];
+        buildPhase = ''
+          python3 setup.py build
+        '';
 
-      buildPhase = ''
-        python3 setup.py build
-      '';
+        installPhase = ''
+          mkdir -p $out/lib
+          cp -r build/lib/* $out/lib/
+        '';
+      }
+    packages/cli.nix: |
+      { pkgs }:
 
-      installPhase = ''
-        mkdir -p $out/lib
-        cp -r build/lib/* $out/lib/
-      '';
-    }
+      GARBAGE_NIX_001_B = "noise_cli_nix";
 
-  # Trap: another sibling package
-  packages/cli.nix: |
-    { pkgs }:
+      pkgs.stdenv.mkDerivation {
+        pname = "cli-tool";
+        version = "0.2.0";
 
-    GARBAGE_NIX_001_B = "noise_cli_nix";
+        src = ../src/cli;
 
-    pkgs.stdenv.mkDerivation {
-      pname = "cli-tool";
-      version = "0.2.0";
+        buildInputs = [
+          pkgs.go
+        ];
 
-      src = ../src/cli;
+        buildPhase = ''
+          go build -o cli-tool .
+        '';
 
-      buildInputs = [
-        pkgs.go
-      ];
+        installPhase = ''
+          mkdir -p $out/bin
+          cp cli-tool $out/bin/
+        '';
+      }
+    shell.nix: |
+      { pkgs ? import <nixpkgs> {} }:
 
-      buildPhase = ''
-        go build -o cli-tool .
-      '';
+      GARBAGE_NIX_001_C = "noise_shell_nix";
 
-      installPhase = ''
-        mkdir -p $out/bin
-        cp cli-tool $out/bin/
-      '';
-    }
+      pkgs.mkShell {
+        buildInputs = [
+          pkgs.python3
+          pkgs.go
+          pkgs.nodejs
+        ];
+      }
+  changed_files:
+    default.nix: |
+      { pkgs ? import <nixpkgs> {} }:
 
-  # Trap: shell.nix is similar structure but unrelated
-  shell.nix: |
-    { pkgs ? import <nixpkgs> {} }:
+      let
+        myapp = import ./packages/myapp.nix { inherit pkgs; };
+        utils = import ./packages/utils.nix { inherit pkgs; };
+      in
+      pkgs.buildEnv {
+        name = "myproject-env";
+        paths = [
+          myapp
+          utils
+        ];
+      }
+    packages/myapp.nix: |
+      { pkgs }:
 
-    GARBAGE_NIX_001_C = "noise_shell_nix";
+      pkgs.stdenv.mkDerivation {
+        pname = "myapp";
+        version = "1.1.0";
 
-    pkgs.mkShell {
-      buildInputs = [
-        pkgs.python3
-        pkgs.go
-        pkgs.nodejs
-      ];
-    }
+        src = ../src/myapp;
 
-changed:
-  default.nix: |
-    { pkgs ? import <nixpkgs> {} }:
+        buildInputs = [
+          pkgs.python3
+          pkgs.zlib
+          pkgs.openssl
+          pkgs.curl
+        ];
 
-    let
-      myapp = import ./packages/myapp.nix { inherit pkgs; };
-      utils = import ./packages/utils.nix { inherit pkgs; };
-    in
-    pkgs.buildEnv {
-      name = "myproject-env";
-      paths = [
-        myapp
-        utils
-      ];
-    }
-  packages/myapp.nix: |
-    { pkgs }:
+        nativeBuildInputs = [
+          pkgs.pkg-config
+        ];
 
-    pkgs.stdenv.mkDerivation {
-      pname = "myapp";
-      version = "1.1.0";
+        buildPhase = ''
+          export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
+          python3 setup.py build
+        '';
 
-      src = ../src/myapp;
+        installPhase = ''
+          mkdir -p $out/bin
+          cp -r build/lib/* $out/bin/
+        '';
+      }
+    packages/utils.nix: |
+      { pkgs }:
 
-      buildInputs = [
-        pkgs.python3
-        pkgs.zlib
-        pkgs.openssl
-        pkgs.curl
-      ];
+      GARBAGE_NIX_001_A = "noise_utils_nix";
 
-      nativeBuildInputs = [
-        pkgs.pkg-config
-      ];
+      pkgs.stdenv.mkDerivation {
+        pname = "utils";
+        version = "0.5.0";
 
-      buildPhase = ''
-        export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
-        python3 setup.py build
-      '';
+        src = ../src/utils;
 
-      installPhase = ''
-        mkdir -p $out/bin
-        cp -r build/lib/* $out/bin/
-      '';
-    }
-  packages/utils.nix: |
-    { pkgs }:
+        buildInputs = [
+          pkgs.python3
+        ];
 
-    GARBAGE_NIX_001_A = "noise_utils_nix";
+        buildPhase = ''
+          python3 setup.py build
+        '';
 
-    pkgs.stdenv.mkDerivation {
-      pname = "utils";
-      version = "0.5.0";
+        installPhase = ''
+          mkdir -p $out/lib
+          cp -r build/lib/* $out/lib/
+        '';
+      }
+    packages/cli.nix: |
+      { pkgs }:
 
-      src = ../src/utils;
+      GARBAGE_NIX_001_B = "noise_cli_nix";
 
-      buildInputs = [
-        pkgs.python3
-      ];
+      pkgs.stdenv.mkDerivation {
+        pname = "cli-tool";
+        version = "0.2.0";
 
-      buildPhase = ''
-        python3 setup.py build
-      '';
+        src = ../src/cli;
 
-      installPhase = ''
-        mkdir -p $out/lib
-        cp -r build/lib/* $out/lib/
-      '';
-    }
-  packages/cli.nix: |
-    { pkgs }:
+        buildInputs = [
+          pkgs.go
+        ];
 
-    GARBAGE_NIX_001_B = "noise_cli_nix";
+        buildPhase = ''
+          go build -o cli-tool .
+        '';
 
-    pkgs.stdenv.mkDerivation {
-      pname = "cli-tool";
-      version = "0.2.0";
+        installPhase = ''
+          mkdir -p $out/bin
+          cp cli-tool $out/bin/
+        '';
+      }
+    shell.nix: |
+      { pkgs ? import <nixpkgs> {} }:
 
-      src = ../src/cli;
+      GARBAGE_NIX_001_C = "noise_shell_nix";
 
-      buildInputs = [
-        pkgs.go
-      ];
-
-      buildPhase = ''
-        go build -o cli-tool .
-      '';
-
-      installPhase = ''
-        mkdir -p $out/bin
-        cp cli-tool $out/bin/
-      '';
-    }
-  shell.nix: |
-    { pkgs ? import <nixpkgs> {} }:
-
-    GARBAGE_NIX_001_C = "noise_shell_nix";
-
-    pkgs.mkShell {
-      buildInputs = [
-        pkgs.python3
-        pkgs.go
-        pkgs.nodejs
-      ];
-    }
-
-must_include_files:
-- packages/myapp.nix
-- default.nix
-
-must_include_content_from:
-  packages/myapp.nix:
-    - pkgs.openssl
-    - pkgs.curl
-    - pkg-config
-  default.nix:
-    - ./packages/myapp.nix
-
-must_not_include:
-- GARBAGE_NIX_001_A
-- GARBAGE_NIX_001_B
-- GARBAGE_NIX_001_C
-
-must_not_include_files:
-- packages/utils.nix
-- packages/cli.nix
-- shell.nix
-
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      pkgs.mkShell {
+        buildInputs = [
+          pkgs.python3
+          pkgs.go
+          pkgs.nodejs
+        ];
+      }
+  commit_message: Update files
+fragments:
+- id: myapp
+  selector:
+    path: packages/myapp.nix
+    anchor: pkgs.openssl
+- id: myapp_1
+  selector:
+    path: packages/myapp.nix
+    anchor: pkgs.curl
+- id: myapp_2
+  selector:
+    path: packages/myapp.nix
+    anchor: pkg-config
+- id: default
+  selector:
+    path: default.nix
+    anchor: ./packages/myapp.nix
+- id: no_utils
+  selector:
+    path: packages/utils.nix
+- id: no_cli
+  selector:
+    path: packages/cli.nix
+- id: no_shell
+  selector:
+    path: shell.nix
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_NIX_001_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_NIX_001_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_NIX_001_C
+oracle:
+  required:
+  - myapp
+  - myapp_1
+  - myapp_2
+  - default
+  allowed: []
+  forbidden:
+  - no_utils
+  - no_cli
+  - no_shell
+  - no_global_0
+  - no_global_1
+  - no_global_2

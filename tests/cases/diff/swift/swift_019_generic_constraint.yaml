@@ -1,356 +1,385 @@
-# Scenario: A generic cache service is written with constraints referencing
-# a protocol defined in another file.
-#
-# Diff: Features/Cache/EntityCache.swift changes from an empty class to
-# a generic class EntityCache<T: Cacheable> with store(_:), retrieve(forKey:),
-# evictExpired(), and count. All methods use Cacheable protocol members.
-#
-# Reviewer questions:
-#   Q1: "What does the Cacheable protocol require?"
-#       -> Features/Cache/Cacheable.swift: cacheKey: String, expiresAt: Date?,
-#          isExpired: Bool. Reviewer verifies store uses cacheKey, retrieve
-#          checks isExpired, evictExpired filters by isExpired.
-#
-#   Q2: "What is the default implementation of isExpired?"
-#       -> Same file: extension Cacheable provides isExpired checking
-#          Date() > expiresAt. Reviewer verifies eviction logic is correct.
-#
-# Not needed for comprehension:
-#   - Core/Protocols/Persistable.swift: Another protocol with similar
-#     requirements. STRUCTURAL TRAP: same pattern (protocol + extension
-#     with default implementations), primaryKey similar to cacheKey.
-#     But persistence, not caching.
-#
-#   - Features/Storage/DiskCache.swift: Another cache in different directory.
-#     STRUCTURAL TRAP: same "cache" concept, store/retrieve methods.
-#     But file-based, no generic constraint, no Cacheable protocol.
-#
-#   - Features/Cache/CacheManager.swift: Manages multiple EntityCache instances.
-#     HARDEST TRAP: same directory, creates EntityCache<T: Cacheable>,
-#     calls store/retrieve/evictExpired. Direct consumer with same generic
-#     constraint. But orchestration logic doesn't define Cacheable.
-#
-#   - Models/CachedUser.swift: Model conforming to Cacheable.
-#     STRUCTURAL TRAP: implements cacheKey, expiresAt. Shows what Cacheable
-#     looks like in practice. But a conformer doesn't define the protocol.
-#
-#   - Core/Protocols/Expirable.swift: Protocol with isExpired property.
-#     STRUCTURAL TRAP: overlapping concept (expiration checking), similar
-#     property name. But different protocol entirely.
+name: swift_019_generic_constraint
+repo:
+  initial_files:
+    Features/Cache/Cacheable.swift: |
+      import Foundation
 
-max_enrichment: 5.4
-initial:
-  Features/Cache/Cacheable.swift: |
-    import Foundation
+      protocol Cacheable {
+          var cacheKey: String { get }
+          var expiresAt: Date? { get }
+          var isExpired: Bool { get }
+      }
 
-    protocol Cacheable {
-        var cacheKey: String { get }
-        var expiresAt: Date? { get }
-        var isExpired: Bool { get }
-    }
+      extension Cacheable {
+          var isExpired: Bool {
+              guard let expiresAt = expiresAt else { return false }
+              return Date() > expiresAt
+          }
+      }
+    Features/Cache/EntityCache.swift: |
+      class EntityCache {}
+    Core/Protocols/Persistable.swift: |
+      import Foundation
 
-    extension Cacheable {
-        var isExpired: Bool {
-            guard let expiresAt = expiresAt else { return false }
-            return Date() > expiresAt
-        }
-    }
-  Features/Cache/EntityCache.swift: |
-    class EntityCache {}
-  Core/Protocols/Persistable.swift: |
-    import Foundation
+      protocol Persistable {
+          var primaryKey: String { get }
+          func save() throws
+          func delete() throws
+      }
 
-    protocol Persistable {
-        var primaryKey: String { get }
-        func save() throws
-        func delete() throws
-    }
+      extension Persistable {
+          func save() throws {
+              let data = try JSONSerialization.data(withJSONObject: [:])
+              let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
+              try data.write(to: url)
+          }
 
-    extension Persistable {
-        func save() throws {
-            let data = try JSONSerialization.data(withJSONObject: [:])
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
-            try data.write(to: url)
-        }
+          func delete() throws {
+              let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
+              try FileManager.default.removeItem(at: url)
+          }
+      }
+    Features/Storage/DiskCache.swift: |
+      import Foundation
 
-        func delete() throws {
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
-            try FileManager.default.removeItem(at: url)
-        }
-    }
-  Features/Storage/DiskCache.swift: |
-    import Foundation
+      class DiskCache {
+          private let directory: URL
 
-    class DiskCache {
-        private let directory: URL
+          init(directory: URL) {
+              self.directory = directory
+          }
 
-        init(directory: URL) {
-            self.directory = directory
-        }
+          func write(_ data: Data, forKey key: String) throws {
+              let fileURL = directory.appendingPathComponent(key)
+              try data.write(to: fileURL)
+          }
 
-        func write(_ data: Data, forKey key: String) throws {
-            let fileURL = directory.appendingPathComponent(key)
-            try data.write(to: fileURL)
-        }
+          func read(forKey key: String) -> Data? {
+              let fileURL = directory.appendingPathComponent(key)
+              return try? Data(contentsOf: fileURL)
+          }
 
-        func read(forKey key: String) -> Data? {
-            let fileURL = directory.appendingPathComponent(key)
-            return try? Data(contentsOf: fileURL)
-        }
+          func removeAll() throws {
+              let contents = try FileManager.default.contentsOfDirectory(
+                  at: directory, includingPropertiesForKeys: nil
+              )
+              for file in contents {
+                  try FileManager.default.removeItem(at: file)
+              }
+          }
+      }
+    Features/Cache/CacheManager.swift: |
+      import Foundation
 
-        func removeAll() throws {
-            let contents = try FileManager.default.contentsOfDirectory(
-                at: directory, includingPropertiesForKeys: nil
-            )
-            for file in contents {
-                try FileManager.default.removeItem(at: file)
-            }
-        }
-    }
-  Features/Cache/CacheManager.swift: |
-    import Foundation
+      class CacheManager {
+          private var caches: [String: Any] = [:]
 
-    class CacheManager {
-        private var caches: [String: Any] = [:]
+          func getCache<T: Cacheable>(for type: T.Type) -> EntityCache<T> {
+              let key = String(describing: type)
+              if let existing = caches[key] as? EntityCache<T> {
+                  return existing
+              }
+              let cache = EntityCache<T>()
+              caches[key] = cache
+              return cache
+          }
 
-        func getCache<T: Cacheable>(for type: T.Type) -> EntityCache<T> {
-            let key = String(describing: type)
-            if let existing = caches[key] as? EntityCache<T> {
-                return existing
-            }
-            let cache = EntityCache<T>()
-            caches[key] = cache
-            return cache
-        }
+          func evictAll() {
+              caches.removeAll()
+          }
 
-        func evictAll() {
-            caches.removeAll()
-        }
+          func cacheCount() -> Int {
+              caches.count
+          }
+      }
+    Models/CachedUser.swift: |
+      import Foundation
 
-        func cacheCount() -> Int {
-            caches.count
-        }
-    }
-  Models/CachedUser.swift: |
-    import Foundation
+      struct CachedUser: Cacheable {
+          let id: String
+          let username: String
+          let fetchedAt: Date
 
-    struct CachedUser: Cacheable {
-        let id: String
-        let username: String
-        let fetchedAt: Date
+          var cacheKey: String { "user_\(id)" }
 
-        var cacheKey: String { "user_\(id)" }
+          var expiresAt: Date? {
+              Calendar.current.date(byAdding: .hour, value: 1, to: fetchedAt)
+          }
+      }
+    Core/Protocols/Expirable.swift: |
+      import Foundation
 
-        var expiresAt: Date? {
-            Calendar.current.date(byAdding: .hour, value: 1, to: fetchedAt)
-        }
-    }
-  Core/Protocols/Expirable.swift: |
-    import Foundation
+      protocol Expirable {
+          var createdAt: Date { get }
+          var timeToLive: TimeInterval { get }
+          var isExpired: Bool { get }
+      }
 
-    protocol Expirable {
-        var createdAt: Date { get }
-        var timeToLive: TimeInterval { get }
-        var isExpired: Bool { get }
-    }
+      extension Expirable {
+          var isExpired: Bool {
+              Date().timeIntervalSince(createdAt) > timeToLive
+          }
+      }
+  changed_files:
+    Features/Cache/Cacheable.swift: |
+      import Foundation
 
-    extension Expirable {
-        var isExpired: Bool {
-            Date().timeIntervalSince(createdAt) > timeToLive
-        }
-    }
+      protocol Cacheable {
+          var cacheKey: String { get }
+          var expiresAt: Date? { get }
+          var isExpired: Bool { get }
+      }
 
-changed:
-  Features/Cache/Cacheable.swift: |
-    import Foundation
+      extension Cacheable {
+          var isExpired: Bool {
+              guard let expiresAt = expiresAt else { return false }
+              return Date() > expiresAt
+          }
+      }
+    Features/Cache/EntityCache.swift: |
+      import Foundation
 
-    protocol Cacheable {
-        var cacheKey: String { get }
-        var expiresAt: Date? { get }
-        var isExpired: Bool { get }
-    }
+      class EntityCache<T: Cacheable> {
+          private var storage: [String: T] = [:]
 
-    extension Cacheable {
-        var isExpired: Bool {
-            guard let expiresAt = expiresAt else { return false }
-            return Date() > expiresAt
-        }
-    }
-  Features/Cache/EntityCache.swift: |
-    import Foundation
+          func store(_ item: T) {
+              storage[item.cacheKey] = item
+          }
 
-    class EntityCache<T: Cacheable> {
-        private var storage: [String: T] = [:]
+          func retrieve(forKey key: String) -> T? {
+              guard let item = storage[key] else { return nil }
+              if item.isExpired {
+                  storage.removeValue(forKey: key)
+                  return nil
+              }
+              return item
+          }
 
-        func store(_ item: T) {
-            storage[item.cacheKey] = item
-        }
+          func evictExpired() {
+              let expiredKeys = storage.filter { $0.value.isExpired }.map(\.key)
+              for key in expiredKeys {
+                  storage.removeValue(forKey: key)
+              }
+          }
 
-        func retrieve(forKey key: String) -> T? {
-            guard let item = storage[key] else { return nil }
-            if item.isExpired {
-                storage.removeValue(forKey: key)
-                return nil
-            }
-            return item
-        }
+          var count: Int { storage.count }
+      }
+    Core/Protocols/Persistable.swift: |
+      import Foundation
 
-        func evictExpired() {
-            let expiredKeys = storage.filter { $0.value.isExpired }.map(\.key)
-            for key in expiredKeys {
-                storage.removeValue(forKey: key)
-            }
-        }
+      protocol Persistable {
+          var primaryKey: String { get }
+          func save() throws
+          func delete() throws
+      }
 
-        var count: Int { storage.count }
-    }
-  Core/Protocols/Persistable.swift: |
-    import Foundation
+      extension Persistable {
+          func save() throws {
+              let data = try JSONSerialization.data(withJSONObject: [:])
+              let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
+              try data.write(to: url)
+          }
 
-    protocol Persistable {
-        var primaryKey: String { get }
-        func save() throws
-        func delete() throws
-    }
+          func delete() throws {
+              let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
+              try FileManager.default.removeItem(at: url)
+          }
+      }
+    Features/Storage/DiskCache.swift: |
+      import Foundation
 
-    extension Persistable {
-        func save() throws {
-            let data = try JSONSerialization.data(withJSONObject: [:])
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
-            try data.write(to: url)
-        }
+      class DiskCache {
+          private let directory: URL
 
-        func delete() throws {
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent(primaryKey)
-            try FileManager.default.removeItem(at: url)
-        }
-    }
-  Features/Storage/DiskCache.swift: |
-    import Foundation
+          init(directory: URL) {
+              self.directory = directory
+          }
 
-    class DiskCache {
-        private let directory: URL
+          func write(_ data: Data, forKey key: String) throws {
+              let fileURL = directory.appendingPathComponent(key)
+              try data.write(to: fileURL)
+          }
 
-        init(directory: URL) {
-            self.directory = directory
-        }
+          func read(forKey key: String) -> Data? {
+              let fileURL = directory.appendingPathComponent(key)
+              return try? Data(contentsOf: fileURL)
+          }
 
-        func write(_ data: Data, forKey key: String) throws {
-            let fileURL = directory.appendingPathComponent(key)
-            try data.write(to: fileURL)
-        }
+          func removeAll() throws {
+              let contents = try FileManager.default.contentsOfDirectory(
+                  at: directory, includingPropertiesForKeys: nil
+              )
+              for file in contents {
+                  try FileManager.default.removeItem(at: file)
+              }
+          }
+      }
+    Features/Cache/CacheManager.swift: |
+      import Foundation
 
-        func read(forKey key: String) -> Data? {
-            let fileURL = directory.appendingPathComponent(key)
-            return try? Data(contentsOf: fileURL)
-        }
+      class CacheManager {
+          private var caches: [String: Any] = [:]
 
-        func removeAll() throws {
-            let contents = try FileManager.default.contentsOfDirectory(
-                at: directory, includingPropertiesForKeys: nil
-            )
-            for file in contents {
-                try FileManager.default.removeItem(at: file)
-            }
-        }
-    }
-  Features/Cache/CacheManager.swift: |
-    import Foundation
+          func getCache<T: Cacheable>(for type: T.Type) -> EntityCache<T> {
+              let key = String(describing: type)
+              if let existing = caches[key] as? EntityCache<T> {
+                  return existing
+              }
+              let cache = EntityCache<T>()
+              caches[key] = cache
+              return cache
+          }
 
-    class CacheManager {
-        private var caches: [String: Any] = [:]
+          func evictAll() {
+              caches.removeAll()
+          }
 
-        func getCache<T: Cacheable>(for type: T.Type) -> EntityCache<T> {
-            let key = String(describing: type)
-            if let existing = caches[key] as? EntityCache<T> {
-                return existing
-            }
-            let cache = EntityCache<T>()
-            caches[key] = cache
-            return cache
-        }
+          func cacheCount() -> Int {
+              caches.count
+          }
+      }
+    Models/CachedUser.swift: |
+      import Foundation
 
-        func evictAll() {
-            caches.removeAll()
-        }
+      struct CachedUser: Cacheable {
+          let id: String
+          let username: String
+          let fetchedAt: Date
 
-        func cacheCount() -> Int {
-            caches.count
-        }
-    }
-  Models/CachedUser.swift: |
-    import Foundation
+          var cacheKey: String { "user_\(id)" }
 
-    struct CachedUser: Cacheable {
-        let id: String
-        let username: String
-        let fetchedAt: Date
+          var expiresAt: Date? {
+              Calendar.current.date(byAdding: .hour, value: 1, to: fetchedAt)
+          }
+      }
+    Core/Protocols/Expirable.swift: |
+      import Foundation
 
-        var cacheKey: String { "user_\(id)" }
+      protocol Expirable {
+          var createdAt: Date { get }
+          var timeToLive: TimeInterval { get }
+          var isExpired: Bool { get }
+      }
 
-        var expiresAt: Date? {
-            Calendar.current.date(byAdding: .hour, value: 1, to: fetchedAt)
-        }
-    }
-  Core/Protocols/Expirable.swift: |
-    import Foundation
-
-    protocol Expirable {
-        var createdAt: Date { get }
-        var timeToLive: TimeInterval { get }
-        var isExpired: Bool { get }
-    }
-
-    extension Expirable {
-        var isExpired: Bool {
-            Date().timeIntervalSince(createdAt) > timeToLive
-        }
-    }
-
-must_include_files:
-  - Features/Cache/EntityCache.swift
-  - Features/Cache/Cacheable.swift
-
-must_include_content_from:
-  Features/Cache/EntityCache.swift:
-    - "class EntityCache<T: Cacheable>"
-    - "storage[item.cacheKey]"
-    - "item.isExpired"
-  Features/Cache/Cacheable.swift:
-    - "protocol Cacheable"
-    - "var cacheKey: String"
-    - "var isExpired: Bool"
-    - "var expiresAt: Date?"
-
-must_not_include:
-  # --- Persistable.swift: another protocol with default implementations ---
-  - Persistable
-  - primaryKey
-  # --- DiskCache.swift: file-based cache, no Cacheable protocol ---
-  - DiskCache
-  - removeAll
-  # --- CacheManager.swift: HARDEST TRAP, creates EntityCache<T: Cacheable> ---
-  - CacheManager
-  - getCache
-  - evictAll
-  - cacheCount
-  # --- CachedUser.swift: conformer of Cacheable ---
-  - CachedUser
-  - fetchedAt
-  - "user_"
-  # --- Expirable.swift: overlapping concept, isExpired property ---
-  - Expirable
-  - timeToLive
-  - createdAt
-
-must_not_include_files:
-  - Core/Protocols/Persistable.swift
-  - Features/Storage/DiskCache.swift
-  - Features/Cache/CacheManager.swift
-  - Models/CachedUser.swift
-  - Core/Protocols/Expirable.swift
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      extension Expirable {
+          var isExpired: Bool {
+              Date().timeIntervalSince(createdAt) > timeToLive
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: entitycache
+  selector:
+    path: Features/Cache/EntityCache.swift
+    anchor: 'class EntityCache<T: Cacheable>'
+- id: entitycache_1
+  selector:
+    path: Features/Cache/EntityCache.swift
+    anchor: storage[item.cacheKey]
+- id: entitycache_2
+  selector:
+    path: Features/Cache/EntityCache.swift
+    anchor: item.isExpired
+- id: cacheable
+  selector:
+    path: Features/Cache/Cacheable.swift
+    anchor: protocol Cacheable
+- id: cacheable_1
+  selector:
+    path: Features/Cache/Cacheable.swift
+    anchor: 'var cacheKey: String'
+- id: cacheable_2
+  selector:
+    path: Features/Cache/Cacheable.swift
+    anchor: 'var isExpired: Bool'
+- id: cacheable_3
+  selector:
+    path: Features/Cache/Cacheable.swift
+    anchor: 'var expiresAt: Date?'
+- id: no_persistable
+  selector:
+    path: Core/Protocols/Persistable.swift
+- id: no_diskcache
+  selector:
+    path: Features/Storage/DiskCache.swift
+- id: no_cachemanager
+  selector:
+    path: Features/Cache/CacheManager.swift
+- id: no_cacheduser
+  selector:
+    path: Models/CachedUser.swift
+- id: no_expirable
+  selector:
+    path: Core/Protocols/Expirable.swift
+- id: no_global_0
+  selector:
+    anchor: Persistable
+- id: no_global_1
+  selector:
+    anchor: primaryKey
+- id: no_global_2
+  selector:
+    anchor: DiskCache
+- id: no_global_3
+  selector:
+    anchor: removeAll
+- id: no_global_4
+  selector:
+    anchor: CacheManager
+- id: no_global_5
+  selector:
+    anchor: getCache
+- id: no_global_6
+  selector:
+    anchor: evictAll
+- id: no_global_7
+  selector:
+    anchor: cacheCount
+- id: no_global_8
+  selector:
+    anchor: CachedUser
+- id: no_global_9
+  selector:
+    anchor: fetchedAt
+- id: no_global_10
+  selector:
+    anchor: user_
+- id: no_global_11
+  selector:
+    anchor: Expirable
+- id: no_global_12
+  selector:
+    anchor: timeToLive
+- id: no_global_13
+  selector:
+    anchor: createdAt
+oracle:
+  required:
+  - entitycache
+  - entitycache_1
+  - entitycache_2
+  - cacheable
+  - cacheable_1
+  - cacheable_2
+  - cacheable_3
+  allowed: []
+  forbidden:
+  - no_persistable
+  - no_diskcache
+  - no_cachemanager
+  - no_cacheduser
+  - no_expirable
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13

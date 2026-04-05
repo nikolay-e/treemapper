@@ -1,142 +1,148 @@
-# Scenario: codegen.yaml gains a new plugin and output target; generated file unchanged.
-#
-# Diff: codegen.yaml adds `typescript-operations` plugin and new `hooks.ts` output target.
-#
-# Reviewer questions:
-#   Q1: "What new files will the code generator produce?"
-#       -> codegen.yaml now generates hooks.ts using typescript-react-query plugin.
-#   Q2: "Are existing consumers of generated types affected?"
-#       -> src/services/user.ts (UNCHANGED) imports User from generated/types.ts.
-#          The types file itself is unchanged, so existing consumers are safe.
-#
-# Not needed:
-#   - utils/schema_validator.py: validates GraphQL schema files for correctness.
-#     Same "schema" and "graphql" vocabulary but no import of codegen.yaml or types.
-#   - utils/codegen_cache.py: caches code generation results to avoid re-runs.
-#     Related to code generation but has no dependency on the codegen config.
+name: patterns_019_edge_generated_code_comment
+repo:
+  initial_files:
+    codegen.yaml: |
+      generates:
+        src/generated/types.ts:
+          schema: schema.graphql
+          plugins:
+            - typescript
+    src/generated/types.ts: |
+      // THIS FILE IS GENERATED - DO NOT EDIT
+      // Generated from codegen.yaml
 
-max_enrichment: 8.9
-initial:
-  codegen.yaml: |
-    generates:
-      src/generated/types.ts:
-        schema: schema.graphql
-        plugins:
-          - typescript
-  src/generated/types.ts: |
-    // THIS FILE IS GENERATED - DO NOT EDIT
-    // Generated from codegen.yaml
+      export interface User {
+          id: string;
+          name: string;
+      }
+    src/services/user.ts: |
+      import { User } from '../generated/types';
 
-    export interface User {
-        id: string;
-        name: string;
-    }
-  src/services/user.ts: |
-    import { User } from '../generated/types';
+      export function processUser(user: User) {
+          return user.name;
+      }
+    utils/schema_validator.py: |
+      SUPPORTED_SCHEMA_FORMATS = ["graphql", "json", "yaml"]
+      MAX_SCHEMA_SIZE_MB = 10
 
-    export function processUser(user: User) {
-        return user.name;
-    }
-  utils/schema_validator.py: |
-    SUPPORTED_SCHEMA_FORMATS = ["graphql", "json", "yaml"]
-    MAX_SCHEMA_SIZE_MB = 10
+      class SchemaValidator:
+          def validate_graphql(self, schema_path: str) -> list[str]:
+              return []
 
-    class SchemaValidator:
-        def validate_graphql(self, schema_path: str) -> list[str]:
-            return []
+          def check_breaking_changes(self, old_schema: str, new_schema: str) -> list[str]:
+              return []
 
-        def check_breaking_changes(self, old_schema: str, new_schema: str) -> list[str]:
-            return []
+          def get_type_count(self, schema_path: str) -> int:
+              return 0
+    utils/codegen_cache.py: |
+      import hashlib
 
-        def get_type_count(self, schema_path: str) -> int:
-            return 0
-  utils/codegen_cache.py: |
-    import hashlib
+      CACHE_DIR = ".codegen_cache"
+      CACHE_TTL_HOURS = 24
 
-    CACHE_DIR = ".codegen_cache"
-    CACHE_TTL_HOURS = 24
+      class CodegenCache:
+          def __init__(self, cache_dir: str = CACHE_DIR):
+              self.cache_dir = cache_dir
 
-    class CodegenCache:
-        def __init__(self, cache_dir: str = CACHE_DIR):
-            self.cache_dir = cache_dir
+          def get_hash(self, config_path: str) -> str:
+              return hashlib.md5(config_path.encode()).hexdigest()
 
-        def get_hash(self, config_path: str) -> str:
-            return hashlib.md5(config_path.encode()).hexdigest()
+          def is_stale(self, config_path: str) -> bool:
+              return True
+  changed_files:
+    codegen.yaml: |
+      generates:
+        src/generated/types.ts:
+          schema: schema.graphql
+          plugins:
+            - typescript
+            - typescript-operations
+        src/generated/hooks.ts:
+          schema: schema.graphql
+          plugins:
+            - typescript-react-query
+    src/generated/types.ts: |
+      // THIS FILE IS GENERATED - DO NOT EDIT
+      // Generated from codegen.yaml
 
-        def is_stale(self, config_path: str) -> bool:
-            return True
-changed:
-  codegen.yaml: |
-    generates:
-      src/generated/types.ts:
-        schema: schema.graphql
-        plugins:
-          - typescript
-          - typescript-operations
-      src/generated/hooks.ts:
-        schema: schema.graphql
-        plugins:
-          - typescript-react-query
-  src/generated/types.ts: |
-    // THIS FILE IS GENERATED - DO NOT EDIT
-    // Generated from codegen.yaml
+      export interface User {
+          id: string;
+          name: string;
+      }
+    src/services/user.ts: |
+      import { User } from '../generated/types';
 
-    export interface User {
-        id: string;
-        name: string;
-    }
-  src/services/user.ts: |
-    import { User } from '../generated/types';
+      export function processUser(user: User) {
+          return user.name;
+      }
+    utils/schema_validator.py: |
+      SUPPORTED_SCHEMA_FORMATS = ["graphql", "json", "yaml"]
+      MAX_SCHEMA_SIZE_MB = 10
 
-    export function processUser(user: User) {
-        return user.name;
-    }
-  utils/schema_validator.py: |
-    SUPPORTED_SCHEMA_FORMATS = ["graphql", "json", "yaml"]
-    MAX_SCHEMA_SIZE_MB = 10
+      class SchemaValidator:
+          def validate_graphql(self, schema_path: str) -> list[str]:
+              return []
 
-    class SchemaValidator:
-        def validate_graphql(self, schema_path: str) -> list[str]:
-            return []
+          def check_breaking_changes(self, old_schema: str, new_schema: str) -> list[str]:
+              return []
 
-        def check_breaking_changes(self, old_schema: str, new_schema: str) -> list[str]:
-            return []
+          def get_type_count(self, schema_path: str) -> int:
+              return 0
+    utils/codegen_cache.py: |
+      import hashlib
 
-        def get_type_count(self, schema_path: str) -> int:
-            return 0
-  utils/codegen_cache.py: |
-    import hashlib
+      CACHE_DIR = ".codegen_cache"
+      CACHE_TTL_HOURS = 24
 
-    CACHE_DIR = ".codegen_cache"
-    CACHE_TTL_HOURS = 24
+      class CodegenCache:
+          def __init__(self, cache_dir: str = CACHE_DIR):
+              self.cache_dir = cache_dir
 
-    class CodegenCache:
-        def __init__(self, cache_dir: str = CACHE_DIR):
-            self.cache_dir = cache_dir
+          def get_hash(self, config_path: str) -> str:
+              return hashlib.md5(config_path.encode()).hexdigest()
 
-        def get_hash(self, config_path: str) -> str:
-            return hashlib.md5(config_path.encode()).hexdigest()
-
-        def is_stale(self, config_path: str) -> bool:
-            return True
-must_include_files:
-  - codegen.yaml
-must_include_content_from:
-  codegen.yaml:
-    - "- typescript-operations"
-must_not_include:
-  # utils/schema_validator.py: GraphQL schema validation, no import of codegen config
-  - SchemaValidator
-  - SUPPORTED_SCHEMA_FORMATS
-  - check_breaking_changes
-  # utils/codegen_cache.py: generation caching, no dependency on codegen.yaml
-  - CodegenCache
-  - CACHE_DIR
-  - CACHE_TTL_HOURS
-must_not_include_files:
-  - utils/schema_validator.py
-  - utils/codegen_cache.py
-max_fragments: 4
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          def is_stale(self, config_path: str) -> bool:
+              return True
+  commit_message: Update files
+fragments:
+- id: codegen
+  selector:
+    path: codegen.yaml
+    anchor: '- typescript-operations'
+- id: no_schema_validator
+  selector:
+    path: utils/schema_validator.py
+- id: no_codegen_cache
+  selector:
+    path: utils/codegen_cache.py
+- id: no_global_0
+  selector:
+    anchor: SchemaValidator
+- id: no_global_1
+  selector:
+    anchor: SUPPORTED_SCHEMA_FORMATS
+- id: no_global_2
+  selector:
+    anchor: check_breaking_changes
+- id: no_global_3
+  selector:
+    anchor: CodegenCache
+- id: no_global_4
+  selector:
+    anchor: CACHE_DIR
+- id: no_global_5
+  selector:
+    anchor: CACHE_TTL_HOURS
+oracle:
+  required:
+  - codegen
+  allowed: []
+  forbidden:
+  - no_schema_validator
+  - no_codegen_cache
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

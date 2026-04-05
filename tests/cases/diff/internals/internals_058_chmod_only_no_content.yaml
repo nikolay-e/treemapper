@@ -1,22 +1,29 @@
-max_enrichment: 13.6
-initial:
-  script.py: |
-    #!/usr/bin/env python3
-    def main():
-        print("Hello")
+name: internals_058_chmod_only_no_content
+repo:
+  initial_files:
+    script.py: |
+      #!/usr/bin/env python3
+      def main():
+          print("Hello")
 
-    if __name__ == "__main__":
-        main()
-changed:
-  script.py: |
-    #!/usr/bin/env python3
-    def main():
-        print("Hello")
+      if __name__ == "__main__":
+          main()
+  changed_files:
+    script.py: |
+      #!/usr/bin/env python3
+      def main():
+          print("Hello")
 
-    if __name__ == "__main__":
-        main()
-    # Added comment
-must_include_files:
-- script.py
-add_garbage_files: false
-skip_garbage_check: true
+      if __name__ == "__main__":
+          main()
+      # Added comment
+  commit_message: Update files
+fragments:
+- id: script_file
+  selector:
+    path: script.py
+oracle:
+  required:
+  - script_file
+  allowed: []
+  forbidden: []

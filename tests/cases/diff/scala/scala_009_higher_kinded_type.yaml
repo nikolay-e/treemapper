@@ -1,147 +1,154 @@
-# Scenario: FunctorOps uses the Functor[F[_]] higher-kinded type class to write
-# generic container transformations that work with both List and Option.
-#
-# Diff: FunctorOps.scala adds double[F[_]: Functor] and type-specific wrappers.
-#
-# Reviewer questions:
-#   Q1: "What Functor instances exist?" -> Functor.scala (UNCHANGED) provides
-#        listFunctor and optionFunctor.
-#   Q2: "How does the HKT constraint work?" -> [F[_]: Functor] desugars to an
-#        implicit Functor[F] parameter.
-#
-# Trap files (plausible but no dependency on Functor or FunctorOps):
-#   - Monad.scala: another HKT type class extending Functor. Same "type class
-#     hierarchy" domain but FunctorOps only uses Functor, not Monad.
-#   - ListOps.scala: operations on List[Int] using standard library methods.
-#     Same "List transformation" domain but no Functor abstraction.
-
-max_enrichment: 6.8
-initial:
-  Functor.scala: |
-    trait Functor[F[_]] {
-      def map[A, B](fa: F[A])(f: A => B): F[B]
-    }
-
-    object Functor {
-      implicit val listFunctor: Functor[List] = new Functor[List] {
-        def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+name: scala_009_higher_kinded_type
+repo:
+  initial_files:
+    Functor.scala: |
+      trait Functor[F[_]] {
+        def map[A, B](fa: F[A])(f: A => B): F[B]
       }
 
-      implicit val optionFunctor: Functor[Option] = new Functor[Option] {
-        def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
-      }
-    }
-  FunctorOps.scala: |
-    class FunctorOps {}
-  Monad.scala: |
-    trait Monad[F[_]] extends Functor[F] {
-      def pure[A](a: A): F[A]
-      def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
-    }
+      object Functor {
+        implicit val listFunctor: Functor[List] = new Functor[List] {
+          def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        }
 
-    object Monad {
-      implicit val listMonad: Monad[List] = new Monad[List] {
-        def pure[A](a: A): List[A] = List(a)
-        def flatMap[A, B](fa: List[A])(f: A => List[B]): List[B] = fa.flatMap(f)
-        def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        implicit val optionFunctor: Functor[Option] = new Functor[Option] {
+          def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
+        }
+      }
+    FunctorOps.scala: |
+      class FunctorOps {}
+    Monad.scala: |
+      trait Monad[F[_]] extends Functor[F] {
+        def pure[A](a: A): F[A]
+        def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
       }
 
-      implicit val optionMonad: Monad[Option] = new Monad[Option] {
-        def pure[A](a: A): Option[A] = Some(a)
-        def flatMap[A, B](fa: Option[A])(f: A => Option[B]): Option[B] = fa.flatMap(f)
-        def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
-      }
-    }
-  ListOps.scala: |
-    class ListOps {
-      def doubleAll(list: List[Int]): List[Int] = list.map(_ * 2)
-      def sumAll(list: List[Int]): Int = list.sum
-      def filterPositive(list: List[Int]): List[Int] = list.filter(_ > 0)
-      def groupBySign(list: List[Int]): Map[String, List[Int]] =
-        list.groupBy(n => if (n >= 0) "positive" else "negative")
-    }
+      object Monad {
+        implicit val listMonad: Monad[List] = new Monad[List] {
+          def pure[A](a: A): List[A] = List(a)
+          def flatMap[A, B](fa: List[A])(f: A => List[B]): List[B] = fa.flatMap(f)
+          def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        }
 
-changed:
-  Functor.scala: |
-    trait Functor[F[_]] {
-      def map[A, B](fa: F[A])(f: A => B): F[B]
-    }
-
-    object Functor {
-      implicit val listFunctor: Functor[List] = new Functor[List] {
-        def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        implicit val optionMonad: Monad[Option] = new Monad[Option] {
+          def pure[A](a: A): Option[A] = Some(a)
+          def flatMap[A, B](fa: Option[A])(f: A => Option[B]): Option[B] = fa.flatMap(f)
+          def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
+        }
       }
-
-      implicit val optionFunctor: Functor[Option] = new Functor[Option] {
-        def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
+    ListOps.scala: |
+      class ListOps {
+        def doubleAll(list: List[Int]): List[Int] = list.map(_ * 2)
+        def sumAll(list: List[Int]): Int = list.sum
+        def filterPositive(list: List[Int]): List[Int] = list.filter(_ > 0)
+        def groupBySign(list: List[Int]): Map[String, List[Int]] =
+          list.groupBy(n => if (n >= 0) "positive" else "negative")
       }
-    }
-  FunctorOps.scala: |
-    class FunctorOps {
-      def double[F[_]: Functor](container: F[Int]): F[Int] = {
-        implicitly[Functor[F]].map(container)(_ * 2)
+  changed_files:
+    Functor.scala: |
+      trait Functor[F[_]] {
+        def map[A, B](fa: F[A])(f: A => B): F[B]
       }
 
-      def doubleList(list: List[Int]): List[Int] = {
-        double(list)
+      object Functor {
+        implicit val listFunctor: Functor[List] = new Functor[List] {
+          def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        }
+
+        implicit val optionFunctor: Functor[Option] = new Functor[Option] {
+          def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
+        }
+      }
+    FunctorOps.scala: |
+      class FunctorOps {
+        def double[F[_]: Functor](container: F[Int]): F[Int] = {
+          implicitly[Functor[F]].map(container)(_ * 2)
+        }
+
+        def doubleList(list: List[Int]): List[Int] = {
+          double(list)
+        }
+
+        def doubleOption(opt: Option[Int]): Option[Int] = {
+          double(opt)
+        }
+      }
+    Monad.scala: |
+      trait Monad[F[_]] extends Functor[F] {
+        def pure[A](a: A): F[A]
+        def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
       }
 
-      def doubleOption(opt: Option[Int]): Option[Int] = {
-        double(opt)
-      }
-    }
-  Monad.scala: |
-    trait Monad[F[_]] extends Functor[F] {
-      def pure[A](a: A): F[A]
-      def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
-    }
+      object Monad {
+        implicit val listMonad: Monad[List] = new Monad[List] {
+          def pure[A](a: A): List[A] = List(a)
+          def flatMap[A, B](fa: List[A])(f: A => List[B]): List[B] = fa.flatMap(f)
+          def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        }
 
-    object Monad {
-      implicit val listMonad: Monad[List] = new Monad[List] {
-        def pure[A](a: A): List[A] = List(a)
-        def flatMap[A, B](fa: List[A])(f: A => List[B]): List[B] = fa.flatMap(f)
-        def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        implicit val optionMonad: Monad[Option] = new Monad[Option] {
+          def pure[A](a: A): Option[A] = Some(a)
+          def flatMap[A, B](fa: Option[A])(f: A => Option[B]): Option[B] = fa.flatMap(f)
+          def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
+        }
       }
-
-      implicit val optionMonad: Monad[Option] = new Monad[Option] {
-        def pure[A](a: A): Option[A] = Some(a)
-        def flatMap[A, B](fa: Option[A])(f: A => Option[B]): Option[B] = fa.flatMap(f)
-        def map[A, B](fa: Option[A])(f: A => B): Option[B] = fa.map(f)
+    ListOps.scala: |
+      class ListOps {
+        def doubleAll(list: List[Int]): List[Int] = list.map(_ * 2)
+        def sumAll(list: List[Int]): Int = list.sum
+        def filterPositive(list: List[Int]): List[Int] = list.filter(_ > 0)
+        def groupBySign(list: List[Int]): Map[String, List[Int]] =
+          list.groupBy(n => if (n >= 0) "positive" else "negative")
       }
-    }
-  ListOps.scala: |
-    class ListOps {
-      def doubleAll(list: List[Int]): List[Int] = list.map(_ * 2)
-      def sumAll(list: List[Int]): Int = list.sum
-      def filterPositive(list: List[Int]): List[Int] = list.filter(_ > 0)
-      def groupBySign(list: List[Int]): Map[String, List[Int]] =
-        list.groupBy(n => if (n >= 0) "positive" else "negative")
-    }
-
-must_include_files:
-  # Changed: uses Functor HKT with context bounds
-  - FunctorOps.scala
-  # Unchanged but essential: defines Functor trait and instances
-  - Functor.scala
-must_include_content_from:
-  FunctorOps.scala:
-    - "def double[F[_]: Functor](container: F[Int]): F[Int] = {"
-  Functor.scala:
-    - "trait Functor[F[_]] {"
-must_not_include:
-  # Monad.scala: extends Functor but not used by FunctorOps
-  - "trait Monad"
-  - flatMap
-  - pure
-  # ListOps.scala: operates on lists but uses standard map, no Functor
-  - "class ListOps"
-  - sumAll
-  - filterPositive
-  - groupBySign
-must_not_include_files:
-  - Monad.scala
-  - ListOps.scala
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+  commit_message: Update files
+fragments:
+- id: functorops
+  selector:
+    path: FunctorOps.scala
+    anchor: 'def double[F[_]: Functor](container: F[Int]): F[Int] = {'
+- id: functor
+  selector:
+    path: Functor.scala
+    anchor: trait Functor[F[_]] {
+- id: no_monad
+  selector:
+    path: Monad.scala
+- id: no_listops
+  selector:
+    path: ListOps.scala
+- id: no_global_0
+  selector:
+    anchor: trait Monad
+- id: no_global_1
+  selector:
+    anchor: flatMap
+- id: no_global_2
+  selector:
+    anchor: pure
+- id: no_global_3
+  selector:
+    anchor: class ListOps
+- id: no_global_4
+  selector:
+    anchor: sumAll
+- id: no_global_5
+  selector:
+    anchor: filterPositive
+- id: no_global_6
+  selector:
+    anchor: groupBySign
+oracle:
+  required:
+  - functorops
+  - functor
+  allowed: []
+  forbidden:
+  - no_monad
+  - no_listops
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6

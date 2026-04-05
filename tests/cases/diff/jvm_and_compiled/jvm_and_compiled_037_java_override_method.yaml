@@ -1,182 +1,179 @@
-# Scenario: Dog class adds a breed field and overrides both speak() and eat()
-# from the Animal abstract base class.
-#
-# Diff: Dog.java gains a breed field, modifies the constructor, changes speak()
-# to include breed, and adds an eat() override.
-#
-# Reviewer questions:
-#   Q1: "What methods does Dog override from Animal?"
-#       -> Animal.java (UNCHANGED) defines abstract speak() and concrete eat().
-#          Dog now overrides both — reviewer must see Animal to verify signatures.
-#
-# Not needed:
-#   - src/main/java/com/example/Kennel.java: manages a collection of Animals.
-#     Shares the Animal domain but has no import/dependency edge to Dog's override changes.
-#   - src/main/java/com/example/AnimalSound.java: enum of sound types.
-#     Domain-adjacent vocabulary (speak, sound) but not referenced by Dog.
+name: jvm_and_compiled_037_java_override_method
+repo:
+  initial_files:
+    src/main/java/com/example/Animal.java: |
+      package com.example;
 
-max_enrichment: 5.8
-initial:
-  src/main/java/com/example/Animal.java: |
-    package com.example;
+      public abstract class Animal {
+          protected String name;
 
-    public abstract class Animal {
-        protected String name;
+          public abstract String speak();
 
-        public abstract String speak();
+          public void eat() {
+              System.out.println(name + " is eating");
+          }
+      }
+    src/main/java/com/example/Dog.java: |
+      package com.example;
 
-        public void eat() {
-            System.out.println(name + " is eating");
-        }
-    }
-  src/main/java/com/example/Dog.java: |
-    package com.example;
+      public class Dog extends Animal {
+          public Dog(String name) {
+              this.name = name;
+          }
 
-    public class Dog extends Animal {
-        public Dog(String name) {
-            this.name = name;
-        }
+          @Override
+          public String speak() {
+              return "Woof!";
+          }
+      }
+    src/main/java/com/example/Kennel.java: |
+      package com.example;
 
-        @Override
-        public String speak() {
-            return "Woof!";
-        }
-    }
-  src/main/java/com/example/Kennel.java: |
-    package com.example;
+      import java.util.ArrayList;
+      import java.util.List;
 
-    import java.util.ArrayList;
-    import java.util.List;
+      public class Kennel {
+          private final List<Animal> animals = new ArrayList<>();
 
-    public class Kennel {
-        private final List<Animal> animals = new ArrayList<>();
+          public void admit(Animal animal) {
+              animals.add(animal);
+          }
 
-        public void admit(Animal animal) {
-            animals.add(animal);
-        }
+          public void feedAll() {
+              for (Animal animal : animals) {
+                  animal.eat();
+              }
+          }
 
-        public void feedAll() {
-            for (Animal animal : animals) {
-                animal.eat();
-            }
-        }
+          public int getCount() {
+              return animals.size();
+          }
+      }
+    src/main/java/com/example/AnimalSound.java: |
+      package com.example;
 
-        public int getCount() {
-            return animals.size();
-        }
-    }
-  src/main/java/com/example/AnimalSound.java: |
-    package com.example;
+      public enum AnimalSound {
+          BARK("Woof"),
+          MEOW("Meow"),
+          CHIRP("Tweet");
 
-    public enum AnimalSound {
-        BARK("Woof"),
-        MEOW("Meow"),
-        CHIRP("Tweet");
+          private final String sound;
 
-        private final String sound;
+          AnimalSound(String sound) {
+              this.sound = sound;
+          }
 
-        AnimalSound(String sound) {
-            this.sound = sound;
-        }
+          public String getSound() {
+              return sound;
+          }
+      }
+  changed_files:
+    src/main/java/com/example/Animal.java: |
+      package com.example;
 
-        public String getSound() {
-            return sound;
-        }
-    }
+      public abstract class Animal {
+          protected String name;
 
-changed:
-  src/main/java/com/example/Animal.java: |
-    package com.example;
+          public abstract String speak();
 
-    public abstract class Animal {
-        protected String name;
+          public void eat() {
+              System.out.println(name + " is eating");
+          }
+      }
+    src/main/java/com/example/Dog.java: |
+      package com.example;
 
-        public abstract String speak();
+      public class Dog extends Animal {
+          private String breed;
 
-        public void eat() {
-            System.out.println(name + " is eating");
-        }
-    }
-  src/main/java/com/example/Dog.java: |
-    package com.example;
+          public Dog(String name, String breed) {
+              this.name = name;
+              this.breed = breed;
+          }
 
-    public class Dog extends Animal {
-        private String breed;
+          @Override
+          public String speak() {
+              return "Woof! I'm a " + breed;
+          }
 
-        public Dog(String name, String breed) {
-            this.name = name;
-            this.breed = breed;
-        }
+          @Override
+          public void eat() {
+              System.out.println(name + " the " + breed + " is eating");
+          }
+      }
+    src/main/java/com/example/Kennel.java: |
+      package com.example;
 
-        @Override
-        public String speak() {
-            return "Woof! I'm a " + breed;
-        }
+      import java.util.ArrayList;
+      import java.util.List;
 
-        @Override
-        public void eat() {
-            System.out.println(name + " the " + breed + " is eating");
-        }
-    }
-  src/main/java/com/example/Kennel.java: |
-    package com.example;
+      public class Kennel {
+          private final List<Animal> animals = new ArrayList<>();
 
-    import java.util.ArrayList;
-    import java.util.List;
+          public void admit(Animal animal) {
+              animals.add(animal);
+          }
 
-    public class Kennel {
-        private final List<Animal> animals = new ArrayList<>();
+          public void feedAll() {
+              for (Animal animal : animals) {
+                  animal.eat();
+              }
+          }
 
-        public void admit(Animal animal) {
-            animals.add(animal);
-        }
+          public int getCount() {
+              return animals.size();
+          }
+      }
+    src/main/java/com/example/AnimalSound.java: |
+      package com.example;
 
-        public void feedAll() {
-            for (Animal animal : animals) {
-                animal.eat();
-            }
-        }
+      public enum AnimalSound {
+          BARK("Woof"),
+          MEOW("Meow"),
+          CHIRP("Tweet");
 
-        public int getCount() {
-            return animals.size();
-        }
-    }
-  src/main/java/com/example/AnimalSound.java: |
-    package com.example;
+          private final String sound;
 
-    public enum AnimalSound {
-        BARK("Woof"),
-        MEOW("Meow"),
-        CHIRP("Tweet");
+          AnimalSound(String sound) {
+              this.sound = sound;
+          }
 
-        private final String sound;
-
-        AnimalSound(String sound) {
-            this.sound = sound;
-        }
-
-        public String getSound() {
-            return sound;
-        }
-    }
-
-must_include_files:
-  # Q1: Animal.java defines the abstract speak() and concrete eat() being overridden
-  - src/main/java/com/example/Dog.java
-must_include_content_from:
-  src/main/java/com/example/Dog.java:
-    - "private String breed;"
-must_not_include:
-  # Kennel.java: manages animals but has no dependency edge to Dog's new overrides
-  - Kennel
-  - feedAll
-  # AnimalSound.java: sound-related vocabulary but not referenced by Dog
-  - AnimalSound
-  - BARK
-must_not_include_files:
-  - src/main/java/com/example/Kennel.java
-  - src/main/java/com/example/AnimalSound.java
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          public String getSound() {
+              return sound;
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: dog
+  selector:
+    path: src/main/java/com/example/Dog.java
+    anchor: private String breed;
+- id: no_kennel
+  selector:
+    path: src/main/java/com/example/Kennel.java
+- id: no_animalsound
+  selector:
+    path: src/main/java/com/example/AnimalSound.java
+- id: no_global_0
+  selector:
+    anchor: Kennel
+- id: no_global_1
+  selector:
+    anchor: feedAll
+- id: no_global_2
+  selector:
+    anchor: AnimalSound
+- id: no_global_3
+  selector:
+    anchor: BARK
+oracle:
+  required:
+  - dog
+  allowed: []
+  forbidden:
+  - no_kennel
+  - no_animalsound
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

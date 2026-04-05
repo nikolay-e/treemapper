@@ -1,164 +1,180 @@
-# Scenario: Adding a new output for vpc_cidr that references aws_vpc.main.cidr_block.
-#
-# Reviewer questions:
-#   Q1: "What does the VPC resource look like?"
-#       -> main.tf defines the VPC with cidr_block = "10.0.0.0/16".
-#   Q2: "Who consumes these outputs?"
-#       -> modules/app/main.tf references module outputs for the VPC.
-#   Q3: "Is there an existing output for the VPC that may overlap?"
-#       -> outputs.tf already has vpc_id, so vpc_cidr is a sibling output.
-#
-# Not needed:
-#   - modules/database/outputs.tf: Outputs from a different module. HARD TRAP:
-#     same file name (outputs.tf), same output block syntax, same pattern.
-#     But different module scope (database, not networking).
-#
-#   - modules/cache/outputs.tf: Cache module outputs with endpoint and port.
-#     Same file pattern, same output syntax. Different module.
-#
-#   - variables.tf: Input variables. Contains vpc_cidr variable that feeds
-#     the VPC resource. HARD TRAP: same "vpc_cidr" identifier as the new
-#     output. But inputs are declarations, not output references.
-#
-#   - networking/subnets.tf: Subnet resources referencing aws_vpc.main.id.
-#     Same VPC reference, same networking domain. But subnets don't affect
-#     whether the output reference is valid.
-
-max_enrichment: 21.1
-initial:
-  outputs.tf: |
-    output "vpc_id" {
-      value = aws_vpc.main.id
-    }
-
-    output "public_subnet_ids" {
-      value = aws_subnet.public[*].id
-    }
-  main.tf: |
-    resource "aws_vpc" "main" {
-      cidr_block           = "10.0.0.0/16"
-      enable_dns_hostnames = true
-
-      tags = {
-        Name = "main-vpc"
+name: terraform_064_output_references
+repo:
+  initial_files:
+    outputs.tf: |
+      output "vpc_id" {
+        value = aws_vpc.main.id
       }
-    }
 
-    resource "aws_subnet" "public" {
-      count      = 2
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-    }
-  modules/app/main.tf: |
-    module "networking" {
-      source = "../../"
-    }
-
-    resource "aws_instance" "app" {
-      ami       = var.ami_id
-      subnet_id = module.networking.public_subnet_ids[0]
-
-      tags = {
-        VPC = module.networking.vpc_id
+      output "public_subnet_ids" {
+        value = aws_subnet.public[*].id
       }
-    }
-  modules/database/outputs.tf: |
-    output "db_endpoint" {
-      value = aws_db_instance.main.endpoint
-    }
+    main.tf: |
+      resource "aws_vpc" "main" {
+        cidr_block           = "10.0.0.0/16"
+        enable_dns_hostnames = true
 
-    output "db_port" {
-      value = aws_db_instance.main.port
-    }
-
-    output "db_connection_string" {
-      value     = "postgres://admin@${aws_db_instance.main.endpoint}:${aws_db_instance.main.port}/appdb"
-      sensitive = true
-    }
-  modules/cache/outputs.tf: |
-    output "cache_endpoint" {
-      value = aws_elasticache_cluster.main.cache_nodes[0].address
-    }
-
-    output "cache_port" {
-      value = aws_elasticache_cluster.main.cache_nodes[0].port
-    }
-  variables.tf: |
-    variable "vpc_cidr" {
-      type    = string
-      default = "10.0.0.0/16"
-    }
-
-    variable "ami_id" {
-      type = string
-    }
-
-    variable "environment" {
-      type    = string
-      default = "production"
-    }
-  networking/subnets.tf: |
-    resource "aws_subnet" "private" {
-      count      = 2
-      vpc_id     = aws_vpc.main.id
-      cidr_block = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index + 100)
-
-      tags = {
-        Name = "private-${count.index}"
-        Tier = "private"
+        tags = {
+          Name = "main-vpc"
+        }
       }
-    }
 
-changed:
-  outputs.tf: |
-    output "vpc_id" {
-      value = aws_vpc.main.id
-    }
+      resource "aws_subnet" "public" {
+        count      = 2
+        vpc_id     = aws_vpc.main.id
+        cidr_block = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
+      }
+    modules/app/main.tf: |
+      module "networking" {
+        source = "../../"
+      }
 
-    output "vpc_cidr" {
-      value = aws_vpc.main.cidr_block
-    }
+      resource "aws_instance" "app" {
+        ami       = var.ami_id
+        subnet_id = module.networking.public_subnet_ids[0]
 
-    output "public_subnet_ids" {
-      value = aws_subnet.public[*].id
-    }
+        tags = {
+          VPC = module.networking.vpc_id
+        }
+      }
+    modules/database/outputs.tf: |
+      output "db_endpoint" {
+        value = aws_db_instance.main.endpoint
+      }
 
-must_include_files:
-  - outputs.tf
-  # Q1: VPC resource definition -- reviewer confirms cidr_block exists
-  - main.tf
+      output "db_port" {
+        value = aws_db_instance.main.port
+      }
 
-must_include_content_from:
-  outputs.tf:
-    - output "vpc_cidr" {
-    - aws_vpc.main.cidr_block
-  main.tf:
-    - resource "aws_vpc" "main" {
-    - cidr_block           = "10.0.0.0/16"
+      output "db_connection_string" {
+        value     = "postgres://admin@${aws_db_instance.main.endpoint}:${aws_db_instance.main.port}/appdb"
+        sensitive = true
+      }
+    modules/cache/outputs.tf: |
+      output "cache_endpoint" {
+        value = aws_elasticache_cluster.main.cache_nodes[0].address
+      }
 
-must_not_include:
-  # --- database outputs: same file name/syntax but different module ---
-  - db_endpoint
-  - db_port
-  - db_connection_string
-  # --- cache outputs: same pattern, different module ---
-  - cache_endpoint
-  - cache_port
-  - aws_elasticache_cluster
-  # --- variables.tf: has "vpc_cidr" name but input, not output ---
-  - variable "vpc_cidr" {
-  - variable "ami_id" {
-  # --- subnets.tf: references same VPC but doesn't affect output validity ---
-  - 'Tier = "private"'
-  - private-${count.index}
+      output "cache_port" {
+        value = aws_elasticache_cluster.main.cache_nodes[0].port
+      }
+    variables.tf: |
+      variable "vpc_cidr" {
+        type    = string
+        default = "10.0.0.0/16"
+      }
 
-must_not_include_files:
-  - modules/database/outputs.tf
-  - modules/cache/outputs.tf
-  - variables.tf
-  - networking/subnets.tf
+      variable "ami_id" {
+        type = string
+      }
 
-max_fragments: 4
-max_files: 2
-add_garbage_files: false
-skip_garbage_check: true
+      variable "environment" {
+        type    = string
+        default = "production"
+      }
+    networking/subnets.tf: |
+      resource "aws_subnet" "private" {
+        count      = 2
+        vpc_id     = aws_vpc.main.id
+        cidr_block = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index + 100)
+
+        tags = {
+          Name = "private-${count.index}"
+          Tier = "private"
+        }
+      }
+  changed_files:
+    outputs.tf: |
+      output "vpc_id" {
+        value = aws_vpc.main.id
+      }
+
+      output "vpc_cidr" {
+        value = aws_vpc.main.cidr_block
+      }
+
+      output "public_subnet_ids" {
+        value = aws_subnet.public[*].id
+      }
+  commit_message: Update files
+fragments:
+- id: outputs
+  selector:
+    path: outputs.tf
+    anchor: output "vpc_cidr" {
+- id: outputs_1
+  selector:
+    path: outputs.tf
+    anchor: aws_vpc.main.cidr_block
+- id: main
+  selector:
+    path: main.tf
+    anchor: resource "aws_vpc" "main" {
+- id: main_1
+  selector:
+    path: main.tf
+    anchor: cidr_block           = "10.0.0.0/16"
+- id: no_outputs
+  selector:
+    path: modules/database/outputs.tf
+- id: no_outputs_1
+  selector:
+    path: modules/cache/outputs.tf
+- id: no_variables
+  selector:
+    path: variables.tf
+- id: no_subnets
+  selector:
+    path: networking/subnets.tf
+- id: no_global_0
+  selector:
+    anchor: db_endpoint
+- id: no_global_1
+  selector:
+    anchor: db_port
+- id: no_global_2
+  selector:
+    anchor: db_connection_string
+- id: no_global_3
+  selector:
+    anchor: cache_endpoint
+- id: no_global_4
+  selector:
+    anchor: cache_port
+- id: no_global_5
+  selector:
+    anchor: aws_elasticache_cluster
+- id: no_global_6
+  selector:
+    anchor: variable "vpc_cidr" {
+- id: no_global_7
+  selector:
+    anchor: variable "ami_id" {
+- id: no_global_8
+  selector:
+    anchor: Tier = "private"
+- id: no_global_9
+  selector:
+    anchor: private-${count.index}
+oracle:
+  required:
+  - outputs
+  - outputs_1
+  - main
+  - main_1
+  allowed: []
+  forbidden:
+  - no_outputs
+  - no_outputs_1
+  - no_variables
+  - no_subnets
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9

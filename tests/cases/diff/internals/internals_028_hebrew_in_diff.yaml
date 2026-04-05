@@ -1,16 +1,25 @@
-max_enrichment: 3.0
-initial:
-  hebrew_diff.py: |
-    def placeholder():
-        pass
-changed:
-  hebrew_diff.py: |
-    def foo():
-        """תיעוד בעברית"""
-        return process_value(x)
-must_include_files:
-- hebrew_diff.py
-must_include_content:
-- '"""תיעוד בעברית"""'
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_028_hebrew_in_diff
+repo:
+  initial_files:
+    hebrew_diff.py: |
+      def placeholder():
+          pass
+  changed_files:
+    hebrew_diff.py: |
+      def foo():
+          """תיעוד בעברית"""
+          return process_value(x)
+  commit_message: Update files
+fragments:
+- id: hebrew_diff_file
+  selector:
+    path: hebrew_diff.py
+- id: req_global_0
+  selector:
+    anchor: '"""תיעוד בעברית"""'
+oracle:
+  required:
+  - hebrew_diff_file
+  - req_global_0
+  allowed: []
+  forbidden: []

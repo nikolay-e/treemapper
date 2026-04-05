@@ -1,205 +1,213 @@
-# Scenario: OrderService mixes in Logging and Metrics traits, gaining log/debug
-# and incrementCounter/recordMetric capabilities used in new business methods.
-#
-# Diff: src/services/OrderService.scala adds trait mixins and new methods that
-# call trait methods (log, incrementCounter, recordMetric, debug).
-#
-# Reviewer questions:
-#   Q1: "What methods does Logging provide?" -> src/traits/Logging.scala (UNCHANGED)
-#        provides log, debug, error with logPrefix.
-#   Q2: "What methods does Metrics provide?" -> src/traits/Metrics.scala (UNCHANGED)
-#        provides recordMetric, incrementCounter, getCounter.
-#
-# Trap files (plausible but no dependency on OrderService or its trait mixins):
-#   - src/traits/Serializable.scala: another trait in the same package. Shares
-#     "trait" pattern but provides serialization, not mixed into OrderService.
-#   - src/services/InventoryService.scala: another service. Same "services" package
-#     but no relationship to OrderService or its Logging/Metrics traits.
+name: scala_002_trait_mixin
+repo:
+  initial_files:
+    src/traits/Logging.scala: |
+      package traits
 
-max_enrichment: 6.9
-initial:
-  src/traits/Logging.scala: |
-    package traits
+      trait Logging {
+        protected def logPrefix: String = getClass.getSimpleName
 
-    trait Logging {
-      protected def logPrefix: String = getClass.getSimpleName
+        def log(message: String): Unit =
+          println(s"[$logPrefix][LOG] $message")
 
-      def log(message: String): Unit =
-        println(s"[$logPrefix][LOG] $message")
+        def debug(message: String): Unit =
+          println(s"[$logPrefix][DEBUG] $message")
 
-      def debug(message: String): Unit =
-        println(s"[$logPrefix][DEBUG] $message")
-
-      def error(message: String, cause: Throwable): Unit =
-        println(s"[$logPrefix][ERROR] $message: ${cause.getMessage}")
-    }
-  src/traits/Metrics.scala: |
-    package traits
-
-    trait Metrics {
-      private var counters: Map[String, Long] = Map.empty
-
-      def recordMetric(name: String, value: Double): Unit = {
-        println(s"Metric: $name = $value")
+        def error(message: String, cause: Throwable): Unit =
+          println(s"[$logPrefix][ERROR] $message: ${cause.getMessage}")
       }
+    src/traits/Metrics.scala: |
+      package traits
 
-      def incrementCounter(name: String): Unit = {
-        counters = counters.updated(name, counters.getOrElse(name, 0L) + 1)
+      trait Metrics {
+        private var counters: Map[String, Long] = Map.empty
+
+        def recordMetric(name: String, value: Double): Unit = {
+          println(s"Metric: $name = $value")
+        }
+
+        def incrementCounter(name: String): Unit = {
+          counters = counters.updated(name, counters.getOrElse(name, 0L) + 1)
+        }
+
+        def getCounter(name: String): Long = counters.getOrElse(name, 0L)
       }
+    src/services/OrderService.scala: |
+      package services
 
-      def getCounter(name: String): Long = counters.getOrElse(name, 0L)
-    }
-  src/services/OrderService.scala: |
-    package services
-
-    class OrderService {
-      def processOrder(orderId: String): String = {
-        s"Processing order $orderId"
-      }
-    }
-  src/traits/Serializable.scala: |
-    package traits
-
-    trait Serializable {
-      def serialize: String
-      def deserialize(data: String): Unit
-
-      def toJson: String = s"""{"type":"${getClass.getSimpleName}","data":"${serialize}"}"""
-    }
-  src/services/InventoryService.scala: |
-    package services
-
-    class InventoryService {
-      private var stock: Map[String, Int] = Map.empty
-
-      def addStock(productId: String, quantity: Int): Unit = {
-        stock = stock.updated(productId, stock.getOrElse(productId, 0) + quantity)
-      }
-
-      def removeStock(productId: String, quantity: Int): Boolean = {
-        stock.get(productId) match {
-          case Some(current) if current >= quantity =>
-            stock = stock.updated(productId, current - quantity)
-            true
-          case _ => false
+      class OrderService {
+        def processOrder(orderId: String): String = {
+          s"Processing order $orderId"
         }
       }
+    src/traits/Serializable.scala: |
+      package traits
 
-      def getStock(productId: String): Int = stock.getOrElse(productId, 0)
-    }
+      trait Serializable {
+        def serialize: String
+        def deserialize(data: String): Unit
 
-changed:
-  src/traits/Logging.scala: |
-    package traits
-
-    trait Logging {
-      protected def logPrefix: String = getClass.getSimpleName
-
-      def log(message: String): Unit =
-        println(s"[$logPrefix][LOG] $message")
-
-      def debug(message: String): Unit =
-        println(s"[$logPrefix][DEBUG] $message")
-
-      def error(message: String, cause: Throwable): Unit =
-        println(s"[$logPrefix][ERROR] $message: ${cause.getMessage}")
-    }
-  src/traits/Metrics.scala: |
-    package traits
-
-    trait Metrics {
-      private var counters: Map[String, Long] = Map.empty
-
-      def recordMetric(name: String, value: Double): Unit = {
-        println(s"Metric: $name = $value")
+        def toJson: String = s"""{"type":"${getClass.getSimpleName}","data":"${serialize}"}"""
       }
+    src/services/InventoryService.scala: |
+      package services
 
-      def incrementCounter(name: String): Unit = {
-        counters = counters.updated(name, counters.getOrElse(name, 0L) + 1)
+      class InventoryService {
+        private var stock: Map[String, Int] = Map.empty
+
+        def addStock(productId: String, quantity: Int): Unit = {
+          stock = stock.updated(productId, stock.getOrElse(productId, 0) + quantity)
+        }
+
+        def removeStock(productId: String, quantity: Int): Boolean = {
+          stock.get(productId) match {
+            case Some(current) if current >= quantity =>
+              stock = stock.updated(productId, current - quantity)
+              true
+            case _ => false
+          }
+        }
+
+        def getStock(productId: String): Int = stock.getOrElse(productId, 0)
       }
+  changed_files:
+    src/traits/Logging.scala: |
+      package traits
 
-      def getCounter(name: String): Long = counters.getOrElse(name, 0L)
-    }
-  src/services/OrderService.scala: |
-    package services
+      trait Logging {
+        protected def logPrefix: String = getClass.getSimpleName
 
-    import traits.{Logging, Metrics}
+        def log(message: String): Unit =
+          println(s"[$logPrefix][LOG] $message")
 
-    class OrderService extends Logging with Metrics {
-      def processOrder(orderId: String): String = {
-        log(s"Processing order $orderId")
-        incrementCounter("orders_processed")
-        recordMetric("process_count", getCounter("orders_processed").toDouble)
-        val result = s"Order $orderId processed"
-        debug(s"Completed: $result")
-        result
+        def debug(message: String): Unit =
+          println(s"[$logPrefix][DEBUG] $message")
+
+        def error(message: String, cause: Throwable): Unit =
+          println(s"[$logPrefix][ERROR] $message: ${cause.getMessage}")
       }
+    src/traits/Metrics.scala: |
+      package traits
 
-      def cancelOrder(orderId: String): String = {
-        log(s"Cancelling order $orderId")
-        incrementCounter("orders_cancelled")
-        s"Order $orderId cancelled"
+      trait Metrics {
+        private var counters: Map[String, Long] = Map.empty
+
+        def recordMetric(name: String, value: Double): Unit = {
+          println(s"Metric: $name = $value")
+        }
+
+        def incrementCounter(name: String): Unit = {
+          counters = counters.updated(name, counters.getOrElse(name, 0L) + 1)
+        }
+
+        def getCounter(name: String): Long = counters.getOrElse(name, 0L)
       }
-    }
-  src/traits/Serializable.scala: |
-    package traits
+    src/services/OrderService.scala: |
+      package services
 
-    trait Serializable {
-      def serialize: String
-      def deserialize(data: String): Unit
+      import traits.{Logging, Metrics}
 
-      def toJson: String = s"""{"type":"${getClass.getSimpleName}","data":"${serialize}"}"""
-    }
-  src/services/InventoryService.scala: |
-    package services
+      class OrderService extends Logging with Metrics {
+        def processOrder(orderId: String): String = {
+          log(s"Processing order $orderId")
+          incrementCounter("orders_processed")
+          recordMetric("process_count", getCounter("orders_processed").toDouble)
+          val result = s"Order $orderId processed"
+          debug(s"Completed: $result")
+          result
+        }
 
-    class InventoryService {
-      private var stock: Map[String, Int] = Map.empty
-
-      def addStock(productId: String, quantity: Int): Unit = {
-        stock = stock.updated(productId, stock.getOrElse(productId, 0) + quantity)
-      }
-
-      def removeStock(productId: String, quantity: Int): Boolean = {
-        stock.get(productId) match {
-          case Some(current) if current >= quantity =>
-            stock = stock.updated(productId, current - quantity)
-            true
-          case _ => false
+        def cancelOrder(orderId: String): String = {
+          log(s"Cancelling order $orderId")
+          incrementCounter("orders_cancelled")
+          s"Order $orderId cancelled"
         }
       }
+    src/traits/Serializable.scala: |
+      package traits
 
-      def getStock(productId: String): Int = stock.getOrElse(productId, 0)
-    }
+      trait Serializable {
+        def serialize: String
+        def deserialize(data: String): Unit
 
-must_include_files:
-  # Changed: OrderService mixes in Logging and Metrics
-  - src/services/OrderService.scala
-  # Unchanged but essential: Logging trait defines log/debug/error
-  - src/traits/Logging.scala
-  # Unchanged but essential: Metrics trait defines incrementCounter/recordMetric
-  - src/traits/Metrics.scala
-must_include_content_from:
-  src/services/OrderService.scala:
-    - "import traits.{Logging, Metrics}"
-    - "class OrderService extends Logging with Metrics {"
-  src/traits/Logging.scala:
-    - "trait Logging {"
-  src/traits/Metrics.scala:
-    - "trait Metrics {"
-must_not_include:
-  # Serializable.scala: another trait but not mixed into OrderService
-  - "trait Serializable"
-  - toJson
-  - deserialize
-  # InventoryService.scala: another service, no OrderService dependency
-  - InventoryService
-  - addStock
-  - removeStock
-must_not_include_files:
-  - src/traits/Serializable.scala
-  - src/services/InventoryService.scala
-max_fragments: 8
-max_files: 4
-add_garbage_files: false
-skip_garbage_check: true
+        def toJson: String = s"""{"type":"${getClass.getSimpleName}","data":"${serialize}"}"""
+      }
+    src/services/InventoryService.scala: |
+      package services
+
+      class InventoryService {
+        private var stock: Map[String, Int] = Map.empty
+
+        def addStock(productId: String, quantity: Int): Unit = {
+          stock = stock.updated(productId, stock.getOrElse(productId, 0) + quantity)
+        }
+
+        def removeStock(productId: String, quantity: Int): Boolean = {
+          stock.get(productId) match {
+            case Some(current) if current >= quantity =>
+              stock = stock.updated(productId, current - quantity)
+              true
+            case _ => false
+          }
+        }
+
+        def getStock(productId: String): Int = stock.getOrElse(productId, 0)
+      }
+  commit_message: Update files
+fragments:
+- id: orderservice
+  selector:
+    path: src/services/OrderService.scala
+    anchor: import traits.{Logging, Metrics}
+- id: orderservice_1
+  selector:
+    path: src/services/OrderService.scala
+    anchor: class OrderService extends Logging with Metrics {
+- id: logging
+  selector:
+    path: src/traits/Logging.scala
+    anchor: trait Logging {
+- id: metrics
+  selector:
+    path: src/traits/Metrics.scala
+    anchor: trait Metrics {
+- id: no_serializable
+  selector:
+    path: src/traits/Serializable.scala
+- id: no_inventoryservice
+  selector:
+    path: src/services/InventoryService.scala
+- id: no_global_0
+  selector:
+    anchor: trait Serializable
+- id: no_global_1
+  selector:
+    anchor: toJson
+- id: no_global_2
+  selector:
+    anchor: deserialize
+- id: no_global_3
+  selector:
+    anchor: InventoryService
+- id: no_global_4
+  selector:
+    anchor: addStock
+- id: no_global_5
+  selector:
+    anchor: removeStock
+oracle:
+  required:
+  - orderservice
+  - orderservice_1
+  - logging
+  - metrics
+  allowed: []
+  forbidden:
+  - no_serializable
+  - no_inventoryservice
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

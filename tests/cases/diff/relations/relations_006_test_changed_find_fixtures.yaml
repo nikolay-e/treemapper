@@ -1,126 +1,137 @@
-# Test: test_orders uses conftest fixtures — fixture file must be pulled
-#
-# Scenario: tests/test_orders.py is rewritten to use db_session and sample_products
-# fixtures from conftest. tests/conftest.py (UNCHANGED) defines these fixtures.
-# A reviewer needs conftest to understand what the fixtures provide.
-#
-# Reviewer questions:
-#   Q1: "What does db_session return? Is it a real connection?"
-#       -> tests/conftest.py (UNCHANGED) returns {"connected": True}.
-#   Q2: "What's in sample_products? How many items?"
-#       -> conftest provides [{id:1,name:"Widget"},{id:2,name:"Gadget"}].
-#
-# Trap files (plausible but unrelated):
-#   - tests/test_inventory.py: another test module using similar fixtures — same
-#     tests/ directory but independent from test_orders.
-#   - fixtures/sample_data.json: JSON fixture file — test_orders uses conftest
-#     Python fixtures, not JSON files.
+name: relations_006_test_changed_find_fixtures
+repo:
+  initial_files:
+    tests/conftest.py: |
+      import pytest
 
-max_enrichment: 8.3
-initial:
-  tests/conftest.py: |
-    import pytest
+      @pytest.fixture
+      def db_session():
+          return {"connected": True}
 
-    @pytest.fixture
-    def db_session():
-        return {"connected": True}
+      @pytest.fixture
+      def sample_products():
+          return [
+              {"id": 1, "name": "Widget"},
+              {"id": 2, "name": "Gadget"},
+          ]
+    tests/test_orders.py: |
+      def test_create_order():
+          assert True
+    tests/test_inventory.py: |
+      def test_check_stock(sample_products):
+          assert len(sample_products) > 0
 
-    @pytest.fixture
-    def sample_products():
-        return [
-            {"id": 1, "name": "Widget"},
-            {"id": 2, "name": "Gadget"},
+      def test_reorder_threshold():
+          threshold = 10
+          current_stock = 5
+          assert current_stock < threshold
+
+      def test_product_lookup(sample_products):
+          widget = next((p for p in sample_products if p["name"] == "Widget"), None)
+          assert widget is not None
+    fixtures/sample_data.json: |
+      {
+        "orders": [
+          {"id": 1, "product_id": 1, "quantity": 5, "status": "pending"},
+          {"id": 2, "product_id": 2, "quantity": 3, "status": "shipped"}
+        ],
+        "customers": [
+          {"id": 1, "name": "Acme Corp", "tier": "premium"}
         ]
-  tests/test_orders.py: |
-    def test_create_order():
-        assert True
-  tests/test_inventory.py: |
-    def test_check_stock(sample_products):
-        assert len(sample_products) > 0
+      }
+  changed_files:
+    tests/conftest.py: |
+      import pytest
 
-    def test_reorder_threshold():
-        threshold = 10
-        current_stock = 5
-        assert current_stock < threshold
+      @pytest.fixture
+      def db_session():
+          return {"connected": True}
 
-    def test_product_lookup(sample_products):
-        widget = next((p for p in sample_products if p["name"] == "Widget"), None)
-        assert widget is not None
-  fixtures/sample_data.json: |
-    {
-      "orders": [
-        {"id": 1, "product_id": 1, "quantity": 5, "status": "pending"},
-        {"id": 2, "product_id": 2, "quantity": 3, "status": "shipped"}
-      ],
-      "customers": [
-        {"id": 1, "name": "Acme Corp", "tier": "premium"}
-      ]
-    }
-changed:
-  tests/conftest.py: |
-    import pytest
+      @pytest.fixture
+      def sample_products():
+          return [
+              {"id": 1, "name": "Widget"},
+              {"id": 2, "name": "Gadget"},
+          ]
+    tests/test_orders.py: |
+      def test_create_order(db_session):
+          assert db_session["connected"]
 
-    @pytest.fixture
-    def db_session():
-        return {"connected": True}
+      def test_bulk_order(db_session, sample_products):
+          assert len(sample_products) == 2
+    tests/test_inventory.py: |
+      def test_check_stock(sample_products):
+          assert len(sample_products) > 0
 
-    @pytest.fixture
-    def sample_products():
-        return [
-            {"id": 1, "name": "Widget"},
-            {"id": 2, "name": "Gadget"},
+      def test_reorder_threshold():
+          threshold = 10
+          current_stock = 5
+          assert current_stock < threshold
+
+      def test_product_lookup(sample_products):
+          widget = next((p for p in sample_products if p["name"] == "Widget"), None)
+          assert widget is not None
+    fixtures/sample_data.json: |
+      {
+        "orders": [
+          {"id": 1, "product_id": 1, "quantity": 5, "status": "pending"},
+          {"id": 2, "product_id": 2, "quantity": 3, "status": "shipped"}
+        ],
+        "customers": [
+          {"id": 1, "name": "Acme Corp", "tier": "premium"}
         ]
-  tests/test_orders.py: |
-    def test_create_order(db_session):
-        assert db_session["connected"]
-
-    def test_bulk_order(db_session, sample_products):
-        assert len(sample_products) == 2
-  tests/test_inventory.py: |
-    def test_check_stock(sample_products):
-        assert len(sample_products) > 0
-
-    def test_reorder_threshold():
-        threshold = 10
-        current_stock = 5
-        assert current_stock < threshold
-
-    def test_product_lookup(sample_products):
-        widget = next((p for p in sample_products if p["name"] == "Widget"), None)
-        assert widget is not None
-  fixtures/sample_data.json: |
-    {
-      "orders": [
-        {"id": 1, "product_id": 1, "quantity": 5, "status": "pending"},
-        {"id": 2, "product_id": 2, "quantity": 3, "status": "shipped"}
-      ],
-      "customers": [
-        {"id": 1, "name": "Acme Corp", "tier": "premium"}
-      ]
-    }
-must_include_files:
-  - tests/test_orders.py
-  # Q1/Q2: conftest defines the fixtures test_orders now uses
-  - tests/conftest.py
-must_include_content_from:
-  tests/test_orders.py:
-    - "def test_create_order(db_session):"
-    - "def test_bulk_order(db_session, sample_products):"
-  tests/conftest.py:
-    - "def db_session():"
-    - "def sample_products():"
-must_not_include:
-  # tests/test_inventory.py: independent test module
-  - test_check_stock
-  - test_reorder_threshold
-  - test_product_lookup
-  # fixtures/sample_data.json: JSON fixture — tests use conftest Python fixtures
-  - Acme Corp
-  - '"status": "shipped"'
-must_not_include_files:
-  - tests/test_inventory.py
-  - fixtures/sample_data.json
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      }
+  commit_message: Update files
+fragments:
+- id: test_orders
+  selector:
+    path: tests/test_orders.py
+    anchor: 'def test_create_order(db_session):'
+- id: test_orders_1
+  selector:
+    path: tests/test_orders.py
+    anchor: 'def test_bulk_order(db_session, sample_products):'
+- id: conftest
+  selector:
+    path: tests/conftest.py
+    anchor: 'def db_session():'
+- id: conftest_1
+  selector:
+    path: tests/conftest.py
+    anchor: 'def sample_products():'
+- id: no_test_inventory
+  selector:
+    path: tests/test_inventory.py
+- id: no_sample_data
+  selector:
+    path: fixtures/sample_data.json
+- id: no_global_0
+  selector:
+    anchor: test_check_stock
+- id: no_global_1
+  selector:
+    anchor: test_reorder_threshold
+- id: no_global_2
+  selector:
+    anchor: test_product_lookup
+- id: no_global_3
+  selector:
+    anchor: Acme Corp
+- id: no_global_4
+  selector:
+    anchor: '"status": "shipped"'
+oracle:
+  required:
+  - test_orders
+  - test_orders_1
+  - conftest
+  - conftest_1
+  allowed: []
+  forbidden:
+  - no_test_inventory
+  - no_sample_data
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

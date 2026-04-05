@@ -1,275 +1,281 @@
-# Scenario: A Julia project adds a new dependency in Project.toml and starts
-# using that package in a module. The reviewer needs both the Project.toml
-# change and the module code to understand the full picture.
+name: julia_003_project_toml
+repo:
+  initial_files:
+    Project.toml: |
+      name = "SensorAnalytics"
+      uuid = "12345678-1234-1234-1234-123456789012"
+      version = "0.3.0"
 
-max_enrichment: 6.2
-xfail: "TOML fragmentation — version bump line not included in selected [deps] fragment"
-#
-# Diff: Project.toml adds `DataFrames = "a93c6f00-..."` to [deps], and
-# src/report.jl adds `using DataFrames` with a new function that builds
-# a DataFrame from measurement data.
-#
-# Reviewer questions:
-#   Q1: "What new dependency was added?"
-#       -> Project.toml: DataFrames package added to dependencies.
-#
-#   Q2: "How is the new dependency used?"
-#       -> src/report.jl: uses DataFrame constructor and select/transform
-#          operations to build reports from raw data.
-#
-# Not needed for comprehension:
-#   - Manifest.toml: Auto-generated lock file with resolved versions.
-#     STRUCTURAL TRAP: also a TOML file in the same directory, but
-#     machine-generated, not human-authored.
-#
-#   - src/export.jl: Module that exports data to CSV.
-#     Same output domain but uses CSV.jl, not DataFrames.
-#
-#   - src/database.jl: Module that stores data.
-#     Same data domain, different concern (persistence vs reporting).
+      [deps]
+      JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+      Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+      Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
-initial:
-  Project.toml: |
-    name = "SensorAnalytics"
-    uuid = "12345678-1234-1234-1234-123456789012"
-    version = "0.3.0"
+      [compat]
+      JSON = "0.21"
+      julia = "1.6"
+    src/report.jl: |
+      using JSON
+      using Dates
+      using Statistics
 
-    [deps]
-    JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-    Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-    Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+      struct ReportEntry
+          sensor_id::String
+          date::Date
+          avg_value::Float64
+          count::Int
+      end
 
-    [compat]
-    JSON = "0.21"
-    julia = "1.6"
+      function generate_report(entries::Vector{ReportEntry})::String
+          return JSON.json(Dict(
+              "total_entries" => length(entries),
+              "sensors" => length(unique([e.sensor_id for e in entries]))
+          ))
+      end
+    Manifest.toml: |
+      # This file is machine-generated
+      julia_version = "1.9.0"
 
-  src/report.jl: |
-    using JSON
-    using Dates
-    using Statistics
+      [[deps.JSON]]
+      deps = ["Dates", "Mmap", "Parsers"]
+      uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+      version = "0.21.4"
 
-    struct ReportEntry
-        sensor_id::String
-        date::Date
-        avg_value::Float64
-        count::Int
-    end
+      GARBAGE_JULIA_003_A = "manifest_marker"
+      GARBAGE_JULIA_003_B = "lock_marker"
+    src/export.jl: |
+      using CSV
 
-    function generate_report(entries::Vector{ReportEntry})::String
-        return JSON.json(Dict(
-            "total_entries" => length(entries),
-            "sensors" => length(unique([e.sensor_id for e in entries]))
-        ))
-    end
+      GARBAGE_JULIA_003_C = "export_marker"
+      GARBAGE_JULIA_003_D = "csv_marker"
 
-  Manifest.toml: |
-    # This file is machine-generated
-    julia_version = "1.9.0"
+      function export_to_csv(data::Vector, filename::String)
+          open(filename, "w") do f
+              for item in data
+                  println(f, join(fieldnames(typeof(item)), ","))
+                  break
+              end
+              for item in data
+                  vals = [getfield(item, f) for f in fieldnames(typeof(item))]
+                  println(f, join(vals, ","))
+              end
+          end
+      end
 
-    [[deps.JSON]]
-    deps = ["Dates", "Mmap", "Parsers"]
-    uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-    version = "0.21.4"
+      function export_to_json(data::Vector, filename::String)
+          open(filename, "w") do f
+              write(f, JSON.json(data))
+          end
+      end
+    src/database.jl: |
+      GARBAGE_JULIA_003_E = "db_marker"
+      GARBAGE_JULIA_003_F = "store_marker"
 
-    GARBAGE_JULIA_003_A = "manifest_marker"
-    GARBAGE_JULIA_003_B = "lock_marker"
+      mutable struct DataStore
+          records::Dict{String, Vector{Any}}
+          metadata::Dict{String, String}
+      end
 
-  src/export.jl: |
-    using CSV
+      function create_store()::DataStore
+          return DataStore(Dict(), Dict())
+      end
 
-    GARBAGE_JULIA_003_C = "export_marker"
-    GARBAGE_JULIA_003_D = "csv_marker"
+      function insert!(store::DataStore, table::String, record)
+          if !haskey(store.records, table)
+              store.records[table] = Any[]
+          end
+          push!(store.records[table], record)
+      end
 
-    function export_to_csv(data::Vector, filename::String)
-        open(filename, "w") do f
-            for item in data
-                println(f, join(fieldnames(typeof(item)), ","))
-                break
-            end
-            for item in data
-                vals = [getfield(item, f) for f in fieldnames(typeof(item))]
-                println(f, join(vals, ","))
-            end
-        end
-    end
+      function query(store::DataStore, table::String)::Vector{Any}
+          return get(store.records, table, Any[])
+      end
+  changed_files:
+    Project.toml: |
+      name = "SensorAnalytics"
+      uuid = "12345678-1234-1234-1234-123456789012"
+      version = "0.4.0"
 
-    function export_to_json(data::Vector, filename::String)
-        open(filename, "w") do f
-            write(f, JSON.json(data))
-        end
-    end
+      [deps]
+      JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+      Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+      Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+      DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 
-  src/database.jl: |
-    GARBAGE_JULIA_003_E = "db_marker"
-    GARBAGE_JULIA_003_F = "store_marker"
+      [compat]
+      JSON = "0.21"
+      DataFrames = "1.6"
+      julia = "1.6"
+    src/report.jl: |
+      using JSON
+      using Dates
+      using Statistics
+      using DataFrames
 
-    mutable struct DataStore
-        records::Dict{String, Vector{Any}}
-        metadata::Dict{String, String}
-    end
+      struct ReportEntry
+          sensor_id::String
+          date::Date
+          avg_value::Float64
+          count::Int
+      end
 
-    function create_store()::DataStore
-        return DataStore(Dict(), Dict())
-    end
+      function generate_report(entries::Vector{ReportEntry})::String
+          return JSON.json(Dict(
+              "total_entries" => length(entries),
+              "sensors" => length(unique([e.sensor_id for e in entries]))
+          ))
+      end
 
-    function insert!(store::DataStore, table::String, record)
-        if !haskey(store.records, table)
-            store.records[table] = Any[]
-        end
-        push!(store.records[table], record)
-    end
+      function build_report_dataframe(entries::Vector{ReportEntry})::DataFrame
+          df = DataFrame(
+              sensor_id = [e.sensor_id for e in entries],
+              date = [e.date for e in entries],
+              avg_value = [e.avg_value for e in entries],
+              count = [e.count for e in entries]
+          )
+          return sort(df, :date)
+      end
 
-    function query(store::DataStore, table::String)::Vector{Any}
-        return get(store.records, table, Any[])
-    end
+      function summarize_by_sensor(df::DataFrame)::DataFrame
+          return combine(
+              groupby(df, :sensor_id),
+              :avg_value => mean => :mean_value,
+              :count => sum => :total_count,
+              nrow => :num_entries
+          )
+      end
+    Manifest.toml: |
+      # This file is machine-generated
+      julia_version = "1.9.0"
 
-changed:
-  Project.toml: |
-    name = "SensorAnalytics"
-    uuid = "12345678-1234-1234-1234-123456789012"
-    version = "0.4.0"
+      [[deps.JSON]]
+      deps = ["Dates", "Mmap", "Parsers"]
+      uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+      version = "0.21.4"
 
-    [deps]
-    JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-    Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-    Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-    DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+      GARBAGE_JULIA_003_A = "manifest_marker"
+      GARBAGE_JULIA_003_B = "lock_marker"
+    src/export.jl: |
+      using CSV
 
-    [compat]
-    JSON = "0.21"
-    DataFrames = "1.6"
-    julia = "1.6"
+      GARBAGE_JULIA_003_C = "export_marker"
+      GARBAGE_JULIA_003_D = "csv_marker"
 
-  src/report.jl: |
-    using JSON
-    using Dates
-    using Statistics
-    using DataFrames
+      function export_to_csv(data::Vector, filename::String)
+          open(filename, "w") do f
+              for item in data
+                  println(f, join(fieldnames(typeof(item)), ","))
+                  break
+              end
+              for item in data
+                  vals = [getfield(item, f) for f in fieldnames(typeof(item))]
+                  println(f, join(vals, ","))
+              end
+          end
+      end
 
-    struct ReportEntry
-        sensor_id::String
-        date::Date
-        avg_value::Float64
-        count::Int
-    end
+      function export_to_json(data::Vector, filename::String)
+          open(filename, "w") do f
+              write(f, JSON.json(data))
+          end
+      end
+    src/database.jl: |
+      GARBAGE_JULIA_003_E = "db_marker"
+      GARBAGE_JULIA_003_F = "store_marker"
 
-    function generate_report(entries::Vector{ReportEntry})::String
-        return JSON.json(Dict(
-            "total_entries" => length(entries),
-            "sensors" => length(unique([e.sensor_id for e in entries]))
-        ))
-    end
+      mutable struct DataStore
+          records::Dict{String, Vector{Any}}
+          metadata::Dict{String, String}
+      end
 
-    function build_report_dataframe(entries::Vector{ReportEntry})::DataFrame
-        df = DataFrame(
-            sensor_id = [e.sensor_id for e in entries],
-            date = [e.date for e in entries],
-            avg_value = [e.avg_value for e in entries],
-            count = [e.count for e in entries]
-        )
-        return sort(df, :date)
-    end
+      function create_store()::DataStore
+          return DataStore(Dict(), Dict())
+      end
 
-    function summarize_by_sensor(df::DataFrame)::DataFrame
-        return combine(
-            groupby(df, :sensor_id),
-            :avg_value => mean => :mean_value,
-            :count => sum => :total_count,
-            nrow => :num_entries
-        )
-    end
+      function insert!(store::DataStore, table::String, record)
+          if !haskey(store.records, table)
+              store.records[table] = Any[]
+          end
+          push!(store.records[table], record)
+      end
 
-  Manifest.toml: |
-    # This file is machine-generated
-    julia_version = "1.9.0"
-
-    [[deps.JSON]]
-    deps = ["Dates", "Mmap", "Parsers"]
-    uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-    version = "0.21.4"
-
-    GARBAGE_JULIA_003_A = "manifest_marker"
-    GARBAGE_JULIA_003_B = "lock_marker"
-
-  src/export.jl: |
-    using CSV
-
-    GARBAGE_JULIA_003_C = "export_marker"
-    GARBAGE_JULIA_003_D = "csv_marker"
-
-    function export_to_csv(data::Vector, filename::String)
-        open(filename, "w") do f
-            for item in data
-                println(f, join(fieldnames(typeof(item)), ","))
-                break
-            end
-            for item in data
-                vals = [getfield(item, f) for f in fieldnames(typeof(item))]
-                println(f, join(vals, ","))
-            end
-        end
-    end
-
-    function export_to_json(data::Vector, filename::String)
-        open(filename, "w") do f
-            write(f, JSON.json(data))
-        end
-    end
-
-  src/database.jl: |
-    GARBAGE_JULIA_003_E = "db_marker"
-    GARBAGE_JULIA_003_F = "store_marker"
-
-    mutable struct DataStore
-        records::Dict{String, Vector{Any}}
-        metadata::Dict{String, String}
-    end
-
-    function create_store()::DataStore
-        return DataStore(Dict(), Dict())
-    end
-
-    function insert!(store::DataStore, table::String, record)
-        if !haskey(store.records, table)
-            store.records[table] = Any[]
-        end
-        push!(store.records[table], record)
-    end
-
-    function query(store::DataStore, table::String)::Vector{Any}
-        return get(store.records, table, Any[])
-    end
-
-must_include_files:
-  - Project.toml
-  - src/report.jl
-
-must_include_content_from:
-  Project.toml:
-    - 'DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"'
-    - 'DataFrames = "1.6"'
-  src/report.jl:
-    - "using DataFrames"
-    - "function build_report_dataframe"
-    - "DataFrame("
-    - "function summarize_by_sensor(df::DataFrame)"
-    - "groupby(df, :sensor_id)"
-
-must_not_include:
-  # Manifest.toml: machine-generated lock file
-  - GARBAGE_JULIA_003_A
-  - GARBAGE_JULIA_003_B
-  # database.jl: persistence, not reporting
-  - GARBAGE_JULIA_003_E
-  - GARBAGE_JULIA_003_F
-  - DataStore
-  - create_store
-
-must_not_include_files:
-  - Manifest.toml
-  - src/database.jl
-
-max_fragments: 10
-max_files: 4
-add_garbage_files: false
-skip_garbage_check: true
+      function query(store::DataStore, table::String)::Vector{Any}
+          return get(store.records, table, Any[])
+      end
+  commit_message: Update files
+fragments:
+- id: project
+  selector:
+    path: Project.toml
+    anchor: DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+- id: project_1
+  selector:
+    path: Project.toml
+    anchor: DataFrames = "1.6"
+- id: report
+  selector:
+    path: src/report.jl
+    anchor: using DataFrames
+- id: report_1
+  selector:
+    path: src/report.jl
+    anchor: function build_report_dataframe
+- id: report_2
+  selector:
+    path: src/report.jl
+    anchor: DataFrame(
+- id: report_3
+  selector:
+    path: src/report.jl
+    anchor: function summarize_by_sensor(df::DataFrame)
+- id: report_4
+  selector:
+    path: src/report.jl
+    anchor: groupby(df, :sensor_id)
+- id: no_manifest
+  selector:
+    path: Manifest.toml
+- id: no_database
+  selector:
+    path: src/database.jl
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_JULIA_003_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_JULIA_003_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_JULIA_003_E
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_JULIA_003_F
+- id: no_global_4
+  selector:
+    anchor: DataStore
+- id: no_global_5
+  selector:
+    anchor: create_store
+oracle:
+  required:
+  - project
+  - project_1
+  - report
+  - report_1
+  - report_2
+  - report_3
+  - report_4
+  allowed: []
+  forbidden:
+  - no_manifest
+  - no_database
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+xfail:
+  category: null
+  reason: TOML fragmentation — version bump line not included in selected [deps] fragment
+  issue: null

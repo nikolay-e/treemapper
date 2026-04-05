@@ -1,16 +1,25 @@
-max_enrichment: 3.0
-initial:
-  zalgo_diff.py: |
-    def placeholder():
-        pass
-changed:
-  zalgo_diff.py: |
-    # H̸̡̪̯ͨ͊̽̅̾̎Ȩ̬̩̾͛ͪ̈́̀́͘ COMES
-    def process_data(items):
-        return items
-must_include_files:
-- zalgo_diff.py
-must_include_content:
-- 'def process_data(items):'
-add_garbage_files: false
-skip_garbage_check: true
+name: internals_017_zalgo_in_diff_text
+repo:
+  initial_files:
+    zalgo_diff.py: |
+      def placeholder():
+          pass
+  changed_files:
+    zalgo_diff.py: |
+      # H̸̡̪̯ͨ͊̽̅̾̎Ȩ̬̩̾͛ͪ̈́̀́͘ COMES
+      def process_data(items):
+          return items
+  commit_message: Update files
+fragments:
+- id: zalgo_diff_file
+  selector:
+    path: zalgo_diff.py
+- id: req_global_0
+  selector:
+    anchor: 'def process_data(items):'
+oracle:
+  required:
+  - zalgo_diff_file
+  - req_global_0
+  allowed: []
+  forbidden: []

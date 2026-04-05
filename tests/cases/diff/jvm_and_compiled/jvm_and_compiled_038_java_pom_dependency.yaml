@@ -1,157 +1,157 @@
-# Scenario: pom.xml adds spring-boot-starter-data-jpa and postgresql dependencies
-# to enable database persistence in a Spring Boot application.
-#
-# Diff: pom.xml gains two new <dependency> blocks for JPA and PostgreSQL.
-#
-# Reviewer questions:
-#   Q1: "What existing dependencies does the project already have?"
-#       -> pom.xml (CHANGED) already has spring-boot-starter-web.
-#
-# Not needed:
-#   - build.gradle: a Gradle build file for a separate module in the same repo.
-#     Build-system vocabulary overlap but no dependency edge to the Maven pom.xml.
-#   - src/main/resources/logback.xml: logging configuration.
-#     Lives in the same project but unrelated to dependency management.
+name: jvm_and_compiled_038_java_pom_dependency
+repo:
+  initial_files:
+    pom.xml: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <project xmlns="http://maven.apache.org/POM/4.0.0">
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>myapp</artifactId>
+          <version>1.0.0</version>
 
-max_enrichment: 6.7
-initial:
-  pom.xml: |
-    <?xml version="1.0" encoding="UTF-8"?>
-    <project xmlns="http://maven.apache.org/POM/4.0.0">
-        <modelVersion>4.0.0</modelVersion>
-        <groupId>com.example</groupId>
-        <artifactId>myapp</artifactId>
-        <version>1.0.0</version>
+          <dependencies>
+              <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-web</artifactId>
+                  <version>3.0.0</version>
+              </dependency>
+          </dependencies>
+      </project>
+    src/main/java/com/example/Application.java: |
+      package com.example;
 
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-web</artifactId>
-                <version>3.0.0</version>
-            </dependency>
-        </dependencies>
-    </project>
-  src/main/java/com/example/Application.java: |
-    package com.example;
+      import org.springframework.boot.SpringApplication;
+      import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-    import org.springframework.boot.SpringApplication;
-    import org.springframework.boot.autoconfigure.SpringBootApplication;
+      @SpringBootApplication
+      public class Application {
+          public static void main(String[] args) {
+              SpringApplication.run(Application.class, args);
+          }
+      }
+    build.gradle: |
+      plugins {
+          id 'java'
+          id 'org.springframework.boot' version '3.0.0'
+      }
 
-    @SpringBootApplication
-    public class Application {
-        public static void main(String[] args) {
-            SpringApplication.run(Application.class, args);
-        }
-    }
-  build.gradle: |
-    plugins {
-        id 'java'
-        id 'org.springframework.boot' version '3.0.0'
-    }
+      repositories {
+          mavenCentral()
+      }
 
-    repositories {
-        mavenCentral()
-    }
+      dependencies {
+          implementation 'org.springframework.boot:spring-boot-starter-web:3.0.0'
+          testImplementation 'org.springframework.boot:spring-boot-starter-test:3.0.0'
+      }
+    src/main/resources/logback.xml: |
+      <configuration>
+          <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+              <encoder>
+                  <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+              </encoder>
+          </appender>
 
-    dependencies {
-        implementation 'org.springframework.boot:spring-boot-starter-web:3.0.0'
-        testImplementation 'org.springframework.boot:spring-boot-starter-test:3.0.0'
-    }
-  src/main/resources/logback.xml: |
-    <configuration>
-        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-            </encoder>
-        </appender>
+          <root level="INFO">
+              <appender-ref ref="STDOUT"/>
+          </root>
+      </configuration>
+  changed_files:
+    pom.xml: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <project xmlns="http://maven.apache.org/POM/4.0.0">
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>myapp</artifactId>
+          <version>1.0.0</version>
 
-        <root level="INFO">
-            <appender-ref ref="STDOUT"/>
-        </root>
-    </configuration>
+          <dependencies>
+              <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-web</artifactId>
+                  <version>3.0.0</version>
+              </dependency>
+              <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-data-jpa</artifactId>
+                  <version>3.0.0</version>
+              </dependency>
+              <dependency>
+                  <groupId>org.postgresql</groupId>
+                  <artifactId>postgresql</artifactId>
+                  <version>42.5.0</version>
+              </dependency>
+          </dependencies>
+      </project>
+    src/main/java/com/example/Application.java: |
+      package com.example;
 
-changed:
-  pom.xml: |
-    <?xml version="1.0" encoding="UTF-8"?>
-    <project xmlns="http://maven.apache.org/POM/4.0.0">
-        <modelVersion>4.0.0</modelVersion>
-        <groupId>com.example</groupId>
-        <artifactId>myapp</artifactId>
-        <version>1.0.0</version>
+      import org.springframework.boot.SpringApplication;
+      import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-web</artifactId>
-                <version>3.0.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-data-jpa</artifactId>
-                <version>3.0.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.postgresql</groupId>
-                <artifactId>postgresql</artifactId>
-                <version>42.5.0</version>
-            </dependency>
-        </dependencies>
-    </project>
-  src/main/java/com/example/Application.java: |
-    package com.example;
+      @SpringBootApplication
+      public class Application {
+          public static void main(String[] args) {
+              SpringApplication.run(Application.class, args);
+          }
+      }
+    build.gradle: |
+      plugins {
+          id 'java'
+          id 'org.springframework.boot' version '3.0.0'
+      }
 
-    import org.springframework.boot.SpringApplication;
-    import org.springframework.boot.autoconfigure.SpringBootApplication;
+      repositories {
+          mavenCentral()
+      }
 
-    @SpringBootApplication
-    public class Application {
-        public static void main(String[] args) {
-            SpringApplication.run(Application.class, args);
-        }
-    }
-  build.gradle: |
-    plugins {
-        id 'java'
-        id 'org.springframework.boot' version '3.0.0'
-    }
+      dependencies {
+          implementation 'org.springframework.boot:spring-boot-starter-web:3.0.0'
+          testImplementation 'org.springframework.boot:spring-boot-starter-test:3.0.0'
+      }
+    src/main/resources/logback.xml: |
+      <configuration>
+          <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+              <encoder>
+                  <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+              </encoder>
+          </appender>
 
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        implementation 'org.springframework.boot:spring-boot-starter-web:3.0.0'
-        testImplementation 'org.springframework.boot:spring-boot-starter-test:3.0.0'
-    }
-  src/main/resources/logback.xml: |
-    <configuration>
-        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-            </encoder>
-        </appender>
-
-        <root level="INFO">
-            <appender-ref ref="STDOUT"/>
-        </root>
-    </configuration>
-
-must_include_files:
-  - pom.xml
-must_include_content_from:
-  pom.xml:
-    - "<artifactId>spring-boot-starter-data-jpa</artifactId>"
-must_not_include:
-  # build.gradle: separate Gradle build file, not related to Maven pom changes
-  - "build.gradle"
-  - "spring-boot-starter-test"
-  # logback.xml: logging config, unrelated to dependency additions
-  - ConsoleAppender
-  - logback
-must_not_include_files:
-  - build.gradle
-  - src/main/resources/logback.xml
-max_fragments: 4
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          <root level="INFO">
+              <appender-ref ref="STDOUT"/>
+          </root>
+      </configuration>
+  commit_message: Update files
+fragments:
+- id: pom
+  selector:
+    path: pom.xml
+    anchor: <artifactId>spring-boot-starter-data-jpa</artifactId>
+- id: no_build
+  selector:
+    path: build.gradle
+- id: no_logback
+  selector:
+    path: src/main/resources/logback.xml
+- id: no_global_0
+  selector:
+    anchor: build.gradle
+- id: no_global_1
+  selector:
+    anchor: spring-boot-starter-test
+- id: no_global_2
+  selector:
+    anchor: ConsoleAppender
+- id: no_global_3
+  selector:
+    anchor: logback
+oracle:
+  required:
+  - pom
+  allowed: []
+  forbidden:
+  - no_build
+  - no_logback
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

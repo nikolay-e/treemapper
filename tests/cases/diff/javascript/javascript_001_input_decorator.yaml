@@ -1,116 +1,119 @@
-# Scenario: Angular component gains @Input() binding with imported User type.
-#
-# Diff: user-card.component.ts is rewritten from scratch as an Angular component
-# that imports User from user.model.ts and declares @Input() user!: User.
-#
-# Reviewer questions:
-#   Q1: "Does User have the fields used in the template (name, email)?"
-#       -> user.model.ts (UNCHANGED) defines User with id, name, email.
-#          The template uses user.name and user.email — reviewer confirms they exist.
-#
-# Not needed:
-#   - user-list.component.ts: sibling Angular component rendering users in a list.
-#     Same domain but different component, no import from user-card.
-#   - user.service.ts: HTTP service fetching users. Different layer (data vs view),
-#     not imported by the component.
+name: javascript_001_input_decorator
+repo:
+  initial_files:
+    user.model.ts: |
+      export interface User {
+          id: string;
+          name: string;
+          email: string;
+      }
+    user-card.component.ts: |
+      console.log('initial');
+    user-list.component.ts: |
+      import { Component } from '@angular/core';
 
-max_enrichment: 3.0
-initial:
-  user.model.ts: |
-    export interface User {
-        id: string;
-        name: string;
-        email: string;
-    }
-  user-card.component.ts: |
-    console.log('initial');
-  user-list.component.ts: |
-    import { Component } from '@angular/core';
+      @Component({
+          selector: 'app-user-list',
+          template: `<ul><li *ngFor="let u of users">{{ u.id }}</li></ul>`
+      })
+      export class UserListComponent {
+          users: any[] = [];
+      }
+    user.service.ts: |
+      import { Injectable } from '@angular/core';
+      import { HttpClient } from '@angular/common/http';
 
-    @Component({
-        selector: 'app-user-list',
-        template: `<ul><li *ngFor="let u of users">{{ u.id }}</li></ul>`
-    })
-    export class UserListComponent {
-        users: any[] = [];
-    }
-  user.service.ts: |
-    import { Injectable } from '@angular/core';
-    import { HttpClient } from '@angular/common/http';
+      @Injectable({ providedIn: 'root' })
+      export class UserService {
+          constructor(private http: HttpClient) {}
 
-    @Injectable({ providedIn: 'root' })
-    export class UserService {
-        constructor(private http: HttpClient) {}
+          getUsers() {
+              return this.http.get('/api/users');
+          }
+      }
+  changed_files:
+    user.model.ts: |
+      export interface User {
+          id: string;
+          name: string;
+          email: string;
+      }
+    user-card.component.ts: |
+      import { Component, Input } from '@angular/core';
+      import { User } from './user.model';
 
-        getUsers() {
-            return this.http.get('/api/users');
-        }
-    }
+      @Component({
+          selector: 'app-user-card',
+          template: `
+              <div class="card">
+                  <h3>{{ user.name }}</h3>
+                  <p>{{ user.email }}</p>
+              </div>
+          `
+      })
+      export class UserCardComponent {
+          @Input() user!: User;
+      }
+    user-list.component.ts: |
+      import { Component } from '@angular/core';
 
-changed:
-  user.model.ts: |
-    export interface User {
-        id: string;
-        name: string;
-        email: string;
-    }
-  user-card.component.ts: |
-    import { Component, Input } from '@angular/core';
-    import { User } from './user.model';
+      @Component({
+          selector: 'app-user-list',
+          template: `<ul><li *ngFor="let u of users">{{ u.id }}</li></ul>`
+      })
+      export class UserListComponent {
+          users: any[] = [];
+      }
+    user.service.ts: |
+      import { Injectable } from '@angular/core';
+      import { HttpClient } from '@angular/common/http';
 
-    @Component({
-        selector: 'app-user-card',
-        template: `
-            <div class="card">
-                <h3>{{ user.name }}</h3>
-                <p>{{ user.email }}</p>
-            </div>
-        `
-    })
-    export class UserCardComponent {
-        @Input() user!: User;
-    }
-  user-list.component.ts: |
-    import { Component } from '@angular/core';
+      @Injectable({ providedIn: 'root' })
+      export class UserService {
+          constructor(private http: HttpClient) {}
 
-    @Component({
-        selector: 'app-user-list',
-        template: `<ul><li *ngFor="let u of users">{{ u.id }}</li></ul>`
-    })
-    export class UserListComponent {
-        users: any[] = [];
-    }
-  user.service.ts: |
-    import { Injectable } from '@angular/core';
-    import { HttpClient } from '@angular/common/http';
-
-    @Injectable({ providedIn: 'root' })
-    export class UserService {
-        constructor(private http: HttpClient) {}
-
-        getUsers() {
-            return this.http.get('/api/users');
-        }
-    }
-
-must_include_files:
-  # Q1: user.model.ts defines User — reviewer verifies template fields match interface
-  - user.model.ts
-must_include_content_from:
-  user.model.ts:
-    - "interface User {"
-    - "name: string"
-    - "email: string"
-must_not_include:
-  # user-list.component.ts: sibling component, no @Input binding to verify
-  - UserListComponent
-  # user.service.ts: HTTP layer, unrelated to component input binding
-  - UserService
-  - getUsers
-must_not_include_files:
-  - user-list.component.ts
-  - user.service.ts
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          getUsers() {
+              return this.http.get('/api/users');
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: user_model
+  selector:
+    path: user.model.ts
+    anchor: interface User {
+- id: user_model_1
+  selector:
+    path: user.model.ts
+    anchor: 'name: string'
+- id: user_model_2
+  selector:
+    path: user.model.ts
+    anchor: 'email: string'
+- id: no_user_list_component
+  selector:
+    path: user-list.component.ts
+- id: no_user_service
+  selector:
+    path: user.service.ts
+- id: no_global_0
+  selector:
+    anchor: UserListComponent
+- id: no_global_1
+  selector:
+    anchor: UserService
+- id: no_global_2
+  selector:
+    anchor: getUsers
+oracle:
+  required:
+  - user_model
+  - user_model_1
+  - user_model_2
+  allowed: []
+  forbidden:
+  - no_user_list_component
+  - no_user_service
+  - no_global_0
+  - no_global_1
+  - no_global_2

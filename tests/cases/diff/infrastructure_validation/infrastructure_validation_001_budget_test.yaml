@@ -1,138 +1,131 @@
-# Scenario: Adding a new field `y: int = 3` and changing `x: int = 1` to
-#   `x: int = 2` in a Config dataclass. Only src/models.py is changed.
-#
-# Reviewer questions:
-#   Q1: "What code reads Config.x? Will changing the default from 1 to 2
-#        break any downstream consumers?"
-#       -> Needs src/processor.py: process_config reads cfg.x in the
-#         format string. Reviewer must verify whether the changed default
-#         affects the processing logic.
-#
-#   Q2: "Does create_default_config() need to pass the new y field, or
-#        is the dataclass default sufficient?"
-#       -> Contained in models.py itself (diff). create_default_config()
-#         calls Config() with no args — the default y=3 applies.
-#
-# Not needed for comprehension:
-#   - scripts/benchmark.sh: Shell script that benchmarks processor.run().
-#     Uses the pipeline end-to-end but doesn't reference Config fields.
-#     No structural connection to the dataclass change.
-#
-#   - tests/test_perf.py: Empty test stub. No assertions, no field access.
-#
-#   - docs/budget.md: Documentation file. No code relationship.
+name: infrastructure_validation_001_budget_test
+repo:
+  initial_files:
+    src/models.py: |
+      from dataclasses import dataclass
+      from typing import Optional
 
-max_enrichment: 15.8
-initial:
-  src/models.py: |
-    from dataclasses import dataclass
-    from typing import Optional
+      @dataclass
+      class Config:
+          x: int = 1
+          name: str = "default"
+          enabled: bool = True
 
-    @dataclass
-    class Config:
-        x: int = 1
-        name: str = "default"
-        enabled: bool = True
+      @dataclass
+      class Settings:
+          config: Config
+          debug: bool = False
 
-    @dataclass
-    class Settings:
-        config: Config
-        debug: bool = False
+      def create_default_config():
+          return Config()
 
-    def create_default_config():
-        return Config()
+      def create_settings(config: Optional[Config] = None):
+          if config is None:
+              config = create_default_config()
+          return Settings(config=config)
+    src/processor.py: |
+      from models import Config, create_settings
 
-    def create_settings(config: Optional[Config] = None):
-        if config is None:
-            config = create_default_config()
-        return Settings(config=config)
-  src/processor.py: |
-    from models import Config, create_settings
+      def process_config(cfg: Config):
+          if cfg.enabled:
+              return f"Processing {cfg.name} with x={cfg.x}"
+          return "Disabled"
 
-    def process_config(cfg: Config):
-        if cfg.enabled:
-            return f"Processing {cfg.name} with x={cfg.x}"
-        return "Disabled"
+      def run():
+          settings = create_settings()
+          return process_config(settings.config)
+    scripts/benchmark.sh: |
+      #!/bin/bash
+      python -m timeit "import processor; processor.run()"
+    tests/test_perf.py: |
+      def test_performance():
+          pass
+    docs/budget.md: |
+      # Budget Guide
+  changed_files:
+    src/models.py: |
+      from dataclasses import dataclass
+      from typing import Optional
 
-    def run():
-        settings = create_settings()
-        return process_config(settings.config)
-  scripts/benchmark.sh: |
-    #!/bin/bash
-    python -m timeit "import processor; processor.run()"
-  tests/test_perf.py: |
-    def test_performance():
-        pass
-  docs/budget.md: |
-    # Budget Guide
+      @dataclass
+      class Config:
+          x: int = 2
+          y: int = 3
+          name: str = "default"
+          enabled: bool = True
 
-changed:
-  src/models.py: |
-    from dataclasses import dataclass
-    from typing import Optional
+      @dataclass
+      class Settings:
+          config: Config
+          debug: bool = False
 
-    @dataclass
-    class Config:
-        x: int = 2
-        y: int = 3
-        name: str = "default"
-        enabled: bool = True
+      def create_default_config():
+          return Config()
 
-    @dataclass
-    class Settings:
-        config: Config
-        debug: bool = False
+      def create_settings(config: Optional[Config] = None):
+          if config is None:
+              config = create_default_config()
+          return Settings(config=config)
+    src/processor.py: |
+      from models import Config, create_settings
 
-    def create_default_config():
-        return Config()
+      def process_config(cfg: Config):
+          if cfg.enabled:
+              return f"Processing {cfg.name} with x={cfg.x}"
+          return "Disabled"
 
-    def create_settings(config: Optional[Config] = None):
-        if config is None:
-            config = create_default_config()
-        return Settings(config=config)
-  src/processor.py: |
-    from models import Config, create_settings
-
-    def process_config(cfg: Config):
-        if cfg.enabled:
-            return f"Processing {cfg.name} with x={cfg.x}"
-        return "Disabled"
-
-    def run():
-        settings = create_settings()
-        return process_config(settings.config)
-  scripts/benchmark.sh: |
-    #!/bin/bash
-    python -m timeit "import processor; processor.run()"
-  tests/test_perf.py: |
-    def test_performance():
-        pass
-  docs/budget.md: |
-    # Budget Guide
-
-must_include_files:
-  - src/models.py
-
-must_include_content_from:
-  src/models.py:
-    - "x: int = 2"
-    - "y: int = 3"
-
-must_not_include:
-  # --- scripts/benchmark.sh: benchmarks the pipeline ---
-  - benchmark
-  - timeit
-  # --- tests/test_perf.py: empty test stub ---
-  - test_performance
-  # --- docs/budget.md: documentation ---
-  - Budget Guide
-
-must_not_include_files:
-  - scripts/benchmark.sh
-  - tests/test_perf.py
-  - docs/budget.md
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      def run():
+          settings = create_settings()
+          return process_config(settings.config)
+    scripts/benchmark.sh: |
+      #!/bin/bash
+      python -m timeit "import processor; processor.run()"
+    tests/test_perf.py: |
+      def test_performance():
+          pass
+    docs/budget.md: |
+      # Budget Guide
+  commit_message: Update files
+fragments:
+- id: models
+  selector:
+    path: src/models.py
+    anchor: 'x: int = 2'
+- id: models_1
+  selector:
+    path: src/models.py
+    anchor: 'y: int = 3'
+- id: no_benchmark
+  selector:
+    path: scripts/benchmark.sh
+- id: no_test_perf
+  selector:
+    path: tests/test_perf.py
+- id: no_budget
+  selector:
+    path: docs/budget.md
+- id: no_global_0
+  selector:
+    anchor: benchmark
+- id: no_global_1
+  selector:
+    anchor: timeit
+- id: no_global_2
+  selector:
+    anchor: test_performance
+- id: no_global_3
+  selector:
+    anchor: Budget Guide
+oracle:
+  required:
+  - models
+  - models_1
+  allowed: []
+  forbidden:
+  - no_benchmark
+  - no_test_perf
+  - no_budget
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

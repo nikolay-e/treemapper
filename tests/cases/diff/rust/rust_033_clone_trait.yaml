@@ -1,266 +1,270 @@
-# Scenario: Entity gains #[derive(Clone)] and a duplicate() method; a new
-# service.rs uses .clone() and .cloned() to work with Entity copies.
-#
-# Diff: src/entity.rs adds Clone derive and duplicate(); src/service.rs (NEW)
-# imports Entity and uses clone-based patterns; src/lib.rs adds pub mod service.
-#
-# Reviewer questions:
-#   Q1: "What fields does Entity clone?" -> src/entity.rs (CHANGED) has id: u64,
-#        name: String, tags: Vec<String> — all Clone types, so derive works.
-#   Q2: "Does lib.rs register the new module?" -> src/lib.rs (CHANGED) adds
-#        pub mod service.
-#
-# Trap files (plausible but no dependency on Entity or its Clone impl):
-#   - src/cache.rs: LRU cache that clones values internally via HashMap. Shares
-#     "clone" usage but works with generic types, not Entity.
-#   - src/snapshot.rs: creates snapshots of application state by deep-copying.
-#     Same "duplication" domain but operates on its own State struct.
+name: rust_033_clone_trait
+repo:
+  initial_files:
+    src/lib.rs: |
+      pub mod entity;
+      pub mod cache;
+      pub mod snapshot;
+    src/entity.rs: |
+      #[derive(Debug)]
+      pub struct Entity {
+          id: u64,
+          name: String,
+          tags: Vec<String>,
+      }
 
-max_enrichment: 9.5
-initial:
-  src/lib.rs: |
-    pub mod entity;
-    pub mod cache;
-    pub mod snapshot;
-  src/entity.rs: |
-    #[derive(Debug)]
-    pub struct Entity {
-        id: u64,
-        name: String,
-        tags: Vec<String>,
-    }
+      impl Entity {
+          pub fn new(id: u64, name: String) -> Self {
+              Self {
+                  id,
+                  name,
+                  tags: Vec::new(),
+              }
+          }
 
-    impl Entity {
-        pub fn new(id: u64, name: String) -> Self {
-            Self {
-                id,
-                name,
-                tags: Vec::new(),
-            }
-        }
+          pub fn add_tag(&mut self, tag: String) {
+              self.tags.push(tag);
+          }
 
-        pub fn add_tag(&mut self, tag: String) {
-            self.tags.push(tag);
-        }
+          pub fn id(&self) -> u64 {
+              self.id
+          }
 
-        pub fn id(&self) -> u64 {
-            self.id
-        }
+          pub fn name(&self) -> &str {
+              &self.name
+          }
 
-        pub fn name(&self) -> &str {
-            &self.name
-        }
+          pub fn tags(&self) -> &[String] {
+              &self.tags
+          }
+      }
+    src/cache.rs: |
+      use std::collections::HashMap;
 
-        pub fn tags(&self) -> &[String] {
-            &self.tags
-        }
-    }
-  src/cache.rs: |
-    use std::collections::HashMap;
+      pub struct LruCache<K: std::hash::Hash + Eq + Clone, V: Clone> {
+          map: HashMap<K, V>,
+          max_size: usize,
+      }
 
-    pub struct LruCache<K: std::hash::Hash + Eq + Clone, V: Clone> {
-        map: HashMap<K, V>,
-        max_size: usize,
-    }
+      impl<K: std::hash::Hash + Eq + Clone, V: Clone> LruCache<K, V> {
+          pub fn new(max_size: usize) -> Self {
+              Self {
+                  map: HashMap::new(),
+                  max_size,
+              }
+          }
 
-    impl<K: std::hash::Hash + Eq + Clone, V: Clone> LruCache<K, V> {
-        pub fn new(max_size: usize) -> Self {
-            Self {
-                map: HashMap::new(),
-                max_size,
-            }
-        }
+          pub fn get(&self, key: &K) -> Option<V> {
+              self.map.get(key).cloned()
+          }
 
-        pub fn get(&self, key: &K) -> Option<V> {
-            self.map.get(key).cloned()
-        }
+          pub fn insert(&mut self, key: K, value: V) {
+              if self.map.len() >= self.max_size {
+                  if let Some(first_key) = self.map.keys().next().cloned() {
+                      self.map.remove(&first_key);
+                  }
+              }
+              self.map.insert(key, value);
+          }
 
-        pub fn insert(&mut self, key: K, value: V) {
-            if self.map.len() >= self.max_size {
-                if let Some(first_key) = self.map.keys().next().cloned() {
-                    self.map.remove(&first_key);
-                }
-            }
-            self.map.insert(key, value);
-        }
+          pub fn size(&self) -> usize {
+              self.map.len()
+          }
+      }
+    src/snapshot.rs: |
+      #[derive(Clone)]
+      pub struct AppState {
+          pub version: u32,
+          pub entries: Vec<String>,
+      }
 
-        pub fn size(&self) -> usize {
-            self.map.len()
-        }
-    }
-  src/snapshot.rs: |
-    #[derive(Clone)]
-    pub struct AppState {
-        pub version: u32,
-        pub entries: Vec<String>,
-    }
+      pub struct SnapshotManager {
+          history: Vec<AppState>,
+      }
 
-    pub struct SnapshotManager {
-        history: Vec<AppState>,
-    }
+      impl SnapshotManager {
+          pub fn new() -> Self {
+              Self { history: Vec::new() }
+          }
 
-    impl SnapshotManager {
-        pub fn new() -> Self {
-            Self { history: Vec::new() }
-        }
+          pub fn take_snapshot(&mut self, state: &AppState) {
+              self.history.push(state.clone());
+          }
 
-        pub fn take_snapshot(&mut self, state: &AppState) {
-            self.history.push(state.clone());
-        }
+          pub fn restore_latest(&self) -> Option<AppState> {
+              self.history.last().cloned()
+          }
 
-        pub fn restore_latest(&self) -> Option<AppState> {
-            self.history.last().cloned()
-        }
+          pub fn snapshot_count(&self) -> usize {
+              self.history.len()
+          }
+      }
+  changed_files:
+    src/lib.rs: |
+      pub mod entity;
+      pub mod service;
+      pub mod cache;
+      pub mod snapshot;
+    src/entity.rs: |
+      #[derive(Debug, Clone)]
+      pub struct Entity {
+          id: u64,
+          name: String,
+          tags: Vec<String>,
+      }
 
-        pub fn snapshot_count(&self) -> usize {
-            self.history.len()
-        }
-    }
+      impl Entity {
+          pub fn new(id: u64, name: String) -> Self {
+              Self {
+                  id,
+                  name,
+                  tags: Vec::new(),
+              }
+          }
 
-changed:
-  src/lib.rs: |
-    pub mod entity;
-    pub mod service;
-    pub mod cache;
-    pub mod snapshot;
-  src/entity.rs: |
-    #[derive(Debug, Clone)]
-    pub struct Entity {
-        id: u64,
-        name: String,
-        tags: Vec<String>,
-    }
+          pub fn add_tag(&mut self, tag: String) {
+              self.tags.push(tag);
+          }
 
-    impl Entity {
-        pub fn new(id: u64, name: String) -> Self {
-            Self {
-                id,
-                name,
-                tags: Vec::new(),
-            }
-        }
+          pub fn id(&self) -> u64 {
+              self.id
+          }
 
-        pub fn add_tag(&mut self, tag: String) {
-            self.tags.push(tag);
-        }
+          pub fn name(&self) -> &str {
+              &self.name
+          }
 
-        pub fn id(&self) -> u64 {
-            self.id
-        }
+          pub fn tags(&self) -> &[String] {
+              &self.tags
+          }
 
-        pub fn name(&self) -> &str {
-            &self.name
-        }
+          pub fn duplicate(&self) -> Self {
+              self.clone()
+          }
+      }
+    src/service.rs: |
+      use crate::entity::Entity;
 
-        pub fn tags(&self) -> &[String] {
-            &self.tags
-        }
+      pub fn clone_entities(entities: &[Entity]) -> Vec<Entity> {
+          entities.iter().cloned().collect()
+      }
 
-        pub fn duplicate(&self) -> Self {
-            self.clone()
-        }
-    }
-  src/service.rs: |
-    use crate::entity::Entity;
+      pub fn process_with_backup(entity: &Entity) -> Entity {
+          let backup = entity.clone();
+          println!("Processing entity {}: {}", entity.id(), entity.name());
+          backup
+      }
+    src/cache.rs: |
+      use std::collections::HashMap;
 
-    pub fn clone_entities(entities: &[Entity]) -> Vec<Entity> {
-        entities.iter().cloned().collect()
-    }
+      pub struct LruCache<K: std::hash::Hash + Eq + Clone, V: Clone> {
+          map: HashMap<K, V>,
+          max_size: usize,
+      }
 
-    pub fn process_with_backup(entity: &Entity) -> Entity {
-        let backup = entity.clone();
-        println!("Processing entity {}: {}", entity.id(), entity.name());
-        backup
-    }
-  src/cache.rs: |
-    use std::collections::HashMap;
+      impl<K: std::hash::Hash + Eq + Clone, V: Clone> LruCache<K, V> {
+          pub fn new(max_size: usize) -> Self {
+              Self {
+                  map: HashMap::new(),
+                  max_size,
+              }
+          }
 
-    pub struct LruCache<K: std::hash::Hash + Eq + Clone, V: Clone> {
-        map: HashMap<K, V>,
-        max_size: usize,
-    }
+          pub fn get(&self, key: &K) -> Option<V> {
+              self.map.get(key).cloned()
+          }
 
-    impl<K: std::hash::Hash + Eq + Clone, V: Clone> LruCache<K, V> {
-        pub fn new(max_size: usize) -> Self {
-            Self {
-                map: HashMap::new(),
-                max_size,
-            }
-        }
+          pub fn insert(&mut self, key: K, value: V) {
+              if self.map.len() >= self.max_size {
+                  if let Some(first_key) = self.map.keys().next().cloned() {
+                      self.map.remove(&first_key);
+                  }
+              }
+              self.map.insert(key, value);
+          }
 
-        pub fn get(&self, key: &K) -> Option<V> {
-            self.map.get(key).cloned()
-        }
+          pub fn size(&self) -> usize {
+              self.map.len()
+          }
+      }
+    src/snapshot.rs: |
+      #[derive(Clone)]
+      pub struct AppState {
+          pub version: u32,
+          pub entries: Vec<String>,
+      }
 
-        pub fn insert(&mut self, key: K, value: V) {
-            if self.map.len() >= self.max_size {
-                if let Some(first_key) = self.map.keys().next().cloned() {
-                    self.map.remove(&first_key);
-                }
-            }
-            self.map.insert(key, value);
-        }
+      pub struct SnapshotManager {
+          history: Vec<AppState>,
+      }
 
-        pub fn size(&self) -> usize {
-            self.map.len()
-        }
-    }
-  src/snapshot.rs: |
-    #[derive(Clone)]
-    pub struct AppState {
-        pub version: u32,
-        pub entries: Vec<String>,
-    }
+      impl SnapshotManager {
+          pub fn new() -> Self {
+              Self { history: Vec::new() }
+          }
 
-    pub struct SnapshotManager {
-        history: Vec<AppState>,
-    }
+          pub fn take_snapshot(&mut self, state: &AppState) {
+              self.history.push(state.clone());
+          }
 
-    impl SnapshotManager {
-        pub fn new() -> Self {
-            Self { history: Vec::new() }
-        }
+          pub fn restore_latest(&self) -> Option<AppState> {
+              self.history.last().cloned()
+          }
 
-        pub fn take_snapshot(&mut self, state: &AppState) {
-            self.history.push(state.clone());
-        }
-
-        pub fn restore_latest(&self) -> Option<AppState> {
-            self.history.last().cloned()
-        }
-
-        pub fn snapshot_count(&self) -> usize {
-            self.history.len()
-        }
-    }
-
-must_include_files:
-  # Changed: Entity gains Clone derive and duplicate()
-  - src/entity.rs
-  # Changed: lib.rs adds pub mod service
-  - src/lib.rs
-  # New: service.rs uses Entity clone patterns
-  - src/service.rs
-must_include_content_from:
-  src/entity.rs:
-    - "pub fn duplicate(&self) -> Self {"
-  src/lib.rs:
-    - "pub mod service;"
-  src/service.rs:
-    - "use crate::entity::Entity;"
-must_not_include:
-  # cache.rs: generic LRU cache with Clone bounds, no Entity dependency
-  - LruCache
-  - "max_size"
-  # snapshot.rs: state snapshotting with its own AppState type
-  - SnapshotManager
-  - AppState
-  - take_snapshot
-  - restore_latest
-must_not_include_files:
-  - src/cache.rs
-  - src/snapshot.rs
-max_fragments: 8
-max_files: 4
-add_garbage_files: false
-skip_garbage_check: true
+          pub fn snapshot_count(&self) -> usize {
+              self.history.len()
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: entity
+  selector:
+    path: src/entity.rs
+    anchor: pub fn duplicate(&self) -> Self {
+- id: lib
+  selector:
+    path: src/lib.rs
+    anchor: pub mod service;
+- id: service
+  selector:
+    path: src/service.rs
+    anchor: use crate::entity::Entity;
+- id: no_cache
+  selector:
+    path: src/cache.rs
+- id: no_snapshot
+  selector:
+    path: src/snapshot.rs
+- id: no_global_0
+  selector:
+    anchor: LruCache
+- id: no_global_1
+  selector:
+    anchor: max_size
+- id: no_global_2
+  selector:
+    anchor: SnapshotManager
+- id: no_global_3
+  selector:
+    anchor: AppState
+- id: no_global_4
+  selector:
+    anchor: take_snapshot
+- id: no_global_5
+  selector:
+    anchor: restore_latest
+oracle:
+  required:
+  - entity
+  - lib
+  - service
+  allowed: []
+  forbidden:
+  - no_cache
+  - no_snapshot
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

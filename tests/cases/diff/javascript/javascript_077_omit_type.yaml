@@ -1,172 +1,185 @@
-# Scenario: public.ts is rewritten from a stub to import FullRecord from full.ts
-#   and use Omit<FullRecord, 'secret' | 'internal'> to create a safe public type.
-#   Only public.ts is changed; full.ts is unchanged.
-#
-# Diff shows:
-#   - console.log('initial')
-#   + import { FullRecord } from './full'
-#   + type PublicRecord = Omit<FullRecord, 'secret' | 'internal'>
-#   + function sanitize(record: FullRecord): PublicRecord using destructuring
-#
-# Reviewer questions:
-#   Q1: "What fields does FullRecord have — which ones remain after Omit?"
-#       -> full.ts: FullRecord has id, name, secret, internal. After omitting
-#          'secret' and 'internal', PublicRecord has { id: string; name: string }.
-#
-#   Q2: "Does the sanitize destructuring correctly exclude the omitted fields?"
-#       -> full.ts: secret is string, internal is boolean. The destructuring
-#          `const { secret, internal, ...publicData } = record` extracts both
-#          and returns the rest, which matches PublicRecord.
-#
-# Not needed for comprehension:
-#   - record-logger.ts: Logs record access with the same FullRecord type.
-#     Direct type edge — imports FullRecord. But HOW it logs records doesn't
-#     help review the Omit type or the destructuring sanitization.
-#
-#   - admin-record.ts: Extends FullRecord with admin fields (lastModifiedBy,
-#     auditTrail). Same base type. HARD TRAP: operates on FullRecord too,
-#     but adds fields rather than removing them.
-#
-#   - record-validator.ts: Validates FullRecord fields (secret format, name length).
-#     Same type, same field names. HARD TRAP: references secret and internal
-#     by name — exactly the fields being omitted. But validation logic doesn't
-#     help review the Omit type derivation.
+name: javascript_077_omit_type
+repo:
+  initial_files:
+    full.ts: |
+      export interface FullRecord {
+          id: string;
+          name: string;
+          secret: string;
+          internal: boolean;
+      }
+    public.ts: |
+      console.log('initial');
+    record-logger.ts: |
+      import { FullRecord } from './full';
 
-max_enrichment: 7.7
-initial:
-  full.ts: |
-    export interface FullRecord {
-        id: string;
-        name: string;
-        secret: string;
-        internal: boolean;
-    }
-  public.ts: |
-    console.log('initial');
-  record-logger.ts: |
-    import { FullRecord } from './full';
+      export function logRecordAccess(record: FullRecord, action: string): void {
+          console.log(`[${action}] Record ${record.id}: ${record.name}`);
+      }
 
-    export function logRecordAccess(record: FullRecord, action: string): void {
-        console.log(`[${action}] Record ${record.id}: ${record.name}`);
-    }
+      export function logSensitiveAccess(record: FullRecord): void {
+          console.log(`[SENSITIVE] Accessed secret for record ${record.id}`);
+      }
+    admin-record.ts: |
+      import { FullRecord } from './full';
 
-    export function logSensitiveAccess(record: FullRecord): void {
-        console.log(`[SENSITIVE] Accessed secret for record ${record.id}`);
-    }
-  admin-record.ts: |
-    import { FullRecord } from './full';
+      export interface AdminRecord extends FullRecord {
+          lastModifiedBy: string;
+          auditTrail: { timestamp: Date; action: string }[];
+      }
 
-    export interface AdminRecord extends FullRecord {
-        lastModifiedBy: string;
-        auditTrail: { timestamp: Date; action: string }[];
-    }
+      export function createAdminRecord(base: FullRecord, adminId: string): AdminRecord {
+          return { ...base, lastModifiedBy: adminId, auditTrail: [] };
+      }
+    record-validator.ts: |
+      import { FullRecord } from './full';
 
-    export function createAdminRecord(base: FullRecord, adminId: string): AdminRecord {
-        return { ...base, lastModifiedBy: adminId, auditTrail: [] };
-    }
-  record-validator.ts: |
-    import { FullRecord } from './full';
+      export function validateRecord(record: FullRecord): { valid: boolean; errors: string[] } {
+          const errors: string[] = [];
+          if (!record.id) errors.push('id is required');
+          if (!record.name || record.name.length < 1) errors.push('name is required');
+          if (!record.secret || record.secret.length < 16) errors.push('secret must be at least 16 chars');
+          return { valid: errors.length === 0, errors };
+      }
+  changed_files:
+    full.ts: |
+      export interface FullRecord {
+          id: string;
+          name: string;
+          secret: string;
+          internal: boolean;
+      }
+    public.ts: |
+      import { FullRecord } from './full';
 
-    export function validateRecord(record: FullRecord): { valid: boolean; errors: string[] } {
-        const errors: string[] = [];
-        if (!record.id) errors.push('id is required');
-        if (!record.name || record.name.length < 1) errors.push('name is required');
-        if (!record.secret || record.secret.length < 16) errors.push('secret must be at least 16 chars');
-        return { valid: errors.length === 0, errors };
-    }
+      type PublicRecord = Omit<FullRecord, 'secret' | 'internal'>;
 
-changed:
-  full.ts: |
-    export interface FullRecord {
-        id: string;
-        name: string;
-        secret: string;
-        internal: boolean;
-    }
-  public.ts: |
-    import { FullRecord } from './full';
+      function sanitize(record: FullRecord): PublicRecord {
+          const { secret, internal, ...publicData } = record;
+          return publicData;
+      }
+    record-logger.ts: |
+      import { FullRecord } from './full';
 
-    type PublicRecord = Omit<FullRecord, 'secret' | 'internal'>;
+      export function logRecordAccess(record: FullRecord, action: string): void {
+          console.log(`[${action}] Record ${record.id}: ${record.name}`);
+      }
 
-    function sanitize(record: FullRecord): PublicRecord {
-        const { secret, internal, ...publicData } = record;
-        return publicData;
-    }
-  record-logger.ts: |
-    import { FullRecord } from './full';
+      export function logSensitiveAccess(record: FullRecord): void {
+          console.log(`[SENSITIVE] Accessed secret for record ${record.id}`);
+      }
+    admin-record.ts: |
+      import { FullRecord } from './full';
 
-    export function logRecordAccess(record: FullRecord, action: string): void {
-        console.log(`[${action}] Record ${record.id}: ${record.name}`);
-    }
+      export interface AdminRecord extends FullRecord {
+          lastModifiedBy: string;
+          auditTrail: { timestamp: Date; action: string }[];
+      }
 
-    export function logSensitiveAccess(record: FullRecord): void {
-        console.log(`[SENSITIVE] Accessed secret for record ${record.id}`);
-    }
-  admin-record.ts: |
-    import { FullRecord } from './full';
+      export function createAdminRecord(base: FullRecord, adminId: string): AdminRecord {
+          return { ...base, lastModifiedBy: adminId, auditTrail: [] };
+      }
+    record-validator.ts: |
+      import { FullRecord } from './full';
 
-    export interface AdminRecord extends FullRecord {
-        lastModifiedBy: string;
-        auditTrail: { timestamp: Date; action: string }[];
-    }
-
-    export function createAdminRecord(base: FullRecord, adminId: string): AdminRecord {
-        return { ...base, lastModifiedBy: adminId, auditTrail: [] };
-    }
-  record-validator.ts: |
-    import { FullRecord } from './full';
-
-    export function validateRecord(record: FullRecord): { valid: boolean; errors: string[] } {
-        const errors: string[] = [];
-        if (!record.id) errors.push('id is required');
-        if (!record.name || record.name.length < 1) errors.push('name is required');
-        if (!record.secret || record.secret.length < 16) errors.push('secret must be at least 16 chars');
-        return { valid: errors.length === 0, errors };
-    }
-
-must_include_files:
-  - public.ts
-  # Q1+Q2: full.ts defines FullRecord — reviewer needs to see all four fields
-  # to understand which remain after Omit<FullRecord, 'secret' | 'internal'>.
-  - full.ts
-
-must_include_content_from:
-  public.ts:
-    - "import { FullRecord } from './full'"
-    - "type PublicRecord = Omit<FullRecord, 'secret' | 'internal'>"
-    - "const { secret, internal, ...publicData } = record"
-  full.ts:
-    - "interface FullRecord {"
-    - "id: string"
-    - "name: string"
-    - "secret: string"
-    - "internal: boolean"
-
-must_not_include:
-  # --- record-logger.ts: logs records using FullRecord ---
-  # Direct type edge: imports FullRecord from full.ts. But logging
-  # doesn't help review the Omit type or the destructuring.
-  - logRecordAccess
-  - logSensitiveAccess
-  - "[SENSITIVE]"
-  # --- admin-record.ts: extends FullRecord with admin fields ---
-  # HARD TRAP: operates on same FullRecord base type.
-  - AdminRecord
-  - createAdminRecord
-  - lastModifiedBy
-  - auditTrail
-  # --- record-validator.ts: validates FullRecord fields ---
-  # HARD TRAP: references secret and internal by name — the exact
-  # fields being omitted. But validation doesn't help review the Omit type.
-  - validateRecord
-  - "secret must be at least"
-
-must_not_include_files:
-  - record-logger.ts
-  - admin-record.ts
-  - record-validator.ts
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      export function validateRecord(record: FullRecord): { valid: boolean; errors: string[] } {
+          const errors: string[] = [];
+          if (!record.id) errors.push('id is required');
+          if (!record.name || record.name.length < 1) errors.push('name is required');
+          if (!record.secret || record.secret.length < 16) errors.push('secret must be at least 16 chars');
+          return { valid: errors.length === 0, errors };
+      }
+  commit_message: Update files
+fragments:
+- id: public
+  selector:
+    path: public.ts
+    anchor: import { FullRecord } from './full'
+- id: public_1
+  selector:
+    path: public.ts
+    anchor: type PublicRecord = Omit<FullRecord, 'secret' | 'internal'>
+- id: public_2
+  selector:
+    path: public.ts
+    anchor: const { secret, internal, ...publicData } = record
+- id: full
+  selector:
+    path: full.ts
+    anchor: interface FullRecord {
+- id: full_1
+  selector:
+    path: full.ts
+    anchor: 'id: string'
+- id: full_2
+  selector:
+    path: full.ts
+    anchor: 'name: string'
+- id: full_3
+  selector:
+    path: full.ts
+    anchor: 'secret: string'
+- id: full_4
+  selector:
+    path: full.ts
+    anchor: 'internal: boolean'
+- id: no_record_logger
+  selector:
+    path: record-logger.ts
+- id: no_admin_record
+  selector:
+    path: admin-record.ts
+- id: no_record_validator
+  selector:
+    path: record-validator.ts
+- id: no_global_0
+  selector:
+    anchor: logRecordAccess
+- id: no_global_1
+  selector:
+    anchor: logSensitiveAccess
+- id: no_global_2
+  selector:
+    anchor: '[SENSITIVE]'
+- id: no_global_3
+  selector:
+    anchor: AdminRecord
+- id: no_global_4
+  selector:
+    anchor: createAdminRecord
+- id: no_global_5
+  selector:
+    anchor: lastModifiedBy
+- id: no_global_6
+  selector:
+    anchor: auditTrail
+- id: no_global_7
+  selector:
+    anchor: validateRecord
+- id: no_global_8
+  selector:
+    anchor: secret must be at least
+oracle:
+  required:
+  - public
+  - public_1
+  - public_2
+  - full
+  - full_1
+  - full_2
+  - full_3
+  - full_4
+  allowed: []
+  forbidden:
+  - no_record_logger
+  - no_admin_record
+  - no_record_validator
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8

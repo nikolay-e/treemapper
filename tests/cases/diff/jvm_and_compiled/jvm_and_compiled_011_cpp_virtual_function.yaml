@@ -1,186 +1,208 @@
-# Scenario: widget.cpp goes from empty main to Button class that overrides
-#   virtual draw() and resize() from Drawable base class.
-#
-# Reviewer questions:
-#   Q1: "What pure virtual methods does Drawable declare?"
-#       -> drawable.h: draw() = 0 and resize(int w, int h) = 0.
-#          Button must implement both. Reviewer must verify signatures match.
-#
-#   Q2: "Does Button correctly use 'override' on both methods?"
-#       -> Diff shows 'void draw() override' and 'void resize(int w, int h) override'.
-#          Reviewer needs drawable.h to confirm these match exactly.
-#
-#   Q3: "Is the virtual destructor handled correctly?"
-#       -> drawable.h: virtual ~Drawable() = default. Button doesn't declare
-#          destructor — inherits the defaulted virtual one. This is correct.
-#
-# Not needed:
-#   - ui/checkbox.cpp: Another class inheriting Drawable. IDENTICAL override
-#     pattern (draw() override, resize() override). Different widget type.
-#
-#   - ui/widget_factory.cpp: Factory that creates Button and other widgets.
-#     Direct structural edge (new Button()). But factory pattern doesn't
-#     help review whether virtual function overrides are correct.
-#
-#   - ui/event_handler.h: Interface with virtual onClick() = 0. Similar
-#     pure virtual pattern. Different interface, unrelated to drawing.
-#
-#   - tests/widget_test.cpp: Tests Button::draw() and resize(). Calls
-#     the methods being overridden. But test behavior doesn't verify
-#     that the override declarations match the base class.
+name: jvm_and_compiled_011_cpp_virtual_function
+repo:
+  initial_files:
+    include/drawable.h: |
+      #pragma once
 
-max_enrichment: 6.5
-initial:
-  include/drawable.h: |
-    #pragma once
+      class Drawable {
+      public:
+          virtual ~Drawable() = default;
+          virtual void draw() = 0;
+          virtual void resize(int w, int h) = 0;
+      };
+    src/widget.cpp: |
+      #include <iostream>
+      int main() { return 0; }
+    src/checkbox.cpp: |
+      #include "drawable.h"
+      #include <iostream>
 
-    class Drawable {
-    public:
-        virtual ~Drawable() = default;
-        virtual void draw() = 0;
-        virtual void resize(int w, int h) = 0;
-    };
+      class Checkbox : public Drawable {
+          bool checked_ = false;
+      public:
+          void draw() override {
+              std::cout << (checked_ ? "[x]" : "[ ]") << std::endl;
+          }
 
-  src/widget.cpp: |
-    #include <iostream>
-    int main() { return 0; }
+          void resize(int w, int h) override {
+              std::cout << "Checkbox resize: " << w << "x" << h << std::endl;
+          }
 
-  src/checkbox.cpp: |
-    #include "drawable.h"
-    #include <iostream>
+          void toggle() { checked_ = !checked_; }
+      };
+    src/widget_factory.cpp: |
+      #include "drawable.h"
+      #include <memory>
+      #include <string>
 
-    class Checkbox : public Drawable {
-        bool checked_ = false;
-    public:
-        void draw() override {
-            std::cout << (checked_ ? "[x]" : "[ ]") << std::endl;
-        }
+      class WidgetFactory {
+      public:
+          static std::unique_ptr<Drawable> create(const std::string& type) {
+              if (type == "button") {
+                  return nullptr;
+              }
+              if (type == "checkbox") {
+                  return nullptr;
+              }
+              return nullptr;
+          }
 
-        void resize(int w, int h) override {
-            std::cout << "Checkbox resize: " << w << "x" << h << std::endl;
-        }
+          static void renderAll(const std::vector<std::unique_ptr<Drawable>>& widgets) {
+              for (const auto& w : widgets) {
+                  w->draw();
+              }
+          }
+      };
+    include/event_handler.h: |
+      #pragma once
 
-        void toggle() { checked_ = !checked_; }
-    };
+      class EventHandler {
+      public:
+          virtual ~EventHandler() = default;
+          virtual void onClick(int x, int y) = 0;
+          virtual void onHover(int x, int y) = 0;
+          virtual void onKeyPress(char key) = 0;
+      };
+    tests/widget_test.cpp: |
+      #include "drawable.h"
+      #include <cassert>
+      #include <sstream>
 
-  src/widget_factory.cpp: |
-    #include "drawable.h"
-    #include <memory>
-    #include <string>
+      class TestButton : public Drawable {
+          std::string lastDraw_;
+      public:
+          void draw() override { lastDraw_ = "drawn"; }
+          void resize(int w, int h) override { lastDraw_ = "resized"; }
+          const std::string& lastDraw() const { return lastDraw_; }
+      };
 
-    class WidgetFactory {
-    public:
-        static std::unique_ptr<Drawable> create(const std::string& type) {
-            if (type == "button") {
-                return nullptr;
-            }
-            if (type == "checkbox") {
-                return nullptr;
-            }
-            return nullptr;
-        }
+      void test_draw() {
+          TestButton btn;
+          btn.draw();
+          assert(btn.lastDraw() == "drawn");
+      }
 
-        static void renderAll(const std::vector<std::unique_ptr<Drawable>>& widgets) {
-            for (const auto& w : widgets) {
-                w->draw();
-            }
-        }
-    };
+      void test_resize() {
+          TestButton btn;
+          btn.resize(100, 50);
+          assert(btn.lastDraw() == "resized");
+      }
+  changed_files:
+    src/widget.cpp: |
+      #include "drawable.h"
+      #include <iostream>
 
-  include/event_handler.h: |
-    #pragma once
+      class Button : public Drawable {
+      public:
+          void draw() override {
+              std::cout << "Drawing button" << std::endl;
+          }
 
-    class EventHandler {
-    public:
-        virtual ~EventHandler() = default;
-        virtual void onClick(int x, int y) = 0;
-        virtual void onHover(int x, int y) = 0;
-        virtual void onKeyPress(char key) = 0;
-    };
-
-  tests/widget_test.cpp: |
-    #include "drawable.h"
-    #include <cassert>
-    #include <sstream>
-
-    class TestButton : public Drawable {
-        std::string lastDraw_;
-    public:
-        void draw() override { lastDraw_ = "drawn"; }
-        void resize(int w, int h) override { lastDraw_ = "resized"; }
-        const std::string& lastDraw() const { return lastDraw_; }
-    };
-
-    void test_draw() {
-        TestButton btn;
-        btn.draw();
-        assert(btn.lastDraw() == "drawn");
-    }
-
-    void test_resize() {
-        TestButton btn;
-        btn.resize(100, 50);
-        assert(btn.lastDraw() == "resized");
-    }
-
-changed:
-  src/widget.cpp: |
-    #include "drawable.h"
-    #include <iostream>
-
-    class Button : public Drawable {
-    public:
-        void draw() override {
-            std::cout << "Drawing button" << std::endl;
-        }
-
-        void resize(int w, int h) override {
-            std::cout << "Resizing to " << w << "x" << h << std::endl;
-        }
-    };
-
-must_include_files:
-  - src/widget.cpp
-  # Q1+Q2+Q3: Reviewer needs Drawable to verify pure virtual declarations
-  # match the override signatures in Button.
-  - include/drawable.h
-
-must_include_content_from:
-  src/widget.cpp:
-    - "class Button : public Drawable"
-    - "void draw() override"
-    - "void resize(int w, int h) override"
-  include/drawable.h:
-    - "virtual void draw() = 0"
-    - "virtual void resize(int w, int h) = 0"
-    - "virtual ~Drawable() = default"
-
-must_not_include:
-  # --- checkbox.cpp: identical override pattern, different widget ---
-  - Checkbox
-  - "checked_"
-  - toggle
-  # --- widget_factory.cpp: creates widgets, different concern ---
-  - WidgetFactory
-  - renderAll
-  - "create(const std::string"
-  # --- event_handler.h: similar virtual pattern, different interface ---
-  - EventHandler
-  - onClick
-  - onHover
-  - onKeyPress
-  # --- tests ---
-  - TestButton
-  - test_draw
-  - test_resize
-
-must_not_include_files:
-  - src/checkbox.cpp
-  - src/widget_factory.cpp
-  - include/event_handler.h
-  - tests/widget_test.cpp
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+          void resize(int w, int h) override {
+              std::cout << "Resizing to " << w << "x" << h << std::endl;
+          }
+      };
+  commit_message: Update files
+fragments:
+- id: widget
+  selector:
+    path: src/widget.cpp
+    anchor: 'class Button : public Drawable'
+- id: widget_1
+  selector:
+    path: src/widget.cpp
+    anchor: void draw() override
+- id: widget_2
+  selector:
+    path: src/widget.cpp
+    anchor: void resize(int w, int h) override
+- id: drawable
+  selector:
+    path: include/drawable.h
+    anchor: virtual void draw() = 0
+- id: drawable_1
+  selector:
+    path: include/drawable.h
+    anchor: virtual void resize(int w, int h) = 0
+- id: drawable_2
+  selector:
+    path: include/drawable.h
+    anchor: virtual ~Drawable() = default
+- id: no_checkbox
+  selector:
+    path: src/checkbox.cpp
+- id: no_widget_factory
+  selector:
+    path: src/widget_factory.cpp
+- id: no_event_handler
+  selector:
+    path: include/event_handler.h
+- id: no_widget_test
+  selector:
+    path: tests/widget_test.cpp
+- id: no_global_0
+  selector:
+    anchor: Checkbox
+- id: no_global_1
+  selector:
+    anchor: checked_
+- id: no_global_2
+  selector:
+    anchor: toggle
+- id: no_global_3
+  selector:
+    anchor: WidgetFactory
+- id: no_global_4
+  selector:
+    anchor: renderAll
+- id: no_global_5
+  selector:
+    anchor: create(const std::string
+- id: no_global_6
+  selector:
+    anchor: EventHandler
+- id: no_global_7
+  selector:
+    anchor: onClick
+- id: no_global_8
+  selector:
+    anchor: onHover
+- id: no_global_9
+  selector:
+    anchor: onKeyPress
+- id: no_global_10
+  selector:
+    anchor: TestButton
+- id: no_global_11
+  selector:
+    anchor: test_draw
+- id: no_global_12
+  selector:
+    anchor: test_resize
+oracle:
+  required:
+  - widget
+  - widget_1
+  - widget_2
+  - drawable
+  - drawable_1
+  - drawable_2
+  allowed: []
+  forbidden:
+  - no_checkbox
+  - no_widget_factory
+  - no_event_handler
+  - no_widget_test
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12

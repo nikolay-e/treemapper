@@ -1,95 +1,118 @@
-max_enrichment: 4.4
-initial:
-  Models/PersonRecord.cs: |
-    namespace MyApp.Models;
+name: csharp_021_record_type
+repo:
+  initial_files:
+    Models/PersonRecord.cs: |
+      namespace MyApp.Models;
 
-    public record Person(string FirstName, string LastName, int Age)
-    {
-        public string FullName => $"{FirstName} {LastName}";
-    }
+      public record Person(string FirstName, string LastName, int Age)
+      {
+          public string FullName => $"{FirstName} {LastName}";
+      }
 
-    public record Address(string Street, string City, string Country);
-  Services/PersonService.cs: |
-    namespace MyApp.Services;
+      public record Address(string Street, string City, string Country);
+    Services/PersonService.cs: |
+      namespace MyApp.Services;
 
-    public class PersonService { }
-  Unrelated/GeoService.cs: |
-    namespace MyApp.Unrelated;
+      public class PersonService { }
+    Unrelated/GeoService.cs: |
+      namespace MyApp.Unrelated;
 
-    public class GeoService
-    {
-        private const string GARBAGE_CS_021_GEO_SERVICE_A = "geo_service_marker";
+      public class GeoService
+      {
+          private const string GARBAGE_CS_021_GEO_SERVICE_A = "geo_service_marker";
 
-        public string Geocode(string address) => GARBAGE_CS_021_GEO_SERVICE_A + address;
-    }
-  Unrelated/CurrencyConverter.cs: |
-    namespace MyApp.Unrelated;
+          public string Geocode(string address) => GARBAGE_CS_021_GEO_SERVICE_A + address;
+      }
+    Unrelated/CurrencyConverter.cs: |
+      namespace MyApp.Unrelated;
 
-    public class CurrencyConverter
-    {
-        public const string GARBAGE_CS_021_CURRENCY_CONVERTER_B = "currency_converter_marker";
+      public class CurrencyConverter
+      {
+          public const string GARBAGE_CS_021_CURRENCY_CONVERTER_B = "currency_converter_marker";
 
-        public decimal Convert(decimal amount) => amount;
-    }
-changed:
-  Models/PersonRecord.cs: |
-    namespace MyApp.Models;
+          public decimal Convert(decimal amount) => amount;
+      }
+  changed_files:
+    Models/PersonRecord.cs: |
+      namespace MyApp.Models;
 
-    public record Person(string FirstName, string LastName, int Age)
-    {
-        public string FullName => $"{FirstName} {LastName}";
-    }
+      public record Person(string FirstName, string LastName, int Age)
+      {
+          public string FullName => $"{FirstName} {LastName}";
+      }
 
-    public record Address(string Street, string City, string Country);
-  Services/PersonService.cs: |
-    using MyApp.Models;
+      public record Address(string Street, string City, string Country);
+    Services/PersonService.cs: |
+      using MyApp.Models;
 
-    namespace MyApp.Services;
+      namespace MyApp.Services;
 
-    public class PersonService
-    {
-        public Person CreatePerson(string first, string last, int age)
-        {
-            return new Person(first, last, age);
-        }
+      public class PersonService
+      {
+          public Person CreatePerson(string first, string last, int age)
+          {
+              return new Person(first, last, age);
+          }
 
-        public Person UpdateAge(Person person, int newAge)
-        {
-            return person with { Age = newAge };
-        }
+          public Person UpdateAge(Person person, int newAge)
+          {
+              return person with { Age = newAge };
+          }
 
-        public bool AreEqual(Person p1, Person p2)
-        {
-            return p1 == p2;
-        }
-    }
-  Unrelated/GeoService.cs: |
-    namespace MyApp.Unrelated;
+          public bool AreEqual(Person p1, Person p2)
+          {
+              return p1 == p2;
+          }
+      }
+    Unrelated/GeoService.cs: |
+      namespace MyApp.Unrelated;
 
-    public class GeoService
-    {
-        private const string GARBAGE_CS_021_GEO_SERVICE_A = "geo_service_marker";
+      public class GeoService
+      {
+          private const string GARBAGE_CS_021_GEO_SERVICE_A = "geo_service_marker";
 
-        public string Geocode(string address) => GARBAGE_CS_021_GEO_SERVICE_A + address;
-    }
-  Unrelated/CurrencyConverter.cs: |
-    namespace MyApp.Unrelated;
+          public string Geocode(string address) => GARBAGE_CS_021_GEO_SERVICE_A + address;
+      }
+    Unrelated/CurrencyConverter.cs: |
+      namespace MyApp.Unrelated;
 
-    public class CurrencyConverter
-    {
-        public const string GARBAGE_CS_021_CURRENCY_CONVERTER_B = "currency_converter_marker";
+      public class CurrencyConverter
+      {
+          public const string GARBAGE_CS_021_CURRENCY_CONVERTER_B = "currency_converter_marker";
 
-        public decimal Convert(decimal amount) => amount;
-    }
-must_include_files:
-- Services/PersonService.cs
-must_include_content:
-- public Person CreatePerson(string first, string last, int age)
-- public Person UpdateAge(Person person, int newAge)
-must_not_include:
-- GARBAGE_CS_021_CURRENCY_CONVERTER_B
-- GARBAGE_CS_021_GEO_SERVICE_A
-- CurrencyConverter.cs
-- GeoService.cs
-add_garbage_files: false
-skip_garbage_check: true
+          public decimal Convert(decimal amount) => amount;
+      }
+  commit_message: Update files
+fragments:
+- id: personservice_file
+  selector:
+    path: Services/PersonService.cs
+- id: req_global_0
+  selector:
+    anchor: public Person CreatePerson(string first, string last, int age)
+- id: req_global_1
+  selector:
+    anchor: public Person UpdateAge(Person person, int newAge)
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_CS_021_CURRENCY_CONVERTER_B
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_CS_021_GEO_SERVICE_A
+- id: no_global_2
+  selector:
+    anchor: CurrencyConverter.cs
+- id: no_global_3
+  selector:
+    anchor: GeoService.cs
+oracle:
+  required:
+  - personservice_file
+  - req_global_0
+  - req_global_1
+  allowed: []
+  forbidden:
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

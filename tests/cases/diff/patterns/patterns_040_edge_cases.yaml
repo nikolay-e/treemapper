@@ -1,174 +1,181 @@
-# Test 040: test_validator expands to parametrized email and phone edge cases
-#           — reviewer needs validator module to understand validation rules
-#
-# Scenario: test_validator.py adds parametrized tests for validate_email and
-# validate_phone with extensive edge cases. Imports change to include
-# validate_phone. The validator.py functions are unchanged.
-#
-# Reviewer questions:
-#   Q1: "Does validate_email's regex handle the edge cases in tests?"
-#       -> Regex pattern: ^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$
-#   Q2: "What are validate_phone's constraints?"
-#       -> phone.isdigit() and 10 <= len(phone) <= 15.
-#
-# Trap files (plausible but unrelated):
-#   - src/sanitizer.py: input sanitization with validate-like methods but
-#     for HTML/SQL, not email/phone validation.
-#   - tests/test_sanitizer.py: parametrized edge case tests for sanitizer,
-#     similar test structure but different validation domain.
+name: patterns_040_edge_cases
+repo:
+  initial_files:
+    src/validator.py: |
+      import re
 
-max_enrichment: 5.3
-initial:
-  src/validator.py: |
-    import re
+      def validate_email(email: str) -> bool:
+          pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+          return bool(re.match(pattern, email))
 
-    def validate_email(email: str) -> bool:
-        pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-        return bool(re.match(pattern, email))
+      def validate_phone(phone: str) -> bool:
+          return phone.isdigit() and 10 <= len(phone) <= 15
 
-    def validate_phone(phone: str) -> bool:
-        return phone.isdigit() and 10 <= len(phone) <= 15
+      def validate_username(username: str) -> bool:
+          return len(username) >= 3 and username.isalnum()
+    tests/test_validator.py: |
+      from src.validator import validate_email
 
-    def validate_username(username: str) -> bool:
-        return len(username) >= 3 and username.isalnum()
-  tests/test_validator.py: |
-    from src.validator import validate_email
+      def test_email_valid():
+          assert validate_email("test@example.com")
+    src/sanitizer.py: |
+      import re
 
-    def test_email_valid():
-        assert validate_email("test@example.com")
-  src/sanitizer.py: |
-    import re
+      def sanitize_html(text: str) -> str:
+          return re.sub(r'<[^>]+>', '', text)
 
-    def sanitize_html(text: str) -> str:
-        return re.sub(r'<[^>]+>', '', text)
+      def validate_sql_input(value: str) -> bool:
+          dangerous = ["DROP", "DELETE", "INSERT", "UPDATE", "--", ";"]
+          upper_val = value.upper()
+          return not any(d in upper_val for d in dangerous)
 
-    def validate_sql_input(value: str) -> bool:
-        dangerous = ["DROP", "DELETE", "INSERT", "UPDATE", "--", ";"]
-        upper_val = value.upper()
-        return not any(d in upper_val for d in dangerous)
+      def escape_special_chars(text: str) -> str:
+          return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    tests/test_sanitizer.py: |
+      import pytest
+      from src.sanitizer import sanitize_html, validate_sql_input
 
-    def escape_special_chars(text: str) -> str:
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-  tests/test_sanitizer.py: |
-    import pytest
-    from src.sanitizer import sanitize_html, validate_sql_input
+      @pytest.mark.parametrize("input_html,expected", [
+          ("<b>bold</b>", "bold"),
+          ("<script>alert('xss')</script>", "alert('xss')"),
+          ("no tags", "no tags"),
+      ])
+      def test_sanitize_html(input_html, expected):
+          assert sanitize_html(input_html) == expected
 
-    @pytest.mark.parametrize("input_html,expected", [
-        ("<b>bold</b>", "bold"),
-        ("<script>alert('xss')</script>", "alert('xss')"),
-        ("no tags", "no tags"),
-    ])
-    def test_sanitize_html(input_html, expected):
-        assert sanitize_html(input_html) == expected
+      @pytest.mark.parametrize("value,expected", [
+          ("normal input", True),
+          ("DROP TABLE users", False),
+          ("hello; --", False),
+      ])
+      def test_validate_sql(value, expected):
+          assert validate_sql_input(value) == expected
+  changed_files:
+    src/validator.py: |
+      import re
 
-    @pytest.mark.parametrize("value,expected", [
-        ("normal input", True),
-        ("DROP TABLE users", False),
-        ("hello; --", False),
-    ])
-    def test_validate_sql(value, expected):
-        assert validate_sql_input(value) == expected
+      def validate_email(email: str) -> bool:
+          pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+          return bool(re.match(pattern, email))
 
-changed:
-  src/validator.py: |
-    import re
+      def validate_phone(phone: str) -> bool:
+          return phone.isdigit() and 10 <= len(phone) <= 15
 
-    def validate_email(email: str) -> bool:
-        pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-        return bool(re.match(pattern, email))
+      def validate_username(username: str) -> bool:
+          return len(username) >= 3 and username.isalnum()
+    tests/test_validator.py: |
+      import pytest
+      from src.validator import validate_email, validate_phone
 
-    def validate_phone(phone: str) -> bool:
-        return phone.isdigit() and 10 <= len(phone) <= 15
+      @pytest.mark.parametrize("email,expected", [
+          ("test@example.com", True),
+          ("user.name+tag@domain.co.uk", True),
+          ("invalid", False),
+          ("missing@domain", False),
+          ("@nodomain.com", False),
+          ("spaces in@email.com", False),
+          ("", False),
+      ])
+      def test_email_validation(email, expected):
+          assert validate_email(email) == expected
 
-    def validate_username(username: str) -> bool:
-        return len(username) >= 3 and username.isalnum()
-  tests/test_validator.py: |
-    import pytest
-    from src.validator import validate_email, validate_phone
+      @pytest.mark.parametrize("phone,expected", [
+          ("1234567890", True),
+          ("12345678901234", True),
+          ("123", False),
+          ("12345678901234567", False),
+          ("123-456-7890", False),
+          ("phone123", False),
+      ])
+      def test_phone_validation(phone, expected):
+          assert validate_phone(phone) == expected
+    src/sanitizer.py: |
+      import re
 
-    @pytest.mark.parametrize("email,expected", [
-        ("test@example.com", True),
-        ("user.name+tag@domain.co.uk", True),
-        ("invalid", False),
-        ("missing@domain", False),
-        ("@nodomain.com", False),
-        ("spaces in@email.com", False),
-        ("", False),
-    ])
-    def test_email_validation(email, expected):
-        assert validate_email(email) == expected
+      def sanitize_html(text: str) -> str:
+          return re.sub(r'<[^>]+>', '', text)
 
-    @pytest.mark.parametrize("phone,expected", [
-        ("1234567890", True),
-        ("12345678901234", True),
-        ("123", False),
-        ("12345678901234567", False),
-        ("123-456-7890", False),
-        ("phone123", False),
-    ])
-    def test_phone_validation(phone, expected):
-        assert validate_phone(phone) == expected
-  src/sanitizer.py: |
-    import re
+      def validate_sql_input(value: str) -> bool:
+          dangerous = ["DROP", "DELETE", "INSERT", "UPDATE", "--", ";"]
+          upper_val = value.upper()
+          return not any(d in upper_val for d in dangerous)
 
-    def sanitize_html(text: str) -> str:
-        return re.sub(r'<[^>]+>', '', text)
+      def escape_special_chars(text: str) -> str:
+          return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    tests/test_sanitizer.py: |
+      import pytest
+      from src.sanitizer import sanitize_html, validate_sql_input
 
-    def validate_sql_input(value: str) -> bool:
-        dangerous = ["DROP", "DELETE", "INSERT", "UPDATE", "--", ";"]
-        upper_val = value.upper()
-        return not any(d in upper_val for d in dangerous)
+      @pytest.mark.parametrize("input_html,expected", [
+          ("<b>bold</b>", "bold"),
+          ("<script>alert('xss')</script>", "alert('xss')"),
+          ("no tags", "no tags"),
+      ])
+      def test_sanitize_html(input_html, expected):
+          assert sanitize_html(input_html) == expected
 
-    def escape_special_chars(text: str) -> str:
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-  tests/test_sanitizer.py: |
-    import pytest
-    from src.sanitizer import sanitize_html, validate_sql_input
-
-    @pytest.mark.parametrize("input_html,expected", [
-        ("<b>bold</b>", "bold"),
-        ("<script>alert('xss')</script>", "alert('xss')"),
-        ("no tags", "no tags"),
-    ])
-    def test_sanitize_html(input_html, expected):
-        assert sanitize_html(input_html) == expected
-
-    @pytest.mark.parametrize("value,expected", [
-        ("normal input", True),
-        ("DROP TABLE users", False),
-        ("hello; --", False),
-    ])
-    def test_validate_sql(value, expected):
-        assert validate_sql_input(value) == expected
-
-must_include_files:
-  - tests/test_validator.py
-  # Q1/Q2: Reviewer needs validator to verify rules match test expectations
-  - src/validator.py
-
-must_include_content_from:
-  tests/test_validator.py:
-    - "import pytest"
-    - '@pytest.mark.parametrize("email,expected", ['
-  src/validator.py:
-    - "def validate_email(email: str) -> bool:"
-    - "def validate_phone(phone: str) -> bool:"
-
-must_not_include:
-  # --- sanitizer.py: input validation but for HTML/SQL, not email/phone ---
-  - "sanitize_html"
-  - "validate_sql_input"
-  - "escape_special_chars"
-  # --- test_sanitizer.py: similar parametrize patterns but different domain ---
-  - "test_sanitize_html"
-  - "test_validate_sql"
-  - "DROP TABLE"
-
-must_not_include_files:
-  - src/sanitizer.py
-  - tests/test_sanitizer.py
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+      @pytest.mark.parametrize("value,expected", [
+          ("normal input", True),
+          ("DROP TABLE users", False),
+          ("hello; --", False),
+      ])
+      def test_validate_sql(value, expected):
+          assert validate_sql_input(value) == expected
+  commit_message: Update files
+fragments:
+- id: test_validator
+  selector:
+    path: tests/test_validator.py
+    anchor: import pytest
+- id: test_validator_1
+  selector:
+    path: tests/test_validator.py
+    anchor: '@pytest.mark.parametrize("email,expected", ['
+- id: validator
+  selector:
+    path: src/validator.py
+    anchor: 'def validate_email(email: str) -> bool:'
+- id: validator_1
+  selector:
+    path: src/validator.py
+    anchor: 'def validate_phone(phone: str) -> bool:'
+- id: no_sanitizer
+  selector:
+    path: src/sanitizer.py
+- id: no_test_sanitizer
+  selector:
+    path: tests/test_sanitizer.py
+- id: no_global_0
+  selector:
+    anchor: sanitize_html
+- id: no_global_1
+  selector:
+    anchor: validate_sql_input
+- id: no_global_2
+  selector:
+    anchor: escape_special_chars
+- id: no_global_3
+  selector:
+    anchor: test_sanitize_html
+- id: no_global_4
+  selector:
+    anchor: test_validate_sql
+- id: no_global_5
+  selector:
+    anchor: DROP TABLE
+oracle:
+  required:
+  - test_validator
+  - test_validator_1
+  - validator
+  - validator_1
+  allowed: []
+  forbidden:
+  - no_sanitizer
+  - no_test_sanitizer
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

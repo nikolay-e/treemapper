@@ -1,174 +1,183 @@
-# Scenario: worker.rb includes Logging module and calls log() in its perform method.
-# logging.rb defines the Logging module with log and log_error methods.
-#
-# Diff: worker.rb changes from empty class to including Logging and adding
-# a perform method that calls log("Starting work") and log("Work completed").
-#
-# Reviewer questions:
-#   Q1: "What does log() do — where does output go?"
-#       -> logging.rb (UNCHANGED) shows log(message) outputs to stdout via puts
-#          with "[LOG]" prefix. Reviewer understands the logging format.
-#   Q2: "Are there other logging methods available via the mixin?"
-#       -> logging.rb also provides log_error(message) which uses "[ERROR]" prefix.
-#          Worker only uses log(), not log_error(). Reviewer can assess if error
-#          logging should be added.
-#
-# Not needed:
-#   - metrics.rb: collects performance metrics. Similar observability concern
-#     but doesn't reference Logging module — no edge.
-#   - notifier.rb: sends notifications via external channels. Different output
-#     mechanism, independent of the Logging module.
+name: scripting_018_module_mixin
+repo:
+  initial_files:
+    lib/logging.rb: |
+      module Logging
+        def log(message)
+          puts "[LOG] #{message}"
+        end
 
-max_enrichment: 6.9
-initial:
-  lib/logging.rb: |
-    module Logging
-      def log(message)
-        puts "[LOG] #{message}"
-      end
+        def log_error(message)
+          puts "[ERROR] #{message}"
+        end
 
-      def log_error(message)
-        puts "[ERROR] #{message}"
+        def log_warning(message)
+          puts "[WARNING] #{message}"
+        end
       end
+    lib/worker.rb: |
+      class Worker
+      end
+    lib/metrics.rb: |
+      class Metrics
+        def initialize
+          @counters = {}
+          @timings = {}
+        end
 
-      def log_warning(message)
-        puts "[WARNING] #{message}"
-      end
-    end
-  lib/worker.rb: |
-    class Worker
-    end
-  lib/metrics.rb: |
-    class Metrics
-      def initialize
-        @counters = {}
-        @timings = {}
-      end
+        def increment(name, amount = 1)
+          @counters[name] = (@counters[name] || 0) + amount
+        end
 
-      def increment(name, amount = 1)
-        @counters[name] = (@counters[name] || 0) + amount
-      end
+        def time(name)
+          start = Time.now
+          result = yield
+          @timings[name] = Time.now - start
+          result
+        end
 
-      def time(name)
-        start = Time.now
-        result = yield
-        @timings[name] = Time.now - start
-        result
+        def report
+          { counters: @counters, timings: @timings }
+        end
       end
+    lib/notifier.rb: |
+      class Notifier
+        def initialize(channel)
+          @channel = channel
+        end
 
-      def report
-        { counters: @counters, timings: @timings }
-      end
-    end
-  lib/notifier.rb: |
-    class Notifier
-      def initialize(channel)
-        @channel = channel
-      end
+        def send_alert(subject, body)
+          dispatch(@channel, subject, body)
+        end
 
-      def send_alert(subject, body)
-        dispatch(@channel, subject, body)
-      end
+        def send_info(subject, body)
+          dispatch(@channel, subject, body)
+        end
 
-      def send_info(subject, body)
-        dispatch(@channel, subject, body)
-      end
+        private
 
-      private
+        def dispatch(channel, subject, body)
+          puts "Sending to #{channel}: [#{subject}] #{body}"
+        end
+      end
+  changed_files:
+    lib/logging.rb: |
+      module Logging
+        def log(message)
+          puts "[LOG] #{message}"
+        end
 
-      def dispatch(channel, subject, body)
-        puts "Sending to #{channel}: [#{subject}] #{body}"
-      end
-    end
-changed:
-  lib/logging.rb: |
-    module Logging
-      def log(message)
-        puts "[LOG] #{message}"
-      end
+        def log_error(message)
+          puts "[ERROR] #{message}"
+        end
 
-      def log_error(message)
-        puts "[ERROR] #{message}"
+        def log_warning(message)
+          puts "[WARNING] #{message}"
+        end
       end
+    lib/worker.rb: |
+      require_relative 'logging'
 
-      def log_warning(message)
-        puts "[WARNING] #{message}"
-      end
-    end
-  lib/worker.rb: |
-    require_relative 'logging'
+      class Worker
+        include Logging
 
-    class Worker
-      include Logging
+        def perform
+          log("Starting work")
+          log("Work completed")
+        end
+      end
+    lib/metrics.rb: |
+      class Metrics
+        def initialize
+          @counters = {}
+          @timings = {}
+        end
 
-      def perform
-        log("Starting work")
-        log("Work completed")
-      end
-    end
-  lib/metrics.rb: |
-    class Metrics
-      def initialize
-        @counters = {}
-        @timings = {}
-      end
+        def increment(name, amount = 1)
+          @counters[name] = (@counters[name] || 0) + amount
+        end
 
-      def increment(name, amount = 1)
-        @counters[name] = (@counters[name] || 0) + amount
-      end
+        def time(name)
+          start = Time.now
+          result = yield
+          @timings[name] = Time.now - start
+          result
+        end
 
-      def time(name)
-        start = Time.now
-        result = yield
-        @timings[name] = Time.now - start
-        result
+        def report
+          { counters: @counters, timings: @timings }
+        end
       end
+    lib/notifier.rb: |
+      class Notifier
+        def initialize(channel)
+          @channel = channel
+        end
 
-      def report
-        { counters: @counters, timings: @timings }
-      end
-    end
-  lib/notifier.rb: |
-    class Notifier
-      def initialize(channel)
-        @channel = channel
-      end
+        def send_alert(subject, body)
+          dispatch(@channel, subject, body)
+        end
 
-      def send_alert(subject, body)
-        dispatch(@channel, subject, body)
-      end
+        def send_info(subject, body)
+          dispatch(@channel, subject, body)
+        end
 
-      def send_info(subject, body)
-        dispatch(@channel, subject, body)
-      end
+        private
 
-      private
-
-      def dispatch(channel, subject, body)
-        puts "Sending to #{channel}: [#{subject}] #{body}"
+        def dispatch(channel, subject, body)
+          puts "Sending to #{channel}: [#{subject}] #{body}"
+        end
       end
-    end
-must_include_files:
-  # Q1: logging.rb defines the Logging module that worker.rb includes
-  - lib/logging.rb
-must_include_content_from:
-  lib/logging.rb:
-    - "module Logging"
-    - "def log(message)"
-    - "puts \"[LOG] #{message}\""
-must_not_include:
-  # metrics.rb: performance tracking, no reference to Logging module
-  - Metrics
-  - increment
-  - "@counters"
-  # notifier.rb: alert sending, independent notification mechanism
-  - Notifier
-  - send_alert
-  - dispatch
-must_not_include_files:
-  - lib/metrics.rb
-  - lib/notifier.rb
-max_fragments: 5
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+  commit_message: Update files
+fragments:
+- id: logging
+  selector:
+    path: lib/logging.rb
+    anchor: module Logging
+- id: logging_1
+  selector:
+    path: lib/logging.rb
+    anchor: def log(message)
+- id: logging_2
+  selector:
+    path: lib/logging.rb
+    anchor: 'puts "[LOG] #{message}"'
+- id: no_metrics
+  selector:
+    path: lib/metrics.rb
+- id: no_notifier
+  selector:
+    path: lib/notifier.rb
+- id: no_global_0
+  selector:
+    anchor: Metrics
+- id: no_global_1
+  selector:
+    anchor: increment
+- id: no_global_2
+  selector:
+    anchor: '@counters'
+- id: no_global_3
+  selector:
+    anchor: Notifier
+- id: no_global_4
+  selector:
+    anchor: send_alert
+- id: no_global_5
+  selector:
+    anchor: dispatch
+oracle:
+  required:
+  - logging
+  - logging_1
+  - logging_2
+  allowed: []
+  forbidden:
+  - no_metrics
+  - no_notifier
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

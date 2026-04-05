@@ -1,394 +1,431 @@
-# Scenario: Validator is implemented with C# pattern matching on User
-#   properties — property patterns on Age, IsActive, Name, and recursive
-#   patterns with is-pattern variable binding.
-#
-# Diff shows:
-#   - class Validator { }  (empty)
-#   + ValidateUser using switch expression with User { Age: < 18 },
-#     User { IsActive: false }, User { Name: "" or null }, and
-#     IsAdult using is User { Age: >= 18 } with variable binding.
-#
-# Reviewer questions:
-#   Q1: "What properties does User have — do Age, IsActive, Name exist?"
-#       -> Needs User.cs: has int Age, bool IsActive, string Name.
-#          Pattern matching destructures these properties directly.
-#
-#   Q2: "Is Age an int so < 18 and >= 18 comparisons are valid?"
-#       -> Same file: Age is int, IsActive is bool, Name is string.
-#
-# Not needed for comprehension:
-#   - OrderValidator.cs: IDENTICAL pattern matching style — switch expression
-#     on Order properties with property patterns. Same C# syntax, different type.
-#
-#   - UserFormatter.cs: Formats User for display, accesses User.Name and
-#     User.Age. Same property accesses as the patterns in the diff.
-#     But formatting doesn't help review pattern matching correctness.
-#
-#   - UserRepository.cs: Stores and retrieves User entities. References
-#     User type directly. But CRUD operations are unrelated to validation.
-#
-#   - PatternExamples.cs: Demonstrates various C# pattern matching techniques.
-#     Same pattern syntax vocabulary. Not referenced by Validator.
-#
-#   - UserFactory.cs: Creates User instances with default values. References
-#     User constructor and properties. Independent of validation.
+name: jvm_and_compiled_022_csharp_pattern_matching
+repo:
+  initial_files:
+    Models/User.cs: |
+      namespace App.Models
+      {
+          public class User
+          {
+              public int Id { get; set; }
+              public string Name { get; set; }
+              public int Age { get; set; }
+              public bool IsActive { get; set; }
+              public string Role { get; set; }
 
-max_enrichment: 7.6
-initial:
-  Models/User.cs: |
-    namespace App.Models
-    {
-        public class User
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-            public int Age { get; set; }
-            public bool IsActive { get; set; }
-            public string Role { get; set; }
+              public User(string name, int age, bool isActive = true)
+              {
+                  Name = name;
+                  Age = age;
+                  IsActive = isActive;
+                  Role = "user";
+              }
+          }
+      }
+    Validators/Validator.cs: |
+      namespace App.Validators
+      {
+          class Validator { }
+      }
+    Validators/OrderValidator.cs: |
+      namespace App.Validators
+      {
+          class OrderValidator
+          {
+              public string ValidateOrder(object obj)
+              {
+                  return obj switch
+                  {
+                      Order { Total: <= 0 } => "Order total must be positive",
+                      Order { Status: "cancelled" } => "Order is cancelled",
+                      Order { ItemCount: 0 } => "Order has no items",
+                      Order order => $"Valid order: {order.Id}",
+                      null => "Object is null",
+                      _ => "Unknown object"
+                  };
+              }
 
-            public User(string name, int age, bool isActive = true)
-            {
-                Name = name;
-                Age = age;
-                IsActive = isActive;
-                Role = "user";
-            }
-        }
-    }
-  Validators/Validator.cs: |
-    namespace App.Validators
-    {
-        class Validator { }
-    }
-  Validators/OrderValidator.cs: |
-    namespace App.Validators
-    {
-        class OrderValidator
-        {
-            public string ValidateOrder(object obj)
-            {
-                return obj switch
-                {
-                    Order { Total: <= 0 } => "Order total must be positive",
-                    Order { Status: "cancelled" } => "Order is cancelled",
-                    Order { ItemCount: 0 } => "Order has no items",
-                    Order order => $"Valid order: {order.Id}",
-                    null => "Object is null",
-                    _ => "Unknown object"
-                };
-            }
+              public bool IsFulfillable(object obj)
+              {
+                  if (obj is Order { Status: "pending", ItemCount: > 0 } order)
+                  {
+                      Console.WriteLine($"Order {order.Id} can be fulfilled");
+                      return true;
+                  }
+                  return false;
+              }
+          }
+      }
+    Formatters/UserFormatter.cs: |
+      namespace App.Formatters
+      {
+          class UserFormatter
+          {
+              public string Format(User user)
+              {
+                  return $"{user.Name} (age: {user.Age}, active: {user.IsActive})";
+              }
 
-            public bool IsFulfillable(object obj)
-            {
-                if (obj is Order { Status: "pending", ItemCount: > 0 } order)
-                {
-                    Console.WriteLine($"Order {order.Id} can be fulfilled");
-                    return true;
-                }
-                return false;
-            }
-        }
-    }
-  Formatters/UserFormatter.cs: |
-    namespace App.Formatters
-    {
-        class UserFormatter
-        {
-            public string Format(User user)
-            {
-                return $"{user.Name} (age: {user.Age}, active: {user.IsActive})";
-            }
+              public string FormatShort(User user)
+              {
+                  return user.IsActive ? user.Name : $"[inactive] {user.Name}";
+              }
 
-            public string FormatShort(User user)
-            {
-                return user.IsActive ? user.Name : $"[inactive] {user.Name}";
-            }
+              public string FormatForAdmin(User user)
+              {
+                  return $"[{user.Role}] {user.Name}, Age: {user.Age}";
+              }
+          }
+      }
+    Repositories/UserRepository.cs: |
+      using System.Collections.Generic;
+      using System.Linq;
 
-            public string FormatForAdmin(User user)
-            {
-                return $"[{user.Role}] {user.Name}, Age: {user.Age}";
-            }
-        }
-    }
-  Repositories/UserRepository.cs: |
-    using System.Collections.Generic;
-    using System.Linq;
+      namespace App.Repositories
+      {
+          class UserRepository
+          {
+              private readonly List<User> _users = new();
 
-    namespace App.Repositories
-    {
-        class UserRepository
-        {
-            private readonly List<User> _users = new();
+              public void Add(User user)
+              {
+                  _users.Add(user);
+              }
 
-            public void Add(User user)
-            {
-                _users.Add(user);
-            }
+              public User FindByName(string name)
+              {
+                  return _users.FirstOrDefault(u => u.Name == name);
+              }
 
-            public User FindByName(string name)
-            {
-                return _users.FirstOrDefault(u => u.Name == name);
-            }
+              public List<User> GetActiveUsers()
+              {
+                  return _users.Where(u => u.IsActive).ToList();
+              }
+          }
+      }
+    Examples/PatternExamples.cs: |
+      namespace App.Examples
+      {
+          class PatternExamples
+          {
+              public string DescribeObject(object obj)
+              {
+                  return obj switch
+                  {
+                      int i when i > 0 => "positive int",
+                      string { Length: > 10 } => "long string",
+                      null => "null value",
+                      _ => "something else"
+                  };
+              }
 
-            public List<User> GetActiveUsers()
-            {
-                return _users.Where(u => u.IsActive).ToList();
-            }
-        }
-    }
-  Examples/PatternExamples.cs: |
-    namespace App.Examples
-    {
-        class PatternExamples
-        {
-            public string DescribeObject(object obj)
-            {
-                return obj switch
-                {
-                    int i when i > 0 => "positive int",
-                    string { Length: > 10 } => "long string",
-                    null => "null value",
-                    _ => "something else"
-                };
-            }
+              public bool IsPositive(object value)
+              {
+                  return value is int i and > 0;
+              }
+          }
+      }
+    Factories/UserFactory.cs: |
+      namespace App.Factories
+      {
+          class UserFactory
+          {
+              public User CreateDefault()
+              {
+                  return new User("Guest", 0, false);
+              }
 
-            public bool IsPositive(object value)
-            {
-                return value is int i and > 0;
-            }
-        }
-    }
-  Factories/UserFactory.cs: |
-    namespace App.Factories
-    {
-        class UserFactory
-        {
-            public User CreateDefault()
-            {
-                return new User("Guest", 0, false);
-            }
+              public User CreateAdmin(string name, int age)
+              {
+                  var user = new User(name, age, true);
+                  user.Role = "admin";
+                  return user;
+              }
+          }
+      }
+  changed_files:
+    Models/User.cs: |
+      namespace App.Models
+      {
+          public class User
+          {
+              public int Id { get; set; }
+              public string Name { get; set; }
+              public int Age { get; set; }
+              public bool IsActive { get; set; }
+              public string Role { get; set; }
 
-            public User CreateAdmin(string name, int age)
-            {
-                var user = new User(name, age, true);
-                user.Role = "admin";
-                return user;
-            }
-        }
-    }
+              public User(string name, int age, bool isActive = true)
+              {
+                  Name = name;
+                  Age = age;
+                  IsActive = isActive;
+                  Role = "user";
+              }
+          }
+      }
+    Validators/Validator.cs: |
+      namespace App.Validators
+      {
+          class Validator
+          {
+              public string ValidateUser(object obj)
+              {
+                  return obj switch
+                  {
+                      User { Age: < 18 } => "User is too young",
+                      User { IsActive: false } => "User is not active",
+                      User { Name: "" or null } => "User name is empty",
+                      User user => $"Valid user: {user.Name}",
+                      null => "Object is null",
+                      _ => "Unknown object"
+                  };
+              }
 
-changed:
-  Models/User.cs: |
-    namespace App.Models
-    {
-        public class User
-        {
-            public int Id { get; set; }
-            public string Name { get; set; }
-            public int Age { get; set; }
-            public bool IsActive { get; set; }
-            public string Role { get; set; }
+              public bool IsAdult(object obj)
+              {
+                  if (obj is User { Age: >= 18 } adult)
+                  {
+                      Console.WriteLine($"{adult.Name} is an adult");
+                      return true;
+                  }
+                  return false;
+              }
+          }
+      }
+    Validators/OrderValidator.cs: |
+      namespace App.Validators
+      {
+          class OrderValidator
+          {
+              public string ValidateOrder(object obj)
+              {
+                  return obj switch
+                  {
+                      Order { Total: <= 0 } => "Order total must be positive",
+                      Order { Status: "cancelled" } => "Order is cancelled",
+                      Order { ItemCount: 0 } => "Order has no items",
+                      Order order => $"Valid order: {order.Id}",
+                      null => "Object is null",
+                      _ => "Unknown object"
+                  };
+              }
 
-            public User(string name, int age, bool isActive = true)
-            {
-                Name = name;
-                Age = age;
-                IsActive = isActive;
-                Role = "user";
-            }
-        }
-    }
-  Validators/Validator.cs: |
-    namespace App.Validators
-    {
-        class Validator
-        {
-            public string ValidateUser(object obj)
-            {
-                return obj switch
-                {
-                    User { Age: < 18 } => "User is too young",
-                    User { IsActive: false } => "User is not active",
-                    User { Name: "" or null } => "User name is empty",
-                    User user => $"Valid user: {user.Name}",
-                    null => "Object is null",
-                    _ => "Unknown object"
-                };
-            }
+              public bool IsFulfillable(object obj)
+              {
+                  if (obj is Order { Status: "pending", ItemCount: > 0 } order)
+                  {
+                      Console.WriteLine($"Order {order.Id} can be fulfilled");
+                      return true;
+                  }
+                  return false;
+              }
+          }
+      }
+    Formatters/UserFormatter.cs: |
+      namespace App.Formatters
+      {
+          class UserFormatter
+          {
+              public string Format(User user)
+              {
+                  return $"{user.Name} (age: {user.Age}, active: {user.IsActive})";
+              }
 
-            public bool IsAdult(object obj)
-            {
-                if (obj is User { Age: >= 18 } adult)
-                {
-                    Console.WriteLine($"{adult.Name} is an adult");
-                    return true;
-                }
-                return false;
-            }
-        }
-    }
-  Validators/OrderValidator.cs: |
-    namespace App.Validators
-    {
-        class OrderValidator
-        {
-            public string ValidateOrder(object obj)
-            {
-                return obj switch
-                {
-                    Order { Total: <= 0 } => "Order total must be positive",
-                    Order { Status: "cancelled" } => "Order is cancelled",
-                    Order { ItemCount: 0 } => "Order has no items",
-                    Order order => $"Valid order: {order.Id}",
-                    null => "Object is null",
-                    _ => "Unknown object"
-                };
-            }
+              public string FormatShort(User user)
+              {
+                  return user.IsActive ? user.Name : $"[inactive] {user.Name}";
+              }
 
-            public bool IsFulfillable(object obj)
-            {
-                if (obj is Order { Status: "pending", ItemCount: > 0 } order)
-                {
-                    Console.WriteLine($"Order {order.Id} can be fulfilled");
-                    return true;
-                }
-                return false;
-            }
-        }
-    }
-  Formatters/UserFormatter.cs: |
-    namespace App.Formatters
-    {
-        class UserFormatter
-        {
-            public string Format(User user)
-            {
-                return $"{user.Name} (age: {user.Age}, active: {user.IsActive})";
-            }
+              public string FormatForAdmin(User user)
+              {
+                  return $"[{user.Role}] {user.Name}, Age: {user.Age}";
+              }
+          }
+      }
+    Repositories/UserRepository.cs: |
+      using System.Collections.Generic;
+      using System.Linq;
 
-            public string FormatShort(User user)
-            {
-                return user.IsActive ? user.Name : $"[inactive] {user.Name}";
-            }
+      namespace App.Repositories
+      {
+          class UserRepository
+          {
+              private readonly List<User> _users = new();
 
-            public string FormatForAdmin(User user)
-            {
-                return $"[{user.Role}] {user.Name}, Age: {user.Age}";
-            }
-        }
-    }
-  Repositories/UserRepository.cs: |
-    using System.Collections.Generic;
-    using System.Linq;
+              public void Add(User user)
+              {
+                  _users.Add(user);
+              }
 
-    namespace App.Repositories
-    {
-        class UserRepository
-        {
-            private readonly List<User> _users = new();
+              public User FindByName(string name)
+              {
+                  return _users.FirstOrDefault(u => u.Name == name);
+              }
 
-            public void Add(User user)
-            {
-                _users.Add(user);
-            }
+              public List<User> GetActiveUsers()
+              {
+                  return _users.Where(u => u.IsActive).ToList();
+              }
+          }
+      }
+    Examples/PatternExamples.cs: |
+      namespace App.Examples
+      {
+          class PatternExamples
+          {
+              public string DescribeObject(object obj)
+              {
+                  return obj switch
+                  {
+                      int i when i > 0 => "positive int",
+                      string { Length: > 10 } => "long string",
+                      null => "null value",
+                      _ => "something else"
+                  };
+              }
 
-            public User FindByName(string name)
-            {
-                return _users.FirstOrDefault(u => u.Name == name);
-            }
+              public bool IsPositive(object value)
+              {
+                  return value is int i and > 0;
+              }
+          }
+      }
+    Factories/UserFactory.cs: |
+      namespace App.Factories
+      {
+          class UserFactory
+          {
+              public User CreateDefault()
+              {
+                  return new User("Guest", 0, false);
+              }
 
-            public List<User> GetActiveUsers()
-            {
-                return _users.Where(u => u.IsActive).ToList();
-            }
-        }
-    }
-  Examples/PatternExamples.cs: |
-    namespace App.Examples
-    {
-        class PatternExamples
-        {
-            public string DescribeObject(object obj)
-            {
-                return obj switch
-                {
-                    int i when i > 0 => "positive int",
-                    string { Length: > 10 } => "long string",
-                    null => "null value",
-                    _ => "something else"
-                };
-            }
-
-            public bool IsPositive(object value)
-            {
-                return value is int i and > 0;
-            }
-        }
-    }
-  Factories/UserFactory.cs: |
-    namespace App.Factories
-    {
-        class UserFactory
-        {
-            public User CreateDefault()
-            {
-                return new User("Guest", 0, false);
-            }
-
-            public User CreateAdmin(string name, int age)
-            {
-                var user = new User(name, age, true);
-                user.Role = "admin";
-                return user;
-            }
-        }
-    }
-
-must_include_files:
-  - Validators/Validator.cs
-  - Models/User.cs
-
-must_include_content_from:
-  Validators/Validator.cs:
-    - "User { Age: < 18 }"
-    - "User { IsActive: false }"
-    - 'User { Name: "" or null }'
-    - "is User { Age: >= 18 } adult"
-  Models/User.cs:
-    - "public int Age { get; set; }"
-    - "public bool IsActive { get; set; }"
-    - "public string Name { get; set; }"
-
-must_not_include:
-  # OrderValidator.cs: identical pattern matching on Order, different type
-  - OrderValidator
-  - ValidateOrder
-  - IsFulfillable
-  - "Order { Total"
-  # UserFormatter.cs: accesses same User properties, but for formatting
-  - UserFormatter
-  - FormatShort
-  - FormatForAdmin
-  # UserRepository.cs: stores Users, no relevance to validation
-  - FindByName
-  - GetActiveUsers
-  # PatternExamples.cs: pattern matching examples, not called by Validator
-  - PatternExamples
-  - DescribeObject
-  - IsPositive
-  # UserFactory.cs: creates Users, independent of validation
-  - UserFactory
-  - CreateDefault
-  - CreateAdmin
-
-must_not_include_files:
-  - Validators/OrderValidator.cs
-  - Formatters/UserFormatter.cs
-  - Repositories/UserRepository.cs
-  - Examples/PatternExamples.cs
-  - Factories/UserFactory.cs
-
-max_fragments: 6
-max_files: 3
-add_garbage_files: false
-skip_garbage_check: true
+              public User CreateAdmin(string name, int age)
+              {
+                  var user = new User(name, age, true);
+                  user.Role = "admin";
+                  return user;
+              }
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: validator
+  selector:
+    path: Validators/Validator.cs
+    anchor: 'User { Age: < 18 }'
+- id: validator_1
+  selector:
+    path: Validators/Validator.cs
+    anchor: 'User { IsActive: false }'
+- id: validator_2
+  selector:
+    path: Validators/Validator.cs
+    anchor: 'User { Name: "" or null }'
+- id: validator_3
+  selector:
+    path: Validators/Validator.cs
+    anchor: 'is User { Age: >= 18 } adult'
+- id: user
+  selector:
+    path: Models/User.cs
+    anchor: public int Age { get; set; }
+- id: user_1
+  selector:
+    path: Models/User.cs
+    anchor: public bool IsActive { get; set; }
+- id: user_2
+  selector:
+    path: Models/User.cs
+    anchor: public string Name { get; set; }
+- id: no_ordervalidator
+  selector:
+    path: Validators/OrderValidator.cs
+- id: no_userformatter
+  selector:
+    path: Formatters/UserFormatter.cs
+- id: no_userrepository
+  selector:
+    path: Repositories/UserRepository.cs
+- id: no_patternexamples
+  selector:
+    path: Examples/PatternExamples.cs
+- id: no_userfactory
+  selector:
+    path: Factories/UserFactory.cs
+- id: no_global_0
+  selector:
+    anchor: OrderValidator
+- id: no_global_1
+  selector:
+    anchor: ValidateOrder
+- id: no_global_2
+  selector:
+    anchor: IsFulfillable
+- id: no_global_3
+  selector:
+    anchor: Order { Total
+- id: no_global_4
+  selector:
+    anchor: UserFormatter
+- id: no_global_5
+  selector:
+    anchor: FormatShort
+- id: no_global_6
+  selector:
+    anchor: FormatForAdmin
+- id: no_global_7
+  selector:
+    anchor: FindByName
+- id: no_global_8
+  selector:
+    anchor: GetActiveUsers
+- id: no_global_9
+  selector:
+    anchor: PatternExamples
+- id: no_global_10
+  selector:
+    anchor: DescribeObject
+- id: no_global_11
+  selector:
+    anchor: IsPositive
+- id: no_global_12
+  selector:
+    anchor: UserFactory
+- id: no_global_13
+  selector:
+    anchor: CreateDefault
+- id: no_global_14
+  selector:
+    anchor: CreateAdmin
+oracle:
+  required:
+  - validator
+  - validator_1
+  - validator_2
+  - validator_3
+  - user
+  - user_1
+  - user_2
+  allowed: []
+  forbidden:
+  - no_ordervalidator
+  - no_userformatter
+  - no_userrepository
+  - no_patternexamples
+  - no_userfactory
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
+  - no_global_6
+  - no_global_7
+  - no_global_8
+  - no_global_9
+  - no_global_10
+  - no_global_11
+  - no_global_12
+  - no_global_13
+  - no_global_14
