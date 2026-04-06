@@ -136,9 +136,18 @@ class PythonEdgeBuilder(EdgeBuilder):
             if module:
                 changed_modules.add(module)
                 parts = module.split(".")
-                for i in range(1, len(parts) + 1):
-                    changed_modules.add(".".join(parts[:i]))
+                for i in range(1, len(parts)):
+                    prefix = ".".join(parts[:i])
+                    if self._is_real_package(parts[:i], repo_root):
+                        changed_modules.add(prefix)
         return changed_modules
+
+    @staticmethod
+    def _is_real_package(parts: list[str], repo_root: Path | None) -> bool:
+        if repo_root is None:
+            return True
+        pkg_dir = repo_root.joinpath(*parts)
+        return (pkg_dir / "__init__.py").exists()
 
     def _find_files_importing_modules(
         self, all_candidate_files: list[Path], changed_set: set[Path], changed_modules: set[str], repo_root: Path | None = None
