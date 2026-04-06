@@ -6,9 +6,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from ...config.weights import LANG_WEIGHTS
-from ...python_semantics import PyFragmentInfo, analyze_python_fragment
 from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict, _strip_source_prefix, add_semantic_edges, path_to_module
+from .python_semantics import PyFragmentInfo, analyze_python_fragment
 
 _PYTHON_EXTS = {".py", ".pyi", ".pyw"}
 
