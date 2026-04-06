@@ -313,6 +313,10 @@ def _extract_namespace_imports(code: str, sources: set[str], names: set[str]) ->
 
 def _extract_side_effect_imports(code: str, sources: set[str]) -> None:
     for match in _SIDE_EFFECT_IMPORT_RE.finditer(code):
+        line_start = code.rfind("\n", 0, match.start()) + 1
+        line_prefix = code[line_start : match.start()].lstrip()
+        if line_prefix.startswith("//") or line_prefix.startswith("*"):
+            continue
         sources.add(match.group(1))
 
 
@@ -505,7 +509,7 @@ def analyze_javascript_fragment(code: str) -> JsFragmentInfo:
     if not code.strip():
         return _EMPTY_INFO
 
-    import_sources, _imported_names = _extract_imports_full(code)
+    import_sources, _ = _extract_imports_full(code)
     exports = _extract_exports(code)
     defines = _extract_defines(code)
     calls = _extract_calls(code)

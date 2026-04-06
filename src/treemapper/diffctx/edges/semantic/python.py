@@ -17,7 +17,9 @@ _CALL_WEIGHT = _PY_WEIGHTS.call
 _SYMBOL_REF_WEIGHT = _PY_WEIGHTS.symbol_ref
 _TYPE_REF_WEIGHT = _PY_WEIGHTS.type_ref
 
-_PY_IMPORT_RE = re.compile(r"(?:from\s{1,20}(\.{0,3}[\w.]{0,200})\s{1,20}import|import\s{1,20}([\w.]{1,200}))")
+_PY_IMPORT_RE = re.compile(
+    r"(?:from\s{1,20}(\.{0,3}[\w.]{0,200})\s{1,20}import|import\s{1,20}([\w.]{1,200}(?:\s*,\s*[\w.]{1,200})*))"
+)
 
 
 def _is_python_file(path: Path) -> bool:
@@ -56,24 +58,33 @@ def _resolve_relative_import(imported: str, source_path: Path, repo_root: Path |
     return ".".join(parent_parts) if parent_parts else None
 
 
+def _add_import_with_prefixes(imports: set[str], imported: str) -> None:
+    imports.add(imported)
+    parts = imported.split(".")
+    for i in range(1, len(parts) + 1):
+        imports.add(".".join(parts[:i]))
+
+
 def _extract_imports_from_content(content: str, source_path: Path | None = None, repo_root: Path | None = None) -> set[str]:
     imports: set[str] = set()
     for match in _PY_IMPORT_RE.finditer(content):
-        imported = match.group(1) or match.group(2)
-        if not imported:
-            continue
+        from_module = match.group(1)
+        bare_imports = match.group(2)
 
-        if imported.startswith(".") and source_path:
-            resolved = _resolve_relative_import(imported, source_path, repo_root)
-            if resolved:
-                imported = resolved
-            else:
-                continue
-
-        imports.add(imported)
-        parts = imported.split(".")
-        for i in range(1, len(parts) + 1):
-            imports.add(".".join(parts[:i]))
+        if from_module:
+            imported = from_module
+            if imported.startswith(".") and source_path:
+                resolved = _resolve_relative_import(imported, source_path, repo_root)
+                if resolved:
+                    imported = resolved
+                else:
+                    continue
+            _add_import_with_prefixes(imports, imported)
+        elif bare_imports:
+            for name in bare_imports.split(","):
+                name = name.strip()
+                if name:
+                    _add_import_with_prefixes(imports, name)
     return imports
 
 

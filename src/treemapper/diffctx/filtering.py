@@ -10,7 +10,7 @@ from .types import DiffHunk, Fragment, FragmentId
 
 logger = logging.getLogger(__name__)
 
-_PROXIMITY_FLOOR_MAX = 0.01
+_PROXIMITY_FLOOR_MAX = 0.04
 _PROXIMITY_HALF_DECAY = 50
 _DEFINITION_PROXIMITY_HALF_DECAY = 5
 _HUB_REVERSE_THRESHOLD = 2
