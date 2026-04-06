@@ -275,7 +275,3 @@ oracle:
   - no_global_3
   - no_global_4
   - no_global_5
-xfail:
-  category: null
-  reason: TOML fragmentation — version bump line not included in selected [deps] fragment
-  issue: null

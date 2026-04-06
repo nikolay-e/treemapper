@@ -342,7 +342,3 @@ oracle:
   - no_global_13
   - no_global_14
   - no_global_15
-xfail:
-  category: null
-  reason: Enum fragment truncated under budget pressure — QUARTER value missing
-  issue: null

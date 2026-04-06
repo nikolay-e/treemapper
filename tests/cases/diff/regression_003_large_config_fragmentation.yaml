@@ -158,7 +158,3 @@ oracle:
   allowed: []
   forbidden:
   - no_global_0
-xfail:
-  category: null
-  reason: package.json fragmentation — config files need better merge strategy
-  issue: null
