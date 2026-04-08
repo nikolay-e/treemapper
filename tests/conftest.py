@@ -733,7 +733,7 @@ def _write_score_histogram(terminalreporter, results):
         return
 
     bucket_labels = ["0-10", "10-20", "20-30", "30-40", "40-50", "50-60", "60-70", "70-80", "80-90", "90-100", "100"]
-    counts = {b: 0 for b in bucket_labels}
+    counts = dict.fromkeys(bucket_labels, 0)
     for s in scores:
         if s >= 100.0:
             counts["100"] += 1
