@@ -87,19 +87,13 @@ _SUPPRESSION_EXEMPT = frozenset({"semantic", "structural", "test_edge"})
 _HUB_OUT_DEGREE_THRESHOLD = 3
 
 
-def _apply_hub_suppression(
+def _suppress_high_in_degree(
     edges: dict[tuple[FragmentId, FragmentId], float],
     edge_categories: dict[tuple[FragmentId, FragmentId], str],
 ) -> dict[tuple[FragmentId, FragmentId], float]:
-    if not edges:
-        return edges
-
     in_degree: dict[FragmentId, int] = {}
-    for _src, dst in edges.keys():
+    for _src, dst in edges:
         in_degree[dst] = in_degree.get(dst, 0) + 1
-
-    if not in_degree:
-        return edges
 
     degrees = sorted(in_degree.values())
     mid = len(degrees) // 2
@@ -108,21 +102,33 @@ def _apply_hub_suppression(
     suppressed: dict[tuple[FragmentId, FragmentId], float] = {}
     for (src, dst), weight in edges.items():
         deg = in_degree.get(dst, 0)
-        cat = edge_categories.get((src, dst), "generic")
-        if deg > d_median and cat not in _SUPPRESSION_EXEMPT:
+        if deg > d_median and edge_categories.get((src, dst), "generic") not in _SUPPRESSION_EXEMPT:
             weight = weight / max(1.0, math.log(1 + deg))
         suppressed[(src, dst)] = weight
+    return suppressed
 
+
+def _suppress_semantic_hubs(
+    edges: dict[tuple[FragmentId, FragmentId], float],
+    edge_categories: dict[tuple[FragmentId, FragmentId], str],
+) -> dict[tuple[FragmentId, FragmentId], float]:
     sem_out_files: dict[FragmentId, set[Path]] = {}
     for (src, dst), cat in edge_categories.items():
         if cat == "semantic":
-            if src not in sem_out_files:
-                sem_out_files[src] = set()
-            sem_out_files[src].add(dst.path)
+            sem_out_files.setdefault(src, set()).add(dst.path)
 
-    for src, dst in list(suppressed.keys()):
+    for src, dst in list(edges):
         out_file_deg = len(sem_out_files.get(src, set()))
         if out_file_deg >= _HUB_OUT_DEGREE_THRESHOLD and edge_categories.get((src, dst)) == "semantic":
-            suppressed[(src, dst)] = suppressed[(src, dst)] / math.sqrt(out_file_deg)
+            edges[(src, dst)] = edges[(src, dst)] / math.sqrt(out_file_deg)
+    return edges
 
-    return suppressed
+
+def _apply_hub_suppression(
+    edges: dict[tuple[FragmentId, FragmentId], float],
+    edge_categories: dict[tuple[FragmentId, FragmentId], str],
+) -> dict[tuple[FragmentId, FragmentId], float]:
+    if not edges:
+        return edges
+    suppressed = _suppress_high_in_degree(edges, edge_categories)
+    return _suppress_semantic_hubs(suppressed, edge_categories)

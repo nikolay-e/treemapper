@@ -333,18 +333,24 @@ class JVMEdgeBuilder(EdgeBuilder):
         class_to_frags: dict[str, list[FragmentId]],
         edges: EdgeDict,
     ) -> None:
+        self._link_inheritance_refs(jf, class_to_frags, edges)
+        self._link_type_refs(jf, class_to_frags, edges)
+        self._link_annotation_refs(jf, class_to_frags, edges)
+
+    def _link_inheritance_refs(self, jf: Fragment, class_to_frags: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
         for inh_ref in _extract_inheritance(jf.content, jf.path):
             for fid in class_to_frags.get(inh_ref.lower(), []):
                 if fid != jf.id:
                     self.add_edge(edges, jf.id, fid, self.inheritance_weight)
 
+    def _link_type_refs(self, jf: Fragment, class_to_frags: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
         for type_ref in _extract_type_refs(jf.content):
-            if type_ref in _JVM_STDLIB_TYPES:
-                continue
-            for fid in class_to_frags.get(type_ref.lower(), []):
-                if fid != jf.id:
-                    self.add_edge(edges, jf.id, fid, self.type_weight)
+            if type_ref not in _JVM_STDLIB_TYPES:
+                for fid in class_to_frags.get(type_ref.lower(), []):
+                    if fid != jf.id:
+                        self.add_edge(edges, jf.id, fid, self.type_weight)
 
+    def _link_annotation_refs(self, jf: Fragment, class_to_frags: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
         for ann_ref in _extract_annotations(jf.content):
             for fid in class_to_frags.get(ann_ref.lower(), []):
                 if fid != jf.id:
