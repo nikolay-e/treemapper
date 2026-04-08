@@ -20,7 +20,7 @@ _TF_LOCAL_KEY_RE = re.compile(r"^\s+(\w+)\s*=", re.MULTILINE)
 _TF_VAR_REF_RE = re.compile(r"var\.(\w+)")
 _TF_LOCAL_REF_RE = re.compile(r"local\.(\w+)")
 _TF_DATA_REF_RE = re.compile(r"data\.(\w+)\.(\w+)")
-_TF_RESOURCE_REF_RE = re.compile(r"(?<![.\w])(\w+)\.(\w+)\.(\w+)")
+_TF_RESOURCE_REF_RE = re.compile(r'(?<![.\w"])(\w+)\.(\w+)\.(\w+)')
 _TF_MODULE_REF_RE = re.compile(r"module\.(\w+)")
 
 _TF_SOURCE_RE = re.compile(r'^\s*source\s*=\s*"([^"]+)"', re.MULTILINE)
@@ -74,7 +74,7 @@ def _collect_tf_dirs_and_sources(tf_files: list[Path]) -> tuple[set[Path], set[s
     return tf_dirs, module_sources
 
 
-def _is_in_module(candidate: Path, module_sources: set[str], tf_dirs: set[Path]) -> bool:
+def _is_in_module(candidate: Path, module_sources: set[str], tf_dirs: set[Path], repo_root: Path | None = None) -> bool:
     for src in module_sources:
         for tf_dir in tf_dirs:
             try:
@@ -82,7 +82,81 @@ def _is_in_module(candidate: Path, module_sources: set[str], tf_dirs: set[Path])
                 if candidate.is_relative_to(module_path):
                     return True
             except (ValueError, OSError):
-                continue
+                pass
+        if repo_root:
+            try:
+                clean_src = src.lstrip("./")
+                module_path = (repo_root / clean_src).resolve()
+                if candidate.is_relative_to(module_path):
+                    return True
+            except (ValueError, OSError):
+                pass
+    return False
+
+
+def _extract_qualified_defs(content: str) -> set[str]:
+    defs: set[str] = set()
+    for match in _TF_VARIABLE_RE.finditer(content):
+        defs.add(match.group(1))
+    for match in _TF_RESOURCE_RE.finditer(content):
+        defs.add(f"{match.group(1)}.{match.group(2)}")
+    for match in _TF_DATA_RE.finditer(content):
+        defs.add(f"{match.group(1)}.{match.group(2)}")
+    for local_key in _extract_locals(content):
+        defs.add(local_key)
+    for match in _TF_MODULE_RE.finditer(content):
+        defs.add(match.group(1))
+    return defs
+
+
+_TF_GENERIC_NAMES = frozenset(
+    {
+        "name",
+        "region",
+        "tags",
+        "environment",
+        "env",
+        "description",
+        "enabled",
+        "type",
+        "value",
+        "default",
+        "count",
+        "id",
+        "arn",
+        "vpc_id",
+        "subnet_id",
+        "key",
+        "project",
+        "owner",
+        "stage",
+    }
+)
+
+
+def _candidate_references_changed_defs_strict(content: str, changed_defs: set[str]) -> bool:
+    for match in _TF_VAR_REF_RE.finditer(content):
+        name = match.group(1)
+        if name in changed_defs and name not in _TF_GENERIC_NAMES:
+            return True
+    for match in _TF_LOCAL_REF_RE.finditer(content):
+        name = match.group(1)
+        if name in changed_defs and name not in _TF_GENERIC_NAMES:
+            return True
+    for match in _TF_DATA_REF_RE.finditer(content):
+        data_type, data_name = match.group(1), match.group(2)
+        if f"{data_type}.{data_name}" in changed_defs or data_name in changed_defs:
+            return True
+    for match in _TF_MODULE_REF_RE.finditer(content):
+        if match.group(1) in changed_defs:
+            return True
+    skip_types = {"var", "local", "data", "module", "path", "terraform", "each", "self", "count"}
+    for match in _TF_RESOURCE_REF_RE.finditer(content):
+        res_type, res_name, _ = match.groups()
+        if res_type in skip_types:
+            continue
+        if f"{res_type}.{res_name}" in changed_defs or res_name in changed_defs:
+            return True
     return False
 
 
@@ -117,13 +191,37 @@ class TerraformEdgeBuilder(EdgeBuilder):
             return []
 
         tf_dirs, module_sources = _collect_tf_dirs_and_sources(tf_files)
+
+        changed_defs: set[str] = set()
+        changed_contents: list[str] = []
+        for tf in tf_files:
+            try:
+                content = tf.read_text(encoding="utf-8")
+                changed_defs.update(_extract_qualified_defs(content))
+                changed_contents.append(content)
+            except (OSError, UnicodeDecodeError):
+                pass
+
         changed_set = set(changed_files)
         discovered: list[Path] = []
 
         for candidate in all_candidate_files:
             if candidate in changed_set or not _is_terraform_file(candidate):
                 continue
-            if candidate.parent in tf_dirs or _is_in_module(candidate, module_sources, tf_dirs):
+            if _is_in_module(candidate, module_sources, tf_dirs, repo_root):
+                discovered.append(candidate)
+                continue
+            if candidate.parent not in tf_dirs:
+                continue
+            try:
+                content = candidate.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if _candidate_references_changed_defs_strict(content, changed_defs):
+                discovered.append(candidate)
+                continue
+            candidate_defs = _extract_qualified_defs(content)
+            if candidate_defs and any(_candidate_references_changed_defs_strict(c, candidate_defs) for c in changed_contents):
                 discovered.append(candidate)
 
         return discovered

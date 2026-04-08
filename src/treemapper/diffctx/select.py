@@ -240,6 +240,8 @@ def lazy_greedy_select(
     file_importance: dict[Path, float] | None = None,
 ) -> SelectionResult:
     if not fragments:
+        if budget_tokens > 0:
+            logger.warning("Selection: budget=%d but no candidate fragments available", budget_tokens)
         return _log_and_return(
             SelectionResult(selected=[], reason="no_candidates", used_tokens=0, utility=0.0),
             core_ids,

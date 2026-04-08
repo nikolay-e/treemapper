@@ -221,10 +221,18 @@ def _is_build_or_manifest(path: Path) -> bool:
 
 
 def _collect_expansion_files(
-    inverted_index: dict[str, list[Path]], concepts: frozenset[str], included_set: set[Path]
+    inverted_index: dict[str, list[Path]],
+    concepts: frozenset[str],
+    included_set: set[Path],
+    included_concept_counts: dict[str, int] | None = None,
 ) -> list[Path]:
+    extra = included_concept_counts or {}
     rare_concepts = [
-        c for c in concepts if len(c) >= _MIN_CONCEPT_LENGTH and 0 < len(inverted_index.get(c, [])) <= _RARE_THRESHOLD
+        c
+        for c in concepts
+        if len(c) >= _MIN_CONCEPT_LENGTH
+        and 0 < len(inverted_index.get(c, []))
+        and len(inverted_index.get(c, [])) + extra.get(c, 0) <= _RARE_THRESHOLD
     ]
     expansion_files: set[Path] = set()
 
@@ -289,7 +297,18 @@ def _expand_universe_by_rare_identifiers(
     else:
         files, _ = _collect_candidate_files(root_dir, included_set, combined_spec)
     inverted_index = _build_ident_index(files, concepts, changed_files=changed_files)
-    return _collect_expansion_files(inverted_index, concepts, included_set)
+
+    included_concept_counts: dict[str, int] = {}
+    for f in already_included:
+        try:
+            content = f.read_text(encoding="utf-8")
+            for ident in extract_identifiers(content, skip_stopwords=False):
+                if ident in concepts:
+                    included_concept_counts[ident] = included_concept_counts.get(ident, 0) + 1
+        except (OSError, UnicodeDecodeError):
+            continue
+
+    return _collect_expansion_files(inverted_index, concepts, included_set, included_concept_counts)
 
 
 def _resolve_changed_files(

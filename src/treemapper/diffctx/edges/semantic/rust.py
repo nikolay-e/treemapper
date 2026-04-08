@@ -378,7 +378,7 @@ class RustEdgeBuilder(EdgeBuilder):
         rust_frags: list[Fragment],
         edges: EdgeDict,
     ) -> None:
-        if rf.path.stem.lower() not in {"lib", "main", "mod"}:
+        if rf.path.stem.lower() not in {"lib", "mod"}:
             return
         parent_dir = rf.path.parent
         for f in rust_frags:

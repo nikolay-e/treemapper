@@ -113,14 +113,16 @@ def _apply_hub_suppression(
             weight = weight / max(1.0, math.log(1 + deg))
         suppressed[(src, dst)] = weight
 
-    sem_out_degree: dict[FragmentId, int] = {}
-    for (src, _dst), cat in edge_categories.items():
+    sem_out_files: dict[FragmentId, set[Path]] = {}
+    for (src, dst), cat in edge_categories.items():
         if cat == "semantic":
-            sem_out_degree[src] = sem_out_degree.get(src, 0) + 1
+            if src not in sem_out_files:
+                sem_out_files[src] = set()
+            sem_out_files[src].add(dst.path)
 
     for src, dst in list(suppressed.keys()):
-        out_deg = sem_out_degree.get(src, 0)
-        if out_deg >= _HUB_OUT_DEGREE_THRESHOLD and edge_categories.get((src, dst)) == "semantic":
-            suppressed[(src, dst)] = suppressed[(src, dst)] / math.sqrt(out_deg)
+        out_file_deg = len(sem_out_files.get(src, set()))
+        if out_file_deg >= _HUB_OUT_DEGREE_THRESHOLD and edge_categories.get((src, dst)) == "semantic":
+            suppressed[(src, dst)] = suppressed[(src, dst)] / math.sqrt(out_file_deg)
 
     return suppressed

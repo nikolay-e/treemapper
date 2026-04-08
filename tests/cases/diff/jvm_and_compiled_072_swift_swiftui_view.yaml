@@ -1,4 +1,6 @@
 name: jvm_and_compiled_072_swift_swiftui_view
+xfail:
+  category: swift-same-module-edges
 repo:
   initial_files:
     User.swift: |

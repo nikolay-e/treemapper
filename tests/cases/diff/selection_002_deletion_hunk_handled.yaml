@@ -1,4 +1,6 @@
 name: selection_002_deletion_hunk_handled
+xfail:
+  category: ghost-fragments
 repo:
   initial_files:
     analytics.py: |

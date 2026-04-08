@@ -9,9 +9,11 @@ from typing import TYPE_CHECKING
 
 from .config.limits import UTILITY
 from .edges.structural.testing import _is_test_file
-from .stopwords import CODE_STOPWORDS
+from .stopwords import _DOCS_STOPWORDS, CODE_STOPWORDS
 from .tokenizer import extract_tokens
 from .types import Fragment, FragmentId
+
+_EXPANSION_STOPWORDS = CODE_STOPWORDS | _DOCS_STOPWORDS
 
 if TYPE_CHECKING:
     from .graph import Graph
@@ -269,7 +271,7 @@ def concepts_from_diff_text(
         if len(ident) < 3:
             continue
         low = ident.lower()
-        if low not in CODE_STOPWORDS and low not in _LANGUAGE_BUILTINS:
+        if low not in _EXPANSION_STOPWORDS and low not in _LANGUAGE_BUILTINS:
             result.add(low)
     return frozenset(result)
 

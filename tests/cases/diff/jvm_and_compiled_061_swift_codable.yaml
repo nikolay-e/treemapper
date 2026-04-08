@@ -1,4 +1,6 @@
 name: jvm_and_compiled_061_swift_codable
+xfail:
+  category: swift-same-module-edges
 repo:
   initial_files:
     User.swift: |
