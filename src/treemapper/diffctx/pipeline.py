@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -87,9 +88,52 @@ def _select_with_ppr(
     rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha, seed_weights=seed_weights)
     _apply_hunk_proximity_bonus(rel_scores, core_ids, all_fragments, hunks)
 
-    filtered_fragments = _filter_unrelated_fragments(all_fragments, core_ids, graph)
-    filtered_fragments = _filter_low_relevance_fragments(filtered_fragments, core_ids, rel_scores)
-    filtered_fragments = _cap_context_fragments(filtered_fragments, core_ids, rel_scores)
+    scores_file = os.environ.get("DIFFCTX_DUMP_SCORES")
+    if scores_file and repo_root:
+        import json as _json
+
+        {f.id for f in all_fragments}
+        filtered_fragments = _filter_unrelated_fragments(all_fragments, core_ids, graph)
+        post_unrelated_ids = {f.id for f in filtered_fragments}
+        filtered_fragments = _filter_low_relevance_fragments(filtered_fragments, core_ids, rel_scores)
+        post_lowrel_ids = {f.id for f in filtered_fragments}
+        filtered_fragments = _cap_context_fragments(filtered_fragments, core_ids, rel_scores)
+        post_cap_ids = {f.id for f in filtered_fragments}
+
+        with open(scores_file, "w") as _sf:
+            for f in all_fragments:
+                if f.id in core_ids:
+                    continue
+                try:
+                    rel_path = str(f.path.relative_to(repo_root))
+                except ValueError:
+                    rel_path = str(f.path)
+                score = rel_scores.get(f.id, 0.0)
+                if f.id not in post_unrelated_ids:
+                    reason = "filtered_unrelated"
+                elif f.id not in post_lowrel_ids:
+                    reason = f"filtered_low_relevance (threshold={0.02 * max(1.0, f.token_count / 100) ** 0.5:.4f})"
+                elif f.id not in post_cap_ids:
+                    reason = "filtered_cap_per_file"
+                else:
+                    reason = "candidate_for_greedy"
+                _sf.write(
+                    _json.dumps(
+                        {
+                            "path": rel_path,
+                            "lines": f"{f.start_line}-{f.end_line}",
+                            "kind": f.kind,
+                            "ppr_score": round(score, 6),
+                            "token_count": f.token_count,
+                            "status": reason,
+                        }
+                    )
+                    + "\n"
+                )
+    else:
+        filtered_fragments = _filter_unrelated_fragments(all_fragments, core_ids, graph)
+        filtered_fragments = _filter_low_relevance_fragments(filtered_fragments, core_ids, rel_scores)
+        filtered_fragments = _cap_context_fragments(filtered_fragments, core_ids, rel_scores)
 
     needs = needs_from_diff(filtered_fragments, core_ids, graph, diff_text)
 
@@ -209,7 +253,7 @@ def build_diff_context(
         seen_frag_ids: set[FragmentId] = set()
         all_fragments = _process_files_for_fragments(changed_files, root_dir, preferred_revs, seen_frag_ids, batch_reader)
 
-        all_candidate_files, is_large_repo = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
+        all_candidate_files, _ = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
         all_candidate_files = _filter_whitelist(all_candidate_files, root_dir, wl_spec)
 
         t1 = time.perf_counter()
@@ -227,21 +271,16 @@ def build_diff_context(
 
         t2 = time.perf_counter()
 
-        if not is_large_repo:
-            expanded_files = _expand_universe_by_rare_identifiers(
-                root_dir,
-                expansion_concepts,
-                changed_files + edge_discovered,
-                combined_spec,
-                candidate_files=all_candidate_files,
-                changed_files=changed_files,
-            )
-            expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
-            all_fragments.extend(
-                _process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids, batch_reader)
-            )
-        else:
-            logger.debug("diffctx: skipping rare-identifier expansion for large repo")
+        expanded_files = _expand_universe_by_rare_identifiers(
+            root_dir,
+            expansion_concepts,
+            changed_files + edge_discovered,
+            combined_spec,
+            candidate_files=all_candidate_files,
+            changed_files=changed_files,
+        )
+        expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
+        all_fragments.extend(_process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids, batch_reader))
 
         t3 = time.perf_counter()
 
@@ -252,6 +291,18 @@ def build_diff_context(
         t3 - t2,
         t3 - t0,
     )
+
+    dump_dir = os.environ.get("DIFFCTX_DUMP_DIR")
+    if dump_dir:
+        _dump = Path(dump_dir)
+        _dump.mkdir(parents=True, exist_ok=True)
+        universe = set(changed_files) | set(edge_discovered) | set(expanded_files)
+        (_dump / "universe.txt").write_text("\n".join(sorted(str(p.relative_to(root_dir)) for p in universe)) + "\n")
+        fragmented = {str(f.path.relative_to(root_dir)) for f in all_fragments}
+        (_dump / "fragmented.txt").write_text("\n".join(sorted(fragmented)) + "\n")
+        (_dump / "candidates.txt").write_text(
+            f"candidates={len(all_candidate_files)} edge_discovered={len(edge_discovered)} expanded={len(expanded_files)}\n"
+        )
 
     _assign_token_counts(all_fragments)
 
@@ -289,6 +340,10 @@ def build_diff_context(
 
     t5 = time.perf_counter()
     logger.debug("diffctx: timing — graph+select %.3fs", t5 - t4)
+
+    if dump_dir:
+        sel_paths = {str(f.path.relative_to(root_dir)) for f in selected}
+        (Path(dump_dir) / "selected.txt").write_text("\n".join(sorted(sel_paths)) + "\n")
 
     if no_content:
         for frag in selected:

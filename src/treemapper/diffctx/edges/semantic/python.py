@@ -197,6 +197,16 @@ class PythonEdgeBuilder(EdgeBuilder):
             for name in info.defines:
                 name_to_defs[name].append(f.id)
 
+        module_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
+        for f in py_frags:
+            module = path_to_module(f.path, repo_root)
+            if module:
+                module_to_frags[module].append(f.id)
+
+        frag_imports: dict[FragmentId, set[str]] = {}
+        for f in py_frags:
+            frag_imports[f.id] = _extract_imports_from_content(f.content, f.path, repo_root)
+
         edges: EdgeDict = {}
 
         for f in py_frags:
@@ -215,4 +225,22 @@ class PythonEdgeBuilder(EdgeBuilder):
                 self_defs,
             )
 
+            self._add_import_edges(f, frag_imports[f.id], module_to_frags, edges)
+
         return edges
+
+    _IMPORT_WEIGHT = 0.75
+
+    def _add_import_edges(
+        self,
+        frag: Fragment,
+        imports: set[str],
+        module_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for imp in imports:
+            targets = module_to_frags.get(imp, [])
+            for tgt in targets:
+                if tgt == frag.id:
+                    continue
+                edges[(frag.id, tgt)] = max(edges.get((frag.id, tgt), 0.0), self._IMPORT_WEIGHT)
