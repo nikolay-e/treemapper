@@ -268,15 +268,15 @@ def evaluate_instance(inst: dict, budget: int = 8000) -> dict | None:
     if frag_count == 0:
         diagnostics.append("WARN: diffctx returned 0 fragments")
 
-    if lo_all["line_recall"] == 0.0 and frag_count > 0:
+    if lo_all["line_recall"] < 1e-9 and frag_count > 0:
         diagnostics.append("DIAG: line_recall=0 with fragments>0 — possible line parse bug or no file overlap")
 
-    if file_recall == 0.0 and frag_count > 0:
+    if file_recall < 1e-9 and frag_count > 0:
         diagnostics.append("DIAG: file_recall=0 with fragments>0 — selected files don't overlap gold at all")
         diagnostics.append(f"  gold_files: {sorted(gf)[:5]}")
         diagnostics.append(f"  selected:   {sorted(sel_files)[:5]}")
 
-    if nontrivial_recall == 0.0 and frag_count > 5:
+    if nontrivial_recall < 1e-9 and frag_count > 5:
         diagnostics.append("DIAG: nontrivial_recall=0 — diffctx may only be selecting patch-adjacent files")
 
     unparsed = sum(1 for f in output.get("fragments", []) if parse_lines_field(f.get("lines", "")) is None)
@@ -335,7 +335,7 @@ def aggregate(results: list[dict]) -> None:
             print(f"  {repo:30s} (n={len(rr):3d}): nontrivial_recall={avg_ntr:.3f}")
 
     zero_frag = sum(1 for r in ok if r["fragments"] == 0)
-    zero_line = sum(1 for r in ok if r["line_recall"] == 0.0 and r["fragments"] > 0)
+    zero_line = sum(1 for r in ok if r["line_recall"] < 1e-9 and r["fragments"] > 0)
 
     print("\nDiagnostic summary:")
     print(f"  Instances with 0 fragments: {zero_frag}/{len(ok)}")
@@ -380,8 +380,8 @@ def main():
         print(f"Nontrivial instances: {len(instances)}")
 
     if not args.no_shuffle:
-        random.seed(args.seed)
-        random.shuffle(instances)
+        rng = random.Random(args.seed)  # NOSONAR — deterministic shuffle for benchmark reproducibility, not crypto
+        rng.shuffle(instances)
         print(f"Shuffled with seed={args.seed}")
 
     instances = instances[: args.limit]
