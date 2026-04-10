@@ -28,6 +28,7 @@ from treemapper.diffctx.edges.semantic import (
 from treemapper.diffctx.graph import Graph
 from treemapper.diffctx.graph_analytics import QuotientNode
 from treemapper.diffctx.project_graph import ProjectGraph
+from treemapper.diffctx.scoring import EgoGraphScoring
 from treemapper.diffctx.tokenizer import detect_profile, is_nlp_available
 
 clipboard_available
@@ -62,3 +63,4 @@ RLangEdgeBuilder
 SqlEdgeBuilder
 ZigEdgeBuilder
 blast_radius = graph_analytics.blast_radius
+EgoGraphScoring

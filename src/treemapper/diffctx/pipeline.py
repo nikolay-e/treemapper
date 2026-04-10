@@ -15,18 +15,11 @@ from .config import LIMITS
 from .core import _compute_seed_weights, _identify_core_fragments
 from .edges import discover_all_related_files
 from .file_importance import compute_file_importance
-from .filtering import (
-    _apply_hunk_proximity_bonus,
-    _cap_context_fragments,
-    _filter_low_relevance_fragments,
-    _filter_unrelated_fragments,
-)
 from .fragmentation import _process_files_for_fragments
 from .git import CatFileBatch, GitError, split_diff_range
-from .graph import build_graph
 from .postpass import _coherence_post_pass, _ensure_changed_files_represented
-from .ppr import personalized_pagerank
 from .render import build_diff_context_output
+from .scoring import PPRScoring, ScoringStrategy
 from .select import lazy_greedy_select
 from .signatures import _generate_signature_variants
 from .types import Fragment, FragmentId
@@ -72,85 +65,44 @@ def _select_full_mode(
     return selected
 
 
-def _select_with_ppr(
+def _score_and_select(
     all_fragments: list[Fragment],
     core_ids: set[FragmentId],
     diff_text: str,
     budget_tokens: int | None,
-    alpha: float,
     tau: float,
     hunks: list[Any],
     repo_root: Path | None = None,
     seed_weights: dict[FragmentId, float] | None = None,
+    scoring_strategy: ScoringStrategy | None = None,
 ) -> tuple[list[Fragment], Any]:
-    graph = build_graph(all_fragments, repo_root=repo_root)
-    rel_scores = personalized_pagerank(graph, core_ids, alpha=alpha, seed_weights=seed_weights)
-    _apply_hunk_proximity_bonus(rel_scores, core_ids, all_fragments, hunks)
+    strategy = scoring_strategy or PPRScoring()
 
-    scores_file = os.environ.get("DIFFCTX_DUMP_SCORES")
-    if scores_file and repo_root:
-        import json as _json
+    dump_scores = os.environ.get("DIFFCTX_DUMP_SCORES")
+    scoring_result = strategy.score_and_filter(
+        all_fragments,
+        core_ids,
+        hunks,
+        repo_root=repo_root,
+        seed_weights=seed_weights,
+        dump_scores_file=dump_scores,
+    )
 
-        {f.id for f in all_fragments}
-        filtered_fragments = _filter_unrelated_fragments(all_fragments, core_ids, graph)
-        post_unrelated_ids = {f.id for f in filtered_fragments}
-        filtered_fragments = _filter_low_relevance_fragments(filtered_fragments, core_ids, rel_scores)
-        post_lowrel_ids = {f.id for f in filtered_fragments}
-        filtered_fragments = _cap_context_fragments(filtered_fragments, core_ids, rel_scores)
-        post_cap_ids = {f.id for f in filtered_fragments}
-
-        with open(scores_file, "w") as _sf:
-            for f in all_fragments:
-                if f.id in core_ids:
-                    continue
-                try:
-                    rel_path = str(f.path.relative_to(repo_root))
-                except ValueError:
-                    rel_path = str(f.path)
-                score = rel_scores.get(f.id, 0.0)
-                if f.id not in post_unrelated_ids:
-                    reason = "filtered_unrelated"
-                elif f.id not in post_lowrel_ids:
-                    reason = f"filtered_low_relevance (threshold={0.02 * max(1.0, f.token_count / 100) ** 0.5:.4f})"
-                elif f.id not in post_cap_ids:
-                    reason = "filtered_cap_per_file"
-                else:
-                    reason = "candidate_for_greedy"
-                _sf.write(
-                    _json.dumps(
-                        {
-                            "path": rel_path,
-                            "lines": f"{f.start_line}-{f.end_line}",
-                            "kind": f.kind,
-                            "ppr_score": round(score, 6),
-                            "token_count": f.token_count,
-                            "status": reason,
-                        }
-                    )
-                    + "\n"
-                )
-    else:
-        filtered_fragments = _filter_unrelated_fragments(all_fragments, core_ids, graph)
-        filtered_fragments = _filter_low_relevance_fragments(filtered_fragments, core_ids, rel_scores)
-        filtered_fragments = _cap_context_fragments(filtered_fragments, core_ids, rel_scores)
-
-    needs = needs_from_diff(filtered_fragments, core_ids, graph, diff_text)
-
-    file_importance = compute_file_importance(filtered_fragments)
-
+    needs = needs_from_diff(scoring_result.filtered_fragments, core_ids, scoring_result.graph, diff_text)
+    file_importance = compute_file_importance(scoring_result.filtered_fragments)
     effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
 
     result = lazy_greedy_select(
-        fragments=filtered_fragments,
+        fragments=scoring_result.filtered_fragments,
         core_ids=core_ids,
-        rel=rel_scores,
+        rel=scoring_result.rel_scores,
         needs=needs,
         budget_tokens=effective_budget,
         tau=tau,
         file_importance=file_importance,
     )
 
-    selected = _coherence_post_pass(result, filtered_fragments, graph, effective_budget)
+    selected = _coherence_post_pass(result, scoring_result.filtered_fragments, scoring_result.graph, effective_budget)
     return selected.selected, selected
 
 
@@ -310,16 +262,16 @@ def build_diff_context(
         _log_full_mode(selected)
     else:
         seed_weights = _compute_seed_weights(hunks, core_ids, all_fragments)
-        selected, result = _select_with_ppr(
+        selected, result = _score_and_select(
             all_fragments,
             core_ids,
             diff_text,
             budget_tokens,
-            alpha,
             tau,
             hunks=hunks,
             repo_root=root_dir,
             seed_weights=seed_weights,
+            scoring_strategy=PPRScoring(alpha=alpha),
         )
         effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
         remaining = effective_budget - result.used_tokens
