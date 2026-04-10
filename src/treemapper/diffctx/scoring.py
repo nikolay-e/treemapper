@@ -15,6 +15,15 @@ class DiscoveryContext:
     all_candidate_files: list[Path]
     diff_text: str
     expansion_concepts: frozenset[str]
+    file_cache: dict[Path, str] | None = None
+
+    def read_file(self, path: Path) -> str | None:
+        if self.file_cache is not None and path in self.file_cache:
+            return self.file_cache[path]
+        try:
+            return path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None
 
 
 class DiscoveryStrategy(ABC):
@@ -41,6 +50,75 @@ class DefaultDiscovery(DiscoveryStrategy):
         )
 
         return list(dict.fromkeys(edge_discovered + expanded))
+
+
+class BM25Discovery(DiscoveryStrategy):
+    def __init__(self, top_k: int = 1) -> None:
+        self.top_k = top_k
+
+    def discover(self, ctx: DiscoveryContext) -> list[Path]:
+        import math
+        import re
+        from collections import Counter
+
+        token_re = re.compile(r"[A-Za-z_]\w{2,}")
+        changed_set = set(ctx.changed_files)
+
+        query_tokens = [m.group().lower() for m in token_re.finditer(ctx.diff_text)]
+        if not query_tokens:
+            return []
+
+        corpus: list[list[str]] = []
+        paths: list[Path] = []
+        for f in ctx.all_candidate_files:
+            if f in changed_set:
+                continue
+            content = ctx.read_file(f)
+            if content is None:
+                continue
+            corpus.append([m.group().lower() for m in token_re.finditer(content)])
+            paths.append(f)
+
+        if not corpus:
+            return []
+
+        n_docs = len(corpus)
+        avgdl = sum(len(d) for d in corpus) / n_docs
+        df: Counter[str] = Counter()
+        for doc in corpus:
+            for term in set(doc):
+                df[term] += 1
+
+        query_set = set(query_tokens)
+        idf = {t: math.log((n_docs - df.get(t, 0) + 0.5) / (df.get(t, 0) + 0.5) + 1.0) for t in query_set}
+
+        scores: list[float] = []
+        for doc in corpus:
+            tf: Counter[str] = Counter(doc)
+            dl = len(doc)
+            s = 0.0
+            for t in query_set:
+                if t not in tf:
+                    continue
+                freq = tf[t]
+                s += idf.get(t, 0) * (freq * 2.5) / (freq + 1.5 * (1 - 0.75 + 0.75 * dl / avgdl))
+            scores.append(s)
+
+        ranked = sorted(range(len(scores)), key=lambda i: -scores[i])
+        return [paths[i] for i in ranked[: self.top_k] if scores[i] > 0]
+
+
+class EnsembleDiscovery(DiscoveryStrategy):
+    def __init__(self, strategies: list[DiscoveryStrategy] | None = None) -> None:
+        self._strategies = strategies or [DefaultDiscovery(), BM25Discovery()]
+
+    def discover(self, ctx: DiscoveryContext) -> list[Path]:
+        seen: dict[Path, None] = {}
+        for strategy in self._strategies:
+            for path in strategy.discover(ctx):
+                if path not in seen:
+                    seen[path] = None
+        return list(seen.keys())
 
 
 @dataclass

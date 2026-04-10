@@ -18,7 +18,7 @@ from .fragmentation import _process_files_for_fragments
 from .git import CatFileBatch, GitError, split_diff_range
 from .postpass import _coherence_post_pass, _ensure_changed_files_represented
 from .render import build_diff_context_output
-from .scoring import DefaultDiscovery, DiscoveryContext, PPRScoring, ScoringStrategy
+from .scoring import DiscoveryContext, EnsembleDiscovery, PPRScoring, ScoringStrategy
 from .select import lazy_greedy_select
 from .signatures import _generate_signature_variants
 from .types import Fragment, FragmentId
@@ -207,14 +207,23 @@ def build_diff_context(
 
         t1 = time.perf_counter()
 
+        file_cache: dict[Path, str] = {}
+        for f in all_candidate_files:
+            try:
+                if f.stat().st_size <= 100_000:
+                    file_cache[f] = f.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+
         discovery_ctx = DiscoveryContext(
             root_dir=root_dir,
             changed_files=changed_files,
             all_candidate_files=all_candidate_files,
             diff_text=diff_text,
             expansion_concepts=frozenset(expansion_concepts),
+            file_cache=file_cache,
         )
-        discovery_strategy = DefaultDiscovery()
+        discovery_strategy = EnsembleDiscovery()
         discovered_files = discovery_strategy.discover(discovery_ctx)
         discovered_files = [_normalize_path(p, root_dir) for p in discovered_files]
         all_fragments.extend(
