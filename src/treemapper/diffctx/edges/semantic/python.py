@@ -1,7 +1,7 @@
 # pylint: disable=duplicate-code
 from __future__ import annotations
 
-import re
+import ast
 from collections import defaultdict
 from pathlib import Path
 
@@ -17,45 +17,9 @@ _CALL_WEIGHT = _PY_WEIGHTS.call
 _SYMBOL_REF_WEIGHT = _PY_WEIGHTS.symbol_ref
 _TYPE_REF_WEIGHT = _PY_WEIGHTS.type_ref
 
-_PY_IMPORT_RE = re.compile(
-    r"(?:from\s{1,20}(\.{0,3}[\w.]{0,200})\s{1,20}import|import\s{1,20}([\w.]{1,200}(?:\s*,\s*[\w.]{1,200})*))"
-)
-
 
 def _is_python_file(path: Path) -> bool:
     return path.suffix.lower() in _PYTHON_EXTS
-
-
-def _count_leading_dots(s: str) -> int:
-    return len(s) - len(s.lstrip("."))
-
-
-def _resolve_relative_import(imported: str, source_path: Path, repo_root: Path | None = None) -> str | None:
-    if not imported.startswith("."):
-        return imported
-
-    dots = _count_leading_dots(imported)
-    relative_module = imported[dots:]
-
-    if repo_root and source_path.is_absolute():
-        try:
-            source_path = source_path.relative_to(repo_root)
-        except ValueError:
-            pass
-
-    parent_parts = _strip_source_prefix(list(source_path.parent.parts))
-
-    if parent_parts and parent_parts[-1] == "__pycache__":
-        parent_parts = parent_parts[:-1]
-
-    for _ in range(dots - 1):
-        if parent_parts:
-            parent_parts.pop()
-
-    if relative_module:
-        parent_parts.extend(relative_module.split("."))
-
-    return ".".join(parent_parts) if parent_parts else None
 
 
 def _add_import_with_prefixes(imports: set[str], imported: str) -> None:
@@ -65,26 +29,50 @@ def _add_import_with_prefixes(imports: set[str], imported: str) -> None:
         imports.add(".".join(parts[:i]))
 
 
+def _resolve_relative(name: str, source_path: Path, repo_root: Path | None) -> str | None:
+    try:
+        import importlib.util
+
+        pkg_parts = _strip_source_prefix(list(source_path.parent.parts))
+        if pkg_parts and pkg_parts[-1] == "__pycache__":
+            pkg_parts = pkg_parts[:-1]
+        if repo_root and source_path.is_absolute():
+            try:
+                source_path = source_path.relative_to(repo_root)
+                pkg_parts = _strip_source_prefix(list(source_path.parent.parts))
+            except ValueError:
+                pass
+        package = ".".join(pkg_parts) if pkg_parts else None
+        if not package:
+            return None
+        return importlib.util.resolve_name(name, package)
+    except (ImportError, ValueError):
+        return None
+
+
 def _extract_imports_from_content(content: str, source_path: Path | None = None, repo_root: Path | None = None) -> set[str]:
     imports: set[str] = set()
-    for match in _PY_IMPORT_RE.finditer(content):
-        from_module = match.group(1)
-        bare_imports = match.group(2)
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return imports
 
-        if from_module:
-            imported = from_module
-            if imported.startswith(".") and source_path:
-                resolved = _resolve_relative_import(imported, source_path, repo_root)
-                if resolved:
-                    imported = resolved
-                else:
-                    continue
-            _add_import_with_prefixes(imports, imported)
-        elif bare_imports:
-            for name in bare_imports.split(","):
-                name = name.strip()
-                if name:
-                    _add_import_with_prefixes(imports, name)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name:
+                    _add_import_with_prefixes(imports, alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if node.level and node.level > 0:
+                dots = "." * node.level
+                relative = dots + module
+                if source_path:
+                    resolved = _resolve_relative(relative, source_path, repo_root)
+                    if resolved:
+                        _add_import_with_prefixes(imports, resolved)
+            elif module:
+                _add_import_with_prefixes(imports, module)
     return imports
 
 
