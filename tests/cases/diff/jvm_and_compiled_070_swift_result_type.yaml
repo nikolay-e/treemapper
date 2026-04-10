@@ -1,6 +1,4 @@
 name: jvm_and_compiled_070_swift_result_type
-xfail:
-  category: swift-same-module-edges
 repo:
   initial_files:
     APIError.swift: |

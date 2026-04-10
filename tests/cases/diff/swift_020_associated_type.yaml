@@ -1,6 +1,4 @@
 name: swift_020_associated_type
-xfail:
-  category: swift-parser-boundary
 repo:
   initial_files:
     Container.swift: |

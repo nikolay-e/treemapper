@@ -1,6 +1,4 @@
 name: go_035_http_handler
-xfail:
-  category: go-cross-file-discovery
 repo:
   initial_files:
     api/handlers.go: |

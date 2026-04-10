@@ -45,7 +45,6 @@ from .utility import concepts_from_diff_text, needs_from_diff
 logger = logging.getLogger(__name__)
 
 _OVERHEAD_PER_FRAGMENT = LIMITS.overhead_per_fragment
-_MAX_DISCOVERED_FILES = LIMITS.max_discovered_files
 _UNLIMITED_BUDGET = 10_000_000
 
 
@@ -253,19 +252,12 @@ def build_diff_context(
         seen_frag_ids: set[FragmentId] = set()
         all_fragments = _process_files_for_fragments(changed_files, root_dir, preferred_revs, seen_frag_ids, batch_reader)
 
-        all_candidate_files, _ = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
+        all_candidate_files = _collect_candidate_files(root_dir, set(changed_files), combined_spec)
         all_candidate_files = _filter_whitelist(all_candidate_files, root_dir, wl_spec)
 
         t1 = time.perf_counter()
 
         edge_discovered = discover_all_related_files(changed_files, all_candidate_files, root_dir)
-        if len(edge_discovered) > _MAX_DISCOVERED_FILES:
-            logger.debug(
-                "diffctx: capping edge-discovered files from %d to %d",
-                len(edge_discovered),
-                _MAX_DISCOVERED_FILES,
-            )
-            edge_discovered = edge_discovered[:_MAX_DISCOVERED_FILES]
         edge_discovered = [_normalize_path(p, root_dir) for p in edge_discovered]
         all_fragments.extend(_process_files_for_fragments(edge_discovered, root_dir, preferred_revs, seen_frag_ids, batch_reader))
 
@@ -277,7 +269,6 @@ def build_diff_context(
             changed_files + edge_discovered,
             combined_spec,
             candidate_files=all_candidate_files,
-            changed_files=changed_files,
         )
         expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
         all_fragments.extend(_process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids, batch_reader))

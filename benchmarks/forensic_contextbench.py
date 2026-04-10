@@ -363,7 +363,22 @@ def evaluate_one(inst: dict, budget: int) -> dict:
     }
 
 
+def _print_threshold_sanity_check():
+    v = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from treemapper.diffctx.filtering import _LOW_RELEVANCE_THRESHOLD; print(_LOW_RELEVANCE_THRESHOLD)",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    print(f"diffctx _LOW_RELEVANCE_THRESHOLD = {v}", file=sys.stderr)
+
+
 def main():
+    _print_threshold_sanity_check()
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=5)
     ap.add_argument("--budget", type=int, default=8000)

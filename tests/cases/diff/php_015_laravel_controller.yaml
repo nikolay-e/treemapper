@@ -1,6 +1,4 @@
 name: php_015_laravel_controller
-xfail:
-  category: php-namespace-over-linking
 repo:
   initial_files:
     app/Http/Requests/StoreUserRequest.php: |

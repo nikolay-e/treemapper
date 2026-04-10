@@ -1,6 +1,4 @@
 name: ruby_006_attr_accessor
-xfail:
-  category: low-relevance-threshold-tuning
 repo:
   initial_files:
     lib/user.rb: |

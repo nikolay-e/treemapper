@@ -20,11 +20,8 @@ class AlgorithmLimits:
     max_fragments: int = field(default_factory=lambda: _env_int("TREEMAPPER_MAX_FRAGMENTS", 200))
     max_generated_fragments: int = 5
     max_generated_lines: int = 30
-    max_candidate_files: int = 5000
-    max_discovered_files: int = field(default_factory=lambda: _env_int("TREEMAPPER_MAX_DISCOVERED", 200))
     skip_expensive_threshold: int = 2000
     rare_identifier_threshold: int = 3
-    max_expansion_files: int = field(default_factory=lambda: _env_int("TREEMAPPER_MAX_EXPANSION", 50))
     overhead_per_fragment: int = 18
 
 

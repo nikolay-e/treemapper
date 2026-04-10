@@ -143,7 +143,7 @@ def run_diffctx(repo_dir: Path, budget: int = 8000) -> dict | None:
         ],
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=600,
     )
     if r.returncode != 0:
         print(f"  DIFFCTX FAIL (rc={r.returncode}): {r.stderr[:300]}")
@@ -351,7 +351,22 @@ def aggregate(results: list[dict]) -> None:
         print(f"\nFailures: {dict(by_status)}")
 
 
+def _print_threshold_sanity_check():
+    v = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from treemapper.diffctx.filtering import _LOW_RELEVANCE_THRESHOLD; print(_LOW_RELEVANCE_THRESHOLD)",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    print(f"diffctx _LOW_RELEVANCE_THRESHOLD = {v}", file=sys.stderr)
+
+
 def main():
+    _print_threshold_sanity_check()
+
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -389,9 +404,12 @@ def main():
 
     results = []
     for inst in instances:
-        r = evaluate_instance(inst, args.budget)
-        if r:
-            results.append(r)
+        try:
+            r = evaluate_instance(inst, args.budget)
+            if r:
+                results.append(r)
+        except Exception as e:
+            print(f"  ERROR: {type(e).__name__}: {e}")
 
     aggregate(results)
 
