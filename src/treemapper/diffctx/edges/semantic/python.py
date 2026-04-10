@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ...config.weights import LANG_WEIGHTS
 from ...types import Fragment, FragmentId
-from ..base import EdgeBuilder, EdgeDict, _strip_source_prefix, add_semantic_edges, path_to_module
+from ..base import EdgeBuilder, EdgeDict, _strip_source_prefix, path_to_module
 from .python_semantics import PyFragmentInfo, analyze_python_fragment
 
 _PYTHON_EXTS = {".py", ".pyi", ".pyw"}
@@ -92,6 +92,8 @@ class PythonEdgeBuilder(EdgeBuilder):
     weight = 0.70
     reverse_weight_factor = 0.5
 
+    _DISCOVERY_MAX_DEPTH = 2
+
     def discover_related_files(
         self,
         changed_files: list[Path],
@@ -102,82 +104,69 @@ class PythonEdgeBuilder(EdgeBuilder):
         if not py_changed:
             return []
 
+        file_to_module, module_to_files, file_to_imports = self._build_import_index(all_candidate_files, repo_root)
+
         changed_set = set(changed_files)
         discovered: set[Path] = set()
+        frontier = set(py_changed)
 
-        # Forward dependencies: files imported BY changed files
-        imported_modules = self._collect_imported_modules(py_changed, repo_root)
-        if imported_modules:
-            discovered.update(self._find_files_for_modules(all_candidate_files, changed_set, imported_modules, repo_root))
+        for _depth in range(self._DISCOVERY_MAX_DEPTH):
+            next_frontier: set[Path] = set()
+            for f in frontier:
+                f_imports = file_to_imports.get(f)
+                if f_imports is None:
+                    try:
+                        content = f.read_text(encoding="utf-8")
+                        f_imports = _extract_imports_from_content(content, f, repo_root)
+                    except (OSError, UnicodeDecodeError):
+                        continue
 
-        # Backward dependencies: files that import the changed modules
-        changed_modules = self._collect_changed_modules(py_changed, repo_root)
-        if changed_modules:
-            discovered.update(self._find_files_importing_modules(all_candidate_files, changed_set, changed_modules, repo_root))
+                for imp in f_imports:
+                    for target in module_to_files.get(imp, []):
+                        if target not in changed_set and target not in discovered:
+                            discovered.add(target)
+                            next_frontier.add(target)
+
+                f_module = file_to_module.get(f) or path_to_module(f, repo_root)
+                if f_module:
+                    for candidate, cand_imports in file_to_imports.items():
+                        if candidate in changed_set or candidate in discovered:
+                            continue
+                        if f_module in cand_imports:
+                            discovered.add(candidate)
+                            next_frontier.add(candidate)
+
+            frontier = next_frontier
+            if not frontier:
+                break
 
         return list(discovered)
 
-    def _collect_imported_modules(self, py_changed: list[Path], repo_root: Path | None = None) -> set[str]:
-        imported_modules: set[str] = set()
-        for f in py_changed:
-            try:
-                content = f.read_text(encoding="utf-8")
-                imports = _extract_imports_from_content(content, f, repo_root)
-                imported_modules.update(imports)
-            except (OSError, UnicodeDecodeError):
-                continue
-        return imported_modules
+    def _build_import_index(
+        self, all_candidate_files: list[Path], repo_root: Path | None
+    ) -> tuple[dict[Path, str], dict[str, list[Path]], dict[Path, set[str]]]:
+        file_to_module: dict[Path, str] = {}
+        module_to_files: dict[str, list[Path]] = defaultdict(list)
+        file_to_imports: dict[Path, set[str]] = {}
 
-    def _find_files_for_modules(
-        self, all_candidate_files: list[Path], changed_set: set[Path], modules: set[str], repo_root: Path | None
-    ) -> list[Path]:
-        discovered: list[Path] = []
-        for candidate in all_candidate_files:
-            if candidate in changed_set or not _is_python_file(candidate):
+        for f in all_candidate_files:
+            if not _is_python_file(f):
                 continue
-            module = path_to_module(candidate, repo_root)
-            if module and module in modules:
-                discovered.append(candidate)
-        return discovered
-
-    def _collect_changed_modules(self, py_changed: list[Path], repo_root: Path | None) -> set[str]:
-        changed_modules: set[str] = set()
-        for f in py_changed:
             module = path_to_module(f, repo_root)
             if module:
-                changed_modules.add(module)
+                file_to_module[f] = module
+                module_to_files[module].append(f)
                 parts = module.split(".")
                 for i in range(1, len(parts)):
                     prefix = ".".join(parts[:i])
-                    if self._is_real_package(parts[:i], repo_root):
-                        changed_modules.add(prefix)
-        return changed_modules
-
-    @staticmethod
-    def _is_real_package(parts: list[str], repo_root: Path | None) -> bool:
-        if repo_root is None:
-            return True
-        pkg_dir = repo_root.joinpath(*parts)
-        return (pkg_dir / "__init__.py").exists()
-
-    def _find_files_importing_modules(
-        self, all_candidate_files: list[Path], changed_set: set[Path], changed_modules: set[str], repo_root: Path | None = None
-    ) -> list[Path]:
-        discovered: list[Path] = []
-        for candidate in all_candidate_files:
-            if candidate in changed_set or not _is_python_file(candidate):
+                    module_to_files[prefix].append(f)
+            try:
+                content = f.read_text(encoding="utf-8")
+                file_to_imports[f] = _extract_imports_from_content(content, f, repo_root)
+            except (OSError, UnicodeDecodeError):
                 continue
-            if self._imports_any_module(candidate, changed_modules, repo_root):
-                discovered.append(candidate)
-        return discovered
 
-    def _imports_any_module(self, candidate: Path, changed_modules: set[str], repo_root: Path | None = None) -> bool:
-        try:
-            content = candidate.read_text(encoding="utf-8")
-            imports = _extract_imports_from_content(content, candidate, repo_root)
-            return any(imp in changed_modules for imp in imports)
-        except (OSError, UnicodeDecodeError):
-            return False
+        return file_to_module, dict(module_to_files), file_to_imports
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         py_frags = [f for f in fragments if _is_python_file(f.path)]
@@ -207,29 +196,65 @@ class PythonEdgeBuilder(EdgeBuilder):
         for f in py_frags:
             frag_imports[f.id] = _extract_imports_from_content(f.content, f.path, repo_root)
 
+        frag_to_module: dict[FragmentId, str] = {}
+        for f in py_frags:
+            m = path_to_module(f.path, repo_root)
+            if m:
+                frag_to_module[f.id] = m
+
         edges: EdgeDict = {}
 
         for f in py_frags:
             info = info_cache[f.id]
             self_defs = set(frag_defines.get(f.id, frozenset()))
+            src_imports = frag_imports.get(f.id, set())
 
-            add_semantic_edges(
+            self._add_import_confirmed_edges(
                 edges,
                 f.id,
                 info,
                 name_to_defs,
-                _CALL_WEIGHT,
-                _SYMBOL_REF_WEIGHT,
-                _TYPE_REF_WEIGHT,
-                self.reverse_weight_factor,
                 self_defs,
+                src_imports,
+                frag_to_module,
             )
 
             self._add_import_edges(f, frag_imports[f.id], module_to_frags, edges)
 
         return edges
 
+    _IMPORT_CONFIRMED_BOOST = 1.5
+    _IMPORT_UNCONFIRMED_PENALTY = 0.2
     _IMPORT_WEIGHT = 0.75
+
+    def _add_import_confirmed_edges(
+        self,
+        edges: EdgeDict,
+        src_id: FragmentId,
+        info: PyFragmentInfo,
+        name_to_defs: dict[str, list[FragmentId]],
+        self_defs: set[str],
+        src_imports: set[str],
+        frag_to_module: dict[FragmentId, str],
+    ) -> None:
+        for ref_set, base_weight in [
+            (info.calls, _CALL_WEIGHT),
+            (info.references, _SYMBOL_REF_WEIGHT),
+            (info.type_refs, _TYPE_REF_WEIGHT),
+        ]:
+            for name in ref_set:
+                if name in self_defs:
+                    continue
+                for dst_id in name_to_defs.get(name, []):
+                    if dst_id == src_id:
+                        continue
+                    dst_module = frag_to_module.get(dst_id, "")
+                    confirmed = bool(dst_module and dst_module in src_imports)
+                    factor = self._IMPORT_CONFIRMED_BOOST if confirmed else self._IMPORT_UNCONFIRMED_PENALTY
+                    w = base_weight * factor
+                    edges[(src_id, dst_id)] = max(edges.get((src_id, dst_id), 0.0), w)
+                    rev_w = w * self.reverse_weight_factor
+                    edges[(dst_id, src_id)] = max(edges.get((dst_id, src_id), 0.0), rev_w)
 
     def _add_import_edges(
         self,

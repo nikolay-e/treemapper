@@ -162,9 +162,8 @@ class PPRScoring(ScoringStrategy):
 
 
 class EgoGraphScoring(ScoringStrategy):
-    def __init__(self, max_depth: int = 2, decay: float = 0.5) -> None:
+    def __init__(self, max_depth: int = 2) -> None:
         self.max_depth = max_depth
-        self.decay = decay
 
     def score_and_filter(
         self,
@@ -179,38 +178,9 @@ class EgoGraphScoring(ScoringStrategy):
         from .graph import build_graph
 
         graph = build_graph(all_fragments, repo_root=repo_root)
-        rel_scores = self._ego_graph_bfs(graph, core_ids)
+        rel_scores = graph.ego_graph(core_ids, radius=self.max_depth)
 
         filtered = [f for f in all_fragments if f.id in core_ids or rel_scores.get(f.id, 0.0) > 0]
         filtered = _cap_context_fragments(filtered, core_ids, rel_scores)
 
         return ScoringResult(rel_scores=rel_scores, filtered_fragments=filtered, graph=graph)
-
-    def _ego_graph_bfs(self, graph: Graph, core_ids: set[FragmentId]) -> dict[FragmentId, float]:
-        scores: dict[FragmentId, float] = {}
-        for cid in core_ids:
-            scores[cid] = 1.0
-
-        frontier = set(core_ids)
-        visited = set(core_ids)
-
-        for depth in range(1, self.max_depth + 1):
-            hop_score = self.decay**depth
-            next_frontier: set[FragmentId] = set()
-
-            for node in frontier:
-                for neighbor, weight in graph.adjacency.get(node, {}).items():
-                    if neighbor not in visited:
-                        scores[neighbor] = max(scores.get(neighbor, 0.0), hop_score * weight)
-                        next_frontier.add(neighbor)
-                for neighbor, weight in graph.reverse_adjacency.get(node, {}).items():
-                    if neighbor not in visited:
-                        scores[neighbor] = max(scores.get(neighbor, 0.0), hop_score * weight)
-                        next_frontier.add(neighbor)
-
-            visited |= next_frontier
-            frontier = next_frontier
-            if not frontier:
-                break
-
-        return scores
