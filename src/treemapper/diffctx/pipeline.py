@@ -13,13 +13,12 @@ from ..tokens import count_tokens
 from . import git as _git
 from .config import LIMITS
 from .core import _compute_seed_weights, _identify_core_fragments
-from .edges import discover_all_related_files
 from .file_importance import compute_file_importance
 from .fragmentation import _process_files_for_fragments
 from .git import CatFileBatch, GitError, split_diff_range
 from .postpass import _coherence_post_pass, _ensure_changed_files_represented
 from .render import build_diff_context_output
-from .scoring import PPRScoring, ScoringStrategy
+from .scoring import DefaultDiscovery, DiscoveryContext, PPRScoring, ScoringStrategy
 from .select import lazy_greedy_select
 from .signatures import _generate_signature_variants
 from .types import Fragment, FragmentId
@@ -27,7 +26,6 @@ from .universe import (
     _collect_candidate_files,
     _discover_untracked_files,
     _enrich_concepts,
-    _expand_universe_by_rare_identifiers,
     _filter_whitelist,
     _normalize_path,
     _resolve_changed_files,
@@ -209,43 +207,38 @@ def build_diff_context(
 
         t1 = time.perf_counter()
 
-        edge_discovered = discover_all_related_files(changed_files, all_candidate_files, root_dir)
-        edge_discovered = [_normalize_path(p, root_dir) for p in edge_discovered]
-        all_fragments.extend(_process_files_for_fragments(edge_discovered, root_dir, preferred_revs, seen_frag_ids, batch_reader))
+        discovery_ctx = DiscoveryContext(
+            root_dir=root_dir,
+            changed_files=changed_files,
+            all_candidate_files=all_candidate_files,
+            diff_text=diff_text,
+            expansion_concepts=frozenset(expansion_concepts),
+        )
+        discovery_strategy = DefaultDiscovery()
+        discovered_files = discovery_strategy.discover(discovery_ctx)
+        discovered_files = [_normalize_path(p, root_dir) for p in discovered_files]
+        all_fragments.extend(
+            _process_files_for_fragments(discovered_files, root_dir, preferred_revs, seen_frag_ids, batch_reader)
+        )
 
         t2 = time.perf_counter()
 
-        expanded_files = _expand_universe_by_rare_identifiers(
-            root_dir,
-            expansion_concepts,
-            changed_files + edge_discovered,
-            combined_spec,
-            candidate_files=all_candidate_files,
-        )
-        expanded_files = [_normalize_path(p, root_dir) for p in expanded_files]
-        all_fragments.extend(_process_files_for_fragments(expanded_files, root_dir, preferred_revs, seen_frag_ids, batch_reader))
-
-        t3 = time.perf_counter()
-
     logger.debug(
-        "diffctx: timing — changed_files %.3fs, edge_discovery %.3fs, expansion %.3fs, total_io %.3fs",
+        "diffctx: timing — changed_files %.3fs, discovery %.3fs, total_io %.3fs",
         t1 - t0,
         t2 - t1,
-        t3 - t2,
-        t3 - t0,
+        t2 - t0,
     )
 
     dump_dir = os.environ.get("DIFFCTX_DUMP_DIR")
     if dump_dir:
         _dump = Path(dump_dir)
         _dump.mkdir(parents=True, exist_ok=True)
-        universe = set(changed_files) | set(edge_discovered) | set(expanded_files)
+        universe = set(changed_files) | set(discovered_files)
         (_dump / "universe.txt").write_text("\n".join(sorted(str(p.relative_to(root_dir)) for p in universe)) + "\n")
         fragmented = {str(f.path.relative_to(root_dir)) for f in all_fragments}
         (_dump / "fragmented.txt").write_text("\n".join(sorted(fragmented)) + "\n")
-        (_dump / "candidates.txt").write_text(
-            f"candidates={len(all_candidate_files)} edge_discovered={len(edge_discovered)} expanded={len(expanded_files)}\n"
-        )
+        (_dump / "candidates.txt").write_text(f"candidates={len(all_candidate_files)} discovered={len(discovered_files)}\n")
 
     _assign_token_counts(all_fragments)
 

@@ -8,6 +8,41 @@ from .graph import Graph
 from .types import DiffHunk, Fragment, FragmentId
 
 
+@dataclass(frozen=True)
+class DiscoveryContext:
+    root_dir: Path
+    changed_files: list[Path]
+    all_candidate_files: list[Path]
+    diff_text: str
+    expansion_concepts: frozenset[str]
+
+
+class DiscoveryStrategy(ABC):
+    @abstractmethod
+    def discover(self, ctx: DiscoveryContext) -> list[Path]: ...
+
+
+class DefaultDiscovery(DiscoveryStrategy):
+    def discover(self, ctx: DiscoveryContext) -> list[Path]:
+        from .edges import discover_all_related_files
+        from .universe import _expand_universe_by_rare_identifiers
+
+        edge_discovered = discover_all_related_files(ctx.changed_files, ctx.all_candidate_files, ctx.root_dir)
+
+        from ..ignore import get_ignore_specs
+
+        combined_spec = get_ignore_specs(ctx.root_dir, None, False, None)
+        expanded = _expand_universe_by_rare_identifiers(
+            ctx.root_dir,
+            ctx.expansion_concepts,
+            ctx.changed_files + edge_discovered,
+            combined_spec,
+            candidate_files=ctx.all_candidate_files,
+        )
+
+        return list(dict.fromkeys(edge_discovered + expanded))
+
+
 @dataclass
 class ScoringResult:
     rel_scores: dict[FragmentId, float]
