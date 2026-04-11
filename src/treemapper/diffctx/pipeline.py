@@ -235,7 +235,7 @@ def build_diff_context(
                 continue
 
         mode = ScoringMode(os.environ.get("DIFFCTX_SCORING", scoring_mode))
-        config = PipelineConfig.from_mode(mode, n_fragments=len(all_fragments))
+        config = PipelineConfig.from_mode(mode, n_candidate_files=len(all_candidate_files))
 
         discovery_ctx = DiscoveryContext(
             root_dir=root_dir,

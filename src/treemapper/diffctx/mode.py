@@ -20,7 +20,7 @@ class PipelineConfig:
     ppr_alpha: float
 
     @staticmethod
-    def from_mode(mode: ScoringMode, n_fragments: int = 0) -> PipelineConfig:
+    def from_mode(mode: ScoringMode, n_candidate_files: int = 0) -> PipelineConfig:
         if mode == ScoringMode.PRECISE:
             return PipelineConfig(
                 discovery="default",
@@ -39,7 +39,7 @@ class PipelineConfig:
                 ego_depth=2,
                 ppr_alpha=0.60,
             )
-        is_large = n_fragments > 300
+        is_large = n_candidate_files > 50
         return PipelineConfig(
             discovery="ensemble" if is_large else "default",
             scoring="ego" if is_large else "ppr",
