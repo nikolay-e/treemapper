@@ -88,7 +88,7 @@ def _unquote_c_style(quoted: str) -> str:
             if nxt in _C_ESCAPE_MAP:
                 chars.append(_C_ESCAPE_MAP[nxt])
                 i += 2
-            elif nxt in "01234567" and i + 3 < len(raw) and all(c in "01234567" for c in raw[i + 1 : i + 4]):
+            elif nxt in "01234567" and i + 3 <= len(raw) and all(c in "01234567" for c in raw[i + 1 : i + 4]):
                 chars.append(chr(int(raw[i + 1 : i + 4], 8)))
                 i += 4
             else:
@@ -110,13 +110,29 @@ def _parse_path_line(line: str, repo_root: Path) -> tuple[str, Path | None]:
     if line.startswith("+++ /dev/null"):
         return "new", None
     if line.startswith("--- a/"):
-        return "old", repo_root / line.removeprefix("--- a/").strip()
+        rel_path = line.removeprefix("--- a/").strip()
+        resolved = (repo_root / rel_path).resolve()
+        if not resolved.is_relative_to(repo_root.resolve()):
+            return "", None
+        return "old", repo_root / rel_path
     if line.startswith("+++ b/"):
-        return "new", repo_root / line.removeprefix("+++ b/").strip()
+        rel_path = line.removeprefix("+++ b/").strip()
+        resolved = (repo_root / rel_path).resolve()
+        if not resolved.is_relative_to(repo_root.resolve()):
+            return "", None
+        return "new", repo_root / rel_path
     if line.startswith('--- "a/'):
-        return "old", repo_root / _unquote_c_style(line.removeprefix("--- ").strip()).removeprefix("a/")
+        rel_path = _unquote_c_style(line.removeprefix("--- ").strip()).removeprefix("a/")
+        resolved = (repo_root / rel_path).resolve()
+        if not resolved.is_relative_to(repo_root.resolve()):
+            return "", None
+        return "old", repo_root / rel_path
     if line.startswith('+++ "b/'):
-        return "new", repo_root / _unquote_c_style(line.removeprefix("+++ ").strip()).removeprefix("b/")
+        rel_path = _unquote_c_style(line.removeprefix("+++ ").strip()).removeprefix("b/")
+        resolved = (repo_root / rel_path).resolve()
+        if not resolved.is_relative_to(repo_root.resolve()):
+            return "", None
+        return "new", repo_root / rel_path
     return "", None
 
 
@@ -215,7 +231,7 @@ class CatFileBatch:
                 ["git", "-C", str(self._repo_root), "cat-file", "--batch"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
             )
         return self._proc
 

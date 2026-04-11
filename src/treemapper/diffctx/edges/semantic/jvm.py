@@ -13,7 +13,7 @@ _KOTLIN_EXTS = {".kt", ".kts"}
 _SCALA_EXTS = {".scala", ".sc"}
 _JVM_EXTS = _JAVA_EXTS | _KOTLIN_EXTS | _SCALA_EXTS
 
-_JAVA_IMPORT_RE = re.compile(r"^\s*import\s+(?:static\s+)?([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*(?:\.[A-Z]\w*)?)", re.MULTILINE)
+_JAVA_IMPORT_RE = re.compile(r"^\s*import\s+(?:static\s+)?([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*(?:\.[A-Z]\w*)*)", re.MULTILINE)
 _JAVA_PACKAGE_RE = re.compile(r"^\s*package\s+([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)", re.MULTILINE)
 _JAVA_CLASS_RE = re.compile(
     r"^\s*(?:(?:public|private|protected|static|abstract|final|sealed|non-sealed|strictfp)\s+)*(?:class|interface|enum|record)\s+([A-Z]\w*)",

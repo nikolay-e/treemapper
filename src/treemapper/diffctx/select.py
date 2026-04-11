@@ -340,6 +340,12 @@ def lazy_greedy_select(
     state = _init_selection_state(core_ids, rel, budget_tokens, file_importance)
     _select_core_fragments(core_fragments, rel, needs, state, budget_tokens, sig_lookup)
 
+    selected_core_ids = {f.id for f in state.selected}
+    skipped_core = core_ids - selected_core_ids
+    if skipped_core:
+        non_core_fragments.extend(f for f in core_fragments if f.id in skipped_core)
+        core_ids = selected_core_ids
+
     if state.remaining_budget <= 0:
         used = budget_tokens - state.remaining_budget
         return _log_and_return(

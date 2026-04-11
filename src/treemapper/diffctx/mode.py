@@ -19,10 +19,10 @@ class PipelineConfig:
     ego_depth: int
     ppr_alpha: float
 
-    @staticmethod
-    def from_mode(mode: ScoringMode, n_candidate_files: int = 0) -> PipelineConfig:
+    @classmethod
+    def from_mode(cls, mode: ScoringMode, n_candidate_files: int = 0) -> PipelineConfig:
         if mode == ScoringMode.PRECISE:
-            return PipelineConfig(
+            return cls(
                 discovery="default",
                 scoring="ppr",
                 low_relevance=True,
@@ -31,7 +31,7 @@ class PipelineConfig:
                 ppr_alpha=0.60,
             )
         if mode == ScoringMode.DISCOVER:
-            return PipelineConfig(
+            return cls(
                 discovery="ensemble",
                 scoring="ego",
                 low_relevance=False,

@@ -92,31 +92,6 @@ class Graph:
                 scores[node] = max(scores.get(node, 0.0), hop_score)
         return scores
 
-    def pagerank(
-        self, seeds: set[FragmentId], alpha: float = 0.6, seed_weights: dict[FragmentId, float] | None = None
-    ) -> dict[FragmentId, float]:
-        if not self._g.nodes:
-            return {}
-        valid_seeds = seeds & set(self._g.nodes)
-        if not valid_seeds:
-            return {n: 1.0 / len(self._g) for n in self._g}
-        personalization: dict[FragmentId, float] = {}
-        if seed_weights:
-            total = sum(seed_weights.get(s, 1.0) for s in valid_seeds)
-            for s in valid_seeds:
-                personalization[s] = seed_weights.get(s, 1.0) / total if total > 0 else 1.0 / len(valid_seeds)
-        else:
-            for s in valid_seeds:
-                personalization[s] = 1.0 / len(valid_seeds)
-        try:
-            scores: dict[FragmentId, float] = nx.pagerank(
-                self._g, alpha=1 - alpha, personalization=personalization, max_iter=200, tol=1e-6
-            )
-            return scores
-        except nx.PowerIterationFailedConvergence:
-            logger.warning("PageRank failed to converge, falling back to uniform")
-            return {n: 1.0 / len(self._g) for n in self._g}
-
 
 def build_graph(fragments: list[Fragment], repo_root: Path | None = None) -> Graph:
     graph = Graph()
@@ -190,11 +165,12 @@ def _suppress_semantic_hubs(
         if cat == "semantic":
             sem_out_files.setdefault(src, set()).add(dst.path)
 
-    for src, dst in list(edges):
+    suppressed = dict(edges)
+    for src, dst in list(suppressed):
         out_file_deg = len(sem_out_files.get(src, set()))
         if out_file_deg >= _HUB_OUT_DEGREE_THRESHOLD and edge_categories.get((src, dst)) == "semantic":
-            edges[(src, dst)] = edges[(src, dst)] / math.sqrt(out_file_deg)
-    return edges
+            suppressed[(src, dst)] = suppressed[(src, dst)] / math.sqrt(out_file_deg)
+    return suppressed
 
 
 def _apply_hub_suppression(

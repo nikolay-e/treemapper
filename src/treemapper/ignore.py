@@ -152,6 +152,7 @@ def _find_ignore_files_via_git(root: Path, ignore_filenames: list[str]) -> list[
             timeout=10,
         )
         if result.returncode != 0:
+            logger.warning("git ls-files failed (returncode=%d) in %s", result.returncode, root)
             return None
         out = result.stdout.decode("utf-8", errors="surrogateescape")
         paths = [root / f for f in out.split("\0") if f and any(f.endswith(name) for name in ignore_filenames)]

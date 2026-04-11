@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -542,15 +542,10 @@ class UtilityState:
     file_importance: dict[Path, float] = field(default_factory=dict)
 
     def copy(self) -> UtilityState:
-        return UtilityState(
+        return replace(
+            self,
             max_rel=dict(self.max_rel),
             priorities=dict(self.priorities),
-            structural_sum=self.structural_sum,
-            eta=self.eta,
-            gamma=self.gamma,
-            r_cap=self.r_cap,
-            changed_dirs=self.changed_dirs,
-            proximity_decay=self.proximity_decay,
             file_importance=dict(self.file_importance),
         )
 

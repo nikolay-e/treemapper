@@ -228,7 +228,6 @@ def main() -> None:
         print("\nInterrupted", file=sys.stderr)
         sys.exit(130)
     except BrokenPipeError:
-        sys.stderr.close()
         sys.exit(141)
 
 

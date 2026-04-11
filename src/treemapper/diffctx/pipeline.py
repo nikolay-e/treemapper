@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 _OVERHEAD_PER_FRAGMENT = LIMITS.overhead_per_fragment
 _UNLIMITED_BUDGET = 10_000_000
+_MAX_CACHE_BYTES = 200 * 1024 * 1024
 
 
 def _build_preferred_revs(base_rev: str | None, head_rev: str | None) -> list[str]:
@@ -176,6 +177,22 @@ def _empty_tree(root_dir: Path) -> dict[str, Any]:
     }
 
 
+def _build_file_cache(candidate_files: list[Path]) -> dict[Path, str]:
+    cache: dict[Path, str] = {}
+    cache_bytes = 0
+    for f in candidate_files:
+        if cache_bytes > _MAX_CACHE_BYTES:
+            break
+        try:
+            if f.stat().st_size <= 100_000:
+                content = f.read_text(encoding="utf-8")
+                cache_bytes += len(content.encode("utf-8", errors="replace"))
+                cache[f] = content
+        except (OSError, UnicodeDecodeError):
+            continue
+    return cache
+
+
 def build_diff_context(
     root_dir: Path,
     diff_range: str,
@@ -204,6 +221,7 @@ def build_diff_context(
         hunks.extend(_synthetic_hunks(untracked))
 
     if not hunks:
+        logger.warning("no diff hunks found — empty diff or parse failure")
         return _empty_tree(root_dir)
 
     diff_text = _git.get_diff_text(root_dir, diff_range)
@@ -226,13 +244,7 @@ def build_diff_context(
 
         t1 = time.perf_counter()
 
-        file_cache: dict[Path, str] = {}
-        for f in all_candidate_files:
-            try:
-                if f.stat().st_size <= 100_000:
-                    file_cache[f] = f.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError):
-                continue
+        file_cache = _build_file_cache(all_candidate_files)
 
         mode = ScoringMode(os.environ.get("DIFFCTX_SCORING", scoring_mode))
         config = PipelineConfig.from_mode(mode, n_candidate_files=len(all_candidate_files))

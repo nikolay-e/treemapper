@@ -1,6 +1,4 @@
 name: javascript_043_redux_action_change
-xfail:
-  category: r-cap-scoring-shift
 repo:
   initial_files:
     actions.ts: |

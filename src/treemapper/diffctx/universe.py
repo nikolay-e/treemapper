@@ -139,7 +139,7 @@ def _build_ident_index(
         content = file_cache.get(file_path) if file_cache else None
         if content is None:
             try:
-                content = file_path.read_text(encoding="utf-8")
+                content = file_path.read_text(encoding="utf-8", errors="replace")
             except (OSError, UnicodeDecodeError):
                 continue
         file_idents = extract_identifiers(content, skip_stopwords=False)
@@ -239,13 +239,12 @@ def _expand_universe_by_rare_identifiers(
         content = file_cache.get(f) if file_cache else None
         if content is None:
             try:
-                content = f.read_text(encoding="utf-8")
+                content = f.read_text(encoding="utf-8", errors="replace")
             except (OSError, UnicodeDecodeError):
                 continue
         for ident in extract_identifiers(content, skip_stopwords=False):
             if ident in concepts:
                 included_concept_counts[ident] = included_concept_counts.get(ident, 0) + 1
-            continue
 
     return _collect_expansion_files(inverted_index, concepts, included_set, included_concept_counts)
 
@@ -296,7 +295,7 @@ def _synthetic_hunks(files: list[Path]) -> list[DiffHunk]:
     hunks: list[DiffHunk] = []
     for f in files:
         try:
-            content = f.read_text(encoding="utf-8")
+            content = f.read_text(encoding="utf-8", errors="replace")
             line_count = len(content.splitlines())
             if line_count > 0:
                 hunks.append(DiffHunk(path=f, new_start=1, new_len=line_count))
@@ -309,7 +308,7 @@ def _enrich_concepts(concepts: frozenset[str], files: list[Path]) -> frozenset[s
     extra: set[str] = set()
     for f in files:
         try:
-            content = f.read_text(encoding="utf-8")
+            content = f.read_text(encoding="utf-8", errors="replace")
             extra.update(extract_identifiers(content))
         except (OSError, UnicodeDecodeError):
             continue
