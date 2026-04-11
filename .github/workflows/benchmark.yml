@@ -21,23 +21,89 @@ name: Benchmark Suite
         default: '8000'
 
 jobs:
+  start-runners:
+    name: Start EC2 runners
+    runs-on: ubuntu-latest
+    outputs:
+      cb-ppr-label: ${{ steps.cb-ppr.outputs.label }}
+      cb-ppr-id: ${{ steps.cb-ppr.outputs.ec2-instance-id }}
+      cb-ego-label: ${{ steps.cb-ego.outputs.label }}
+      cb-ego-id: ${{ steps.cb-ego.outputs.ec2-instance-id }}
+      loo-ppr-label: ${{ steps.loo-ppr.outputs.label }}
+      loo-ppr-id: ${{ steps.loo-ppr.outputs.ec2-instance-id }}
+      loo-ego-label: ${{ steps.loo-ego.outputs.label }}
+      loo-ego-id: ${{ steps.loo-ego.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-central-1' }}
+
+      - name: Start CB-PPR runner
+        id: cb-ppr
+        if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PAT }}
+          ec2-image-id: ${{ secrets.AWS_AMI_ID }}
+          ec2-instance-type: c7g.4xlarge
+          subnet-id: ${{ secrets.AWS_SUBNET_ID }}
+          security-group-id: ${{ secrets.AWS_SG_ID }}
+          market-type: spot
+
+      - name: Start CB-EGO runner
+        id: cb-ego
+        if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PAT }}
+          ec2-image-id: ${{ secrets.AWS_AMI_ID }}
+          ec2-instance-type: c7g.4xlarge
+          subnet-id: ${{ secrets.AWS_SUBNET_ID }}
+          security-group-id: ${{ secrets.AWS_SG_ID }}
+          market-type: spot
+
+      - name: Start LOO-PPR runner
+        id: loo-ppr
+        if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PAT }}
+          ec2-image-id: ${{ secrets.AWS_AMI_ID }}
+          ec2-instance-type: c7g.4xlarge
+          subnet-id: ${{ secrets.AWS_SUBNET_ID }}
+          security-group-id: ${{ secrets.AWS_SG_ID }}
+          market-type: spot
+
+      - name: Start LOO-EGO runner
+        id: loo-ego
+        if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PAT }}
+          ec2-image-id: ${{ secrets.AWS_AMI_ID }}
+          ec2-instance-type: c7g.4xlarge
+          subnet-id: ${{ secrets.AWS_SUBNET_ID }}
+          security-group-id: ${{ secrets.AWS_SG_ID }}
+          market-type: spot
+
   cb-ppr:
     name: ContextBench PPR
+    needs: start-runners
     if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ${{ needs.start-runners.outputs.cb-ppr-label }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cache/pip
-            /tmp/contextbench_repos
-          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
-          restore-keys: bench-
       - run: pip install -e ".[dev,tree-sitter]" datasets
       - name: Run
         run: |
@@ -56,21 +122,15 @@ jobs:
 
   cb-ego:
     name: ContextBench EgoGraph
+    needs: start-runners
     if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ${{ needs.start-runners.outputs.cb-ego-label }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cache/pip
-            /tmp/contextbench_repos
-          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
-          restore-keys: bench-
       - run: pip install -e ".[dev,tree-sitter]" datasets
       - name: Run
         run: |
@@ -89,21 +149,15 @@ jobs:
 
   loo-ppr:
     name: LOO PPR
+    needs: start-runners
     if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ${{ needs.start-runners.outputs.loo-ppr-label }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cache/pip
-            /tmp/contextbench_repos
-          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
-          restore-keys: bench-
       - run: pip install -e ".[dev,tree-sitter]" datasets
       - name: Run
         run: |
@@ -122,21 +176,15 @@ jobs:
 
   loo-ego:
     name: LOO EgoGraph
+    needs: start-runners
     if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
-    runs-on: ubuntu-latest-16-cores
+    runs-on: ${{ needs.start-runners.outputs.loo-ego-label }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cache/pip
-            /tmp/contextbench_repos
-          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
-          restore-keys: bench-
       - run: pip install -e ".[dev,tree-sitter]" datasets
       - name: Run
         run: |
@@ -154,6 +202,55 @@ jobs:
         with:
           name: loo-ego
           path: results/
+
+  stop-runners:
+    name: Stop EC2 runners
+    needs: [start-runners, cb-ppr, cb-ego, loo-ppr, loo-ego]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-central-1' }}
+
+      - name: Stop CB-PPR
+        if: needs.start-runners.outputs.cb-ppr-label
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PAT }}
+          label: ${{ needs.start-runners.outputs.cb-ppr-label }}
+          ec2-instance-id: ${{ needs.start-runners.outputs.cb-ppr-id }}
+
+      - name: Stop CB-EGO
+        if: needs.start-runners.outputs.cb-ego-label
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PAT }}
+          label: ${{ needs.start-runners.outputs.cb-ego-label }}
+          ec2-instance-id: ${{ needs.start-runners.outputs.cb-ego-id }}
+
+      - name: Stop LOO-PPR
+        if: needs.start-runners.outputs.loo-ppr-label
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PAT }}
+          label: ${{ needs.start-runners.outputs.loo-ppr-label }}
+          ec2-instance-id: ${{ needs.start-runners.outputs.loo-ppr-id }}
+
+      - name: Stop LOO-EGO
+        if: needs.start-runners.outputs.loo-ego-label
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PAT }}
+          label: ${{ needs.start-runners.outputs.loo-ego-label }}
+          ec2-instance-id: ${{ needs.start-runners.outputs.loo-ego-id }}
 
   summary:
     name: Publish results
