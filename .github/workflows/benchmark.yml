@@ -1,0 +1,103 @@
+name: Benchmark Suite
+
+'on':
+  workflow_dispatch:
+    inputs:
+      instances:
+        description: 'Number of instances per benchmark'
+        required: true
+        default: '25'
+        type: choice
+        options: ['10', '25', '50', '100', '200', '500']
+      scoring:
+        description: 'Scoring modes to run'
+        required: true
+        default: 'both'
+        type: choice
+        options: ['ppr', 'ego', 'both']
+      budget:
+        description: 'Token budget'
+        required: true
+        default: '8000'
+
+jobs:
+  benchmark:
+    name: Run benchmarks (${{ inputs.instances }} instances, ${{ inputs.scoring }})
+    runs-on: ubuntu-latest-16-cores
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: bench-pip-${{ hashFiles('pyproject.toml') }}
+
+      - name: Cache cloned repos
+        uses: actions/cache@v5
+        with:
+          path: /tmp/contextbench_repos
+          key: bench-repos-v1
+          restore-keys: bench-repos-
+
+      - name: Install
+        run: pip install -e ".[dev,tree-sitter]" datasets
+
+      - name: Run ContextBench (PPR)
+        if: inputs.scoring == 'ppr' || inputs.scoring == 'both'
+        run: |
+          python benchmarks/forensic_contextbench.py \
+            --limit ${{ inputs.instances }} \
+            --budget ${{ inputs.budget }} \
+            2>&1 | tee results/cb_ppr.txt
+        env:
+          DIFFCTX_SCORING: precise
+
+      - name: Run ContextBench (EgoGraph)
+        if: inputs.scoring == 'ego' || inputs.scoring == 'both'
+        run: |
+          python benchmarks/forensic_contextbench.py \
+            --limit ${{ inputs.instances }} \
+            --budget ${{ inputs.budget }} \
+            2>&1 | tee results/cb_ego.txt
+        env:
+          DIFFCTX_SCORING: discover
+
+      - name: Run LOO (PPR)
+        if: inputs.scoring == 'ppr' || inputs.scoring == 'both'
+        run: |
+          python benchmarks/loo_swebench.py \
+            --limit ${{ inputs.instances }} \
+            --budget ${{ inputs.budget }} \
+            --output results/loo_ppr.json \
+            2>&1 | tee results/loo_ppr.txt
+
+      - name: Run LOO (EgoGraph)
+        if: inputs.scoring == 'ego' || inputs.scoring == 'both'
+        run: |
+          python benchmarks/loo_swebench.py \
+            --limit ${{ inputs.instances }} \
+            --budget ${{ inputs.budget }} \
+            --output results/loo_ego.json \
+            2>&1 | tee results/loo_ego.txt
+        env:
+          DIFFCTX_SCORING: discover
+
+      - name: Generate summary
+        if: always()
+        run: python benchmarks/summarize_results.py results/ >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ inputs.instances }}-${{ inputs.scoring }}
+          path: results/
+          retention-days: 90
