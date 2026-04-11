@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class Graph:
     def __init__(self) -> None:
-        self._g = nx.DiGraph()
+        self._g: nx.DiGraph[FragmentId] = nx.DiGraph()
         self.edge_categories: dict[tuple[FragmentId, FragmentId], str] = {}
         self._adj_cache: dict[FragmentId, dict[FragmentId, float]] | None = None
         self._rev_cache: dict[FragmentId, dict[FragmentId, float]] | None = None
@@ -75,7 +75,7 @@ class Graph:
         return {dst: self._g[node][dst].get("weight", 0.0) for dst in self._g.successors(node)}
 
     @property
-    def nx(self) -> nx.DiGraph:
+    def nx(self) -> nx.DiGraph[FragmentId]:
         return self._g
 
     def ego_graph(self, seeds: set[FragmentId], radius: int = 2) -> dict[FragmentId, float]:

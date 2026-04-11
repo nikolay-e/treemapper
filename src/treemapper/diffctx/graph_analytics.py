@@ -124,7 +124,7 @@ def to_mermaid(qg: QuotientGraph, top_n: int = 20) -> str:
 
 
 def _tarjan_scc(adjacency: dict[str, set[str]]) -> list[list[str]]:
-    g = nx.DiGraph()
+    g: nx.DiGraph[str] = nx.DiGraph()
     for node, neighbors in adjacency.items():
         g.add_node(node)
         for nbr in neighbors:
