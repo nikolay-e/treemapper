@@ -1,4 +1,5 @@
 from treemapper.clipboard import clipboard_available
+from treemapper.diffctx.edges.base import EdgeBuilder
 from treemapper.diffctx.edges.semantic import (
     AnsibleEdgeBuilder,
     BazelEdgeBuilder,
@@ -66,4 +67,5 @@ ZigEdgeBuilder
 blast_radius = graph_analytics.blast_radius
 ScoringMode.AUTO
 PipelineConfig.low_relevance
+EdgeBuilder._read_file
 EgoGraphScoring

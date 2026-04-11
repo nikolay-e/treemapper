@@ -185,6 +185,17 @@ class EdgeBuilder(ABC):
     ) -> list[Path]:
         return []
 
+    @staticmethod
+    def _read_file(path: Path, file_cache: dict[Path, str] | None = None) -> str | None:
+        if file_cache is not None:
+            content = file_cache.get(path)
+            if content is not None:
+                return content
+        try:
+            return path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None
+
     def add_edge(
         self,
         edges: EdgeDict,

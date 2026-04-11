@@ -80,13 +80,14 @@ class Graph:
 
     def ego_graph(self, seeds: set[FragmentId], radius: int = 2) -> dict[FragmentId, float]:
         scores: dict[FragmentId, float] = {}
+        if not self._g:
+            return scores
+        undirected = self._g.to_undirected(as_view=True)
         for seed in seeds:
             if seed not in self._g:
                 continue
-            undirected = self._g.to_undirected(as_view=True)
-            ego = nx.ego_graph(undirected, seed, radius=radius)
-            for node in ego.nodes:
-                dist = nx.shortest_path_length(undirected, seed, node)
+            distances = nx.single_source_shortest_path_length(undirected, seed, cutoff=radius)
+            for node, dist in distances.items():
                 hop_score = 1.0 / (1 + dist) if dist > 0 else 1.0
                 scores[node] = max(scores.get(node, 0.0), hop_score)
         return scores

@@ -49,6 +49,7 @@ class DefaultDiscovery(DiscoveryStrategy):
             ctx.changed_files + edge_discovered,
             combined_spec,
             candidate_files=ctx.all_candidate_files,
+            file_cache=ctx.file_cache,
         )
 
         return list(dict.fromkeys(edge_discovered + expanded))
