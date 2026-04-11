@@ -52,8 +52,12 @@ def _resolve_relative(name: str, source_path: Path, repo_root: Path | None) -> s
 
 def _extract_imports_from_content(content: str, source_path: Path | None = None, repo_root: Path | None = None) -> set[str]:
     imports: set[str] = set()
+    import warnings
+
     try:
-        tree = ast.parse(content)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tree = ast.parse(content)
     except SyntaxError:
         return imports
 
