@@ -12,77 +12,135 @@ name: Benchmark Suite
       scoring:
         description: 'Scoring modes to run'
         required: true
-        default: 'both'
+        default: 'auto'
         type: choice
-        options: ['ppr', 'ego', 'both']
+        options: ['ppr', 'ego', 'auto']
       budget:
         description: 'Token budget'
         required: true
         default: '8000'
 
 jobs:
-  benchmark:
-    name: Run benchmarks (${{ inputs.instances }} instances, ${{ inputs.scoring }})
+  cb-ppr:
+    name: ContextBench PPR
+    if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
     runs-on: ubuntu-latest-16-cores
     timeout-minutes: 360
-
     steps:
       - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
-      - name: Cache pip
-        uses: actions/cache@v5
+      - uses: actions/cache@v5
         with:
-          path: ~/.cache/pip
-          key: bench-pip-${{ hashFiles('pyproject.toml') }}
-
-      - name: Cache cloned repos
-        uses: actions/cache@v5
-        with:
-          path: /tmp/contextbench_repos
-          key: bench-repos-v1
-          restore-keys: bench-repos-
-
-      - name: Install
-        run: pip install -e ".[dev,tree-sitter]" datasets
-
-      - name: Run ContextBench (PPR)
-        if: inputs.scoring == 'ppr' || inputs.scoring == 'both'
+          path: |
+            ~/.cache/pip
+            /tmp/contextbench_repos
+          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
+          restore-keys: bench-
+      - run: pip install -e ".[dev,tree-sitter]" datasets
+      - name: Run
         run: |
+          mkdir -p results
           python benchmarks/forensic_contextbench.py \
             --limit ${{ inputs.instances }} \
             --budget ${{ inputs.budget }} \
             2>&1 | tee results/cb_ppr.txt
         env:
           DIFFCTX_SCORING: precise
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cb-ppr
+          path: results/
 
-      - name: Run ContextBench (EgoGraph)
-        if: inputs.scoring == 'ego' || inputs.scoring == 'both'
+  cb-ego:
+    name: ContextBench EgoGraph
+    if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
+    runs-on: ubuntu-latest-16-cores
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            /tmp/contextbench_repos
+          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
+          restore-keys: bench-
+      - run: pip install -e ".[dev,tree-sitter]" datasets
+      - name: Run
         run: |
+          mkdir -p results
           python benchmarks/forensic_contextbench.py \
             --limit ${{ inputs.instances }} \
             --budget ${{ inputs.budget }} \
             2>&1 | tee results/cb_ego.txt
         env:
           DIFFCTX_SCORING: discover
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cb-ego
+          path: results/
 
-      - name: Run LOO (PPR)
-        if: inputs.scoring == 'ppr' || inputs.scoring == 'both'
+  loo-ppr:
+    name: LOO PPR
+    if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
+    runs-on: ubuntu-latest-16-cores
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            /tmp/contextbench_repos
+          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
+          restore-keys: bench-
+      - run: pip install -e ".[dev,tree-sitter]" datasets
+      - name: Run
         run: |
+          mkdir -p results
           python benchmarks/loo_swebench.py \
             --limit ${{ inputs.instances }} \
             --budget ${{ inputs.budget }} \
             --workers 8 \
             --output results/loo_ppr.json \
             2>&1 | tee results/loo_ppr.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loo-ppr
+          path: results/
 
-      - name: Run LOO (EgoGraph)
-        if: inputs.scoring == 'ego' || inputs.scoring == 'both'
+  loo-ego:
+    name: LOO EgoGraph
+    if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
+    runs-on: ubuntu-latest-16-cores
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            /tmp/contextbench_repos
+          key: bench-${{ hashFiles('pyproject.toml') }}-repos-v2
+          restore-keys: bench-
+      - run: pip install -e ".[dev,tree-sitter]" datasets
+      - name: Run
         run: |
+          mkdir -p results
           python benchmarks/loo_swebench.py \
             --limit ${{ inputs.instances }} \
             --budget ${{ inputs.budget }} \
@@ -91,15 +149,25 @@ jobs:
             2>&1 | tee results/loo_ego.txt
         env:
           DIFFCTX_SCORING: discover
-
-      - name: Generate summary
+      - uses: actions/upload-artifact@v4
         if: always()
-        run: python benchmarks/summarize_results.py results/ >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload results
-        if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results-${{ inputs.instances }}-${{ inputs.scoring }}
+          name: loo-ego
           path: results/
-          retention-days: 90
+
+  summary:
+    name: Publish results
+    runs-on: ubuntu-latest
+    needs: [cb-ppr, cb-ego, loo-ppr, loo-ego]
+    if: always()
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          path: results/
+          merge-multiple: true
+      - name: Summary
+        run: python benchmarks/summarize_results.py results/ >> "$GITHUB_STEP_SUMMARY"
