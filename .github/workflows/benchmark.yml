@@ -76,6 +76,7 @@ jobs:
           python benchmarks/loo_swebench.py \
             --limit ${{ inputs.instances }} \
             --budget ${{ inputs.budget }} \
+            --workers 8 \
             --output results/loo_ppr.json \
             2>&1 | tee results/loo_ppr.txt
 
@@ -85,6 +86,7 @@ jobs:
           python benchmarks/loo_swebench.py \
             --limit ${{ inputs.instances }} \
             --budget ${{ inputs.budget }} \
+            --workers 8 \
             --output results/loo_ego.json \
             2>&1 | tee results/loo_ego.txt
         env:

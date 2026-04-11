@@ -142,6 +142,7 @@ def main():
     ap.add_argument("--dataset", default="Contextbench/ContextBench")
     ap.add_argument("--split", default="contextbench_verified")
     ap.add_argument("--output", type=str, default=None)
+    ap.add_argument("--workers", type=int, default=1)
     args = ap.parse_args()
 
     from datasets import load_dataset
@@ -162,19 +163,30 @@ def main():
     all_results: list[dict] = []
     t0 = time.time()
 
-    for i, inst in enumerate(multi_file, 1):
+    def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
+        i, inst = idx_inst
         iid = inst["instance_id"]
         n_files = len(patch_files(inst["patch"]))
-        print(f"[{i}/{len(multi_file)}] {iid} ({n_files} files)")
-
+        print(f"[{i}/{len(multi_file)}] {iid} ({n_files} files)", flush=True)
         try:
             results = evaluate_loo(inst, args.budget)
             hits = sum(1 for r in results if r["found"])
             total = len(results)
-            print(f"  LOO: {hits}/{total} found ({100 * hits / max(1, total):.0f}%)")
-            all_results.extend(results)
+            print(f"  LOO: {hits}/{total} found ({100 * hits / max(1, total):.0f}%)", flush=True)
+            return results
         except Exception as e:
-            print(f"  ERROR: {type(e).__name__}: {e}")
+            print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
+            return []
+
+    if args.workers > 1:
+        from concurrent.futures import ProcessPoolExecutor
+
+        with ProcessPoolExecutor(max_workers=args.workers) as pool:
+            for results in pool.map(_run_one, enumerate(multi_file, 1)):
+                all_results.extend(results)
+    else:
+        for i, inst in enumerate(multi_file, 1):
+            all_results.extend(_run_one((i, inst)))
 
     elapsed = time.time() - t0
     print()
