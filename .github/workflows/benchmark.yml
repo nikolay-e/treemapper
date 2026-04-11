@@ -52,7 +52,6 @@ jobs:
           ec2-instance-type: c7g.4xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
-          market-type: spot
           pre-runner-script: |
             # Failsafe: auto-terminate after 6 hours no matter what
             sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
@@ -68,7 +67,6 @@ jobs:
           ec2-instance-type: c7g.4xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
-          market-type: spot
           pre-runner-script: |
             # Failsafe: auto-terminate after 6 hours no matter what
             sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
@@ -84,7 +82,6 @@ jobs:
           ec2-instance-type: c7g.4xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
-          market-type: spot
           pre-runner-script: |
             # Failsafe: auto-terminate after 6 hours no matter what
             sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
@@ -100,7 +97,6 @@ jobs:
           ec2-instance-type: c7g.4xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
-          market-type: spot
           pre-runner-script: |
             # Failsafe: auto-terminate after 6 hours no matter what
             sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
