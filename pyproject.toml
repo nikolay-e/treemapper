@@ -82,6 +82,7 @@ optional-dependencies.dev = [
   "ruff>=0.4,<1.0",
   "treemapper[tree-sitter]",
   # Type stubs
+  "types-networkx>=3.0,<4.0",
   "types-pyyaml>=6.0,<7.0",
 ]
 optional-dependencies.embeddings = [
