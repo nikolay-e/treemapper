@@ -146,9 +146,9 @@ def build_graph(fragments: list[Fragment], repo_root: Path | None = None) -> Gra
 
     all_edges = _apply_hub_suppression(all_edges, edge_categories)
 
-    for (src, dst), weight in all_edges.items():
-        graph.add_edge(src, dst, weight)
-
+    graph._g.add_nodes_from(frag.id for frag in fragments)
+    graph._g.add_weighted_edges_from((src, dst, w) for (src, dst), w in all_edges.items() if w > 0)
+    graph._invalidate_cache()
     graph.edge_categories = edge_categories
 
     return graph
