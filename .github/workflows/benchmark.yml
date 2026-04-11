@@ -53,6 +53,9 @@ jobs:
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           market-type: spot
+          pre-runner-script: |
+            # Failsafe: auto-terminate after 6 hours no matter what
+            sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
 
       - name: Start CB-EGO runner
         id: cb-ego
@@ -66,6 +69,9 @@ jobs:
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           market-type: spot
+          pre-runner-script: |
+            # Failsafe: auto-terminate after 6 hours no matter what
+            sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
 
       - name: Start LOO-PPR runner
         id: loo-ppr
@@ -79,6 +85,9 @@ jobs:
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           market-type: spot
+          pre-runner-script: |
+            # Failsafe: auto-terminate after 6 hours no matter what
+            sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
 
       - name: Start LOO-EGO runner
         id: loo-ego
@@ -92,6 +101,9 @@ jobs:
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           market-type: spot
+          pre-runner-script: |
+            # Failsafe: auto-terminate after 6 hours no matter what
+            sudo shutdown -P +360 "Benchmark failsafe: auto-shutdown after 6h"
 
   cb-ppr:
     name: ContextBench PPR
@@ -251,6 +263,15 @@ jobs:
           github-token: ${{ secrets.GH_PAT }}
           label: ${{ needs.start-runners.outputs.loo-ego-label }}
           ec2-instance-id: ${{ needs.start-runners.outputs.loo-ego-id }}
+
+      - name: Kill any orphaned benchmark instances
+        if: always()
+        run: |
+          aws ec2 describe-instances \
+            --filters "Name=tag:github:actor,Values=${{ github.actor }}" \
+                      "Name=instance-state-name,Values=running,pending" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text | xargs -r aws ec2 terminate-instances --instance-ids || true
 
   summary:
     name: Publish results
