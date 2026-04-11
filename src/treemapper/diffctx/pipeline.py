@@ -18,7 +18,7 @@ from .fragmentation import _process_files_for_fragments
 from .git import CatFileBatch, GitError, split_diff_range
 from .postpass import _coherence_post_pass, _ensure_changed_files_represented
 from .render import build_diff_context_output
-from .scoring import DiscoveryContext, EnsembleDiscovery, PPRScoring, ScoringStrategy
+from .scoring import DiscoveryContext, EgoGraphScoring, EnsembleDiscovery, PPRScoring, ScoringStrategy
 from .select import lazy_greedy_select
 from .signatures import _generate_signature_variants
 from .types import Fragment, FragmentId
@@ -73,6 +73,7 @@ def _score_and_select(
     repo_root: Path | None = None,
     seed_weights: dict[FragmentId, float] | None = None,
     scoring_strategy: ScoringStrategy | None = None,
+    discovered_paths: set[Path] | None = None,
 ) -> tuple[list[Fragment], Any]:
     strategy = scoring_strategy or PPRScoring()
 
@@ -84,6 +85,7 @@ def _score_and_select(
         repo_root=repo_root,
         seed_weights=seed_weights,
         dump_scores_file=dump_scores,
+        discovered_paths=discovered_paths,
     )
 
     needs = needs_from_diff(scoring_result.filtered_fragments, core_ids, scoring_result.graph, diff_text)
@@ -273,7 +275,8 @@ def build_diff_context(
             hunks=hunks,
             repo_root=root_dir,
             seed_weights=seed_weights,
-            scoring_strategy=PPRScoring(alpha=alpha),
+            scoring_strategy=EgoGraphScoring() if os.environ.get("DIFFCTX_SCORING") == "ego" else PPRScoring(alpha=alpha),
+            discovered_paths=set(discovered_files),
         )
         effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
         remaining = effective_budget - result.used_tokens

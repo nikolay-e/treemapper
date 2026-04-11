@@ -140,6 +140,7 @@ class ScoringStrategy(ABC):
         repo_root: Path | None = None,
         seed_weights: dict[FragmentId, float] | None = None,
         dump_scores_file: str | None = None,
+        discovered_paths: set[Path] | None = None,
     ) -> ScoringResult: ...
 
 
@@ -155,6 +156,7 @@ class PPRScoring(ScoringStrategy):
         repo_root: Path | None = None,
         seed_weights: dict[FragmentId, float] | None = None,
         dump_scores_file: str | None = None,
+        discovered_paths: set[Path] | None = None,
     ) -> ScoringResult:
         from .filtering import (
             _apply_hunk_proximity_bonus,
@@ -253,14 +255,16 @@ class EgoGraphScoring(ScoringStrategy):
         repo_root: Path | None = None,
         seed_weights: dict[FragmentId, float] | None = None,
         dump_scores_file: str | None = None,
+        discovered_paths: set[Path] | None = None,
     ) -> ScoringResult:
-        from .filtering import _cap_context_fragments
+        from .filtering import _cap_context_fragments, _filter_unrelated_fragments
         from .graph import build_graph
 
         graph = build_graph(all_fragments, repo_root=repo_root)
         rel_scores = graph.ego_graph(core_ids, radius=self.max_depth)
 
-        filtered = [f for f in all_fragments if f.id in core_ids or rel_scores.get(f.id, 0.0) > 0]
+        filtered = _filter_unrelated_fragments(all_fragments, core_ids, graph)
+        filtered = [f for f in filtered if f.id in core_ids or rel_scores.get(f.id, 0.0) > 0]
         filtered = _cap_context_fragments(filtered, core_ids, rel_scores)
 
         return ScoringResult(rel_scores=rel_scores, filtered_fragments=filtered, graph=graph)
