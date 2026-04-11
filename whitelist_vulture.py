@@ -67,5 +67,5 @@ ZigEdgeBuilder
 blast_radius = graph_analytics.blast_radius
 ScoringMode.AUTO
 PipelineConfig.low_relevance
-EdgeBuilder._read_file
+_ = EdgeBuilder._read_file
 EgoGraphScoring

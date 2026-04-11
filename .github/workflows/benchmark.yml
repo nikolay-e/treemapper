@@ -19,6 +19,8 @@ name: Benchmark Suite
         description: 'Token budget'
         required: true
         default: '8000'
+        type: choice
+        options: ['4000', '8000', '12000', '16000']
 
 jobs:
   start-runners:
@@ -35,7 +37,7 @@ jobs:
       loo-ego-id: ${{ steps.loo-ego.outputs.ec2-instance-id }}
     steps:
       - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -44,12 +46,12 @@ jobs:
       - name: Start CB-PPR runner
         id: cb-ppr
         if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.xlarge
+          ec2-instance-type: c7g.large
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
@@ -59,12 +61,12 @@ jobs:
       - name: Start CB-EGO runner
         id: cb-ego
         if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.xlarge
+          ec2-instance-type: c7g.large
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
@@ -74,12 +76,12 @@ jobs:
       - name: Start LOO-PPR runner
         id: loo-ppr
         if: inputs.scoring == 'ppr' || inputs.scoring == 'auto'
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.xlarge
+          ec2-instance-type: c7g.large
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
@@ -89,12 +91,12 @@ jobs:
       - name: Start LOO-EGO runner
         id: loo-ego
         if: inputs.scoring == 'ego' || inputs.scoring == 'auto'
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.xlarge
+          ec2-instance-type: c7g.large
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
@@ -108,8 +110,8 @@ jobs:
     runs-on: ${{ needs.start-runners.outputs.cb-ppr-label }}
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: '3.12'
       - run: pip install -e ".[dev,tree-sitter]" datasets
@@ -117,12 +119,14 @@ jobs:
         run: |
           mkdir -p results
           python benchmarks/forensic_contextbench.py \
-            --limit ${{ inputs.instances }} \
-            --budget ${{ inputs.budget }} \
+            --limit "$BENCH_INSTANCES" \
+            --budget "$BENCH_BUDGET" \
             2>&1 | tee results/cb_ppr.txt
         env:
           DIFFCTX_SCORING: precise
-      - uses: actions/upload-artifact@v4
+          BENCH_INSTANCES: ${{ inputs.instances }}
+          BENCH_BUDGET: ${{ inputs.budget }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: cb-ppr
@@ -135,8 +139,8 @@ jobs:
     runs-on: ${{ needs.start-runners.outputs.cb-ego-label }}
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: '3.12'
       - run: pip install -e ".[dev,tree-sitter]" datasets
@@ -144,12 +148,14 @@ jobs:
         run: |
           mkdir -p results
           python benchmarks/forensic_contextbench.py \
-            --limit ${{ inputs.instances }} \
-            --budget ${{ inputs.budget }} \
+            --limit "$BENCH_INSTANCES" \
+            --budget "$BENCH_BUDGET" \
             2>&1 | tee results/cb_ego.txt
         env:
           DIFFCTX_SCORING: discover
-      - uses: actions/upload-artifact@v4
+          BENCH_INSTANCES: ${{ inputs.instances }}
+          BENCH_BUDGET: ${{ inputs.budget }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: cb-ego
@@ -162,8 +168,8 @@ jobs:
     runs-on: ${{ needs.start-runners.outputs.loo-ppr-label }}
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: '3.12'
       - run: pip install -e ".[dev,tree-sitter]" datasets
@@ -171,12 +177,15 @@ jobs:
         run: |
           mkdir -p results
           python benchmarks/loo_swebench.py \
-            --limit ${{ inputs.instances }} \
-            --budget ${{ inputs.budget }} \
-            --workers 8 \
+            --limit "$BENCH_INSTANCES" \
+            --budget "$BENCH_BUDGET" \
+            --workers 2 \
             --output results/loo_ppr.json \
             2>&1 | tee results/loo_ppr.txt
-      - uses: actions/upload-artifact@v4
+        env:
+          BENCH_INSTANCES: ${{ inputs.instances }}
+          BENCH_BUDGET: ${{ inputs.budget }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: loo-ppr
@@ -189,8 +198,8 @@ jobs:
     runs-on: ${{ needs.start-runners.outputs.loo-ego-label }}
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: '3.12'
       - run: pip install -e ".[dev,tree-sitter]" datasets
@@ -198,14 +207,16 @@ jobs:
         run: |
           mkdir -p results
           python benchmarks/loo_swebench.py \
-            --limit ${{ inputs.instances }} \
-            --budget ${{ inputs.budget }} \
-            --workers 8 \
+            --limit "$BENCH_INSTANCES" \
+            --budget "$BENCH_BUDGET" \
+            --workers 2 \
             --output results/loo_ego.json \
             2>&1 | tee results/loo_ego.txt
         env:
           DIFFCTX_SCORING: discover
-      - uses: actions/upload-artifact@v4
+          BENCH_INSTANCES: ${{ inputs.instances }}
+          BENCH_BUDGET: ${{ inputs.budget }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: loo-ego
@@ -218,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -226,7 +237,7 @@ jobs:
 
       - name: Stop CB-PPR
         if: needs.start-runners.outputs.cb-ppr-label
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: stop
           github-token: ${{ secrets.GH_PAT }}
@@ -235,7 +246,7 @@ jobs:
 
       - name: Stop CB-EGO
         if: needs.start-runners.outputs.cb-ego-label
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: stop
           github-token: ${{ secrets.GH_PAT }}
@@ -244,7 +255,7 @@ jobs:
 
       - name: Stop LOO-PPR
         if: needs.start-runners.outputs.loo-ppr-label
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: stop
           github-token: ${{ secrets.GH_PAT }}
@@ -253,7 +264,7 @@ jobs:
 
       - name: Stop LOO-EGO
         if: needs.start-runners.outputs.loo-ego-label
-        uses: machulav/ec2-github-runner@v2
+        uses: machulav/ec2-github-runner@343a1b2ae682e681c3cec9a235d882da17ff04ef # v2
         with:
           mode: stop
           github-token: ${{ secrets.GH_PAT }}
@@ -275,11 +286,11 @@ jobs:
     needs: [cb-ppr, cb-ego, loo-ppr, loo-ego]
     if: always()
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: '3.12'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: results/
           merge-multiple: true

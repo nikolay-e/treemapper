@@ -155,7 +155,7 @@ def main():
     multi_file = [i for i in insts if len(patch_files(i["patch"])) >= 2]
     print(f"Total instances: {len(insts)}, multi-file: {len(multi_file)}")
 
-    rng = random.Random(args.seed)
+    rng = random.Random(args.seed)  # NOSONAR — deterministic PRNG for reproducible benchmarks
     rng.shuffle(multi_file)
     multi_file = multi_file[: args.limit]
 
