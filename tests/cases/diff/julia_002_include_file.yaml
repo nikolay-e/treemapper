@@ -1,6 +1,4 @@
 name: julia_002_include_file
-xfail:
-  category: ego-graph-bm25-noise
 repo:
   initial_files:
     src/MyPackage.jl: |

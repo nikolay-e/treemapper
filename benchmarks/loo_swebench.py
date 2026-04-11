@@ -37,9 +37,11 @@ def strip_file_from_patch(patch_text: str, file_to_hide: str) -> str:
     lines = patch_text.split("\n")
     result = []
     skip = False
+    hidden_markers = {f"a/{file_to_hide}", f"b/{file_to_hide}"}
     for line in lines:
         if line.startswith("diff --git "):
-            skip = f"a/{file_to_hide}" in line or f"b/{file_to_hide}" in line
+            parts = line.split()
+            skip = any(p.strip('"') in hidden_markers or p.lstrip('"') in hidden_markers for p in parts[2:])
         if not skip:
             result.append(line)
     return "\n".join(result)

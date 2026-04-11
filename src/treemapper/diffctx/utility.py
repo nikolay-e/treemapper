@@ -527,7 +527,6 @@ def _phi(x: float) -> float:
 
 
 _MIN_REL_FOR_BONUS = 0.03
-_STRONG_REL_THRESHOLD = 0.07
 _RELATEDNESS_BONUS = 0.25
 
 
@@ -559,7 +558,7 @@ def _diversity_bonus(
 ) -> float:
     if not needs or rel_score < _MIN_REL_FOR_BONUS:
         return 0.0
-    if gain <= 0 and rel_score < _STRONG_REL_THRESHOLD:
+    if gain <= 0:
         return 0.0
     total_covered = sum(min(state.max_rel.get((n.need_type, n.symbol), 0.0), 1.0) for n in needs)
     unsatisfied = max(0.0, 1.0 - total_covered / max(1, len(needs)))

@@ -222,8 +222,8 @@ def _find_best_singleton(
     return best_singleton, best_gain
 
 
-def _compute_r_cap(rel: dict[FragmentId, float]) -> float:
-    values = [v for v in rel.values() if v > 0]
+def _compute_r_cap(rel: dict[FragmentId, float], core_ids: set[FragmentId] | None = None) -> float:
+    values = [v for fid, v in rel.items() if v > 0 and (core_ids is None or fid not in core_ids)]
     if len(values) < 2:
         return max(values[0], 0.01) if values else 1.0
     med = statistics.median(values)
@@ -308,7 +308,7 @@ def _init_selection_state(
     file_importance: dict[Path, float] | None,
 ) -> _SelectionState:
     state = _SelectionState(remaining_budget=budget_tokens)
-    state.utility_state.r_cap = _compute_r_cap(rel)
+    state.utility_state.r_cap = _compute_r_cap(rel, core_ids)
     state.utility_state.changed_dirs = frozenset(cid.path.parent for cid in core_ids)
     if file_importance is not None:
         state.utility_state.file_importance = file_importance

@@ -1,6 +1,4 @@
 name: fragments_003_class_decorator_included
-xfail:
-  category: ego-graph-bm25-noise
 repo:
   initial_files:
     decorated_class.py: |

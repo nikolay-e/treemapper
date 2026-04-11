@@ -1,6 +1,4 @@
 name: fragments_015_markdown_long_heading_truncation
-xfail:
-  category: ego-graph-bm25-noise
 repo:
   initial_files:
     long_heading.md: |+
