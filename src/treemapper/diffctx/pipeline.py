@@ -244,6 +244,7 @@ def build_diff_context(
             diff_text=diff_text,
             expansion_concepts=frozenset(expansion_concepts),
             file_cache=file_cache,
+            combined_spec=combined_spec,
         )
         discovered_files = _create_discovery(config).discover(discovery_ctx)
         discovered_files = [_normalize_path(p, root_dir) for p in discovered_files]

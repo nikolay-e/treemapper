@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .graph import Graph
 from .types import DiffHunk, Fragment, FragmentId
@@ -16,6 +17,7 @@ class DiscoveryContext:
     diff_text: str
     expansion_concepts: frozenset[str]
     file_cache: dict[Path, str] | None = None
+    combined_spec: Any | None = None
 
     def read_file(self, path: Path) -> str | None:
         if self.file_cache is not None and path in self.file_cache:
@@ -42,7 +44,7 @@ class DefaultDiscovery(DiscoveryStrategy):
 
         from ..ignore import get_ignore_specs
 
-        combined_spec = get_ignore_specs(ctx.root_dir, None, False, None)
+        combined_spec = ctx.combined_spec or get_ignore_specs(ctx.root_dir, None, False, None)
         expanded = _expand_universe_by_rare_identifiers(
             ctx.root_dir,
             ctx.expansion_concepts,
