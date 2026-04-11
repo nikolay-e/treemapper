@@ -233,6 +233,7 @@ class RustEdgeBuilder(EdgeBuilder):
         changed_files: list[Path],
         all_candidate_files: list[Path],
         repo_root: Path | None = None,
+        **kwargs: object,
     ) -> list[Path]:
         rust_changed = [f for f in changed_files if _is_rust_file(f)]
         if not rust_changed:

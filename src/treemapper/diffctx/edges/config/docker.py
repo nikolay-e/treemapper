@@ -91,6 +91,7 @@ class DockerEdgeBuilder(EdgeBuilder):
         changed_files: list[Path],
         all_candidate_files: list[Path],
         repo_root: Path | None = None,
+        **kwargs: object,
     ) -> list[Path]:
         docker_files = [f for f in changed_files if _is_dockerfile(f) or _is_compose_file(f)]
         if not docker_files:

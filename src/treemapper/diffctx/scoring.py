@@ -36,7 +36,9 @@ class DefaultDiscovery(DiscoveryStrategy):
         from .edges import discover_all_related_files
         from .universe import _expand_universe_by_rare_identifiers
 
-        edge_discovered = discover_all_related_files(ctx.changed_files, ctx.all_candidate_files, ctx.root_dir)
+        edge_discovered = discover_all_related_files(
+            ctx.changed_files, ctx.all_candidate_files, ctx.root_dir, file_cache=ctx.file_cache
+        )
 
         from ..ignore import get_ignore_specs
 

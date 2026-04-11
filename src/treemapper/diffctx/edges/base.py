@@ -181,6 +181,7 @@ class EdgeBuilder(ABC):
         changed_files: list[Path],
         all_candidate_files: list[Path],
         repo_root: Path | None = None,
+        **kwargs: object,
     ) -> list[Path]:
         return []
 

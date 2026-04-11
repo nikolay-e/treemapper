@@ -87,12 +87,15 @@ class PythonEdgeBuilder(EdgeBuilder):
         changed_files: list[Path],
         all_candidate_files: list[Path],
         repo_root: Path | None = None,
+        **kwargs: object,
     ) -> list[Path]:
         py_changed = [f for f in changed_files if _is_python_file(f)]
         if not py_changed:
             return []
 
-        file_to_module, module_to_files, file_to_imports = self._build_import_index(all_candidate_files, repo_root)
+        fc = kwargs.get("file_cache")
+        cache: dict[Path, str] | None = fc if isinstance(fc, dict) else None
+        file_to_module, module_to_files, file_to_imports = self._build_import_index(all_candidate_files, repo_root, cache)
 
         changed_set = set(changed_files)
         discovered: set[Path] = set()
@@ -131,7 +134,10 @@ class PythonEdgeBuilder(EdgeBuilder):
         return list(discovered)
 
     def _build_import_index(
-        self, all_candidate_files: list[Path], repo_root: Path | None
+        self,
+        all_candidate_files: list[Path],
+        repo_root: Path | None,
+        file_cache: dict[Path, str] | None = None,
     ) -> tuple[dict[Path, str], dict[str, list[Path]], dict[Path, set[str]]]:
         file_to_module: dict[Path, str] = {}
         module_to_files: dict[str, list[Path]] = defaultdict(list)
@@ -148,11 +154,13 @@ class PythonEdgeBuilder(EdgeBuilder):
                 for i in range(1, len(parts)):
                     prefix = ".".join(parts[:i])
                     module_to_files[prefix].append(f)
-            try:
-                content = f.read_text(encoding="utf-8")
-                file_to_imports[f] = _extract_imports_from_content(content, f, repo_root)
-            except (OSError, UnicodeDecodeError):
-                continue
+            content = file_cache.get(f) if file_cache else None
+            if content is None:
+                try:
+                    content = f.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+            file_to_imports[f] = _extract_imports_from_content(content, f, repo_root)
 
         return file_to_module, dict(module_to_files), file_to_imports
 

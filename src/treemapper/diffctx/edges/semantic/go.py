@@ -151,6 +151,7 @@ class GoEdgeBuilder(EdgeBuilder):
         changed_files: list[Path],
         all_candidate_files: list[Path],
         repo_root: Path | None = None,
+        **kwargs: object,
     ) -> list[Path]:
         changed_set = set(changed_files)
         discovered: set[Path] = set()

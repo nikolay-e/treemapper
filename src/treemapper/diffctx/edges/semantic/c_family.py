@@ -190,6 +190,7 @@ class CFamilyEdgeBuilder(EdgeBuilder):
         changed_files: list[Path],
         all_candidate_files: list[Path],
         repo_root: Path | None = None,
+        **kwargs: object,
     ) -> list[Path]:
         c_changed = [f for f in changed_files if _is_c_family(f)]
         if not c_changed:
