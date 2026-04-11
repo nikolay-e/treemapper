@@ -49,7 +49,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.4xlarge
+          ec2-instance-type: c7g.xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
@@ -64,7 +64,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.4xlarge
+          ec2-instance-type: c7g.xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
@@ -79,7 +79,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.4xlarge
+          ec2-instance-type: c7g.xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
@@ -94,7 +94,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PAT }}
           ec2-image-id: ${{ secrets.AWS_AMI_ID }}
-          ec2-instance-type: c7g.4xlarge
+          ec2-instance-type: c7g.xlarge
           subnet-id: ${{ secrets.AWS_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_SG_ID }}
           pre-runner-script: |
