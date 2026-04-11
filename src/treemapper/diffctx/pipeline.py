@@ -16,9 +16,19 @@ from .core import _compute_seed_weights, _identify_core_fragments
 from .file_importance import compute_file_importance
 from .fragmentation import _process_files_for_fragments
 from .git import CatFileBatch, GitError, split_diff_range
+from .mode import PipelineConfig, ScoringMode
 from .postpass import _coherence_post_pass, _ensure_changed_files_represented
 from .render import build_diff_context_output
-from .scoring import DiscoveryContext, EgoGraphScoring, EnsembleDiscovery, PPRScoring, ScoringStrategy
+from .scoring import (
+    BM25Discovery,
+    DefaultDiscovery,
+    DiscoveryContext,
+    DiscoveryStrategy,
+    EgoGraphScoring,
+    EnsembleDiscovery,
+    PPRScoring,
+    ScoringStrategy,
+)
 from .select import lazy_greedy_select
 from .signatures import _generate_signature_variants
 from .types import Fragment, FragmentId
@@ -151,6 +161,12 @@ def _log_ppr_mode(
     )
 
 
+def _create_discovery(config: PipelineConfig) -> DiscoveryStrategy:
+    if config.discovery == "ensemble":
+        return EnsembleDiscovery([DefaultDiscovery(), BM25Discovery(top_k=config.bm25_top_k)])
+    return DefaultDiscovery()
+
+
 def _empty_tree(root_dir: Path) -> dict[str, Any]:
     return {
         "name": root_dir.name,
@@ -171,6 +187,7 @@ def build_diff_context(
     no_default_ignores: bool = False,
     full: bool = False,
     whitelist_file: Path | None = None,
+    scoring_mode: str = "auto",
 ) -> dict[str, Any]:
     _validate_inputs(root_dir, alpha, tau, budget_tokens)
     root_dir = root_dir.resolve()
@@ -217,6 +234,9 @@ def build_diff_context(
             except (OSError, UnicodeDecodeError):
                 continue
 
+        mode = ScoringMode(os.environ.get("DIFFCTX_SCORING", scoring_mode))
+        config = PipelineConfig.from_mode(mode, n_fragments=len(all_fragments))
+
         discovery_ctx = DiscoveryContext(
             root_dir=root_dir,
             changed_files=changed_files,
@@ -225,8 +245,7 @@ def build_diff_context(
             expansion_concepts=frozenset(expansion_concepts),
             file_cache=file_cache,
         )
-        discovery_strategy = EnsembleDiscovery()
-        discovered_files = discovery_strategy.discover(discovery_ctx)
+        discovered_files = _create_discovery(config).discover(discovery_ctx)
         discovered_files = [_normalize_path(p, root_dir) for p in discovered_files]
         all_fragments.extend(
             _process_files_for_fragments(discovered_files, root_dir, preferred_revs, seen_frag_ids, batch_reader)
@@ -275,7 +294,9 @@ def build_diff_context(
             hunks=hunks,
             repo_root=root_dir,
             seed_weights=seed_weights,
-            scoring_strategy=EgoGraphScoring() if os.environ.get("DIFFCTX_SCORING") == "ego" else PPRScoring(alpha=alpha),
+            scoring_strategy=(
+                EgoGraphScoring(max_depth=config.ego_depth) if config.scoring == "ego" else PPRScoring(alpha=config.ppr_alpha)
+            ),
             discovered_paths=set(discovered_files),
         )
         effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET

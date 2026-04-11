@@ -312,6 +312,12 @@ def _build_main_parser() -> argparse.ArgumentParser:
         help="Minimum relevance to include a fragment (default: 0.08, lower = more context)",
     )
     diff_group.add_argument(
+        "--scoring",
+        choices=["auto", "precise", "discover"],
+        default="auto",
+        help="Scoring mode: auto (adapts to repo size), precise (PPR, best for small repos), discover (ego-graph, best for cross-file)",
+    )
+    diff_group.add_argument(
         "--full",
         action="store_true",
         help="Include all changed code (skip smart selection algorithm)",
