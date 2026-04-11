@@ -136,7 +136,28 @@ def evaluate_loo(inst: dict, budget: int) -> list[dict]:
     return results
 
 
+_BUDGET: int = 8000
+
+
+def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
+    i, inst = idx_inst
+    iid = inst["instance_id"]
+    n_files = len(patch_files(inst["patch"]))
+    print(f"[{i}] {iid} ({n_files} files)", flush=True)
+    try:
+        results = evaluate_loo(inst, _BUDGET)
+        hits = sum(1 for r in results if r["found"])
+        total = len(results)
+        print(f"  LOO: {hits}/{total} found ({100 * hits / max(1, total):.0f}%)", flush=True)
+        return results
+    except Exception as e:
+        print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
+        return []
+
+
 def main():
+    global _BUDGET
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=50)
     ap.add_argument("--budget", type=int, default=8000)
@@ -146,6 +167,7 @@ def main():
     ap.add_argument("--output", type=str, default=None)
     ap.add_argument("--workers", type=int, default=1)
     args = ap.parse_args()
+    _BUDGET = args.budget
 
     from datasets import load_dataset
 
@@ -164,21 +186,6 @@ def main():
 
     all_results: list[dict] = []
     t0 = time.time()
-
-    def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
-        i, inst = idx_inst
-        iid = inst["instance_id"]
-        n_files = len(patch_files(inst["patch"]))
-        print(f"[{i}/{len(multi_file)}] {iid} ({n_files} files)", flush=True)
-        try:
-            results = evaluate_loo(inst, args.budget)
-            hits = sum(1 for r in results if r["found"])
-            total = len(results)
-            print(f"  LOO: {hits}/{total} found ({100 * hits / max(1, total):.0f}%)", flush=True)
-            return results
-        except Exception as e:
-            print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
-            return []
 
     if args.workers > 1:
         from concurrent.futures import ProcessPoolExecutor
