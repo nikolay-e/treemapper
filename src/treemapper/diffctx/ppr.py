@@ -16,7 +16,7 @@ def _init_seed_residuals_csr(
     node_to_idx: dict[FragmentId, int],
     n: int,
     seed_weights: dict[FragmentId, float] | None,
-) -> np.ndarray:
+) -> np.ndarray[tuple[int], np.dtype[np.float64]]:
     residual = np.zeros(n, dtype=np.float64)
     valid_seeds = [s for s in seeds if s in node_to_idx]
     if not valid_seeds:
@@ -43,7 +43,7 @@ def _ppr_push_csr(
     alpha: float = 0.60,
     tol: float = 1e-4,
     seed_weights: dict[FragmentId, float] | None = None,
-) -> np.ndarray:
+) -> np.ndarray[tuple[int], np.dtype[np.float64]]:
     n = csr.n
     if n == 0:
         return np.empty(0, dtype=np.float64)

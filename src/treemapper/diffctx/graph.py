@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CSRGraph:
     n: int
-    indptr: np.ndarray
-    indices: np.ndarray
-    weights: np.ndarray
-    out_weight_sum: np.ndarray
+    indptr: np.ndarray[tuple[int], np.dtype[np.int32]]
+    indices: np.ndarray[tuple[int], np.dtype[np.int32]]
+    weights: np.ndarray[tuple[int], np.dtype[np.float64]]
+    out_weight_sum: np.ndarray[tuple[int], np.dtype[np.float64]]
     node_to_idx: dict[FragmentId, int] = field(repr=False)
     idx_to_node: list[FragmentId] = field(repr=False)
 
@@ -97,8 +97,8 @@ class Graph:
                             k += 1
                 indptr[i + 1] = k
             if k < total_edges:
-                indices = indices[:k]
-                weights = weights[:k]
+                indices = np.array(indices[:k], dtype=np.int32)
+                weights = np.array(weights[:k], dtype=np.float64)
             out_sum = np.zeros(n, dtype=np.float64)
             for i in range(n):
                 s, e = indptr[i], indptr[i + 1]
