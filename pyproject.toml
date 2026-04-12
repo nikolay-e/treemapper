@@ -25,6 +25,8 @@ keywords = [
   "json",
   "llm",
   "llm-context",
+  "mcp",
+  "model-context-protocol",
   "tree",
   "yaml",
 ]
@@ -97,6 +99,9 @@ optional-dependencies.full = [
   "ruamel-yaml>=0.18,<1.0",
   "treemapper[tree-sitter]",
 ]
+optional-dependencies.mcp = [
+  "mcp>=1.27,<2.0",
+]
 optional-dependencies.nlp = [
   # Natural language processing for document tokenization
   "spacy>=3.7,<4.0",
@@ -119,6 +124,7 @@ urls.Homepage = "https://github.com/nikolay-e/treemapper"
 urls.Issues = "https://github.com/nikolay-e/treemapper/issues"
 urls.Repository = "https://github.com/nikolay-e/treemapper"
 scripts.treemapper = "treemapper.treemapper:main"
+scripts.treemapper-mcp = "treemapper.mcp.server:run_server"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -207,6 +213,10 @@ module = [
   "spacy.cli.download",
   "spacy.language",
   "numpy",
+  "mcp",
+  "mcp.server",
+  "mcp.server.fastmcp",
+  "anyio",
 ]
 ignore_missing_imports = true
 
@@ -238,6 +248,13 @@ name = "Diffctx should not import writer"
 type = "forbidden"
 source_modules = [ "treemapper.diffctx" ]
 forbidden_modules = [ "treemapper.writer" ]
+
+[[tool.importlinter.contracts]]
+id = "no-mcp-cli"
+name = "MCP server must not import CLI"
+type = "forbidden"
+source_modules = [ "treemapper.mcp" ]
+forbidden_modules = [ "treemapper.cli", "treemapper.treemapper" ]
 
 [[tool.importlinter.contracts]]
 id = "no-writer-cli"
