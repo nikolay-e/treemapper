@@ -179,13 +179,8 @@ def evaluate_loo(inst: dict, budget: int, scoring_mode: str = "auto", repos_dir:
     return results
 
 
-_BUDGET: int = 8000
-_SCORING: str = "auto"
-_INSTANCE_TIMEOUT: int = 300
-
-
-def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
-    i, inst = idx_inst
+def _run_one(run_args: tuple[int, dict, int, str, int]) -> list[dict]:
+    i, inst, budget, scoring, timeout = run_args
     iid = inst["instance_id"]
     n_files = len(patch_files(inst["patch"]))
     worker_dir = REPOS_DIR / f"w{os.getpid()}"
@@ -198,9 +193,9 @@ def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
             raise TimeoutError
 
         old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(_INSTANCE_TIMEOUT)
+        signal.alarm(timeout)
         try:
-            results = evaluate_loo(inst, _BUDGET, _SCORING, repos_dir=worker_dir)
+            results = evaluate_loo(inst, budget, scoring, repos_dir=worker_dir)
         finally:
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old_handler)
@@ -209,7 +204,7 @@ def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
         print(f"  LOO: {hits}/{total} found ({100 * hits / max(1, total):.0f}%)", flush=True)
         return results
     except TimeoutError:
-        print(f"  TIMEOUT ({_INSTANCE_TIMEOUT}s): {iid}", flush=True)
+        print(f"  TIMEOUT ({timeout}s): {iid}", flush=True)
         return []
     except Exception as e:
         print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
@@ -217,8 +212,6 @@ def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
 
 
 def main():
-    global _BUDGET, _SCORING
-
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=50)
     ap.add_argument("--budget", type=int, default=8000)
@@ -228,9 +221,8 @@ def main():
     ap.add_argument("--output", type=str, default=None)
     ap.add_argument("--workers", type=int, default=11)
     ap.add_argument("--scoring", type=str, default="auto", choices=["auto", "precise", "discover"])
+    ap.add_argument("--timeout", type=int, default=300)
     args = ap.parse_args()
-    _BUDGET = args.budget
-    _SCORING = args.scoring
 
     from datasets import load_dataset
 
@@ -256,16 +248,18 @@ def main():
     all_results: list[dict] = []
     t0 = time.time()
 
+    run_args = [(i, inst, args.budget, args.scoring, args.timeout) for i, inst in enumerate(multi_file, 1)]
+
     if args.workers > 1:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            futures = {pool.submit(_run_one, (i, inst)): i for i, inst in enumerate(multi_file, 1)}
+            futures = {pool.submit(_run_one, a): a[0] for a in run_args}
             for future in as_completed(futures):
                 all_results.extend(future.result())
     else:
-        for i, inst in enumerate(multi_file, 1):
-            all_results.extend(_run_one((i, inst)))
+        for a in run_args:
+            all_results.extend(_run_one(a))
 
     elapsed = time.time() - t0
     print()

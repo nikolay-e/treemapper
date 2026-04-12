@@ -418,25 +418,18 @@ def aggregate(results: list[dict]) -> None:
         print(f"\nFailures: {dict(by_status)}")
 
 
-_BUDGET: int = 8000
-_SCORING: str = "auto"
-_BASELINE: str = "treemapper"
-
-
-def _run_one(idx_inst: tuple[int, dict]) -> dict | None:
-    _i, inst = idx_inst
+def _run_one(args: tuple[int, dict, int, str, str]) -> dict | None:
+    _i, inst, budget, scoring, baseline = args
     worker_dir = REPOS_DIR / f"w{os.getpid()}"
     worker_dir.mkdir(exist_ok=True)
     try:
-        return evaluate_instance(inst, _BUDGET, repos_dir=worker_dir, scoring_mode=_SCORING, baseline=_BASELINE)
+        return evaluate_instance(inst, budget, repos_dir=worker_dir, scoring_mode=scoring, baseline=baseline)
     except Exception as e:
         print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
         return None
 
 
 def main():
-    global _BUDGET, _SCORING, _BASELINE
-
     import argparse
 
     from treemapper.diffctx.filtering import _LOW_RELEVANCE_THRESHOLD
@@ -455,9 +448,6 @@ def main():
     parser.add_argument("--scoring", type=str, default="auto", choices=["auto", "precise", "discover"])
     parser.add_argument("--baseline", type=str, default="treemapper", choices=["treemapper", "patch_files"])
     args = parser.parse_args()
-    _BUDGET = args.budget
-    _SCORING = args.scoring
-    _BASELINE = args.baseline
 
     from datasets import load_dataset
 
@@ -485,18 +475,20 @@ def main():
     results = []
     t0 = time.time()
 
+    run_args = [(i, inst, args.budget, args.scoring, args.baseline) for i, inst in enumerate(instances, 1)]
+
     if args.workers > 1:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            futures = {pool.submit(_run_one, (i, inst)): i for i, inst in enumerate(instances, 1)}
+            futures = {pool.submit(_run_one, a): a[0] for a in run_args}
             for future in as_completed(futures):
                 r = future.result()
                 if r:
                     results.append(r)
     else:
-        for i, inst in enumerate(instances, 1):
-            r = _run_one((i, inst))
+        for a in run_args:
+            r = _run_one(a)
             if r:
                 results.append(r)
 
