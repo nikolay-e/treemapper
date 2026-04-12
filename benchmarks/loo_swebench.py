@@ -11,8 +11,8 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-REPOS_DIR = Path(tempfile.gettempdir()) / "contextbench_repos"
-REPOS_DIR.mkdir(exist_ok=True)
+REPOS_DIR = Path(os.environ.get("LOO_REPOS_DIR", str(Path.home() / ".cache" / "contextbench_repos")))
+REPOS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def run_cmd(cmd, cwd=None, check=True, timeout=120):
@@ -47,8 +47,8 @@ def strip_file_from_patch(patch_text: str, file_to_hide: str) -> str:
     return "\n".join(result)
 
 
-def ensure_repo(repo_url: str, repo_name: str, base_commit: str) -> Path | None:
-    repo_dir = REPOS_DIR / repo_name.replace("/", "__")
+def ensure_repo(repo_url: str, repo_name: str, base_commit: str, repos_dir: Path = REPOS_DIR) -> Path | None:
+    repo_dir = repos_dir / repo_name.replace("/", "__")
     if not repo_dir.exists():
         r = run_cmd(["git", "clone", "--quiet", repo_url, str(repo_dir)], check=False, timeout=600)
         if r.returncode != 0:
@@ -80,17 +80,17 @@ def apply_partial_patch(repo_dir: Path, partial_patch: str) -> bool:
         os.unlink(patch_path)
 
 
-def run_diffctx(repo_dir: Path, budget: int) -> set[str]:
+def run_diffctx(repo_dir: Path, budget: int, scoring_mode: str = "auto") -> set[str]:
     from treemapper.diffctx.pipeline import build_diff_context
 
     try:
-        output = build_diff_context(repo_dir, "HEAD~1..HEAD", budget_tokens=budget)
+        output = build_diff_context(repo_dir, "HEAD~1..HEAD", budget_tokens=budget, scoring_mode=scoring_mode)
         return {f["path"] for f in output.get("fragments", [])}
     except Exception:
         return set()
 
 
-def evaluate_loo(inst: dict, budget: int) -> list[dict]:
+def evaluate_loo(inst: dict, budget: int, scoring_mode: str = "auto", repos_dir: Path = REPOS_DIR) -> list[dict]:
     iid = inst["instance_id"]
     all_patch_files = patch_files(inst["patch"])
 
@@ -98,7 +98,7 @@ def evaluate_loo(inst: dict, budget: int) -> list[dict]:
         return []
 
     repo_url = inst.get("repo_url") or f"https://github.com/{inst['repo']}.git"
-    repo_dir = ensure_repo(repo_url, inst["repo"], inst["base_commit"])
+    repo_dir = ensure_repo(repo_url, inst["repo"], inst["base_commit"], repos_dir)
     if not repo_dir:
         return []
 
@@ -115,7 +115,7 @@ def evaluate_loo(inst: dict, budget: int) -> list[dict]:
         if not apply_partial_patch(repo_dir, partial):
             continue
 
-        selected = run_diffctx(repo_dir, budget)
+        selected = run_diffctx(repo_dir, budget, scoring_mode)
         found = hidden in selected
 
         results.append(
@@ -137,15 +137,18 @@ def evaluate_loo(inst: dict, budget: int) -> list[dict]:
 
 
 _BUDGET: int = 8000
+_SCORING: str = "auto"
 
 
 def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
     i, inst = idx_inst
     iid = inst["instance_id"]
     n_files = len(patch_files(inst["patch"]))
+    worker_dir = REPOS_DIR / f"w{os.getpid()}"
+    worker_dir.mkdir(exist_ok=True)
     print(f"[{i}] {iid} ({n_files} files)", flush=True)
     try:
-        results = evaluate_loo(inst, _BUDGET)
+        results = evaluate_loo(inst, _BUDGET, _SCORING, repos_dir=worker_dir)
         hits = sum(1 for r in results if r["found"])
         total = len(results)
         print(f"  LOO: {hits}/{total} found ({100 * hits / max(1, total):.0f}%)", flush=True)
@@ -156,7 +159,7 @@ def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
 
 
 def main():
-    global _BUDGET
+    global _BUDGET, _SCORING
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=50)
@@ -165,9 +168,11 @@ def main():
     ap.add_argument("--dataset", default="Contextbench/ContextBench")
     ap.add_argument("--split", default="contextbench_verified")
     ap.add_argument("--output", type=str, default=None)
-    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--workers", type=int, default=11)
+    ap.add_argument("--scoring", type=str, default="auto", choices=["auto", "precise", "discover"])
     args = ap.parse_args()
     _BUDGET = args.budget
+    _SCORING = args.scoring
 
     from datasets import load_dataset
 

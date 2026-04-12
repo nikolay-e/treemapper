@@ -13,8 +13,10 @@ from collections import defaultdict
 from pathlib import Path
 
 LINES_RE = re.compile(r"^(\d+)-(\d+)$")
-REPOS_DIR = Path(tempfile.gettempdir()) / "contextbench_repos"
-REPOS_DIR.mkdir(exist_ok=True)
+_repos_suffix = os.environ.get("CONTEXTBENCH_REPOS_SUFFIX", "")
+_DEFAULT_REPOS = Path(os.environ.get("CB_REPOS_DIR", str(Path.home() / ".cache" / "contextbench_repos")))
+REPOS_DIR = _DEFAULT_REPOS / _repos_suffix if _repos_suffix else _DEFAULT_REPOS
+REPOS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def parse_lines_field(lines_str: str) -> tuple[int, int] | None:
@@ -53,8 +55,8 @@ def is_nontrivial(gold: list[dict], patch: str) -> bool:
     return bool(gf - pf)
 
 
-def ensure_repo(repo_url: str, repo_name: str, base_commit: str) -> Path | None:
-    repo_dir = REPOS_DIR / repo_name.replace("/", "__")
+def ensure_repo(repo_url: str, repo_name: str, base_commit: str, repos_dir: Path = REPOS_DIR) -> Path | None:
+    repo_dir = repos_dir / repo_name.replace("/", "__")
     if not repo_dir.exists():
         r = subprocess.run(
             ["git", "clone", "--quiet", repo_url, str(repo_dir)],
@@ -124,34 +126,13 @@ def apply_as_commit(repo_dir: Path, patch_text: str) -> bool:
         os.unlink(patch_path)
 
 
-def run_diffctx(repo_dir: Path, budget: int = 8000) -> dict | None:
-    r = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "treemapper",
-            str(repo_dir),
-            "--diff",
-            "HEAD~1..HEAD",
-            "--budget",
-            str(budget),
-            "--format",
-            "json",
-            "-q",
-            "-o",
-            "-",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-    if r.returncode != 0:
-        print(f"  DIFFCTX FAIL (rc={r.returncode}): {r.stderr[:300]}")
-        return None
+def run_diffctx(repo_dir: Path, budget: int = 8000, scoring_mode: str = "auto") -> dict | None:
+    from treemapper.diffctx.pipeline import build_diff_context
+
     try:
-        return json.loads(r.stdout)
-    except json.JSONDecodeError:
-        print(f"  DIFFCTX JSON FAIL: {r.stdout[:200]}")
+        return build_diff_context(repo_dir, "HEAD~1..HEAD", budget_tokens=budget, scoring_mode=scoring_mode)
+    except Exception as e:
+        print(f"  DIFFCTX FAIL: {type(e).__name__}: {e}")
         return None
 
 
@@ -191,7 +172,7 @@ def line_overlap(
     }
 
 
-def evaluate_instance(inst: dict, budget: int = 8000) -> dict | None:
+def evaluate_instance(inst: dict, budget: int = 8000, repos_dir: Path = REPOS_DIR, scoring_mode: str = "auto") -> dict | None:
     iid = inst["instance_id"]
     gold = parse_gold_context(inst["gold_context"])
     gf = gold_files(gold)
@@ -206,7 +187,7 @@ def evaluate_instance(inst: dict, budget: int = 8000) -> dict | None:
         print("SKIP: all gold files are in the patch (trivial)")
         return None
 
-    repo_dir = ensure_repo(inst["repo_url"], inst["repo"], inst["base_commit"])
+    repo_dir = ensure_repo(inst["repo_url"], inst["repo"], inst["base_commit"], repos_dir)
     if not repo_dir:
         return {"id": iid, "status": "clone_fail"}
 
@@ -220,7 +201,7 @@ def evaluate_instance(inst: dict, budget: int = 8000) -> dict | None:
         return {"id": iid, "status": "apply_fail"}
 
     t0 = time.time()
-    output = run_diffctx(repo_dir, budget)
+    output = run_diffctx(repo_dir, budget, scoring_mode)
     elapsed = time.time() - t0
 
     subprocess.run(
@@ -351,23 +332,29 @@ def aggregate(results: list[dict]) -> None:
         print(f"\nFailures: {dict(by_status)}")
 
 
-def _print_threshold_sanity_check():
-    v = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "from treemapper.diffctx.filtering import _LOW_RELEVANCE_THRESHOLD; print(_LOW_RELEVANCE_THRESHOLD)",
-        ],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    print(f"diffctx _LOW_RELEVANCE_THRESHOLD = {v}", file=sys.stderr)
+_BUDGET: int = 8000
+_SCORING: str = "auto"
+
+
+def _run_one(idx_inst: tuple[int, dict]) -> dict | None:
+    _i, inst = idx_inst
+    worker_dir = REPOS_DIR / f"w{os.getpid()}"
+    worker_dir.mkdir(exist_ok=True)
+    try:
+        return evaluate_instance(inst, _BUDGET, repos_dir=worker_dir, scoring_mode=_SCORING)
+    except Exception as e:
+        print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
+        return None
 
 
 def main():
-    _print_threshold_sanity_check()
+    global _BUDGET, _SCORING
 
     import argparse
+
+    from treemapper.diffctx.filtering import _LOW_RELEVANCE_THRESHOLD
+
+    print(f"diffctx _LOW_RELEVANCE_THRESHOLD = {_LOW_RELEVANCE_THRESHOLD}", file=sys.stderr)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=3)
@@ -377,7 +364,11 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--no-shuffle", action="store_true")
     parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--workers", type=int, default=11)
+    parser.add_argument("--scoring", type=str, default="auto", choices=["auto", "precise", "discover"])
     args = parser.parse_args()
+    _BUDGET = args.budget
+    _SCORING = args.scoring
 
     from datasets import load_dataset
 
@@ -400,16 +391,26 @@ def main():
         print(f"Shuffled with seed={args.seed}")
 
     instances = instances[: args.limit]
-    print(f"Evaluating {len(instances)} instances (budget={args.budget})")
+    print(f"Evaluating {len(instances)} instances (budget={args.budget}, workers={args.workers}, scoring={args.scoring})")
 
     results = []
-    for inst in instances:
-        try:
-            r = evaluate_instance(inst, args.budget)
+    t0 = time.time()
+
+    if args.workers > 1:
+        from concurrent.futures import ProcessPoolExecutor
+
+        with ProcessPoolExecutor(max_workers=args.workers) as pool:
+            for r in pool.map(_run_one, enumerate(instances, 1)):
+                if r:
+                    results.append(r)
+    else:
+        for i, inst in enumerate(instances, 1):
+            r = _run_one((i, inst))
             if r:
                 results.append(r)
-        except Exception as e:
-            print(f"  ERROR: {type(e).__name__}: {e}")
+
+    elapsed = time.time() - t0
+    print(f"\nTotal wall time: {elapsed:.0f}s")
 
     aggregate(results)
 
