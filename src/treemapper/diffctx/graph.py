@@ -4,6 +4,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import networkx as nx
 import numpy as np
@@ -16,14 +17,16 @@ from .types import Fragment, FragmentId
 
 logger = logging.getLogger(__name__)
 
+_NDArray = Any
+
 
 @dataclass
 class CSRGraph:
     n: int
-    indptr: np.ndarray[tuple[int], np.dtype[np.int32]]
-    indices: np.ndarray[tuple[int], np.dtype[np.int32]]
-    weights: np.ndarray[tuple[int], np.dtype[np.float64]]
-    out_weight_sum: np.ndarray[tuple[int], np.dtype[np.float64]]
+    indptr: _NDArray
+    indices: _NDArray
+    weights: _NDArray
+    out_weight_sum: _NDArray
     node_to_idx: dict[FragmentId, int] = field(repr=False)
     idx_to_node: list[FragmentId] = field(repr=False)
 
@@ -97,8 +100,8 @@ class Graph:
                             k += 1
                 indptr[i + 1] = k
             if k < total_edges:
-                indices = np.array(indices[:k], dtype=np.int32)
-                weights = np.array(weights[:k], dtype=np.float64)
+                indices = indices[:k]
+                weights = weights[:k]
             out_sum = np.zeros(n, dtype=np.float64)
             for i in range(n):
                 s, e = indptr[i], indptr[i + 1]
