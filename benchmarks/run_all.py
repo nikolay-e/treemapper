@@ -2,90 +2,132 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
-MODES = ["auto", "discover", "precise"]
+BUDGETS = [1000, 2000, 4000, 6000, 8000, 16000, 32000]
+LIMITS = [1, 2, 5, 10, 20, 30, 50, 100, 200, 500]
+MODES = ["discover", "precise"]
 
 
-def run_bench(name: str, cmd: list[str], env: dict[str, str] | None = None) -> None:
-    full_env = {k: v for k, v in os.environ.items() if k != "DIFFCTX_SCORING"}
-    if env:
-        full_env.update(env)
-    print(f"\n{'='*70}")
-    print(f"  {name}")
-    print(f"{'='*70}\n", flush=True)
+def _ts() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _log(log_file: Path, line: str) -> None:
+    print(f">> {line}")
+    with open(log_file, "a") as f:
+        f.write(line + "\n")
+
+
+def _summarize(output_file: Path, name: str, elapsed: float, log_file: Path) -> None:
+    if not output_file.exists():
+        return
+    try:
+        results = json.loads(output_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        return
+
+    ok = [r for r in results if r.get("status") == "ok"]
+    if not ok:
+        _log(log_file, f"{_ts()} | {name:45s} | n={len(results):3d} ok=0 | FAIL | {elapsed:.0f}s")
+        return
+
+    def avg(key: str) -> float:
+        vals = [r[key] for r in ok if key in r]
+        return sum(vals) / len(vals) if vals else 0.0
+
+    _log(
+        log_file,
+        f"{_ts()} | {name:45s} | n={len(ok):3d} | "
+        f"file R={avg('file_recall'):.3f} P={avg('file_precision'):.3f} | "
+        f"nontrivial R={avg('nontrivial_file_recall'):.3f} P={avg('nontrivial_file_precision'):.3f} | "
+        f"line R={avg('line_recall'):.3f} nt={avg('line_recall_nontrivial'):.3f} | "
+        f"{elapsed:.0f}s",
+    )
+
+
+def run_bench(name: str, cmd: list[str], output_file: Path, log_file: Path) -> None:
+    print(f"\n{'='*70}\n  {name}\n{'='*70}\n", flush=True)
     t0 = time.time()
-    subprocess.run(cmd, env=full_env, check=False)
+    env = {k: v for k, v in os.environ.items() if k != "DIFFCTX_SCORING"}
+    subprocess.run(cmd, env=env, check=False)
     elapsed = time.time() - t0
-    print(f"\n  [{name}] done in {elapsed:.0f}s\n", flush=True)
+    print(f"\n  [{name}] {elapsed:.0f}s\n", flush=True)
+    _summarize(output_file, name, elapsed, log_file)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--limit", type=int, default=50)
     ap.add_argument("--workers", type=int, default=11)
-    ap.add_argument("--budget", type=int, default=8000)
-    ap.add_argument("--timeout", type=int, default=300)
     ap.add_argument("--output-dir", type=str, default="results")
-    ap.add_argument("--skip-loo", action="store_true")
-    ap.add_argument("--skip-cb", action="store_true")
-    ap.add_argument("--modes", type=str, nargs="+", default=MODES, choices=MODES)
+    ap.add_argument("--skip-baselines", action="store_true")
     args = ap.parse_args()
 
-    out = Path(args.output_dir)
+    run_ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    out = Path(args.output_dir) / run_ts
     out.mkdir(parents=True, exist_ok=True)
-
+    log_file = out / "log.txt"
     py = sys.executable
-    common_cb = ["--limit", str(args.limit), "--workers", str(args.workers), "--budget", str(args.budget)]
-    common_loo = [
-        "--limit",
-        str(args.limit),
-        "--workers",
-        str(min(args.workers, 6)),
-        "--budget",
-        str(args.budget),
-    ]
 
-    if not args.skip_cb:
-        for mode in args.modes:
-            output = out / f"cb_{mode}.json"
-            run_bench(
-                f"CB {mode}",
-                [py, "benchmarks/contextbench_diffctx.py", *common_cb, "--scoring", mode, "--output", str(output)],
-            )
+    _log(log_file, f"{_ts()} | === START ===")
 
+    combos = [(n, b, m) for n in LIMITS for b in BUDGETS for m in MODES]
+    combos.sort(key=lambda x: (x[0], x[1]))
+
+    for idx, (n, b, mode) in enumerate(combos, 1):
+        tag = f"cb_{mode}_n{n}_b{b}"
+        out_file = out / f"{tag}.json"
         run_bench(
-            "CB baseline (patch_files)",
+            f"[{idx}/{len(combos)}] {mode} n={n} b={b}",
             [
                 py,
                 "benchmarks/contextbench_diffctx.py",
-                *common_cb,
-                "--baseline",
-                "patch_files",
+                "--limit",
+                str(n),
+                "--workers",
+                str(args.workers),
+                "--budget",
+                str(b),
+                "--scoring",
+                mode,
                 "--output",
-                str(out / "cb_baseline_patch_files.json"),
+                str(out_file),
             ],
+            out_file,
+            log_file,
         )
 
-    if not args.skip_loo:
-        for mode in args.modes:
-            output = out / f"loo_{mode}.json"
+    if not args.skip_baselines:
+        for bl in ["patch_files", "bm25"]:
+            out_file = out / f"cb_baseline_{bl}.json"
             run_bench(
-                f"LOO {mode}",
-                [py, "benchmarks/loo_swebench.py", *common_loo, "--scoring", mode, "--output", str(output)],
-                env={"DIFFCTX_INSTANCE_TIMEOUT": str(args.timeout)},
+                f"baseline {bl}",
+                [
+                    py,
+                    "benchmarks/contextbench_diffctx.py",
+                    "--limit",
+                    "50",
+                    "--workers",
+                    str(args.workers),
+                    "--budget",
+                    "8000",
+                    "--baseline",
+                    bl,
+                    "--output",
+                    str(out_file),
+                ],
+                out_file,
+                log_file,
             )
 
-    print(f"\n{'='*70}")
-    print("  ALL DONE")
-    print(f"{'='*70}")
-    print(f"Results in {out}/")
-    for f in sorted(out.glob("*.json")):
-        print(f"  {f.name} ({f.stat().st_size // 1024}KB)")
+    _log(log_file, f"{_ts()} | === DONE ===")
+    print(f"\nLog: {log_file}")
 
 
 if __name__ == "__main__":

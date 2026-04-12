@@ -71,6 +71,9 @@ _GO_COMMON_TYPES = frozenset(
 _GO_PKG_CALL_RE = re.compile(r"\b(\w+)\.([A-Z]\w*)")
 _GO_EMBED_RE = re.compile(r"//go:embed\s+(\S+)", re.MULTILINE)
 _GO_PKG_DECL_RE = re.compile(r"^package\s+(\w+)", re.MULTILINE)
+_GO_STRUCT_BODY_RE = re.compile(r"type\s+(\w+)\s+struct\s*\{([^}]*)\}", re.DOTALL)
+_GO_EMBED_LINE_RE = re.compile(r"^\s*\*?([A-Z]\w*)\s*$", re.MULTILINE)
+_GO_INIT_FUNC_RE = re.compile(r"^func\s+init\s*\(\s*\)", re.MULTILINE)
 
 
 def _extract_imports(content: str) -> set[str]:
@@ -100,6 +103,21 @@ def _extract_references(content: str) -> tuple[set[str], set[str], set[tuple[str
     }
     pkg_calls = {(m.group(1), m.group(2)) for m in _GO_PKG_CALL_RE.finditer(content)}
     return func_calls, type_refs, pkg_calls
+
+
+def _extract_embedded_types(content: str) -> dict[str, set[str]]:
+    result: dict[str, set[str]] = {}
+    for match in _GO_STRUCT_BODY_RE.finditer(content):
+        struct_name = match.group(1)
+        body = match.group(2)
+        embeds = {m.group(1) for m in _GO_EMBED_LINE_RE.finditer(body)}
+        if embeds:
+            result[struct_name] = embeds
+    return result
+
+
+def _has_init_func(content: str) -> bool:
+    return _GO_INIT_FUNC_RE.search(content) is not None
 
 
 def _is_go_file(path: Path) -> bool:
@@ -144,6 +162,7 @@ class GoEdgeBuilder(EdgeBuilder):
     type_weight = EDGE_WEIGHTS["go_type"].forward
     func_weight = EDGE_WEIGHTS["go_func"].forward
     same_package_weight = EDGE_WEIGHTS["go_same_package"].forward
+    init_same_package_weight = 0.15
     reverse_weight_factor = EDGE_WEIGHTS["go_import"].reverse_factor
 
     def discover_related_files(
@@ -291,7 +310,10 @@ class GoEdgeBuilder(EdgeBuilder):
         self._link_refs(gf, type_refs, type_defs, self.type_weight, edges)
         self._link_refs(gf, func_calls, func_defs, self.func_weight, edges)
         self._link_pkg_calls(gf, pkg_calls, pkg_to_frags, edges)
-        self._link_same_package(gf, pkg_to_frags, edges)
+        self._link_embedded_types(gf, type_defs, edges)
+
+        has_init = _has_init_func(gf.content)
+        self._link_same_package(gf, pkg_to_frags, edges, has_init)
 
     def _link_imports(
         self,
@@ -353,13 +375,28 @@ class GoEdgeBuilder(EdgeBuilder):
                 if fid != gf.id:
                     self.add_edge(edges, gf.id, fid, self.func_weight)
 
+    def _link_embedded_types(
+        self,
+        gf: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        embedded_map = _extract_embedded_types(gf.content)
+        for embeds in embedded_map.values():
+            for embed_name in embeds:
+                for fid in type_defs.get(embed_name.lower(), []):
+                    if fid != gf.id:
+                        self.add_edge(edges, gf.id, fid, self.type_weight)
+
     def _link_same_package(
         self,
         gf: Fragment,
         pkg_to_frags: dict[str, list[FragmentId]],
         edges: EdgeDict,
+        has_init: bool = False,
     ) -> None:
+        weight = self.init_same_package_weight if has_init else self.same_package_weight
         current_pkg = _get_package_name_from_content(gf.content, gf.path).lower()
         for fid in pkg_to_frags.get(current_pkg, []):
             if fid != gf.id:
-                self.add_edge(edges, gf.id, fid, self.same_package_weight)
+                self.add_edge(edges, gf.id, fid, weight)

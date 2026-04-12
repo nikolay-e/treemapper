@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from tree_sitter import Language, Node, Parser
 
@@ -102,7 +103,43 @@ _LANG_MODULES = {
     "cpp": "tree_sitter_cpp",
     "ruby": "tree_sitter_ruby",
     "c_sharp": "tree_sitter_c_sharp",
+    "csharp": "tree_sitter_c_sharp",
+    "elixir": "tree_sitter_elixir",
+    "lua": "tree_sitter_lua",
+    "ocaml": "tree_sitter_ocaml",
+    "php": "tree_sitter_php",
+    "scala": "tree_sitter_scala",
+    "swift": "tree_sitter_swift",
 }
+
+
+def _import_lang_module(lang: str) -> Any | None:
+    import importlib
+
+    module_name = _LANG_MODULES.get(lang)
+    if not module_name:
+        return None
+    try:
+        return importlib.import_module(module_name)
+    except ImportError:
+        return None
+
+
+def get_ts_language(lang: str) -> Language | None:
+    mod = _import_lang_module(lang)
+    if mod is None:
+        return None
+    if lang == "tsx":
+        return Language(mod.language_tsx())
+    if lang == "typescript":
+        return Language(mod.language_typescript())
+    if lang == "ocaml" and hasattr(mod, "language_ocaml"):
+        return Language(mod.language_ocaml())
+    if lang == "php" and hasattr(mod, "language_php"):
+        return Language(mod.language_php())
+    if hasattr(mod, "language"):
+        return Language(mod.language())
+    return None
 
 
 class TreeSitterStrategy:
@@ -118,29 +155,13 @@ class TreeSitterStrategy:
         if lang in self._parsers:
             raise ValueError(f"Grammar unavailable for language: {lang}")
 
-        if lang not in _LANG_MODULES:
-            raise ValueError(f"Unsupported language: {lang}")
-
-        import importlib
-
-        module_name = _LANG_MODULES[lang]
-        try:
-            ts_lang_module = importlib.import_module(module_name)
-        except ImportError:
+        ts_lang = get_ts_language(lang)
+        if ts_lang is None:
             self._parsers[lang] = None
             raise ValueError(f"Grammar unavailable for language: {lang}")
 
-        if lang == "tsx":
-            ts_lang = ts_lang_module.language_tsx()
-        elif lang == "typescript":
-            ts_lang = ts_lang_module.language_typescript()
-        elif hasattr(ts_lang_module, "language"):
-            ts_lang = ts_lang_module.language()
-        else:
-            ts_lang = ts_lang_module
-
         parser = Parser()
-        parser.language = Language(ts_lang)
+        parser.language = ts_lang
         self._parsers[lang] = parser
         return parser
 

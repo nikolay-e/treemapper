@@ -16,6 +16,8 @@ _RUST_STRUCT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+([A-Z]\w*)"
 _RUST_ENUM_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?enum\s+([A-Z]\w*)", re.MULTILINE)
 _RUST_TRAIT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?trait\s+([A-Z]\w*)", re.MULTILINE)
 _RUST_IMPL_RE = re.compile(r"^\s*impl(?:<[^>\n]*>)?\s+(?:\w+\s+for\s+)?([A-Z]\w*)", re.MULTILINE)
+_RUST_TRAIT_IMPL_RE = re.compile(r"^\s*impl(?:<[^>\n]*>)?\s+(\w+)\s+for\s+(\w+)", re.MULTILINE)
+_RUST_PUB_USE_RE = re.compile(r"^\s*pub\s+use\s+(?:crate::)?([a-z_]\w*(?:::\w+)*)", re.MULTILINE)
 _RUST_TYPE_ALIAS_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?type\s+([A-Z]\w*)", re.MULTILINE)
 
 _RUST_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
@@ -201,6 +203,14 @@ def _extract_mods(content: str) -> set[str]:
     return {m.group(1) for m in _RUST_MOD_RE.finditer(content)}
 
 
+def _extract_trait_impls(content: str) -> list[tuple[str, str]]:
+    return [(m.group(1), m.group(2)) for m in _RUST_TRAIT_IMPL_RE.finditer(content)]
+
+
+def _extract_pub_uses(content: str) -> list[str]:
+    return [m.group(1) for m in _RUST_PUB_USE_RE.finditer(content)]
+
+
 def _extract_definitions(content: str) -> tuple[set[str], set[str]]:
     funcs = {m.group(1) for m in _RUST_FN_RE.finditer(content)}
     types: set[str] = set()
@@ -270,21 +280,28 @@ class RustEdgeBuilder(EdgeBuilder):
 
         edges: EdgeDict = {}
         indices = self._build_indices(rust_frags)
+        _name_to_frags, _mod_to_frags, type_defs, fn_defs, trait_impls = indices
+
+        self._link_trait_impls(trait_impls, type_defs, edges)
+        self._link_pub_use_edges(rust_frags, type_defs, fn_defs, edges)
 
         for rf in rust_frags:
             self._link_fragment(rf, rust_frags, indices, edges)
 
         return edges
 
-    def _build_indices(
-        self, rust_frags: list[Fragment]
-    ) -> tuple[
-        dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]
+    def _build_indices(self, rust_frags: list[Fragment]) -> tuple[
+        dict[str, list[FragmentId]],
+        dict[str, list[FragmentId]],
+        dict[str, list[FragmentId]],
+        dict[str, list[FragmentId]],
+        dict[FragmentId, list[tuple[str, str]]],
     ]:
         name_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         mod_to_frags: dict[str, list[FragmentId]] = defaultdict(list)
         type_defs: dict[str, list[FragmentId]] = defaultdict(list)
         fn_defs: dict[str, list[FragmentId]] = defaultdict(list)
+        trait_impls: dict[FragmentId, list[tuple[str, str]]] = defaultdict(list)
 
         for f in rust_frags:
             stem = f.path.stem.lower()
@@ -304,18 +321,36 @@ class RustEdgeBuilder(EdgeBuilder):
             for mod_name in _extract_mods(f.content):
                 mod_to_frags[mod_name.lower()].append(f.id)
 
-        return name_to_frags, mod_to_frags, type_defs, fn_defs
+            for trait_name, type_name in _extract_trait_impls(f.content):
+                trait_impls[f.id].append((trait_name, type_name))
+
+            for pub_use_path in _extract_pub_uses(f.content):
+                parts = pub_use_path.split("::")
+                leaf = parts[-1]
+                leaf_lower = leaf.lower()
+                if leaf_lower not in name_to_frags:
+                    for target_fid_list in [type_defs.get(leaf_lower, []), fn_defs.get(leaf_lower, [])]:
+                        for target_fid in target_fid_list:
+                            if target_fid != f.id:
+                                name_to_frags[leaf_lower].append(f.id)
+                                break
+
+        return name_to_frags, mod_to_frags, type_defs, fn_defs, trait_impls
 
     def _link_fragment(
         self,
         rf: Fragment,
         rust_frags: list[Fragment],
         indices: tuple[
-            dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]], dict[str, list[FragmentId]]
+            dict[str, list[FragmentId]],
+            dict[str, list[FragmentId]],
+            dict[str, list[FragmentId]],
+            dict[str, list[FragmentId]],
+            dict[FragmentId, list[tuple[str, str]]],
         ],
         edges: EdgeDict,
     ) -> None:
-        name_to_frags, mod_to_frags, type_defs, fn_defs = indices
+        name_to_frags, mod_to_frags, type_defs, fn_defs, _trait_impls = indices
 
         type_refs, fn_calls, path_calls = _extract_references(rf.content)
 
@@ -324,6 +359,34 @@ class RustEdgeBuilder(EdgeBuilder):
         self._link_refs(rf, type_refs, fn_calls, type_defs, fn_defs, edges)
         self._link_path_calls(rf, path_calls, mod_to_frags, edges)
         self._link_same_crate(rf, rust_frags, edges)
+
+    def _link_trait_impls(
+        self,
+        trait_impls: dict[FragmentId, list[tuple[str, str]]],
+        type_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for impl_fid, pairs in trait_impls.items():
+            for trait_name, _type_name in pairs:
+                for trait_fid in type_defs.get(trait_name.lower(), []):
+                    if trait_fid != impl_fid:
+                        self.add_edge(edges, impl_fid, trait_fid, self.type_weight)
+
+    def _link_pub_use_edges(
+        self,
+        rust_frags: list[Fragment],
+        type_defs: dict[str, list[FragmentId]],
+        fn_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for f in rust_frags:
+            for pub_use_path in _extract_pub_uses(f.content):
+                parts = pub_use_path.split("::")
+                leaf_lower = parts[-1].lower()
+                for target_fid_list in [type_defs.get(leaf_lower, []), fn_defs.get(leaf_lower, [])]:
+                    for target_fid in target_fid_list:
+                        if target_fid != f.id:
+                            self.add_edge(edges, f.id, target_fid, self.use_weight)
 
     def _link_uses(
         self,

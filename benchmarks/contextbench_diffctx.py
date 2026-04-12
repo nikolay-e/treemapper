@@ -162,26 +162,20 @@ def run_diffctx(repo_dir: Path, budget: int = 8000, scoring_mode: str = "auto") 
         return None
 
 
-def run_baseline_patch_files(repo_dir: Path, budget: int = 8000) -> dict | None:
+def _pack_files_to_fragments(repo_dir: Path, ranked_files: list[str], budget: int) -> dict:
     import tiktoken
 
     enc = tiktoken.get_encoding("o200k_base")
-    r = subprocess.run(
-        ["git", "-C", str(repo_dir), "diff", "HEAD~1..HEAD", "--name-only"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
     fragments = []
     used = 0
-    for rel_path in r.stdout.strip().splitlines():
+    for rel_path in ranked_files:
         if used >= budget:
             break
         full = repo_dir / rel_path
         if not full.is_file():
             continue
         try:
-            content = full.read_text(encoding="utf-8")
+            content = full.read_text(encoding="utf-8", errors="replace")
         except (OSError, UnicodeDecodeError):
             continue
         tokens = enc.encode(content)
@@ -203,6 +197,16 @@ def run_baseline_patch_files(repo_dir: Path, budget: int = 8000) -> dict | None:
         "fragment_count": len(fragments),
         "fragments": fragments,
     }
+
+
+def run_baseline_patch_files(repo_dir: Path, budget: int = 8000) -> dict | None:
+    r = subprocess.run(
+        ["git", "-C", str(repo_dir), "diff", "HEAD~1..HEAD", "--name-only"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return _pack_files_to_fragments(repo_dir, r.stdout.strip().splitlines(), budget)
 
 
 def extract_selected_files(output: dict) -> set[str]:

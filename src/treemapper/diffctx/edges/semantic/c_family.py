@@ -35,6 +35,16 @@ _TYPE_REF_RE = re.compile(r"\b([A-Z]\w*)\b")
 
 _METHOD_IMPL_RE = re.compile(r"^\s*(?:[\w:]+\s+)?(\w+)::(\w+)\s*\(", re.MULTILINE)
 
+_INHERITANCE_RE = re.compile(
+    r"(?:class|struct)\s+(\w+)\s*(?:final\s*)?:\s*"
+    r"((?:(?:public|protected|private|virtual)\s+)*\w+(?:\s*,\s*(?:(?:public|protected|private|virtual)\s+)*\w+)*)",
+    re.MULTILINE,
+)
+
+_FORWARD_DECL_RE = re.compile(r"^\s*(?:class|struct)\s+(\w+)\s*;", re.MULTILINE)
+
+_FRIEND_DECL_RE = re.compile(r"\bfriend\s+(?:class|struct)\s+(\w+)", re.MULTILINE)
+
 _C_KEYWORDS = frozenset(
     {
         "if",
@@ -144,6 +154,32 @@ def _extract_definitions(content: str) -> tuple[set[str], set[str], set[str]]:
     return functions, types, namespaces
 
 
+_BASE_CLASS_NAME_RE = re.compile(r"\b(\w+)\s*$")
+
+
+def _extract_inheritance(content: str) -> list[tuple[str, set[str]]]:
+    results: list[tuple[str, set[str]]] = []
+    for match in _INHERITANCE_RE.finditer(content):
+        derived = match.group(1)
+        bases_raw = match.group(2)
+        bases: set[str] = set()
+        for part in bases_raw.split(","):
+            m = _BASE_CLASS_NAME_RE.search(part.strip())
+            if m:
+                bases.add(m.group(1))
+        if bases:
+            results.append((derived, bases))
+    return results
+
+
+def _extract_forward_decls(content: str) -> set[str]:
+    return {match.group(1) for match in _FORWARD_DECL_RE.finditer(content)}
+
+
+def _extract_friend_decls(content: str) -> set[str]:
+    return {match.group(1) for match in _FRIEND_DECL_RE.finditer(content)}
+
+
 def _extract_references(content: str, own_defs: set[str]) -> tuple[set[str], set[str]]:
     calls: set[str] = set()
     type_refs: set[str] = set()
@@ -183,6 +219,9 @@ class CFamilyEdgeBuilder(EdgeBuilder):
     include_weight = EDGE_WEIGHTS["c_include"].forward
     call_weight = EDGE_WEIGHTS["c_call"].forward
     type_weight = EDGE_WEIGHTS["c_type"].forward
+    inheritance_weight = EDGE_WEIGHTS["c_inheritance"].forward
+    forward_decl_weight = EDGE_WEIGHTS["c_forward_decl"].forward
+    friend_weight = EDGE_WEIGHTS["c_friend"].forward
     reverse_weight_factor = EDGE_WEIGHTS["c_include"].reverse_factor
 
     def discover_related_files(
@@ -303,6 +342,9 @@ class CFamilyEdgeBuilder(EdgeBuilder):
 
         self._add_call_edges(f.id, calls, idx.func_defs, edges)
         self._add_type_edges(f.id, type_refs, idx.type_defs, edges)
+        self._add_inheritance_edges(f, idx.type_defs, edges)
+        self._add_forward_decl_edges(f, idx.type_defs, edges)
+        self._add_friend_edges(f, idx.type_defs, edges)
 
     def _add_include_edges(self, f: Fragment, header_to_frags: dict[str, list[FragmentId]], edges: EdgeDict) -> None:
         for inc in _extract_includes(f.content):
@@ -334,6 +376,40 @@ class CFamilyEdgeBuilder(EdgeBuilder):
             for def_id in type_defs.get(t, []):
                 if def_id != src_id:
                     self.add_edge(edges, src_id, def_id, self.type_weight)
+
+    def _add_inheritance_edges(
+        self,
+        f: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for _derived, bases in _extract_inheritance(f.content):
+            for base in bases:
+                for def_id in type_defs.get(base, []):
+                    if def_id != f.id:
+                        self.add_edge(edges, f.id, def_id, self.inheritance_weight)
+
+    def _add_forward_decl_edges(
+        self,
+        f: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for name in _extract_forward_decls(f.content):
+            for def_id in type_defs.get(name, []):
+                if def_id != f.id:
+                    self.add_edge(edges, f.id, def_id, self.forward_decl_weight)
+
+    def _add_friend_edges(
+        self,
+        f: Fragment,
+        type_defs: dict[str, list[FragmentId]],
+        edges: EdgeDict,
+    ) -> None:
+        for name in _extract_friend_decls(f.content):
+            for def_id in type_defs.get(name, []):
+                if def_id != f.id:
+                    self.add_edge(edges, f.id, def_id, self.friend_weight)
 
     def _link_header_impl_pairs(self, frags: list[Fragment], edges: EdgeDict) -> None:
         by_stem: dict[str, list[Fragment]] = defaultdict(list)
