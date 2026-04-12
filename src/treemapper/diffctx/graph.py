@@ -100,8 +100,8 @@ class Graph:
                             k += 1
                 indptr[i + 1] = k
             if k < total_edges:
-                indices = indices[:k]
-                weights = weights[:k]
+                indices = indices[:k]  # type: ignore[assignment,unused-ignore]
+                weights = weights[:k]  # type: ignore[assignment,unused-ignore]
             out_sum = np.zeros(n, dtype=np.float64)
             for i in range(n):
                 s, e = indptr[i], indptr[i + 1]
