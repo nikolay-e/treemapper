@@ -331,4 +331,12 @@ def build_diff_context(
         for frag in selected:
             frag.content = ""
 
-    return build_diff_context_output(root_dir, selected)
+    output = build_diff_context_output(root_dir, selected)
+    output["latency"] = {
+        "fragmentation_ms": round((t1 - t0) * 1000, 1),
+        "discovery_ms": round((t2 - t1) * 1000, 1),
+        "tokenization_ms": round((t4 - t2) * 1000, 1),
+        "scoring_selection_ms": round((t5 - t4) * 1000, 1),
+        "total_ms": round((t5 - t0) * 1000, 1),
+    }
+    return output

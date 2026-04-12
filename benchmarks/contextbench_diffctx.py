@@ -13,6 +13,13 @@ from collections import defaultdict
 from pathlib import Path
 
 LINES_RE = re.compile(r"^(\d+)-(\d+)$")
+_WORKSPACE_PREFIX_RE = re.compile(r"^/workspace/[^/]+/")
+
+
+def normalize_gold_path(path: str) -> str:
+    return _WORKSPACE_PREFIX_RE.sub("", path)
+
+
 _repos_suffix = os.environ.get("CONTEXTBENCH_REPOS_SUFFIX", "")
 _DEFAULT_REPOS = Path(os.environ.get("CB_REPOS_DIR", str(Path.home() / ".cache" / "contextbench_repos")))
 REPOS_DIR = _DEFAULT_REPOS / _repos_suffix if _repos_suffix else _DEFAULT_REPOS
@@ -31,7 +38,13 @@ def parse_lines_field(lines_str: str) -> tuple[int, int] | None:
 
 def parse_gold_context(raw: str) -> list[dict]:
     items = json.loads(raw)
-    return [g for g in items if g.get("file") and g.get("start_line") is not None]
+    out = []
+    for g in items:
+        if not g.get("file") or g.get("start_line") is None:
+            continue
+        g["file"] = normalize_gold_path(g["file"])
+        out.append(g)
+    return out
 
 
 def gold_files(gold: list[dict]) -> set[str]:
@@ -242,6 +255,7 @@ def evaluate_instance(inst: dict, budget: int = 8000, repos_dir: Path = REPOS_DI
         "line_recall_nontrivial": round(lo_nontrivial["line_recall"], 3),
         "gold_lines": lo_all["gold_lines"],
         "covered_lines": lo_all["covered_lines"],
+        "latency": output.get("latency"),
     }
 
     diagnostics = []
@@ -397,10 +411,12 @@ def main():
     t0 = time.time()
 
     if args.workers > 1:
-        from concurrent.futures import ProcessPoolExecutor
+        from concurrent.futures import ProcessPoolExecutor, as_completed
 
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            for r in pool.map(_run_one, enumerate(instances, 1)):
+            futures = {pool.submit(_run_one, (i, inst)): i for i, inst in enumerate(instances, 1)}
+            for future in as_completed(futures):
+                r = future.result()
                 if r:
                     results.append(r)
     else:

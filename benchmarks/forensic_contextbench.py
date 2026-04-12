@@ -12,6 +12,13 @@ import time
 from pathlib import Path
 
 LINES_RE = re.compile(r"^(\d+)-(\d+)$")
+_WORKSPACE_PREFIX_RE = re.compile(r"^/workspace/[^/]+/")
+
+
+def normalize_gold_path(path: str) -> str:
+    return _WORKSPACE_PREFIX_RE.sub("", path)
+
+
 REPOS_DIR = Path(tempfile.gettempdir()) / "contextbench_repos"
 REPOS_DIR.mkdir(exist_ok=True)
 
@@ -285,6 +292,8 @@ def evaluate_one(inst: dict, budget: int) -> dict:
     print(f"Base: {inst['base_commit'][:12]}")
 
     gold_blocks = json.loads(inst["gold_context"]) if isinstance(inst["gold_context"], str) else inst["gold_context"]
+    for g in gold_blocks:
+        g["file"] = normalize_gold_path(g["file"])
     gold_set = {g["file"] for g in gold_blocks}
     added, deleted, modified = patch_files(inst["patch"])
     p_set = added | deleted | modified
@@ -393,7 +402,7 @@ def main():
         kept = []
         for i in insts:
             gb = json.loads(i["gold_context"]) if isinstance(i["gold_context"], str) else i["gold_context"]
-            gold = {g["file"] for g in gb}
+            gold = {normalize_gold_path(g["file"]) for g in gb}
             added, deleted, modified = patch_files(i["patch"])
             if gold - (added | deleted | modified):
                 kept.append(i)

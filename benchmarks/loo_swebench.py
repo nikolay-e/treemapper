@@ -193,11 +193,12 @@ def main():
     t0 = time.time()
 
     if args.workers > 1:
-        from concurrent.futures import ProcessPoolExecutor
+        from concurrent.futures import ProcessPoolExecutor, as_completed
 
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            for results in pool.map(_run_one, enumerate(multi_file, 1)):
-                all_results.extend(results)
+            futures = {pool.submit(_run_one, (i, inst)): i for i, inst in enumerate(multi_file, 1)}
+            for future in as_completed(futures):
+                all_results.extend(future.result())
     else:
         for i, inst in enumerate(multi_file, 1):
             all_results.extend(_run_one((i, inst)))
