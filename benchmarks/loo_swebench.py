@@ -90,6 +90,36 @@ def run_diffctx(repo_dir: Path, budget: int, scoring_mode: str = "auto") -> set[
         return set()
 
 
+_VENDOR_SEGMENTS = frozenset({"vendor/", "node_modules/", "third_party/", "generated/", "__generated__/", ".pb.go", "_pb2.py"})
+
+
+def is_mechanical_change(patch_text: str) -> bool:
+    if "similarity index 9" in patch_text or "similarity index 100%" in patch_text:
+        return True
+    return patch_text.count("diff --git") > 20
+
+
+def is_vendor_or_generated(file_path: str) -> bool:
+    return any(seg in file_path for seg in _VENDOR_SEGMENTS)
+
+
+def _pick_distractor(repo_dir: Path, hidden: str) -> str | None:
+    suffix = Path(hidden).suffix
+    if not suffix:
+        return None
+    r = run_cmd(["find", str(repo_dir), "-name", f"*{suffix}", "-type", "f"], check=False, timeout=10)
+    candidates = [line for line in r.stdout.splitlines() if line.strip() and hidden not in line]
+    if not candidates:
+        return None
+    import random as _rng
+
+    pick = _rng.choice(candidates[:50])  # NOSONAR — non-crypto random for benchmark sampling
+    try:
+        return str(Path(pick).relative_to(repo_dir))
+    except ValueError:
+        return None
+
+
 def evaluate_loo(inst: dict, budget: int, scoring_mode: str = "auto", repos_dir: Path = REPOS_DIR) -> list[dict]:
     iid = inst["instance_id"]
     all_patch_files = patch_files(inst["patch"])
@@ -118,11 +148,16 @@ def evaluate_loo(inst: dict, budget: int, scoring_mode: str = "auto", repos_dir:
         selected = run_diffctx(repo_dir, budget, scoring_mode)
         found = hidden in selected
 
+        distractor = _pick_distractor(repo_dir, hidden)
+        found_distractor = distractor in selected if distractor else False
+
         results.append(
             {
                 "instance_id": iid,
                 "hidden_file": hidden,
                 "found": found,
+                "distractor": distractor,
+                "found_distractor": found_distractor,
                 "n_patch_files": len(all_patch_files),
                 "n_remaining": len(remaining_files),
                 "n_selected": len(selected),
@@ -179,8 +214,14 @@ def main():
     ds = load_dataset(args.dataset, args.split, split="train")
     insts = list(ds)
 
-    multi_file = [i for i in insts if len(patch_files(i["patch"])) >= 2]
-    print(f"Total instances: {len(insts)}, multi-file: {len(multi_file)}")
+    multi_file = [
+        i
+        for i in insts
+        if len(patch_files(i["patch"])) >= 2
+        and not is_mechanical_change(i["patch"])
+        and not any(is_vendor_or_generated(f) for f in patch_files(i["patch"]))
+    ]
+    print(f"Total instances: {len(insts)}, multi-file (filtered): {len(multi_file)}")
 
     rng = random.Random(args.seed)  # NOSONAR — deterministic PRNG for reproducible benchmarks
     rng.shuffle(multi_file)
@@ -215,8 +256,12 @@ def main():
 
     total = len(all_results)
     found = sum(1 for r in all_results if r["found"])
+    distractor_found = sum(1 for r in all_results if r.get("found_distractor"))
+    distractor_total = sum(1 for r in all_results if r.get("distractor"))
     print(f"Total LOO trials: {total}")
     print(f"Found hidden file: {found}/{total} ({100 * found / total:.1f}%)")
+    if distractor_total:
+        print(f"Found distractor:  {distractor_found}/{distractor_total} ({100 * distractor_found / distractor_total:.1f}%)")
     print()
 
     by_repo: dict[str, list[dict]] = defaultdict(list)

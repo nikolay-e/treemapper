@@ -290,6 +290,10 @@ def evaluate_instance(
     lo_all = line_overlap(gold, sel_ranges)
     lo_nontrivial = line_overlap(gold, sel_ranges, exclude_files=pf)
 
+    from metrics.def_coverage import def_coverage
+
+    ext_def_cov = def_coverage(inst["patch"], output.get("fragments", []))
+
     result = {
         "id": iid,
         "status": "ok",
@@ -307,6 +311,7 @@ def evaluate_instance(
         "line_recall_nontrivial": round(lo_nontrivial["line_recall"], 3),
         "gold_lines": lo_all["gold_lines"],
         "covered_lines": lo_all["covered_lines"],
+        "def_coverage": round(ext_def_cov, 3),
         "latency": output.get("latency"),
     }
 
@@ -352,8 +357,10 @@ def aggregate(results: list[dict]) -> None:
     print(f"AGGREGATE ({len(ok)} instances)")
     print(f"{'='*60}")
 
-    for metric in ["file_recall", "nontrivial_file_recall", "line_recall", "line_recall_nontrivial"]:
-        vals = [r[metric] for r in ok]
+    for metric in ["file_recall", "nontrivial_file_recall", "line_recall", "line_recall_nontrivial", "def_coverage"]:
+        vals = [r[metric] for r in ok if metric in r]
+        if not vals:
+            continue
         avg = sum(vals) / len(vals)
         print(f"  {metric:30s}: {avg:.3f} (min={min(vals):.3f}, max={max(vals):.3f})")
 
