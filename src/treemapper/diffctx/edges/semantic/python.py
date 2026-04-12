@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 _RG_BIN = None if os.environ.get("DIFFCTX_NO_RIPGREP") else shutil.which("rg")
 
-_IMPORT_LINE_RE = re.compile(r"^\s*(?:" r"from\s+(\.+)?([\w.]*)\s+import" r"|" r"import\s+([\w.]+(?:\s*,\s*[\w.]+)*)" r")")
+_IMPORT_LINE_RE = re.compile(r"^\s*(?:from\s+(\.+)?([\w.]*)\s+import|import\s+([\w.]+(?:\s*,\s*[\w.]+)*))")
 
 _PYTHON_EXTS = {".py", ".pyi", ".pyw"}
 

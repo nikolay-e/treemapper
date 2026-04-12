@@ -118,7 +118,7 @@ def _format_cycles(g: GraphArgs, pg: Any) -> str:
     return "\n".join(lines)
 
 
-def _format_hotspots(g: GraphArgs, pg: Any) -> str:
+def _format_hotspots(_g: GraphArgs, pg: Any) -> str:
     from .diffctx.graph_analytics import hotspots
 
     hot = hotspots(pg, top=10, edge_types=set(_ARCHITECTURAL_EDGE_TYPES))

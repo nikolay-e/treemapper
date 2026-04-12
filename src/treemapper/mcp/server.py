@@ -34,7 +34,7 @@ _TOOL_DESCRIPTION = (
 )
 
 
-@mcp.tool(description=_TOOL_DESCRIPTION)  # type: ignore[misc]
+@mcp.tool(description=_TOOL_DESCRIPTION)
 async def get_diff_context(
     repo_path: str,
     diff_range: str = "HEAD~1..HEAD",

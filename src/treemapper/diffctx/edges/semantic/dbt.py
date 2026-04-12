@@ -175,7 +175,7 @@ class DbtEdgeBuilder(EdgeBuilder):
         for macro_def in _extract_macro_defs(content):
             model_names.add(macro_def)
 
-    def _collect_refs_from_yaml(self, content: str, refs: set[str], source_tables: set[str]) -> None:
+    def _collect_refs_from_yaml(self, content: str, refs: set[str], _source_tables: set[str]) -> None:
         for name in _extract_schema_model_names(content):
             refs.add(name.lower())
             refs.add(f"{name}.sql")

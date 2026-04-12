@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 _LOCAL_DEF_RE = re.compile(
-    r"^\s*(?:def|class)\s+(\w+)|" r"^\s*(\w+)\s*[:=]|" r"^\s*for\s+(\w+)\s+in|" r"^\s*with\s+.*\s+as\s+(\w+)",
+    r"^\s*(?:def|class)\s+(\w+)|^\s*(\w+)\s*[:=]|^\s*for\s+(\w+)\s+in|^\s*with\s+.*\s+as\s+(\w+)",
     re.MULTILINE,
 )
 _IDENT_RE = re.compile(r"[A-Za-z_]\w{2,}")
