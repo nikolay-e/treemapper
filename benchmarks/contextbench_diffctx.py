@@ -149,6 +149,49 @@ def run_diffctx(repo_dir: Path, budget: int = 8000, scoring_mode: str = "auto") 
         return None
 
 
+def run_baseline_patch_files(repo_dir: Path, budget: int = 8000) -> dict | None:
+    import tiktoken
+
+    enc = tiktoken.get_encoding("o200k_base")
+    r = subprocess.run(
+        ["git", "-C", str(repo_dir), "diff", "HEAD~1..HEAD", "--name-only"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    fragments = []
+    used = 0
+    for rel_path in r.stdout.strip().splitlines():
+        if used >= budget:
+            break
+        full = repo_dir / rel_path
+        if not full.is_file():
+            continue
+        try:
+            content = full.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        tokens = enc.encode(content)
+        available = budget - used
+        truncated = enc.decode(tokens[:available])
+        lines = truncated.splitlines()
+        fragments.append(
+            {
+                "path": rel_path,
+                "lines": f"1-{len(lines)}",
+                "kind": "file",
+                "content": truncated,
+            }
+        )
+        used += min(len(tokens), available)
+    return {
+        "name": repo_dir.name,
+        "type": "diff_context",
+        "fragment_count": len(fragments),
+        "fragments": fragments,
+    }
+
+
 def extract_selected_files(output: dict) -> set[str]:
     return {f["path"] for f in output.get("fragments", [])}
 
@@ -185,7 +228,13 @@ def line_overlap(
     }
 
 
-def evaluate_instance(inst: dict, budget: int = 8000, repos_dir: Path = REPOS_DIR, scoring_mode: str = "auto") -> dict | None:
+def evaluate_instance(
+    inst: dict,
+    budget: int = 8000,
+    repos_dir: Path = REPOS_DIR,
+    scoring_mode: str = "auto",
+    baseline: str = "treemapper",
+) -> dict | None:
     iid = inst["instance_id"]
     gold = parse_gold_context(inst["gold_context"])
     gf = gold_files(gold)
@@ -214,7 +263,10 @@ def evaluate_instance(inst: dict, budget: int = 8000, repos_dir: Path = REPOS_DI
         return {"id": iid, "status": "apply_fail"}
 
     t0 = time.time()
-    output = run_diffctx(repo_dir, budget, scoring_mode)
+    if baseline == "patch_files":
+        output = run_baseline_patch_files(repo_dir, budget)
+    else:
+        output = run_diffctx(repo_dir, budget, scoring_mode)
     elapsed = time.time() - t0
 
     subprocess.run(
@@ -348,6 +400,7 @@ def aggregate(results: list[dict]) -> None:
 
 _BUDGET: int = 8000
 _SCORING: str = "auto"
+_BASELINE: str = "treemapper"
 
 
 def _run_one(idx_inst: tuple[int, dict]) -> dict | None:
@@ -355,14 +408,14 @@ def _run_one(idx_inst: tuple[int, dict]) -> dict | None:
     worker_dir = REPOS_DIR / f"w{os.getpid()}"
     worker_dir.mkdir(exist_ok=True)
     try:
-        return evaluate_instance(inst, _BUDGET, repos_dir=worker_dir, scoring_mode=_SCORING)
+        return evaluate_instance(inst, _BUDGET, repos_dir=worker_dir, scoring_mode=_SCORING, baseline=_BASELINE)
     except Exception as e:
         print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
         return None
 
 
 def main():
-    global _BUDGET, _SCORING
+    global _BUDGET, _SCORING, _BASELINE
 
     import argparse
 
@@ -380,9 +433,11 @@ def main():
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--workers", type=int, default=11)
     parser.add_argument("--scoring", type=str, default="auto", choices=["auto", "precise", "discover"])
+    parser.add_argument("--baseline", type=str, default="treemapper", choices=["treemapper", "patch_files"])
     args = parser.parse_args()
     _BUDGET = args.budget
     _SCORING = args.scoring
+    _BASELINE = args.baseline
 
     from datasets import load_dataset
 

@@ -315,6 +315,26 @@ def _init_selection_state(
     return state
 
 
+def _topk_select(
+    fragments: list[Fragment],
+    core_ids: set[FragmentId],
+    rel: dict[FragmentId, float],
+    budget_tokens: int,
+) -> SelectionResult:
+    sorted_frags = sorted(fragments, key=lambda f: -rel.get(f.id, 0.0))
+    selected: list[Fragment] = []
+    used = 0
+    for f in sorted_frags:
+        if used + f.token_count > budget_tokens:
+            continue
+        selected.append(f)
+        used += f.token_count
+    return _log_and_return(
+        SelectionResult(selected=selected, reason="topk", used_tokens=used, utility=0.0),
+        core_ids,
+    )
+
+
 def lazy_greedy_select(
     fragments: list[Fragment],
     core_ids: set[FragmentId],

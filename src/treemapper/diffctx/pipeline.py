@@ -103,15 +103,20 @@ def _score_and_select(
     file_importance = compute_file_importance(scoring_result.filtered_fragments)
     effective_budget = budget_tokens if budget_tokens is not None else _UNLIMITED_BUDGET
 
-    result = lazy_greedy_select(
-        fragments=scoring_result.filtered_fragments,
-        core_ids=core_ids,
-        rel=scoring_result.rel_scores,
-        needs=needs,
-        budget_tokens=effective_budget,
-        tau=tau,
-        file_importance=file_importance,
-    )
+    if os.environ.get("DIFFCTX_NO_SUBMODULAR"):
+        from .select import _topk_select
+
+        result = _topk_select(scoring_result.filtered_fragments, core_ids, scoring_result.rel_scores, effective_budget)
+    else:
+        result = lazy_greedy_select(
+            fragments=scoring_result.filtered_fragments,
+            core_ids=core_ids,
+            rel=scoring_result.rel_scores,
+            needs=needs,
+            budget_tokens=effective_budget,
+            tau=tau,
+            file_importance=file_importance,
+        )
 
     selected = _coherence_post_pass(result, scoring_result.filtered_fragments, scoring_result.graph, effective_budget)
     return selected.selected, selected
@@ -287,9 +292,10 @@ def build_diff_context(
 
     core_ids = _identify_core_fragments(hunks, all_fragments)
 
-    signature_frags = _generate_signature_variants(all_fragments)
-    _assign_token_counts(signature_frags)
-    all_fragments.extend(signature_frags)
+    if not os.environ.get("DIFFCTX_DISABLE_SIGNATURES"):
+        signature_frags = _generate_signature_variants(all_fragments)
+        _assign_token_counts(signature_frags)
+        all_fragments.extend(signature_frags)
 
     t4 = time.perf_counter()
 
