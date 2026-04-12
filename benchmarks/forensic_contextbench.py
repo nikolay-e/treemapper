@@ -19,8 +19,8 @@ def normalize_gold_path(path: str) -> str:
     return _WORKSPACE_PREFIX_RE.sub("", path)
 
 
-REPOS_DIR = Path(tempfile.gettempdir()) / "contextbench_repos"
-REPOS_DIR.mkdir(exist_ok=True)
+REPOS_DIR = Path(os.environ.get("CB_REPOS_DIR", str(Path.home() / ".cache" / "contextbench_repos")))
+REPOS_DIR.mkdir(parents=True, exist_ok=True)
 
 RECOGNIZED_EXT = {
     ".py",

@@ -94,9 +94,15 @@ _VENDOR_SEGMENTS = frozenset({"vendor/", "node_modules/", "third_party/", "gener
 
 
 def is_mechanical_change(patch_text: str) -> bool:
-    if "similarity index 9" in patch_text or "similarity index 100%" in patch_text:
+    if "similarity index 100%" in patch_text:
         return True
-    return patch_text.count("diff --git") > 20
+    if patch_text.count("diff --git") > 30:
+        return True
+    changes = [ln for ln in patch_text.splitlines() if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))]
+    if not changes:
+        return True
+    whitespace_only = sum(1 for ln in changes if not ln[1:].strip())
+    return whitespace_only / len(changes) > 0.8
 
 
 def is_vendor_or_generated(file_path: str) -> bool:
@@ -111,9 +117,11 @@ def _pick_distractor(repo_dir: Path, hidden: str) -> str | None:
     candidates = [line for line in r.stdout.splitlines() if line.strip() and hidden not in line]
     if not candidates:
         return None
-    import random as _rng
+    import hashlib
 
-    pick = _rng.choice(candidates[:50])  # NOSONAR — non-crypto random for benchmark sampling
+    seed = int(hashlib.md5(hidden.encode()).hexdigest()[:8], 16)  # NOSONAR — deterministic, not crypto
+    rng = random.Random(seed)
+    pick = rng.choice(candidates[:50])
     try:
         return str(Path(pick).relative_to(repo_dir))
     except ValueError:
@@ -173,6 +181,7 @@ def evaluate_loo(inst: dict, budget: int, scoring_mode: str = "auto", repos_dir:
 
 _BUDGET: int = 8000
 _SCORING: str = "auto"
+_INSTANCE_TIMEOUT: int = 300
 
 
 def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
@@ -183,11 +192,25 @@ def _run_one(idx_inst: tuple[int, dict]) -> list[dict]:
     worker_dir.mkdir(exist_ok=True)
     print(f"[{i}] {iid} ({n_files} files)", flush=True)
     try:
-        results = evaluate_loo(inst, _BUDGET, _SCORING, repos_dir=worker_dir)
+        import signal
+
+        def _timeout_handler(_sig: int, _frame: object) -> None:
+            raise TimeoutError
+
+        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+        signal.alarm(_INSTANCE_TIMEOUT)
+        try:
+            results = evaluate_loo(inst, _BUDGET, _SCORING, repos_dir=worker_dir)
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
         hits = sum(1 for r in results if r["found"])
         total = len(results)
         print(f"  LOO: {hits}/{total} found ({100 * hits / max(1, total):.0f}%)", flush=True)
         return results
+    except TimeoutError:
+        print(f"  TIMEOUT ({_INSTANCE_TIMEOUT}s): {iid}", flush=True)
+        return []
     except Exception as e:
         print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
         return []

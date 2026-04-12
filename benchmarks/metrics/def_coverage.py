@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import re
 
-_LOCAL_DEF_RE = re.compile(r"^\s*(\w+)\s*=", re.MULTILINE)
+_LOCAL_DEF_RE = re.compile(
+    r"^\s*(?:def|class)\s+(\w+)|" r"^\s*(\w+)\s*[:=]|" r"^\s*for\s+(\w+)\s+in|" r"^\s*with\s+.*\s+as\s+(\w+)",
+    re.MULTILINE,
+)
 _IDENT_RE = re.compile(r"[A-Za-z_]\w{2,}")
 
 _BUILTINS = frozenset(
@@ -150,7 +153,9 @@ def extract_external_symbols(diff_text: str) -> set[str]:
     for line in added_lines:
         all_idents.update(m.group() for m in _IDENT_RE.finditer(line))
         for m in _LOCAL_DEF_RE.finditer(line):
-            locally_defined.add(m.group(1))
+            name = next((g for g in m.groups() if g), None)
+            if name:
+                locally_defined.add(name)
     return {s for s in all_idents if s not in locally_defined and s.lower() not in _BUILTINS and len(s) > 2}
 
 
@@ -168,5 +173,5 @@ def def_coverage(diff_text: str, selected_fragments: list[dict]) -> float:
     if not external:
         return 1.0
     defined = extract_definitions_in_context(selected_fragments)
-    covered = sum(1 for s in external if s in defined or s.lower() in {d.lower() for d in defined})
+    covered = len(external & defined)
     return covered / len(external)

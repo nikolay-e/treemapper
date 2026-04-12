@@ -52,14 +52,27 @@ def gold_files(gold: list[dict]) -> set[str]:
 
 
 def patch_files(patch: str) -> set[str]:
-    files = set()
+    added, deleted, modified = set(), set(), set()
+    cur_a = cur_b = None
     for line in patch.splitlines():
-        if line.startswith("+++ b/"):
-            files.add(line[6:])
-        elif line.startswith("--- a/"):
-            files.add(line[6:])
-    files.discard("/dev/null")
-    return files
+        if line.startswith("diff --git "):
+            cur_a = cur_b = None
+        elif line.startswith("--- "):
+            p = line[4:]
+            cur_a = None if p == "/dev/null" else (p[2:] if p.startswith("a/") else p)
+        elif line.startswith("+++ "):
+            p = line[4:]
+            cur_b = None if p == "/dev/null" else (p[2:] if p.startswith("b/") else p)
+            if cur_a is None and cur_b is not None:
+                added.add(cur_b)
+            elif cur_a is not None and cur_b is None:
+                deleted.add(cur_a)
+            elif cur_a == cur_b and cur_a is not None:
+                modified.add(cur_a)
+            elif cur_a is not None and cur_b is not None:
+                modified.add(cur_b)
+                modified.add(cur_a)
+    return added | deleted | modified
 
 
 def is_nontrivial(gold: list[dict], patch: str) -> bool:

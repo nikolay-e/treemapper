@@ -29,7 +29,8 @@ def run_at_budget(budget: int, mode: str, output: Path, limit: int, workers: int
         str(output),
     ]
     print(f"  Running: budget={budget} mode={mode} limit={limit}...", flush=True)
-    subprocess.run(cmd, check=True, env={**os.environ})
+    env = {k: v for k, v in os.environ.items() if k != "DIFFCTX_SCORING"}
+    subprocess.run(cmd, check=True, env=env)
 
 
 def main() -> None:
