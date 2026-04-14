@@ -148,8 +148,9 @@ class ScoringStrategy(ABC):
 
 
 class PPRScoring(ScoringStrategy):
-    def __init__(self, alpha: float = 0.60) -> None:
+    def __init__(self, alpha: float = 0.60, low_relevance_filter: bool = True) -> None:
         self.alpha = alpha
+        self.low_relevance_filter = low_relevance_filter
 
     def score_and_filter(
         self,
@@ -185,7 +186,10 @@ class PPRScoring(ScoringStrategy):
             )
 
         filtered = _filter_unrelated_fragments(all_fragments, core_ids, graph)
-        filtered = _filter_low_relevance_fragments(filtered, core_ids, rel_scores)
+        if self.low_relevance_filter:
+            filtered = _filter_low_relevance_fragments(filtered, core_ids, rel_scores)
+        else:
+            filtered = [f for f in filtered if f.id in core_ids or rel_scores.get(f.id, 0.0) > 0]
         filtered = _cap_context_fragments(filtered, core_ids, rel_scores)
 
         return ScoringResult(rel_scores=rel_scores, filtered_fragments=filtered, graph=graph)
