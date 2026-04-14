@@ -160,6 +160,8 @@ _REEXPORT_SOURCE_RE = re.compile(
 )
 
 _MAX_EXTENDS_DEPTH = 5
+_REEXPORT_MAX_DEPTH = 2
+_DISCOVERY_MAX_DEPTH = 2
 
 
 def _strip_jsonc_comments(text: str) -> str:
@@ -320,18 +322,51 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
 
         changed_set = set(changed_files)
         discovered: set[Path] = set()
+        frontier = list(js_changed)
 
-        changed_names = self._collect_changed_names(js_changed, repo_root)
-        if changed_names:
-            discovered.update(self._find_importing_files(all_candidate_files, changed_set, changed_names))
-
-        exported_names = self._collect_exported_names(js_changed)
-        if exported_names:
-            discovered.update(self._find_files_importing_names(exported_names, all_candidate_files, changed_set))
-
-        discovered.update(self._discover_forward_imports(js_changed, all_candidate_files, changed_set, repo_root))
+        for _depth in range(_DISCOVERY_MAX_DEPTH):
+            newly_found = self._discover_one_hop(
+                frontier,
+                all_candidate_files,
+                changed_set,
+                discovered,
+                repo_root,
+            )
+            if not newly_found:
+                break
+            discovered.update(newly_found)
+            frontier = [f for f in newly_found if _is_js_file(f)]
 
         return list(discovered)
+
+    def _discover_one_hop(
+        self,
+        frontier_files: list[Path],
+        all_candidate_files: list[Path],
+        changed_set: set[Path],
+        already_discovered: set[Path],
+        repo_root: Path | None,
+    ) -> list[Path]:
+        excluded = changed_set | already_discovered
+        hop_discovered: set[Path] = set()
+
+        changed_names = self._collect_changed_names(frontier_files, repo_root)
+        if changed_names:
+            for f in self._find_importing_files(all_candidate_files, excluded, changed_names):
+                if f not in excluded:
+                    hop_discovered.add(f)
+
+        exported_names = self._collect_exported_names(frontier_files)
+        if exported_names:
+            for f in self._find_files_importing_names(exported_names, all_candidate_files, excluded):
+                if f not in excluded:
+                    hop_discovered.add(f)
+
+        for f in self._discover_forward_imports(frontier_files, all_candidate_files, excluded, repo_root):
+            if f not in excluded:
+                hop_discovered.add(f)
+
+        return list(hop_discovered)
 
     def _collect_changed_names(self, js_changed: list[Path], repo_root: Path | None) -> set[str]:
         changed_names: set[str] = set()
@@ -508,7 +543,14 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
         file_to_frags: dict[Path, list[FragmentId]],
         fragment_paths: set[Path],
         edges: EdgeDict,
+        depth: int = 0,
+        visited: set[Path] | None = None,
     ) -> None:
+        if visited is None:
+            visited = set()
+        if target_file in visited:
+            return
+        visited.add(target_file)
         try:
             content = target_file.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -527,6 +569,16 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
             reexport_target_ids = file_to_frags.get(resolved, [])
             if reexport_target_ids:
                 self._link_reexport_pairs(src_ids, reexport_target_ids, edges)
+                if depth < _REEXPORT_MAX_DEPTH:
+                    self._follow_reexports(
+                        resolved,
+                        src_ids,
+                        file_to_frags,
+                        fragment_paths,
+                        edges,
+                        depth + 1,
+                        visited,
+                    )
 
     def _link_import_pairs(
         self,

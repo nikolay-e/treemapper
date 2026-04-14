@@ -45,6 +45,8 @@ _FORWARD_DECL_RE = re.compile(r"^\s*(?:class|struct)\s+(\w+)\s*;", re.MULTILINE)
 
 _FRIEND_DECL_RE = re.compile(r"\bfriend\s+(?:class|struct)\s+(\w+)", re.MULTILINE)
 
+_DISCOVERY_MAX_DEPTH = 2
+
 _C_KEYWORDS = frozenset(
     {
         "if",
@@ -237,14 +239,27 @@ class CFamilyEdgeBuilder(EdgeBuilder):
 
         changed_set = set(changed_files)
         discovered: set[Path] = set()
+        frontier = list(c_changed)
 
-        included_headers = self._collect_included_headers(c_changed)
-        if included_headers:
-            discovered.update(self._find_files_for_headers(all_candidate_files, changed_set, included_headers))
+        for _depth in range(_DISCOVERY_MAX_DEPTH):
+            hop_found: list[Path] = []
 
-        changed_names = self._collect_changed_names(c_changed)
-        if changed_names:
-            discovered.update(self._find_files_including_headers(all_candidate_files, changed_set, changed_names))
+            included_headers = self._collect_included_headers(frontier)
+            if included_headers:
+                hop_found.extend(self._find_files_for_headers(all_candidate_files, changed_set | discovered, included_headers))
+
+            frontier_names = self._collect_changed_names(frontier)
+            if frontier_names:
+                hop_found.extend(
+                    self._find_files_including_headers(all_candidate_files, changed_set | discovered, frontier_names)
+                )
+
+            new_files = [f for f in hop_found if f not in discovered]
+            if not new_files:
+                break
+
+            discovered.update(new_files)
+            frontier = new_files
 
         return list(discovered)
 

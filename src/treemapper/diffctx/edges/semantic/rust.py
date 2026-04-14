@@ -237,6 +237,28 @@ def _extract_references(content: str) -> tuple[set[str], set[str], set[tuple[str
     return type_refs, fn_calls, path_calls
 
 
+_DISCOVERY_MAX_DEPTH = 2
+
+
+def _stem_to_mod_name(path: Path) -> str:
+    stem = path.stem.lower()
+    if stem in {"mod", "lib"}:
+        return path.parent.name.lower()
+    return stem
+
+
+def _read_cached(path: Path, cache: dict[Path, str] | None) -> str | None:
+    if cache is not None and path in cache:
+        return cache[path]
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    if cache is not None:
+        cache[path] = content
+    return content
+
+
 class RustEdgeBuilder(EdgeBuilder):
     weight = 0.75
     mod_weight = EDGE_WEIGHTS["rust_mod"].forward
@@ -256,22 +278,80 @@ class RustEdgeBuilder(EdgeBuilder):
         rust_changed = [f for f in changed_files if _is_rust_file(f)]
         if not rust_changed:
             return []
-        changed_stems = {f.stem for f in rust_changed}
-        changed_dirs = {f.parent for f in rust_changed}
+
+        fc = kwargs.get("file_cache")
+        cache: dict[Path, str] | None = fc if isinstance(fc, dict) else None
+
+        rust_candidates = [f for f in all_candidate_files if _is_rust_file(f)]
+
+        mod_name_to_files: dict[str, list[Path]] = defaultdict(list)
+        file_uses: dict[Path, set[str]] = {}
+        file_mods: dict[Path, set[str]] = {}
+
+        for candidate in rust_candidates:
+            mod_name_to_files[_stem_to_mod_name(candidate)].append(candidate)
+            content = _read_cached(candidate, cache)
+            if content is None:
+                continue
+            file_uses[candidate] = _extract_uses(content)
+            file_mods[candidate] = _extract_mods(content)
+
         changed_set = set(changed_files)
-        discovered: list[Path] = []
-        for candidate in all_candidate_files:
-            if candidate in changed_set or not _is_rust_file(candidate):
+        discovered: set[Path] = set()
+        frontier = set(rust_changed)
+
+        for _depth in range(_DISCOVERY_MAX_DEPTH):
+            next_frontier = self._discover_one_hop(
+                frontier, rust_candidates, changed_set, discovered, file_uses, file_mods, mod_name_to_files
+            )
+            discovered.update(next_frontier)
+            frontier = next_frontier
+            if not frontier:
+                break
+
+        return list(discovered)
+
+    @staticmethod
+    def _discover_one_hop(
+        frontier: set[Path],
+        candidates: list[Path],
+        exclude: set[Path],
+        already_found: set[Path],
+        file_uses: dict[Path, set[str]],
+        file_mods: dict[Path, set[str]],
+        mod_name_to_files: dict[str, list[Path]],
+    ) -> set[Path]:
+        found: set[Path] = set()
+        skip = exclude | already_found
+        frontier_mod_names = {_stem_to_mod_name(f) for f in frontier}
+
+        forward_targets: set[str] = set()
+        for f in frontier:
+            for use_path in file_uses.get(f, set()):
+                for part in use_path.split("::"):
+                    forward_targets.add(part.lower())
+            forward_targets.update(m.lower() for m in file_mods.get(f, set()))
+
+        for target_name in forward_targets:
+            for candidate in mod_name_to_files.get(target_name, []):
+                if candidate not in skip and candidate not in found:
+                    found.add(candidate)
+
+        for candidate in candidates:
+            if candidate in skip or candidate in found:
                 continue
-            if candidate.parent not in changed_dirs:
+            cand_mods = file_mods.get(candidate, set())
+            if cand_mods & frontier_mod_names:
+                found.add(candidate)
                 continue
-            try:
-                content = candidate.read_text(encoding="utf-8")
-                if _extract_mods(content) & changed_stems:
-                    discovered.append(candidate)
-            except (OSError, UnicodeDecodeError):
-                pass
-        return discovered
+            cand_parts: set[str] = set()
+            for use_path in file_uses.get(candidate, set()):
+                for part in use_path.split("::"):
+                    cand_parts.add(part.lower())
+            if cand_parts & frontier_mod_names:
+                found.add(candidate)
+
+        return found
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
         rust_frags = [f for f in fragments if _is_rust_file(f.path)]

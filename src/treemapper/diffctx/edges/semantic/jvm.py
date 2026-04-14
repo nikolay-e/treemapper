@@ -8,6 +8,8 @@ from ...config.weights import EDGE_WEIGHTS
 from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict
 
+_DISCOVERY_MAX_DEPTH = 2
+
 _JAVA_EXTS = {".java"}
 _KOTLIN_EXTS = {".kt", ".kts"}
 _SCALA_EXTS = {".scala", ".sc"}
@@ -248,9 +250,30 @@ class JVMEdgeBuilder(EdgeBuilder):
         if not jvm_changed:
             return []
 
+        changed_set = set(changed_files)
+        jvm_candidates = [f for f in all_candidate_files if _is_jvm_file(f) and f not in changed_set]
+        discovered_set: set[Path] = set()
+        frontier: list[Path] = list(jvm_changed)
+
+        for _depth in range(_DISCOVERY_MAX_DEPTH):
+            hop_result = self._discover_single_hop(frontier, jvm_candidates, repo_root)
+            new_files = [f for f in hop_result if f not in discovered_set]
+            if not new_files:
+                break
+            discovered_set.update(new_files)
+            frontier = new_files
+
+        return list(discovered_set)
+
+    def _discover_single_hop(
+        self,
+        source_files: list[Path],
+        candidates: list[Path],
+        repo_root: Path | None,
+    ) -> list[Path]:
         type_refs: set[str] = set()
         import_packages: set[str] = set()
-        for f in jvm_changed:
+        for f in source_files:
             try:
                 content = f.read_text(encoding="utf-8")
                 type_refs.update(_extract_type_refs(content))
@@ -264,8 +287,7 @@ class JVMEdgeBuilder(EdgeBuilder):
             except (OSError, UnicodeDecodeError):
                 pass
 
-        changed_dirs = {f.parent for f in jvm_changed}
-        changed_set = set(changed_files)
+        source_dirs = {f.parent for f in source_files}
 
         import_dirs: set[Path] = set()
         if repo_root and import_packages:
@@ -275,11 +297,12 @@ class JVMEdgeBuilder(EdgeBuilder):
                 for src_prefix in ("src/main/java", "src/main/kotlin", "src/main/scala"):
                     import_dirs.add(repo_root / src_prefix / Path(*pkg.split(".")))
 
-        eligible_dirs = changed_dirs | import_dirs
+        eligible_dirs = source_dirs | import_dirs
+        source_set = set(source_files)
         discovered: list[Path] = []
 
-        for candidate in all_candidate_files:
-            if candidate in changed_set or not _is_jvm_file(candidate):
+        for candidate in candidates:
+            if candidate in source_set:
                 continue
             if candidate.parent not in eligible_dirs:
                 continue

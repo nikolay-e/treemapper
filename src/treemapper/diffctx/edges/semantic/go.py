@@ -164,6 +164,7 @@ class GoEdgeBuilder(EdgeBuilder):
     same_package_weight = EDGE_WEIGHTS["go_same_package"].forward
     init_same_package_weight = 0.15
     reverse_weight_factor = EDGE_WEIGHTS["go_import"].reverse_factor
+    _DISCOVERY_MAX_DEPTH = 2
 
     def discover_related_files(
         self,
@@ -183,7 +184,108 @@ class GoEdgeBuilder(EdgeBuilder):
         embed_go_files = self._discover_embed_files(changed_files, candidates, discovered, repo_root)
         self._discover_package_peers(embed_go_files, candidates, discovered)
 
+        if go_changed:
+            fc = kwargs.get("file_cache")
+            file_cache: dict[Path, str] | None = fc if isinstance(fc, dict) else None
+            candidate_index = self._build_candidate_import_index(candidates, repo_root, file_cache)
+            self._discover_cross_package(go_changed, changed_set, candidates, candidate_index, discovered, repo_root, file_cache)
+
         return list(discovered)
+
+    def _build_candidate_import_index(
+        self,
+        candidates: list[Path],
+        repo_root: Path | None,
+        file_cache: dict[Path, str] | None,
+    ) -> dict[Path, tuple[str, set[str]]]:
+        index: dict[Path, tuple[str, set[str]]] = {}
+        for c in candidates:
+            content = self._read_file(c, file_cache)
+            if content is None:
+                continue
+            pkg = _get_package_name_from_content(content, c).lower()
+            imports = _extract_imports(content)
+            index[c] = (pkg, imports)
+        return index
+
+    def _discover_cross_package(
+        self,
+        go_changed: list[Path],
+        changed_set: set[Path],
+        candidates: list[Path],
+        candidate_index: dict[Path, tuple[str, set[str]]],
+        discovered: set[Path],
+        repo_root: Path | None,
+        file_cache: dict[Path, str] | None,
+    ) -> None:
+        frontier = set(go_changed)
+        for _depth in range(self._DISCOVERY_MAX_DEPTH):
+            next_frontier: set[Path] = set()
+            for f in frontier:
+                content = self._read_file(f, file_cache)
+                if content is None:
+                    continue
+                f_imports = _extract_imports(content)
+                f_pkg = _get_package_name_from_content(content, f).lower()
+                f_rel_dir = str(f.relative_to(repo_root).parent) if repo_root else None
+
+                for c in candidates:
+                    if c in changed_set or c in discovered:
+                        continue
+                    c_info = candidate_index.get(c)
+                    if c_info is None:
+                        continue
+                    c_pkg, c_imports = c_info
+
+                    if self._import_matches_file(f_imports, c, c_pkg, repo_root):
+                        discovered.add(c)
+                        next_frontier.add(c)
+                        continue
+
+                    if self._import_matches_source(c_imports, f, f_pkg, f_rel_dir, repo_root):
+                        discovered.add(c)
+                        next_frontier.add(c)
+
+            frontier = next_frontier
+            if not frontier:
+                break
+
+    @staticmethod
+    def _import_matches_file(
+        imports: set[str],
+        candidate: Path,
+        candidate_pkg: str,
+        repo_root: Path | None,
+    ) -> bool:
+        for imp in imports:
+            imp_pkg = imp.split("/")[-1].lower()
+            if imp_pkg == candidate_pkg:
+                return True
+            if repo_root:
+                try:
+                    rel = str(candidate.relative_to(repo_root).parent)
+                    if imp == rel or imp.endswith(f"/{rel}") or f"/{rel}/" in imp:
+                        return True
+                except ValueError:
+                    pass
+        return False
+
+    @staticmethod
+    def _import_matches_source(
+        candidate_imports: set[str],
+        source: Path,
+        source_pkg: str,
+        source_rel_dir: str | None,
+        repo_root: Path | None,
+    ) -> bool:
+        for imp in candidate_imports:
+            imp_pkg = imp.split("/")[-1].lower()
+            if imp_pkg == source_pkg:
+                return True
+            if source_rel_dir is not None:
+                if imp == source_rel_dir or imp.endswith(f"/{source_rel_dir}") or f"/{source_rel_dir}/" in imp:
+                    return True
+        return False
 
     def _discover_same_package(self, go_changed: list[Path], candidates: list[Path], discovered: set[Path]) -> None:
         pkg_dirs = {f.parent for f in go_changed}
