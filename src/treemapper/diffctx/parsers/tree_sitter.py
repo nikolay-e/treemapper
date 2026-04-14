@@ -9,6 +9,11 @@ from ..languages import TREE_SITTER_LANGUAGES
 from ..types import Fragment, FragmentId, extract_identifiers
 from .base import MIN_FRAGMENT_LINES, create_code_gap_fragments, create_snippet
 
+_SUB_FRAGMENT_THRESHOLD_LINES = 30
+_SUB_FRAGMENT_TARGET_LINES = 20
+_BODY_FIELD_NAMES = ("body", "block", "consequence")
+_MAX_SUB_DEPTH = 3
+
 _DEFINITION_NODE_TYPES = {
     "python": {"function_definition", "class_definition", "decorated_definition"},
     "javascript": {"function_declaration", "class_declaration", "method_definition", "arrow_function", "variable_declarator"},
@@ -248,6 +253,8 @@ class TreeSitterStrategy:
             return
 
         self._add_leaf_definition(path, lines, start, end, kind, sym_name, fragments, covered, added_ends)
+        if end - start + 1 > _SUB_FRAGMENT_THRESHOLD_LINES:
+            self._create_sub_fragments(node, path, lines, sym_name, fragments, covered)
         if node.type == "variable_declarator" and self._has_function_child(node):
             return
         self._recurse_children(node, code_bytes, path, lines, definition_types, fragments, covered, added_ends, depth)
@@ -316,6 +323,76 @@ class TreeSitterStrategy:
         )
         covered.add((start, end))
         added_ends.add((kind, end))
+
+    @staticmethod
+    def _find_body_node(node: Node) -> Node | None:
+        for field in _BODY_FIELD_NAMES:
+            child = node.child_by_field_name(field)
+            if child is not None:
+                return child
+        for child in node.children:
+            if child.type in ("block", "statement_block", "compound_statement", "function_body"):
+                return child
+        return None
+
+    @staticmethod
+    def _create_sub_fragments(
+        node: Node,
+        path: Path,
+        lines: list[str],
+        parent_symbol: str | None,
+        fragments: list[Fragment],
+        covered: set[tuple[int, int]],
+        _depth: int = 0,
+    ) -> None:
+        if _depth > _MAX_SUB_DEPTH:
+            return
+        body = TreeSitterStrategy._find_body_node(node)
+        if body is None:
+            return
+        children = [c for c in body.named_children if c.end_point[0] - c.start_point[0] >= 0]
+        if len(children) < 2:
+            return
+
+        chunk_start_line = children[0].start_point[0] + 1
+        chunk_end_line = children[0].end_point[0] + 1
+
+        for child in children[1:]:
+            child_start = child.start_point[0] + 1
+            child_end = child.end_point[0] + 1
+            prospective_end = child_end
+            if prospective_end - chunk_start_line + 1 > _SUB_FRAGMENT_TARGET_LINES:
+                if chunk_end_line >= chunk_start_line:
+                    snippet = create_snippet(lines, chunk_start_line, chunk_end_line)
+                    if snippet and chunk_end_line - chunk_start_line + 1 >= MIN_FRAGMENT_LINES:
+                        fragments.append(
+                            Fragment(
+                                id=FragmentId(path=path, start_line=chunk_start_line, end_line=chunk_end_line),
+                                kind="chunk",
+                                content=snippet,
+                                identifiers=extract_identifiers(snippet, profile="code"),
+                                symbol_name=f"{parent_symbol}[{chunk_start_line}]" if parent_symbol else None,
+                            )
+                        )
+                        covered.add((chunk_start_line, chunk_end_line))
+                chunk_start_line = child_start
+                chunk_end_line = child_end
+            else:
+                chunk_end_line = prospective_end
+
+        if chunk_end_line >= chunk_start_line:
+            snippet = create_snippet(lines, chunk_start_line, chunk_end_line)
+            if snippet and chunk_end_line - chunk_start_line + 1 >= MIN_FRAGMENT_LINES:
+                fragments.append(
+                    Fragment(
+                        id=FragmentId(path=path, start_line=chunk_start_line, end_line=chunk_end_line),
+                        kind="chunk",
+                        content=snippet,
+                        identifiers=extract_identifiers(snippet, profile="code"),
+                        symbol_name=f"{parent_symbol}[{chunk_start_line}]" if parent_symbol else None,
+                    )
+                )
+                covered.add((chunk_start_line, chunk_end_line))
 
     def _recurse_children(
         self,
