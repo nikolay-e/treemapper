@@ -18,7 +18,7 @@ from .file_importance import compute_file_importance
 from .fragmentation import _process_files_for_fragments
 from .git import CatFileBatch, GitError, split_diff_range
 from .mode import PipelineConfig, ScoringMode
-from .postpass import _coherence_post_pass, _ensure_changed_files_represented
+from .postpass import _coherence_post_pass, _ensure_changed_files_represented, _rescue_nontrivial_context
 from .render import build_diff_context_output
 from .scoring import (
     BM25Discovery,
@@ -126,6 +126,7 @@ def _score_and_select(
         )
 
     selected = _coherence_post_pass(result, scoring_result.filtered_fragments, scoring_result.graph, effective_budget)
+    selected = _rescue_nontrivial_context(selected, all_fragments, scoring_result.rel_scores, core_ids, effective_budget)
     return selected.selected, selected
 
 
