@@ -12,7 +12,7 @@ from pathlib import Path
 
 BUDGETS = [1000, 2000, 4000, 6000, 8000, 16000, 32000]
 LIMITS = [10, 20, 50, 100, 200, 500]
-MODES = ["discover", "precise"]
+MODES = ["ego", "ppr"]
 
 
 def _ts() -> str:
@@ -50,8 +50,9 @@ def _summarize(output_file: Path, name: str, elapsed: float, log_file: Path) -> 
         log_file,
         f"{_ts()} | {name:45s} | n={len(ok):3d} | "
         f"file R={avg('file_recall'):.3f} P={avg('file_precision'):.3f} | "
-        f"nontrivial R={avg('nontrivial_file_recall'):.3f} P={avg('nontrivial_file_precision'):.3f} | "
+        f"nontrivial R={avg('nontrivial_file_recall'):.3f} | "
         f"line R={avg('line_recall'):.3f} nt={avg('line_recall_nontrivial'):.3f} | "
+        f"def_cov={avg('def_coverage'):.3f} | "
         f"{elapsed:.0f}s",
     )
 
@@ -65,16 +66,12 @@ def run_bench(name: str, cmd: list[str], output_file: Path, log_file: Path) -> N
     _summarize(output_file, name, elapsed, log_file)
 
 
-def _bench_cmd(
-    py: str, workers: int, out_file: Path, limit: int, budget: int, scoring: str, baseline: str | None = None
-) -> list[str]:
+def _bench_cmd(py: str, limit: int, budget: int, scoring: str, baseline: str | None = None) -> list[str]:
     cmd = [
         py,
         "benchmarks/contextbench_diffctx.py",
         "--limit",
         str(limit),
-        "--workers",
-        str(workers),
         "--budget",
         str(budget),
     ]
@@ -82,21 +79,19 @@ def _bench_cmd(
         cmd += ["--baseline", baseline]
     else:
         cmd += ["--scoring", scoring]
-    cmd += ["--output", str(out_file)]
     return cmd
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--workers", type=int, default=11)
-    ap.add_argument("--output-dir", type=str, default="results")
     ap.add_argument("--skip-baselines", action="store_true")
     args = ap.parse_args()
 
+    results_dir = Path("results")
     run_ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    out = Path(args.output_dir) / run_ts
-    out.mkdir(parents=True, exist_ok=True)
-    log_file = out / "log.txt"
+    log_dir = results_dir / run_ts
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "log.txt"
     py = sys.executable
 
     _log(log_file, f"{_ts()} | === START ===")
@@ -108,20 +103,20 @@ def main() -> None:
 
     for idx, (n, b, mode) in enumerate(combos, 1):
         tag = f"cb_{mode}_n{n}_b{b}"
-        out_file = out / f"{tag}.json"
+        out_file = results_dir / f"{tag}.json"
         run_bench(
             f"[{idx}/{len(combos)}] {mode} n={n} b={b}",
-            _bench_cmd(py, args.workers, out_file, n, b, mode),
+            _bench_cmd(py, n, b, mode),
             out_file,
             log_file,
         )
 
     if not args.skip_baselines:
         for bl in ["patch_files", "bm25"]:
-            out_file = out / f"cb_baseline_{bl}.json"
+            out_file = results_dir / f"cb_baseline_{bl}.json"
             run_bench(
                 f"baseline {bl}",
-                _bench_cmd(py, args.workers, out_file, 50, 8000, "", baseline=bl),
+                _bench_cmd(py, 50, 8000, "", baseline=bl),
                 out_file,
                 log_file,
             )

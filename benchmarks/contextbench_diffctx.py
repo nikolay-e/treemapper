@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import random
 import subprocess
 import sys
@@ -11,6 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from common import (
+    WORKERS,
     apply_as_commit,
     ensure_repo,
     normalize_gold_path,
@@ -19,6 +19,9 @@ from common import (
     repos_dir,
     reset_to_parent,
     run_parallel,
+    save_results,
+    warm_cache,
+    worker_dir,
 )
 
 REPOS_DIR = repos_dir("CB_REPOS_DIR", suffix_var="CONTEXTBENCH_REPOS_SUFFIX")
@@ -43,7 +46,7 @@ def is_nontrivial(gold: list[dict], patch: str) -> bool:
     return bool(gold_files(gold) - patch_files(patch))
 
 
-def run_diffctx(repo_dir: Path, budget: int = 8000, scoring_mode: str = "auto") -> dict | None:
+def run_diffctx(repo_dir: Path, budget: int = 8000, scoring_mode: str = "hybrid") -> dict | None:
     from treemapper.diffctx.pipeline import build_diff_context
 
     try:
@@ -140,7 +143,7 @@ def evaluate_instance(
     inst: dict,
     budget: int = 8000,
     repos_dir: Path = REPOS_DIR,
-    scoring_mode: str = "auto",
+    scoring_mode: str = "hybrid",
     baseline: str = "treemapper",
 ) -> dict | None:
     iid = inst["instance_id"]
@@ -170,14 +173,15 @@ def evaluate_instance(
         )
         return {"id": iid, "status": "apply_fail"}
 
-    t0 = time.time()
-    if baseline == "patch_files":
-        output = run_baseline_patch_files(repo_dir, budget)
-    else:
-        output = run_diffctx(repo_dir, budget, scoring_mode)
-    elapsed = time.time() - t0
-
-    reset_to_parent(repo_dir)
+    try:
+        t0 = time.time()
+        if baseline == "patch_files":
+            output = run_baseline_patch_files(repo_dir, budget)
+        else:
+            output = run_diffctx(repo_dir, budget, scoring_mode)
+        elapsed = time.time() - t0
+    finally:
+        reset_to_parent(repo_dir)
 
     if not output:
         return {"id": iid, "status": "diffctx_fail"}
@@ -309,18 +313,13 @@ def aggregate(results: list[dict]) -> None:
 
 
 def _run_one(args: tuple[int, dict, int, str, str]) -> dict | None:
-    import shutil
-
     _i, inst, budget, scoring, baseline = args
-    worker_dir = REPOS_DIR / f"w{os.getpid()}"
-    worker_dir.mkdir(exist_ok=True)
+    wdir = worker_dir(REPOS_DIR)
     try:
-        return evaluate_instance(inst, budget, repos_dir=worker_dir, scoring_mode=scoring, baseline=baseline)
+        return evaluate_instance(inst, budget, repos_dir=wdir, scoring_mode=scoring, baseline=baseline)
     except Exception as e:
         print(f"  ERROR: {type(e).__name__}: {e}", flush=True)
-        return None
-    finally:
-        shutil.rmtree(worker_dir, ignore_errors=True)
+        return {"id": inst["instance_id"], "status": "error"}
 
 
 def main():
@@ -337,9 +336,7 @@ def main():
     parser.add_argument("--nontrivial-only", action="store_true", default=True)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--no-shuffle", action="store_true")
-    parser.add_argument("--output", type=str, default=None)
-    parser.add_argument("--workers", type=int, default=11)
-    parser.add_argument("--scoring", type=str, default="auto", choices=["auto", "precise", "discover"])
+    parser.add_argument("--scoring", type=str, default="hybrid", choices=["hybrid", "ppr", "ego"])
     parser.add_argument("--baseline", type=str, default="treemapper", choices=["treemapper", "patch_files"])
     args = parser.parse_args()
 
@@ -364,20 +361,22 @@ def main():
         print(f"Shuffled with seed={args.seed}")
 
     instances = instances[: args.limit]
-    print(f"Evaluating {len(instances)} instances (budget={args.budget}, workers={args.workers}, scoring={args.scoring})")
+    print(f"Evaluating {len(instances)} instances (budget={args.budget}, workers={WORKERS}, scoring={args.scoring})")
+
+    warm_cache(instances)
 
     t0 = time.time()
     run_args = [(i, inst, args.budget, args.scoring, args.baseline) for i, inst in enumerate(instances, 1)]
-    results = run_parallel(_run_one, run_args, args.workers)
+    results = run_parallel(_run_one, run_args, WORKERS)
     elapsed = time.time() - t0
     print(f"\nTotal wall time: {elapsed:.0f}s")
 
     aggregate(results)
 
-    if args.output:
-        with open(args.output, "w") as f:
-            json.dump(results, f, indent=2)
-        print(f"\nResults saved to {args.output}")
+    tag = f"cb_{args.scoring}_n{args.limit}_b{args.budget}"
+    if args.baseline != "treemapper":
+        tag = f"cb_baseline_{args.baseline}"
+    save_results(results, tag)
 
 
 if __name__ == "__main__":
