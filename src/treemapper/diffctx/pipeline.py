@@ -225,7 +225,7 @@ def build_diff_context(
 
     import threading
 
-    can_use_alarm = threading.current_thread() is threading.main_thread()
+    can_use_alarm = hasattr(signal, "SIGALRM") and threading.current_thread() is threading.main_thread()
 
     if can_use_alarm and timeout > 0:
 
