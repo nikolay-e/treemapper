@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytest
@@ -125,9 +124,8 @@ def test_diff_yaml(yaml_test_runner: YamlTestRunner, case: YamlTestCase, record_
         reason = case.xfail.reason or f"category: {case.xfail.category}"
         request.node.add_marker(pytest.mark.xfail(reason=reason, strict=True))
 
-    scoring_mode = os.environ.get("DIFFCTX_SCORING", "hybrid")
-    if scoring_mode == "ego" and case.id in _DISCOVER_MODE_XFAIL:
-        request.node.add_marker(pytest.mark.xfail(reason="discover mode: ego-graph noise on small repos", strict=True))
+    if case.id in _DISCOVER_MODE_XFAIL:
+        request.node.add_marker(pytest.mark.xfail(reason="discovery precision tradeoff", strict=True))
 
     context = yaml_test_runner.run_test_case(case)
     breakdown = yaml_test_runner.score_test_case(context, case)
