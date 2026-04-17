@@ -182,10 +182,31 @@ def parse_lines_field(lines_str: str) -> tuple[int, int] | None:
     return (s, e)
 
 
-def save_results(results: list, tag: str, output_dir: Path = RESULTS_DIR) -> Path:
+def load_results(path: Path) -> list[dict]:
+    data = json.loads(path.read_text())
+    if isinstance(data, dict) and "results" in data:
+        return data["results"]
+    return data
+
+
+def save_results(results: list, tag: str, output_dir: Path = RESULTS_DIR, **meta) -> Path:
+    import platform
+    import sys
+    from datetime import datetime, timezone
+
+    envelope = {
+        "meta": {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "command": " ".join(sys.argv),
+            "python_version": sys.version.split()[0],
+            "platform": platform.platform(),
+            **meta,
+        },
+        "results": results,
+    }
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / f"{tag}.json"
-    path.write_text(json.dumps(results, indent=2))
+    path.write_text(json.dumps(envelope, indent=2))
     print(f"\nResults saved to {path}")
     return path
 

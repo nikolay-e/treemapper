@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from common import load_results
+
 BUDGETS = [2000, 4000, 8000]
 MODES = ["hybrid", "ego", "ppr"]
 
@@ -42,7 +44,7 @@ def _aggregate_curve(out_dir: Path, limit: int) -> dict[str, list[dict[str, floa
             data_path = out_dir / f"cb_{mode}_n{limit}_b{budget}.json"
             if not data_path.exists():
                 continue
-            ok = [d for d in json.loads(data_path.read_text()) if d.get("status") == "ok"]
+            ok = [d for d in load_results(data_path) if d.get("status") == "ok"]
             if not ok:
                 continue
 

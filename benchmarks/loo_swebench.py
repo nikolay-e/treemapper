@@ -24,17 +24,18 @@ REPOS_DIR = repos_dir("LOO_REPOS_DIR")
 
 
 def strip_file_from_patch(patch_text: str, file_to_hide: str) -> str:
-    lines = patch_text.split("\n")
-    result = []
-    skip = False
+    import re
+
+    pattern = re.compile(r"^diff --git\s.*?(?=^diff --git\s|\Z)", re.MULTILINE | re.DOTALL)
     hidden_markers = {f"a/{file_to_hide}", f"b/{file_to_hide}"}
-    for line in lines:
-        if line.startswith("diff --git "):
-            parts = line.split()
-            skip = any(p.strip('"') in hidden_markers or p.lstrip('"') in hidden_markers for p in parts[2:])
-        if not skip:
-            result.append(line)
-    return "\n".join(result)
+    kept = []
+    for m in pattern.finditer(patch_text):
+        block = m.group()
+        first_line = block.split("\n", 1)[0]
+        parts = first_line.split()
+        if not any(p.strip('"') in hidden_markers for p in parts[2:]):
+            kept.append(block)
+    return "".join(kept)
 
 
 def run_diffctx(repo_dir: Path, budget: int, scoring_mode: str = "hybrid") -> set[str]:
