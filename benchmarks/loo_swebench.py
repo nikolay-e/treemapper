@@ -38,7 +38,7 @@ def strip_file_from_patch(patch_text: str, file_to_hide: str) -> str:
     return "".join(kept)
 
 
-def run_diffctx(repo_dir: Path, budget: int, scoring_mode: str = "hybrid") -> set[str]:
+def run_diffctx(repo_dir: Path, budget: int, scoring_mode: str = "ego") -> set[str]:
     from treemapper.diffctx.pipeline import build_diff_context
 
     try:
@@ -86,7 +86,7 @@ def _pick_distractor(repo_dir: Path, hidden: str) -> str | None:
         return None
 
 
-def evaluate_loo(inst: dict, budget: int, scoring_mode: str = "hybrid", repos_dir: Path = REPOS_DIR) -> list[dict]:
+def evaluate_loo(inst: dict, budget: int, scoring_mode: str = "ego", repos_dir: Path = REPOS_DIR) -> list[dict]:
     iid = inst["instance_id"]
     all_patch_files = patch_files(inst["patch"])
 
@@ -171,12 +171,12 @@ def _run_one(run_args: tuple[int, dict, int, str, int]) -> list[dict]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=50)
-    ap.add_argument("--budget", type=int, default=8000)
+    ap.add_argument("--budget", type=int, default=16000)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--seeds", type=str, default=None)
     ap.add_argument("--dataset", default="Contextbench/ContextBench")
     ap.add_argument("--split", default="contextbench_verified")
-    ap.add_argument("--scoring", type=str, default="hybrid", choices=["hybrid", "ppr", "ego"])
+    ap.add_argument("--scoring", type=str, default="ego", choices=["hybrid", "ppr", "ego"])
     ap.add_argument("--timeout", type=int, default=300)
     args = ap.parse_args()
 

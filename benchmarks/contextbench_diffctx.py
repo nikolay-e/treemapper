@@ -441,7 +441,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=3)
-    parser.add_argument("--budget", type=int, default=8000)
+    parser.add_argument("--budget", type=int, default=16000)
     parser.add_argument("--lang", type=str, default=None)
     parser.add_argument("--nontrivial-only", action="store_true", default=True)
     parser.add_argument("--seeds", type=str, default="42")
