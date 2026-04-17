@@ -34,6 +34,12 @@ def run_cmd(
     return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=check, timeout=timeout)
 
 
+def _parse_diff_path(raw: str, prefix: str) -> str | None:
+    if raw == "/dev/null":
+        return None
+    return raw[len(prefix):] if raw.startswith(prefix) else raw
+
+
 def patch_files_detailed(patch: str) -> tuple[set[str], set[str], set[str]]:
     added: set[str] = set()
     deleted: set[str] = set()
@@ -43,11 +49,9 @@ def patch_files_detailed(patch: str) -> tuple[set[str], set[str], set[str]]:
         if line.startswith("diff --git "):
             cur_a = cur_b = None
         elif line.startswith("--- "):
-            p = line[4:]
-            cur_a = None if p == "/dev/null" else (p[2:] if p.startswith("a/") else p)
+            cur_a = _parse_diff_path(line[4:], "a/")
         elif line.startswith("+++ "):
-            p = line[4:]
-            cur_b = None if p == "/dev/null" else (p[2:] if p.startswith("b/") else p)
+            cur_b = _parse_diff_path(line[4:], "b/")
             if cur_a is None and cur_b is not None:
                 added.add(cur_b)
             elif cur_a is not None and cur_b is None:
