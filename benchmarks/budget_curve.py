@@ -30,6 +30,8 @@ def run_at_budget(budget: int, mode: str, limit: int) -> None:
             str(budget),
             "--scoring",
             mode,
+            "--seeds",
+            "42",
         ],
         check=True,
         env=_clean_env(),

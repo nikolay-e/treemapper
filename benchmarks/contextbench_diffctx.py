@@ -105,6 +105,79 @@ def run_baseline_patch_files(repo_dir: Path, budget: int = 8000) -> dict | None:
     return _pack_files_to_fragments(repo_dir, r.stdout.strip().splitlines(), budget)
 
 
+def run_baseline_bm25(repo_dir: Path, budget: int = 8000) -> dict | None:
+    import re
+
+    try:
+        from rank_bm25 import BM25Okapi
+    except ImportError:
+        print("ERROR: rank_bm25 not installed. Run: pip install rank-bm25", file=sys.stderr)
+        sys.exit(1)
+
+    ls_result = subprocess.run(
+        ["git", "-C", str(repo_dir), "ls-files"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    all_files = [f for f in ls_result.stdout.strip().splitlines() if f]
+    if not all_files:
+        return _pack_files_to_fragments(repo_dir, [], budget)
+
+    diff_result = subprocess.run(
+        ["git", "-C", str(repo_dir), "diff", "HEAD~1..HEAD"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    added_lines = []
+    for line in diff_result.stdout.splitlines():
+        if line.startswith("+") and not line.startswith("+++"):
+            added_lines.append(line[1:])
+
+    query_tokens = re.findall(r"[A-Za-z_]\w+", " ".join(added_lines).lower())
+    if not query_tokens:
+        return _pack_files_to_fragments(repo_dir, [], budget)
+
+    corpus_tokens: list[list[str]] = []
+    valid_files: list[str] = []
+    for rel_path in all_files:
+        full = repo_dir / rel_path
+        if not full.is_file():
+            continue
+        try:
+            text = full.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        tokens = re.findall(r"[A-Za-z_]\w+", text.lower())
+        if not tokens:
+            continue
+        corpus_tokens.append(tokens)
+        valid_files.append(rel_path)
+
+    if not corpus_tokens:
+        return _pack_files_to_fragments(repo_dir, [], budget)
+
+    bm25 = BM25Okapi(corpus_tokens)
+    scores = bm25.get_scores(query_tokens)
+    ranked_indices = sorted(range(len(valid_files)), key=lambda i: scores[i], reverse=True)
+    ranked_files = [valid_files[i] for i in ranked_indices if scores[i] > 0]
+
+    return _pack_files_to_fragments(repo_dir, ranked_files, budget)
+
+
+def _get_diffctx_config() -> dict:
+    from treemapper.diffctx.config.limits import UTILITY as _UTILITY
+    from treemapper.diffctx.filtering import _LOW_RELEVANCE_THRESHOLD, _MAX_CONTEXT_FRAGMENTS_PER_FILE
+
+    return {
+        "low_relevance_threshold": _LOW_RELEVANCE_THRESHOLD,
+        "proximity_decay": _UTILITY.proximity_decay,
+        "peripheral_cap": _UTILITY.peripheral_cap,
+        "max_context_frags_per_file": _MAX_CONTEXT_FRAGMENTS_PER_FILE,
+    }
+
+
 def extract_selected_files(output: dict) -> set[str]:
     return {f["path"] for f in output.get("fragments", [])}
 
@@ -179,6 +252,8 @@ def evaluate_instance(
         t0 = time.time()
         if baseline == "patch_files":
             output = run_baseline_patch_files(repo_dir, budget)
+        elif baseline == "bm25":
+            output = run_baseline_bm25(repo_dir, budget)
         else:
             output = run_diffctx(repo_dir, budget, scoring_mode)
         elapsed = time.time() - t0
@@ -220,6 +295,7 @@ def evaluate_instance(
         "config": {
             "scoring_mode": scoring_mode,
             "budget": budget,
+            **_get_diffctx_config(),
         },
     }
 
@@ -371,7 +447,7 @@ def main():
     parser.add_argument("--seeds", type=str, default="42")
     parser.add_argument("--no-shuffle", action="store_true")
     parser.add_argument("--scoring", type=str, default="hybrid", choices=["hybrid", "ppr", "ego"])
-    parser.add_argument("--baseline", type=str, default="treemapper", choices=["treemapper", "patch_files"])
+    parser.add_argument("--baseline", type=str, default="treemapper", choices=["treemapper", "patch_files", "bm25"])
     args = parser.parse_args()
 
     seeds = [int(s) for s in args.seeds.split(",")]
@@ -391,7 +467,7 @@ def main():
         all_instances = [i for i in all_instances if is_nontrivial(parse_gold_context(i["gold_context"]), i["patch"])]
         print(f"Nontrivial instances: {len(all_instances)}")
 
-    warm_cache(all_instances[: args.limit])
+    warm_cache(all_instances)
 
     all_seed_results: dict[int, list[dict]] = {}
 
@@ -417,9 +493,12 @@ def main():
 
         aggregate(results)
 
-        tag = f"cb_{args.scoring}_n{args.limit}_b{args.budget}_s{seed}"
+        if len(seeds) == 1:
+            tag = f"cb_{args.scoring}_n{args.limit}_b{args.budget}"
+        else:
+            tag = f"cb_{args.scoring}_n{args.limit}_b{args.budget}_s{seed}"
         if args.baseline != "treemapper":
-            tag = f"cb_baseline_{args.baseline}_s{seed}"
+            tag = f"cb_baseline_{args.baseline}" if len(seeds) == 1 else f"cb_baseline_{args.baseline}_s{seed}"
         save_results(results, tag, seed=seed, budget=args.budget, scoring=args.scoring, baseline=args.baseline)
 
         all_seed_results[seed] = results

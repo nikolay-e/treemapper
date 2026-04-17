@@ -120,7 +120,7 @@ def to_mermaid(qg: QuotientGraph, top_n: int = 20) -> str:
         src_id = node_ids[edge.source]
         dst_id = node_ids[edge.target]
         cats = edge.categories
-        top_cat = max(cats, key=cats.__getitem__) if cats else "?"
+        top_cat = max(cats, key=lambda k: cats[k]) if cats else "?"
         weight = int(edge.weight) if edge.weight == int(edge.weight) else round(edge.weight, 1)
         lines.append(f'    {src_id} -->|"{top_cat}: {weight}"| {dst_id}')
 

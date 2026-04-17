@@ -37,7 +37,7 @@ def run_cmd(
 def _parse_diff_path(raw: str, prefix: str) -> str | None:
     if raw == "/dev/null":
         return None
-    return raw[len(prefix):] if raw.startswith(prefix) else raw
+    return raw[len(prefix) :] if raw.startswith(prefix) else raw
 
 
 def patch_files_detailed(patch: str) -> tuple[set[str], set[str], set[str]]:
@@ -193,6 +193,19 @@ def load_results(path: Path) -> list[dict]:
     return data
 
 
+def _git_commit_sha() -> str:
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--short=7", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return r.stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+
 def save_results(results: list, tag: str, output_dir: Path = RESULTS_DIR, **meta) -> Path:
     import platform
     import sys
@@ -204,6 +217,7 @@ def save_results(results: list, tag: str, output_dir: Path = RESULTS_DIR, **meta
             "command": " ".join(sys.argv),
             "python_version": sys.version.split()[0],
             "platform": platform.platform(),
+            "git_commit": _git_commit_sha(),
             **meta,
         },
         "results": results,

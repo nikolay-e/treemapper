@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
+from common import load_results as _load_raw
 from stats import bootstrap_ci, paired_bootstrap_delta, wilcoxon_paired
 
 METRICS = [
@@ -16,8 +16,7 @@ METRICS = [
 
 
 def load_results(path: Path) -> dict[str, dict]:
-    raw = json.loads(path.read_text())
-    return {r["id"]: r for r in raw if r.get("status") == "ok"}
+    return {r["id"]: r for r in _load_raw(path) if r.get("status") == "ok"}
 
 
 def compare(after_path: Path, before_path: Path) -> None:

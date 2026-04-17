@@ -88,6 +88,8 @@ def _bench_cmd(py: str, limit: int, budget: int, scoring: str, baseline: str | N
         str(limit),
         "--budget",
         str(budget),
+        "--seeds",
+        "42",
     ]
     if baseline:
         cmd += ["--baseline", baseline]

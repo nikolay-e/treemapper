@@ -437,7 +437,7 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
 
     @staticmethod
     def _build_def_index(
-        js_frags: list[Fragment], info_cache: dict[FragmentId, JsFragmentInfo],
+        js_frags: list[Fragment], info_cache: dict[FragmentId, JsFragmentInfo]
     ) -> tuple[dict[str, list[FragmentId]], dict[FragmentId, frozenset[str]]]:
         name_to_defs: dict[str, list[FragmentId]] = defaultdict(list)
         frag_defines: dict[FragmentId, frozenset[str]] = {}

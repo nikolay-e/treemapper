@@ -80,6 +80,7 @@ optional-dependencies.dev = [
   "pytest-xdist>=3.0,<4.0",
   "pyyaml>=6.0.2,<8.0",
   "radon>=6.0,<7.0",
+  "rank-bm25>=0.2,<1.0",
   "ruamel-yaml>=0.18,<1.0",
   # Quality checks
   "ruff>=0.4,<1.0",
