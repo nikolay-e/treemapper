@@ -40,6 +40,7 @@ async def get_diff_context(
     repo_path: str,
     diff_range: str = "HEAD~1..HEAD",
     budget_tokens: int = 8000,
+    clipboard: bool = False,
 ) -> str:
     validated_path = validate_repo_path(repo_path)
     try:
@@ -61,7 +62,17 @@ async def get_diff_context(
                 "or check that both refs exist with 'git log --oneline'."
             ) from e
         raise ValueError(f"Git error: {e}") from e
-    return format_diff_context_as_markdown(result)
+
+    content = format_diff_context_as_markdown(result)
+
+    if clipboard:
+        from treemapper.clipboard import copy_to_clipboard
+
+        await anyio.to_thread.run_sync(lambda: copy_to_clipboard(content))
+        frag_count = result.get("fragment_count", 0)
+        return f"Copied diff context ({frag_count} fragments) to clipboard"
+
+    return content
 
 
 _TREE_MAP_DESCRIPTION = (
@@ -87,6 +98,7 @@ async def get_tree_map(
     no_content: bool = False,
     max_depth: int | None = None,
     max_file_bytes: int = 100_000,
+    clipboard: bool = False,
 ) -> str:
     from treemapper.ignore import get_ignore_specs, get_whitelist_spec
     from treemapper.tokens import count_tokens
@@ -109,12 +121,18 @@ async def get_tree_map(
             whitelist_spec=get_whitelist_spec(None, target),
         )
         tree = {"name": target.name or str(target), "type": "directory", "children": build_tree(target, ctx)}
-        content = tree_to_string(tree, output_format)
-        token_info = count_tokens(content)
-        return f"<!-- {token_info.count:,} tokens ({token_info.encoding}) -->\n{content}"
+        return tree_to_string(tree, output_format)
 
-    result: str = await anyio.to_thread.run_sync(_build)
-    return result
+    content: str = await anyio.to_thread.run_sync(_build)
+    token_info = count_tokens(content)
+
+    if clipboard:
+        from treemapper.clipboard import copy_to_clipboard
+
+        await anyio.to_thread.run_sync(lambda: copy_to_clipboard(content))
+        return f"Copied to clipboard ({token_info.count:,} tokens, {token_info.encoding})"
+
+    return f"<!-- {token_info.count:,} tokens ({token_info.encoding}) -->\n{content}"
 
 
 _FILE_CONTEXT_DESCRIPTION = (
@@ -134,10 +152,11 @@ async def get_file_context(
     patterns: list[str],
     max_files: int = 50,
     max_file_bytes: int = 100_000,
+    clipboard: bool = False,
 ) -> str:
     validated_path = validate_repo_path(repo_path)
 
-    def _read() -> str:
+    def _read() -> tuple[str, int, int]:
         import glob as globmod
 
         matched: list[Path] = []
@@ -149,9 +168,10 @@ async def get_file_context(
                     matched.append(p)
 
         if not matched:
-            return f"No files matched patterns: {patterns}"
+            return f"No files matched patterns: {patterns}", 0, 0
 
         parts = [f"# {len(matched)} files matched\n"]
+        total_lines = 0
         for p in matched:
             rel = p.relative_to(validated_path)
             try:
@@ -160,15 +180,24 @@ async def get_file_context(
                     parts.append(f"## {rel}\n*Skipped: {size:,} bytes exceeds limit*\n")
                     continue
                 content = p.read_text(encoding="utf-8", errors="replace")
+                total_lines += content.count("\n") + 1
                 suffix = p.suffix.lstrip(".")
                 parts.append(f"## {rel}\n```{suffix}\n{content}\n```\n")
             except OSError as e:
                 parts.append(f"## {rel}\n*Error: {e}*\n")
 
-        return "\n".join(parts)
+        return "\n".join(parts), len(matched), total_lines
 
-    result: str = await anyio.to_thread.run_sync(_read)
-    return result
+    raw_result: tuple[str, int, int] = await anyio.to_thread.run_sync(_read)
+    content, n_files, n_lines = raw_result
+
+    if clipboard and n_files > 0:
+        from treemapper.clipboard import copy_to_clipboard
+
+        await anyio.to_thread.run_sync(lambda: copy_to_clipboard(content))
+        return f"Copied {n_files} files ({n_lines:,} lines) to clipboard"
+
+    return content
 
 
 def run_server() -> None:
