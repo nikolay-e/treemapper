@@ -301,6 +301,12 @@ def _build_diff_context_inner(
     if untracked:
         expansion_concepts = _enrich_concepts(expansion_concepts, untracked)
 
+    if head_rev and not os.environ.get("DIFFCTX_NO_COMMIT_SIGNAL"):
+        commit_msg = _git.get_commit_message(root_dir, head_rev)
+        if commit_msg:
+            msg_concepts = concepts_from_diff_text(commit_msg)
+            expansion_concepts = frozenset(expansion_concepts | msg_concepts)
+
     changed_files = _resolve_changed_files(root_dir, diff_range, untracked, combined_spec, wl_spec)
 
     preferred_revs = _build_preferred_revs(base_rev, head_rev)
