@@ -1,0 +1,289 @@
+name: bal_refactor_025_java_strings_to_enum
+tags:
+- lang:java
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/main/java/com/app/model/Ticket.java: |
+      package com.app.model;
+
+      public class Ticket {
+          private String id;
+          private String title;
+          private String status;
+
+          public Ticket(String id, String title) {
+              this.id = id;
+              this.title = title;
+              this.status = "open";
+          }
+
+          public void resolve() {
+              if (!"open".equals(status) && !"in_progress".equals(status)) {
+                  throw new IllegalStateException("cannot resolve");
+              }
+              this.status = "resolved";
+          }
+
+          public void close() {
+              if (!"resolved".equals(status)) {
+                  throw new IllegalStateException("must resolve first");
+              }
+              this.status = "closed";
+          }
+
+          public String getStatus() { return status; }
+          public String getId() { return id; }
+          public String getTitle() { return title; }
+      }
+    src/main/java/com/app/service/TicketService.java: |
+      package com.app.service;
+
+      import com.app.model.Ticket;
+      import java.util.ArrayList;
+      import java.util.List;
+
+      public class TicketService {
+          private final List<Ticket> tickets = new ArrayList<>();
+
+          public void addTicket(Ticket ticket) {
+              tickets.add(ticket);
+          }
+
+          public List<Ticket> getOpenTickets() {
+              List<Ticket> result = new ArrayList<>();
+              for (Ticket t : tickets) {
+                  if ("open".equals(t.getStatus())) {
+                      result.add(t);
+                  }
+              }
+              return result;
+          }
+
+          public List<Ticket> getResolvedTickets() {
+              List<Ticket> result = new ArrayList<>();
+              for (Ticket t : tickets) {
+                  if ("resolved".equals(t.getStatus())) {
+                      result.add(t);
+                  }
+              }
+              return result;
+          }
+      }
+    src/main/java/com/app/view/TicketView.java: |
+      package com.app.view;
+
+      import com.app.model.Ticket;
+
+      public class TicketView {
+          public String renderBadge(Ticket ticket) {
+              String color;
+              switch (ticket.getStatus()) {
+                  case "open": color = "blue"; break;
+                  case "in_progress": color = "yellow"; break;
+                  case "resolved": color = "green"; break;
+                  case "closed": color = "gray"; break;
+                  default: color = "white";
+              }
+              return "<badge color=\"" + color + "\">" + ticket.getStatus() + "</badge>";
+          }
+      }
+    src/main/java/com/app/GarbageSearch.java: |
+      package com.app;
+
+      public class GarbageSearch {
+          public static final String GARBAGE_REFACTOR_025_SEARCH_A = "search";
+          public static final int GARBAGE_REFACTOR_025_MAX_B = 100;
+          public static final boolean GARBAGE_REFACTOR_025_FUZZY_C = true;
+
+          public Object search(String query) { return null; }
+      }
+    src/main/java/com/app/GarbageBackup.java: |
+      package com.app;
+
+      public class GarbageBackup {
+          public static final String GARBAGE_REFACTOR_025_BACKUP_D = "backup";
+          public static final boolean GARBAGE_REFACTOR_025_COMPRESS_E = true;
+
+          public void backup() {}
+      }
+  changed_files:
+    src/main/java/com/app/model/TicketStatus.java: |
+      package com.app.model;
+
+      public enum TicketStatus {
+          OPEN, IN_PROGRESS, RESOLVED, CLOSED
+      }
+    src/main/java/com/app/model/Ticket.java: |
+      package com.app.model;
+
+      public class Ticket {
+          private String id;
+          private String title;
+          private TicketStatus status;
+
+          public Ticket(String id, String title) {
+              this.id = id;
+              this.title = title;
+              this.status = TicketStatus.OPEN;
+          }
+
+          public void resolve() {
+              if (status != TicketStatus.OPEN && status != TicketStatus.IN_PROGRESS) {
+                  throw new IllegalStateException("cannot resolve");
+              }
+              this.status = TicketStatus.RESOLVED;
+          }
+
+          public void close() {
+              if (status != TicketStatus.RESOLVED) {
+                  throw new IllegalStateException("must resolve first");
+              }
+              this.status = TicketStatus.CLOSED;
+          }
+
+          public TicketStatus getStatus() { return status; }
+          public String getId() { return id; }
+          public String getTitle() { return title; }
+      }
+    src/main/java/com/app/service/TicketService.java: |
+      package com.app.service;
+
+      import com.app.model.Ticket;
+      import com.app.model.TicketStatus;
+      import java.util.ArrayList;
+      import java.util.List;
+
+      public class TicketService {
+          private final List<Ticket> tickets = new ArrayList<>();
+
+          public void addTicket(Ticket ticket) {
+              tickets.add(ticket);
+          }
+
+          public List<Ticket> getOpenTickets() {
+              List<Ticket> result = new ArrayList<>();
+              for (Ticket t : tickets) {
+                  if (t.getStatus() == TicketStatus.OPEN) {
+                      result.add(t);
+                  }
+              }
+              return result;
+          }
+
+          public List<Ticket> getResolvedTickets() {
+              List<Ticket> result = new ArrayList<>();
+              for (Ticket t : tickets) {
+                  if (t.getStatus() == TicketStatus.RESOLVED) {
+                      result.add(t);
+                  }
+              }
+              return result;
+          }
+      }
+    src/main/java/com/app/view/TicketView.java: |
+      package com.app.view;
+
+      import com.app.model.Ticket;
+      import com.app.model.TicketStatus;
+
+      public class TicketView {
+          public String renderBadge(Ticket ticket) {
+              String color;
+              switch (ticket.getStatus()) {
+                  case OPEN: color = "blue"; break;
+                  case IN_PROGRESS: color = "yellow"; break;
+                  case RESOLVED: color = "green"; break;
+                  case CLOSED: color = "gray"; break;
+                  default: color = "white";
+              }
+              return "<badge color=\"" + color + "\">" + ticket.getStatus() + "</badge>";
+          }
+      }
+    src/main/java/com/app/GarbageSearch.java: |
+      package com.app;
+
+      public class GarbageSearch {
+          public static final String GARBAGE_REFACTOR_025_SEARCH_A = "search";
+          public static final int GARBAGE_REFACTOR_025_MAX_B = 100;
+          public static final boolean GARBAGE_REFACTOR_025_FUZZY_C = true;
+
+          public Object search(String query) { return null; }
+      }
+    src/main/java/com/app/GarbageBackup.java: |
+      package com.app;
+
+      public class GarbageBackup {
+          public static final String GARBAGE_REFACTOR_025_BACKUP_D = "backup";
+          public static final boolean GARBAGE_REFACTOR_025_COMPRESS_E = true;
+
+          public void backup() {}
+      }
+  commit_message: "refactor: replace ticket status strings with TicketStatus enum"
+fragments:
+- id: new_enum
+  selector:
+    path: src/main/java/com/app/model/TicketStatus.java
+    anchor: "public enum TicketStatus"
+- id: ticket_uses_enum
+  selector:
+    path: src/main/java/com/app/model/Ticket.java
+    anchor: "private TicketStatus status"
+- id: ticket_init_enum
+  selector:
+    path: src/main/java/com/app/model/Ticket.java
+    anchor: "TicketStatus.OPEN"
+- id: service_imports_enum
+  selector:
+    path: src/main/java/com/app/service/TicketService.java
+    anchor: "import com.app.model.TicketStatus"
+- id: service_compares_enum
+  selector:
+    path: src/main/java/com/app/service/TicketService.java
+    anchor: "TicketStatus.OPEN"
+- id: view_imports_enum
+  selector:
+    path: src/main/java/com/app/view/TicketView.java
+    anchor: "import com.app.model.TicketStatus"
+- id: no_garbage_search
+  selector:
+    path: src/main/java/com/app/GarbageSearch.java
+- id: no_garbage_backup
+  selector:
+    path: src/main/java/com/app/GarbageBackup.java
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_025_SEARCH_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_025_MAX_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_025_FUZZY_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_025_BACKUP_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_025_COMPRESS_E
+oracle:
+  required:
+  - new_enum
+  - ticket_uses_enum
+  - ticket_init_enum
+  - service_imports_enum
+  - service_compares_enum
+  - view_imports_enum
+  allowed: []
+  forbidden:
+  - no_garbage_search
+  - no_garbage_backup
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

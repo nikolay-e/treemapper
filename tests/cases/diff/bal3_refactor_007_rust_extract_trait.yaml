@@ -1,0 +1,174 @@
+name: bal3_refactor_007_rust_extract_trait
+tags:
+- lang:rust
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/storage/memory.rs: |
+      use std::collections::HashMap;
+
+      pub struct MemoryStore {
+          data: HashMap<String, Vec<u8>>,
+      }
+
+      impl MemoryStore {
+          pub fn new() -> Self {
+              Self { data: HashMap::new() }
+          }
+
+          pub fn get(&self, key: &str) -> Option<&Vec<u8>> {
+              self.data.get(key)
+          }
+
+          pub fn set(&mut self, key: String, value: Vec<u8>) {
+              self.data.insert(key, value);
+          }
+
+          pub fn remove(&mut self, key: &str) {
+              self.data.remove(key);
+          }
+      }
+    src/services/cache.rs: |
+      use crate::storage::memory::MemoryStore;
+
+      pub struct CacheService {
+          store: MemoryStore,
+      }
+
+      impl CacheService {
+          pub fn new(store: MemoryStore) -> Self {
+              Self { store }
+          }
+
+          pub fn cached_get(&self, key: &str) -> Option<&Vec<u8>> {
+              self.store.get(key)
+          }
+      }
+    src/utils/format.rs: |
+      pub const GARBAGE_R007_FORMAT_A: &str = "formatter";
+
+      pub fn format_bytes(data: &[u8]) -> String {
+          format!("{:?}", data)
+      }
+    src/utils/time.rs: |
+      pub const GARBAGE_R007_TIME_B: &str = "timer";
+
+      pub fn now_millis() -> u64 {
+          0
+      }
+    src/utils/rand.rs: |
+      pub const GARBAGE_R007_RAND_C: &str = "random";
+
+      pub fn random_id() -> u64 {
+          42
+      }
+  changed_files:
+    src/storage/traits.rs: |
+      pub trait KeyValueStore {
+          fn get(&self, key: &str) -> Option<&Vec<u8>>;
+          fn set(&mut self, key: String, value: Vec<u8>);
+          fn remove(&mut self, key: &str);
+      }
+    src/storage/memory.rs: |
+      use std::collections::HashMap;
+      use super::traits::KeyValueStore;
+
+      pub struct MemoryStore {
+          data: HashMap<String, Vec<u8>>,
+      }
+
+      impl MemoryStore {
+          pub fn new() -> Self {
+              Self { data: HashMap::new() }
+          }
+      }
+
+      impl KeyValueStore for MemoryStore {
+          fn get(&self, key: &str) -> Option<&Vec<u8>> {
+              self.data.get(key)
+          }
+
+          fn set(&mut self, key: String, value: Vec<u8>) {
+              self.data.insert(key, value);
+          }
+
+          fn remove(&mut self, key: &str) {
+              self.data.remove(key);
+          }
+      }
+    src/services/cache.rs: |
+      use crate::storage::traits::KeyValueStore;
+
+      pub struct CacheService<S: KeyValueStore> {
+          store: S,
+      }
+
+      impl<S: KeyValueStore> CacheService<S> {
+          pub fn new(store: S) -> Self {
+              Self { store }
+          }
+
+          pub fn cached_get(&self, key: &str) -> Option<&Vec<u8>> {
+              self.store.get(key)
+          }
+      }
+    src/utils/format.rs: |
+      pub const GARBAGE_R007_FORMAT_A: &str = "formatter";
+
+      pub fn format_bytes(data: &[u8]) -> String {
+          format!("{:?}", data)
+      }
+    src/utils/time.rs: |
+      pub const GARBAGE_R007_TIME_B: &str = "timer";
+
+      pub fn now_millis() -> u64 {
+          0
+      }
+    src/utils/rand.rs: |
+      pub const GARBAGE_R007_RAND_C: &str = "random";
+
+      pub fn random_id() -> u64 {
+          42
+      }
+  commit_message: "refactor: extract KeyValueStore trait from MemoryStore"
+fragments:
+- id: kv_trait
+  selector:
+    path: src/storage/traits.rs
+    anchor: "pub trait KeyValueStore"
+- id: memory_implements_trait
+  selector:
+    path: src/storage/memory.rs
+    anchor: "impl KeyValueStore for MemoryStore"
+- id: cache_uses_generic
+  selector:
+    path: src/services/cache.rs
+    anchor: "pub struct CacheService<S: KeyValueStore>"
+- id: cache_import_trait
+  selector:
+    path: src/services/cache.rs
+    anchor: "use crate::storage::traits::KeyValueStore"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R007_FORMAT_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R007_TIME_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R007_RAND_C
+oracle:
+  required:
+  - kv_trait
+  - memory_implements_trait
+  - cache_uses_generic
+  - cache_import_trait
+  allowed: []
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

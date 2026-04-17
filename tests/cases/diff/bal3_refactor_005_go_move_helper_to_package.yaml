@@ -1,0 +1,205 @@
+name: bal3_refactor_005_go_move_helper_to_package
+tags:
+- lang:go
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    api/handlers/auth.go: |
+      package handlers
+
+      import (
+          "crypto/sha256"
+          "encoding/hex"
+          "net/http"
+      )
+
+      func hashPassword(password string) string {
+          h := sha256.Sum256([]byte(password))
+          return hex.EncodeToString(h[:])
+      }
+
+      func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+          pass := r.FormValue("password")
+          hashed := hashPassword(pass)
+          w.Write([]byte(hashed))
+      }
+    api/handlers/settings.go: |
+      package handlers
+
+      import (
+          "crypto/sha256"
+          "encoding/hex"
+          "net/http"
+      )
+
+      func hashPwd(pwd string) string {
+          h := sha256.Sum256([]byte(pwd))
+          return hex.EncodeToString(h[:])
+      }
+
+      func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
+          newPass := r.FormValue("new_password")
+          hashed := hashPwd(newPass)
+          w.Write([]byte(hashed))
+      }
+    services/admin.go: |
+      package services
+
+      import (
+          "crypto/sha256"
+          "encoding/hex"
+      )
+
+      type AdminService struct{}
+
+      func (a *AdminService) ResetPassword(userID string, newPwd string) string {
+          h := sha256.Sum256([]byte(newPwd))
+          return hex.EncodeToString(h[:])
+      }
+    pkg/billing/invoice.go: |
+      package billing
+
+      GARBAGE_R005_BILLING_A = "invoice"
+
+      type Invoice struct {
+          Amount float64
+      }
+
+      func NewInvoice(amount float64) *Invoice {
+          return &Invoice{Amount: amount}
+      }
+    pkg/audit/log.go: |
+      package audit
+
+      GARBAGE_R005_AUDIT_B = "log"
+
+      type AuditLog struct {
+          Action string
+      }
+    pkg/i18n/translate.go: |
+      package i18n
+
+      GARBAGE_R005_I18N_C = "translate"
+
+      type Translator struct {
+          Locale string
+      }
+  changed_files:
+    pkg/crypto/hash.go: |
+      package crypto
+
+      import (
+          "crypto/sha256"
+          "encoding/hex"
+      )
+
+      func HashPassword(password string) string {
+          h := sha256.Sum256([]byte(password))
+          return hex.EncodeToString(h[:])
+      }
+    api/handlers/auth.go: |
+      package handlers
+
+      import (
+          "net/http"
+          "pkg/crypto"
+      )
+
+      func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+          pass := r.FormValue("password")
+          hashed := crypto.HashPassword(pass)
+          w.Write([]byte(hashed))
+      }
+    api/handlers/settings.go: |
+      package handlers
+
+      import (
+          "net/http"
+          "pkg/crypto"
+      )
+
+      func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
+          newPass := r.FormValue("new_password")
+          hashed := crypto.HashPassword(newPass)
+          w.Write([]byte(hashed))
+      }
+    services/admin.go: |
+      package services
+
+      import "pkg/crypto"
+
+      type AdminService struct{}
+
+      func (a *AdminService) ResetPassword(userID string, newPwd string) string {
+          return crypto.HashPassword(newPwd)
+      }
+    pkg/billing/invoice.go: |
+      package billing
+
+      GARBAGE_R005_BILLING_A = "invoice"
+
+      type Invoice struct {
+          Amount float64
+      }
+
+      func NewInvoice(amount float64) *Invoice {
+          return &Invoice{Amount: amount}
+      }
+    pkg/audit/log.go: |
+      package audit
+
+      GARBAGE_R005_AUDIT_B = "log"
+
+      type AuditLog struct {
+          Action string
+      }
+    pkg/i18n/translate.go: |
+      package i18n
+
+      GARBAGE_R005_I18N_C = "translate"
+
+      type Translator struct {
+          Locale string
+      }
+  commit_message: "refactor: deduplicate password hashing into crypto package"
+fragments:
+- id: hash_password_func
+  selector:
+    path: pkg/crypto/hash.go
+    anchor: "func HashPassword(password string)"
+- id: auth_uses_crypto
+  selector:
+    path: api/handlers/auth.go
+    anchor: "crypto.HashPassword(pass)"
+- id: settings_uses_crypto
+  selector:
+    path: api/handlers/settings.go
+    anchor: "crypto.HashPassword(newPass)"
+- id: admin_uses_crypto
+  selector:
+    path: services/admin.go
+    anchor: "crypto.HashPassword(newPwd)"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R005_BILLING_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R005_AUDIT_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R005_I18N_C
+oracle:
+  required:
+  - hash_password_func
+  - auth_uses_crypto
+  - settings_uses_crypto
+  - admin_uses_crypto
+  allowed: []
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

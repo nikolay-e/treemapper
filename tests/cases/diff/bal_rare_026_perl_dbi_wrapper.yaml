@@ -1,0 +1,244 @@
+name: bal_rare_026_perl_dbi_wrapper
+tags:
+- lang:perl
+- change:multi_file
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    lib/DB.pm: |
+      package DB;
+      use strict;
+      use warnings;
+      use Exporter 'import';
+      our @EXPORT_OK = qw(connect query);
+
+      my $connection;
+
+      sub connect {
+          my ($dsn, $user, $pass) = @_;
+          $connection = {
+              dsn  => $dsn,
+              user => $user,
+              connected => 1,
+          };
+          return $connection;
+      }
+
+      sub query {
+          my ($sql) = @_;
+          die "Not connected" unless $connection && $connection->{connected};
+          return { sql => $sql, rows => [] };
+      }
+
+      1;
+    lib/UserRepo.pm: |
+      package UserRepo;
+      use strict;
+      use warnings;
+      use DB qw(query);
+
+      sub find_by_id {
+          my ($id) = @_;
+          my $result = query("SELECT * FROM users WHERE id = $id");
+          return $result->{rows}->[0];
+      }
+
+      sub find_all {
+          my $result = query("SELECT * FROM users");
+          return $result->{rows};
+      }
+
+      1;
+    lib/App.pm: |
+      package App;
+      use strict;
+      use warnings;
+      use DB qw(connect);
+      use UserRepo;
+
+      sub run {
+          connect("dbi:Pg:dbname=app", "admin", "secret");
+          my $users = UserRepo::find_all();
+          return $users;
+      }
+
+      1;
+    garbage_logger.pm: |
+      package GarbageLogger;
+      our $GARBAGE_RARE_026_LEVEL_A = "info";
+      our $GARBAGE_RARE_026_FILE_B = "/var/log/app.log";
+
+      sub garbage_log {
+          return $GARBAGE_RARE_026_LEVEL_A;
+      }
+
+      our $GARBAGE_RARE_026_ROTATE_C = 1;
+      1;
+    garbage_config.pm: |
+      package GarbageConfig;
+      our $GARBAGE_RARE_026_ENV_D = "production";
+      our $GARBAGE_RARE_026_DEBUG_E = 0;
+
+      sub garbage_load {
+          return $GARBAGE_RARE_026_ENV_D;
+      }
+
+      our $GARBAGE_RARE_026_STRICT_F = 1;
+      1;
+  changed_files:
+    lib/DB.pm: |
+      package DB;
+      use strict;
+      use warnings;
+      use Exporter 'import';
+      our @EXPORT_OK = qw(connect query execute);
+
+      my $connection;
+
+      sub connect {
+          my ($dsn, $user, $pass) = @_;
+          $connection = {
+              dsn  => $dsn,
+              user => $user,
+              connected => 1,
+          };
+          return $connection;
+      }
+
+      sub query {
+          my ($sql, @params) = @_;
+          die "Not connected" unless $connection && $connection->{connected};
+          return { sql => $sql, params => \@params, rows => [] };
+      }
+
+      sub execute {
+          my ($sql, @params) = @_;
+          die "Not connected" unless $connection && $connection->{connected};
+          return { sql => $sql, params => \@params, affected => 0 };
+      }
+
+      1;
+    lib/UserRepo.pm: |
+      package UserRepo;
+      use strict;
+      use warnings;
+      use DB qw(query execute);
+
+      sub find_by_id {
+          my ($id) = @_;
+          my $result = query("SELECT * FROM users WHERE id = ?", $id);
+          return $result->{rows}->[0];
+      }
+
+      sub find_all {
+          my $result = query("SELECT * FROM users");
+          return $result->{rows};
+      }
+
+      sub delete_by_id {
+          my ($id) = @_;
+          return execute("DELETE FROM users WHERE id = ?", $id);
+      }
+
+      1;
+    lib/App.pm: |
+      package App;
+      use strict;
+      use warnings;
+      use DB qw(connect);
+      use UserRepo;
+
+      sub run {
+          connect("dbi:Pg:dbname=app", "admin", "secret");
+          my $users = UserRepo::find_all();
+          return $users;
+      }
+
+      1;
+    garbage_logger.pm: |
+      package GarbageLogger;
+      our $GARBAGE_RARE_026_LEVEL_A = "info";
+      our $GARBAGE_RARE_026_FILE_B = "/var/log/app.log";
+
+      sub garbage_log {
+          return $GARBAGE_RARE_026_LEVEL_A;
+      }
+
+      our $GARBAGE_RARE_026_ROTATE_C = 1;
+      1;
+    garbage_config.pm: |
+      package GarbageConfig;
+      our $GARBAGE_RARE_026_ENV_D = "production";
+      our $GARBAGE_RARE_026_DEBUG_E = 0;
+
+      sub garbage_load {
+          return $GARBAGE_RARE_026_ENV_D;
+      }
+
+      our $GARBAGE_RARE_026_STRICT_F = 1;
+      1;
+  commit_message: "fix: use parameterized queries to prevent SQL injection"
+fragments:
+- id: query_params
+  selector:
+    path: lib/DB.pm
+    anchor: "my ($sql, @params) = @_"
+- id: execute_fn
+  selector:
+    path: lib/DB.pm
+    anchor: "sub execute"
+- id: repo_parameterized
+  selector:
+    path: lib/UserRepo.pm
+    anchor: 'query("SELECT * FROM users WHERE id = ?", $id)'
+- id: repo_delete
+  selector:
+    path: lib/UserRepo.pm
+    anchor: "sub delete_by_id"
+- id: no_app
+  selector:
+    path: lib/App.pm
+- id: no_garbage_logger
+  selector:
+    path: garbage_logger.pm
+- id: no_garbage_config
+  selector:
+    path: garbage_config.pm
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_026_LEVEL_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_026_FILE_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_026_ROTATE_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_026_ENV_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_026_DEBUG_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_026_STRICT_F
+oracle:
+  required:
+  - query_params
+  - execute_fn
+  - repo_parameterized
+  - repo_delete
+  allowed: []
+  forbidden:
+  - no_app
+  - no_garbage_logger
+  - no_garbage_config
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

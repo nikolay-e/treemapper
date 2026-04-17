@@ -1,4 +1,10 @@
 name: internals_006_arabic_rtl_mixed_direction
+tags:
+- lang:python
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
     src/content/renderer.py: |

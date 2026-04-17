@@ -1,0 +1,235 @@
+name: bal3_1hop_005_go_cache_layer
+tags:
+- lang:go
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/cache/store.go: |
+      package cache
+
+      import "time"
+
+      type Entry struct {
+          Value     string
+          ExpiresAt time.Time
+      }
+
+      type Store struct {
+          data map[string]*Entry
+      }
+
+      func NewStore() *Store {
+          return &Store{data: make(map[string]*Entry)}
+      }
+
+      func (s *Store) Get(key string) (string, bool) {
+          e, ok := s.data[key]
+          if !ok {
+              return "", false
+          }
+          return e.Value, true
+      }
+
+      func (s *Store) Set(key, value string, ttl time.Duration) {
+          s.data[key] = &Entry{Value: value, ExpiresAt: time.Now().Add(ttl)}
+      }
+    internal/api/user_handler.go: |
+      package api
+
+      import "pkg/cache"
+
+      type UserHandler struct {
+          cache *cache.Store
+      }
+
+      func NewUserHandler(c *cache.Store) *UserHandler {
+          return &UserHandler{cache: c}
+      }
+
+      func (h *UserHandler) GetUser(id string) string {
+          val, ok := h.cache.Get("user:" + id)
+          if ok {
+              return val
+          }
+          return "fetched-" + id
+      }
+    internal/api/product_handler.go: |
+      package api
+
+      import "pkg/cache"
+
+      type ProductHandler struct {
+          cache *cache.Store
+      }
+
+      func NewProductHandler(c *cache.Store) *ProductHandler {
+          return &ProductHandler{cache: c}
+      }
+
+      func (h *ProductHandler) GetProduct(id string) string {
+          val, ok := h.cache.Get("product:" + id)
+          if ok {
+              return val
+          }
+          return "product-" + id
+      }
+    internal/api/search_handler.go: |
+      package api
+
+      import "pkg/cache"
+
+      type SearchHandler struct {
+          cache *cache.Store
+      }
+
+      func NewSearchHandler(c *cache.Store) *SearchHandler {
+          return &SearchHandler{cache: c}
+      }
+
+      func (h *SearchHandler) Search(q string) string {
+          val, ok := h.cache.Get("search:" + q)
+          if ok {
+              return val
+          }
+          return "results-for-" + q
+      }
+    internal/queue/publisher.go: |
+      package queue
+
+      GARBAGE_005_PUBLISHER_A = "publisher"
+
+      type Publisher struct {
+          Topic string
+      }
+
+      func (p *Publisher) Publish(msg []byte) error {
+          return nil
+      }
+    internal/audit/trail.go: |
+      package audit
+
+      GARBAGE_005_AUDIT_B = "audit"
+
+      type Trail struct {
+          Entries []string
+      }
+
+      func (t *Trail) Record(action string) {
+          t.Entries = append(t.Entries, action)
+      }
+    internal/ratelimit/limiter.go: |
+      package ratelimit
+
+      GARBAGE_005_LIMITER_C = "limiter"
+
+      type Limiter struct {
+          MaxPerSec int
+      }
+
+      func (l *Limiter) Allow() bool {
+          return true
+      }
+  changed_files:
+    pkg/cache/store.go: |
+      package cache
+
+      import "time"
+
+      type Entry struct {
+          Value     string
+          ExpiresAt time.Time
+      }
+
+      type Store struct {
+          data map[string]*Entry
+      }
+
+      func NewStore() *Store {
+          return &Store{data: make(map[string]*Entry)}
+      }
+
+      func (s *Store) Get(key string) (string, bool) {
+          e, ok := s.data[key]
+          if !ok {
+              return "", false
+          }
+          if time.Now().After(e.ExpiresAt) {
+              delete(s.data, key)
+              return "", false
+          }
+          return e.Value, true
+      }
+
+      func (s *Store) Set(key, value string, ttl time.Duration) {
+          s.data[key] = &Entry{Value: value, ExpiresAt: time.Now().Add(ttl)}
+      }
+
+      func (s *Store) Delete(key string) {
+          delete(s.data, key)
+      }
+  commit_message: "fix: expire stale cache entries on Get and add Delete method"
+fragments:
+- id: expiry_check
+  selector:
+    path: pkg/cache/store.go
+    anchor: "time.Now().After(e.ExpiresAt)"
+- id: delete_on_expire
+  selector:
+    path: pkg/cache/store.go
+    anchor: "delete(s.data, key)"
+- id: delete_method
+  selector:
+    path: pkg/cache/store.go
+    anchor: "func (s *Store) Delete"
+- id: user_handler_imports_cache
+  selector:
+    path: internal/api/user_handler.go
+    anchor: "h.cache.Get(\"user:\""
+- id: product_handler_imports_cache
+  selector:
+    path: internal/api/product_handler.go
+    anchor: "h.cache.Get(\"product:\""
+- id: search_handler_imports_cache
+  selector:
+    path: internal/api/search_handler.go
+    anchor: "h.cache.Get(\"search:\""
+- id: unrelated_publisher
+  selector:
+    path: internal/queue/publisher.go
+    anchor: "type Publisher struct"
+- id: unrelated_audit
+  selector:
+    path: internal/audit/trail.go
+    anchor: "type Trail struct"
+- id: unrelated_limiter
+  selector:
+    path: internal/ratelimit/limiter.go
+    anchor: "type Limiter struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_005_PUBLISHER_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_005_AUDIT_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_005_LIMITER_C
+oracle:
+  required:
+  - expiry_check
+  - delete_on_expire
+  - delete_method
+  - user_handler_imports_cache
+  allowed:
+  - product_handler_imports_cache
+  - search_handler_imports_cache
+  forbidden:
+  - unrelated_publisher
+  - unrelated_audit
+  - unrelated_limiter
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

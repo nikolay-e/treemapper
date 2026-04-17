@@ -1,4 +1,11 @@
 name: php_012_constructor_promotion
+tags:
+- lang:php
+- change:single_file
+- change:signature
+- context:cross_module
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
     src/Config/DatabaseConfig.php: |

@@ -1,0 +1,172 @@
+name: bal3_rare_013_julia_struct_dispatch
+tags:
+- lang:julia
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/Geometry.jl: |
+      module Geometry
+
+      export Shape, Circle, Rectangle, area, perimeter
+
+      abstract type Shape end
+
+      struct Circle <: Shape
+          radius::Float64
+      end
+
+      struct Rectangle <: Shape
+          width::Float64
+          height::Float64
+      end
+
+      area(c::Circle) = pi * c.radius^2
+      area(r::Rectangle) = r.width * r.height
+
+      perimeter(c::Circle) = 2 * pi * c.radius
+      perimeter(r::Rectangle) = 2 * (r.width + r.height)
+
+      end
+    src/Renderer.jl: |
+      module Renderer
+
+      using ..Geometry
+
+      export render_shape, render_all
+
+      function render_shape(s::Shape)
+          a = area(s)
+          p = perimeter(s)
+          "Shape: area=$(round(a, digits=2)), perimeter=$(round(p, digits=2))"
+      end
+
+      function render_all(shapes::Vector{<:Shape})
+          join(map(render_shape, shapes), "\n")
+      end
+
+      end
+    src/Physics.jl: |
+      module Physics
+
+      GARBAGE_RARE_013_PHYS_A = "gravity"
+      GARBAGE_RARE_013_G_B = 9.81
+
+      velocity(t::Float64, a::Float64) = a * t
+
+      end
+    src/Statistics.jl: |
+      module Statistics
+
+      GARBAGE_RARE_013_STAT_C = "mean"
+      GARBAGE_RARE_013_STD_D = "stddev"
+
+      mean(xs) = sum(xs) / length(xs)
+
+      end
+    src/FileIO.jl: |
+      module FileIO
+
+      GARBAGE_RARE_013_IO_E = "csv"
+      GARBAGE_RARE_013_DELIM_F = ","
+
+      read_csv(path::String) = readlines(path)
+
+      end
+  changed_files:
+    src/Geometry.jl: |
+      module Geometry
+
+      export Shape, Circle, Rectangle, Triangle, area, perimeter
+
+      abstract type Shape end
+
+      struct Circle <: Shape
+          radius::Float64
+      end
+
+      struct Rectangle <: Shape
+          width::Float64
+          height::Float64
+      end
+
+      struct Triangle <: Shape
+          a::Float64
+          b::Float64
+          c::Float64
+      end
+
+      area(c::Circle) = pi * c.radius^2
+      area(r::Rectangle) = r.width * r.height
+      area(t::Triangle) = begin
+          s = (t.a + t.b + t.c) / 2
+          sqrt(s * (s - t.a) * (s - t.b) * (s - t.c))
+      end
+
+      perimeter(c::Circle) = 2 * pi * c.radius
+      perimeter(r::Rectangle) = 2 * (r.width + r.height)
+      perimeter(t::Triangle) = t.a + t.b + t.c
+
+      end
+  commit_message: "add Triangle shape with area and perimeter"
+fragments:
+- id: renderer_uses_area
+  selector:
+    path: src/Renderer.jl
+    anchor: "area(s)"
+- id: renderer_uses_perimeter
+  selector:
+    path: src/Renderer.jl
+    anchor: "perimeter(s)"
+- id: renderer_uses_geometry
+  selector:
+    path: src/Renderer.jl
+    anchor: "using ..Geometry"
+- id: no_physics
+  selector:
+    path: src/Physics.jl
+    anchor: "velocity"
+- id: no_statistics
+  selector:
+    path: src/Statistics.jl
+    anchor: "mean(xs)"
+- id: no_fileio
+  selector:
+    path: src/FileIO.jl
+    anchor: "read_csv"
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_013_PHYS_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_013_G_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_013_STAT_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_013_STD_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_013_IO_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_013_DELIM_F
+oracle:
+  required:
+  - renderer_uses_area
+  - renderer_uses_perimeter
+  - renderer_uses_geometry
+  allowed: []
+  forbidden:
+  - no_physics
+  - no_statistics
+  - no_fileio
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

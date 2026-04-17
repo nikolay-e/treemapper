@@ -1,0 +1,59 @@
+name: bal3_bugfix_024_kotlin_wrong_operator
+tags:
+- lang:kotlin
+- change:single_file
+- change:bug_fix
+- context:same_file
+- distance:0hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/main/kotlin/search/Filter.kt: |
+      package search
+
+      data class Product(val name: String, val price: Double, val inStock: Boolean)
+
+      class Filter {
+          fun affordable(products: List<Product>, maxPrice: Double): List<Product> {
+              return products.filter { it.price < maxPrice || it.inStock }
+          }
+
+          fun available(products: List<Product>): List<Product> {
+              return products.filter { it.inStock }
+          }
+      }
+    src/main/kotlin/render/Display.kt: |
+      package render
+
+      fun showProduct(name: String, price: Double): String = "$name: $$price"
+  changed_files:
+    src/main/kotlin/search/Filter.kt: |
+      package search
+
+      data class Product(val name: String, val price: Double, val inStock: Boolean)
+
+      class Filter {
+          fun affordable(products: List<Product>, maxPrice: Double): List<Product> {
+              return products.filter { it.price <= maxPrice && it.inStock }
+          }
+
+          fun available(products: List<Product>): List<Product> {
+              return products.filter { it.inStock }
+          }
+      }
+  commit_message: "fix: use && instead of || and <= instead of < in affordable filter"
+fragments:
+- id: operator_fix
+  selector:
+    path: search/Filter.kt
+    anchor: "it.price <= maxPrice && it.inStock"
+- id: no_display
+  selector:
+    path: render/Display.kt
+    anchor: "fun showProduct"
+oracle:
+  required:
+  - operator_fix
+  allowed: []
+  forbidden:
+  - no_display

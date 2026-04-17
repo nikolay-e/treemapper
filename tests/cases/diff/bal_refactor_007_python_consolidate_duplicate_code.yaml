@@ -1,0 +1,203 @@
+name: bal_refactor_007_python_consolidate_duplicate_code
+tags:
+- lang:python
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    exporters/csv_exporter.py: |
+      import csv
+      import io
+
+      def sanitize_value(val):
+          if val is None:
+              return ""
+          text = str(val).strip()
+          text = text.replace('"', '""')
+          return text
+
+      def export_csv(records, columns):
+          buf = io.StringIO()
+          writer = csv.writer(buf)
+          writer.writerow(columns)
+          for record in records:
+              row = [sanitize_value(record.get(col)) for col in columns]
+              writer.writerow(row)
+          return buf.getvalue()
+    exporters/json_exporter.py: |
+      import json
+
+      def sanitize_value(val):
+          if val is None:
+              return ""
+          text = str(val).strip()
+          text = text.replace('"', '""')
+          return text
+
+      def export_json(records, columns):
+          cleaned = []
+          for record in records:
+              row = {col: sanitize_value(record.get(col)) for col in columns}
+              cleaned.append(row)
+          return json.dumps(cleaned, indent=2)
+    exporters/xml_exporter.py: |
+      def sanitize_value(val):
+          if val is None:
+              return ""
+          text = str(val).strip()
+          text = text.replace('"', '""')
+          return text
+
+      def export_xml(records, columns):
+          lines = ['<?xml version="1.0"?>']
+          lines.append("<records>")
+          for record in records:
+              lines.append("  <record>")
+              for col in columns:
+                  val = sanitize_value(record.get(col))
+                  lines.append(f"    <{col}>{val}</{col}>")
+              lines.append("  </record>")
+          lines.append("</records>")
+          return "\n".join(lines)
+    garbage_auth.py: |
+      GARBAGE_REFACTOR_007_AUTH_MARKER_A = "auth"
+      GARBAGE_REFACTOR_007_TOKEN_MARKER_B = "jwt"
+
+      class AuthProvider:
+          GARBAGE_REFACTOR_007_PROVIDER_C = True
+
+          def authenticate(self, token):
+              return True
+    garbage_queue.py: |
+      GARBAGE_REFACTOR_007_QUEUE_MARKER_D = "queue"
+      GARBAGE_REFACTOR_007_SIZE_MARKER_E = 1000
+
+      class MessageQueue:
+          GARBAGE_REFACTOR_007_MQ_CLASS_F = True
+
+          def enqueue(self, msg):
+              pass
+  changed_files:
+    exporters/sanitizer.py: |
+      def sanitize_value(val):
+          if val is None:
+              return ""
+          text = str(val).strip()
+          text = text.replace('"', '""')
+          return text
+    exporters/csv_exporter.py: |
+      import csv
+      import io
+      from exporters.sanitizer import sanitize_value
+
+      def export_csv(records, columns):
+          buf = io.StringIO()
+          writer = csv.writer(buf)
+          writer.writerow(columns)
+          for record in records:
+              row = [sanitize_value(record.get(col)) for col in columns]
+              writer.writerow(row)
+          return buf.getvalue()
+    exporters/json_exporter.py: |
+      import json
+      from exporters.sanitizer import sanitize_value
+
+      def export_json(records, columns):
+          cleaned = []
+          for record in records:
+              row = {col: sanitize_value(record.get(col)) for col in columns}
+              cleaned.append(row)
+          return json.dumps(cleaned, indent=2)
+    exporters/xml_exporter.py: |
+      from exporters.sanitizer import sanitize_value
+
+      def export_xml(records, columns):
+          lines = ['<?xml version="1.0"?>']
+          lines.append("<records>")
+          for record in records:
+              lines.append("  <record>")
+              for col in columns:
+                  val = sanitize_value(record.get(col))
+                  lines.append(f"    <{col}>{val}</{col}>")
+              lines.append("  </record>")
+          lines.append("</records>")
+          return "\n".join(lines)
+    garbage_auth.py: |
+      GARBAGE_REFACTOR_007_AUTH_MARKER_A = "auth"
+      GARBAGE_REFACTOR_007_TOKEN_MARKER_B = "jwt"
+
+      class AuthProvider:
+          GARBAGE_REFACTOR_007_PROVIDER_C = True
+
+          def authenticate(self, token):
+              return True
+    garbage_queue.py: |
+      GARBAGE_REFACTOR_007_QUEUE_MARKER_D = "queue"
+      GARBAGE_REFACTOR_007_SIZE_MARKER_E = 1000
+
+      class MessageQueue:
+          GARBAGE_REFACTOR_007_MQ_CLASS_F = True
+
+          def enqueue(self, msg):
+              pass
+  commit_message: "refactor: consolidate duplicate sanitize_value into shared module"
+fragments:
+- id: new_sanitizer_module
+  selector:
+    path: exporters/sanitizer.py
+    anchor: "def sanitize_value(val)"
+- id: csv_imports_sanitizer
+  selector:
+    path: exporters/csv_exporter.py
+    anchor: "from exporters.sanitizer import sanitize_value"
+- id: json_imports_sanitizer
+  selector:
+    path: exporters/json_exporter.py
+    anchor: "from exporters.sanitizer import sanitize_value"
+- id: xml_imports_sanitizer
+  selector:
+    path: exporters/xml_exporter.py
+    anchor: "from exporters.sanitizer import sanitize_value"
+- id: no_garbage_auth
+  selector:
+    path: garbage_auth.py
+- id: no_garbage_queue
+  selector:
+    path: garbage_queue.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_007_AUTH_MARKER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_007_TOKEN_MARKER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_007_PROVIDER_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_007_QUEUE_MARKER_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_007_SIZE_MARKER_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_REFACTOR_007_MQ_CLASS_F
+oracle:
+  required:
+  - new_sanitizer_module
+  - csv_imports_sanitizer
+  - json_imports_sanitizer
+  - xml_imports_sanitizer
+  allowed: []
+  forbidden:
+  - no_garbage_auth
+  - no_garbage_queue
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

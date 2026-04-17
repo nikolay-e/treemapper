@@ -1,0 +1,239 @@
+name: bal3_refactor_003_go_consolidate_error_handling
+tags:
+- lang:go
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    services/user.go: |
+      package services
+
+      import "fmt"
+
+      type UserService struct{}
+
+      func (s *UserService) GetUser(id int) (string, error) {
+          if id <= 0 {
+              return "", fmt.Errorf("user not found: invalid id %d", id)
+          }
+          return "user", nil
+      }
+
+      func (s *UserService) DeleteUser(id int) error {
+          if id <= 0 {
+              return fmt.Errorf("user not found: cannot delete id %d", id)
+          }
+          return nil
+      }
+    services/order.go: |
+      package services
+
+      import "fmt"
+
+      type OrderService struct{}
+
+      func (s *OrderService) GetOrder(id int) (string, error) {
+          if id <= 0 {
+              return "", fmt.Errorf("order not found: invalid id %d", id)
+          }
+          return "order", nil
+      }
+
+      func (s *OrderService) CancelOrder(id int) error {
+          if id <= 0 {
+              return fmt.Errorf("order not found: cannot cancel id %d", id)
+          }
+          return nil
+      }
+    api/router.go: |
+      package api
+
+      import "services"
+
+      type Router struct {
+          users  *services.UserService
+          orders *services.OrderService
+      }
+
+      func NewRouter() *Router {
+          return &Router{
+              users:  &services.UserService{},
+              orders: &services.OrderService{},
+          }
+      }
+    pkg/cache/store.go: |
+      package cache
+
+      GARBAGE_R003_CACHE_A = "store"
+
+      type Store struct {
+          TTL int
+      }
+
+      func NewStore(ttl int) *Store {
+          return &Store{TTL: ttl}
+      }
+    pkg/telemetry/tracer.go: |
+      package telemetry
+
+      GARBAGE_R003_TRACER_B = "tracer"
+
+      type Tracer struct {
+          Endpoint string
+      }
+    pkg/search/index.go: |
+      package search
+
+      GARBAGE_R003_INDEX_C = "index"
+
+      type Index struct {
+          Name string
+      }
+  changed_files:
+    pkg/apperr/errors.go: |
+      package apperr
+
+      import "fmt"
+
+      type NotFoundError struct {
+          Entity string
+          ID     int
+      }
+
+      func (e *NotFoundError) Error() string {
+          return fmt.Sprintf("%s not found: id %d", e.Entity, e.ID)
+      }
+
+      func NewNotFound(entity string, id int) *NotFoundError {
+          return &NotFoundError{Entity: entity, ID: id}
+      }
+    services/user.go: |
+      package services
+
+      import "pkg/apperr"
+
+      type UserService struct{}
+
+      func (s *UserService) GetUser(id int) (string, error) {
+          if id <= 0 {
+              return "", apperr.NewNotFound("user", id)
+          }
+          return "user", nil
+      }
+
+      func (s *UserService) DeleteUser(id int) error {
+          if id <= 0 {
+              return apperr.NewNotFound("user", id)
+          }
+          return nil
+      }
+    services/order.go: |
+      package services
+
+      import "pkg/apperr"
+
+      type OrderService struct{}
+
+      func (s *OrderService) GetOrder(id int) (string, error) {
+          if id <= 0 {
+              return "", apperr.NewNotFound("order", id)
+          }
+          return "order", nil
+      }
+
+      func (s *OrderService) CancelOrder(id int) error {
+          if id <= 0 {
+              return apperr.NewNotFound("order", id)
+          }
+          return nil
+      }
+    api/router.go: |
+      package api
+
+      import "services"
+
+      type Router struct {
+          users  *services.UserService
+          orders *services.OrderService
+      }
+
+      func NewRouter() *Router {
+          return &Router{
+              users:  &services.UserService{},
+              orders: &services.OrderService{},
+          }
+      }
+    pkg/cache/store.go: |
+      package cache
+
+      GARBAGE_R003_CACHE_A = "store"
+
+      type Store struct {
+          TTL int
+      }
+
+      func NewStore(ttl int) *Store {
+          return &Store{TTL: ttl}
+      }
+    pkg/telemetry/tracer.go: |
+      package telemetry
+
+      GARBAGE_R003_TRACER_B = "tracer"
+
+      type Tracer struct {
+          Endpoint string
+      }
+    pkg/search/index.go: |
+      package search
+
+      GARBAGE_R003_INDEX_C = "index"
+
+      type Index struct {
+          Name string
+      }
+  commit_message: "refactor: consolidate error handling into apperr package"
+fragments:
+- id: not_found_error_type
+  selector:
+    path: pkg/apperr/errors.go
+    anchor: "type NotFoundError struct"
+- id: new_not_found_func
+  selector:
+    path: pkg/apperr/errors.go
+    anchor: "func NewNotFound"
+- id: user_uses_apperr
+  selector:
+    path: services/user.go
+    anchor: "apperr.NewNotFound"
+- id: order_uses_apperr
+  selector:
+    path: services/order.go
+    anchor: "apperr.NewNotFound"
+- id: router_context
+  selector:
+    path: api/router.go
+    anchor: "services.UserService"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R003_CACHE_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R003_TRACER_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R003_INDEX_C
+oracle:
+  required:
+  - not_found_error_type
+  - new_not_found_func
+  - user_uses_apperr
+  - order_uses_apperr
+  allowed:
+  - router_context
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

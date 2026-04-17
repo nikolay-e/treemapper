@@ -1,0 +1,205 @@
+name: bal_1hop_012_go_gateway_calls_circuit
+tags:
+- lang:go
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    pkg/circuit/breaker.go: |
+      package circuit
+
+      import "sync"
+
+      type State int
+
+      const (
+          Closed State = iota
+          Open
+          HalfOpen
+      )
+
+      type Breaker struct {
+          mu       sync.Mutex
+          state    State
+          failures int
+          threshold int
+      }
+
+      func NewBreaker(threshold int) *Breaker {
+          return &Breaker{state: Closed, threshold: threshold}
+      }
+
+      func (b *Breaker) Execute(fn func() error) error {
+          b.mu.Lock()
+          if b.state == Open {
+              b.mu.Unlock()
+              return fmt.Errorf("circuit open")
+          }
+          b.mu.Unlock()
+          err := fn()
+          if err != nil {
+              b.recordFailure()
+          }
+          return err
+      }
+
+      func (b *Breaker) recordFailure() {
+          b.mu.Lock()
+          defer b.mu.Unlock()
+          b.failures++
+          if b.failures >= b.threshold {
+              b.state = Open
+          }
+      }
+    pkg/gateway/proxy.go: |
+      package gateway
+
+      import (
+          "net/http"
+          "myapp/pkg/circuit"
+      )
+
+      type APIGateway struct {
+          breaker *circuit.Breaker
+          backend string
+      }
+
+      func NewGateway(backend string, breaker *circuit.Breaker) *APIGateway {
+          return &APIGateway{breaker: breaker, backend: backend}
+      }
+
+      func (g *APIGateway) Forward(w http.ResponseWriter, r *http.Request) {
+          err := g.breaker.Execute(func() error {
+              resp, err := http.Get(g.backend + r.URL.Path)
+              if err != nil {
+                  return err
+              }
+              defer resp.Body.Close()
+              w.WriteHeader(resp.StatusCode)
+              return nil
+          })
+          if err != nil {
+              http.Error(w, "service unavailable", 503)
+          }
+      }
+    pkg/discovery/consul.go: |
+      package discovery
+
+      type ServiceEntry struct {
+          Name string
+          Addr string
+          Port int
+      }
+
+      func Lookup(name string) (*ServiceEntry, error) {
+          return &ServiceEntry{Name: name, Addr: "127.0.0.1", Port: 8080}, nil
+      }
+    pkg/loadbalance/round_robin.go: |
+      package loadbalance
+
+      type RoundRobin struct {
+          addrs   []string
+          current int
+      }
+
+      func NewRoundRobin(addrs []string) *RoundRobin {
+          return &RoundRobin{addrs: addrs}
+      }
+
+      func (rr *RoundRobin) Next() string {
+          addr := rr.addrs[rr.current%len(rr.addrs)]
+          rr.current++
+          return addr
+      }
+  changed_files:
+    pkg/circuit/breaker.go: |
+      package circuit
+
+      import (
+          "fmt"
+          "sync"
+          "time"
+      )
+
+      type State int
+
+      const (
+          Closed State = iota
+          Open
+          HalfOpen
+      )
+
+      type Breaker struct {
+          mu        sync.Mutex
+          state     State
+          failures  int
+          threshold int
+          cooldown  time.Duration
+          openedAt  time.Time
+      }
+
+      func NewBreaker(threshold int) *Breaker {
+          return &Breaker{state: Closed, threshold: threshold, cooldown: 30 * time.Second}
+      }
+
+      func (b *Breaker) Execute(fn func() error) error {
+          b.mu.Lock()
+          if b.state == Open {
+              if time.Since(b.openedAt) > b.cooldown {
+                  b.state = HalfOpen
+              } else {
+                  b.mu.Unlock()
+                  return fmt.Errorf("circuit open")
+              }
+          }
+          b.mu.Unlock()
+          err := fn()
+          b.mu.Lock()
+          defer b.mu.Unlock()
+          if err != nil {
+              b.failures++
+              if b.failures >= b.threshold {
+                  b.state = Open
+                  b.openedAt = time.Now()
+              }
+              return err
+          }
+          if b.state == HalfOpen {
+              b.state = Closed
+              b.failures = 0
+          }
+          return nil
+      }
+  commit_message: "fix: implement half-open state with cooldown recovery"
+fragments:
+- id: breaker_halfopen
+  selector:
+    path: pkg/circuit/breaker.go
+    anchor: "b.state = HalfOpen"
+- id: breaker_cooldown
+  selector:
+    path: pkg/circuit/breaker.go
+    anchor: "time.Since(b.openedAt) > b.cooldown"
+- id: gateway_calls_execute
+  selector:
+    path: pkg/gateway/proxy.go
+    anchor: "g.breaker.Execute"
+- id: unrelated_consul
+  selector:
+    path: pkg/discovery/consul.go
+    anchor: "func Lookup"
+- id: unrelated_roundrobin
+  selector:
+    path: pkg/loadbalance/round_robin.go
+    anchor: "func NewRoundRobin"
+oracle:
+  required:
+  - breaker_halfopen
+  - gateway_calls_execute
+  allowed:
+  - breaker_cooldown
+  forbidden:
+  - unrelated_consul
+  - unrelated_roundrobin

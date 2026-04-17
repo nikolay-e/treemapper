@@ -1,0 +1,224 @@
+name: bal3_refactor_002_go_rename_struct_across_files
+tags:
+- lang:go
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    models/item.go: |
+      package models
+
+      type Item struct {
+          ID    int
+          Name  string
+          Price float64
+      }
+
+      func NewItem(id int, name string, price float64) *Item {
+          return &Item{ID: id, Name: name, Price: price}
+      }
+    services/catalog.go: |
+      package services
+
+      import "models"
+
+      type CatalogService struct {
+          items []*models.Item
+      }
+
+      func (s *CatalogService) AddItem(item *models.Item) {
+          s.items = append(s.items, item)
+      }
+
+      func (s *CatalogService) FindByName(name string) *models.Item {
+          for _, it := range s.items {
+              if it.Name == name {
+                  return it
+              }
+          }
+          return nil
+      }
+    api/catalog_handler.go: |
+      package api
+
+      import (
+          "encoding/json"
+          "net/http"
+          "services"
+      )
+
+      type CatalogHandler struct {
+          svc *services.CatalogService
+      }
+
+      func (h *CatalogHandler) List(w http.ResponseWriter, r *http.Request) {
+          json.NewEncoder(w).Encode(h.svc)
+      }
+    pkg/events/publisher.go: |
+      package events
+
+      GARBAGE_R002_PUB_A = "publisher"
+
+      type Publisher struct {
+          Topic string
+      }
+
+      func (p *Publisher) Publish(msg string) error {
+          return nil
+      }
+    pkg/queue/worker.go: |
+      package queue
+
+      GARBAGE_R002_QUEUE_B = "worker"
+
+      type Worker struct {
+          Concurrency int
+      }
+
+      func (w *Worker) Start() error {
+          return nil
+      }
+    pkg/notifications/email.go: |
+      package notifications
+
+      GARBAGE_R002_EMAIL_C = "email"
+
+      type EmailSender struct {
+          SMTP string
+      }
+
+      func (e *EmailSender) Send(to, body string) error {
+          return nil
+      }
+  changed_files:
+    models/product.go: |
+      package models
+
+      type Product struct {
+          ID    int
+          Name  string
+          Price float64
+      }
+
+      func NewProduct(id int, name string, price float64) *Product {
+          return &Product{ID: id, Name: name, Price: price}
+      }
+    services/catalog.go: |
+      package services
+
+      import "models"
+
+      type CatalogService struct {
+          products []*models.Product
+      }
+
+      func (s *CatalogService) AddProduct(product *models.Product) {
+          s.products = append(s.products, product)
+      }
+
+      func (s *CatalogService) FindByName(name string) *models.Product {
+          for _, p := range s.products {
+              if p.Name == name {
+                  return p
+              }
+          }
+          return nil
+      }
+    api/catalog_handler.go: |
+      package api
+
+      import (
+          "encoding/json"
+          "net/http"
+          "services"
+      )
+
+      type CatalogHandler struct {
+          svc *services.CatalogService
+      }
+
+      func (h *CatalogHandler) List(w http.ResponseWriter, r *http.Request) {
+          json.NewEncoder(w).Encode(h.svc)
+      }
+    pkg/events/publisher.go: |
+      package events
+
+      GARBAGE_R002_PUB_A = "publisher"
+
+      type Publisher struct {
+          Topic string
+      }
+
+      func (p *Publisher) Publish(msg string) error {
+          return nil
+      }
+    pkg/queue/worker.go: |
+      package queue
+
+      GARBAGE_R002_QUEUE_B = "worker"
+
+      type Worker struct {
+          Concurrency int
+      }
+
+      func (w *Worker) Start() error {
+          return nil
+      }
+    pkg/notifications/email.go: |
+      package notifications
+
+      GARBAGE_R002_EMAIL_C = "email"
+
+      type EmailSender struct {
+          SMTP string
+      }
+
+      func (e *EmailSender) Send(to, body string) error {
+          return nil
+      }
+  commit_message: "refactor: rename Item to Product across codebase"
+fragments:
+- id: product_struct
+  selector:
+    path: models/product.go
+    anchor: "type Product struct"
+- id: new_product_constructor
+  selector:
+    path: models/product.go
+    anchor: "func NewProduct"
+- id: catalog_uses_product
+  selector:
+    path: services/catalog.go
+    anchor: "models.Product"
+- id: add_product_method
+  selector:
+    path: services/catalog.go
+    anchor: "func (s *CatalogService) AddProduct"
+- id: handler_uses_catalog
+  selector:
+    path: api/catalog_handler.go
+    anchor: "services.CatalogService"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R002_PUB_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R002_QUEUE_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R002_EMAIL_C
+oracle:
+  required:
+  - product_struct
+  - new_product_constructor
+  - catalog_uses_product
+  - add_product_method
+  allowed:
+  - handler_uses_catalog
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

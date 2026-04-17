@@ -1,4 +1,10 @@
 name: csharp_008_default_interface
+tags:
+- lang:csharp
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     Interfaces/IProcessor.cs: |

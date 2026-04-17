@@ -1,0 +1,232 @@
+name: bal3_1hop_015_go_template_engine
+tags:
+- lang:go
+- change:multi_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/template/engine.go: |
+      package template
+
+      import "strings"
+
+      type Context struct {
+          Vars map[string]string
+      }
+
+      type Engine struct {
+          Delimiter string
+      }
+
+      func NewEngine() *Engine {
+          return &Engine{Delimiter: "{{}}"}
+      }
+
+      func (e *Engine) Render(tpl string, ctx Context) string {
+          result := tpl
+          for k, v := range ctx.Vars {
+              result = strings.ReplaceAll(result, "{{"+k+"}}", v)
+          }
+          return result
+      }
+    internal/email/composer.go: |
+      package email
+
+      import "pkg/template"
+
+      type Composer struct {
+          engine *template.Engine
+      }
+
+      func NewComposer(e *template.Engine) *Composer {
+          return &Composer{engine: e}
+      }
+
+      func (c *Composer) Compose(tpl string, vars map[string]string) string {
+          ctx := template.Context{Vars: vars}
+          return c.engine.Render(tpl, ctx)
+      }
+    internal/report/builder.go: |
+      package report
+
+      import "pkg/template"
+
+      type Builder struct {
+          engine *template.Engine
+      }
+
+      func NewBuilder(e *template.Engine) *Builder {
+          return &Builder{engine: e}
+      }
+
+      func (b *Builder) Build(tpl string, data map[string]string) string {
+          ctx := template.Context{Vars: data}
+          return b.engine.Render(tpl, ctx)
+      }
+    internal/page/renderer.go: |
+      package page
+
+      import "pkg/template"
+
+      type Renderer struct {
+          engine *template.Engine
+      }
+
+      func NewRenderer(e *template.Engine) *Renderer {
+          return &Renderer{engine: e}
+      }
+
+      func (r *Renderer) Render(tpl string, pageVars map[string]string) string {
+          ctx := template.Context{Vars: pageVars}
+          return r.engine.Render(tpl, ctx)
+      }
+    internal/sitemap/generator.go: |
+      package sitemap
+
+      GARBAGE_015_SITEMAP_A = "sitemap"
+
+      type Generator struct {
+          BaseURL string
+      }
+
+      func (g *Generator) Generate(paths []string) string {
+          return ""
+      }
+    internal/feed/rss.go: |
+      package feed
+
+      GARBAGE_015_RSS_B = "rss"
+
+      type RSSBuilder struct {
+          Title string
+      }
+
+      func (r *RSSBuilder) Build(items []string) string {
+          return ""
+      }
+    internal/compress/minifier.go: |
+      package compress
+
+      GARBAGE_015_MINIFY_C = "minify"
+
+      type Minifier struct {
+          RemoveSpaces bool
+      }
+
+      func (m *Minifier) Minify(html string) string {
+          return html
+      }
+  changed_files:
+    pkg/template/engine.go: |
+      package template
+
+      import (
+          "fmt"
+          "strings"
+      )
+
+      type Context struct {
+          Vars    map[string]string
+          Helpers map[string]func(string) string
+      }
+
+      type Engine struct {
+          Delimiter  string
+          StrictMode bool
+      }
+
+      func NewEngine() *Engine {
+          return &Engine{Delimiter: "{{}}", StrictMode: false}
+      }
+
+      func (e *Engine) Render(tpl string, ctx Context) (string, error) {
+          result := tpl
+          for k, v := range ctx.Vars {
+              result = strings.ReplaceAll(result, "{{"+k+"}}", v)
+          }
+          if e.StrictMode && strings.Contains(result, "{{") {
+              return "", fmt.Errorf("unresolved template variables")
+          }
+          return result, nil
+      }
+
+      func (e *Engine) RenderWithHelpers(tpl string, ctx Context) (string, error) {
+          result, err := e.Render(tpl, ctx)
+          if err != nil {
+              return "", err
+          }
+          for name, fn := range ctx.Helpers {
+              result = strings.ReplaceAll(result, "{{helper:"+name+"}}", fn(result))
+          }
+          return result, nil
+      }
+  commit_message: "feat: add StrictMode, Helpers, and error return to Engine.Render"
+fragments:
+- id: helpers_field
+  selector:
+    path: pkg/template/engine.go
+    anchor: "Helpers map[string]func(string) string"
+- id: strict_mode_field
+  selector:
+    path: pkg/template/engine.go
+    anchor: "StrictMode bool"
+- id: render_returns_error
+  selector:
+    path: pkg/template/engine.go
+    anchor: "func (e *Engine) Render(tpl string, ctx Context) (string, error)"
+- id: render_with_helpers
+  selector:
+    path: pkg/template/engine.go
+    anchor: "func (e *Engine) RenderWithHelpers"
+- id: composer_calls_render
+  selector:
+    path: internal/email/composer.go
+    anchor: "c.engine.Render(tpl, ctx)"
+- id: builder_calls_render
+  selector:
+    path: internal/report/builder.go
+    anchor: "b.engine.Render(tpl, ctx)"
+- id: page_renderer_calls_render
+  selector:
+    path: internal/page/renderer.go
+    anchor: "r.engine.Render(tpl, ctx)"
+- id: unrelated_sitemap
+  selector:
+    path: internal/sitemap/generator.go
+    anchor: "type Generator struct"
+- id: unrelated_rss
+  selector:
+    path: internal/feed/rss.go
+    anchor: "type RSSBuilder struct"
+- id: unrelated_minifier
+  selector:
+    path: internal/compress/minifier.go
+    anchor: "type Minifier struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_015_SITEMAP_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_015_RSS_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_015_MINIFY_C
+oracle:
+  required:
+  - helpers_field
+  - strict_mode_field
+  - render_returns_error
+  - composer_calls_render
+  allowed:
+  - render_with_helpers
+  - builder_calls_render
+  - page_renderer_calls_render
+  forbidden:
+  - unrelated_sitemap
+  - unrelated_rss
+  - unrelated_minifier
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

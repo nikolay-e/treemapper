@@ -1,4 +1,12 @@
 name: patterns_042_raise_sites
+tags:
+- lang:python
+- change:multi_file
+- change:new_function
+- change:signature
+- context:cross_module
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
     src/auth_errors.py: |

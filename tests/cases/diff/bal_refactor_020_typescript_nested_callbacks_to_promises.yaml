@@ -1,0 +1,208 @@
+name: bal_refactor_020_typescript_nested_callbacks_to_promises
+tags:
+- lang:typescript
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/db/connection.ts: |
+      type Callback<T> = (err: Error | null, result?: T) => void;
+
+      export function connect(dsn: string, cb: Callback<{ query: Function }>) {
+          const client = {
+              query: (sql: string, params: any[], cb2: Callback<any[]>) => {
+                  cb2(null, []);
+              }
+          };
+          cb(null, client);
+      }
+    src/db/queries.ts: |
+      import { connect } from './connection';
+
+      type Callback<T> = (err: Error | null, result?: T) => void;
+
+      export function getUserById(dsn: string, id: string, cb: Callback<any>) {
+          connect(dsn, (err, client) => {
+              if (err) { cb(err); return; }
+              client!.query('SELECT * FROM users WHERE id = $1', [id], (err2: Error | null, rows?: any[]) => {
+                  if (err2) { cb(err2); return; }
+                  cb(null, rows![0]);
+              });
+          });
+      }
+
+      export function getOrdersByUser(dsn: string, userId: string, cb: Callback<any[]>) {
+          connect(dsn, (err, client) => {
+              if (err) { cb(err); return; }
+              client!.query('SELECT * FROM orders WHERE user_id = $1', [userId], (err2: Error | null, rows?: any[]) => {
+                  if (err2) { cb(err2); return; }
+                  cb(null, rows);
+              });
+          });
+      }
+    src/handlers/userHandler.ts: |
+      import { getUserById, getOrdersByUser } from '../db/queries';
+
+      type Callback<T> = (err: Error | null, result?: T) => void;
+
+      export function handleUserProfile(dsn: string, userId: string, cb: Callback<any>) {
+          getUserById(dsn, userId, (err, user) => {
+              if (err) { cb(err); return; }
+              getOrdersByUser(dsn, userId, (err2, orders) => {
+                  if (err2) { cb(err2); return; }
+                  cb(null, { user, orders });
+              });
+          });
+      }
+    src/routes/router.ts: |
+      import { handleUserProfile } from '../handlers/userHandler';
+
+      export function setupRoutes(dsn: string) {
+          return {
+              '/profile': (userId: string, cb: Function) => handleUserProfile(dsn, userId, cb as any),
+          };
+      }
+    src/middleware/logging.ts: |
+      const GARBAGE_REFACTOR_020_LOG_A = 'logging';
+      const GARBAGE_REFACTOR_020_LEVEL_B = 'debug';
+
+      export function logRequest(method: string, path: string): void {
+          console.log(`${method} ${path}`);
+      }
+    garbage_cache.ts: |
+      const GARBAGE_REFACTOR_020_CACHE_C = 'cache';
+      const GARBAGE_REFACTOR_020_TTL_D = 300;
+
+      export class MemoryCache {
+          static GARBAGE_REFACTOR_020_MC_E = true;
+
+          get(key: string): unknown { return null; }
+          set(key: string, val: unknown): void {}
+      }
+  changed_files:
+    src/db/connection.ts: |
+      export async function connect(dsn: string): Promise<{ query: (sql: string, params: any[]) => Promise<any[]> }> {
+          return {
+              query: async (sql: string, params: any[]) => {
+                  return [];
+              }
+          };
+      }
+    src/db/queries.ts: |
+      import { connect } from './connection';
+
+      export async function getUserById(dsn: string, id: string) {
+          const client = await connect(dsn);
+          const rows = await client.query('SELECT * FROM users WHERE id = $1', [id]);
+          return rows[0];
+      }
+
+      export async function getOrdersByUser(dsn: string, userId: string) {
+          const client = await connect(dsn);
+          return client.query('SELECT * FROM orders WHERE user_id = $1', [userId]);
+      }
+    src/handlers/userHandler.ts: |
+      import { getUserById, getOrdersByUser } from '../db/queries';
+
+      export async function handleUserProfile(dsn: string, userId: string) {
+          const user = await getUserById(dsn, userId);
+          const orders = await getOrdersByUser(dsn, userId);
+          return { user, orders };
+      }
+    src/routes/router.ts: |
+      import { handleUserProfile } from '../handlers/userHandler';
+
+      export function setupRoutes(dsn: string) {
+          return {
+              '/profile': (userId: string) => handleUserProfile(dsn, userId),
+          };
+      }
+    src/middleware/logging.ts: |
+      const GARBAGE_REFACTOR_020_LOG_A = 'logging';
+      const GARBAGE_REFACTOR_020_LEVEL_B = 'debug';
+
+      export function logRequest(method: string, path: string): void {
+          console.log(`${method} ${path}`);
+      }
+    garbage_cache.ts: |
+      const GARBAGE_REFACTOR_020_CACHE_C = 'cache';
+      const GARBAGE_REFACTOR_020_TTL_D = 300;
+
+      export class MemoryCache {
+          static GARBAGE_REFACTOR_020_MC_E = true;
+
+          get(key: string): unknown { return null; }
+          set(key: string, val: unknown): void {}
+      }
+  commit_message: "refactor: convert nested callbacks to async/await with promises"
+fragments:
+- id: async_connect
+  selector:
+    path: src/db/connection.ts
+    anchor: "export async function connect"
+- id: async_get_user
+  selector:
+    path: src/db/queries.ts
+    anchor: "export async function getUserById"
+- id: queries_await_connect
+  selector:
+    path: src/db/queries.ts
+    anchor: "await connect(dsn)"
+- id: async_get_orders
+  selector:
+    path: src/db/queries.ts
+    anchor: "export async function getOrdersByUser"
+- id: async_handler
+  selector:
+    path: src/handlers/userHandler.ts
+    anchor: "export async function handleUserProfile"
+- id: handler_awaits
+  selector:
+    path: src/handlers/userHandler.ts
+    anchor: "await getUserById(dsn, userId)"
+- id: router_uses_handler
+  selector:
+    path: src/routes/router.ts
+    anchor: "handleUserProfile(dsn, userId)"
+- id: no_logging
+  selector:
+    path: src/middleware/logging.ts
+- id: no_garbage_cache
+  selector:
+    path: garbage_cache.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_020_LOG_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_020_LEVEL_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_020_CACHE_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_020_TTL_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_020_MC_E
+oracle:
+  required:
+  - async_connect
+  - async_get_user
+  - queries_await_connect
+  - async_get_orders
+  - async_handler
+  - handler_awaits
+  - router_uses_handler
+  allowed: []
+  forbidden:
+  - no_logging
+  - no_garbage_cache
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

@@ -1,4 +1,10 @@
 name: internals_018_math_symbols_julia_style
+tags:
+- lang:julia
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     math_symbols.jl: |

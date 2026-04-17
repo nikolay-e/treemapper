@@ -1,0 +1,207 @@
+name: bal_rare_024_ocaml_result_monad
+tags:
+- lang:ocaml
+- change:multi_file
+- change:bug_fix
+- context:cross_module
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    lib/result.ml: |
+      type ('a, 'e) t =
+        | Ok of 'a
+        | Error of 'e
+
+      let map f = function
+        | Ok v -> Ok (f v)
+        | Error e -> Error e
+
+      let bind f = function
+        | Ok v -> f v
+        | Error e -> Error e
+
+      let ( >>= ) r f = bind f r
+    lib/validate.ml: |
+      open Result
+
+      let validate_age age =
+        if age < 0 then Error "Age cannot be negative"
+        else if age > 150 then Error "Age unreasonably high"
+        else Ok age
+
+      let validate_name name =
+        if String.length name = 0 then Error "Name cannot be empty"
+        else Ok name
+    lib/user.ml: |
+      open Result
+      open Validate
+
+      type user = { name : string; age : int }
+
+      let create_user name age =
+        validate_name name >>= fun valid_name ->
+        validate_age age >>= fun valid_age ->
+        Ok { name = valid_name; age = valid_age }
+    lib/app.ml: |
+      open User
+
+      let run () =
+        match create_user "Alice" 30 with
+        | Result.Ok u -> Printf.printf "Created user: %s, age %d\n" u.name u.age
+        | Result.Error e -> Printf.printf "Error: %s\n" e
+    garbage_http.ml: |
+      let garbage_rare_024_method_a = "GET"
+      let garbage_rare_024_status_b = 200
+
+      let garbage_request () =
+        garbage_rare_024_method_a
+
+      let garbage_rare_024_timeout_c = 30
+    garbage_db.ml: |
+      let garbage_rare_024_driver_d = "postgresql"
+      let garbage_rare_024_pool_e = 5
+
+      let garbage_connect () =
+        garbage_rare_024_driver_d
+
+      let garbage_rare_024_ssl_f = true
+  changed_files:
+    lib/result.ml: |
+      type ('a, 'e) t =
+        | Ok of 'a
+        | Error of 'e
+
+      let map f = function
+        | Ok v -> Ok (f v)
+        | Error e -> Error e
+
+      let bind f = function
+        | Ok v -> f v
+        | Error e -> Error e
+
+      let map_error f = function
+        | Ok v -> Ok v
+        | Error e -> Error (f e)
+
+      let ( >>= ) r f = bind f r
+
+      let ( >|= ) r f = map f r
+    lib/validate.ml: |
+      open Result
+
+      let validate_age age =
+        if age < 0 then Error "Age cannot be negative"
+        else if age > 150 then Error "Age unreasonably high"
+        else Ok age
+
+      let validate_name name =
+        if String.length name = 0 then Error "Name cannot be empty"
+        else if String.length name > 100 then Error "Name too long"
+        else Ok (String.trim name)
+
+      let validate_email email =
+        if not (String.contains email '@') then Error "Invalid email"
+        else Ok email
+    lib/user.ml: |
+      open Result
+      open Validate
+
+      type user = { name : string; age : int; email : string }
+
+      let create_user name age email =
+        validate_name name >>= fun valid_name ->
+        validate_age age >>= fun valid_age ->
+        validate_email email >>= fun valid_email ->
+        Ok { name = valid_name; age = valid_age; email = valid_email }
+    lib/app.ml: |
+      open User
+
+      let run () =
+        match create_user "Alice" 30 "alice@example.com" with
+        | Result.Ok u -> Printf.printf "Created user: %s, age %d, email %s\n" u.name u.age u.email
+        | Result.Error e -> Printf.printf "Error: %s\n" e
+    garbage_http.ml: |
+      let garbage_rare_024_method_a = "GET"
+      let garbage_rare_024_status_b = 200
+
+      let garbage_request () =
+        garbage_rare_024_method_a
+
+      let garbage_rare_024_timeout_c = 30
+    garbage_db.ml: |
+      let garbage_rare_024_driver_d = "postgresql"
+      let garbage_rare_024_pool_e = 5
+
+      let garbage_connect () =
+        garbage_rare_024_driver_d
+
+      let garbage_rare_024_ssl_f = true
+  commit_message: "feat: add email validation and map_error to result monad"
+fragments:
+- id: map_error_fn
+  selector:
+    path: lib/result.ml
+    anchor: "let map_error f"
+- id: map_operator
+  selector:
+    path: lib/result.ml
+    anchor: "let ( >|= ) r f = map f r"
+- id: validate_email
+  selector:
+    path: lib/validate.ml
+    anchor: "let validate_email email"
+- id: user_email_field
+  selector:
+    path: lib/user.ml
+    anchor: "email : string"
+- id: create_user_email
+  selector:
+    path: lib/user.ml
+    anchor: "validate_email email"
+- id: app_uses_email
+  selector:
+    path: lib/app.ml
+    anchor: 'create_user "Alice" 30 "alice@example.com"'
+- id: no_garbage_http
+  selector:
+    path: garbage_http.ml
+- id: no_garbage_db
+  selector:
+    path: garbage_db.ml
+- id: no_global_0
+  selector:
+    anchor: garbage_rare_024_method_a
+- id: no_global_1
+  selector:
+    anchor: garbage_rare_024_status_b
+- id: no_global_2
+  selector:
+    anchor: garbage_rare_024_timeout_c
+- id: no_global_3
+  selector:
+    anchor: garbage_rare_024_driver_d
+- id: no_global_4
+  selector:
+    anchor: garbage_rare_024_pool_e
+- id: no_global_5
+  selector:
+    anchor: garbage_rare_024_ssl_f
+oracle:
+  required:
+  - map_error_fn
+  - validate_email
+  - user_email_field
+  - create_user_email
+  - app_uses_email
+  allowed:
+  - map_operator
+  forbidden:
+  - no_garbage_http
+  - no_garbage_db
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

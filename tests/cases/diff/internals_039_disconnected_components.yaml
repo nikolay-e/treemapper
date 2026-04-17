@@ -1,4 +1,13 @@
 name: internals_039_disconnected_components
+tags:
+- lang:python
+- change:multi_file
+- change:new_function
+- change:new_function
+- change:signature
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     component_a.py: |

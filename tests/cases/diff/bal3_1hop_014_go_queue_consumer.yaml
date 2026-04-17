@@ -1,0 +1,239 @@
+name: bal3_1hop_014_go_queue_consumer
+tags:
+- lang:go
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/queue/message.go: |
+      package queue
+
+      type Message struct {
+          ID      string
+          Topic   string
+          Payload []byte
+      }
+
+      type Consumer interface {
+          Consume(msg *Message) error
+      }
+
+      type Broker struct {
+          consumers map[string][]Consumer
+      }
+
+      func NewBroker() *Broker {
+          return &Broker{consumers: make(map[string][]Consumer)}
+      }
+
+      func (b *Broker) Register(topic string, c Consumer) {
+          b.consumers[topic] = append(b.consumers[topic], c)
+      }
+
+      func (b *Broker) Dispatch(msg *Message) {
+          for _, c := range b.consumers[msg.Topic] {
+              c.Consume(msg)
+          }
+      }
+    internal/worker/email_worker.go: |
+      package worker
+
+      import "pkg/queue"
+
+      type EmailWorker struct{}
+
+      func (w *EmailWorker) Consume(msg *queue.Message) error {
+          _ = string(msg.Payload)
+          return nil
+      }
+
+      func SetupEmailWorker(broker *queue.Broker) {
+          broker.Register("email.send", &EmailWorker{})
+      }
+    internal/worker/sms_worker.go: |
+      package worker
+
+      import "pkg/queue"
+
+      type SMSWorker struct{}
+
+      func (w *SMSWorker) Consume(msg *queue.Message) error {
+          _ = string(msg.Payload)
+          return nil
+      }
+
+      func SetupSMSWorker(broker *queue.Broker) {
+          broker.Register("sms.send", &SMSWorker{})
+      }
+    internal/worker/push_worker.go: |
+      package worker
+
+      import "pkg/queue"
+
+      type PushWorker struct{}
+
+      func (w *PushWorker) Consume(msg *queue.Message) error {
+          _ = string(msg.Payload)
+          return nil
+      }
+
+      func SetupPushWorker(broker *queue.Broker) {
+          broker.Register("push.send", &PushWorker{})
+      }
+    internal/scheduler/daily.go: |
+      package scheduler
+
+      GARBAGE_014_DAILY_A = "daily"
+
+      type DailyJob struct {
+          Hour int
+      }
+
+      func (d *DailyJob) Run() error {
+          return nil
+      }
+    internal/debug/profiler.go: |
+      package debug
+
+      GARBAGE_014_PROFILER_B = "profiler"
+
+      type Profiler struct {
+          Port int
+      }
+
+      func (p *Profiler) Start() error {
+          return nil
+      }
+    internal/migration/schema.go: |
+      package migration
+
+      GARBAGE_014_SCHEMA_C = "schema"
+
+      type SchemaMigration struct {
+          Version int
+      }
+
+      func (s *SchemaMigration) Apply() error {
+          return nil
+      }
+  changed_files:
+    pkg/queue/message.go: |
+      package queue
+
+      import "fmt"
+
+      type Message struct {
+          ID        string
+          Topic     string
+          Payload   []byte
+          Attempts  int
+          MaxRetries int
+      }
+
+      type Consumer interface {
+          Consume(msg *Message) error
+      }
+
+      type Broker struct {
+          consumers map[string][]Consumer
+          deadLetter []*Message
+      }
+
+      func NewBroker() *Broker {
+          return &Broker{consumers: make(map[string][]Consumer)}
+      }
+
+      func (b *Broker) Register(topic string, c Consumer) {
+          b.consumers[topic] = append(b.consumers[topic], c)
+      }
+
+      func (b *Broker) Dispatch(msg *Message) error {
+          consumers := b.consumers[msg.Topic]
+          if len(consumers) == 0 {
+              return fmt.Errorf("no consumers for topic %s", msg.Topic)
+          }
+          for _, c := range consumers {
+              if err := c.Consume(msg); err != nil {
+                  msg.Attempts++
+                  if msg.Attempts >= msg.MaxRetries {
+                      b.deadLetter = append(b.deadLetter, msg)
+                  }
+                  return err
+              }
+          }
+          return nil
+      }
+
+      func (b *Broker) DeadLetters() []*Message {
+          return b.deadLetter
+      }
+  commit_message: "fix: add retry tracking and dead letter queue to Broker"
+fragments:
+- id: attempts_field
+  selector:
+    path: pkg/queue/message.go
+    anchor: "Attempts  int"
+- id: max_retries_field
+  selector:
+    path: pkg/queue/message.go
+    anchor: "MaxRetries int"
+- id: dead_letter_field
+  selector:
+    path: pkg/queue/message.go
+    anchor: "deadLetter []*Message"
+- id: dispatch_error_handling
+  selector:
+    path: pkg/queue/message.go
+    anchor: "msg.Attempts >= msg.MaxRetries"
+- id: email_worker_consumes
+  selector:
+    path: internal/worker/email_worker.go
+    anchor: "broker.Register(\"email.send\""
+- id: sms_worker_consumes
+  selector:
+    path: internal/worker/sms_worker.go
+    anchor: "broker.Register(\"sms.send\""
+- id: push_worker_consumes
+  selector:
+    path: internal/worker/push_worker.go
+    anchor: "broker.Register(\"push.send\""
+- id: unrelated_daily
+  selector:
+    path: internal/scheduler/daily.go
+    anchor: "type DailyJob struct"
+- id: unrelated_profiler
+  selector:
+    path: internal/debug/profiler.go
+    anchor: "type Profiler struct"
+- id: unrelated_schema
+  selector:
+    path: internal/migration/schema.go
+    anchor: "type SchemaMigration struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_014_DAILY_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_014_PROFILER_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_014_SCHEMA_C
+oracle:
+  required:
+  - attempts_field
+  - max_retries_field
+  - dead_letter_field
+  - dispatch_error_handling
+  allowed:
+  - email_worker_consumes
+  - sms_worker_consumes
+  - push_worker_consumes
+  forbidden:
+  - unrelated_daily
+  - unrelated_profiler
+  - unrelated_schema
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

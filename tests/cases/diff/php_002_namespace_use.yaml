@@ -1,4 +1,11 @@
 name: php_002_namespace_use
+tags:
+- lang:php
+- change:single_file
+- change:signature
+- context:cross_module
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
     src/Services/PaymentService.php: |

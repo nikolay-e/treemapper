@@ -1,0 +1,84 @@
+name: bal3_bugfix_026_php_null_coalesce
+tags:
+- lang:php
+- change:single_file
+- change:bug_fix
+- context:same_file
+- distance:0hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/Config/Settings.php: |
+      <?php
+      namespace App\Config;
+
+      class Settings
+      {
+          private array $data;
+
+          public function __construct(array $data)
+          {
+              $this->data = $data;
+          }
+
+          public function get(string $key): string
+          {
+              return $this->data[$key];
+          }
+
+          public function has(string $key): bool
+          {
+              return isset($this->data[$key]);
+          }
+      }
+    src/Util/Env.php: |
+      <?php
+      namespace App\Util;
+
+      class Env
+      {
+          public static function load(): array
+          {
+              return ['APP_NAME' => 'myapp'];
+          }
+      }
+  changed_files:
+    src/Config/Settings.php: |
+      <?php
+      namespace App\Config;
+
+      class Settings
+      {
+          private array $data;
+
+          public function __construct(array $data)
+          {
+              $this->data = $data;
+          }
+
+          public function get(string $key, string $default = ''): string
+          {
+              return $this->data[$key] ?? $default;
+          }
+
+          public function has(string $key): bool
+          {
+              return isset($this->data[$key]);
+          }
+      }
+  commit_message: "fix: use null coalesce to prevent undefined index error"
+fragments:
+- id: coalesce_fix
+  selector:
+    path: src/Config/Settings.php
+    anchor: "$this->data[$key] ?? $default"
+- id: no_env
+  selector:
+    path: src/Util/Env.php
+    anchor: "class Env"
+oracle:
+  required:
+  - coalesce_fix
+  allowed: []
+  forbidden:
+  - no_env

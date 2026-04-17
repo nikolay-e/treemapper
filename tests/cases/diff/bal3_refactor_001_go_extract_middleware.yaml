@@ -1,0 +1,206 @@
+name: bal3_refactor_001_go_extract_middleware
+tags:
+- lang:go
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    api/handlers/user.go: |
+      package handlers
+
+      import (
+          "encoding/json"
+          "net/http"
+          "strings"
+      )
+
+      func UserHandler(w http.ResponseWriter, r *http.Request) {
+          token := r.Header.Get("Authorization")
+          if token == "" || !strings.HasPrefix(token, "Bearer ") {
+              http.Error(w, "unauthorized", http.StatusUnauthorized)
+              return
+          }
+          userID := strings.TrimPrefix(token, "Bearer ")
+          json.NewEncoder(w).Encode(map[string]string{"user": userID})
+      }
+    api/handlers/order.go: |
+      package handlers
+
+      import (
+          "encoding/json"
+          "net/http"
+          "strings"
+      )
+
+      func OrderHandler(w http.ResponseWriter, r *http.Request) {
+          token := r.Header.Get("Authorization")
+          if token == "" || !strings.HasPrefix(token, "Bearer ") {
+              http.Error(w, "unauthorized", http.StatusUnauthorized)
+              return
+          }
+          userID := strings.TrimPrefix(token, "Bearer ")
+          json.NewEncoder(w).Encode(map[string]string{"orders_for": userID})
+      }
+    pkg/metrics/counter.go: |
+      package metrics
+
+      GARBAGE_R001_METRICS_A = "counter"
+
+      type Counter struct {
+          Name  string
+          Value int64
+      }
+
+      func NewCounter(name string) *Counter {
+          return &Counter{Name: name}
+      }
+    pkg/logging/logger.go: |
+      package logging
+
+      GARBAGE_R001_LOGGING_B = "logger"
+
+      type Logger struct {
+          Level string
+      }
+
+      func NewLogger(level string) *Logger {
+          return &Logger{Level: level}
+      }
+    pkg/config/settings.go: |
+      package config
+
+      GARBAGE_R001_CONFIG_C = "settings"
+
+      type Settings struct {
+          Port int
+          Host string
+      }
+  changed_files:
+    api/middleware/auth.go: |
+      package middleware
+
+      import (
+          "context"
+          "net/http"
+          "strings"
+      )
+
+      type contextKey string
+
+      const UserIDKey contextKey = "userID"
+
+      func AuthMiddleware(next http.Handler) http.Handler {
+          return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+              token := r.Header.Get("Authorization")
+              if token == "" || !strings.HasPrefix(token, "Bearer ") {
+                  http.Error(w, "unauthorized", http.StatusUnauthorized)
+                  return
+              }
+              userID := strings.TrimPrefix(token, "Bearer ")
+              ctx := context.WithValue(r.Context(), UserIDKey, userID)
+              next.ServeHTTP(w, r.WithContext(ctx))
+          })
+      }
+    api/handlers/user.go: |
+      package handlers
+
+      import (
+          "encoding/json"
+          "net/http"
+
+          "api/middleware"
+      )
+
+      func UserHandler(w http.ResponseWriter, r *http.Request) {
+          userID := r.Context().Value(middleware.UserIDKey).(string)
+          json.NewEncoder(w).Encode(map[string]string{"user": userID})
+      }
+    api/handlers/order.go: |
+      package handlers
+
+      import (
+          "encoding/json"
+          "net/http"
+
+          "api/middleware"
+      )
+
+      func OrderHandler(w http.ResponseWriter, r *http.Request) {
+          userID := r.Context().Value(middleware.UserIDKey).(string)
+          json.NewEncoder(w).Encode(map[string]string{"orders_for": userID})
+      }
+    pkg/metrics/counter.go: |
+      package metrics
+
+      GARBAGE_R001_METRICS_A = "counter"
+
+      type Counter struct {
+          Name  string
+          Value int64
+      }
+
+      func NewCounter(name string) *Counter {
+          return &Counter{Name: name}
+      }
+    pkg/logging/logger.go: |
+      package logging
+
+      GARBAGE_R001_LOGGING_B = "logger"
+
+      type Logger struct {
+          Level string
+      }
+
+      func NewLogger(level string) *Logger {
+          return &Logger{Level: level}
+      }
+    pkg/config/settings.go: |
+      package config
+
+      GARBAGE_R001_CONFIG_C = "settings"
+
+      type Settings struct {
+          Port int
+          Host string
+      }
+  commit_message: "refactor: extract auth logic into shared middleware"
+fragments:
+- id: new_auth_middleware
+  selector:
+    path: api/middleware/auth.go
+    anchor: "func AuthMiddleware(next http.Handler)"
+- id: user_id_key
+  selector:
+    path: api/middleware/auth.go
+    anchor: "const UserIDKey contextKey"
+- id: user_handler_uses_ctx
+  selector:
+    path: api/handlers/user.go
+    anchor: "middleware.UserIDKey"
+- id: order_handler_uses_ctx
+  selector:
+    path: api/handlers/order.go
+    anchor: "middleware.UserIDKey"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R001_METRICS_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R001_LOGGING_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R001_CONFIG_C
+oracle:
+  required:
+  - new_auth_middleware
+  - user_id_key
+  - user_handler_uses_ctx
+  allowed:
+  - order_handler_uses_ctx
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

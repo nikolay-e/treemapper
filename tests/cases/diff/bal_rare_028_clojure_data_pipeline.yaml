@@ -1,0 +1,172 @@
+name: bal_rare_028_clojure_data_pipeline
+tags:
+- lang:clojure
+- change:single_file
+- change:new_function
+- context:same_file
+- distance:0hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/pipeline/transform.clj: |
+      (ns pipeline.transform)
+
+      (defn normalize-key [k]
+        (-> k name clojure.string/lower-case (clojure.string/replace #"_" "-") keyword))
+
+      (defn normalize-keys [m]
+        (into {} (map (fn [[k v]] [(normalize-key k) v]) m)))
+
+      (defn filter-blanks [m]
+        (into {} (filter (fn [[_ v]] (and (some? v) (not= v ""))) m)))
+
+      (defn transform [record]
+        (-> record
+            normalize-keys
+            filter-blanks))
+    src/pipeline/loader.clj: |
+      (ns pipeline.loader
+        (:require [pipeline.transform :as t]))
+
+      (defn load-records [records]
+        (map t/transform records))
+
+      (defn load-and-count [records]
+        (let [transformed (load-records records)]
+          {:count (count transformed)
+           :records transformed}))
+    garbage_notify.clj: |
+      (ns garbage-notify)
+
+      (def ^:const GARBAGE_RARE_028_CHANNEL_A "email")
+      (def ^:const GARBAGE_RARE_028_RETRY_B 3)
+
+      (defn garbage-send []
+        GARBAGE_RARE_028_CHANNEL_A)
+
+      (def ^:const GARBAGE_RARE_028_BATCH_C 50)
+    garbage_metrics.clj: |
+      (ns garbage-metrics)
+
+      (def ^:const GARBAGE_RARE_028_INTERVAL_D 60)
+      (def ^:const GARBAGE_RARE_028_PREFIX_E "app")
+
+      (defn garbage-record []
+        GARBAGE_RARE_028_INTERVAL_D)
+
+      (def ^:const GARBAGE_RARE_028_FLUSH_F true)
+  changed_files:
+    src/pipeline/transform.clj: |
+      (ns pipeline.transform)
+
+      (defn normalize-key [k]
+        (-> k name clojure.string/lower-case (clojure.string/replace #"_" "-") keyword))
+
+      (defn normalize-keys [m]
+        (into {} (map (fn [[k v]] [(normalize-key k) v]) m)))
+
+      (defn filter-blanks [m]
+        (into {} (filter (fn [[_ v]] (and (some? v) (not= v ""))) m)))
+
+      (defn coerce-types [m schema]
+        (reduce-kv
+          (fn [acc k coercer]
+            (if-let [v (get acc k)]
+              (assoc acc k (coercer v))
+              acc))
+          m
+          schema))
+
+      (defn validate-required [m required-keys]
+        (let [missing (remove #(contains? m %) required-keys)]
+          (when (seq missing)
+            (throw (ex-info "Missing required keys" {:keys missing})))
+          m))
+
+      (defn transform [record]
+        (-> record
+            normalize-keys
+            filter-blanks))
+    src/pipeline/loader.clj: |
+      (ns pipeline.loader
+        (:require [pipeline.transform :as t]))
+
+      (defn load-records [records]
+        (map t/transform records))
+
+      (defn load-and-count [records]
+        (let [transformed (load-records records)]
+          {:count (count transformed)
+           :records transformed}))
+    garbage_notify.clj: |
+      (ns garbage-notify)
+
+      (def ^:const GARBAGE_RARE_028_CHANNEL_A "email")
+      (def ^:const GARBAGE_RARE_028_RETRY_B 3)
+
+      (defn garbage-send []
+        GARBAGE_RARE_028_CHANNEL_A)
+
+      (def ^:const GARBAGE_RARE_028_BATCH_C 50)
+    garbage_metrics.clj: |
+      (ns garbage-metrics)
+
+      (def ^:const GARBAGE_RARE_028_INTERVAL_D 60)
+      (def ^:const GARBAGE_RARE_028_PREFIX_E "app")
+
+      (defn garbage-record []
+        GARBAGE_RARE_028_INTERVAL_D)
+
+      (def ^:const GARBAGE_RARE_028_FLUSH_F true)
+  commit_message: "feat: add type coercion and required-key validation"
+fragments:
+- id: coerce_types
+  selector:
+    path: src/pipeline/transform.clj
+    anchor: "(defn coerce-types [m schema]"
+- id: validate_required
+  selector:
+    path: src/pipeline/transform.clj
+    anchor: "(defn validate-required [m required-keys]"
+- id: no_loader
+  selector:
+    path: src/pipeline/loader.clj
+- id: no_garbage_notify
+  selector:
+    path: garbage_notify.clj
+- id: no_garbage_metrics
+  selector:
+    path: garbage_metrics.clj
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_028_CHANNEL_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_028_RETRY_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_028_BATCH_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_028_INTERVAL_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_028_PREFIX_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_028_FLUSH_F
+oracle:
+  required:
+  - coerce_types
+  - validate_required
+  allowed: []
+  forbidden:
+  - no_loader
+  - no_garbage_notify
+  - no_garbage_metrics
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

@@ -1,0 +1,168 @@
+name: bal3_rare_012_elixir_plug_pipeline
+tags:
+- lang:elixir
+- change:single_file
+- change:config
+- context:config_to_code
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    lib/auth_plug.ex: |
+      defmodule AuthPlug do
+        import Plug.Conn
+
+        def init(opts), do: opts
+
+        def call(conn, _opts) do
+          case get_req_header(conn, "authorization") do
+            ["Bearer " <> token] ->
+              assign(conn, :current_user, verify_token(token))
+            _ ->
+              conn
+              |> send_resp(401, "Unauthorized")
+              |> halt()
+          end
+        end
+
+        defp verify_token(token) do
+          %{id: "user_1", token: token}
+        end
+      end
+    lib/router.ex: |
+      defmodule Router do
+        use Plug.Router
+
+        plug :match
+        plug AuthPlug
+        plug :dispatch
+
+        get "/profile" do
+          user = conn.assigns[:current_user]
+          send_resp(conn, 200, "Hello #{user.id}")
+        end
+
+        get "/settings" do
+          user = conn.assigns[:current_user]
+          send_resp(conn, 200, "Settings for #{user.id}")
+        end
+
+        match _ do
+          send_resp(conn, 404, "Not found")
+        end
+      end
+    lib/rate_limiter.ex: |
+      defmodule RateLimiter do
+        @garbage_rare_012_rate_a 100
+        @garbage_rare_012_window_b 60
+
+        def check(_conn), do: :ok
+      end
+    lib/metrics_plug.ex: |
+      defmodule MetricsPlug do
+        @garbage_rare_012_metric_c "prometheus"
+        @garbage_rare_012_prefix_d "http"
+
+        def init(opts), do: opts
+        def call(conn, _opts), do: conn
+      end
+    lib/cors_plug.ex: |
+      defmodule CorsPlug do
+        @garbage_rare_012_origin_e "*"
+        @garbage_rare_012_methods_f "GET,POST"
+
+        def init(opts), do: opts
+        def call(conn, _opts), do: conn
+      end
+  changed_files:
+    lib/auth_plug.ex: |
+      defmodule AuthPlug do
+        import Plug.Conn
+
+        @allowed_roles ~w(admin editor viewer)
+
+        def init(opts), do: opts
+
+        def call(conn, _opts) do
+          case get_req_header(conn, "authorization") do
+            ["Bearer " <> token] ->
+              case verify_token(token) do
+                {:ok, user} ->
+                  conn
+                  |> assign(:current_user, user)
+                  |> assign(:user_role, user.role)
+                {:error, reason} ->
+                  conn
+                  |> send_resp(401, "Invalid token: #{reason}")
+                  |> halt()
+              end
+            _ ->
+              conn
+              |> send_resp(401, "Unauthorized")
+              |> halt()
+          end
+        end
+
+        defp verify_token(token) do
+          if String.length(token) > 0 do
+            {:ok, %{id: "user_1", token: token, role: "viewer"}}
+          else
+            {:error, "empty token"}
+          end
+        end
+      end
+  commit_message: "add role-based auth and error handling to AuthPlug"
+fragments:
+- id: router_uses_authplug
+  selector:
+    path: lib/router.ex
+    anchor: "plug AuthPlug"
+- id: router_reads_current_user
+  selector:
+    path: lib/router.ex
+    anchor: "conn.assigns[:current_user]"
+- id: no_rate_limiter
+  selector:
+    path: lib/rate_limiter.ex
+    anchor: "def check"
+- id: no_metrics
+  selector:
+    path: lib/metrics_plug.ex
+    anchor: "def call(conn, _opts), do: conn"
+- id: no_cors
+  selector:
+    path: lib/cors_plug.ex
+    anchor: "def call(conn, _opts), do: conn"
+- id: no_global_0
+  selector:
+    anchor: garbage_rare_012_rate_a
+- id: no_global_1
+  selector:
+    anchor: garbage_rare_012_window_b
+- id: no_global_2
+  selector:
+    anchor: garbage_rare_012_metric_c
+- id: no_global_3
+  selector:
+    anchor: garbage_rare_012_prefix_d
+- id: no_global_4
+  selector:
+    anchor: garbage_rare_012_origin_e
+- id: no_global_5
+  selector:
+    anchor: garbage_rare_012_methods_f
+oracle:
+  required:
+  - router_uses_authplug
+  - router_reads_current_user
+  allowed: []
+  forbidden:
+  - no_rate_limiter
+  - no_metrics
+  - no_cors
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

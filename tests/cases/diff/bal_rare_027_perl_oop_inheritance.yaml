@@ -1,0 +1,268 @@
+name: bal_rare_027_perl_oop_inheritance
+tags:
+- lang:perl
+- change:multi_file
+- change:signature
+- context:cross_module
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    lib/Animal.pm: |
+      package Animal;
+      use strict;
+      use warnings;
+
+      sub new {
+          my ($class, %args) = @_;
+          return bless {
+              name => $args{name} // "Unknown",
+              sound => $args{sound} // "...",
+          }, $class;
+      }
+
+      sub name { return $_[0]->{name} }
+      sub sound { return $_[0]->{sound} }
+
+      sub speak {
+          my ($self) = @_;
+          return $self->name() . " says " . $self->sound();
+      }
+
+      1;
+    lib/Dog.pm: |
+      package Dog;
+      use strict;
+      use warnings;
+      use parent 'Animal';
+
+      sub new {
+          my ($class, %args) = @_;
+          $args{sound} = "Woof";
+          my $self = $class->SUPER::new(%args);
+          $self->{breed} = $args{breed} // "Mixed";
+          return $self;
+      }
+
+      sub breed { return $_[0]->{breed} }
+
+      1;
+    lib/Kennel.pm: |
+      package Kennel;
+      use strict;
+      use warnings;
+
+      sub new {
+          my ($class) = @_;
+          return bless { dogs => [] }, $class;
+      }
+
+      sub add {
+          my ($self, $dog) = @_;
+          push @{$self->{dogs}}, $dog;
+      }
+
+      sub list_all {
+          my ($self) = @_;
+          return map { $_->speak() } @{$self->{dogs}};
+      }
+
+      1;
+    lib/main.pl: |
+      use lib 'lib';
+      use Dog;
+      use Kennel;
+
+      my $kennel = Kennel->new();
+      $kennel->add(Dog->new(name => "Rex", breed => "Lab"));
+      $kennel->add(Dog->new(name => "Buddy", breed => "Poodle"));
+      print join("\n", $kennel->list_all()), "\n";
+    garbage_parser.pm: |
+      package GarbageParser;
+      our $GARBAGE_RARE_027_FORMAT_A = "xml";
+      our $GARBAGE_RARE_027_STRICT_B = 1;
+
+      sub garbage_parse {
+          return $GARBAGE_RARE_027_FORMAT_A;
+      }
+
+      our $GARBAGE_RARE_027_NS_C = "http://example.com";
+      1;
+    garbage_queue.pm: |
+      package GarbageQueue;
+      our $GARBAGE_RARE_027_MAX_D = 10000;
+      our $GARBAGE_RARE_027_WORKERS_E = 4;
+
+      sub garbage_enqueue {
+          return $GARBAGE_RARE_027_MAX_D;
+      }
+
+      our $GARBAGE_RARE_027_RETRY_F = 3;
+      1;
+  changed_files:
+    lib/Animal.pm: |
+      package Animal;
+      use strict;
+      use warnings;
+
+      sub new {
+          my ($class, %args) = @_;
+          return bless {
+              name => $args{name} // "Unknown",
+              sound => $args{sound} // "...",
+              age => $args{age} // 0,
+          }, $class;
+      }
+
+      sub name { return $_[0]->{name} }
+      sub sound { return $_[0]->{sound} }
+      sub age { return $_[0]->{age} }
+
+      sub speak {
+          my ($self) = @_;
+          return $self->name() . " says " . $self->sound();
+      }
+
+      sub describe {
+          my ($self) = @_;
+          return $self->name() . " (age: " . $self->age() . ")";
+      }
+
+      1;
+    lib/Dog.pm: |
+      package Dog;
+      use strict;
+      use warnings;
+      use parent 'Animal';
+
+      sub new {
+          my ($class, %args) = @_;
+          $args{sound} = "Woof";
+          my $self = $class->SUPER::new(%args);
+          $self->{breed} = $args{breed} // "Mixed";
+          return $self;
+      }
+
+      sub breed { return $_[0]->{breed} }
+
+      sub describe {
+          my ($self) = @_;
+          return $self->SUPER::describe() . " [" . $self->breed() . "]";
+      }
+
+      1;
+    lib/Kennel.pm: |
+      package Kennel;
+      use strict;
+      use warnings;
+
+      sub new {
+          my ($class) = @_;
+          return bless { dogs => [] }, $class;
+      }
+
+      sub add {
+          my ($self, $dog) = @_;
+          push @{$self->{dogs}}, $dog;
+      }
+
+      sub list_all {
+          my ($self) = @_;
+          return map { $_->describe() . " - " . $_->speak() } @{$self->{dogs}};
+      }
+
+      1;
+    lib/main.pl: |
+      use lib 'lib';
+      use Dog;
+      use Kennel;
+
+      my $kennel = Kennel->new();
+      $kennel->add(Dog->new(name => "Rex", breed => "Lab", age => 3));
+      $kennel->add(Dog->new(name => "Buddy", breed => "Poodle", age => 5));
+      print join("\n", $kennel->list_all()), "\n";
+    garbage_parser.pm: |
+      package GarbageParser;
+      our $GARBAGE_RARE_027_FORMAT_A = "xml";
+      our $GARBAGE_RARE_027_STRICT_B = 1;
+
+      sub garbage_parse {
+          return $GARBAGE_RARE_027_FORMAT_A;
+      }
+
+      our $GARBAGE_RARE_027_NS_C = "http://example.com";
+      1;
+    garbage_queue.pm: |
+      package GarbageQueue;
+      our $GARBAGE_RARE_027_MAX_D = 10000;
+      our $GARBAGE_RARE_027_WORKERS_E = 4;
+
+      sub garbage_enqueue {
+          return $GARBAGE_RARE_027_MAX_D;
+      }
+
+      our $GARBAGE_RARE_027_RETRY_F = 3;
+      1;
+  commit_message: "feat: add age field and describe method with Dog override"
+fragments:
+- id: animal_age_field
+  selector:
+    path: lib/Animal.pm
+    anchor: "age => $args{age}"
+- id: animal_describe
+  selector:
+    path: lib/Animal.pm
+    anchor: "sub describe"
+- id: dog_describe_override
+  selector:
+    path: lib/Dog.pm
+    anchor: "SUPER::describe()"
+- id: kennel_uses_describe
+  selector:
+    path: lib/Kennel.pm
+    anchor: "$_->describe()"
+- id: main_passes_age
+  selector:
+    path: lib/main.pl
+    anchor: "age => 3"
+- id: no_garbage_parser
+  selector:
+    path: garbage_parser.pm
+- id: no_garbage_queue
+  selector:
+    path: garbage_queue.pm
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_027_FORMAT_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_027_STRICT_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_027_NS_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_027_MAX_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_027_WORKERS_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_027_RETRY_F
+oracle:
+  required:
+  - animal_age_field
+  - animal_describe
+  - dog_describe_override
+  - kennel_uses_describe
+  - main_passes_age
+  allowed: []
+  forbidden:
+  - no_garbage_parser
+  - no_garbage_queue
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

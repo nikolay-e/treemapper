@@ -1,0 +1,193 @@
+name: bal3_1hop_003_go_cli_config
+tags:
+- lang:go
+- change:multi_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    internal/config/config.go: |
+      package config
+
+      type Config struct {
+          Host    string
+          Port    int
+          Verbose bool
+      }
+
+      func Load(path string) (*Config, error) {
+          return &Config{Host: "localhost", Port: 8080, Verbose: false}, nil
+      }
+    cmd/serve/main.go: |
+      package main
+
+      import (
+          "fmt"
+          "internal/config"
+      )
+
+      func runServer() error {
+          cfg, err := config.Load("config.yaml")
+          if err != nil {
+              return err
+          }
+          fmt.Printf("serving on %s:%d\n", cfg.Host, cfg.Port)
+          return nil
+      }
+    cmd/migrate/main.go: |
+      package main
+
+      import (
+          "fmt"
+          "internal/config"
+      )
+
+      func runMigration() error {
+          cfg, err := config.Load("config.yaml")
+          if err != nil {
+              return err
+          }
+          fmt.Printf("migrating db at %s:%d\n", cfg.Host, cfg.Port)
+          return nil
+      }
+    cmd/healthcheck/main.go: |
+      package main
+
+      import (
+          "fmt"
+          "internal/config"
+      )
+
+      func runHealthcheck() error {
+          cfg, err := config.Load("config.yaml")
+          if err != nil {
+              return err
+          }
+          fmt.Printf("checking %s:%d\n", cfg.Host, cfg.Port)
+          return nil
+      }
+    internal/logger/logger.go: |
+      package logger
+
+      GARBAGE_003_LOGGER_A = "logger"
+
+      type Logger struct {
+          Level string
+      }
+
+      func New(level string) *Logger {
+          return &Logger{Level: level}
+      }
+    internal/version/version.go: |
+      package version
+
+      GARBAGE_003_VERSION_B = "version"
+
+      var BuildVersion = "dev"
+
+      func Get() string {
+          return BuildVersion
+      }
+    internal/telemetry/otel.go: |
+      package telemetry
+
+      GARBAGE_003_OTEL_C = "otel"
+
+      type TracerProvider struct {
+          Endpoint string
+      }
+
+      func NewProvider(endpoint string) *TracerProvider {
+          return &TracerProvider{Endpoint: endpoint}
+      }
+  changed_files:
+    internal/config/config.go: |
+      package config
+
+      import "os"
+
+      type Config struct {
+          Host      string
+          Port      int
+          Verbose   bool
+          LogLevel  string
+          MaxConns  int
+      }
+
+      func Load(path string) (*Config, error) {
+          logLevel := os.Getenv("LOG_LEVEL")
+          if logLevel == "" {
+              logLevel = "info"
+          }
+          return &Config{
+              Host:     "localhost",
+              Port:     8080,
+              Verbose:  false,
+              LogLevel: logLevel,
+              MaxConns: 100,
+          }, nil
+      }
+  commit_message: "feat: add LogLevel and MaxConns to config"
+fragments:
+- id: log_level_field
+  selector:
+    path: internal/config/config.go
+    anchor: "LogLevel  string"
+- id: max_conns_field
+  selector:
+    path: internal/config/config.go
+    anchor: "MaxConns  int"
+- id: env_log_level
+  selector:
+    path: internal/config/config.go
+    anchor: "os.Getenv(\"LOG_LEVEL\")"
+- id: serve_uses_config
+  selector:
+    path: cmd/serve/main.go
+    anchor: "config.Load(\"config.yaml\")"
+- id: migrate_uses_config
+  selector:
+    path: cmd/migrate/main.go
+    anchor: "config.Load(\"config.yaml\")"
+- id: healthcheck_uses_config
+  selector:
+    path: cmd/healthcheck/main.go
+    anchor: "config.Load(\"config.yaml\")"
+- id: unrelated_logger
+  selector:
+    path: internal/logger/logger.go
+    anchor: "type Logger struct"
+- id: unrelated_version
+  selector:
+    path: internal/version/version.go
+    anchor: "var BuildVersion"
+- id: unrelated_otel
+  selector:
+    path: internal/telemetry/otel.go
+    anchor: "type TracerProvider struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_003_LOGGER_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_003_VERSION_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_003_OTEL_C
+oracle:
+  required:
+  - log_level_field
+  - max_conns_field
+  - env_log_level
+  - serve_uses_config
+  allowed:
+  - migrate_uses_config
+  - healthcheck_uses_config
+  forbidden:
+  - unrelated_logger
+  - unrelated_version
+  - unrelated_otel
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

@@ -1,0 +1,177 @@
+name: bal3_cfgcode_004_go_json_rate_limit
+tags:
+- lang:go
+- change:single_file
+- change:config
+- context:config_to_code
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    config/ratelimit.json: |
+      {
+        "rate_limit": {
+          "requests_per_second": 100,
+          "burst_size": 50,
+          "enabled": true
+        }
+      }
+    internal/middleware/ratelimit.go: |
+      package middleware
+
+      import (
+          "encoding/json"
+          "net/http"
+          "os"
+          "sync"
+          "time"
+      )
+
+      type RateLimitConfig struct {
+          RequestsPerSecond int  `json:"requests_per_second"`
+          BurstSize         int  `json:"burst_size"`
+          Enabled           bool `json:"enabled"`
+      }
+
+      func LoadRateLimitConfig(path string) (*RateLimitConfig, error) {
+          data, err := os.ReadFile(path)
+          if err != nil {
+              return nil, err
+          }
+          var wrapper struct {
+              RateLimit RateLimitConfig `json:"rate_limit"`
+          }
+          if err := json.Unmarshal(data, &wrapper); err != nil {
+              return nil, err
+          }
+          return &wrapper.RateLimit, nil
+      }
+
+      type RateLimiter struct {
+          config *RateLimitConfig
+          mu     sync.Mutex
+          tokens int
+          last   time.Time
+      }
+
+      func NewRateLimiter(cfg *RateLimitConfig) *RateLimiter {
+          return &RateLimiter{
+              config: cfg,
+              tokens: cfg.BurstSize,
+              last:   time.Now(),
+          }
+      }
+
+      func (rl *RateLimiter) Allow() bool {
+          if !rl.config.Enabled {
+              return true
+          }
+          rl.mu.Lock()
+          defer rl.mu.Unlock()
+          return rl.tokens > 0
+      }
+
+      func RateLimitMiddleware(rl *RateLimiter) func(http.Handler) http.Handler {
+          return func(next http.Handler) http.Handler {
+              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                  if !rl.Allow() {
+                      http.Error(w, "rate limited", http.StatusTooManyRequests)
+                      return
+                  }
+                  next.ServeHTTP(w, r)
+              })
+          }
+      }
+    internal/middleware/auth.go: |
+      package middleware
+
+      GARBAGE_CFGCODE_004_AUTH_A = "auth"
+      GARBAGE_CFGCODE_004_JWT_B = "bearer"
+
+      func AuthMiddleware() {}
+    internal/storage/cache.go: |
+      package storage
+
+      GARBAGE_CFGCODE_004_CACHE_C = "cache"
+      GARBAGE_CFGCODE_004_EVICT_D = 100
+
+      type Cache struct {
+          MaxSize int
+      }
+    internal/queue/worker.go: |
+      package queue
+
+      GARBAGE_CFGCODE_004_WORKER_E = "worker"
+      GARBAGE_CFGCODE_004_RETRY_F = 3
+
+      func ProcessQueue() {}
+  changed_files:
+    config/ratelimit.json: |
+      {
+        "rate_limit": {
+          "requests_per_second": 500,
+          "burst_size": 200,
+          "enabled": true,
+          "whitelist_ips": ["10.0.0.0/8"]
+        }
+      }
+  commit_message: "increase rate limits and add IP whitelist"
+fragments:
+- id: ratelimit_struct
+  selector:
+    path: internal/middleware/ratelimit.go
+    anchor: "type RateLimitConfig struct"
+- id: load_ratelimit
+  selector:
+    path: internal/middleware/ratelimit.go
+    anchor: "func LoadRateLimitConfig"
+- id: ratelimiter_allow
+  selector:
+    path: internal/middleware/ratelimit.go
+    anchor: "func (rl *RateLimiter) Allow"
+- id: no_auth
+  selector:
+    path: internal/middleware/auth.go
+    anchor: "AuthMiddleware"
+- id: no_cache
+  selector:
+    path: internal/storage/cache.go
+    anchor: "type Cache struct"
+- id: no_worker
+  selector:
+    path: internal/queue/worker.go
+    anchor: "ProcessQueue"
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_CFGCODE_004_AUTH_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_CFGCODE_004_JWT_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_CFGCODE_004_CACHE_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_CFGCODE_004_EVICT_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_CFGCODE_004_WORKER_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_CFGCODE_004_RETRY_F
+oracle:
+  required:
+  - ratelimit_struct
+  - load_ratelimit
+  - ratelimiter_allow
+  allowed: []
+  forbidden:
+  - no_auth
+  - no_cache
+  - no_worker
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

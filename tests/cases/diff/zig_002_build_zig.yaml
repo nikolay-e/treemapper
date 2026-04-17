@@ -1,4 +1,10 @@
 name: zig_002_build_zig
+tags:
+- lang:zig
+- change:multi_file
+- context:cross_module
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
     build.zig: |

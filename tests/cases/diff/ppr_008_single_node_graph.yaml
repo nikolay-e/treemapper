@@ -1,4 +1,11 @@
 name: ppr_008_single_node_graph
+tags:
+- lang:python
+- change:single_file
+- change:bug_fix
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     single.py: |

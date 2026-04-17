@@ -1,0 +1,186 @@
+name: bal_1hop_020_rust_serializer_calls_schema
+tags:
+- lang:rust
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/schema/types.rs: |
+      #[derive(Debug, Clone)]
+      pub enum FieldType {
+          String,
+          Integer,
+          Float,
+          Boolean,
+      }
+
+      #[derive(Debug, Clone)]
+      pub struct Field {
+          pub name: String,
+          pub field_type: FieldType,
+          pub required: bool,
+      }
+
+      #[derive(Debug, Clone)]
+      pub struct Schema {
+          pub name: String,
+          pub fields: Vec<Field>,
+      }
+
+      impl Schema {
+          pub fn new(name: &str) -> Self {
+              Schema {
+                  name: name.to_string(),
+                  fields: Vec::new(),
+              }
+          }
+
+          pub fn add_field(&mut self, name: &str, ft: FieldType, required: bool) {
+              self.fields.push(Field {
+                  name: name.to_string(),
+                  field_type: ft,
+                  required,
+              });
+          }
+      }
+    src/serializer/json.rs: |
+      use crate::schema::types::{Schema, FieldType};
+
+      pub fn schema_to_json(schema: &Schema) -> String {
+          let mut parts = Vec::new();
+          for field in &schema.fields {
+              let type_str = match field.field_type {
+                  FieldType::String => "string",
+                  FieldType::Integer => "integer",
+                  FieldType::Float => "float",
+                  FieldType::Boolean => "boolean",
+              };
+              parts.push(format!(
+                  r#""{}":{{"type":"{}","required":{}}}"#,
+                  field.name, type_str, field.required
+              ));
+          }
+          format!(r#"{{"name":"{}","fields":{{{}}}}}"#, schema.name, parts.join(","))
+      }
+    src/validator/rules.rs: |
+      pub struct ValidationRule {
+          pub field: String,
+          pub pattern: String,
+      }
+
+      pub fn validate_email(value: &str) -> bool {
+          value.contains('@') && value.contains('.')
+      }
+
+      pub fn validate_length(value: &str, min: usize, max: usize) -> bool {
+          value.len() >= min && value.len() <= max
+      }
+    src/migration/runner.rs: |
+      pub struct Migration {
+          pub version: u32,
+          pub sql: String,
+      }
+
+      pub fn run_migrations(migrations: &[Migration]) -> Result<(), String> {
+          for m in migrations {
+              println!("Running migration v{}", m.version);
+          }
+          Ok(())
+      }
+  changed_files:
+    src/schema/types.rs: |
+      #[derive(Debug, Clone)]
+      pub enum FieldType {
+          String,
+          Integer,
+          Float,
+          Boolean,
+          Array(Box<FieldType>),
+          Object(Box<Schema>),
+      }
+
+      #[derive(Debug, Clone)]
+      pub struct Field {
+          pub name: String,
+          pub field_type: FieldType,
+          pub required: bool,
+          pub default_value: Option<String>,
+      }
+
+      #[derive(Debug, Clone)]
+      pub struct Schema {
+          pub name: String,
+          pub fields: Vec<Field>,
+          pub version: u32,
+      }
+
+      impl Schema {
+          pub fn new(name: &str) -> Self {
+              Schema {
+                  name: name.to_string(),
+                  fields: Vec::new(),
+                  version: 1,
+              }
+          }
+
+          pub fn add_field(&mut self, name: &str, ft: FieldType, required: bool) {
+              self.fields.push(Field {
+                  name: name.to_string(),
+                  field_type: ft,
+                  required,
+                  default_value: None,
+              });
+          }
+
+          pub fn add_field_with_default(&mut self, name: &str, ft: FieldType, default: &str) {
+              self.fields.push(Field {
+                  name: name.to_string(),
+                  field_type: ft,
+                  required: false,
+                  default_value: Some(default.to_string()),
+              });
+          }
+      }
+  commit_message: "feat: add nested types, default values and schema versioning"
+fragments:
+- id: array_type_variant
+  selector:
+    path: src/schema/types.rs
+    anchor: "Array(Box<FieldType>)"
+- id: object_type_variant
+  selector:
+    path: src/schema/types.rs
+    anchor: "Object(Box<Schema>)"
+- id: default_value_field
+  selector:
+    path: src/schema/types.rs
+    anchor: "pub default_value: Option<String>"
+- id: add_field_with_default
+  selector:
+    path: src/schema/types.rs
+    anchor: "pub fn add_field_with_default"
+- id: serializer_matches_type
+  selector:
+    path: src/serializer/json.rs
+    anchor: "match field.field_type"
+- id: unrelated_validator
+  selector:
+    path: src/validator/rules.rs
+    anchor: "pub fn validate_email"
+- id: unrelated_migration
+  selector:
+    path: src/migration/runner.rs
+    anchor: "pub fn run_migrations"
+oracle:
+  required:
+  - array_type_variant
+  - object_type_variant
+  - serializer_matches_type
+  allowed:
+  - default_value_field
+  - add_field_with_default
+  forbidden:
+  - unrelated_validator
+  - unrelated_migration

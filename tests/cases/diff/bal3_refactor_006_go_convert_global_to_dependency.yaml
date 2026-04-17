@@ -1,0 +1,206 @@
+name: bal3_refactor_006_go_convert_global_to_dependency
+tags:
+- lang:go
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    config/global.go: |
+      package config
+
+      var DBHost = "localhost"
+      var DBPort = 5432
+      var DBName = "appdb"
+    services/user.go: |
+      package services
+
+      import (
+          "config"
+          "fmt"
+      )
+
+      type UserService struct{}
+
+      func (s *UserService) ConnectionString() string {
+          return fmt.Sprintf("%s:%d/%s", config.DBHost, config.DBPort, config.DBName)
+      }
+    services/analytics.go: |
+      package services
+
+      import (
+          "config"
+          "fmt"
+      )
+
+      type AnalyticsService struct{}
+
+      func (s *AnalyticsService) DSN() string {
+          return fmt.Sprintf("host=%s port=%d dbname=%s", config.DBHost, config.DBPort, config.DBName)
+      }
+    cmd/main.go: |
+      package main
+
+      import "services"
+
+      func main() {
+          u := &services.UserService{}
+          a := &services.AnalyticsService{}
+          _ = u.ConnectionString()
+          _ = a.DSN()
+      }
+    pkg/upload/handler.go: |
+      package upload
+
+      GARBAGE_R006_UPLOAD_A = "handler"
+
+      type Handler struct {
+          MaxSize int64
+      }
+    pkg/session/store.go: |
+      package session
+
+      GARBAGE_R006_SESSION_B = "store"
+
+      type Store struct {
+          TTL int
+      }
+    pkg/cors/config.go: |
+      package cors
+
+      GARBAGE_R006_CORS_C = "config"
+
+      type Config struct {
+          Origins []string
+      }
+  changed_files:
+    config/database.go: |
+      package config
+
+      type DatabaseConfig struct {
+          Host string
+          Port int
+          Name string
+      }
+    services/user.go: |
+      package services
+
+      import (
+          "config"
+          "fmt"
+      )
+
+      type UserService struct {
+          db config.DatabaseConfig
+      }
+
+      func NewUserService(db config.DatabaseConfig) *UserService {
+          return &UserService{db: db}
+      }
+
+      func (s *UserService) ConnectionString() string {
+          return fmt.Sprintf("%s:%d/%s", s.db.Host, s.db.Port, s.db.Name)
+      }
+    services/analytics.go: |
+      package services
+
+      import (
+          "config"
+          "fmt"
+      )
+
+      type AnalyticsService struct {
+          db config.DatabaseConfig
+      }
+
+      func NewAnalyticsService(db config.DatabaseConfig) *AnalyticsService {
+          return &AnalyticsService{db: db}
+      }
+
+      func (s *AnalyticsService) DSN() string {
+          return fmt.Sprintf("host=%s port=%d dbname=%s", s.db.Host, s.db.Port, s.db.Name)
+      }
+    cmd/main.go: |
+      package main
+
+      import (
+          "config"
+          "services"
+      )
+
+      func main() {
+          dbCfg := config.DatabaseConfig{Host: "localhost", Port: 5432, Name: "appdb"}
+          u := services.NewUserService(dbCfg)
+          a := services.NewAnalyticsService(dbCfg)
+          _ = u.ConnectionString()
+          _ = a.DSN()
+      }
+    pkg/upload/handler.go: |
+      package upload
+
+      GARBAGE_R006_UPLOAD_A = "handler"
+
+      type Handler struct {
+          MaxSize int64
+      }
+    pkg/session/store.go: |
+      package session
+
+      GARBAGE_R006_SESSION_B = "store"
+
+      type Store struct {
+          TTL int
+      }
+    pkg/cors/config.go: |
+      package cors
+
+      GARBAGE_R006_CORS_C = "config"
+
+      type Config struct {
+          Origins []string
+      }
+  commit_message: "refactor: replace global config vars with dependency injection"
+fragments:
+- id: database_config_struct
+  selector:
+    path: config/database.go
+    anchor: "type DatabaseConfig struct"
+- id: user_service_injected
+  selector:
+    path: services/user.go
+    anchor: "db config.DatabaseConfig"
+- id: user_constructor
+  selector:
+    path: services/user.go
+    anchor: "func NewUserService(db config.DatabaseConfig)"
+- id: analytics_injected
+  selector:
+    path: services/analytics.go
+    anchor: "db config.DatabaseConfig"
+- id: main_wires_config
+  selector:
+    path: cmd/main.go
+    anchor: "config.DatabaseConfig{Host:"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R006_UPLOAD_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R006_SESSION_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R006_CORS_C
+oracle:
+  required:
+  - database_config_struct
+  - user_service_injected
+  - user_constructor
+  - analytics_injected
+  - main_wires_config
+  allowed: []
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

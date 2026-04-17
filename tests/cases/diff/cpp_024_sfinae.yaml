@@ -1,4 +1,10 @@
 name: cpp_024_sfinae
+tags:
+- lang:cpp
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     include/typecheck/type_check.hpp: |

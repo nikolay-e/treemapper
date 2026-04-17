@@ -1,0 +1,195 @@
+name: bal3_1hop_006_go_middleware_chain
+tags:
+- lang:go
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/middleware/cors.go: |
+      package middleware
+
+      import "net/http"
+
+      type CORSConfig struct {
+          AllowOrigins []string
+          AllowMethods []string
+      }
+
+      func CORS(cfg CORSConfig) func(http.Handler) http.Handler {
+          return func(next http.Handler) http.Handler {
+              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                  w.Header().Set("Access-Control-Allow-Origin", "*")
+                  next.ServeHTTP(w, r)
+              })
+          }
+      }
+    cmd/api/server.go: |
+      package main
+
+      import (
+          "net/http"
+          "pkg/middleware"
+      )
+
+      func buildServer() http.Handler {
+          mux := http.NewServeMux()
+          corsCfg := middleware.CORSConfig{
+              AllowOrigins: []string{"*"},
+              AllowMethods: []string{"GET", "POST"},
+          }
+          return middleware.CORS(corsCfg)(mux)
+      }
+    cmd/api/routes.go: |
+      package main
+
+      import (
+          "net/http"
+          "pkg/middleware"
+      )
+
+      func setupRoutes(mux *http.ServeMux) http.Handler {
+          corsCfg := middleware.CORSConfig{
+              AllowOrigins: []string{"https://example.com"},
+              AllowMethods: []string{"GET"},
+          }
+          return middleware.CORS(corsCfg)(mux)
+      }
+    internal/health/check.go: |
+      package health
+
+      GARBAGE_006_HEALTH_A = "health"
+
+      type Checker struct {
+          Services []string
+      }
+
+      func (c *Checker) Run() bool {
+          return len(c.Services) > 0
+      }
+    internal/migrations/runner.go: |
+      package migrations
+
+      GARBAGE_006_MIGRATE_B = "migrate"
+
+      type Runner struct {
+          Dir string
+      }
+
+      func (r *Runner) Execute() error {
+          return nil
+      }
+    internal/seed/loader.go: |
+      package seed
+
+      GARBAGE_006_SEED_C = "seed"
+
+      type Loader struct {
+          Path string
+      }
+
+      func (l *Loader) Load() error {
+          return nil
+      }
+  changed_files:
+    pkg/middleware/cors.go: |
+      package middleware
+
+      import "net/http"
+
+      type CORSConfig struct {
+          AllowOrigins  []string
+          AllowMethods  []string
+          AllowHeaders  []string
+          ExposeHeaders []string
+          MaxAge        int
+      }
+
+      func CORS(cfg CORSConfig) func(http.Handler) http.Handler {
+          return func(next http.Handler) http.Handler {
+              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+                  origin := r.Header.Get("Origin")
+                  if isAllowed(cfg.AllowOrigins, origin) {
+                      w.Header().Set("Access-Control-Allow-Origin", origin)
+                  }
+                  if r.Method == http.MethodOptions {
+                      w.WriteHeader(http.StatusNoContent)
+                      return
+                  }
+                  next.ServeHTTP(w, r)
+              })
+          }
+      }
+
+      func isAllowed(origins []string, origin string) bool {
+          for _, o := range origins {
+              if o == "*" || o == origin {
+                  return true
+              }
+          }
+          return false
+      }
+  commit_message: "feat: add preflight handling and origin validation to CORS"
+fragments:
+- id: allow_headers_field
+  selector:
+    path: pkg/middleware/cors.go
+    anchor: "AllowHeaders  []string"
+- id: preflight_check
+  selector:
+    path: pkg/middleware/cors.go
+    anchor: "r.Method == http.MethodOptions"
+- id: is_allowed_func
+  selector:
+    path: pkg/middleware/cors.go
+    anchor: "func isAllowed"
+- id: origin_validation
+  selector:
+    path: pkg/middleware/cors.go
+    anchor: "isAllowed(cfg.AllowOrigins, origin)"
+- id: server_uses_cors
+  selector:
+    path: cmd/api/server.go
+    anchor: "middleware.CORS(corsCfg)"
+- id: routes_uses_cors
+  selector:
+    path: cmd/api/routes.go
+    anchor: "middleware.CORS(corsCfg)"
+- id: unrelated_health
+  selector:
+    path: internal/health/check.go
+    anchor: "type Checker struct"
+- id: unrelated_migrate
+  selector:
+    path: internal/migrations/runner.go
+    anchor: "type Runner struct"
+- id: unrelated_seed
+  selector:
+    path: internal/seed/loader.go
+    anchor: "type Loader struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_006_HEALTH_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_006_MIGRATE_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_006_SEED_C
+oracle:
+  required:
+  - allow_headers_field
+  - preflight_check
+  - is_allowed_func
+  - origin_validation
+  allowed:
+  - server_uses_cors
+  - routes_uses_cors
+  forbidden:
+  - unrelated_health
+  - unrelated_migrate
+  - unrelated_seed
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

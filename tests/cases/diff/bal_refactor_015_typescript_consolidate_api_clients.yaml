@@ -1,0 +1,210 @@
+name: bal_refactor_015_typescript_consolidate_api_clients
+tags:
+- lang:typescript
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/api/usersApi.ts: |
+      const BASE_URL = 'https://api.example.com';
+
+      function buildHeaders(token: string): Record<string, string> {
+          return {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+          };
+      }
+
+      export async function fetchUsers(token: string) {
+          const resp = await fetch(`${BASE_URL}/users`, { headers: buildHeaders(token) });
+          return resp.json();
+      }
+
+      export async function fetchUser(token: string, id: string) {
+          const resp = await fetch(`${BASE_URL}/users/${id}`, { headers: buildHeaders(token) });
+          return resp.json();
+      }
+    src/api/ordersApi.ts: |
+      const BASE_URL = 'https://api.example.com';
+
+      function buildHeaders(token: string): Record<string, string> {
+          return {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+          };
+      }
+
+      export async function fetchOrders(token: string) {
+          const resp = await fetch(`${BASE_URL}/orders`, { headers: buildHeaders(token) });
+          return resp.json();
+      }
+
+      export async function createOrder(token: string, data: Record<string, unknown>) {
+          const resp = await fetch(`${BASE_URL}/orders`, {
+              method: 'POST',
+              headers: buildHeaders(token),
+              body: JSON.stringify(data),
+          });
+          return resp.json();
+      }
+    src/pages/dashboard.ts: |
+      import { fetchUsers } from '../api/usersApi';
+      import { fetchOrders } from '../api/ordersApi';
+
+      export async function loadDashboard(token: string) {
+          const users = await fetchUsers(token);
+          const orders = await fetchOrders(token);
+          return { users, orders };
+      }
+    src/utils/constants.ts: |
+      const GARBAGE_REFACTOR_015_CONST_A = 'constants';
+      const GARBAGE_REFACTOR_015_VERSION_B = '2.0';
+
+      export const APP_NAME = 'MyApp';
+    garbage_i18n.ts: |
+      const GARBAGE_REFACTOR_015_I18N_C = 'i18n';
+      const GARBAGE_REFACTOR_015_LANG_D = 'en';
+
+      export class I18n {
+          static GARBAGE_REFACTOR_015_I18N_CLASS_E = true;
+
+          t(key: string): string {
+              return key;
+          }
+      }
+  changed_files:
+    src/api/httpClient.ts: |
+      const BASE_URL = 'https://api.example.com';
+
+      function buildHeaders(token: string): Record<string, string> {
+          return {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+          };
+      }
+
+      export async function get(token: string, path: string) {
+          const resp = await fetch(`${BASE_URL}${path}`, { headers: buildHeaders(token) });
+          return resp.json();
+      }
+
+      export async function post(token: string, path: string, data: Record<string, unknown>) {
+          const resp = await fetch(`${BASE_URL}${path}`, {
+              method: 'POST',
+              headers: buildHeaders(token),
+              body: JSON.stringify(data),
+          });
+          return resp.json();
+      }
+    src/api/usersApi.ts: |
+      import { get } from './httpClient';
+
+      export async function fetchUsers(token: string) {
+          return get(token, '/users');
+      }
+
+      export async function fetchUser(token: string, id: string) {
+          return get(token, `/users/${id}`);
+      }
+    src/api/ordersApi.ts: |
+      import { get, post } from './httpClient';
+
+      export async function fetchOrders(token: string) {
+          return get(token, '/orders');
+      }
+
+      export async function createOrder(token: string, data: Record<string, unknown>) {
+          return post(token, '/orders', data);
+      }
+    src/pages/dashboard.ts: |
+      import { fetchUsers } from '../api/usersApi';
+      import { fetchOrders } from '../api/ordersApi';
+
+      export async function loadDashboard(token: string) {
+          const users = await fetchUsers(token);
+          const orders = await fetchOrders(token);
+          return { users, orders };
+      }
+    src/utils/constants.ts: |
+      const GARBAGE_REFACTOR_015_CONST_A = 'constants';
+      const GARBAGE_REFACTOR_015_VERSION_B = '2.0';
+
+      export const APP_NAME = 'MyApp';
+    garbage_i18n.ts: |
+      const GARBAGE_REFACTOR_015_I18N_C = 'i18n';
+      const GARBAGE_REFACTOR_015_LANG_D = 'en';
+
+      export class I18n {
+          static GARBAGE_REFACTOR_015_I18N_CLASS_E = true;
+
+          t(key: string): string {
+              return key;
+          }
+      }
+  commit_message: "refactor: consolidate duplicate HTTP client logic into shared module"
+fragments:
+- id: new_http_client_get
+  selector:
+    path: src/api/httpClient.ts
+    anchor: "export async function get(token"
+- id: new_http_client_post
+  selector:
+    path: src/api/httpClient.ts
+    anchor: "export async function post(token"
+- id: users_imports_client
+  selector:
+    path: src/api/usersApi.ts
+    anchor: "from './httpClient'"
+- id: users_uses_get
+  selector:
+    path: src/api/usersApi.ts
+    anchor: "return get(token, '/users')"
+- id: orders_imports_client
+  selector:
+    path: src/api/ordersApi.ts
+    anchor: "from './httpClient'"
+- id: dashboard_uses_apis
+  selector:
+    path: src/pages/dashboard.ts
+    anchor: "from '../api/usersApi'"
+- id: no_constants
+  selector:
+    path: src/utils/constants.ts
+- id: no_garbage_i18n
+  selector:
+    path: garbage_i18n.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_015_CONST_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_015_VERSION_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_015_I18N_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_015_LANG_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_015_I18N_CLASS_E
+oracle:
+  required:
+  - new_http_client_get
+  - new_http_client_post
+  - users_imports_client
+  - users_uses_get
+  - orders_imports_client
+  - dashboard_uses_apis
+  allowed: []
+  forbidden:
+  - no_constants
+  - no_garbage_i18n
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

@@ -1,0 +1,171 @@
+name: bal_refactor_003_python_move_function_to_module
+tags:
+- lang:python
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    core/handlers.py: |
+      import json
+
+      def parse_request(raw_body):
+          data = json.loads(raw_body)
+          if "action" not in data:
+              raise KeyError("missing action")
+          return data
+
+      def dispatch(action, payload):
+          if action == "create":
+              return {"status": "created", "data": payload}
+          elif action == "delete":
+              return {"status": "deleted"}
+          return {"status": "unknown"}
+
+      def handle(raw_body):
+          data = parse_request(raw_body)
+          return dispatch(data["action"], data.get("payload", {}))
+    core/router.py: |
+      from core.handlers import handle
+
+      class Router:
+          def __init__(self):
+              self.routes = {}
+
+          def add_route(self, path, handler):
+              self.routes[path] = handler
+
+          def process(self, path, body):
+              if path in self.routes:
+                  return self.routes[path](body)
+              return handle(body)
+    core/config.py: |
+      GARBAGE_REFACTOR_003_CONFIG_MARKER_A = "config"
+      GARBAGE_REFACTOR_003_ENV_MARKER_B = "production"
+
+      class AppConfig:
+          GARBAGE_REFACTOR_003_APP_MARKER_C = True
+          debug = False
+          port = 8080
+    garbage_database.py: |
+      GARBAGE_REFACTOR_003_DB_MARKER_D = "database"
+      GARBAGE_REFACTOR_003_POOL_MARKER_E = 10
+
+      class DatabasePool:
+          GARBAGE_REFACTOR_003_POOL_CLASS_F = True
+
+          def connect(self):
+              pass
+  changed_files:
+    core/handlers.py: |
+      from core.parsing import parse_request
+
+      def dispatch(action, payload):
+          if action == "create":
+              return {"status": "created", "data": payload}
+          elif action == "delete":
+              return {"status": "deleted"}
+          return {"status": "unknown"}
+
+      def handle(raw_body):
+          data = parse_request(raw_body)
+          return dispatch(data["action"], data.get("payload", {}))
+    core/parsing.py: |
+      import json
+
+      def parse_request(raw_body):
+          data = json.loads(raw_body)
+          if "action" not in data:
+              raise KeyError("missing action")
+          return data
+    core/router.py: |
+      from core.handlers import handle
+
+      class Router:
+          def __init__(self):
+              self.routes = {}
+
+          def add_route(self, path, handler):
+              self.routes[path] = handler
+
+          def process(self, path, body):
+              if path in self.routes:
+                  return self.routes[path](body)
+              return handle(body)
+    core/config.py: |
+      GARBAGE_REFACTOR_003_CONFIG_MARKER_A = "config"
+      GARBAGE_REFACTOR_003_ENV_MARKER_B = "production"
+
+      class AppConfig:
+          GARBAGE_REFACTOR_003_APP_MARKER_C = True
+          debug = False
+          port = 8080
+    garbage_database.py: |
+      GARBAGE_REFACTOR_003_DB_MARKER_D = "database"
+      GARBAGE_REFACTOR_003_POOL_MARKER_E = 10
+
+      class DatabasePool:
+          GARBAGE_REFACTOR_003_POOL_CLASS_F = True
+
+          def connect(self):
+              pass
+  commit_message: "refactor: move parse_request to dedicated parsing module"
+fragments:
+- id: handlers_imports_parsing
+  selector:
+    path: core/handlers.py
+    anchor: "from core.parsing import parse_request"
+- id: new_parsing_module
+  selector:
+    path: core/parsing.py
+    anchor: "def parse_request(raw_body)"
+- id: handle_uses_parse
+  selector:
+    path: core/handlers.py
+    anchor: "def handle(raw_body)"
+- id: router_uses_handle
+  selector:
+    path: core/router.py
+    anchor: "from core.handlers import handle"
+- id: no_config
+  selector:
+    path: core/config.py
+- id: no_garbage_database
+  selector:
+    path: garbage_database.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_003_CONFIG_MARKER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_003_ENV_MARKER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_003_APP_MARKER_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_003_DB_MARKER_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_003_POOL_MARKER_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_REFACTOR_003_POOL_CLASS_F
+oracle:
+  required:
+  - handlers_imports_parsing
+  - new_parsing_module
+  - handle_uses_parse
+  - router_uses_handle
+  allowed: []
+  forbidden:
+  - no_config
+  - no_garbage_database
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

@@ -1,0 +1,176 @@
+name: bal3_1hop_001_go_http_handler
+tags:
+- lang:go
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/auth/token.go: |
+      package auth
+
+      import "time"
+
+      type Claims struct {
+          UserID    string
+          ExpiresAt time.Time
+      }
+
+      func ValidateToken(raw string) (*Claims, error) {
+          if len(raw) == 0 {
+              return nil, fmt.Errorf("empty token")
+          }
+          return &Claims{UserID: raw, ExpiresAt: time.Now().Add(time.Hour)}, nil
+      }
+    api/handlers/profile.go: |
+      package handlers
+
+      import (
+          "net/http"
+          "pkg/auth"
+      )
+
+      func ProfileHandler(w http.ResponseWriter, r *http.Request) {
+          raw := r.Header.Get("Authorization")
+          claims, err := auth.ValidateToken(raw)
+          if err != nil {
+              http.Error(w, "unauthorized", http.StatusUnauthorized)
+              return
+          }
+          w.Write([]byte("hello " + claims.UserID))
+      }
+    api/handlers/settings.go: |
+      package handlers
+
+      import (
+          "net/http"
+          "pkg/auth"
+      )
+
+      func SettingsHandler(w http.ResponseWriter, r *http.Request) {
+          raw := r.Header.Get("Authorization")
+          claims, err := auth.ValidateToken(raw)
+          if err != nil {
+              http.Error(w, "unauthorized", http.StatusUnauthorized)
+              return
+          }
+          w.Write([]byte("settings for " + claims.UserID))
+      }
+    api/middleware/logging.go: |
+      package middleware
+
+      import "net/http"
+
+      GARBAGE_001_LOGGING_A = "logger"
+
+      func LoggingMiddleware(next http.Handler) http.Handler {
+          return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+              next.ServeHTTP(w, r)
+          })
+      }
+    pkg/storage/db.go: |
+      package storage
+
+      GARBAGE_001_DB_B = "database"
+
+      type DB struct {
+          DSN string
+      }
+
+      func NewDB(dsn string) *DB {
+          return &DB{DSN: dsn}
+      }
+    pkg/cache/redis.go: |
+      package cache
+
+      GARBAGE_001_REDIS_C = "redis"
+
+      type RedisClient struct {
+          Addr string
+      }
+
+      func NewRedisClient(addr string) *RedisClient {
+          return &RedisClient{Addr: addr}
+      }
+  changed_files:
+    pkg/auth/token.go: |
+      package auth
+
+      import (
+          "fmt"
+          "strings"
+          "time"
+      )
+
+      type Claims struct {
+          UserID    string
+          Role      string
+          ExpiresAt time.Time
+      }
+
+      func ValidateToken(raw string) (*Claims, error) {
+          if len(raw) == 0 {
+              return nil, fmt.Errorf("empty token")
+          }
+          raw = strings.TrimPrefix(raw, "Bearer ")
+          return &Claims{UserID: raw, Role: "user", ExpiresAt: time.Now().Add(time.Hour)}, nil
+      }
+  commit_message: "feat: add Role field to Claims and strip Bearer prefix"
+fragments:
+- id: claims_role_field
+  selector:
+    path: pkg/auth/token.go
+    anchor: "Role      string"
+- id: strip_bearer
+  selector:
+    path: pkg/auth/token.go
+    anchor: "strings.TrimPrefix(raw, \"Bearer \")"
+- id: role_in_return
+  selector:
+    path: pkg/auth/token.go
+    anchor: "Role: \"user\""
+- id: profile_imports_auth
+  selector:
+    path: api/handlers/profile.go
+    anchor: "auth.ValidateToken(raw)"
+- id: settings_imports_auth
+  selector:
+    path: api/handlers/settings.go
+    anchor: "auth.ValidateToken(raw)"
+- id: unrelated_logging
+  selector:
+    path: api/middleware/logging.go
+    anchor: "func LoggingMiddleware"
+- id: unrelated_db
+  selector:
+    path: pkg/storage/db.go
+    anchor: "type DB struct"
+- id: unrelated_redis
+  selector:
+    path: pkg/cache/redis.go
+    anchor: "type RedisClient struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_001_LOGGING_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_001_DB_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_001_REDIS_C
+oracle:
+  required:
+  - claims_role_field
+  - strip_bearer
+  - role_in_return
+  - profile_imports_auth
+  allowed:
+  - settings_imports_auth
+  forbidden:
+  - unrelated_logging
+  - unrelated_db
+  - unrelated_redis
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

@@ -1,4 +1,10 @@
 name: internals_024_korean_strings_neighbor_identifiers
+tags:
+- lang:python
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     korean_str.py: |

@@ -1,0 +1,196 @@
+name: bal_refactor_013_typescript_extract_interface
+tags:
+- lang:typescript
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/emailNotifier.ts: |
+      export class EmailNotifier {
+          constructor(private smtpHost: string) {}
+
+          async notify(to: string, subject: string, body: string): Promise<void> {
+              console.log(`Sending email to ${to} via ${this.smtpHost}`);
+          }
+
+          async notifyBatch(recipients: string[], subject: string, body: string): Promise<void> {
+              for (const to of recipients) {
+                  await this.notify(to, subject, body);
+              }
+          }
+      }
+    src/smsNotifier.ts: |
+      export class SmsNotifier {
+          constructor(private apiKey: string) {}
+
+          async notify(to: string, subject: string, body: string): Promise<void> {
+              console.log(`Sending SMS to ${to}`);
+          }
+
+          async notifyBatch(recipients: string[], subject: string, body: string): Promise<void> {
+              for (const to of recipients) {
+                  await this.notify(to, subject, body);
+              }
+          }
+      }
+    src/alertService.ts: |
+      import { EmailNotifier } from './emailNotifier';
+
+      export class AlertService {
+          private notifier: EmailNotifier;
+
+          constructor(smtpHost: string) {
+              this.notifier = new EmailNotifier(smtpHost);
+          }
+
+          async sendAlert(to: string, message: string): Promise<void> {
+              await this.notifier.notify(to, 'Alert', message);
+          }
+      }
+    src/utils/format.ts: |
+      const GARBAGE_REFACTOR_013_FORMAT_A = 'format';
+      const GARBAGE_REFACTOR_013_DATE_B = 'ISO';
+
+      export function formatDate(d: Date): string {
+          return d.toISOString();
+      }
+    garbage_storage.ts: |
+      const GARBAGE_REFACTOR_013_STORAGE_C = 'storage';
+      const GARBAGE_REFACTOR_013_BUCKET_D = 's3';
+
+      export class StorageClient {
+          static GARBAGE_REFACTOR_013_CLIENT_E = true;
+
+          upload(key: string, data: Buffer): void {}
+      }
+  changed_files:
+    src/types/notifier.ts: |
+      export interface Notifier {
+          notify(to: string, subject: string, body: string): Promise<void>;
+          notifyBatch(recipients: string[], subject: string, body: string): Promise<void>;
+      }
+    src/emailNotifier.ts: |
+      import { Notifier } from './types/notifier';
+
+      export class EmailNotifier implements Notifier {
+          constructor(private smtpHost: string) {}
+
+          async notify(to: string, subject: string, body: string): Promise<void> {
+              console.log(`Sending email to ${to} via ${this.smtpHost}`);
+          }
+
+          async notifyBatch(recipients: string[], subject: string, body: string): Promise<void> {
+              for (const to of recipients) {
+                  await this.notify(to, subject, body);
+              }
+          }
+      }
+    src/smsNotifier.ts: |
+      import { Notifier } from './types/notifier';
+
+      export class SmsNotifier implements Notifier {
+          constructor(private apiKey: string) {}
+
+          async notify(to: string, subject: string, body: string): Promise<void> {
+              console.log(`Sending SMS to ${to}`);
+          }
+
+          async notifyBatch(recipients: string[], subject: string, body: string): Promise<void> {
+              for (const to of recipients) {
+                  await this.notify(to, subject, body);
+              }
+          }
+      }
+    src/alertService.ts: |
+      import { Notifier } from './types/notifier';
+
+      export class AlertService {
+          constructor(private notifier: Notifier) {}
+
+          async sendAlert(to: string, message: string): Promise<void> {
+              await this.notifier.notify(to, 'Alert', message);
+          }
+      }
+    src/utils/format.ts: |
+      const GARBAGE_REFACTOR_013_FORMAT_A = 'format';
+      const GARBAGE_REFACTOR_013_DATE_B = 'ISO';
+
+      export function formatDate(d: Date): string {
+          return d.toISOString();
+      }
+    garbage_storage.ts: |
+      const GARBAGE_REFACTOR_013_STORAGE_C = 'storage';
+      const GARBAGE_REFACTOR_013_BUCKET_D = 's3';
+
+      export class StorageClient {
+          static GARBAGE_REFACTOR_013_CLIENT_E = true;
+
+          upload(key: string, data: Buffer): void {}
+      }
+  commit_message: "refactor: extract Notifier interface for polymorphic notifications"
+fragments:
+- id: new_interface
+  selector:
+    path: src/types/notifier.ts
+    anchor: "export interface Notifier"
+- id: email_implements
+  selector:
+    path: src/emailNotifier.ts
+    anchor: "implements Notifier"
+- id: email_imports_interface
+  selector:
+    path: src/emailNotifier.ts
+    anchor: "from './types/notifier'"
+- id: sms_implements
+  selector:
+    path: src/smsNotifier.ts
+    anchor: "implements Notifier"
+- id: alert_uses_interface
+  selector:
+    path: src/alertService.ts
+    anchor: "private notifier: Notifier"
+- id: alert_imports_interface
+  selector:
+    path: src/alertService.ts
+    anchor: "from './types/notifier'"
+- id: no_format
+  selector:
+    path: src/utils/format.ts
+- id: no_garbage_storage
+  selector:
+    path: garbage_storage.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_013_FORMAT_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_013_DATE_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_013_STORAGE_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_013_BUCKET_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_013_CLIENT_E
+oracle:
+  required:
+  - new_interface
+  - email_implements
+  - email_imports_interface
+  - sms_implements
+  - alert_uses_interface
+  - alert_imports_interface
+  allowed: []
+  forbidden:
+  - no_format
+  - no_garbage_storage
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

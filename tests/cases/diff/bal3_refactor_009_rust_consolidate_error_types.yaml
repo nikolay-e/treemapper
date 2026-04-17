@@ -1,0 +1,191 @@
+name: bal3_refactor_009_rust_consolidate_error_types
+tags:
+- lang:rust
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/parser/mod.rs: |
+      use std::fmt;
+
+      #[derive(Debug)]
+      pub struct ParseError {
+          pub message: String,
+          pub line: usize,
+      }
+
+      impl fmt::Display for ParseError {
+          fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+              write!(f, "parse error at line {}: {}", self.line, self.message)
+          }
+      }
+
+      pub fn parse(input: &str) -> Result<Vec<String>, ParseError> {
+          if input.is_empty() {
+              return Err(ParseError { message: "empty input".into(), line: 0 });
+          }
+          Ok(vec![input.to_string()])
+      }
+    src/validator/mod.rs: |
+      use std::fmt;
+
+      #[derive(Debug)]
+      pub struct ValidationError {
+          pub field: String,
+          pub reason: String,
+      }
+
+      impl fmt::Display for ValidationError {
+          fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+              write!(f, "validation error on {}: {}", self.field, self.reason)
+          }
+      }
+
+      pub fn validate(data: &str) -> Result<(), ValidationError> {
+          if data.len() < 3 {
+              return Err(ValidationError { field: "data".into(), reason: "too short".into() });
+          }
+          Ok(())
+      }
+    src/pipeline/mod.rs: |
+      use crate::parser;
+      use crate::validator;
+
+      pub fn process(input: &str) -> Result<Vec<String>, String> {
+          validator::validate(input).map_err(|e| e.to_string())?;
+          parser::parse(input).map_err(|e| e.to_string())
+      }
+    src/export/csv.rs: |
+      pub const GARBAGE_R009_CSV_A: &str = "csv_export";
+
+      pub fn to_csv(rows: &[Vec<String>]) -> String {
+          String::new()
+      }
+    src/export/json.rs: |
+      pub const GARBAGE_R009_JSON_B: &str = "json_export";
+
+      pub fn to_json(data: &str) -> String {
+          format!("{{{}}}", data)
+      }
+    src/export/xml.rs: |
+      pub const GARBAGE_R009_XML_C: &str = "xml_export";
+
+      pub fn to_xml(data: &str) -> String {
+          format!("<data>{}</data>", data)
+      }
+  changed_files:
+    src/errors.rs: |
+      use std::fmt;
+
+      #[derive(Debug)]
+      pub enum AppError {
+          Parse { message: String, line: usize },
+          Validation { field: String, reason: String },
+      }
+
+      impl fmt::Display for AppError {
+          fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+              match self {
+                  AppError::Parse { message, line } =>
+                      write!(f, "parse error at line {}: {}", line, message),
+                  AppError::Validation { field, reason } =>
+                      write!(f, "validation error on {}: {}", field, reason),
+              }
+          }
+      }
+    src/parser/mod.rs: |
+      use crate::errors::AppError;
+
+      pub fn parse(input: &str) -> Result<Vec<String>, AppError> {
+          if input.is_empty() {
+              return Err(AppError::Parse { message: "empty input".into(), line: 0 });
+          }
+          Ok(vec![input.to_string()])
+      }
+    src/validator/mod.rs: |
+      use crate::errors::AppError;
+
+      pub fn validate(data: &str) -> Result<(), AppError> {
+          if data.len() < 3 {
+              return Err(AppError::Validation { field: "data".into(), reason: "too short".into() });
+          }
+          Ok(())
+      }
+    src/pipeline/mod.rs: |
+      use crate::errors::AppError;
+      use crate::parser;
+      use crate::validator;
+
+      pub fn process(input: &str) -> Result<Vec<String>, AppError> {
+          validator::validate(input)?;
+          parser::parse(input)
+      }
+    src/export/csv.rs: |
+      pub const GARBAGE_R009_CSV_A: &str = "csv_export";
+
+      pub fn to_csv(rows: &[Vec<String>]) -> String {
+          String::new()
+      }
+    src/export/json.rs: |
+      pub const GARBAGE_R009_JSON_B: &str = "json_export";
+
+      pub fn to_json(data: &str) -> String {
+          format!("{{{}}}", data)
+      }
+    src/export/xml.rs: |
+      pub const GARBAGE_R009_XML_C: &str = "xml_export";
+
+      pub fn to_xml(data: &str) -> String {
+          format!("<data>{}</data>", data)
+      }
+  commit_message: "refactor: consolidate error types into unified AppError enum"
+fragments:
+- id: app_error_enum
+  selector:
+    path: src/errors.rs
+    anchor: "pub enum AppError"
+- id: parse_variant
+  selector:
+    path: src/errors.rs
+    anchor: "Parse { message: String, line: usize }"
+- id: validation_variant
+  selector:
+    path: src/errors.rs
+    anchor: "Validation { field: String, reason: String }"
+- id: parser_uses_app_error
+  selector:
+    path: src/parser/mod.rs
+    anchor: "use crate::errors::AppError"
+- id: validator_uses_app_error
+  selector:
+    path: src/validator/mod.rs
+    anchor: "use crate::errors::AppError"
+- id: pipeline_uses_app_error
+  selector:
+    path: src/pipeline/mod.rs
+    anchor: "Result<Vec<String>, AppError>"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R009_CSV_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R009_JSON_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R009_XML_C
+oracle:
+  required:
+  - app_error_enum
+  - parse_variant
+  - validation_variant
+  - parser_uses_app_error
+  - validator_uses_app_error
+  - pipeline_uses_app_error
+  allowed: []
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

@@ -1,0 +1,226 @@
+name: bal3_1hop_008_go_event_bus
+tags:
+- lang:go
+- change:new_function
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/events/bus.go: |
+      package events
+
+      type Event struct {
+          Type    string
+          Payload map[string]string
+      }
+
+      type Handler func(Event)
+
+      type Bus struct {
+          handlers map[string][]Handler
+      }
+
+      func NewBus() *Bus {
+          return &Bus{handlers: make(map[string][]Handler)}
+      }
+
+      func (b *Bus) Subscribe(eventType string, h Handler) {
+          b.handlers[eventType] = append(b.handlers[eventType], h)
+      }
+
+      func (b *Bus) Publish(e Event) {
+          for _, h := range b.handlers[e.Type] {
+              h(e)
+          }
+      }
+    internal/order/processor.go: |
+      package order
+
+      import "pkg/events"
+
+      type Processor struct {
+          bus *events.Bus
+      }
+
+      func NewProcessor(bus *events.Bus) *Processor {
+          return &Processor{bus: bus}
+      }
+
+      func (p *Processor) Process(orderID string) {
+          p.bus.Publish(events.Event{
+              Type:    "order.created",
+              Payload: map[string]string{"order_id": orderID},
+          })
+      }
+    internal/inventory/watcher.go: |
+      package inventory
+
+      import "pkg/events"
+
+      type Watcher struct {
+          bus *events.Bus
+      }
+
+      func NewWatcher(bus *events.Bus) *Watcher {
+          w := &Watcher{bus: bus}
+          bus.Subscribe("order.created", w.onOrderCreated)
+          return w
+      }
+
+      func (w *Watcher) onOrderCreated(e events.Event) {
+          _ = e.Payload["order_id"]
+      }
+    internal/notification/dispatcher.go: |
+      package notification
+
+      import "pkg/events"
+
+      type Dispatcher struct {
+          bus *events.Bus
+      }
+
+      func NewDispatcher(bus *events.Bus) *Dispatcher {
+          d := &Dispatcher{bus: bus}
+          bus.Subscribe("order.created", d.onOrderCreated)
+          return d
+      }
+
+      func (d *Dispatcher) onOrderCreated(e events.Event) {
+          _ = e.Payload["order_id"]
+      }
+    internal/billing/invoice.go: |
+      package billing
+
+      GARBAGE_008_INVOICE_A = "invoice"
+
+      type InvoiceGenerator struct {
+          Template string
+      }
+
+      func (g *InvoiceGenerator) Generate(orderID string) string {
+          return "INV-" + orderID
+      }
+    internal/shipping/tracker.go: |
+      package shipping
+
+      GARBAGE_008_SHIPPING_B = "shipping"
+
+      type Tracker struct {
+          Carrier string
+      }
+
+      func (t *Tracker) Track(shipmentID string) string {
+          return "tracking-" + shipmentID
+      }
+    internal/reporting/summary.go: |
+      package reporting
+
+      GARBAGE_008_REPORT_C = "report"
+
+      type SummaryBuilder struct {
+          Title string
+      }
+
+      func (s *SummaryBuilder) Build() string {
+          return s.Title
+      }
+  changed_files:
+    pkg/events/bus.go: |
+      package events
+
+      type Event struct {
+          Type    string
+          Payload map[string]string
+      }
+
+      type Handler func(Event)
+
+      type Bus struct {
+          handlers map[string][]Handler
+      }
+
+      func NewBus() *Bus {
+          return &Bus{handlers: make(map[string][]Handler)}
+      }
+
+      func (b *Bus) Subscribe(eventType string, h Handler) {
+          b.handlers[eventType] = append(b.handlers[eventType], h)
+      }
+
+      func (b *Bus) Unsubscribe(eventType string) {
+          delete(b.handlers, eventType)
+      }
+
+      func (b *Bus) Publish(e Event) {
+          for _, h := range b.handlers[e.Type] {
+              h(e)
+          }
+      }
+
+      func (b *Bus) HasSubscribers(eventType string) bool {
+          return len(b.handlers[eventType]) > 0
+      }
+  commit_message: "feat: add Unsubscribe and HasSubscribers to event bus"
+fragments:
+- id: unsubscribe_method
+  selector:
+    path: pkg/events/bus.go
+    anchor: "func (b *Bus) Unsubscribe"
+- id: has_subscribers_method
+  selector:
+    path: pkg/events/bus.go
+    anchor: "func (b *Bus) HasSubscribers"
+- id: delete_handlers
+  selector:
+    path: pkg/events/bus.go
+    anchor: "delete(b.handlers, eventType)"
+- id: processor_publishes
+  selector:
+    path: internal/order/processor.go
+    anchor: "bus.Publish(events.Event"
+- id: watcher_subscribes
+  selector:
+    path: internal/inventory/watcher.go
+    anchor: "bus.Subscribe(\"order.created\""
+- id: dispatcher_subscribes
+  selector:
+    path: internal/notification/dispatcher.go
+    anchor: "bus.Subscribe(\"order.created\""
+- id: unrelated_invoice
+  selector:
+    path: internal/billing/invoice.go
+    anchor: "type InvoiceGenerator struct"
+- id: unrelated_shipping
+  selector:
+    path: internal/shipping/tracker.go
+    anchor: "type Tracker struct"
+- id: unrelated_report
+  selector:
+    path: internal/reporting/summary.go
+    anchor: "type SummaryBuilder struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_008_INVOICE_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_008_SHIPPING_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_008_REPORT_C
+oracle:
+  required:
+  - unsubscribe_method
+  - has_subscribers_method
+  - delete_handlers
+  - processor_publishes
+  allowed:
+  - watcher_subscribes
+  - dispatcher_subscribes
+  forbidden:
+  - unrelated_invoice
+  - unrelated_shipping
+  - unrelated_report
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

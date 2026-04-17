@@ -1,0 +1,224 @@
+name: bal3_refactor_004_go_interface_extraction
+tags:
+- lang:go
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    storage/postgres.go: |
+      package storage
+
+      type PostgresRepo struct {
+          DSN string
+      }
+
+      func NewPostgresRepo(dsn string) *PostgresRepo {
+          return &PostgresRepo{DSN: dsn}
+      }
+
+      func (r *PostgresRepo) Save(key string, value []byte) error {
+          return nil
+      }
+
+      func (r *PostgresRepo) Load(key string) ([]byte, error) {
+          return nil, nil
+      }
+
+      func (r *PostgresRepo) Delete(key string) error {
+          return nil
+      }
+    services/profile.go: |
+      package services
+
+      import "storage"
+
+      type ProfileService struct {
+          repo *storage.PostgresRepo
+      }
+
+      func NewProfileService(repo *storage.PostgresRepo) *ProfileService {
+          return &ProfileService{repo: repo}
+      }
+
+      func (s *ProfileService) SaveProfile(userID string, data []byte) error {
+          return s.repo.Save(userID, data)
+      }
+
+      func (s *ProfileService) GetProfile(userID string) ([]byte, error) {
+          return s.repo.Load(userID)
+      }
+    cmd/server/main.go: |
+      package main
+
+      import (
+          "storage"
+          "services"
+      )
+
+      func main() {
+          repo := storage.NewPostgresRepo("postgres://localhost/db")
+          svc := services.NewProfileService(repo)
+          _ = svc
+      }
+    pkg/cron/scheduler.go: |
+      package cron
+
+      GARBAGE_R004_CRON_A = "scheduler"
+
+      type Scheduler struct {
+          Interval int
+      }
+
+      func (s *Scheduler) Start() {}
+    pkg/health/checker.go: |
+      package health
+
+      GARBAGE_R004_HEALTH_B = "checker"
+
+      type Checker struct {
+          Endpoint string
+      }
+    pkg/ratelimit/limiter.go: |
+      package ratelimit
+
+      GARBAGE_R004_LIMIT_C = "limiter"
+
+      type Limiter struct {
+          MaxRPS int
+      }
+  changed_files:
+    storage/repository.go: |
+      package storage
+
+      type Repository interface {
+          Save(key string, value []byte) error
+          Load(key string) ([]byte, error)
+          Delete(key string) error
+      }
+    storage/postgres.go: |
+      package storage
+
+      type PostgresRepo struct {
+          DSN string
+      }
+
+      func NewPostgresRepo(dsn string) *PostgresRepo {
+          return &PostgresRepo{DSN: dsn}
+      }
+
+      func (r *PostgresRepo) Save(key string, value []byte) error {
+          return nil
+      }
+
+      func (r *PostgresRepo) Load(key string) ([]byte, error) {
+          return nil, nil
+      }
+
+      func (r *PostgresRepo) Delete(key string) error {
+          return nil
+      }
+    services/profile.go: |
+      package services
+
+      import "storage"
+
+      type ProfileService struct {
+          repo storage.Repository
+      }
+
+      func NewProfileService(repo storage.Repository) *ProfileService {
+          return &ProfileService{repo: repo}
+      }
+
+      func (s *ProfileService) SaveProfile(userID string, data []byte) error {
+          return s.repo.Save(userID, data)
+      }
+
+      func (s *ProfileService) GetProfile(userID string) ([]byte, error) {
+          return s.repo.Load(userID)
+      }
+    cmd/server/main.go: |
+      package main
+
+      import (
+          "storage"
+          "services"
+      )
+
+      func main() {
+          repo := storage.NewPostgresRepo("postgres://localhost/db")
+          svc := services.NewProfileService(repo)
+          _ = svc
+      }
+    pkg/cron/scheduler.go: |
+      package cron
+
+      GARBAGE_R004_CRON_A = "scheduler"
+
+      type Scheduler struct {
+          Interval int
+      }
+
+      func (s *Scheduler) Start() {}
+    pkg/health/checker.go: |
+      package health
+
+      GARBAGE_R004_HEALTH_B = "checker"
+
+      type Checker struct {
+          Endpoint string
+      }
+    pkg/ratelimit/limiter.go: |
+      package ratelimit
+
+      GARBAGE_R004_LIMIT_C = "limiter"
+
+      type Limiter struct {
+          MaxRPS int
+      }
+  commit_message: "refactor: extract Repository interface from PostgresRepo"
+fragments:
+- id: repository_interface
+  selector:
+    path: storage/repository.go
+    anchor: "type Repository interface"
+- id: service_uses_interface
+  selector:
+    path: services/profile.go
+    anchor: "repo storage.Repository"
+- id: constructor_uses_interface
+  selector:
+    path: services/profile.go
+    anchor: "func NewProfileService(repo storage.Repository)"
+- id: postgres_implements
+  selector:
+    path: storage/postgres.go
+    anchor: "type PostgresRepo struct"
+- id: main_wires
+  selector:
+    path: cmd/server/main.go
+    anchor: "services.NewProfileService(repo)"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R004_CRON_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R004_HEALTH_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R004_LIMIT_C
+oracle:
+  required:
+  - repository_interface
+  - service_uses_interface
+  - constructor_uses_interface
+  - postgres_implements
+  allowed:
+  - main_wires
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

@@ -1,0 +1,146 @@
+name: bal_refactor_002_python_rename_class_across_files
+tags:
+- lang:python
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    models/payment.py: |
+      class PaymentProcessor:
+          def __init__(self, gateway):
+              self.gateway = gateway
+
+          def charge(self, amount, currency):
+              return self.gateway.submit(amount, currency)
+
+          def refund(self, transaction_id):
+              return self.gateway.reverse(transaction_id)
+    handlers/checkout.py: |
+      from models.payment import PaymentProcessor
+
+      def process_checkout(cart, gateway):
+          processor = PaymentProcessor(gateway)
+          total = sum(item.price for item in cart.items)
+          return processor.charge(total, cart.currency)
+    handlers/refund.py: |
+      from models.payment import PaymentProcessor
+
+      def handle_refund(transaction_id, gateway):
+          processor = PaymentProcessor(gateway)
+          return processor.refund(transaction_id)
+    utils/formatting.py: |
+      GARBAGE_REFACTOR_002_FORMAT_MARKER_A = "formatting"
+      GARBAGE_REFACTOR_002_LOCALE_MARKER_B = "en_US"
+
+      def format_currency(amount, currency):
+          return f"{currency} {amount:.2f}"
+    garbage_metrics.py: |
+      GARBAGE_REFACTOR_002_METRICS_MARKER_C = "metrics"
+      GARBAGE_REFACTOR_002_COUNTER_MARKER_D = 0
+
+      class MetricsCollector:
+          GARBAGE_REFACTOR_002_COLLECTOR_E = True
+
+          def record(self, name, value):
+              pass
+  changed_files:
+    models/payment.py: |
+      class BillingService:
+          def __init__(self, gateway):
+              self.gateway = gateway
+
+          def charge(self, amount, currency):
+              return self.gateway.submit(amount, currency)
+
+          def refund(self, transaction_id):
+              return self.gateway.reverse(transaction_id)
+    handlers/checkout.py: |
+      from models.payment import BillingService
+
+      def process_checkout(cart, gateway):
+          billing = BillingService(gateway)
+          total = sum(item.price for item in cart.items)
+          return billing.charge(total, cart.currency)
+    handlers/refund.py: |
+      from models.payment import BillingService
+
+      def handle_refund(transaction_id, gateway):
+          billing = BillingService(gateway)
+          return billing.refund(transaction_id)
+    utils/formatting.py: |
+      GARBAGE_REFACTOR_002_FORMAT_MARKER_A = "formatting"
+      GARBAGE_REFACTOR_002_LOCALE_MARKER_B = "en_US"
+
+      def format_currency(amount, currency):
+          return f"{currency} {amount:.2f}"
+    garbage_metrics.py: |
+      GARBAGE_REFACTOR_002_METRICS_MARKER_C = "metrics"
+      GARBAGE_REFACTOR_002_COUNTER_MARKER_D = 0
+
+      class MetricsCollector:
+          GARBAGE_REFACTOR_002_COLLECTOR_E = True
+
+          def record(self, name, value):
+              pass
+  commit_message: "refactor: rename PaymentProcessor to BillingService"
+fragments:
+- id: renamed_class_def
+  selector:
+    path: models/payment.py
+    anchor: "class BillingService"
+- id: checkout_imports_billing
+  selector:
+    path: handlers/checkout.py
+    anchor: "from models.payment import BillingService"
+- id: checkout_uses_billing
+  selector:
+    path: handlers/checkout.py
+    anchor: "billing = BillingService(gateway)"
+- id: refund_imports_billing
+  selector:
+    path: handlers/refund.py
+    anchor: "from models.payment import BillingService"
+- id: refund_uses_billing
+  selector:
+    path: handlers/refund.py
+    anchor: "billing = BillingService(gateway)"
+- id: no_formatting
+  selector:
+    path: utils/formatting.py
+- id: no_garbage_metrics
+  selector:
+    path: garbage_metrics.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_002_FORMAT_MARKER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_002_LOCALE_MARKER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_002_METRICS_MARKER_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_002_COUNTER_MARKER_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_002_COLLECTOR_E
+oracle:
+  required:
+  - renamed_class_def
+  - checkout_imports_billing
+  - checkout_uses_billing
+  - refund_imports_billing
+  - refund_uses_billing
+  allowed: []
+  forbidden:
+  - no_formatting
+  - no_garbage_metrics
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

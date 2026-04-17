@@ -1,0 +1,237 @@
+name: bal_refactor_010_python_inheritance_to_composition
+tags:
+- lang:python
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    core/base_handler.py: |
+      import logging
+
+      class BaseHandler:
+          def __init__(self):
+              self.logger = logging.getLogger(self.__class__.__name__)
+
+          def log_request(self, method, path):
+              self.logger.info(f"{method} {path}")
+
+          def validate_auth(self, token):
+              if not token:
+                  raise PermissionError("missing token")
+              return True
+
+          def format_response(self, data, status=200):
+              return {"status": status, "data": data}
+    handlers/user_handler.py: |
+      from core.base_handler import BaseHandler
+
+      class UserHandler(BaseHandler):
+          def __init__(self, user_repo):
+              super().__init__()
+              self.user_repo = user_repo
+
+          def get_user(self, request):
+              self.log_request("GET", "/users")
+              self.validate_auth(request.get("token"))
+              user = self.user_repo.find(request["user_id"])
+              return self.format_response(user)
+    handlers/product_handler.py: |
+      from core.base_handler import BaseHandler
+
+      class ProductHandler(BaseHandler):
+          def __init__(self, product_repo):
+              super().__init__()
+              self.product_repo = product_repo
+
+          def list_products(self, request):
+              self.log_request("GET", "/products")
+              self.validate_auth(request.get("token"))
+              products = self.product_repo.all()
+              return self.format_response(products)
+    app/routes.py: |
+      from handlers.user_handler import UserHandler
+      from handlers.product_handler import ProductHandler
+
+      def setup_routes(user_repo, product_repo):
+          user_h = UserHandler(user_repo)
+          product_h = ProductHandler(product_repo)
+          return {
+              "/users": user_h.get_user,
+              "/products": product_h.list_products,
+          }
+    garbage_i18n.py: |
+      GARBAGE_REFACTOR_010_I18N_MARKER_A = "i18n"
+      GARBAGE_REFACTOR_010_LOCALE_MARKER_B = "en"
+
+      class Translator:
+          GARBAGE_REFACTOR_010_TRANS_CLASS_C = True
+
+          def translate(self, key, locale):
+              return key
+    garbage_templates.py: |
+      GARBAGE_REFACTOR_010_TMPL_MARKER_D = "templates"
+      GARBAGE_REFACTOR_010_ENGINE_MARKER_E = "jinja2"
+
+      class TemplateEngine:
+          GARBAGE_REFACTOR_010_ENGINE_CLASS_F = True
+
+          def render(self, name, ctx):
+              return ""
+  changed_files:
+    core/request_logger.py: |
+      import logging
+
+      class RequestLogger:
+          def __init__(self, name):
+              self.logger = logging.getLogger(name)
+
+          def log_request(self, method, path):
+              self.logger.info(f"{method} {path}")
+    core/auth.py: |
+      def validate_auth(token):
+          if not token:
+              raise PermissionError("missing token")
+          return True
+    core/response.py: |
+      def format_response(data, status=200):
+          return {"status": status, "data": data}
+    handlers/user_handler.py: |
+      from core.request_logger import RequestLogger
+      from core.auth import validate_auth
+      from core.response import format_response
+
+      class UserHandler:
+          def __init__(self, user_repo):
+              self.user_repo = user_repo
+              self.logger = RequestLogger("UserHandler")
+
+          def get_user(self, request):
+              self.logger.log_request("GET", "/users")
+              validate_auth(request.get("token"))
+              user = self.user_repo.find(request["user_id"])
+              return format_response(user)
+    handlers/product_handler.py: |
+      from core.request_logger import RequestLogger
+      from core.auth import validate_auth
+      from core.response import format_response
+
+      class ProductHandler:
+          def __init__(self, product_repo):
+              self.product_repo = product_repo
+              self.logger = RequestLogger("ProductHandler")
+
+          def list_products(self, request):
+              self.logger.log_request("GET", "/products")
+              validate_auth(request.get("token"))
+              products = self.product_repo.all()
+              return format_response(products)
+    app/routes.py: |
+      from handlers.user_handler import UserHandler
+      from handlers.product_handler import ProductHandler
+
+      def setup_routes(user_repo, product_repo):
+          user_h = UserHandler(user_repo)
+          product_h = ProductHandler(product_repo)
+          return {
+              "/users": user_h.get_user,
+              "/products": product_h.list_products,
+          }
+    garbage_i18n.py: |
+      GARBAGE_REFACTOR_010_I18N_MARKER_A = "i18n"
+      GARBAGE_REFACTOR_010_LOCALE_MARKER_B = "en"
+
+      class Translator:
+          GARBAGE_REFACTOR_010_TRANS_CLASS_C = True
+
+          def translate(self, key, locale):
+              return key
+    garbage_templates.py: |
+      GARBAGE_REFACTOR_010_TMPL_MARKER_D = "templates"
+      GARBAGE_REFACTOR_010_ENGINE_MARKER_E = "jinja2"
+
+      class TemplateEngine:
+          GARBAGE_REFACTOR_010_ENGINE_CLASS_F = True
+
+          def render(self, name, ctx):
+              return ""
+  commit_message: "refactor: replace BaseHandler inheritance with composition"
+fragments:
+- id: new_request_logger
+  selector:
+    path: core/request_logger.py
+    anchor: "class RequestLogger"
+- id: new_auth_module
+  selector:
+    path: core/auth.py
+    anchor: "def validate_auth(token)"
+- id: new_response_module
+  selector:
+    path: core/response.py
+    anchor: "def format_response(data"
+- id: user_handler_imports
+  selector:
+    path: handlers/user_handler.py
+    anchor: "from core.request_logger import RequestLogger"
+- id: user_handler_composition
+  selector:
+    path: handlers/user_handler.py
+    anchor: "self.logger = RequestLogger"
+- id: product_handler_imports
+  selector:
+    path: handlers/product_handler.py
+    anchor: "from core.request_logger import RequestLogger"
+- id: product_handler_composition
+  selector:
+    path: handlers/product_handler.py
+    anchor: "self.logger = RequestLogger"
+- id: routes_wires_handlers
+  selector:
+    path: app/routes.py
+    anchor: "from handlers.user_handler import UserHandler"
+- id: no_garbage_i18n
+  selector:
+    path: garbage_i18n.py
+- id: no_garbage_templates
+  selector:
+    path: garbage_templates.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_010_I18N_MARKER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_010_LOCALE_MARKER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_010_TRANS_CLASS_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_010_TMPL_MARKER_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_010_ENGINE_MARKER_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_REFACTOR_010_ENGINE_CLASS_F
+oracle:
+  required:
+  - new_request_logger
+  - new_auth_module
+  - new_response_module
+  - user_handler_imports
+  - user_handler_composition
+  - product_handler_imports
+  - product_handler_composition
+  - routes_wires_handlers
+  allowed: []
+  forbidden:
+  - no_garbage_i18n
+  - no_garbage_templates
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

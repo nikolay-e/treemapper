@@ -1,0 +1,137 @@
+name: bal3_refactor_008_rust_rename_module
+tags:
+- lang:rust
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/db/conn.rs: |
+      pub struct Connection {
+          pub url: String,
+      }
+
+      impl Connection {
+          pub fn new(url: &str) -> Self {
+              Self { url: url.to_string() }
+          }
+
+          pub fn execute(&self, query: &str) -> Result<(), String> {
+              Ok(())
+          }
+      }
+    src/db/mod.rs: |
+      pub mod conn;
+    src/handlers/user.rs: |
+      use crate::db::conn::Connection;
+
+      pub fn get_user(conn: &Connection, id: u64) -> String {
+          conn.execute("SELECT * FROM users").unwrap();
+          format!("user_{}", id)
+      }
+    src/handlers/mod.rs: |
+      pub mod user;
+    src/lib.rs: |
+      pub mod db;
+      pub mod handlers;
+    src/logging/sink.rs: |
+      pub const GARBAGE_R008_SINK_A: &str = "sink";
+
+      pub struct LogSink;
+    src/metrics/gauge.rs: |
+      pub const GARBAGE_R008_GAUGE_B: &str = "gauge";
+
+      pub struct Gauge {
+          pub value: f64,
+      }
+    src/tracing/span.rs: |
+      pub const GARBAGE_R008_SPAN_C: &str = "span";
+
+      pub struct Span {
+          pub name: String,
+      }
+  changed_files:
+    src/database/connection.rs: |
+      pub struct Connection {
+          pub url: String,
+      }
+
+      impl Connection {
+          pub fn new(url: &str) -> Self {
+              Self { url: url.to_string() }
+          }
+
+          pub fn execute(&self, query: &str) -> Result<(), String> {
+              Ok(())
+          }
+      }
+    src/database/mod.rs: |
+      pub mod connection;
+    src/handlers/user.rs: |
+      use crate::database::connection::Connection;
+
+      pub fn get_user(conn: &Connection, id: u64) -> String {
+          conn.execute("SELECT * FROM users").unwrap();
+          format!("user_{}", id)
+      }
+    src/handlers/mod.rs: |
+      pub mod user;
+    src/lib.rs: |
+      pub mod database;
+      pub mod handlers;
+    src/logging/sink.rs: |
+      pub const GARBAGE_R008_SINK_A: &str = "sink";
+
+      pub struct LogSink;
+    src/metrics/gauge.rs: |
+      pub const GARBAGE_R008_GAUGE_B: &str = "gauge";
+
+      pub struct Gauge {
+          pub value: f64,
+      }
+    src/tracing/span.rs: |
+      pub const GARBAGE_R008_SPAN_C: &str = "span";
+
+      pub struct Span {
+          pub name: String,
+      }
+  commit_message: "refactor: rename db module to database with clearer file names"
+fragments:
+- id: new_connection_file
+  selector:
+    path: src/database/connection.rs
+    anchor: "pub struct Connection"
+- id: new_mod_rs
+  selector:
+    path: src/database/mod.rs
+    anchor: "pub mod connection"
+- id: handler_updated_import
+  selector:
+    path: src/handlers/user.rs
+    anchor: "use crate::database::connection::Connection"
+- id: lib_updated_mod
+  selector:
+    path: src/lib.rs
+    anchor: "pub mod database"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R008_SINK_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R008_GAUGE_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R008_SPAN_C
+oracle:
+  required:
+  - new_connection_file
+  - new_mod_rs
+  - handler_updated_import
+  - lib_updated_mod
+  allowed: []
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

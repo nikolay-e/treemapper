@@ -1,0 +1,270 @@
+name: bal_refactor_028_java_inheritance_to_composition
+tags:
+- lang:java
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/main/java/com/app/base/AbstractLogger.java: |
+      package com.app.base;
+
+      import java.time.LocalDateTime;
+
+      public abstract class AbstractLogger {
+          protected String formatTimestamp() {
+              return LocalDateTime.now().toString();
+          }
+
+          protected String formatMessage(String level, String msg) {
+              return String.format("[%s] %s: %s", formatTimestamp(), level, msg);
+          }
+
+          public void info(String msg) {
+              write(formatMessage("INFO", msg));
+          }
+
+          public void error(String msg) {
+              write(formatMessage("ERROR", msg));
+          }
+
+          protected abstract void write(String formatted);
+      }
+    src/main/java/com/app/logging/ConsoleLogger.java: |
+      package com.app.logging;
+
+      import com.app.base.AbstractLogger;
+
+      public class ConsoleLogger extends AbstractLogger {
+          @Override
+          protected void write(String formatted) {
+              System.out.println(formatted);
+          }
+      }
+    src/main/java/com/app/logging/FileLogger.java: |
+      package com.app.logging;
+
+      import com.app.base.AbstractLogger;
+
+      public class FileLogger extends AbstractLogger {
+          private final String filePath;
+
+          public FileLogger(String filePath) {
+              this.filePath = filePath;
+          }
+
+          @Override
+          protected void write(String formatted) {
+              System.out.println("Writing to " + filePath + ": " + formatted);
+          }
+      }
+    src/main/java/com/app/service/OrderProcessor.java: |
+      package com.app.service;
+
+      import com.app.base.AbstractLogger;
+
+      public class OrderProcessor {
+          private final AbstractLogger logger;
+
+          public OrderProcessor(AbstractLogger logger) {
+              this.logger = logger;
+          }
+
+          public void process(String orderId) {
+              logger.info("Processing order " + orderId);
+              logger.info("Order " + orderId + " completed");
+          }
+      }
+    src/main/java/com/app/GarbageParser.java: |
+      package com.app;
+
+      public class GarbageParser {
+          public static final String GARBAGE_REFACTOR_028_PARSER_A = "parser";
+          public static final int GARBAGE_REFACTOR_028_DEPTH_B = 10;
+          public static final boolean GARBAGE_REFACTOR_028_STRICT_C = true;
+
+          public Object parse(String input) { return null; }
+      }
+    src/main/java/com/app/GarbageMigration.java: |
+      package com.app;
+
+      public class GarbageMigration {
+          public static final String GARBAGE_REFACTOR_028_MIG_D = "migration";
+          public static final boolean GARBAGE_REFACTOR_028_DRY_E = false;
+
+          public void migrate() {}
+      }
+  changed_files:
+    src/main/java/com/app/logging/LogWriter.java: |
+      package com.app.logging;
+
+      public interface LogWriter {
+          void write(String formatted);
+      }
+    src/main/java/com/app/logging/LogFormatter.java: |
+      package com.app.logging;
+
+      import java.time.LocalDateTime;
+
+      public class LogFormatter {
+          public String format(String level, String msg) {
+              String timestamp = LocalDateTime.now().toString();
+              return String.format("[%s] %s: %s", timestamp, level, msg);
+          }
+      }
+    src/main/java/com/app/logging/Logger.java: |
+      package com.app.logging;
+
+      public class Logger {
+          private final LogFormatter formatter;
+          private final LogWriter writer;
+
+          public Logger(LogFormatter formatter, LogWriter writer) {
+              this.formatter = formatter;
+              this.writer = writer;
+          }
+
+          public void info(String msg) {
+              writer.write(formatter.format("INFO", msg));
+          }
+
+          public void error(String msg) {
+              writer.write(formatter.format("ERROR", msg));
+          }
+      }
+    src/main/java/com/app/logging/ConsoleLogger.java: |
+      package com.app.logging;
+
+      public class ConsoleLogger implements LogWriter {
+          @Override
+          public void write(String formatted) {
+              System.out.println(formatted);
+          }
+      }
+    src/main/java/com/app/logging/FileLogger.java: |
+      package com.app.logging;
+
+      public class FileLogger implements LogWriter {
+          private final String filePath;
+
+          public FileLogger(String filePath) {
+              this.filePath = filePath;
+          }
+
+          @Override
+          public void write(String formatted) {
+              System.out.println("Writing to " + filePath + ": " + formatted);
+          }
+      }
+    src/main/java/com/app/service/OrderProcessor.java: |
+      package com.app.service;
+
+      import com.app.logging.Logger;
+
+      public class OrderProcessor {
+          private final Logger logger;
+
+          public OrderProcessor(Logger logger) {
+              this.logger = logger;
+          }
+
+          public void process(String orderId) {
+              logger.info("Processing order " + orderId);
+              logger.info("Order " + orderId + " completed");
+          }
+      }
+    src/main/java/com/app/GarbageParser.java: |
+      package com.app;
+
+      public class GarbageParser {
+          public static final String GARBAGE_REFACTOR_028_PARSER_A = "parser";
+          public static final int GARBAGE_REFACTOR_028_DEPTH_B = 10;
+          public static final boolean GARBAGE_REFACTOR_028_STRICT_C = true;
+
+          public Object parse(String input) { return null; }
+      }
+    src/main/java/com/app/GarbageMigration.java: |
+      package com.app;
+
+      public class GarbageMigration {
+          public static final String GARBAGE_REFACTOR_028_MIG_D = "migration";
+          public static final boolean GARBAGE_REFACTOR_028_DRY_E = false;
+
+          public void migrate() {}
+      }
+  commit_message: "refactor: replace AbstractLogger inheritance with composition"
+fragments:
+- id: new_log_writer_interface
+  selector:
+    path: src/main/java/com/app/logging/LogWriter.java
+    anchor: "public interface LogWriter"
+- id: new_log_formatter
+  selector:
+    path: src/main/java/com/app/logging/LogFormatter.java
+    anchor: "public class LogFormatter"
+- id: new_logger_composition
+  selector:
+    path: src/main/java/com/app/logging/Logger.java
+    anchor: "public class Logger"
+- id: logger_uses_writer
+  selector:
+    path: src/main/java/com/app/logging/Logger.java
+    anchor: "private final LogWriter writer"
+- id: console_implements_writer
+  selector:
+    path: src/main/java/com/app/logging/ConsoleLogger.java
+    anchor: "implements LogWriter"
+- id: file_implements_writer
+  selector:
+    path: src/main/java/com/app/logging/FileLogger.java
+    anchor: "implements LogWriter"
+- id: processor_imports_logger
+  selector:
+    path: src/main/java/com/app/service/OrderProcessor.java
+    anchor: "import com.app.logging.Logger"
+- id: processor_uses_logger
+  selector:
+    path: src/main/java/com/app/service/OrderProcessor.java
+    anchor: "private final Logger logger"
+- id: no_garbage_parser
+  selector:
+    path: src/main/java/com/app/GarbageParser.java
+- id: no_garbage_migration
+  selector:
+    path: src/main/java/com/app/GarbageMigration.java
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_028_PARSER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_028_DEPTH_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_028_STRICT_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_028_MIG_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_028_DRY_E
+oracle:
+  required:
+  - new_log_writer_interface
+  - new_log_formatter
+  - new_logger_composition
+  - logger_uses_writer
+  - console_implements_writer
+  - file_implements_writer
+  - processor_imports_logger
+  - processor_uses_logger
+  allowed: []
+  forbidden:
+  - no_garbage_parser
+  - no_garbage_migration
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

@@ -1,0 +1,196 @@
+name: bal3_1hop_016_ruby_user_model
+tags:
+- lang:ruby
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    lib/models/user.rb: |
+      module Models
+        class User
+          attr_reader :id, :email, :name
+
+          def initialize(id:, email:, name:)
+            @id = id
+            @email = email
+            @name = name
+          end
+
+          def display_name
+            name.strip
+          end
+        end
+      end
+    lib/services/user_service.rb: |
+      require_relative '../models/user'
+
+      module Services
+        class UserService
+          def initialize
+            @users = {}
+          end
+
+          def create(id:, email:, name:)
+            user = Models::User.new(id: id, email: email, name: name)
+            @users[id] = user
+            user
+          end
+
+          def find(id)
+            @users[id]
+          end
+        end
+      end
+    lib/services/auth_service.rb: |
+      require_relative '../models/user'
+
+      module Services
+        class AuthService
+          def initialize(user_service)
+            @user_service = user_service
+          end
+
+          def authenticate(id)
+            user = @user_service.find(id)
+            return nil unless user
+            user
+          end
+        end
+      end
+    lib/services/notification_service.rb: |
+      require_relative '../models/user'
+
+      module Services
+        class NotificationService
+          def notify(user)
+            "Notifying #{user.display_name} at #{user.email}"
+          end
+        end
+      end
+    lib/utils/string_helpers.rb: |
+      GARBAGE_016_STRING_A = "string_helpers"
+
+      module Utils
+        module StringHelpers
+          def self.truncate(str, length)
+            str[0...length]
+          end
+        end
+      end
+    lib/utils/date_helpers.rb: |
+      GARBAGE_016_DATE_B = "date_helpers"
+
+      module Utils
+        module DateHelpers
+          def self.format(date)
+            date.strftime("%Y-%m-%d")
+          end
+        end
+      end
+    lib/utils/number_helpers.rb: |
+      GARBAGE_016_NUMBER_C = "number_helpers"
+
+      module Utils
+        module NumberHelpers
+          def self.format_currency(amount)
+            "$#{amount}"
+          end
+        end
+      end
+  changed_files:
+    lib/models/user.rb: |
+      module Models
+        class User
+          attr_reader :id, :email, :name, :role, :active
+
+          def initialize(id:, email:, name:, role: 'member', active: true)
+            @id = id
+            @email = email
+            @name = name
+            @role = role
+            @active = active
+          end
+
+          def display_name
+            name.strip
+          end
+
+          def admin?
+            role == 'admin'
+          end
+
+          def deactivate!
+            @active = false
+          end
+        end
+      end
+  commit_message: "feat: add role, active status, admin? and deactivate! to User"
+fragments:
+- id: role_attr
+  selector:
+    path: lib/models/user.rb
+    anchor: "role, :active"
+- id: role_param
+  selector:
+    path: lib/models/user.rb
+    anchor: "role: 'member'"
+- id: admin_method
+  selector:
+    path: lib/models/user.rb
+    anchor: "def admin?"
+- id: deactivate_method
+  selector:
+    path: lib/models/user.rb
+    anchor: "def deactivate!"
+- id: user_service_creates_user
+  selector:
+    path: lib/services/user_service.rb
+    anchor: "Models::User.new(id: id, email: email, name: name)"
+- id: auth_uses_user
+  selector:
+    path: lib/services/auth_service.rb
+    anchor: "user = @user_service.find(id)"
+- id: notification_uses_user
+  selector:
+    path: lib/services/notification_service.rb
+    anchor: "user.display_name"
+- id: unrelated_string
+  selector:
+    path: lib/utils/string_helpers.rb
+    anchor: "module StringHelpers"
+- id: unrelated_date
+  selector:
+    path: lib/utils/date_helpers.rb
+    anchor: "module DateHelpers"
+- id: unrelated_number
+  selector:
+    path: lib/utils/number_helpers.rb
+    anchor: "module NumberHelpers"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_016_STRING_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_016_DATE_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_016_NUMBER_C
+oracle:
+  required:
+  - role_attr
+  - role_param
+  - admin_method
+  - user_service_creates_user
+  allowed:
+  - deactivate_method
+  - auth_uses_user
+  - notification_uses_user
+  forbidden:
+  - unrelated_string
+  - unrelated_date
+  - unrelated_number
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

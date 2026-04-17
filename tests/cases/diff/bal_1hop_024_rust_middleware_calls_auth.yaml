@@ -1,0 +1,197 @@
+name: bal_1hop_024_rust_middleware_calls_auth
+tags:
+- lang:rust
+- change:signature
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/auth/jwt.rs: |
+      pub struct Claims {
+          pub sub: String,
+          pub exp: u64,
+      }
+
+      pub fn decode_token(token: &str) -> Result<Claims, String> {
+          if token.is_empty() {
+              return Err("empty token".to_string());
+          }
+          Ok(Claims {
+              sub: "user123".to_string(),
+              exp: 9999999999,
+          })
+      }
+
+      pub fn encode_token(claims: &Claims) -> String {
+          format!("token.{}.{}", claims.sub, claims.exp)
+      }
+    src/auth/permissions.rs: |
+      pub enum Permission {
+          Read,
+          Write,
+          Admin,
+      }
+
+      pub fn check_permission(role: &str, perm: &Permission) -> bool {
+          match (role, perm) {
+              ("admin", _) => true,
+              ("editor", Permission::Read | Permission::Write) => true,
+              ("viewer", Permission::Read) => true,
+              _ => false,
+          }
+      }
+    src/middleware/auth_guard.rs: |
+      use crate::auth::jwt::{decode_token, Claims};
+
+      pub fn authenticate_request(auth_header: &str) -> Result<Claims, String> {
+          let token = auth_header.strip_prefix("Bearer ")
+              .ok_or_else(|| "missing Bearer prefix".to_string())?;
+          decode_token(token)
+      }
+    src/middleware/logging.rs: |
+      use std::time::Instant;
+
+      pub fn log_request(method: &str, path: &str) {
+          let start = Instant::now();
+          println!("{} {} started at {:?}", method, path, start);
+      }
+    src/handler/profile.rs: |
+      pub fn get_profile(user_id: &str) -> String {
+          format!("Profile for user {}", user_id)
+      }
+
+      pub fn update_profile(user_id: &str, name: &str) -> String {
+          format!("Updated {} name to {}", user_id, name)
+      }
+    src/storage/files.rs: |
+      use std::path::PathBuf;
+
+      pub struct FileStore {
+          base_dir: PathBuf,
+      }
+
+      impl FileStore {
+          pub fn new(dir: &str) -> Self {
+              FileStore { base_dir: PathBuf::from(dir) }
+          }
+
+          pub fn read(&self, name: &str) -> Result<Vec<u8>, String> {
+              Err("not implemented".to_string())
+          }
+      }
+    src/crypto/hash.rs: |
+      pub fn sha256(input: &[u8]) -> String {
+          format!("sha256:{:x}", input.len())
+      }
+
+      pub fn verify_hash(input: &[u8], expected: &str) -> bool {
+          sha256(input) == expected
+      }
+  changed_files:
+    src/auth/jwt.rs: |
+      use std::time::{SystemTime, UNIX_EPOCH};
+
+      pub struct Claims {
+          pub sub: String,
+          pub exp: u64,
+          pub roles: Vec<String>,
+          pub issuer: String,
+      }
+
+      pub fn decode_token(token: &str, expected_issuer: &str) -> Result<Claims, String> {
+          if token.is_empty() {
+              return Err("empty token".to_string());
+          }
+          let claims = Claims {
+              sub: "user123".to_string(),
+              exp: 9999999999,
+              roles: vec!["viewer".to_string()],
+              issuer: expected_issuer.to_string(),
+          };
+          let now = SystemTime::now()
+              .duration_since(UNIX_EPOCH)
+              .unwrap()
+              .as_secs();
+          if claims.exp < now {
+              return Err("token expired".to_string());
+          }
+          if claims.issuer != expected_issuer {
+              return Err("invalid issuer".to_string());
+          }
+          Ok(claims)
+      }
+
+      pub fn encode_token(claims: &Claims) -> String {
+          format!("token.{}.{}.{}", claims.sub, claims.exp, claims.issuer)
+      }
+    src/auth/permissions.rs: |
+      pub enum Permission {
+          Read,
+          Write,
+          Admin,
+      }
+
+      pub fn check_permission(role: &str, perm: &Permission) -> bool {
+          match (role, perm) {
+              ("admin", _) => true,
+              ("editor", Permission::Read | Permission::Write) => true,
+              ("viewer", Permission::Read) => true,
+              _ => false,
+          }
+      }
+
+      pub fn check_roles(roles: &[String], required: &str) -> bool {
+          roles.iter().any(|r| r == required || r == "admin")
+      }
+  commit_message: "feat: add roles, issuer validation and expiry check to JWT"
+fragments:
+- id: claims_roles_field
+  selector:
+    path: src/auth/jwt.rs
+    anchor: "pub roles: Vec<String>"
+- id: decode_issuer_param
+  selector:
+    path: src/auth/jwt.rs
+    anchor: "pub fn decode_token(token: &str, expected_issuer: &str)"
+- id: expiry_check
+  selector:
+    path: src/auth/jwt.rs
+    anchor: "token expired"
+- id: check_roles_fn
+  selector:
+    path: src/auth/permissions.rs
+    anchor: "pub fn check_roles"
+- id: middleware_calls_decode
+  selector:
+    path: src/middleware/auth_guard.rs
+    anchor: "decode_token(token)"
+- id: unrelated_logging
+  selector:
+    path: src/middleware/logging.rs
+    anchor: "pub fn log_request"
+- id: unrelated_profile
+  selector:
+    path: src/handler/profile.rs
+    anchor: "pub fn get_profile"
+- id: unrelated_filestore
+  selector:
+    path: src/storage/files.rs
+    anchor: "pub struct FileStore"
+- id: unrelated_crypto
+  selector:
+    path: src/crypto/hash.rs
+    anchor: "pub fn sha256"
+oracle:
+  required:
+  - claims_roles_field
+  - decode_issuer_param
+  - middleware_calls_decode
+  allowed:
+  - expiry_check
+  - check_roles_fn
+  forbidden:
+  - unrelated_logging
+  - unrelated_profile
+  - unrelated_filestore
+  - unrelated_crypto

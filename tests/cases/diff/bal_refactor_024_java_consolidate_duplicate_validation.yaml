@@ -1,0 +1,205 @@
+name: bal_refactor_024_java_consolidate_duplicate_validation
+tags:
+- lang:java
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/main/java/com/app/api/UserEndpoint.java: |
+      package com.app.api;
+
+      public class UserEndpoint {
+          public String createUser(String email, String name) {
+              if (email == null || !email.contains("@") || email.length() > 255) {
+                  throw new IllegalArgumentException("invalid email");
+              }
+              if (name == null || name.trim().isEmpty() || name.length() > 100) {
+                  throw new IllegalArgumentException("invalid name");
+              }
+              return "created:" + email;
+          }
+      }
+    src/main/java/com/app/api/ContactEndpoint.java: |
+      package com.app.api;
+
+      public class ContactEndpoint {
+          public String submitContact(String email, String message) {
+              if (email == null || !email.contains("@") || email.length() > 255) {
+                  throw new IllegalArgumentException("invalid email");
+              }
+              if (message == null || message.trim().isEmpty()) {
+                  throw new IllegalArgumentException("empty message");
+              }
+              return "submitted:" + email;
+          }
+      }
+    src/main/java/com/app/api/NewsletterEndpoint.java: |
+      package com.app.api;
+
+      public class NewsletterEndpoint {
+          public String subscribe(String email) {
+              if (email == null || !email.contains("@") || email.length() > 255) {
+                  throw new IllegalArgumentException("invalid email");
+              }
+              return "subscribed:" + email;
+          }
+      }
+    src/main/java/com/app/GarbageExport.java: |
+      package com.app;
+
+      public class GarbageExport {
+          public static final String GARBAGE_REFACTOR_024_EXPORT_A = "export";
+          public static final int GARBAGE_REFACTOR_024_LIMIT_B = 5000;
+          public static final boolean GARBAGE_REFACTOR_024_CSV_C = true;
+
+          public byte[] export() { return new byte[0]; }
+      }
+    src/main/java/com/app/GarbageHealthCheck.java: |
+      package com.app;
+
+      public class GarbageHealthCheck {
+          public static final String GARBAGE_REFACTOR_024_HEALTH_D = "health";
+          public static final boolean GARBAGE_REFACTOR_024_DEEP_E = false;
+
+          public boolean check() { return true; }
+      }
+  changed_files:
+    src/main/java/com/app/validation/InputValidator.java: |
+      package com.app.validation;
+
+      public class InputValidator {
+          public static void requireValidEmail(String email) {
+              if (email == null || !email.contains("@") || email.length() > 255) {
+                  throw new IllegalArgumentException("invalid email");
+              }
+          }
+
+          public static void requireNonEmpty(String value, String fieldName) {
+              if (value == null || value.trim().isEmpty()) {
+                  throw new IllegalArgumentException("empty " + fieldName);
+              }
+          }
+
+          public static void requireMaxLength(String value, int max, String fieldName) {
+              if (value != null && value.length() > max) {
+                  throw new IllegalArgumentException(fieldName + " too long");
+              }
+          }
+      }
+    src/main/java/com/app/api/UserEndpoint.java: |
+      package com.app.api;
+
+      import com.app.validation.InputValidator;
+
+      public class UserEndpoint {
+          public String createUser(String email, String name) {
+              InputValidator.requireValidEmail(email);
+              InputValidator.requireNonEmpty(name, "name");
+              InputValidator.requireMaxLength(name, 100, "name");
+              return "created:" + email;
+          }
+      }
+    src/main/java/com/app/api/ContactEndpoint.java: |
+      package com.app.api;
+
+      import com.app.validation.InputValidator;
+
+      public class ContactEndpoint {
+          public String submitContact(String email, String message) {
+              InputValidator.requireValidEmail(email);
+              InputValidator.requireNonEmpty(message, "message");
+              return "submitted:" + email;
+          }
+      }
+    src/main/java/com/app/api/NewsletterEndpoint.java: |
+      package com.app.api;
+
+      import com.app.validation.InputValidator;
+
+      public class NewsletterEndpoint {
+          public String subscribe(String email) {
+              InputValidator.requireValidEmail(email);
+              return "subscribed:" + email;
+          }
+      }
+    src/main/java/com/app/GarbageExport.java: |
+      package com.app;
+
+      public class GarbageExport {
+          public static final String GARBAGE_REFACTOR_024_EXPORT_A = "export";
+          public static final int GARBAGE_REFACTOR_024_LIMIT_B = 5000;
+          public static final boolean GARBAGE_REFACTOR_024_CSV_C = true;
+
+          public byte[] export() { return new byte[0]; }
+      }
+    src/main/java/com/app/GarbageHealthCheck.java: |
+      package com.app;
+
+      public class GarbageHealthCheck {
+          public static final String GARBAGE_REFACTOR_024_HEALTH_D = "health";
+          public static final boolean GARBAGE_REFACTOR_024_DEEP_E = false;
+
+          public boolean check() { return true; }
+      }
+  commit_message: "refactor: consolidate duplicate email validation into InputValidator"
+fragments:
+- id: new_validator
+  selector:
+    path: src/main/java/com/app/validation/InputValidator.java
+    anchor: "public class InputValidator"
+- id: validator_email_method
+  selector:
+    path: src/main/java/com/app/validation/InputValidator.java
+    anchor: "requireValidEmail"
+- id: user_imports_validator
+  selector:
+    path: src/main/java/com/app/api/UserEndpoint.java
+    anchor: "import com.app.validation.InputValidator"
+- id: contact_imports_validator
+  selector:
+    path: src/main/java/com/app/api/ContactEndpoint.java
+    anchor: "import com.app.validation.InputValidator"
+- id: newsletter_imports_validator
+  selector:
+    path: src/main/java/com/app/api/NewsletterEndpoint.java
+    anchor: "import com.app.validation.InputValidator"
+- id: no_garbage_export
+  selector:
+    path: src/main/java/com/app/GarbageExport.java
+- id: no_garbage_health
+  selector:
+    path: src/main/java/com/app/GarbageHealthCheck.java
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_024_EXPORT_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_024_LIMIT_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_024_CSV_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_024_HEALTH_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_024_DEEP_E
+oracle:
+  required:
+  - new_validator
+  - validator_email_method
+  - user_imports_validator
+  - contact_imports_validator
+  - newsletter_imports_validator
+  allowed: []
+  forbidden:
+  - no_garbage_export
+  - no_garbage_health
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

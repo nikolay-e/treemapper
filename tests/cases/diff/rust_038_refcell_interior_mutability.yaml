@@ -1,4 +1,12 @@
 name: rust_038_refcell_interior_mutability
+tags:
+- lang:rust
+- change:single_file
+- change:new_function
+- change:signature
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     src/lib.rs: |

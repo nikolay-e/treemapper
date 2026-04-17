@@ -1,0 +1,206 @@
+name: bal_rare_017_nim_http_server
+tags:
+- lang:nim
+- change:multi_file
+- change:new_function
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/router.nim: |
+      import tables
+
+      type
+        Handler* = proc(path: string): string
+        Router* = object
+          routes: Table[string, Handler]
+
+      proc newRouter*(): Router =
+        Router(routes: initTable[string, Handler]())
+
+      proc addRoute*(r: var Router, path: string, handler: Handler) =
+        r.routes[path] = handler
+
+      proc dispatch*(r: Router, path: string): string =
+        if r.routes.hasKey(path):
+          return r.routes[path](path)
+        return "404 Not Found"
+    src/server.nim: |
+      import router
+
+      type
+        Server* = object
+          router: Router
+          port: int
+
+      proc newServer*(port: int): Server =
+        Server(router: newRouter(), port: port)
+
+      proc route*(s: var Server, path: string, handler: Handler) =
+        s.router.addRoute(path, handler)
+
+      proc handle*(s: Server, path: string): string =
+        s.router.dispatch(path)
+    src/app.nim: |
+      import server
+
+      proc main() =
+        var s = newServer(8080)
+        s.route("/", proc(p: string): string = "Hello World")
+        s.route("/health", proc(p: string): string = "OK")
+        echo s.handle("/")
+
+      main()
+    garbage_validator.nim: |
+      const GARBAGE_RARE_017_MAXLEN_A = 255
+      const GARBAGE_RARE_017_MINLEN_B = 1
+
+      proc garbage_validate*() =
+        discard GARBAGE_RARE_017_MAXLEN_A
+
+      const GARBAGE_RARE_017_PATTERN_C = "^[a-z]+$"
+    garbage_cache.nim: |
+      const GARBAGE_RARE_017_SIZE_D = 1024
+      const GARBAGE_RARE_017_POLICY_E = "lru"
+
+      proc garbage_cache_get*() =
+        discard GARBAGE_RARE_017_SIZE_D
+
+      const GARBAGE_RARE_017_SHARD_F = 4
+  changed_files:
+    src/router.nim: |
+      import tables
+
+      type
+        Handler* = proc(path: string): string
+        MiddlewareProc* = proc(path: string, next: Handler): string
+        Router* = object
+          routes: Table[string, Handler]
+          middlewares: seq[MiddlewareProc]
+
+      proc newRouter*(): Router =
+        Router(routes: initTable[string, Handler](), middlewares: @[])
+
+      proc addRoute*(r: var Router, path: string, handler: Handler) =
+        r.routes[path] = handler
+
+      proc use*(r: var Router, mw: MiddlewareProc) =
+        r.middlewares.add(mw)
+
+      proc dispatch*(r: Router, path: string): string =
+        if not r.routes.hasKey(path):
+          return "404 Not Found"
+        var handler = r.routes[path]
+        for i in countdown(r.middlewares.len - 1, 0):
+          let mw = r.middlewares[i]
+          let prevHandler = handler
+          handler = proc(p: string): string = mw(p, prevHandler)
+        return handler(path)
+    src/server.nim: |
+      import router
+
+      type
+        Server* = object
+          router: Router
+          port: int
+
+      proc newServer*(port: int): Server =
+        Server(router: newRouter(), port: port)
+
+      proc route*(s: var Server, path: string, handler: Handler) =
+        s.router.addRoute(path, handler)
+
+      proc middleware*(s: var Server, mw: MiddlewareProc) =
+        s.router.use(mw)
+
+      proc handle*(s: Server, path: string): string =
+        s.router.dispatch(path)
+    src/app.nim: |
+      import server
+
+      proc main() =
+        var s = newServer(8080)
+        s.route("/", proc(p: string): string = "Hello World")
+        s.route("/health", proc(p: string): string = "OK")
+        echo s.handle("/")
+
+      main()
+    garbage_validator.nim: |
+      const GARBAGE_RARE_017_MAXLEN_A = 255
+      const GARBAGE_RARE_017_MINLEN_B = 1
+
+      proc garbage_validate*() =
+        discard GARBAGE_RARE_017_MAXLEN_A
+
+      const GARBAGE_RARE_017_PATTERN_C = "^[a-z]+$"
+    garbage_cache.nim: |
+      const GARBAGE_RARE_017_SIZE_D = 1024
+      const GARBAGE_RARE_017_POLICY_E = "lru"
+
+      proc garbage_cache_get*() =
+        discard GARBAGE_RARE_017_SIZE_D
+
+      const GARBAGE_RARE_017_SHARD_F = 4
+  commit_message: "feat: add middleware chain support to router"
+fragments:
+- id: middleware_type
+  selector:
+    path: src/router.nim
+    anchor: "MiddlewareProc* = proc"
+- id: router_use
+  selector:
+    path: src/router.nim
+    anchor: "proc use*(r: var Router, mw: MiddlewareProc)"
+- id: dispatch_chain
+  selector:
+    path: src/router.nim
+    anchor: "for i in countdown"
+- id: server_middleware
+  selector:
+    path: src/server.nim
+    anchor: "proc middleware*(s: var Server, mw: MiddlewareProc)"
+- id: no_app
+  selector:
+    path: src/app.nim
+- id: no_garbage_validator
+  selector:
+    path: garbage_validator.nim
+- id: no_garbage_cache
+  selector:
+    path: garbage_cache.nim
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_017_MAXLEN_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_017_MINLEN_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_017_PATTERN_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_017_SIZE_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_017_POLICY_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_017_SHARD_F
+oracle:
+  required:
+  - middleware_type
+  - router_use
+  - dispatch_chain
+  - server_middleware
+  allowed: []
+  forbidden:
+  - no_app
+  - no_garbage_validator
+  - no_garbage_cache
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

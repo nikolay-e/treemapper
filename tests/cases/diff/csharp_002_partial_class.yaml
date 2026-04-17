@@ -1,4 +1,11 @@
 name: csharp_002_partial_class
+tags:
+- lang:csharp
+- change:single_file
+- change:signature
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     Models/User.cs: |

@@ -1,0 +1,153 @@
+name: bal3_rare_011_elixir_pipeline_transform
+tags:
+- lang:elixir
+- change:single_file
+- change:bug_fix
+- context:call_graph
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    lib/transform.ex: |
+      defmodule Transform do
+        def normalize(text) do
+          text
+          |> String.trim()
+          |> String.downcase()
+        end
+
+        def tokenize(text) do
+          text
+          |> normalize()
+          |> String.split(~r/\s+/)
+        end
+
+        def word_count(text) do
+          text
+          |> tokenize()
+          |> length()
+        end
+      end
+    lib/analyzer.ex: |
+      defmodule Analyzer do
+        def analyze(text) do
+          tokens = Transform.tokenize(text)
+          count = Transform.word_count(text)
+          %{tokens: tokens, count: count}
+        end
+
+        def summary(text) do
+          normalized = Transform.normalize(text)
+          "Normalized: #{normalized} (#{Transform.word_count(text)} words)"
+        end
+      end
+    lib/exporter.ex: |
+      defmodule Exporter do
+        @garbage_rare_011_export_a "csv"
+        @garbage_rare_011_delim_b ","
+
+        def to_csv(data), do: Enum.join(data, ",")
+      end
+    lib/importer.ex: |
+      defmodule Importer do
+        @garbage_rare_011_import_c "json"
+        @garbage_rare_011_strict_d true
+
+        def from_json(json), do: json
+      end
+    lib/formatter.ex: |
+      defmodule Formatter do
+        @garbage_rare_011_fmt_e "html"
+        @garbage_rare_011_escape_f true
+
+        def to_html(text), do: "<p>#{text}</p>"
+      end
+  changed_files:
+    lib/transform.ex: |
+      defmodule Transform do
+        def normalize(text) do
+          text
+          |> String.trim()
+          |> String.downcase()
+          |> String.replace(~r/[^\w\s]/, "")
+        end
+
+        def tokenize(text) do
+          text
+          |> normalize()
+          |> String.split(~r/\s+/)
+          |> Enum.reject(&(&1 == ""))
+        end
+
+        def word_count(text) do
+          text
+          |> tokenize()
+          |> length()
+        end
+
+        def unique_words(text) do
+          text
+          |> tokenize()
+          |> Enum.uniq()
+        end
+      end
+  commit_message: "strip punctuation, filter empties, add unique_words"
+fragments:
+- id: analyzer_uses_tokenize
+  selector:
+    path: lib/analyzer.ex
+    anchor: "Transform.tokenize(text)"
+- id: analyzer_uses_normalize
+  selector:
+    path: lib/analyzer.ex
+    anchor: "Transform.normalize(text)"
+- id: analyzer_uses_word_count
+  selector:
+    path: lib/analyzer.ex
+    anchor: "Transform.word_count(text)"
+- id: no_exporter
+  selector:
+    path: lib/exporter.ex
+    anchor: "to_csv"
+- id: no_importer
+  selector:
+    path: lib/importer.ex
+    anchor: "from_json"
+- id: no_formatter
+  selector:
+    path: lib/formatter.ex
+    anchor: "to_html"
+- id: no_global_0
+  selector:
+    anchor: garbage_rare_011_export_a
+- id: no_global_1
+  selector:
+    anchor: garbage_rare_011_delim_b
+- id: no_global_2
+  selector:
+    anchor: garbage_rare_011_import_c
+- id: no_global_3
+  selector:
+    anchor: garbage_rare_011_strict_d
+- id: no_global_4
+  selector:
+    anchor: garbage_rare_011_fmt_e
+- id: no_global_5
+  selector:
+    anchor: garbage_rare_011_escape_f
+oracle:
+  required:
+  - analyzer_uses_tokenize
+  - analyzer_uses_normalize
+  - analyzer_uses_word_count
+  allowed: []
+  forbidden:
+  - no_exporter
+  - no_importer
+  - no_formatter
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

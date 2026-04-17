@@ -1,0 +1,118 @@
+name: bal_1hop_021_rust_cli_calls_config
+tags:
+- lang:rust
+- change:signature
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/config/loader.rs: |
+      use std::collections::HashMap;
+
+      pub struct Config {
+          pub values: HashMap<String, String>,
+      }
+
+      impl Config {
+          pub fn from_env() -> Self {
+              Config {
+                  values: HashMap::new(),
+              }
+          }
+
+          pub fn get(&self, key: &str) -> Option<&String> {
+              self.values.get(key)
+          }
+      }
+    src/cli/run.rs: |
+      use crate::config::loader::Config;
+
+      pub fn execute() {
+          let cfg = Config::from_env();
+          if let Some(port) = cfg.get("PORT") {
+              println!("Starting on port {}", port);
+          } else {
+              println!("Starting on default port 3000");
+          }
+      }
+    src/logging/setup.rs: |
+      pub enum LogLevel {
+          Debug,
+          Info,
+          Warn,
+          Error,
+      }
+
+      pub fn init_logger(level: LogLevel) {
+          match level {
+              LogLevel::Debug => println!("Logger: debug"),
+              LogLevel::Info => println!("Logger: info"),
+              LogLevel::Warn => println!("Logger: warn"),
+              LogLevel::Error => println!("Logger: error"),
+          }
+      }
+  changed_files:
+    src/config/loader.rs: |
+      use std::collections::HashMap;
+      use std::path::Path;
+      use std::fs;
+
+      pub struct Config {
+          pub values: HashMap<String, String>,
+          pub source: String,
+      }
+
+      impl Config {
+          pub fn from_env() -> Self {
+              Config {
+                  values: HashMap::new(),
+                  source: "env".to_string(),
+              }
+          }
+
+          pub fn from_file(path: &Path) -> Result<Self, String> {
+              let content = fs::read_to_string(path)
+                  .map_err(|e| format!("failed to read config: {}", e))?;
+              let mut values = HashMap::new();
+              for line in content.lines() {
+                  if let Some((key, val)) = line.split_once('=') {
+                      values.insert(key.trim().to_string(), val.trim().to_string());
+                  }
+              }
+              Ok(Config {
+                  values,
+                  source: path.display().to_string(),
+              })
+          }
+
+          pub fn get(&self, key: &str) -> Option<&String> {
+              self.values.get(key)
+          }
+      }
+  commit_message: "feat: add from_file config loading with source tracking"
+fragments:
+- id: from_file_method
+  selector:
+    path: src/config/loader.rs
+    anchor: "pub fn from_file(path: &Path)"
+- id: source_field
+  selector:
+    path: src/config/loader.rs
+    anchor: "pub source: String"
+- id: cli_calls_from_env
+  selector:
+    path: src/cli/run.rs
+    anchor: "Config::from_env()"
+- id: unrelated_logging
+  selector:
+    path: src/logging/setup.rs
+    anchor: "pub fn init_logger"
+oracle:
+  required:
+  - from_file_method
+  - cli_calls_from_env
+  allowed:
+  - source_field
+  forbidden:
+  - unrelated_logging

@@ -1,0 +1,234 @@
+name: bal_refactor_022_java_rename_class_across_files
+tags:
+- lang:java
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/main/java/com/app/data/DataManager.java: |
+      package com.app.data;
+
+      import java.util.HashMap;
+      import java.util.Map;
+
+      public class DataManager {
+          private final Map<String, Object> cache = new HashMap<>();
+
+          public void put(String key, Object value) {
+              cache.put(key, value);
+          }
+
+          public Object get(String key) {
+              return cache.get(key);
+          }
+
+          public boolean contains(String key) {
+              return cache.containsKey(key);
+          }
+      }
+    src/main/java/com/app/service/ProductService.java: |
+      package com.app.service;
+
+      import com.app.data.DataManager;
+
+      public class ProductService {
+          private final DataManager dataManager;
+
+          public ProductService(DataManager dataManager) {
+              this.dataManager = dataManager;
+          }
+
+          public void cacheProduct(String id, Object product) {
+              dataManager.put("product:" + id, product);
+          }
+
+          public Object getProduct(String id) {
+              return dataManager.get("product:" + id);
+          }
+      }
+    src/main/java/com/app/service/SessionService.java: |
+      package com.app.service;
+
+      import com.app.data.DataManager;
+
+      public class SessionService {
+          private final DataManager dataManager;
+
+          public SessionService(DataManager dataManager) {
+              this.dataManager = dataManager;
+          }
+
+          public void storeSession(String sessionId, Object data) {
+              dataManager.put("session:" + sessionId, data);
+          }
+
+          public boolean hasSession(String sessionId) {
+              return dataManager.contains("session:" + sessionId);
+          }
+      }
+    src/main/java/com/app/util/StringUtils.java: |
+      package com.app.util;
+
+      public class StringUtils {
+          public static final String GARBAGE_REFACTOR_022_UTILS_A = "string_utils";
+          public static final boolean GARBAGE_REFACTOR_022_TRIM_B = true;
+
+          public static String trim(String s) {
+              return s == null ? "" : s.trim();
+          }
+      }
+    src/main/java/com/app/GarbageScheduler.java: |
+      package com.app;
+
+      public class GarbageScheduler {
+          public static final String GARBAGE_REFACTOR_022_SCHED_C = "scheduler";
+          public static final int GARBAGE_REFACTOR_022_DELAY_D = 1000;
+          public static final boolean GARBAGE_REFACTOR_022_REPEAT_E = true;
+
+          public void schedule(Runnable task) {}
+      }
+  changed_files:
+    src/main/java/com/app/data/CacheStore.java: |
+      package com.app.data;
+
+      import java.util.HashMap;
+      import java.util.Map;
+
+      public class CacheStore {
+          private final Map<String, Object> cache = new HashMap<>();
+
+          public void put(String key, Object value) {
+              cache.put(key, value);
+          }
+
+          public Object get(String key) {
+              return cache.get(key);
+          }
+
+          public boolean contains(String key) {
+              return cache.containsKey(key);
+          }
+      }
+    src/main/java/com/app/service/ProductService.java: |
+      package com.app.service;
+
+      import com.app.data.CacheStore;
+
+      public class ProductService {
+          private final CacheStore cacheStore;
+
+          public ProductService(CacheStore cacheStore) {
+              this.cacheStore = cacheStore;
+          }
+
+          public void cacheProduct(String id, Object product) {
+              cacheStore.put("product:" + id, product);
+          }
+
+          public Object getProduct(String id) {
+              return cacheStore.get("product:" + id);
+          }
+      }
+    src/main/java/com/app/service/SessionService.java: |
+      package com.app.service;
+
+      import com.app.data.CacheStore;
+
+      public class SessionService {
+          private final CacheStore cacheStore;
+
+          public SessionService(CacheStore cacheStore) {
+              this.cacheStore = cacheStore;
+          }
+
+          public void storeSession(String sessionId, Object data) {
+              cacheStore.put("session:" + sessionId, data);
+          }
+
+          public boolean hasSession(String sessionId) {
+              return cacheStore.contains("session:" + sessionId);
+          }
+      }
+    src/main/java/com/app/util/StringUtils.java: |
+      package com.app.util;
+
+      public class StringUtils {
+          public static final String GARBAGE_REFACTOR_022_UTILS_A = "string_utils";
+          public static final boolean GARBAGE_REFACTOR_022_TRIM_B = true;
+
+          public static String trim(String s) {
+              return s == null ? "" : s.trim();
+          }
+      }
+    src/main/java/com/app/GarbageScheduler.java: |
+      package com.app;
+
+      public class GarbageScheduler {
+          public static final String GARBAGE_REFACTOR_022_SCHED_C = "scheduler";
+          public static final int GARBAGE_REFACTOR_022_DELAY_D = 1000;
+          public static final boolean GARBAGE_REFACTOR_022_REPEAT_E = true;
+
+          public void schedule(Runnable task) {}
+      }
+  commit_message: "refactor: rename DataManager to CacheStore"
+fragments:
+- id: renamed_class
+  selector:
+    path: src/main/java/com/app/data/CacheStore.java
+    anchor: "public class CacheStore"
+- id: product_imports_renamed
+  selector:
+    path: src/main/java/com/app/service/ProductService.java
+    anchor: "import com.app.data.CacheStore"
+- id: product_field_renamed
+  selector:
+    path: src/main/java/com/app/service/ProductService.java
+    anchor: "private final CacheStore cacheStore"
+- id: session_imports_renamed
+  selector:
+    path: src/main/java/com/app/service/SessionService.java
+    anchor: "import com.app.data.CacheStore"
+- id: session_field_renamed
+  selector:
+    path: src/main/java/com/app/service/SessionService.java
+    anchor: "private final CacheStore cacheStore"
+- id: no_string_utils
+  selector:
+    path: src/main/java/com/app/util/StringUtils.java
+- id: no_garbage_scheduler
+  selector:
+    path: src/main/java/com/app/GarbageScheduler.java
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_022_UTILS_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_022_TRIM_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_022_SCHED_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_022_DELAY_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_022_REPEAT_E
+oracle:
+  required:
+  - renamed_class
+  - product_imports_renamed
+  - product_field_renamed
+  - session_imports_renamed
+  - session_field_renamed
+  allowed: []
+  forbidden:
+  - no_string_utils
+  - no_garbage_scheduler
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

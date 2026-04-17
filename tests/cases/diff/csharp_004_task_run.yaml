@@ -1,4 +1,11 @@
 name: csharp_004_task_run
+tags:
+- lang:csharp
+- change:single_file
+- change:signature
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     Services/ComputeService.cs: |

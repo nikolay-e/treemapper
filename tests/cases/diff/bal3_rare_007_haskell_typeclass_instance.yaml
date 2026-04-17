@@ -1,0 +1,153 @@
+name: bal3_rare_007_haskell_typeclass_instance
+tags:
+- lang:haskell
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/Types.hs: |
+      module Types where
+
+      data Priority = Low | Medium | High
+        deriving (Show, Eq, Ord)
+
+      data Task = Task
+        { taskId       :: Int
+        , taskTitle    :: String
+        , taskPriority :: Priority
+        } deriving (Show, Eq)
+
+      comparePriority :: Task -> Task -> Ordering
+      comparePriority a b = compare (taskPriority a) (taskPriority b)
+    src/Scheduler.hs: |
+      module Scheduler where
+
+      import Types (Task(..), Priority(..), comparePriority)
+      import Data.List (sortBy)
+
+      scheduleByPriority :: [Task] -> [Task]
+      scheduleByPriority = sortBy (flip comparePriority)
+
+      nextTask :: [Task] -> Maybe Task
+      nextTask [] = Nothing
+      nextTask tasks = Just (head (scheduleByPriority tasks))
+    src/Renderer.hs: |
+      module Renderer where
+
+      import Types (Task(..), Priority(..))
+
+      renderTask :: Task -> String
+      renderTask t = "[" ++ show (taskPriority t) ++ "] " ++ taskTitle t
+
+      renderTaskList :: [Task] -> String
+      renderTaskList = unlines . map renderTask
+    src/Logger.hs: |
+      module Logger where
+
+      gARBAGE_RARE_007_LOG_A = "logger"
+      gARBAGE_RARE_007_LEVEL_B = "info"
+
+      logInfo :: String -> IO ()
+      logInfo msg = putStrLn $ "INFO: " ++ msg
+    src/Config.hs: |
+      module Config where
+
+      gARBAGE_RARE_007_CFG_C = "config"
+      gARBAGE_RARE_007_PATH_D = "app.yaml"
+
+      defaultPort :: Int
+      defaultPort = 8080
+    src/Database.hs: |
+      module Database where
+
+      gARBAGE_RARE_007_DB_E = "sqlite"
+      gARBAGE_RARE_007_FILE_F = "app.db"
+
+      connect :: String -> IO ()
+      connect _ = return ()
+  changed_files:
+    src/Types.hs: |
+      module Types where
+
+      data Priority = Low | Medium | High | Critical
+        deriving (Show, Eq, Ord)
+
+      data Task = Task
+        { taskId       :: Int
+        , taskTitle    :: String
+        , taskPriority :: Priority
+        , taskDeadline :: Maybe String
+        } deriving (Show, Eq)
+
+      comparePriority :: Task -> Task -> Ordering
+      comparePriority a b = compare (taskPriority a) (taskPriority b)
+
+      isUrgent :: Task -> Bool
+      isUrgent t = taskPriority t >= High
+  commit_message: "add Critical priority, deadline field, and isUrgent"
+fragments:
+- id: scheduler_imports_types
+  selector:
+    path: src/Scheduler.hs
+    anchor: "import Types"
+- id: scheduler_uses_compare
+  selector:
+    path: src/Scheduler.hs
+    anchor: "comparePriority"
+- id: renderer_imports_types
+  selector:
+    path: src/Renderer.hs
+    anchor: "import Types"
+- id: renderer_uses_priority
+  selector:
+    path: src/Renderer.hs
+    anchor: "taskPriority t"
+- id: no_logger
+  selector:
+    path: src/Logger.hs
+    anchor: "logInfo"
+- id: no_config
+  selector:
+    path: src/Config.hs
+    anchor: "defaultPort"
+- id: no_database
+  selector:
+    path: src/Database.hs
+    anchor: "connect"
+- id: no_global_0
+  selector:
+    anchor: gARBAGE_RARE_007_LOG_A
+- id: no_global_1
+  selector:
+    anchor: gARBAGE_RARE_007_LEVEL_B
+- id: no_global_2
+  selector:
+    anchor: gARBAGE_RARE_007_CFG_C
+- id: no_global_3
+  selector:
+    anchor: gARBAGE_RARE_007_PATH_D
+- id: no_global_4
+  selector:
+    anchor: gARBAGE_RARE_007_DB_E
+- id: no_global_5
+  selector:
+    anchor: gARBAGE_RARE_007_FILE_F
+oracle:
+  required:
+  - scheduler_imports_types
+  - scheduler_uses_compare
+  - renderer_imports_types
+  - renderer_uses_priority
+  allowed: []
+  forbidden:
+  - no_logger
+  - no_config
+  - no_database
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

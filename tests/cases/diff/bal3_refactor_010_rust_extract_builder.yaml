@@ -1,0 +1,217 @@
+name: bal3_refactor_010_rust_extract_builder
+tags:
+- lang:rust
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/http/client.rs: |
+      pub struct HttpClient {
+          pub base_url: String,
+          pub timeout_ms: u64,
+          pub retries: u32,
+          pub headers: Vec<(String, String)>,
+      }
+
+      impl HttpClient {
+          pub fn new(
+              base_url: &str,
+              timeout_ms: u64,
+              retries: u32,
+              headers: Vec<(String, String)>,
+          ) -> Self {
+              Self {
+                  base_url: base_url.to_string(),
+                  timeout_ms,
+                  retries,
+                  headers,
+              }
+          }
+
+          pub fn get(&self, path: &str) -> Result<String, String> {
+              Ok(format!("GET {}{}", self.base_url, path))
+          }
+      }
+    src/services/api.rs: |
+      use crate::http::client::HttpClient;
+
+      pub struct ApiService {
+          client: HttpClient,
+      }
+
+      impl ApiService {
+          pub fn new() -> Self {
+              let client = HttpClient::new(
+                  "https://api.example.com",
+                  5000,
+                  3,
+                  vec![("Accept".into(), "application/json".into())],
+              );
+              Self { client }
+          }
+
+          pub fn fetch_data(&self) -> Result<String, String> {
+              self.client.get("/data")
+          }
+      }
+    src/network/dns.rs: |
+      pub const GARBAGE_R010_DNS_A: &str = "resolver";
+
+      pub fn resolve(host: &str) -> String {
+          format!("127.0.0.1:{}", host)
+      }
+    src/network/tls.rs: |
+      pub const GARBAGE_R010_TLS_B: &str = "tls";
+
+      pub struct TlsConfig {
+          pub verify: bool,
+      }
+    src/network/proxy.rs: |
+      pub const GARBAGE_R010_PROXY_C: &str = "proxy";
+
+      pub struct ProxyConfig {
+          pub url: String,
+      }
+  changed_files:
+    src/http/client.rs: |
+      pub struct HttpClient {
+          pub base_url: String,
+          pub timeout_ms: u64,
+          pub retries: u32,
+          pub headers: Vec<(String, String)>,
+      }
+
+      impl HttpClient {
+          pub fn get(&self, path: &str) -> Result<String, String> {
+              Ok(format!("GET {}{}", self.base_url, path))
+          }
+      }
+    src/http/builder.rs: |
+      use super::client::HttpClient;
+
+      pub struct HttpClientBuilder {
+          base_url: String,
+          timeout_ms: u64,
+          retries: u32,
+          headers: Vec<(String, String)>,
+      }
+
+      impl HttpClientBuilder {
+          pub fn new(base_url: &str) -> Self {
+              Self {
+                  base_url: base_url.to_string(),
+                  timeout_ms: 30000,
+                  retries: 0,
+                  headers: Vec::new(),
+              }
+          }
+
+          pub fn timeout(mut self, ms: u64) -> Self {
+              self.timeout_ms = ms;
+              self
+          }
+
+          pub fn retries(mut self, n: u32) -> Self {
+              self.retries = n;
+              self
+          }
+
+          pub fn header(mut self, key: &str, value: &str) -> Self {
+              self.headers.push((key.to_string(), value.to_string()));
+              self
+          }
+
+          pub fn build(self) -> HttpClient {
+              HttpClient {
+                  base_url: self.base_url,
+                  timeout_ms: self.timeout_ms,
+                  retries: self.retries,
+                  headers: self.headers,
+              }
+          }
+      }
+    src/services/api.rs: |
+      use crate::http::builder::HttpClientBuilder;
+
+      pub struct ApiService {
+          client: crate::http::client::HttpClient,
+      }
+
+      impl ApiService {
+          pub fn new() -> Self {
+              let client = HttpClientBuilder::new("https://api.example.com")
+                  .timeout(5000)
+                  .retries(3)
+                  .header("Accept", "application/json")
+                  .build();
+              Self { client }
+          }
+
+          pub fn fetch_data(&self) -> Result<String, String> {
+              self.client.get("/data")
+          }
+      }
+    src/network/dns.rs: |
+      pub const GARBAGE_R010_DNS_A: &str = "resolver";
+
+      pub fn resolve(host: &str) -> String {
+          format!("127.0.0.1:{}", host)
+      }
+    src/network/tls.rs: |
+      pub const GARBAGE_R010_TLS_B: &str = "tls";
+
+      pub struct TlsConfig {
+          pub verify: bool,
+      }
+    src/network/proxy.rs: |
+      pub const GARBAGE_R010_PROXY_C: &str = "proxy";
+
+      pub struct ProxyConfig {
+          pub url: String,
+      }
+  commit_message: "refactor: extract builder pattern for HttpClient construction"
+fragments:
+- id: builder_struct
+  selector:
+    path: src/http/builder.rs
+    anchor: "pub struct HttpClientBuilder"
+- id: builder_new
+  selector:
+    path: src/http/builder.rs
+    anchor: "pub fn new(base_url: &str)"
+- id: builder_build
+  selector:
+    path: src/http/builder.rs
+    anchor: "pub fn build(self) -> HttpClient"
+- id: api_uses_builder
+  selector:
+    path: src/services/api.rs
+    anchor: "HttpClientBuilder::new"
+- id: client_struct
+  selector:
+    path: src/http/client.rs
+    anchor: "pub struct HttpClient"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_R010_DNS_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_R010_TLS_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_R010_PROXY_C
+oracle:
+  required:
+  - builder_struct
+  - builder_new
+  - builder_build
+  - api_uses_builder
+  - client_struct
+  allowed: []
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

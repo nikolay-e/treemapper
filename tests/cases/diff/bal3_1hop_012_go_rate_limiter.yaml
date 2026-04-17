@@ -1,0 +1,221 @@
+name: bal3_1hop_012_go_rate_limiter
+tags:
+- lang:go
+- change:signature
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/ratelimit/limiter.go: |
+      package ratelimit
+
+      import "time"
+
+      type Limiter struct {
+          Rate     int
+          Window   time.Duration
+          counters map[string]int
+      }
+
+      func NewLimiter(rate int, window time.Duration) *Limiter {
+          return &Limiter{Rate: rate, Window: window, counters: make(map[string]int)}
+      }
+
+      func (l *Limiter) Allow(key string) bool {
+          l.counters[key]++
+          return l.counters[key] <= l.Rate
+      }
+    internal/gateway/proxy.go: |
+      package gateway
+
+      import "pkg/ratelimit"
+
+      type Proxy struct {
+          limiter *ratelimit.Limiter
+          Target  string
+      }
+
+      func NewProxy(target string, limiter *ratelimit.Limiter) *Proxy {
+          return &Proxy{limiter: limiter, Target: target}
+      }
+
+      func (p *Proxy) Forward(clientIP string) bool {
+          return p.limiter.Allow(clientIP)
+      }
+    internal/gateway/loadbalancer.go: |
+      package gateway
+
+      import "pkg/ratelimit"
+
+      type LoadBalancer struct {
+          limiter  *ratelimit.Limiter
+          Backends []string
+      }
+
+      func NewLoadBalancer(backends []string, limiter *ratelimit.Limiter) *LoadBalancer {
+          return &LoadBalancer{limiter: limiter, Backends: backends}
+      }
+
+      func (lb *LoadBalancer) Route(clientIP string) string {
+          if !lb.limiter.Allow(clientIP) {
+              return ""
+          }
+          return lb.Backends[0]
+      }
+    internal/gateway/circuit.go: |
+      package gateway
+
+      import "pkg/ratelimit"
+
+      type CircuitGateway struct {
+          limiter *ratelimit.Limiter
+      }
+
+      func NewCircuitGateway(limiter *ratelimit.Limiter) *CircuitGateway {
+          return &CircuitGateway{limiter: limiter}
+      }
+
+      func (c *CircuitGateway) Check(key string) bool {
+          return c.limiter.Allow(key)
+      }
+    pkg/discovery/consul.go: |
+      package discovery
+
+      GARBAGE_012_CONSUL_A = "consul"
+
+      type ConsulClient struct {
+          Addr string
+      }
+
+      func (c *ConsulClient) Register(name string) error {
+          return nil
+      }
+    pkg/tracing/jaeger.go: |
+      package tracing
+
+      GARBAGE_012_JAEGER_B = "jaeger"
+
+      type JaegerTracer struct {
+          Endpoint string
+      }
+
+      func (j *JaegerTracer) StartSpan(name string) string {
+          return "span-" + name
+      }
+    pkg/feature/flags.go: |
+      package feature
+
+      GARBAGE_012_FLAGS_C = "flags"
+
+      type FlagStore struct {
+          Flags map[string]bool
+      }
+
+      func (f *FlagStore) IsEnabled(name string) bool {
+          return f.Flags[name]
+      }
+  changed_files:
+    pkg/ratelimit/limiter.go: |
+      package ratelimit
+
+      import "time"
+
+      type Decision struct {
+          Allowed   bool
+          Remaining int
+          ResetAt   time.Time
+      }
+
+      type Limiter struct {
+          Rate     int
+          Burst    int
+          Window   time.Duration
+          counters map[string]int
+      }
+
+      func NewLimiter(rate, burst int, window time.Duration) *Limiter {
+          return &Limiter{Rate: rate, Burst: burst, Window: window, counters: make(map[string]int)}
+      }
+
+      func (l *Limiter) Allow(key string) Decision {
+          l.counters[key]++
+          allowed := l.counters[key] <= l.Rate+l.Burst
+          remaining := l.Rate + l.Burst - l.counters[key]
+          if remaining < 0 {
+              remaining = 0
+          }
+          return Decision{
+              Allowed:   allowed,
+              Remaining: remaining,
+              ResetAt:   time.Now().Add(l.Window),
+          }
+      }
+  commit_message: "feat: return Decision struct from Allow with burst support"
+fragments:
+- id: decision_type
+  selector:
+    path: pkg/ratelimit/limiter.go
+    anchor: "type Decision struct"
+- id: burst_field
+  selector:
+    path: pkg/ratelimit/limiter.go
+    anchor: "Burst    int"
+- id: allow_returns_decision
+  selector:
+    path: pkg/ratelimit/limiter.go
+    anchor: "func (l *Limiter) Allow(key string) Decision"
+- id: remaining_calc
+  selector:
+    path: pkg/ratelimit/limiter.go
+    anchor: "l.Rate + l.Burst - l.counters[key]"
+- id: proxy_calls_allow
+  selector:
+    path: internal/gateway/proxy.go
+    anchor: "p.limiter.Allow(clientIP)"
+- id: lb_calls_allow
+  selector:
+    path: internal/gateway/loadbalancer.go
+    anchor: "lb.limiter.Allow(clientIP)"
+- id: circuit_calls_allow
+  selector:
+    path: internal/gateway/circuit.go
+    anchor: "c.limiter.Allow(key)"
+- id: unrelated_consul
+  selector:
+    path: pkg/discovery/consul.go
+    anchor: "type ConsulClient struct"
+- id: unrelated_jaeger
+  selector:
+    path: pkg/tracing/jaeger.go
+    anchor: "type JaegerTracer struct"
+- id: unrelated_flags
+  selector:
+    path: pkg/feature/flags.go
+    anchor: "type FlagStore struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_012_CONSUL_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_012_JAEGER_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_012_FLAGS_C
+oracle:
+  required:
+  - decision_type
+  - burst_field
+  - allow_returns_decision
+  - proxy_calls_allow
+  allowed:
+  - remaining_calc
+  - lb_calls_allow
+  - circuit_calls_allow
+  forbidden:
+  - unrelated_consul
+  - unrelated_jaeger
+  - unrelated_flags
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

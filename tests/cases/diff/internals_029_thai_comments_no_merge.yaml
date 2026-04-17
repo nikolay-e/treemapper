@@ -1,4 +1,10 @@
 name: internals_029_thai_comments_no_merge
+tags:
+- lang:python
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     thai_comments.py: |

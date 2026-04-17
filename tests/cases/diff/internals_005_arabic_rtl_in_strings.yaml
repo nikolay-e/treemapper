@@ -1,4 +1,10 @@
 name: internals_005_arabic_rtl_in_strings
+tags:
+- lang:python
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
     src/messaging/sender.py: |

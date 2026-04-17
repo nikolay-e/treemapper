@@ -1,0 +1,150 @@
+name: bal3_cfgcode_009_rust_toml_cache_ttl
+tags:
+- lang:rust
+- change:single_file
+- change:config
+- context:config_to_code
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    config/cache.toml: |
+      [cache]
+      backend = "redis"
+      ttl_secs = 300
+      max_entries = 1000
+    src/cache/config.rs: |
+      use serde::Deserialize;
+      use std::fs;
+
+      #[derive(Deserialize)]
+      pub struct CacheConfig {
+          pub backend: String,
+          pub ttl_secs: u64,
+          pub max_entries: usize,
+      }
+
+      pub fn load_cache_config(path: &str) -> Result<CacheConfig, Box<dyn std::error::Error>> {
+          let content = fs::read_to_string(path)?;
+          let wrapper: toml::Value = toml::from_str(&content)?;
+          let cache = wrapper.get("cache").unwrap();
+          let cfg: CacheConfig = cache.clone().try_into()?;
+          Ok(cfg)
+      }
+    src/cache/store.rs: |
+      use super::config::CacheConfig;
+      use std::collections::HashMap;
+      use std::time::Instant;
+
+      pub struct CacheStore {
+          entries: HashMap<String, (String, Instant)>,
+          config: CacheConfig,
+      }
+
+      impl CacheStore {
+          pub fn new(config: CacheConfig) -> Self {
+              Self {
+                  entries: HashMap::new(),
+                  config,
+              }
+          }
+
+          pub fn get(&self, key: &str) -> Option<&String> {
+              self.entries.get(key).map(|(v, _)| v)
+          }
+
+          pub fn is_expired(&self, key: &str) -> bool {
+              if let Some((_, created)) = self.entries.get(key) {
+                  created.elapsed().as_secs() > self.config.ttl_secs
+              } else {
+                  true
+              }
+          }
+      }
+    src/api/health.rs: |
+      GARBAGE_CFGCODE_009_HEALTH_A: &str = "ok";
+      GARBAGE_CFGCODE_009_VERSION_B: &str = "1.0";
+
+      pub fn health_check() -> &'static str { "ok" }
+    src/jobs/cleanup.rs: |
+      GARBAGE_CFGCODE_009_CLEANUP_C: &str = "daily";
+      GARBAGE_CFGCODE_009_BATCH_D: u32 = 500;
+
+      pub fn run_cleanup() {}
+    src/notifications/push.rs: |
+      GARBAGE_CFGCODE_009_PUSH_E: &str = "fcm";
+      GARBAGE_CFGCODE_009_TOPIC_F: &str = "default";
+
+      pub fn send_push(device_token: &str, message: &str) {}
+  changed_files:
+    config/cache.toml: |
+      [cache]
+      backend = "memcached"
+      ttl_secs = 600
+      max_entries = 5000
+      eviction_policy = "lru"
+  commit_message: "switch to memcached, increase TTL and max entries"
+fragments:
+- id: cache_struct
+  selector:
+    path: src/cache/config.rs
+    anchor: "pub struct CacheConfig"
+- id: load_cache
+  selector:
+    path: src/cache/config.rs
+    anchor: "pub fn load_cache_config"
+- id: is_expired
+  selector:
+    path: src/cache/store.rs
+    anchor: "fn is_expired"
+- id: ttl_usage
+  selector:
+    path: src/cache/store.rs
+    anchor: "self.config.ttl_secs"
+- id: no_health
+  selector:
+    path: src/api/health.rs
+    anchor: "health_check"
+- id: no_cleanup
+  selector:
+    path: src/jobs/cleanup.rs
+    anchor: "run_cleanup"
+- id: no_push
+  selector:
+    path: src/notifications/push.rs
+    anchor: "send_push"
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_CFGCODE_009_HEALTH_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_CFGCODE_009_VERSION_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_CFGCODE_009_CLEANUP_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_CFGCODE_009_BATCH_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_CFGCODE_009_PUSH_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_CFGCODE_009_TOPIC_F
+oracle:
+  required:
+  - cache_struct
+  - load_cache
+  - is_expired
+  - ttl_usage
+  allowed: []
+  forbidden:
+  - no_health
+  - no_cleanup
+  - no_push
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

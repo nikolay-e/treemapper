@@ -1,0 +1,190 @@
+name: bal_rare_019_zig_allocator_wrapper
+tags:
+- lang:zig
+- change:single_file
+- change:bug_fix
+- context:same_file
+- distance:0hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/pool.zig: |
+      const std = @import("std");
+
+      pub const Pool = struct {
+          allocator: std.mem.Allocator,
+          items: std.ArrayList([]u8),
+
+          pub fn init(allocator: std.mem.Allocator) Pool {
+              return Pool{
+                  .allocator = allocator,
+                  .items = std.ArrayList([]u8).init(allocator),
+              };
+          }
+
+          pub fn alloc(self: *Pool, size: usize) ![]u8 {
+              const buf = try self.allocator.alloc(u8, size);
+              try self.items.append(buf);
+              return buf;
+          }
+
+          pub fn deinit(self: *Pool) void {
+              for (self.items.items) |item| {
+                  self.allocator.free(item);
+              }
+              self.items.deinit();
+          }
+      };
+    src/main.zig: |
+      const std = @import("std");
+      const Pool = @import("pool.zig").Pool;
+
+      pub fn main() !void {
+          var pool = Pool.init(std.heap.page_allocator);
+          defer pool.deinit();
+
+          const buf = try pool.alloc(1024);
+          buf[0] = 42;
+          std.debug.print("Allocated {} bytes\n", .{buf.len});
+      }
+    garbage_hash.zig: |
+      const GARBAGE_RARE_019_ALGO_A: []const u8 = "sha256";
+      const GARBAGE_RARE_019_ROUNDS_B: u32 = 10000;
+
+      fn garbage_hash() void {
+          _ = GARBAGE_RARE_019_ALGO_A;
+      }
+
+      const GARBAGE_RARE_019_SALT_C: u32 = 16;
+    garbage_random.zig: |
+      const GARBAGE_RARE_019_SEED_D: u64 = 12345;
+      const GARBAGE_RARE_019_RANGE_E: u32 = 100;
+
+      fn garbage_random() void {
+          _ = GARBAGE_RARE_019_SEED_D;
+      }
+
+      const GARBAGE_RARE_019_DIST_F: []const u8 = "uniform";
+  changed_files:
+    src/pool.zig: |
+      const std = @import("std");
+
+      pub const Pool = struct {
+          allocator: std.mem.Allocator,
+          items: std.ArrayList([]u8),
+          total_allocated: usize,
+
+          pub fn init(allocator: std.mem.Allocator) Pool {
+              return Pool{
+                  .allocator = allocator,
+                  .items = std.ArrayList([]u8).init(allocator),
+                  .total_allocated = 0,
+              };
+          }
+
+          pub fn alloc(self: *Pool, size: usize) ![]u8 {
+              if (size == 0) return error.ZeroSizeAllocation;
+              const buf = try self.allocator.alloc(u8, size);
+              try self.items.append(buf);
+              self.total_allocated += size;
+              return buf;
+          }
+
+          pub fn totalAllocated(self: *const Pool) usize {
+              return self.total_allocated;
+          }
+
+          pub fn deinit(self: *Pool) void {
+              for (self.items.items) |item| {
+                  self.allocator.free(item);
+              }
+              self.items.deinit();
+          }
+      };
+    src/main.zig: |
+      const std = @import("std");
+      const Pool = @import("pool.zig").Pool;
+
+      pub fn main() !void {
+          var pool = Pool.init(std.heap.page_allocator);
+          defer pool.deinit();
+
+          const buf = try pool.alloc(1024);
+          buf[0] = 42;
+          std.debug.print("Allocated {} bytes\n", .{buf.len});
+      }
+    garbage_hash.zig: |
+      const GARBAGE_RARE_019_ALGO_A: []const u8 = "sha256";
+      const GARBAGE_RARE_019_ROUNDS_B: u32 = 10000;
+
+      fn garbage_hash() void {
+          _ = GARBAGE_RARE_019_ALGO_A;
+      }
+
+      const GARBAGE_RARE_019_SALT_C: u32 = 16;
+    garbage_random.zig: |
+      const GARBAGE_RARE_019_SEED_D: u64 = 12345;
+      const GARBAGE_RARE_019_RANGE_E: u32 = 100;
+
+      fn garbage_random() void {
+          _ = GARBAGE_RARE_019_SEED_D;
+      }
+
+      const GARBAGE_RARE_019_DIST_F: []const u8 = "uniform";
+  commit_message: "fix: reject zero-size allocations and track total allocated"
+fragments:
+- id: zero_size_check
+  selector:
+    path: src/pool.zig
+    anchor: "if (size == 0) return error.ZeroSizeAllocation"
+- id: total_allocated_field
+  selector:
+    path: src/pool.zig
+    anchor: "total_allocated: usize"
+- id: total_allocated_fn
+  selector:
+    path: src/pool.zig
+    anchor: "pub fn totalAllocated"
+- id: no_main
+  selector:
+    path: src/main.zig
+- id: no_garbage_hash
+  selector:
+    path: garbage_hash.zig
+- id: no_garbage_random
+  selector:
+    path: garbage_random.zig
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_019_ALGO_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_019_ROUNDS_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_019_SALT_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_019_SEED_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_019_RANGE_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_019_DIST_F
+oracle:
+  required:
+  - zero_size_check
+  - total_allocated_field
+  - total_allocated_fn
+  allowed: []
+  forbidden:
+  - no_main
+  - no_garbage_hash
+  - no_garbage_random
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

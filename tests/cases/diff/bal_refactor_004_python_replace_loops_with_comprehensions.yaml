@@ -1,0 +1,156 @@
+name: bal_refactor_004_python_replace_loops_with_comprehensions
+tags:
+- lang:python
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    data/transform.py: |
+      def filter_active_users(users):
+          result = []
+          for user in users:
+              if user.is_active:
+                  result.append(user)
+          return result
+
+      def extract_emails(users):
+          emails = []
+          for user in users:
+              emails.append(user.email)
+          return emails
+
+      def build_lookup(users):
+          lookup = {}
+          for user in users:
+              lookup[user.id] = user.name
+          return lookup
+    data/report.py: |
+      from data.transform import filter_active_users, extract_emails
+
+      def generate_active_email_report(users):
+          active = filter_active_users(users)
+          emails = extract_emails(active)
+          return {"count": len(emails), "emails": emails}
+    data/export.py: |
+      from data.transform import build_lookup, filter_active_users
+
+      def export_active_lookup(users):
+          active = filter_active_users(users)
+          lookup = build_lookup(active)
+          return lookup
+    data/constants.py: |
+      GARBAGE_REFACTOR_004_CONST_MARKER_A = "constants"
+      GARBAGE_REFACTOR_004_VERSION_MARKER_B = "1.0"
+
+      MAX_EXPORT_SIZE = 10000
+      DEFAULT_FORMAT = "csv"
+    garbage_scheduler.py: |
+      GARBAGE_REFACTOR_004_SCHED_MARKER_C = "scheduler"
+      GARBAGE_REFACTOR_004_INTERVAL_MARKER_D = 60
+
+      class Scheduler:
+          GARBAGE_REFACTOR_004_SCHED_CLASS_E = True
+
+          def run(self):
+              pass
+  changed_files:
+    data/transform.py: |
+      def filter_active_users(users):
+          return [user for user in users if user.is_active]
+
+      def extract_emails(users):
+          return [user.email for user in users]
+
+      def build_lookup(users):
+          return {user.id: user.name for user in users}
+    data/report.py: |
+      from data.transform import filter_active_users, extract_emails
+
+      def generate_active_email_report(users):
+          active = filter_active_users(users)
+          emails = extract_emails(active)
+          return {"count": len(emails), "emails": emails}
+    data/export.py: |
+      from data.transform import build_lookup, filter_active_users
+
+      def export_active_lookup(users):
+          active = filter_active_users(users)
+          lookup = build_lookup(active)
+          return lookup
+    data/constants.py: |
+      GARBAGE_REFACTOR_004_CONST_MARKER_A = "constants"
+      GARBAGE_REFACTOR_004_VERSION_MARKER_B = "1.0"
+
+      MAX_EXPORT_SIZE = 10000
+      DEFAULT_FORMAT = "csv"
+    garbage_scheduler.py: |
+      GARBAGE_REFACTOR_004_SCHED_MARKER_C = "scheduler"
+      GARBAGE_REFACTOR_004_INTERVAL_MARKER_D = 60
+
+      class Scheduler:
+          GARBAGE_REFACTOR_004_SCHED_CLASS_E = True
+
+          def run(self):
+              pass
+  commit_message: "refactor: replace manual loops with comprehensions"
+fragments:
+- id: filter_comprehension
+  selector:
+    path: data/transform.py
+    anchor: "return [user for user in users if user.is_active]"
+- id: extract_comprehension
+  selector:
+    path: data/transform.py
+    anchor: "return [user.email for user in users]"
+- id: lookup_comprehension
+  selector:
+    path: data/transform.py
+    anchor: "return {user.id: user.name for user in users}"
+- id: report_uses_transform
+  selector:
+    path: data/report.py
+    anchor: "from data.transform import filter_active_users"
+- id: export_uses_transform
+  selector:
+    path: data/export.py
+    anchor: "from data.transform import build_lookup"
+- id: no_constants
+  selector:
+    path: data/constants.py
+- id: no_garbage_scheduler
+  selector:
+    path: garbage_scheduler.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_004_CONST_MARKER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_004_VERSION_MARKER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_004_SCHED_MARKER_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_004_INTERVAL_MARKER_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_004_SCHED_CLASS_E
+oracle:
+  required:
+  - filter_comprehension
+  - extract_comprehension
+  - lookup_comprehension
+  - report_uses_transform
+  - export_uses_transform
+  allowed: []
+  forbidden:
+  - no_constants
+  - no_garbage_scheduler
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

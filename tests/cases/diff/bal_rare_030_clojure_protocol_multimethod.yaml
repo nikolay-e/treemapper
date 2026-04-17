@@ -1,0 +1,237 @@
+name: bal_rare_030_clojure_protocol_multimethod
+tags:
+- lang:clojure
+- change:multi_file
+- change:bug_fix
+- context:cross_module
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/store/protocol.clj: |
+      (ns store.protocol)
+
+      (defprotocol Storage
+        (save! [this key value])
+        (fetch [this key])
+        (delete! [this key]))
+    src/store/memory.clj: |
+      (ns store.memory
+        (:require [store.protocol :as p]))
+
+      (defrecord MemoryStore [state]
+        p/Storage
+        (save! [this key value]
+          (swap! state assoc key value)
+          this)
+        (fetch [this key]
+          (get @state key))
+        (delete! [this key]
+          (swap! state dissoc key)
+          this))
+
+      (defn create-memory-store []
+        (->MemoryStore (atom {})))
+    src/store/cache.clj: |
+      (ns store.cache
+        (:require [store.protocol :as p]))
+
+      (defrecord CachedStore [backend cache]
+        p/Storage
+        (save! [this key value]
+          (swap! cache assoc key value)
+          (p/save! backend key value)
+          this)
+        (fetch [this key]
+          (if-let [cached (get @cache key)]
+            cached
+            (when-let [value (p/fetch backend key)]
+              (swap! cache assoc key value)
+              value)))
+        (delete! [this key]
+          (swap! cache dissoc key)
+          (p/delete! backend key)
+          this))
+
+      (defn create-cached-store [backend]
+        (->CachedStore backend (atom {})))
+    src/app.clj: |
+      (ns app
+        (:require [store.memory :as mem]
+                  [store.cache :as cache]
+                  [store.protocol :as p]))
+
+      (defn run []
+        (let [store (-> (mem/create-memory-store)
+                        cache/create-cached-store)]
+          (p/save! store :user {:name "Alice"})
+          (println (p/fetch store :user))))
+    garbage_search.clj: |
+      (ns garbage-search)
+
+      (def ^:const GARBAGE_RARE_030_INDEX_A "inverted")
+      (def ^:const GARBAGE_RARE_030_ANALYZER_B "standard")
+
+      (defn garbage-search []
+        GARBAGE_RARE_030_INDEX_A)
+
+      (def ^:const GARBAGE_RARE_030_SHARDS_C 3)
+    garbage_scheduler.clj: |
+      (ns garbage-scheduler)
+
+      (def ^:const GARBAGE_RARE_030_POOL_D 4)
+      (def ^:const GARBAGE_RARE_030_QUEUE_E "fifo")
+
+      (defn garbage-schedule []
+        GARBAGE_RARE_030_POOL_D)
+
+      (def ^:const GARBAGE_RARE_030_TIMEOUT_F 30000)
+  changed_files:
+    src/store/protocol.clj: |
+      (ns store.protocol)
+
+      (defprotocol Storage
+        (save! [this key value])
+        (fetch [this key])
+        (delete! [this key])
+        (exists? [this key]))
+    src/store/memory.clj: |
+      (ns store.memory
+        (:require [store.protocol :as p]))
+
+      (defrecord MemoryStore [state]
+        p/Storage
+        (save! [this key value]
+          (swap! state assoc key value)
+          this)
+        (fetch [this key]
+          (get @state key))
+        (delete! [this key]
+          (swap! state dissoc key)
+          this)
+        (exists? [this key]
+          (contains? @state key)))
+
+      (defn create-memory-store []
+        (->MemoryStore (atom {})))
+    src/store/cache.clj: |
+      (ns store.cache
+        (:require [store.protocol :as p]))
+
+      (defrecord CachedStore [backend cache]
+        p/Storage
+        (save! [this key value]
+          (swap! cache assoc key value)
+          (p/save! backend key value)
+          this)
+        (fetch [this key]
+          (if-let [cached (get @cache key)]
+            cached
+            (when-let [value (p/fetch backend key)]
+              (swap! cache assoc key value)
+              value)))
+        (delete! [this key]
+          (swap! cache dissoc key)
+          (p/delete! backend key)
+          this)
+        (exists? [this key]
+          (or (contains? @cache key)
+              (p/exists? backend key))))
+
+      (defn create-cached-store [backend]
+        (->CachedStore backend (atom {})))
+    src/app.clj: |
+      (ns app
+        (:require [store.memory :as mem]
+                  [store.cache :as cache]
+                  [store.protocol :as p]))
+
+      (defn run []
+        (let [store (-> (mem/create-memory-store)
+                        cache/create-cached-store)]
+          (p/save! store :user {:name "Alice"})
+          (println "Exists?" (p/exists? store :user))
+          (println (p/fetch store :user))))
+    garbage_search.clj: |
+      (ns garbage-search)
+
+      (def ^:const GARBAGE_RARE_030_INDEX_A "inverted")
+      (def ^:const GARBAGE_RARE_030_ANALYZER_B "standard")
+
+      (defn garbage-search []
+        GARBAGE_RARE_030_INDEX_A)
+
+      (def ^:const GARBAGE_RARE_030_SHARDS_C 3)
+    garbage_scheduler.clj: |
+      (ns garbage-scheduler)
+
+      (def ^:const GARBAGE_RARE_030_POOL_D 4)
+      (def ^:const GARBAGE_RARE_030_QUEUE_E "fifo")
+
+      (defn garbage-schedule []
+        GARBAGE_RARE_030_POOL_D)
+
+      (def ^:const GARBAGE_RARE_030_TIMEOUT_F 30000)
+  commit_message: "feat: add exists? method to Storage protocol and implementations"
+fragments:
+- id: protocol_exists
+  selector:
+    path: src/store/protocol.clj
+    anchor: "(exists? [this key])"
+- id: memory_exists
+  selector:
+    path: src/store/memory.clj
+    anchor: "(exists? [this key]"
+- id: cache_exists
+  selector:
+    path: src/store/cache.clj
+    anchor: "(exists? [this key]"
+- id: cache_delegates_exists
+  selector:
+    path: src/store/cache.clj
+    anchor: "(p/exists? backend key)"
+- id: app_uses_exists
+  selector:
+    path: src/app.clj
+    anchor: "(p/exists? store :user)"
+- id: no_garbage_search
+  selector:
+    path: garbage_search.clj
+- id: no_garbage_scheduler
+  selector:
+    path: garbage_scheduler.clj
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_030_INDEX_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_030_ANALYZER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_030_SHARDS_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_030_POOL_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_030_QUEUE_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_030_TIMEOUT_F
+oracle:
+  required:
+  - protocol_exists
+  - memory_exists
+  - cache_exists
+  - cache_delegates_exists
+  - app_uses_exists
+  allowed: []
+  forbidden:
+  - no_garbage_search
+  - no_garbage_scheduler
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

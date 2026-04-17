@@ -1,0 +1,222 @@
+name: bal_1hop_025_rust_indexer_calls_analyzer
+tags:
+- lang:rust
+- change:new_function
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/analyzer/tokenizer.rs: |
+      pub struct Token {
+          pub text: String,
+          pub position: usize,
+      }
+
+      pub fn tokenize(input: &str) -> Vec<Token> {
+          input.split_whitespace()
+              .enumerate()
+              .map(|(i, word)| Token {
+                  text: word.to_lowercase(),
+                  position: i,
+              })
+              .collect()
+      }
+
+      pub fn normalize(text: &str) -> String {
+          text.to_lowercase()
+              .chars()
+              .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+              .collect()
+      }
+    src/analyzer/stemmer.rs: |
+      pub fn stem(word: &str) -> String {
+          let word = word.to_lowercase();
+          if word.ends_with("ing") && word.len() > 5 {
+              return word[..word.len() - 3].to_string();
+          }
+          if word.ends_with("ed") && word.len() > 4 {
+              return word[..word.len() - 2].to_string();
+          }
+          if word.ends_with("ly") && word.len() > 4 {
+              return word[..word.len() - 2].to_string();
+          }
+          word
+      }
+    src/indexer/inverted.rs: |
+      use crate::analyzer::tokenizer::{tokenize, Token};
+      use crate::analyzer::stemmer::stem;
+      use std::collections::HashMap;
+
+      pub struct InvertedIndex {
+          index: HashMap<String, Vec<(String, usize)>>,
+      }
+
+      impl InvertedIndex {
+          pub fn new() -> Self {
+              InvertedIndex { index: HashMap::new() }
+          }
+
+          pub fn add_document(&mut self, doc_id: &str, content: &str) {
+              let tokens = tokenize(content);
+              for token in tokens {
+                  let stemmed = stem(&token.text);
+                  self.index
+                      .entry(stemmed)
+                      .or_default()
+                      .push((doc_id.to_string(), token.position));
+              }
+          }
+
+          pub fn search(&self, query: &str) -> Vec<String> {
+              let stemmed = stem(query);
+              self.index
+                  .get(&stemmed)
+                  .map(|entries| {
+                      entries.iter().map(|(id, _)| id.clone()).collect()
+                  })
+                  .unwrap_or_default()
+          }
+      }
+    src/storage/segment.rs: |
+      pub struct Segment {
+          pub id: u64,
+          pub path: String,
+          pub size_bytes: u64,
+      }
+
+      impl Segment {
+          pub fn new(id: u64, path: &str) -> Self {
+              Segment {
+                  id,
+                  path: path.to_string(),
+                  size_bytes: 0,
+              }
+          }
+      }
+    src/query/parser.rs: |
+      pub enum QueryOp {
+          Term(String),
+          And(Box<QueryOp>, Box<QueryOp>),
+          Or(Box<QueryOp>, Box<QueryOp>),
+      }
+
+      pub fn parse_query(input: &str) -> QueryOp {
+          QueryOp::Term(input.to_string())
+      }
+    src/highlight/snippet.rs: |
+      pub fn highlight(text: &str, term: &str) -> String {
+          text.replace(term, &format!("**{}**", term))
+      }
+  changed_files:
+    src/analyzer/tokenizer.rs: |
+      pub struct Token {
+          pub text: String,
+          pub position: usize,
+          pub byte_offset: usize,
+      }
+
+      pub fn tokenize(input: &str) -> Vec<Token> {
+          let mut tokens = Vec::new();
+          let mut pos = 0;
+          for (byte_off, word) in input.split_whitespace().enumerate() {
+              tokens.push(Token {
+                  text: word.to_lowercase(),
+                  position: pos,
+                  byte_offset: byte_off,
+              });
+              pos += 1;
+          }
+          tokens
+      }
+
+      pub fn tokenize_with_ngrams(input: &str, n: usize) -> Vec<Token> {
+          let base = tokenize(input);
+          let mut result = base.clone();
+          if n > 1 {
+              for window in base.windows(n) {
+                  let combined = window.iter()
+                      .map(|t| t.text.as_str())
+                      .collect::<Vec<_>>()
+                      .join("_");
+                  result.push(Token {
+                      text: combined,
+                      position: window[0].position,
+                      byte_offset: window[0].byte_offset,
+                  });
+              }
+          }
+          result
+      }
+
+      pub fn normalize(text: &str) -> String {
+          text.to_lowercase()
+              .chars()
+              .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+              .collect()
+      }
+
+      pub fn normalize_unicode(text: &str) -> String {
+          text.to_lowercase()
+              .chars()
+              .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+              .map(|c| match c {
+                  '\u{00e9}' | '\u{00e8}' => 'e',
+                  '\u{00e0}' | '\u{00e1}' => 'a',
+                  '\u{00f6}' | '\u{00f2}' => 'o',
+                  '\u{00fc}' | '\u{00f9}' => 'u',
+                  other => other,
+              })
+              .collect()
+      }
+  commit_message: "feat: add ngram tokenization and unicode normalization"
+fragments:
+- id: byte_offset_field
+  selector:
+    path: src/analyzer/tokenizer.rs
+    anchor: "pub byte_offset: usize"
+- id: tokenize_ngrams
+  selector:
+    path: src/analyzer/tokenizer.rs
+    anchor: "pub fn tokenize_with_ngrams"
+- id: normalize_unicode
+  selector:
+    path: src/analyzer/tokenizer.rs
+    anchor: "pub fn normalize_unicode"
+- id: indexer_calls_tokenize
+  selector:
+    path: src/indexer/inverted.rs
+    anchor: "tokenize(content)"
+- id: indexer_calls_stem
+  selector:
+    path: src/indexer/inverted.rs
+    anchor: "stem(&token.text)"
+- id: stemmer_fn
+  selector:
+    path: src/analyzer/stemmer.rs
+    anchor: "pub fn stem"
+- id: unrelated_segment
+  selector:
+    path: src/storage/segment.rs
+    anchor: "pub struct Segment"
+- id: unrelated_query_parser
+  selector:
+    path: src/query/parser.rs
+    anchor: "pub fn parse_query"
+- id: unrelated_highlight
+  selector:
+    path: src/highlight/snippet.rs
+    anchor: "pub fn highlight"
+oracle:
+  required:
+  - tokenize_ngrams
+  - normalize_unicode
+  - indexer_calls_tokenize
+  allowed:
+  - byte_offset_field
+  - indexer_calls_stem
+  - stemmer_fn
+  forbidden:
+  - unrelated_segment
+  - unrelated_query_parser
+  - unrelated_highlight

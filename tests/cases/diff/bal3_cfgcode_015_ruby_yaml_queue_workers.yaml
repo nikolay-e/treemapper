@@ -1,0 +1,179 @@
+name: bal3_cfgcode_015_ruby_yaml_queue_workers
+tags:
+- lang:ruby
+- change:single_file
+- change:config
+- context:config_to_code
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    config/queue.yml: |
+      queue:
+        backend: inline
+        concurrency: 1
+        retry_attempts: 3
+        queues:
+          - default
+          - mailers
+    lib/queue/config.rb: |
+      require 'yaml'
+
+      module Queue
+        class Config
+          attr_reader :backend, :concurrency, :retry_attempts, :queues
+
+          def initialize(config_path)
+            data = YAML.load_file(config_path)
+            cfg = data['queue']
+            @backend = cfg['backend']
+            @concurrency = cfg['concurrency']
+            @retry_attempts = cfg['retry_attempts']
+            @queues = cfg['queues']
+          end
+
+          def async?
+            @backend != 'inline'
+          end
+
+          def queue_names
+            @queues.join(',')
+          end
+        end
+      end
+    lib/queue/worker.rb: |
+      module Queue
+        class Worker
+          def initialize(config)
+            @config = config
+          end
+
+          def start
+            threads = @config.concurrency
+            queues = @config.queue_names
+            { threads: threads, queues: queues, async: @config.async? }
+          end
+
+          def process(job)
+            attempts = 0
+            loop do
+              attempts += 1
+              break if attempts > @config.retry_attempts
+            end
+          end
+        end
+      end
+    lib/notifications/slack.rb: |
+      GARBAGE_CFGCODE_015_SLACK_A = "webhook"
+      GARBAGE_CFGCODE_015_CHANNEL_B = "general"
+
+      module Notifications
+        class Slack
+          def post(message); end
+        end
+      end
+    lib/reports/csv.rb: |
+      GARBAGE_CFGCODE_015_CSV_C = "export"
+      GARBAGE_CFGCODE_015_DELIM_D = ","
+
+      module Reports
+        class CSV
+          def generate(data); end
+        end
+      end
+    lib/audit/trail.rb: |
+      GARBAGE_CFGCODE_015_AUDIT_E = "trail"
+      GARBAGE_CFGCODE_015_RETAIN_F = 90
+
+      module Audit
+        class Trail
+          def log(event); end
+        end
+      end
+  changed_files:
+    config/queue.yml: |
+      queue:
+        backend: sidekiq
+        concurrency: 10
+        retry_attempts: 5
+        queues:
+          - critical
+          - default
+          - mailers
+          - reports
+        redis_url: redis://queue:6379/1
+  commit_message: "switch to sidekiq with higher concurrency"
+fragments:
+- id: queue_config
+  selector:
+    path: lib/queue/config.rb
+    anchor: "class Config"
+- id: concurrency_read
+  selector:
+    path: lib/queue/config.rb
+    anchor: "@concurrency = cfg['concurrency']"
+- id: async_check
+  selector:
+    path: lib/queue/config.rb
+    anchor: "def async?"
+- id: queue_names
+  selector:
+    path: lib/queue/config.rb
+    anchor: "def queue_names"
+- id: worker_start
+  selector:
+    path: lib/queue/worker.rb
+    anchor: "def start"
+- id: worker_retry
+  selector:
+    path: lib/queue/worker.rb
+    anchor: "@config.retry_attempts"
+- id: no_slack
+  selector:
+    path: lib/notifications/slack.rb
+    anchor: "class Slack"
+- id: no_csv
+  selector:
+    path: lib/reports/csv.rb
+    anchor: "class CSV"
+- id: no_audit
+  selector:
+    path: lib/audit/trail.rb
+    anchor: "class Trail"
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_CFGCODE_015_SLACK_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_CFGCODE_015_CHANNEL_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_CFGCODE_015_CSV_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_CFGCODE_015_DELIM_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_CFGCODE_015_AUDIT_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_CFGCODE_015_RETAIN_F
+oracle:
+  required:
+  - queue_config
+  - concurrency_read
+  - async_check
+  - queue_names
+  - worker_start
+  - worker_retry
+  allowed: []
+  forbidden:
+  - no_slack
+  - no_csv
+  - no_audit
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

@@ -1,4 +1,10 @@
 name: csharp_017_custom_attribute
+tags:
+- lang:csharp
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     Attributes/ValidateAttribute.cs: |

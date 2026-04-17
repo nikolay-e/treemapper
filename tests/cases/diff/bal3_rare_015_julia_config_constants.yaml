@@ -1,0 +1,167 @@
+name: bal3_rare_015_julia_config_constants
+tags:
+- lang:julia
+- change:single_file
+- change:config
+- context:config_to_code
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/Constants.jl: |
+      module Constants
+
+      export DB_HOST, DB_PORT, DB_NAME, MAX_RETRIES
+
+      const DB_HOST = "localhost"
+      const DB_PORT = 5432
+      const DB_NAME = "myapp_dev"
+      const MAX_RETRIES = 3
+
+      end
+    src/Database.jl: |
+      module Database
+
+      using ..Constants
+
+      export connect, connection_string
+
+      function connection_string()
+          "postgres://$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+      end
+
+      function connect()
+          url = connection_string()
+          retries = 0
+          while retries < MAX_RETRIES
+              retries += 1
+          end
+          url
+      end
+
+      end
+    src/API.jl: |
+      module API
+
+      using ..Constants
+      using ..Database
+
+      export start_server
+
+      function start_server()
+          conn = connect()
+          "Server connected to $(conn) with max_retries=$(MAX_RETRIES)"
+      end
+
+      end
+    src/Logging.jl: |
+      module Logging
+
+      GARBAGE_RARE_015_LOG_A = "file"
+      GARBAGE_RARE_015_PATH_B = "/var/log/app.log"
+
+      log_info(msg) = println("INFO: $msg")
+
+      end
+    src/Metrics.jl: |
+      module Metrics
+
+      GARBAGE_RARE_015_METRIC_C = "counter"
+      GARBAGE_RARE_015_PREFIX_D = "app"
+
+      record(name, value) = nothing
+
+      end
+    src/Scheduler.jl: |
+      module Scheduler
+
+      GARBAGE_RARE_015_CRON_E = "daily"
+      GARBAGE_RARE_015_TZ_F = "UTC"
+
+      schedule(task) = nothing
+
+      end
+  changed_files:
+    src/Constants.jl: |
+      module Constants
+
+      export DB_HOST, DB_PORT, DB_NAME, MAX_RETRIES, POOL_SIZE, TIMEOUT_MS
+
+      const DB_HOST = "db-prod.internal"
+      const DB_PORT = 5432
+      const DB_NAME = "myapp_production"
+      const MAX_RETRIES = 5
+      const POOL_SIZE = 20
+      const TIMEOUT_MS = 30000
+
+      end
+  commit_message: "update constants for production with pool and timeout"
+fragments:
+- id: database_uses_constants
+  selector:
+    path: src/Database.jl
+    anchor: "using ..Constants"
+- id: database_uses_host
+  selector:
+    path: src/Database.jl
+    anchor: "DB_HOST"
+- id: database_uses_retries
+  selector:
+    path: src/Database.jl
+    anchor: "MAX_RETRIES"
+- id: api_uses_constants
+  selector:
+    path: src/API.jl
+    anchor: "using ..Constants"
+- id: api_uses_connect
+  selector:
+    path: src/API.jl
+    anchor: "connect()"
+- id: no_logging
+  selector:
+    path: src/Logging.jl
+    anchor: "log_info"
+- id: no_metrics
+  selector:
+    path: src/Metrics.jl
+    anchor: "record(name, value)"
+- id: no_scheduler
+  selector:
+    path: src/Scheduler.jl
+    anchor: "schedule(task)"
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_015_LOG_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_015_PATH_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_015_METRIC_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_015_PREFIX_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_015_CRON_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_015_TZ_F
+oracle:
+  required:
+  - database_uses_constants
+  - database_uses_host
+  - database_uses_retries
+  - api_uses_constants
+  allowed:
+  - api_uses_connect
+  forbidden:
+  - no_logging
+  - no_metrics
+  - no_scheduler
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

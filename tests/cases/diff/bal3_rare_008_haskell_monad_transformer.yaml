@@ -1,0 +1,162 @@
+name: bal3_rare_008_haskell_monad_transformer
+tags:
+- lang:haskell
+- change:single_file
+- change:refactor
+- context:call_graph
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/AppMonad.hs: |
+      module AppMonad where
+
+      import Control.Monad.Reader
+
+      data AppEnv = AppEnv
+        { appName    :: String
+        , appVersion :: String
+        , appDebug   :: Bool
+        }
+
+      type AppM a = ReaderT AppEnv IO a
+
+      runApp :: AppEnv -> AppM a -> IO a
+      runApp env action = runReaderT action env
+
+      getAppName :: AppM String
+      getAppName = asks appName
+
+      isDebug :: AppM Bool
+      isDebug = asks appDebug
+    src/Service.hs: |
+      module Service where
+
+      import AppMonad (AppM, getAppName, isDebug)
+
+      greet :: String -> AppM String
+      greet user = do
+          name <- getAppName
+          debug <- isDebug
+          let prefix = if debug then "[DEBUG] " else ""
+          return $ prefix ++ "Welcome to " ++ name ++ ", " ++ user
+
+      healthCheck :: AppM String
+      healthCheck = do
+          name <- getAppName
+          return $ name ++ " is running"
+    src/Networking.hs: |
+      module Networking where
+
+      gARBAGE_RARE_008_NET_A = "http"
+      gARBAGE_RARE_008_PORT_B = 443
+
+      fetchUrl :: String -> IO String
+      fetchUrl url = return $ "response from " ++ url
+    src/Parsing.hs: |
+      module Parsing where
+
+      gARBAGE_RARE_008_PARSE_C = "json"
+      gARBAGE_RARE_008_STRICT_D = True
+
+      parseInput :: String -> Maybe String
+      parseInput "" = Nothing
+      parseInput s = Just s
+    src/Crypto.hs: |
+      module Crypto where
+
+      gARBAGE_RARE_008_HASH_E = "sha256"
+      gARBAGE_RARE_008_ROUNDS_F = 10000
+
+      hashValue :: String -> String
+      hashValue = reverse
+  changed_files:
+    src/AppMonad.hs: |
+      module AppMonad where
+
+      import Control.Monad.Reader
+      import Control.Monad.Except
+
+      data AppEnv = AppEnv
+        { appName    :: String
+        , appVersion :: String
+        , appDebug   :: Bool
+        , appMaxRetries :: Int
+        }
+
+      data AppError = NotFound String | Unauthorized | InternalError String
+        deriving (Show)
+
+      type AppM a = ExceptT AppError (ReaderT AppEnv IO) a
+
+      runApp :: AppEnv -> AppM a -> IO (Either AppError a)
+      runApp env action = runReaderT (runExceptT action) env
+
+      getAppName :: AppM String
+      getAppName = lift $ asks appName
+
+      isDebug :: AppM Bool
+      isDebug = lift $ asks appDebug
+
+      throwAppError :: AppError -> AppM a
+      throwAppError = throwError
+  commit_message: "add ExceptT error handling to AppM monad stack"
+fragments:
+- id: service_imports_appmonad
+  selector:
+    path: src/Service.hs
+    anchor: "import AppMonad"
+- id: service_uses_getappname
+  selector:
+    path: src/Service.hs
+    anchor: "getAppName"
+- id: service_uses_isdebug
+  selector:
+    path: src/Service.hs
+    anchor: "isDebug"
+- id: no_networking
+  selector:
+    path: src/Networking.hs
+    anchor: "fetchUrl"
+- id: no_parsing
+  selector:
+    path: src/Parsing.hs
+    anchor: "parseInput"
+- id: no_crypto
+  selector:
+    path: src/Crypto.hs
+    anchor: "hashValue"
+- id: no_global_0
+  selector:
+    anchor: gARBAGE_RARE_008_NET_A
+- id: no_global_1
+  selector:
+    anchor: gARBAGE_RARE_008_PORT_B
+- id: no_global_2
+  selector:
+    anchor: gARBAGE_RARE_008_PARSE_C
+- id: no_global_3
+  selector:
+    anchor: gARBAGE_RARE_008_STRICT_D
+- id: no_global_4
+  selector:
+    anchor: gARBAGE_RARE_008_HASH_E
+- id: no_global_5
+  selector:
+    anchor: gARBAGE_RARE_008_ROUNDS_F
+oracle:
+  required:
+  - service_imports_appmonad
+  - service_uses_getappname
+  - service_uses_isdebug
+  allowed: []
+  forbidden:
+  - no_networking
+  - no_parsing
+  - no_crypto
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

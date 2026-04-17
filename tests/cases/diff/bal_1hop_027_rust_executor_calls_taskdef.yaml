@@ -1,0 +1,213 @@
+name: bal_1hop_027_rust_executor_calls_taskdef
+tags:
+- lang:rust
+- change:multi_file
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/task/definition.rs: |
+      pub enum Priority {
+          Low,
+          Normal,
+          High,
+      }
+
+      pub struct TaskDef {
+          pub name: String,
+          pub priority: Priority,
+          pub command: String,
+      }
+
+      impl TaskDef {
+          pub fn new(name: &str, command: &str) -> Self {
+              TaskDef {
+                  name: name.to_string(),
+                  priority: Priority::Normal,
+                  command: command.to_string(),
+              }
+          }
+
+          pub fn with_priority(mut self, p: Priority) -> Self {
+              self.priority = p;
+              self
+          }
+      }
+    src/task/result.rs: |
+      pub struct TaskResult {
+          pub task_name: String,
+          pub success: bool,
+          pub output: String,
+      }
+
+      impl TaskResult {
+          pub fn ok(name: &str, output: &str) -> Self {
+              TaskResult {
+                  task_name: name.to_string(),
+                  success: true,
+                  output: output.to_string(),
+              }
+          }
+
+          pub fn fail(name: &str, err: &str) -> Self {
+              TaskResult {
+                  task_name: name.to_string(),
+                  success: false,
+                  output: err.to_string(),
+              }
+          }
+      }
+    src/executor/pool.rs: |
+      use crate::task::definition::TaskDef;
+      use crate::task::result::TaskResult;
+
+      pub struct ExecutorPool {
+          max_workers: usize,
+      }
+
+      impl ExecutorPool {
+          pub fn new(max_workers: usize) -> Self {
+              ExecutorPool { max_workers }
+          }
+
+          pub fn execute(&self, task: &TaskDef) -> TaskResult {
+              println!("Executing: {}", task.name);
+              TaskResult::ok(&task.name, "done")
+          }
+      }
+    src/monitor/health.rs: |
+      pub struct HealthStatus {
+          pub cpu_usage: f64,
+          pub memory_mb: u64,
+      }
+
+      pub fn check_health() -> HealthStatus {
+          HealthStatus {
+              cpu_usage: 0.5,
+              memory_mb: 1024,
+          }
+      }
+  changed_files:
+    src/task/definition.rs: |
+      use std::time::Duration;
+
+      pub enum Priority {
+          Low,
+          Normal,
+          High,
+          Critical,
+      }
+
+      pub struct TaskDef {
+          pub name: String,
+          pub priority: Priority,
+          pub command: String,
+          pub timeout: Duration,
+          pub retries: u32,
+      }
+
+      impl TaskDef {
+          pub fn new(name: &str, command: &str) -> Self {
+              TaskDef {
+                  name: name.to_string(),
+                  priority: Priority::Normal,
+                  command: command.to_string(),
+                  timeout: Duration::from_secs(60),
+                  retries: 0,
+              }
+          }
+
+          pub fn with_priority(mut self, p: Priority) -> Self {
+              self.priority = p;
+              self
+          }
+
+          pub fn with_timeout(mut self, t: Duration) -> Self {
+              self.timeout = t;
+              self
+          }
+
+          pub fn with_retries(mut self, n: u32) -> Self {
+              self.retries = n;
+              self
+          }
+      }
+    src/task/result.rs: |
+      use std::time::Duration;
+
+      pub struct TaskResult {
+          pub task_name: String,
+          pub success: bool,
+          pub output: String,
+          pub duration: Duration,
+          pub attempt: u32,
+      }
+
+      impl TaskResult {
+          pub fn ok(name: &str, output: &str, duration: Duration) -> Self {
+              TaskResult {
+                  task_name: name.to_string(),
+                  success: true,
+                  output: output.to_string(),
+                  duration,
+                  attempt: 1,
+              }
+          }
+
+          pub fn fail(name: &str, err: &str, duration: Duration, attempt: u32) -> Self {
+              TaskResult {
+                  task_name: name.to_string(),
+                  success: false,
+                  output: err.to_string(),
+                  duration,
+                  attempt,
+              }
+          }
+      }
+  commit_message: "feat: add timeout, retries, Critical priority and result tracking"
+fragments:
+- id: critical_priority
+  selector:
+    path: src/task/definition.rs
+    anchor: "Critical"
+- id: timeout_field
+  selector:
+    path: src/task/definition.rs
+    anchor: "pub timeout: Duration"
+- id: with_retries
+  selector:
+    path: src/task/definition.rs
+    anchor: "pub fn with_retries"
+- id: result_duration
+  selector:
+    path: src/task/result.rs
+    anchor: "pub duration: Duration"
+- id: result_attempt
+  selector:
+    path: src/task/result.rs
+    anchor: "pub attempt: u32"
+- id: executor_calls_taskdef
+  selector:
+    path: src/executor/pool.rs
+    anchor: "task: &TaskDef"
+- id: executor_returns_result
+  selector:
+    path: src/executor/pool.rs
+    anchor: "TaskResult::ok(&task.name"
+- id: unrelated_health
+  selector:
+    path: src/monitor/health.rs
+    anchor: "pub fn check_health"
+oracle:
+  required:
+  - timeout_field
+  - with_retries
+  - executor_calls_taskdef
+  - executor_returns_result
+  allowed:
+  - critical_priority
+  - result_duration
+  - result_attempt
+  forbidden:
+  - unrelated_health

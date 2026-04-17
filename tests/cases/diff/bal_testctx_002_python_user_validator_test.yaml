@@ -1,0 +1,79 @@
+name: bal_testctx_002_python_user_validator_test
+tags:
+- lang:python
+- change:single_file
+- change:bug_fix
+- context:test_file
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/validators.py: |
+      import re
+
+      def validate_email(email: str) -> bool:
+          pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+          return bool(re.match(pattern, email))
+
+      def validate_username(username: str) -> bool:
+          return len(username) >= 3
+    tests/test_validators.py: |
+      from src.validators import validate_email, validate_username
+
+      def test_valid_email():
+          assert validate_email("user@example.com") is True
+
+      def test_invalid_email():
+          assert validate_email("not-an-email") is False
+
+      def test_valid_username():
+          assert validate_username("alice") is True
+
+      def test_short_username():
+          assert validate_username("ab") is False
+    src/database.py: |
+      class DatabaseConnection:
+          def __init__(self, host: str, port: int):
+              self.host = host
+              self.port = port
+
+          def connect(self):
+              return f"Connected to {self.host}:{self.port}"
+  changed_files:
+    src/validators.py: |
+      import re
+
+      def validate_email(email: str) -> bool:
+          pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+          if not email or len(email) > 254:
+              return False
+          return bool(re.match(pattern, email))
+
+      def validate_username(username: str) -> bool:
+          return len(username) >= 3
+  commit_message: "fix: add length check to email validation"
+fragments:
+- id: validate_email_fn
+  selector:
+    path: src/validators.py
+    anchor: "def validate_email(email: str)"
+- id: test_imports_validators
+  selector:
+    path: tests/test_validators.py
+    anchor: "from src.validators import validate_email"
+- id: test_valid_email
+  selector:
+    path: tests/test_validators.py
+    anchor: "def test_valid_email"
+- id: no_database
+  selector:
+    path: src/database.py
+    anchor: "class DatabaseConnection"
+oracle:
+  required:
+  - validate_email_fn
+  - test_imports_validators
+  allowed:
+  - test_valid_email
+  forbidden:
+  - no_database

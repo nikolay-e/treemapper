@@ -1,0 +1,185 @@
+name: bal_1hop_030_rust_pipeline_calls_stage
+tags:
+- lang:rust
+- change:new_function
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/stage/transform.rs: |
+      pub struct Record {
+          pub fields: Vec<(String, String)>,
+      }
+
+      impl Record {
+          pub fn new() -> Self {
+              Record { fields: Vec::new() }
+          }
+
+          pub fn set(&mut self, key: &str, value: &str) {
+              self.fields.push((key.to_string(), value.to_string()));
+          }
+
+          pub fn get(&self, key: &str) -> Option<&str> {
+              self.fields.iter()
+                  .find(|(k, _)| k == key)
+                  .map(|(_, v)| v.as_str())
+          }
+      }
+
+      pub fn map_field(records: &mut [Record], from: &str, to: &str) {
+          for record in records.iter_mut() {
+              if let Some(val) = record.get(from).map(|v| v.to_string()) {
+                  record.set(to, &val);
+              }
+          }
+      }
+    src/stage/filter.rs: |
+      use super::transform::Record;
+
+      pub fn filter_by_field(records: Vec<Record>, key: &str, value: &str) -> Vec<Record> {
+          records.into_iter()
+              .filter(|r| r.get(key) == Some(value))
+              .collect()
+      }
+
+      pub fn drop_empty(records: Vec<Record>) -> Vec<Record> {
+          records.into_iter()
+              .filter(|r| !r.fields.is_empty())
+              .collect()
+      }
+    src/pipeline/runner.rs: |
+      use crate::stage::transform::{Record, map_field};
+      use crate::stage::filter::filter_by_field;
+
+      pub struct Pipeline {
+          steps: Vec<Box<dyn Fn(Vec<Record>) -> Vec<Record>>>,
+      }
+
+      impl Pipeline {
+          pub fn new() -> Self {
+              Pipeline { steps: Vec::new() }
+          }
+
+          pub fn add_step(&mut self, step: Box<dyn Fn(Vec<Record>) -> Vec<Record>>) {
+              self.steps.push(step);
+          }
+
+          pub fn run(&self, mut records: Vec<Record>) -> Vec<Record> {
+              for step in &self.steps {
+                  records = step(records);
+              }
+              records
+          }
+      }
+    src/output/csv.rs: |
+      pub fn to_csv_line(fields: &[(String, String)]) -> String {
+          fields.iter()
+              .map(|(_, v)| v.as_str())
+              .collect::<Vec<_>>()
+              .join(",")
+      }
+    src/input/reader.rs: |
+      pub fn read_lines(content: &str) -> Vec<String> {
+          content.lines().map(|l| l.to_string()).collect()
+      }
+  changed_files:
+    src/stage/transform.rs: |
+      pub struct Record {
+          pub fields: Vec<(String, String)>,
+      }
+
+      impl Record {
+          pub fn new() -> Self {
+              Record { fields: Vec::new() }
+          }
+
+          pub fn set(&mut self, key: &str, value: &str) {
+              if let Some(entry) = self.fields.iter_mut().find(|(k, _)| k == key) {
+                  entry.1 = value.to_string();
+              } else {
+                  self.fields.push((key.to_string(), value.to_string()));
+              }
+          }
+
+          pub fn get(&self, key: &str) -> Option<&str> {
+              self.fields.iter()
+                  .find(|(k, _)| k == key)
+                  .map(|(_, v)| v.as_str())
+          }
+
+          pub fn remove(&mut self, key: &str) -> Option<String> {
+              if let Some(pos) = self.fields.iter().position(|(k, _)| k == key) {
+                  Some(self.fields.remove(pos).1)
+              } else {
+                  None
+              }
+          }
+
+          pub fn keys(&self) -> Vec<&str> {
+              self.fields.iter().map(|(k, _)| k.as_str()).collect()
+          }
+      }
+
+      pub fn map_field(records: &mut [Record], from: &str, to: &str) {
+          for record in records.iter_mut() {
+              if let Some(val) = record.get(from).map(|v| v.to_string()) {
+                  record.set(to, &val);
+              }
+          }
+      }
+
+      pub fn rename_field(records: &mut [Record], from: &str, to: &str) {
+          for record in records.iter_mut() {
+              if let Some(val) = record.remove(from) {
+                  record.set(to, &val);
+              }
+          }
+      }
+  commit_message: "feat: add upsert set, remove, keys and rename_field to Record"
+fragments:
+- id: set_upsert_logic
+  selector:
+    path: src/stage/transform.rs
+    anchor: "entry.1 = value.to_string()"
+- id: remove_method
+  selector:
+    path: src/stage/transform.rs
+    anchor: "pub fn remove"
+- id: keys_method
+  selector:
+    path: src/stage/transform.rs
+    anchor: "pub fn keys"
+- id: rename_field_fn
+  selector:
+    path: src/stage/transform.rs
+    anchor: "pub fn rename_field"
+- id: pipeline_calls_map_field
+  selector:
+    path: src/pipeline/runner.rs
+    anchor: "use crate::stage::transform::{Record, map_field}"
+- id: filter_uses_record
+  selector:
+    path: src/stage/filter.rs
+    anchor: "use super::transform::Record"
+- id: unrelated_csv
+  selector:
+    path: src/output/csv.rs
+    anchor: "pub fn to_csv_line"
+- id: unrelated_reader
+  selector:
+    path: src/input/reader.rs
+    anchor: "pub fn read_lines"
+oracle:
+  required:
+  - set_upsert_logic
+  - remove_method
+  - rename_field_fn
+  - pipeline_calls_map_field
+  allowed:
+  - keys_method
+  - filter_uses_record
+  forbidden:
+  - unrelated_csv
+  - unrelated_reader

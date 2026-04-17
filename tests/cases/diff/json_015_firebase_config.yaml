@@ -1,4 +1,11 @@
 name: json_015_firebase_config
+tags:
+- lang:javascript
+- change:single_file
+- change:config
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     firebase.json: |

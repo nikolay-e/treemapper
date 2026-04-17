@@ -1,0 +1,268 @@
+name: bal_refactor_027_java_replace_loops_with_streams
+tags:
+- lang:java
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/main/java/com/app/repository/EmployeeRepository.java: |
+      package com.app.repository;
+
+      import java.util.ArrayList;
+      import java.util.List;
+
+      public class EmployeeRepository {
+          private final List<Employee> employees = new ArrayList<>();
+
+          public void add(Employee emp) {
+              employees.add(emp);
+          }
+
+          public List<Employee> findByDepartment(String dept) {
+              List<Employee> result = new ArrayList<>();
+              for (Employee e : employees) {
+                  if (dept.equals(e.getDepartment())) {
+                      result.add(e);
+                  }
+              }
+              return result;
+          }
+
+          public List<String> getAllEmails() {
+              List<String> emails = new ArrayList<>();
+              for (Employee e : employees) {
+                  emails.add(e.getEmail());
+              }
+              return emails;
+          }
+
+          public double getTotalSalary() {
+              double total = 0;
+              for (Employee e : employees) {
+                  total += e.getSalary();
+              }
+              return total;
+          }
+      }
+    src/main/java/com/app/repository/Employee.java: |
+      package com.app.repository;
+
+      public class Employee {
+          private String name;
+          private String email;
+          private String department;
+          private double salary;
+
+          public Employee(String name, String email, String department, double salary) {
+              this.name = name;
+              this.email = email;
+              this.department = department;
+              this.salary = salary;
+          }
+
+          public String getName() { return name; }
+          public String getEmail() { return email; }
+          public String getDepartment() { return department; }
+          public double getSalary() { return salary; }
+      }
+    src/main/java/com/app/service/HRService.java: |
+      package com.app.service;
+
+      import com.app.repository.EmployeeRepository;
+      import java.util.List;
+
+      public class HRService {
+          private final EmployeeRepository repo;
+
+          public HRService(EmployeeRepository repo) {
+              this.repo = repo;
+          }
+
+          public List<String> getDepartmentEmails(String dept) {
+              List<String> emails = new java.util.ArrayList<>();
+              for (var emp : repo.findByDepartment(dept)) {
+                  emails.add(emp.getEmail());
+              }
+              return emails;
+          }
+      }
+    src/main/java/com/app/GarbageImporter.java: |
+      package com.app;
+
+      public class GarbageImporter {
+          public static final String GARBAGE_REFACTOR_027_IMPORT_A = "importer";
+          public static final int GARBAGE_REFACTOR_027_CHUNK_B = 500;
+          public static final boolean GARBAGE_REFACTOR_027_VALIDATE_C = true;
+
+          public void importData() {}
+      }
+    src/main/java/com/app/GarbageEncryption.java: |
+      package com.app;
+
+      public class GarbageEncryption {
+          public static final String GARBAGE_REFACTOR_027_ENCRYPT_D = "encryption";
+          public static final boolean GARBAGE_REFACTOR_027_AES_E = true;
+
+          public byte[] encrypt(byte[] data) { return data; }
+      }
+  changed_files:
+    src/main/java/com/app/repository/EmployeeRepository.java: |
+      package com.app.repository;
+
+      import java.util.ArrayList;
+      import java.util.List;
+      import java.util.stream.Collectors;
+
+      public class EmployeeRepository {
+          private final List<Employee> employees = new ArrayList<>();
+
+          public void add(Employee emp) {
+              employees.add(emp);
+          }
+
+          public List<Employee> findByDepartment(String dept) {
+              return employees.stream()
+                  .filter(e -> dept.equals(e.getDepartment()))
+                  .collect(Collectors.toList());
+          }
+
+          public List<String> getAllEmails() {
+              return employees.stream()
+                  .map(Employee::getEmail)
+                  .collect(Collectors.toList());
+          }
+
+          public double getTotalSalary() {
+              return employees.stream()
+                  .mapToDouble(Employee::getSalary)
+                  .sum();
+          }
+      }
+    src/main/java/com/app/repository/Employee.java: |
+      package com.app.repository;
+
+      public class Employee {
+          private String name;
+          private String email;
+          private String department;
+          private double salary;
+
+          public Employee(String name, String email, String department, double salary) {
+              this.name = name;
+              this.email = email;
+              this.department = department;
+              this.salary = salary;
+          }
+
+          public String getName() { return name; }
+          public String getEmail() { return email; }
+          public String getDepartment() { return department; }
+          public double getSalary() { return salary; }
+      }
+    src/main/java/com/app/service/HRService.java: |
+      package com.app.service;
+
+      import com.app.repository.Employee;
+      import com.app.repository.EmployeeRepository;
+      import java.util.List;
+      import java.util.stream.Collectors;
+
+      public class HRService {
+          private final EmployeeRepository repo;
+
+          public HRService(EmployeeRepository repo) {
+              this.repo = repo;
+          }
+
+          public List<String> getDepartmentEmails(String dept) {
+              return repo.findByDepartment(dept).stream()
+                  .map(Employee::getEmail)
+                  .collect(Collectors.toList());
+          }
+      }
+    src/main/java/com/app/GarbageImporter.java: |
+      package com.app;
+
+      public class GarbageImporter {
+          public static final String GARBAGE_REFACTOR_027_IMPORT_A = "importer";
+          public static final int GARBAGE_REFACTOR_027_CHUNK_B = 500;
+          public static final boolean GARBAGE_REFACTOR_027_VALIDATE_C = true;
+
+          public void importData() {}
+      }
+    src/main/java/com/app/GarbageEncryption.java: |
+      package com.app;
+
+      public class GarbageEncryption {
+          public static final String GARBAGE_REFACTOR_027_ENCRYPT_D = "encryption";
+          public static final boolean GARBAGE_REFACTOR_027_AES_E = true;
+
+          public byte[] encrypt(byte[] data) { return data; }
+      }
+  commit_message: "refactor: replace manual loops with Stream API"
+fragments:
+- id: repo_stream_filter
+  selector:
+    path: src/main/java/com/app/repository/EmployeeRepository.java
+    anchor: "employees.stream()"
+- id: repo_map_email
+  selector:
+    path: src/main/java/com/app/repository/EmployeeRepository.java
+    anchor: "Employee::getEmail"
+- id: repo_sum_salary
+  selector:
+    path: src/main/java/com/app/repository/EmployeeRepository.java
+    anchor: "Employee::getSalary"
+- id: employee_model
+  selector:
+    path: src/main/java/com/app/repository/Employee.java
+    anchor: "public class Employee"
+- id: hr_uses_stream
+  selector:
+    path: src/main/java/com/app/service/HRService.java
+    anchor: "repo.findByDepartment(dept).stream()"
+- id: hr_imports_repo
+  selector:
+    path: src/main/java/com/app/service/HRService.java
+    anchor: "import com.app.repository.EmployeeRepository"
+- id: no_garbage_importer
+  selector:
+    path: src/main/java/com/app/GarbageImporter.java
+- id: no_garbage_encryption
+  selector:
+    path: src/main/java/com/app/GarbageEncryption.java
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_027_IMPORT_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_027_CHUNK_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_027_VALIDATE_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_027_ENCRYPT_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_027_AES_E
+oracle:
+  required:
+  - repo_stream_filter
+  - repo_map_email
+  - repo_sum_salary
+  - employee_model
+  - hr_uses_stream
+  - hr_imports_repo
+  allowed: []
+  forbidden:
+  - no_garbage_importer
+  - no_garbage_encryption
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

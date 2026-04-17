@@ -1,0 +1,154 @@
+name: bal3_cfgcode_008_rust_json_auth_config
+tags:
+- lang:rust
+- change:single_file
+- change:config
+- context:config_to_code
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    config/auth.json: |
+      {
+        "auth": {
+          "jwt_secret": "dev-secret-key",
+          "token_expiry_secs": 3600,
+          "refresh_enabled": false
+        }
+      }
+    src/auth/config.rs: |
+      use serde::Deserialize;
+      use std::fs;
+
+      #[derive(Deserialize, Clone)]
+      pub struct AuthConfig {
+          pub jwt_secret: String,
+          pub token_expiry_secs: u64,
+          pub refresh_enabled: bool,
+      }
+
+      #[derive(Deserialize)]
+      struct AuthConfigFile {
+          auth: AuthConfig,
+      }
+
+      pub fn load_auth_config(path: &str) -> Result<AuthConfig, Box<dyn std::error::Error>> {
+          let content = fs::read_to_string(path)?;
+          let file: AuthConfigFile = serde_json::from_str(&content)?;
+          Ok(file.auth)
+      }
+    src/auth/jwt.rs: |
+      use super::config::AuthConfig;
+      use std::time::{SystemTime, UNIX_EPOCH};
+
+      pub struct TokenClaims {
+          pub sub: String,
+          pub exp: u64,
+      }
+
+      pub fn generate_token(cfg: &AuthConfig, user_id: &str) -> String {
+          let exp = SystemTime::now()
+              .duration_since(UNIX_EPOCH)
+              .unwrap()
+              .as_secs() + cfg.token_expiry_secs;
+          format!("token_{}_{}", user_id, exp)
+      }
+
+      pub fn validate_token(cfg: &AuthConfig, token: &str) -> bool {
+          !token.is_empty() && !cfg.jwt_secret.is_empty()
+      }
+    src/handlers/login.rs: |
+      GARBAGE_CFGCODE_008_LOGIN_A: &str = "login";
+      GARBAGE_CFGCODE_008_FORM_B: &str = "form";
+
+      pub fn handle_login() {}
+    src/db/users.rs: |
+      GARBAGE_CFGCODE_008_USERS_C: &str = "users";
+      GARBAGE_CFGCODE_008_TABLE_D: &str = "user_accounts";
+
+      pub fn find_user_by_email(email: &str) {}
+    src/email/verify.rs: |
+      GARBAGE_CFGCODE_008_VERIFY_E: &str = "verify";
+      GARBAGE_CFGCODE_008_LINK_F: &str = "https://example.com";
+
+      pub fn send_verification_email(to: &str) {}
+  changed_files:
+    config/auth.json: |
+      {
+        "auth": {
+          "jwt_secret": "prod-secret-rotated-2024",
+          "token_expiry_secs": 900,
+          "refresh_enabled": true,
+          "refresh_expiry_secs": 86400
+        }
+      }
+  commit_message: "enable refresh tokens and reduce JWT expiry"
+fragments:
+- id: auth_struct
+  selector:
+    path: src/auth/config.rs
+    anchor: "pub struct AuthConfig"
+- id: load_auth
+  selector:
+    path: src/auth/config.rs
+    anchor: "pub fn load_auth_config"
+- id: generate_token
+  selector:
+    path: src/auth/jwt.rs
+    anchor: "pub fn generate_token"
+- id: validate_token
+  selector:
+    path: src/auth/jwt.rs
+    anchor: "pub fn validate_token"
+- id: token_expiry_usage
+  selector:
+    path: src/auth/jwt.rs
+    anchor: "cfg.token_expiry_secs"
+- id: no_login
+  selector:
+    path: src/handlers/login.rs
+    anchor: "handle_login"
+- id: no_users
+  selector:
+    path: src/db/users.rs
+    anchor: "find_user_by_email"
+- id: no_verify
+  selector:
+    path: src/email/verify.rs
+    anchor: "send_verification_email"
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_CFGCODE_008_LOGIN_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_CFGCODE_008_FORM_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_CFGCODE_008_USERS_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_CFGCODE_008_TABLE_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_CFGCODE_008_VERIFY_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_CFGCODE_008_LINK_F
+oracle:
+  required:
+  - auth_struct
+  - load_auth
+  - generate_token
+  - token_expiry_usage
+  allowed:
+  - validate_token
+  forbidden:
+  - no_login
+  - no_users
+  - no_verify
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

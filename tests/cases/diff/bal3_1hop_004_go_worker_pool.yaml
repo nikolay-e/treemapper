@@ -1,0 +1,197 @@
+name: bal3_1hop_004_go_worker_pool
+tags:
+- lang:go
+- change:new_function
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/task/task.go: |
+      package task
+
+      type Priority int
+
+      const (
+          Low    Priority = iota
+          Medium
+          High
+      )
+
+      type Task struct {
+          ID       string
+          Payload  []byte
+          Priority Priority
+      }
+
+      func New(id string, payload []byte) *Task {
+          return &Task{ID: id, Payload: payload, Priority: Medium}
+      }
+    pkg/worker/pool.go: |
+      package worker
+
+      import "pkg/task"
+
+      type Pool struct {
+          Size  int
+          queue chan *task.Task
+      }
+
+      func NewPool(size int) *Pool {
+          return &Pool{Size: size, queue: make(chan *task.Task, 100)}
+      }
+
+      func (p *Pool) Submit(t *task.Task) {
+          p.queue <- t
+      }
+
+      func (p *Pool) Start() {
+          for i := 0; i < p.Size; i++ {
+              go p.work()
+          }
+      }
+
+      func (p *Pool) work() {
+          for t := range p.queue {
+              _ = t
+          }
+      }
+    pkg/scheduler/cron.go: |
+      package scheduler
+
+      import "pkg/task"
+
+      type CronScheduler struct {
+          tasks []*task.Task
+      }
+
+      func NewCronScheduler() *CronScheduler {
+          return &CronScheduler{}
+      }
+
+      func (c *CronScheduler) Schedule(t *task.Task) {
+          c.tasks = append(c.tasks, t)
+      }
+    pkg/metrics/counter.go: |
+      package metrics
+
+      GARBAGE_004_COUNTER_A = "counter"
+
+      type Counter struct {
+          Name  string
+          Value int64
+      }
+
+      func (c *Counter) Inc() {
+          c.Value++
+      }
+    pkg/retry/backoff.go: |
+      package retry
+
+      GARBAGE_004_BACKOFF_B = "backoff"
+
+      type Backoff struct {
+          MaxRetries int
+      }
+
+      func (b *Backoff) Execute(fn func() error) error {
+          return fn()
+      }
+    pkg/circuitbreaker/breaker.go: |
+      package circuitbreaker
+
+      GARBAGE_004_BREAKER_C = "breaker"
+
+      type Breaker struct {
+          Threshold int
+          Failures  int
+      }
+
+      func (b *Breaker) Allow() bool {
+          return b.Failures < b.Threshold
+      }
+  changed_files:
+    pkg/task/task.go: |
+      package task
+
+      type Priority int
+
+      const (
+          Low    Priority = iota
+          Medium
+          High
+          Critical
+      )
+
+      type Task struct {
+          ID       string
+          Payload  []byte
+          Priority Priority
+          Retries  int
+      }
+
+      func New(id string, payload []byte) *Task {
+          return &Task{ID: id, Payload: payload, Priority: Medium, Retries: 0}
+      }
+
+      func NewWithPriority(id string, payload []byte, p Priority) *Task {
+          return &Task{ID: id, Payload: payload, Priority: p, Retries: 0}
+      }
+  commit_message: "feat: add Critical priority, Retries field, and NewWithPriority"
+fragments:
+- id: critical_priority
+  selector:
+    path: pkg/task/task.go
+    anchor: "Critical"
+- id: retries_field
+  selector:
+    path: pkg/task/task.go
+    anchor: "Retries  int"
+- id: new_with_priority
+  selector:
+    path: pkg/task/task.go
+    anchor: "func NewWithPriority"
+- id: pool_imports_task
+  selector:
+    path: pkg/worker/pool.go
+    anchor: "task.Task"
+- id: cron_imports_task
+  selector:
+    path: pkg/scheduler/cron.go
+    anchor: "task.Task"
+- id: unrelated_counter
+  selector:
+    path: pkg/metrics/counter.go
+    anchor: "type Counter struct"
+- id: unrelated_backoff
+  selector:
+    path: pkg/retry/backoff.go
+    anchor: "type Backoff struct"
+- id: unrelated_breaker
+  selector:
+    path: pkg/circuitbreaker/breaker.go
+    anchor: "type Breaker struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_004_COUNTER_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_004_BACKOFF_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_004_BREAKER_C
+oracle:
+  required:
+  - critical_priority
+  - retries_field
+  - new_with_priority
+  - pool_imports_task
+  allowed:
+  - cron_imports_task
+  forbidden:
+  - unrelated_counter
+  - unrelated_backoff
+  - unrelated_breaker
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

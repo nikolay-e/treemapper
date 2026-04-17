@@ -1,0 +1,260 @@
+name: bal_rare_020_zig_ring_buffer
+tags:
+- lang:zig
+- change:multi_file
+- change:new_function
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/ring.zig: |
+      const std = @import("std");
+
+      pub fn RingBuffer(comptime T: type, comptime capacity: usize) type {
+          return struct {
+              const Self = @This();
+              buf: [capacity]T = undefined,
+              head: usize = 0,
+              tail: usize = 0,
+              count: usize = 0,
+
+              pub fn push(self: *Self, item: T) !void {
+                  if (self.count == capacity) return error.BufferFull;
+                  self.buf[self.tail] = item;
+                  self.tail = (self.tail + 1) % capacity;
+                  self.count += 1;
+              }
+
+              pub fn pop(self: *Self) !T {
+                  if (self.count == 0) return error.BufferEmpty;
+                  const item = self.buf[self.head];
+                  self.head = (self.head + 1) % capacity;
+                  self.count -= 1;
+                  return item;
+              }
+
+              pub fn len(self: *const Self) usize {
+                  return self.count;
+              }
+          };
+      }
+    src/logger.zig: |
+      const std = @import("std");
+      const RingBuffer = @import("ring.zig").RingBuffer;
+
+      pub const LogEntry = struct {
+          level: u8,
+          message: [256]u8,
+          msg_len: usize,
+      };
+
+      pub const Logger = struct {
+          buffer: RingBuffer(LogEntry, 64),
+
+          pub fn init() Logger {
+              return Logger{ .buffer = .{} };
+          }
+
+          pub fn log(self: *Logger, level: u8, msg: []const u8) void {
+              var entry = LogEntry{ .level = level, .message = undefined, .msg_len = msg.len };
+              @memcpy(entry.message[0..msg.len], msg);
+              self.buffer.push(entry) catch {};
+          }
+      };
+    src/app.zig: |
+      const Logger = @import("logger.zig").Logger;
+
+      pub fn main() !void {
+          var logger = Logger.init();
+          logger.log(1, "Application started");
+          logger.log(2, "Processing request");
+      }
+    garbage_timer.zig: |
+      const GARBAGE_RARE_020_INTERVAL_A: u64 = 1000;
+      const GARBAGE_RARE_020_PRECISION_B: u32 = 1;
+
+      fn garbage_tick() void {
+          _ = GARBAGE_RARE_020_INTERVAL_A;
+      }
+
+      const GARBAGE_RARE_020_MONOTONIC_C: bool = true;
+    garbage_net.zig: |
+      const GARBAGE_RARE_020_PORT_D: u16 = 8080;
+      const GARBAGE_RARE_020_BACKLOG_E: u32 = 128;
+
+      fn garbage_listen() void {
+          _ = GARBAGE_RARE_020_PORT_D;
+      }
+
+      const GARBAGE_RARE_020_REUSE_F: bool = true;
+  changed_files:
+    src/ring.zig: |
+      const std = @import("std");
+
+      pub fn RingBuffer(comptime T: type, comptime capacity: usize) type {
+          return struct {
+              const Self = @This();
+              buf: [capacity]T = undefined,
+              head: usize = 0,
+              tail: usize = 0,
+              count: usize = 0,
+
+              pub fn push(self: *Self, item: T) !void {
+                  if (self.count == capacity) return error.BufferFull;
+                  self.buf[self.tail] = item;
+                  self.tail = (self.tail + 1) % capacity;
+                  self.count += 1;
+              }
+
+              pub fn pop(self: *Self) !T {
+                  if (self.count == 0) return error.BufferEmpty;
+                  const item = self.buf[self.head];
+                  self.head = (self.head + 1) % capacity;
+                  self.count -= 1;
+                  return item;
+              }
+
+              pub fn peek(self: *const Self) !T {
+                  if (self.count == 0) return error.BufferEmpty;
+                  return self.buf[self.head];
+              }
+
+              pub fn clear(self: *Self) void {
+                  self.head = 0;
+                  self.tail = 0;
+                  self.count = 0;
+              }
+
+              pub fn len(self: *const Self) usize {
+                  return self.count;
+              }
+
+              pub fn isFull(self: *const Self) bool {
+                  return self.count == capacity;
+              }
+          };
+      }
+    src/logger.zig: |
+      const std = @import("std");
+      const RingBuffer = @import("ring.zig").RingBuffer;
+
+      pub const LogEntry = struct {
+          level: u8,
+          message: [256]u8,
+          msg_len: usize,
+      };
+
+      pub const Logger = struct {
+          buffer: RingBuffer(LogEntry, 64),
+
+          pub fn init() Logger {
+              return Logger{ .buffer = .{} };
+          }
+
+          pub fn log(self: *Logger, level: u8, msg: []const u8) void {
+              if (self.buffer.isFull()) {
+                  _ = self.buffer.pop() catch {};
+              }
+              var entry = LogEntry{ .level = level, .message = undefined, .msg_len = msg.len };
+              @memcpy(entry.message[0..msg.len], msg);
+              self.buffer.push(entry) catch {};
+          }
+
+          pub fn flush(self: *Logger) void {
+              self.buffer.clear();
+          }
+      };
+    src/app.zig: |
+      const Logger = @import("logger.zig").Logger;
+
+      pub fn main() !void {
+          var logger = Logger.init();
+          logger.log(1, "Application started");
+          logger.log(2, "Processing request");
+      }
+    garbage_timer.zig: |
+      const GARBAGE_RARE_020_INTERVAL_A: u64 = 1000;
+      const GARBAGE_RARE_020_PRECISION_B: u32 = 1;
+
+      fn garbage_tick() void {
+          _ = GARBAGE_RARE_020_INTERVAL_A;
+      }
+
+      const GARBAGE_RARE_020_MONOTONIC_C: bool = true;
+    garbage_net.zig: |
+      const GARBAGE_RARE_020_PORT_D: u16 = 8080;
+      const GARBAGE_RARE_020_BACKLOG_E: u32 = 128;
+
+      fn garbage_listen() void {
+          _ = GARBAGE_RARE_020_PORT_D;
+      }
+
+      const GARBAGE_RARE_020_REUSE_F: bool = true;
+  commit_message: "feat: add peek, clear, isFull to ring buffer; auto-evict in logger"
+fragments:
+- id: ring_peek
+  selector:
+    path: src/ring.zig
+    anchor: "pub fn peek"
+- id: ring_clear
+  selector:
+    path: src/ring.zig
+    anchor: "pub fn clear"
+- id: ring_is_full
+  selector:
+    path: src/ring.zig
+    anchor: "pub fn isFull"
+- id: logger_auto_evict
+  selector:
+    path: src/logger.zig
+    anchor: "if (self.buffer.isFull())"
+- id: logger_flush
+  selector:
+    path: src/logger.zig
+    anchor: "pub fn flush"
+- id: no_app
+  selector:
+    path: src/app.zig
+- id: no_garbage_timer
+  selector:
+    path: garbage_timer.zig
+- id: no_garbage_net
+  selector:
+    path: garbage_net.zig
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_020_INTERVAL_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_020_PRECISION_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_020_MONOTONIC_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_020_PORT_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_020_BACKLOG_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_020_REUSE_F
+oracle:
+  required:
+  - ring_peek
+  - ring_clear
+  - ring_is_full
+  - logger_auto_evict
+  - logger_flush
+  allowed: []
+  forbidden:
+  - no_app
+  - no_garbage_timer
+  - no_garbage_net
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

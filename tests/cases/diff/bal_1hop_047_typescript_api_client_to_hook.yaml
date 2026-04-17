@@ -1,0 +1,95 @@
+name: bal_1hop_047_typescript_api_client_to_hook
+tags:
+- lang:typescript
+- change:signature
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/api/todoApi.ts: |
+      export interface Todo {
+        id: number;
+        title: string;
+        completed: boolean;
+      }
+
+      export async function fetchTodos(): Promise<Todo[]> {
+        const response = await fetch('/api/todos');
+        return response.json();
+      }
+
+      export async function createTodo(title: string): Promise<Todo> {
+        const response = await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        });
+        return response.json();
+      }
+    src/hooks/useTodos.ts: |
+      import { fetchTodos, createTodo, Todo } from '../api/todoApi';
+
+      export class TodoManager {
+        private todos: Todo[] = [];
+
+        async load(): Promise<void> {
+          this.todos = await fetchTodos();
+        }
+
+        async add(title: string): Promise<void> {
+          const todo = await createTodo(title);
+          this.todos.push(todo);
+        }
+
+        getAll(): Todo[] {
+          return [...this.todos];
+        }
+      }
+    src/config/constants.ts: |
+      export const API_BASE_URL = 'http://localhost:3000';
+      export const MAX_TODOS = 100;
+  changed_files:
+    src/api/todoApi.ts: |
+      export interface Todo {
+        id: number;
+        title: string;
+        completed: boolean;
+      }
+
+      export async function fetchTodos(filter?: 'all' | 'active' | 'completed'): Promise<Todo[]> {
+        const params = filter && filter !== 'all' ? `?status=${filter}` : '';
+        const response = await fetch(`/api/todos${params}`);
+        return response.json();
+      }
+
+      export async function createTodo(title: string): Promise<Todo> {
+        const response = await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        });
+        return response.json();
+      }
+  commit_message: "feat: add optional filter parameter to fetchTodos"
+fragments:
+- id: api_filter_param
+  selector:
+    path: todoApi.ts
+    anchor: "filter"
+- id: hook_uses_fetch_todos
+  selector:
+    path: useTodos.ts
+    anchor: "fetchTodos()"
+- id: no_constants
+  selector:
+    path: constants.ts
+    anchor: "API_BASE_URL"
+oracle:
+  required:
+  - api_filter_param
+  - hook_uses_fetch_todos
+  allowed: []
+  forbidden:
+  - no_constants

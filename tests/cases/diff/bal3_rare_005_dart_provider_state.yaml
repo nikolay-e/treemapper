@@ -1,0 +1,180 @@
+name: bal3_rare_005_dart_provider_state
+tags:
+- lang:dart
+- change:single_file
+- change:refactor
+- context:call_graph
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    lib/providers/cart_provider.dart: |
+      import '../models/cart_item.dart';
+
+      class CartProvider {
+        final List<CartItem> _items = [];
+
+        List<CartItem> get items => List.unmodifiable(_items);
+
+        void addItem(CartItem item) {
+          _items.add(item);
+        }
+
+        void removeItem(String productId) {
+          _items.removeWhere((item) => item.productId == productId);
+        }
+
+        double get total {
+          return _items.fold(0.0, (sum, item) => sum + item.price * item.quantity);
+        }
+      }
+    lib/models/cart_item.dart: |
+      class CartItem {
+        final String productId;
+        final String name;
+        final double price;
+        final int quantity;
+
+        CartItem({
+          required this.productId,
+          required this.name,
+          required this.price,
+          required this.quantity,
+        });
+      }
+    lib/screens/cart_screen.dart: |
+      import '../providers/cart_provider.dart';
+
+      class CartScreen {
+        final CartProvider cartProvider;
+
+        CartScreen(this.cartProvider);
+
+        String renderTotal() {
+          return 'Total: \$${cartProvider.total.toStringAsFixed(2)}';
+        }
+
+        int itemCount() => cartProvider.items.length;
+      }
+    lib/services/payment.dart: |
+      const GARBAGE_RARE_005_PAY_A = 'stripe';
+      const GARBAGE_RARE_005_KEY_B = 'pk_test';
+
+      class PaymentService {
+        void charge(double amount) {}
+      }
+    lib/utils/formatter.dart: |
+      const GARBAGE_RARE_005_FMT_C = 'currency';
+      const GARBAGE_RARE_005_LOCALE_D = 'en_US';
+
+      String formatPrice(double price) => '\$$price';
+    lib/services/shipping.dart: |
+      const GARBAGE_RARE_005_SHIP_E = 'fedex';
+      const GARBAGE_RARE_005_RATE_F = 9.99;
+
+      class ShippingService {
+        double calculateRate(double weight) => weight * 0.5;
+      }
+  changed_files:
+    lib/providers/cart_provider.dart: |
+      import '../models/cart_item.dart';
+
+      class CartProvider {
+        final List<CartItem> _items = [];
+        String? _couponCode;
+        double _discountPercent = 0.0;
+
+        List<CartItem> get items => List.unmodifiable(_items);
+
+        void addItem(CartItem item) {
+          final existing = _items.indexWhere((i) => i.productId == item.productId);
+          if (existing >= 0) {
+            _items[existing] = CartItem(
+              productId: item.productId,
+              name: item.name,
+              price: item.price,
+              quantity: _items[existing].quantity + item.quantity,
+            );
+          } else {
+            _items.add(item);
+          }
+        }
+
+        void removeItem(String productId) {
+          _items.removeWhere((item) => item.productId == productId);
+        }
+
+        void applyCoupon(String code, double discountPercent) {
+          _couponCode = code;
+          _discountPercent = discountPercent;
+        }
+
+        double get subtotal {
+          return _items.fold(0.0, (sum, item) => sum + item.price * item.quantity);
+        }
+
+        double get total {
+          final sub = subtotal;
+          return sub - (sub * _discountPercent / 100);
+        }
+      }
+  commit_message: "add coupon support and merge duplicate items in cart"
+fragments:
+- id: cart_item_model
+  selector:
+    path: lib/models/cart_item.dart
+    anchor: "class CartItem"
+- id: screen_uses_total
+  selector:
+    path: lib/screens/cart_screen.dart
+    anchor: "cartProvider.total"
+- id: screen_uses_items
+  selector:
+    path: lib/screens/cart_screen.dart
+    anchor: "cartProvider.items.length"
+- id: no_payment
+  selector:
+    path: lib/services/payment.dart
+    anchor: "class PaymentService"
+- id: no_formatter
+  selector:
+    path: lib/utils/formatter.dart
+    anchor: "formatPrice"
+- id: no_shipping
+  selector:
+    path: lib/services/shipping.dart
+    anchor: "class ShippingService"
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_RARE_005_PAY_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_RARE_005_KEY_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_RARE_005_FMT_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_RARE_005_LOCALE_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_RARE_005_SHIP_E
+- id: no_global_5
+  selector:
+    anchor: GARBAGE_RARE_005_RATE_F
+oracle:
+  required:
+  - cart_item_model
+  - screen_uses_total
+  - screen_uses_items
+  allowed: []
+  forbidden:
+  - no_payment
+  - no_formatter
+  - no_shipping
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

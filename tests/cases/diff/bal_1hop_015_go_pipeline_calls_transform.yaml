@@ -1,0 +1,244 @@
+name: bal_1hop_015_go_pipeline_calls_transform
+tags:
+- lang:go
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    internal/transform/filter.go: |
+      package transform
+
+      type Row map[string]interface{}
+
+      type FilterFunc func(Row) bool
+
+      func Filter(rows []Row, fn FilterFunc) []Row {
+          var result []Row
+          for _, r := range rows {
+              if fn(r) {
+                  result = append(result, r)
+              }
+          }
+          return result
+      }
+
+      func Map(rows []Row, fn func(Row) Row) []Row {
+          result := make([]Row, len(rows))
+          for i, r := range rows {
+              result[i] = fn(r)
+          }
+          return result
+      }
+    internal/transform/aggregate.go: |
+      package transform
+
+      func Sum(rows []Row, field string) float64 {
+          var total float64
+          for _, r := range rows {
+              if v, ok := r[field].(float64); ok {
+                  total += v
+              }
+          }
+          return total
+      }
+
+      func Count(rows []Row) int {
+          return len(rows)
+      }
+    internal/pipeline/etl.go: |
+      package pipeline
+
+      import "myapp/internal/transform"
+
+      type Pipeline struct {
+          filters   []transform.FilterFunc
+          mappers   []func(transform.Row) transform.Row
+      }
+
+      func New() *Pipeline {
+          return &Pipeline{}
+      }
+
+      func (p *Pipeline) AddFilter(fn transform.FilterFunc) {
+          p.filters = append(p.filters, fn)
+      }
+
+      func (p *Pipeline) AddMapper(fn func(transform.Row) transform.Row) {
+          p.mappers = append(p.mappers, fn)
+      }
+
+      func (p *Pipeline) Execute(rows []transform.Row) []transform.Row {
+          result := rows
+          for _, f := range p.filters {
+              result = transform.Filter(result, f)
+          }
+          for _, m := range p.mappers {
+              result = transform.Map(result, m)
+          }
+          return result
+      }
+    internal/pipeline/source.go: |
+      package pipeline
+
+      import "myapp/internal/transform"
+
+      func FromCSVRows(data [][]string, headers []string) []transform.Row {
+          var rows []transform.Row
+          for _, line := range data {
+              row := make(transform.Row)
+              for i, h := range headers {
+                  if i < len(line) {
+                      row[h] = line[i]
+                  }
+              }
+              rows = append(rows, row)
+          }
+          return rows
+      }
+    internal/io/reader.go: |
+      package io
+
+      import "os"
+
+      func ReadFile(path string) ([]byte, error) {
+          return os.ReadFile(path)
+      }
+    internal/config/settings.go: |
+      package config
+
+      type Settings struct {
+          InputPath  string
+          OutputPath string
+          BatchSize  int
+      }
+
+      func DefaultSettings() *Settings {
+          return &Settings{
+              InputPath:  "input.csv",
+              OutputPath: "output.csv",
+              BatchSize:  1000,
+          }
+      }
+    cmd/etl/main.go: |
+      package main
+
+      import "fmt"
+
+      func main() {
+          fmt.Println("ETL pipeline starting")
+      }
+  changed_files:
+    internal/transform/filter.go: |
+      package transform
+
+      import "fmt"
+
+      type Row map[string]interface{}
+
+      type FilterFunc func(Row) bool
+
+      type TransformError struct {
+          Stage string
+          Err   error
+      }
+
+      func (e *TransformError) Error() string {
+          return fmt.Sprintf("transform error in %s: %v", e.Stage, e.Err)
+      }
+
+      func Filter(rows []Row, fn FilterFunc) []Row {
+          var result []Row
+          for _, r := range rows {
+              if fn(r) {
+                  result = append(result, r)
+              }
+          }
+          return result
+      }
+
+      func Map(rows []Row, fn func(Row) Row) []Row {
+          result := make([]Row, len(rows))
+          for i, r := range rows {
+              result[i] = fn(r)
+          }
+          return result
+      }
+
+      func FlatMap(rows []Row, fn func(Row) []Row) []Row {
+          var result []Row
+          for _, r := range rows {
+              result = append(result, fn(r)...)
+          }
+          return result
+      }
+
+      func Distinct(rows []Row, keyField string) []Row {
+          seen := make(map[interface{}]bool)
+          var result []Row
+          for _, r := range rows {
+              key := r[keyField]
+              if !seen[key] {
+                  seen[key] = true
+                  result = append(result, r)
+              }
+          }
+          return result
+      }
+  commit_message: "feat: add FlatMap, Distinct and TransformError"
+fragments:
+- id: flatmap_func
+  selector:
+    path: internal/transform/filter.go
+    anchor: "func FlatMap(rows []Row, fn func(Row) []Row)"
+- id: distinct_func
+  selector:
+    path: internal/transform/filter.go
+    anchor: "func Distinct(rows []Row, keyField string)"
+- id: transform_error_type
+  selector:
+    path: internal/transform/filter.go
+    anchor: "type TransformError struct"
+- id: pipeline_calls_filter
+  selector:
+    path: internal/pipeline/etl.go
+    anchor: "transform.Filter(result, f)"
+- id: pipeline_calls_map
+  selector:
+    path: internal/pipeline/etl.go
+    anchor: "transform.Map(result, m)"
+- id: pipeline_source_uses_row
+  selector:
+    path: internal/pipeline/source.go
+    anchor: "transform.Row"
+- id: aggregate_uses_row
+  selector:
+    path: internal/transform/aggregate.go
+    anchor: "func Sum(rows []Row"
+- id: unrelated_reader
+  selector:
+    path: internal/io/reader.go
+    anchor: "func ReadFile"
+- id: unrelated_settings
+  selector:
+    path: internal/config/settings.go
+    anchor: "func DefaultSettings"
+- id: unrelated_main
+  selector:
+    path: cmd/etl/main.go
+    anchor: "func main()"
+oracle:
+  required:
+  - flatmap_func
+  - distinct_func
+  - pipeline_calls_filter
+  - pipeline_calls_map
+  allowed:
+  - transform_error_type
+  - pipeline_source_uses_row
+  - aggregate_uses_row
+  forbidden:
+  - unrelated_reader
+  - unrelated_settings
+  - unrelated_main

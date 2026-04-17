@@ -1,0 +1,66 @@
+name: bal_testctx_004_python_json_parser_test
+tags:
+- lang:python
+- change:single_file
+- change:new_function
+- context:test_file
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/parser.py: |
+      import json
+      from typing import Any, Dict
+
+      def parse_json(raw: str) -> Dict[str, Any]:
+          return json.loads(raw)
+    tests/test_parser.py: |
+      from src.parser import parse_json
+
+      def test_parse_valid_json():
+          result = parse_json('{"key": "value"}')
+          assert result == {"key": "value"}
+
+      def test_parse_nested_json():
+          result = parse_json('{"a": {"b": 1}}')
+          assert result["a"]["b"] == 1
+    src/serializer.py: |
+      import json
+      from typing import Any
+
+      def to_json(data: Any) -> str:
+          return json.dumps(data, indent=2)
+  changed_files:
+    src/parser.py: |
+      import json
+      from typing import Any, Dict, List
+
+      def parse_json(raw: str) -> Dict[str, Any]:
+          return json.loads(raw)
+
+      def parse_json_array(raw: str) -> List[Dict[str, Any]]:
+          data = json.loads(raw)
+          if not isinstance(data, list):
+              raise ValueError("Expected JSON array")
+          return data
+  commit_message: "feat: add parse_json_array function"
+fragments:
+- id: parse_json_array_fn
+  selector:
+    path: src/parser.py
+    anchor: "def parse_json_array(raw: str)"
+- id: test_imports_parser
+  selector:
+    path: tests/test_parser.py
+    anchor: "from src.parser import parse_json"
+- id: no_serializer
+  selector:
+    path: src/serializer.py
+    anchor: "def to_json"
+oracle:
+  required:
+  - parse_json_array_fn
+  - test_imports_parser
+  allowed: []
+  forbidden:
+  - no_serializer

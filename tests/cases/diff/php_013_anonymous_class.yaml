@@ -1,4 +1,11 @@
 name: php_013_anonymous_class
+tags:
+- lang:php
+- change:single_file
+- change:signature
+- context:cross_module
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
     src/Contracts/Handler.php: |

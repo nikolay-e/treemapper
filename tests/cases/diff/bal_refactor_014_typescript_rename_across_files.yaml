@@ -1,0 +1,174 @@
+name: bal_refactor_014_typescript_rename_across_files
+tags:
+- lang:typescript
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/models/item.ts: |
+      export interface Item {
+          id: string;
+          name: string;
+          price: number;
+          quantity: number;
+      }
+
+      export function createItem(name: string, price: number, quantity: number): Item {
+          return { id: crypto.randomUUID(), name, price, quantity };
+      }
+    src/cart/cartManager.ts: |
+      import { Item, createItem } from '../models/item';
+
+      export class CartManager {
+          private items: Item[] = [];
+
+          addItem(name: string, price: number, quantity: number): void {
+              this.items.push(createItem(name, price, quantity));
+          }
+
+          getTotal(): number {
+              return this.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+          }
+
+          getItems(): Item[] {
+              return [...this.items];
+          }
+      }
+    src/pages/checkout.ts: |
+      import { CartManager } from '../cart/cartManager';
+
+      export function renderCheckout(cart: CartManager): string {
+          const items = cart.getItems();
+          const total = cart.getTotal();
+          return `Items: ${items.length}, Total: $${total.toFixed(2)}`;
+      }
+    src/analytics/tracker.ts: |
+      const GARBAGE_REFACTOR_014_TRACK_A = 'tracker';
+      const GARBAGE_REFACTOR_014_EVENT_B = 'click';
+
+      export function trackEvent(name: string): void {
+          console.log(`Event: ${name}`);
+      }
+    garbage_theme.ts: |
+      const GARBAGE_REFACTOR_014_THEME_C = 'theme';
+      const GARBAGE_REFACTOR_014_MODE_D = 'dark';
+
+      export const theme = {
+          GARBAGE_REFACTOR_014_THEME_OBJ_E: true,
+          primary: '#333',
+      };
+  changed_files:
+    src/models/product.ts: |
+      export interface Product {
+          id: string;
+          name: string;
+          price: number;
+          quantity: number;
+      }
+
+      export function createProduct(name: string, price: number, quantity: number): Product {
+          return { id: crypto.randomUUID(), name, price, quantity };
+      }
+    src/cart/cartManager.ts: |
+      import { Product, createProduct } from '../models/product';
+
+      export class CartManager {
+          private items: Product[] = [];
+
+          addItem(name: string, price: number, quantity: number): void {
+              this.items.push(createProduct(name, price, quantity));
+          }
+
+          getTotal(): number {
+              return this.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+          }
+
+          getItems(): Product[] {
+              return [...this.items];
+          }
+      }
+    src/pages/checkout.ts: |
+      import { CartManager } from '../cart/cartManager';
+
+      export function renderCheckout(cart: CartManager): string {
+          const items = cart.getItems();
+          const total = cart.getTotal();
+          return `Items: ${items.length}, Total: $${total.toFixed(2)}`;
+      }
+    src/analytics/tracker.ts: |
+      const GARBAGE_REFACTOR_014_TRACK_A = 'tracker';
+      const GARBAGE_REFACTOR_014_EVENT_B = 'click';
+
+      export function trackEvent(name: string): void {
+          console.log(`Event: ${name}`);
+      }
+    garbage_theme.ts: |
+      const GARBAGE_REFACTOR_014_THEME_C = 'theme';
+      const GARBAGE_REFACTOR_014_MODE_D = 'dark';
+
+      export const theme = {
+          GARBAGE_REFACTOR_014_THEME_OBJ_E: true,
+          primary: '#333',
+      };
+  commit_message: "refactor: rename Item to Product across codebase"
+fragments:
+- id: new_product_interface
+  selector:
+    path: src/models/product.ts
+    anchor: "export interface Product"
+- id: create_product_fn
+  selector:
+    path: src/models/product.ts
+    anchor: "export function createProduct"
+- id: cart_imports_product
+  selector:
+    path: src/cart/cartManager.ts
+    anchor: "from '../models/product'"
+- id: cart_uses_product_type
+  selector:
+    path: src/cart/cartManager.ts
+    anchor: "private items: Product[]"
+- id: checkout_uses_cart
+  selector:
+    path: src/pages/checkout.ts
+    anchor: "from '../cart/cartManager'"
+- id: no_tracker
+  selector:
+    path: src/analytics/tracker.ts
+- id: no_garbage_theme
+  selector:
+    path: garbage_theme.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_014_TRACK_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_014_EVENT_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_014_THEME_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_014_MODE_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_014_THEME_OBJ_E
+oracle:
+  required:
+  - new_product_interface
+  - create_product_fn
+  - cart_imports_product
+  - cart_uses_product_type
+  - checkout_uses_cart
+  allowed: []
+  forbidden:
+  - no_tracker
+  - no_garbage_theme
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

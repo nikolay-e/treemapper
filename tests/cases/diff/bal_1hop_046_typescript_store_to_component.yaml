@@ -1,0 +1,89 @@
+name: bal_1hop_046_typescript_store_to_component
+tags:
+- lang:typescript
+- change:new_function
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/store/userStore.ts: |
+      export interface User {
+        id: string;
+        name: string;
+        email: string;
+      }
+
+      let currentUser: User | null = null;
+
+      export function setUser(user: User): void {
+        currentUser = user;
+      }
+
+      export function getUser(): User | null {
+        return currentUser;
+      }
+    src/components/UserProfile.ts: |
+      import { getUser } from '../store/userStore';
+
+      export function renderUserProfile(): string {
+        const user = getUser();
+        if (!user) return '<div>Not logged in</div>';
+        return `<div class="profile">${user.name} (${user.email})</div>`;
+      }
+    src/utils/dateFormat.ts: |
+      export function formatDate(date: Date): string {
+        return date.toISOString().split('T')[0];
+      }
+  changed_files:
+    src/store/userStore.ts: |
+      export interface User {
+        id: string;
+        name: string;
+        email: string;
+      }
+
+      let currentUser: User | null = null;
+
+      export function setUser(user: User): void {
+        currentUser = user;
+      }
+
+      export function getUser(): User | null {
+        return currentUser;
+      }
+
+      export function clearUser(): void {
+        currentUser = null;
+      }
+
+      export function isLoggedIn(): boolean {
+        return currentUser !== null;
+      }
+  commit_message: "feat: add clearUser and isLoggedIn to user store"
+fragments:
+- id: store_clear_user
+  selector:
+    path: userStore.ts
+    anchor: "clearUser"
+- id: store_is_logged_in
+  selector:
+    path: userStore.ts
+    anchor: "isLoggedIn"
+- id: component_uses_store
+  selector:
+    path: UserProfile.ts
+    anchor: "getUser()"
+- id: no_date_format
+  selector:
+    path: dateFormat.ts
+    anchor: "formatDate"
+oracle:
+  required:
+  - store_clear_user
+  - store_is_logged_in
+  - component_uses_store
+  allowed: []
+  forbidden:
+  - no_date_format

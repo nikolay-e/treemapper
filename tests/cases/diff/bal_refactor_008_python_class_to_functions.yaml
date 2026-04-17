@@ -1,0 +1,167 @@
+name: bal_refactor_008_python_class_to_functions
+tags:
+- lang:python
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    lib/calculator.py: |
+      class TaxCalculator:
+          def __init__(self, rate):
+              self.rate = rate
+
+          def calculate_tax(self, amount):
+              return amount * self.rate
+
+          def calculate_total(self, amount):
+              return amount + self.calculate_tax(amount)
+
+          def calculate_discount(self, amount, discount_pct):
+              discounted = amount * (1 - discount_pct)
+              return self.calculate_total(discounted)
+    services/invoice.py: |
+      from lib.calculator import TaxCalculator
+
+      class InvoiceService:
+          def __init__(self, tax_rate):
+              self.calc = TaxCalculator(tax_rate)
+
+          def create_invoice(self, line_items):
+              subtotal = sum(item["price"] * item["qty"] for item in line_items)
+              total = self.calc.calculate_total(subtotal)
+              tax = self.calc.calculate_tax(subtotal)
+              return {"subtotal": subtotal, "tax": tax, "total": total}
+    api/billing.py: |
+      from services.invoice import InvoiceService
+
+      invoice_svc = InvoiceService(tax_rate=0.2)
+
+      def handle_billing(items):
+          return invoice_svc.create_invoice(items)
+    lib/formatting.py: |
+      GARBAGE_REFACTOR_008_FORMAT_MARKER_A = "formatting"
+      GARBAGE_REFACTOR_008_PRECISION_MARKER_B = 2
+
+      def format_amount(amount):
+          return f"${amount:.2f}"
+    garbage_email.py: |
+      GARBAGE_REFACTOR_008_EMAIL_MARKER_C = "email"
+      GARBAGE_REFACTOR_008_SMTP_MARKER_D = "smtp.example.com"
+
+      class EmailSender:
+          GARBAGE_REFACTOR_008_SENDER_E = True
+
+          def send(self, to, subject, body):
+              pass
+  changed_files:
+    lib/calculator.py: |
+      def calculate_tax(amount, rate):
+          return amount * rate
+
+      def calculate_total(amount, rate):
+          return amount + calculate_tax(amount, rate)
+
+      def calculate_discount(amount, discount_pct, rate):
+          discounted = amount * (1 - discount_pct)
+          return calculate_total(discounted, rate)
+    services/invoice.py: |
+      from lib.calculator import calculate_total, calculate_tax
+
+      class InvoiceService:
+          def __init__(self, tax_rate):
+              self.tax_rate = tax_rate
+
+          def create_invoice(self, line_items):
+              subtotal = sum(item["price"] * item["qty"] for item in line_items)
+              total = calculate_total(subtotal, self.tax_rate)
+              tax = calculate_tax(subtotal, self.tax_rate)
+              return {"subtotal": subtotal, "tax": tax, "total": total}
+    api/billing.py: |
+      from services.invoice import InvoiceService
+
+      invoice_svc = InvoiceService(tax_rate=0.2)
+
+      def handle_billing(items):
+          return invoice_svc.create_invoice(items)
+    lib/formatting.py: |
+      GARBAGE_REFACTOR_008_FORMAT_MARKER_A = "formatting"
+      GARBAGE_REFACTOR_008_PRECISION_MARKER_B = 2
+
+      def format_amount(amount):
+          return f"${amount:.2f}"
+    garbage_email.py: |
+      GARBAGE_REFACTOR_008_EMAIL_MARKER_C = "email"
+      GARBAGE_REFACTOR_008_SMTP_MARKER_D = "smtp.example.com"
+
+      class EmailSender:
+          GARBAGE_REFACTOR_008_SENDER_E = True
+
+          def send(self, to, subject, body):
+              pass
+  commit_message: "refactor: convert TaxCalculator class to pure functions"
+fragments:
+- id: calc_tax_function
+  selector:
+    path: lib/calculator.py
+    anchor: "def calculate_tax(amount, rate)"
+- id: calc_total_function
+  selector:
+    path: lib/calculator.py
+    anchor: "def calculate_total(amount, rate)"
+- id: calc_discount_function
+  selector:
+    path: lib/calculator.py
+    anchor: "def calculate_discount(amount, discount_pct, rate)"
+- id: invoice_imports_functions
+  selector:
+    path: services/invoice.py
+    anchor: "from lib.calculator import calculate_total, calculate_tax"
+- id: invoice_calls_functions
+  selector:
+    path: services/invoice.py
+    anchor: "total = calculate_total(subtotal, self.tax_rate)"
+- id: billing_uses_invoice
+  selector:
+    path: api/billing.py
+    anchor: "from services.invoice import InvoiceService"
+- id: no_formatting
+  selector:
+    path: lib/formatting.py
+- id: no_garbage_email
+  selector:
+    path: garbage_email.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_008_FORMAT_MARKER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_008_PRECISION_MARKER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_008_EMAIL_MARKER_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_008_SMTP_MARKER_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_008_SENDER_E
+oracle:
+  required:
+  - calc_tax_function
+  - calc_total_function
+  - calc_discount_function
+  - invoice_imports_functions
+  - invoice_calls_functions
+  - billing_uses_invoice
+  allowed: []
+  forbidden:
+  - no_formatting
+  - no_garbage_email
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

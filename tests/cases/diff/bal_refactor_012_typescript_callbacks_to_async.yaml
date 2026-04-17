@@ -1,0 +1,191 @@
+name: bal_refactor_012_typescript_callbacks_to_async
+tags:
+- lang:typescript
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    src/fileReader.ts: |
+      import fs from 'fs';
+
+      export function readConfig(path: string, callback: (err: Error | null, data?: string) => void) {
+          fs.readFile(path, 'utf-8', (err, content) => {
+              if (err) {
+                  callback(err);
+                  return;
+              }
+              callback(null, content);
+          });
+      }
+
+      export function parseConfig(raw: string, callback: (err: Error | null, config?: Record<string, string>) => void) {
+          try {
+              const parsed = JSON.parse(raw);
+              callback(null, parsed);
+          } catch (e) {
+              callback(e as Error);
+          }
+      }
+    src/app.ts: |
+      import { readConfig, parseConfig } from './fileReader';
+
+      export function loadApp(configPath: string, callback: (err: Error | null, config?: Record<string, string>) => void) {
+          readConfig(configPath, (err, raw) => {
+              if (err) {
+                  callback(err);
+                  return;
+              }
+              parseConfig(raw!, (err2, config) => {
+                  if (err2) {
+                      callback(err2);
+                      return;
+                  }
+                  callback(null, config);
+              });
+          });
+      }
+    src/server.ts: |
+      import { loadApp } from './app';
+
+      export function startServer() {
+          loadApp('./config.json', (err, config) => {
+              if (err) {
+                  console.error('Failed to load config:', err);
+                  process.exit(1);
+              }
+              console.log('Server started with config:', config);
+          });
+      }
+    src/utils/paths.ts: |
+      const GARBAGE_REFACTOR_012_PATHS_A = 'paths';
+      const GARBAGE_REFACTOR_012_BASE_B = '/tmp';
+
+      export function resolvePath(p: string): string {
+          return p.startsWith('/') ? p : `/app/${p}`;
+      }
+    garbage_validator.ts: |
+      const GARBAGE_REFACTOR_012_VALID_C = 'validator';
+      const GARBAGE_REFACTOR_012_STRICT_D = true;
+
+      export class Validator {
+          static GARBAGE_REFACTOR_012_CLASS_E = true;
+
+          validate(input: string): boolean {
+              return input.length > 0;
+          }
+      }
+  changed_files:
+    src/fileReader.ts: |
+      import fs from 'fs/promises';
+
+      export async function readConfig(path: string): Promise<string> {
+          return fs.readFile(path, 'utf-8');
+      }
+
+      export async function parseConfig(raw: string): Promise<Record<string, string>> {
+          return JSON.parse(raw);
+      }
+    src/app.ts: |
+      import { readConfig, parseConfig } from './fileReader';
+
+      export async function loadApp(configPath: string): Promise<Record<string, string>> {
+          const raw = await readConfig(configPath);
+          return parseConfig(raw);
+      }
+    src/server.ts: |
+      import { loadApp } from './app';
+
+      export async function startServer() {
+          try {
+              const config = await loadApp('./config.json');
+              console.log('Server started with config:', config);
+          } catch (err) {
+              console.error('Failed to load config:', err);
+              process.exit(1);
+          }
+      }
+    src/utils/paths.ts: |
+      const GARBAGE_REFACTOR_012_PATHS_A = 'paths';
+      const GARBAGE_REFACTOR_012_BASE_B = '/tmp';
+
+      export function resolvePath(p: string): string {
+          return p.startsWith('/') ? p : `/app/${p}`;
+      }
+    garbage_validator.ts: |
+      const GARBAGE_REFACTOR_012_VALID_C = 'validator';
+      const GARBAGE_REFACTOR_012_STRICT_D = true;
+
+      export class Validator {
+          static GARBAGE_REFACTOR_012_CLASS_E = true;
+
+          validate(input: string): boolean {
+              return input.length > 0;
+          }
+      }
+  commit_message: "refactor: convert callback-based file reading to async/await"
+fragments:
+- id: async_read_config
+  selector:
+    path: src/fileReader.ts
+    anchor: "export async function readConfig"
+- id: async_parse_config
+  selector:
+    path: src/fileReader.ts
+    anchor: "export async function parseConfig"
+- id: async_load_app
+  selector:
+    path: src/app.ts
+    anchor: "export async function loadApp"
+- id: app_awaits_read
+  selector:
+    path: src/app.ts
+    anchor: "await readConfig(configPath)"
+- id: async_start_server
+  selector:
+    path: src/server.ts
+    anchor: "export async function startServer"
+- id: server_awaits_load
+  selector:
+    path: src/server.ts
+    anchor: "await loadApp"
+- id: no_paths
+  selector:
+    path: src/utils/paths.ts
+- id: no_garbage_validator
+  selector:
+    path: garbage_validator.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_012_PATHS_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_012_BASE_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_012_VALID_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_012_STRICT_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_012_CLASS_E
+oracle:
+  required:
+  - async_read_config
+  - async_parse_config
+  - async_load_app
+  - app_awaits_read
+  - async_start_server
+  - server_awaits_load
+  allowed: []
+  forbidden:
+  - no_paths
+  - no_garbage_validator
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

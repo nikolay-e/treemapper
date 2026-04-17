@@ -1,4 +1,10 @@
 name: csharp_009_generic_class
+tags:
+- lang:csharp
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     Collections/Cache.cs: |

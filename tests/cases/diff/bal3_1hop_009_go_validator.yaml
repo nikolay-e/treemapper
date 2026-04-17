@@ -1,0 +1,230 @@
+name: bal3_1hop_009_go_validator
+tags:
+- lang:go
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    pkg/validation/rules.go: |
+      package validation
+
+      import "regexp"
+
+      type Rule struct {
+          Field   string
+          Pattern string
+      }
+
+      func (r Rule) Validate(value string) bool {
+          matched, _ := regexp.MatchString(r.Pattern, value)
+          return matched
+      }
+
+      func EmailRule() Rule {
+          return Rule{Field: "email", Pattern: `^[^@]+@[^@]+$`}
+      }
+
+      func PhoneRule() Rule {
+          return Rule{Field: "phone", Pattern: `^\+?[0-9]{10,15}$`}
+      }
+    internal/handlers/register.go: |
+      package handlers
+
+      import "pkg/validation"
+
+      type RegisterRequest struct {
+          Email string
+          Phone string
+      }
+
+      func ValidateRegister(req RegisterRequest) []string {
+          var errs []string
+          if !validation.EmailRule().Validate(req.Email) {
+              errs = append(errs, "invalid email")
+          }
+          if !validation.PhoneRule().Validate(req.Phone) {
+              errs = append(errs, "invalid phone")
+          }
+          return errs
+      }
+    internal/handlers/update_profile.go: |
+      package handlers
+
+      import "pkg/validation"
+
+      type UpdateProfileRequest struct {
+          Email string
+          Phone string
+      }
+
+      func ValidateUpdateProfile(req UpdateProfileRequest) []string {
+          var errs []string
+          if req.Email != "" && !validation.EmailRule().Validate(req.Email) {
+              errs = append(errs, "invalid email")
+          }
+          if req.Phone != "" && !validation.PhoneRule().Validate(req.Phone) {
+              errs = append(errs, "invalid phone")
+          }
+          return errs
+      }
+    internal/handlers/contact.go: |
+      package handlers
+
+      import "pkg/validation"
+
+      type ContactRequest struct {
+          Email   string
+          Message string
+      }
+
+      func ValidateContact(req ContactRequest) []string {
+          var errs []string
+          if !validation.EmailRule().Validate(req.Email) {
+              errs = append(errs, "invalid email")
+          }
+          return errs
+      }
+    pkg/i18n/translator.go: |
+      package i18n
+
+      GARBAGE_009_TRANSLATOR_A = "translator"
+
+      type Translator struct {
+          Locale string
+      }
+
+      func (t *Translator) Translate(key string) string {
+          return key
+      }
+    pkg/upload/handler.go: |
+      package upload
+
+      GARBAGE_009_UPLOAD_B = "upload"
+
+      type Handler struct {
+          MaxSize int64
+      }
+
+      func (h *Handler) Accept(filename string) bool {
+          return true
+      }
+    pkg/export/csv.go: |
+      package export
+
+      GARBAGE_009_EXPORT_C = "export"
+
+      type CSVExporter struct {
+          Delimiter string
+      }
+
+      func (e *CSVExporter) Export(rows [][]string) string {
+          return ""
+      }
+  changed_files:
+    pkg/validation/rules.go: |
+      package validation
+
+      import (
+          "fmt"
+          "regexp"
+      )
+
+      type ValidationError struct {
+          Field   string
+          Message string
+      }
+
+      func (e ValidationError) Error() string {
+          return fmt.Sprintf("%s: %s", e.Field, e.Message)
+      }
+
+      type Rule struct {
+          Field   string
+          Pattern string
+      }
+
+      func (r Rule) Validate(value string) *ValidationError {
+          matched, _ := regexp.MatchString(r.Pattern, value)
+          if !matched {
+              return &ValidationError{Field: r.Field, Message: "does not match pattern"}
+          }
+          return nil
+      }
+
+      func EmailRule() Rule {
+          return Rule{Field: "email", Pattern: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`}
+      }
+
+      func PhoneRule() Rule {
+          return Rule{Field: "phone", Pattern: `^\+?[0-9]{10,15}$`}
+      }
+  commit_message: "fix: return ValidationError from Rule.Validate and stricter email regex"
+fragments:
+- id: validation_error_type
+  selector:
+    path: pkg/validation/rules.go
+    anchor: "type ValidationError struct"
+- id: validate_returns_error
+  selector:
+    path: pkg/validation/rules.go
+    anchor: "func (r Rule) Validate(value string) *ValidationError"
+- id: stricter_email
+  selector:
+    path: pkg/validation/rules.go
+    anchor: "a-zA-Z0-9._%+-"
+- id: error_method
+  selector:
+    path: pkg/validation/rules.go
+    anchor: "func (e ValidationError) Error()"
+- id: register_calls_validate
+  selector:
+    path: internal/handlers/register.go
+    anchor: "validation.EmailRule().Validate(req.Email)"
+- id: update_calls_validate
+  selector:
+    path: internal/handlers/update_profile.go
+    anchor: "validation.EmailRule().Validate(req.Email)"
+- id: contact_calls_validate
+  selector:
+    path: internal/handlers/contact.go
+    anchor: "validation.EmailRule().Validate(req.Email)"
+- id: unrelated_translator
+  selector:
+    path: pkg/i18n/translator.go
+    anchor: "type Translator struct"
+- id: unrelated_upload
+  selector:
+    path: pkg/upload/handler.go
+    anchor: "type Handler struct"
+- id: unrelated_export
+  selector:
+    path: pkg/export/csv.go
+    anchor: "type CSVExporter struct"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_009_TRANSLATOR_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_009_UPLOAD_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_009_EXPORT_C
+oracle:
+  required:
+  - validation_error_type
+  - validate_returns_error
+  - stricter_email
+  - register_calls_validate
+  allowed:
+  - error_method
+  - update_calls_validate
+  - contact_calls_validate
+  forbidden:
+  - unrelated_translator
+  - unrelated_upload
+  - unrelated_export
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

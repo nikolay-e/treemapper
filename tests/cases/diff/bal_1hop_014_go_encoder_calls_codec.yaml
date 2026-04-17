@@ -1,0 +1,112 @@
+name: bal_1hop_014_go_encoder_calls_codec
+tags:
+- lang:go
+- change:new_function
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    pkg/codec/msgpack.go: |
+      package codec
+
+      import "encoding/json"
+
+      func Encode(v interface{}) ([]byte, error) {
+          return json.Marshal(v)
+      }
+
+      func Decode(data []byte, v interface{}) error {
+          return json.Unmarshal(data, v)
+      }
+    pkg/transport/sender.go: |
+      package transport
+
+      import (
+          "myapp/pkg/codec"
+      )
+
+      type Sender struct {
+          addr string
+      }
+
+      func NewSender(addr string) *Sender {
+          return &Sender{addr: addr}
+      }
+
+      func (s *Sender) Send(payload interface{}) ([]byte, error) {
+          data, err := codec.Encode(payload)
+          if err != nil {
+              return nil, err
+          }
+          return data, nil
+      }
+    pkg/retry/backoff.go: |
+      package retry
+
+      import "time"
+
+      func WithRetry(attempts int, delay time.Duration, fn func() error) error {
+          var err error
+          for i := 0; i < attempts; i++ {
+              err = fn()
+              if err == nil {
+                  return nil
+              }
+              time.Sleep(delay)
+          }
+          return err
+      }
+  changed_files:
+    pkg/codec/msgpack.go: |
+      package codec
+
+      import (
+          "bytes"
+          "encoding/gob"
+          "encoding/json"
+      )
+
+      func Encode(v interface{}) ([]byte, error) {
+          return json.Marshal(v)
+      }
+
+      func Decode(data []byte, v interface{}) error {
+          return json.Unmarshal(data, v)
+      }
+
+      func EncodeGob(v interface{}) ([]byte, error) {
+          var buf bytes.Buffer
+          err := gob.NewEncoder(&buf).Encode(v)
+          return buf.Bytes(), err
+      }
+
+      func DecodeGob(data []byte, v interface{}) error {
+          return gob.NewDecoder(bytes.NewReader(data)).Decode(v)
+      }
+  commit_message: "feat: add Gob encoding/decoding functions"
+fragments:
+- id: encode_gob
+  selector:
+    path: pkg/codec/msgpack.go
+    anchor: "func EncodeGob"
+- id: decode_gob
+  selector:
+    path: pkg/codec/msgpack.go
+    anchor: "func DecodeGob"
+- id: sender_calls_encode
+  selector:
+    path: pkg/transport/sender.go
+    anchor: "codec.Encode(payload)"
+- id: unrelated_retry
+  selector:
+    path: pkg/retry/backoff.go
+    anchor: "func WithRetry"
+oracle:
+  required:
+  - encode_gob
+  - sender_calls_encode
+  allowed:
+  - decode_gob
+  forbidden:
+  - unrelated_retry

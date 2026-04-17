@@ -1,0 +1,79 @@
+name: bal3_bugfix_022_kotlin_boundary_index
+tags:
+- lang:kotlin
+- change:single_file
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/main/kotlin/data/Ring.kt: |
+      package data
+
+      class Ring<T>(private val items: List<T>) {
+          fun at(index: Int): T {
+              return items[index % items.size]
+          }
+
+          fun next(current: Int): T {
+              return items[current + 1]
+          }
+
+          fun size(): Int = items.size
+      }
+    src/main/kotlin/game/Turns.kt: |
+      package game
+
+      import data.Ring
+
+      class Turns(players: List<String>) {
+          private val ring = Ring(players)
+          private var current = 0
+
+          fun nextPlayer(): String {
+              val player = ring.next(current)
+              current++
+              return player
+          }
+      }
+    src/main/kotlin/util/Random.kt: |
+      package util
+
+      fun roll(sides: Int): Int = (1..sides).random()
+  changed_files:
+    src/main/kotlin/data/Ring.kt: |
+      package data
+
+      class Ring<T>(private val items: List<T>) {
+          fun at(index: Int): T {
+              return items[index % items.size]
+          }
+
+          fun next(current: Int): T {
+              return items[(current + 1) % items.size]
+          }
+
+          fun size(): Int = items.size
+      }
+  commit_message: "fix: wrap around index in next() to prevent IndexOutOfBoundsException"
+fragments:
+- id: modulo_fix
+  selector:
+    path: data/Ring.kt
+    anchor: "(current + 1) % items.size"
+- id: turns_calls_next
+  selector:
+    path: game/Turns.kt
+    anchor: "ring.next(current)"
+- id: no_random
+  selector:
+    path: util/Random.kt
+    anchor: "fun roll"
+oracle:
+  required:
+  - modulo_fix
+  - turns_calls_next
+  allowed: []
+  forbidden:
+  - no_random

@@ -1,4 +1,10 @@
 name: zig_003_error_set
+tags:
+- lang:zig
+- change:multi_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     src/errors.zig: |

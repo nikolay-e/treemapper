@@ -1,0 +1,75 @@
+name: bal_1hop_048_typescript_validator_to_form
+tags:
+- lang:typescript
+- change:bug_fix
+- change:single_file
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/validation/emailValidator.ts: |
+      export function isValidEmail(email: string): boolean {
+        return email.includes('@');
+      }
+
+      export function isValidPassword(password: string): boolean {
+        return password.length >= 8;
+      }
+    src/forms/SignupForm.ts: |
+      import { isValidEmail, isValidPassword } from '../validation/emailValidator';
+
+      export interface SignupData {
+        email: string;
+        password: string;
+      }
+
+      export function validateSignup(data: SignupData): string[] {
+        const errors: string[] = [];
+        if (!isValidEmail(data.email)) {
+          errors.push('Invalid email address');
+        }
+        if (!isValidPassword(data.password)) {
+          errors.push('Password must be at least 8 characters');
+        }
+        return errors;
+      }
+    src/theme/colors.ts: |
+      export const colors = {
+        primary: '#3b82f6',
+        secondary: '#64748b',
+        error: '#ef4444',
+        success: '#22c55e',
+      };
+  changed_files:
+    src/validation/emailValidator.ts: |
+      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      export function isValidEmail(email: string): boolean {
+        return EMAIL_REGEX.test(email);
+      }
+
+      export function isValidPassword(password: string): boolean {
+        return password.length >= 8;
+      }
+  commit_message: "fix: use proper regex for email validation"
+fragments:
+- id: validator_regex_fix
+  selector:
+    path: emailValidator.ts
+    anchor: "EMAIL_REGEX"
+- id: form_uses_validator
+  selector:
+    path: SignupForm.ts
+    anchor: "isValidEmail(data.email)"
+- id: no_colors
+  selector:
+    path: colors.ts
+    anchor: "colors"
+oracle:
+  required:
+  - validator_regex_fix
+  - form_uses_validator
+  allowed: []
+  forbidden:
+  - no_colors

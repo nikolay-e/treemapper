@@ -1,4 +1,11 @@
 name: php_007_magic_method
+tags:
+- lang:php
+- change:single_file
+- change:signature
+- context:cross_module
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
     src/Core/DynamicObject.php: |

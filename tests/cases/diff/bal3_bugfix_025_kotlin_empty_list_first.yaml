@@ -1,0 +1,91 @@
+name: bal3_bugfix_025_kotlin_empty_list_first
+tags:
+- lang:kotlin
+- change:single_file
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:trivial
+repo:
+  initial_files:
+    src/main/kotlin/queue/TaskQueue.kt: |
+      package queue
+
+      data class Task(val id: String, val priority: Int)
+
+      class TaskQueue {
+          private val tasks = mutableListOf<Task>()
+
+          fun enqueue(task: Task) {
+              tasks.add(task)
+          }
+
+          fun peek(): Task {
+              return tasks.first()
+          }
+
+          fun dequeue(): Task {
+              return tasks.removeAt(0)
+          }
+      }
+    src/main/kotlin/worker/Executor.kt: |
+      package worker
+
+      import queue.TaskQueue
+
+      class Executor(private val queue: TaskQueue) {
+          fun processNext(): String {
+              val task = queue.dequeue()
+              return "processed: ${task.id}"
+          }
+      }
+    src/main/kotlin/config/Limits.kt: |
+      package config
+
+      object Limits {
+          const val MAX_QUEUE_SIZE = 1000
+          const val TIMEOUT_MS = 5000L
+      }
+  changed_files:
+    src/main/kotlin/queue/TaskQueue.kt: |
+      package queue
+
+      data class Task(val id: String, val priority: Int)
+
+      class TaskQueue {
+          private val tasks = mutableListOf<Task>()
+
+          fun enqueue(task: Task) {
+              tasks.add(task)
+          }
+
+          fun peek(): Task? {
+              return tasks.firstOrNull()
+          }
+
+          fun dequeue(): Task? {
+              if (tasks.isEmpty()) return null
+              return tasks.removeAt(0)
+          }
+      }
+  commit_message: "fix: return null instead of throwing on empty queue"
+fragments:
+- id: empty_guard
+  selector:
+    path: queue/TaskQueue.kt
+    anchor: "if (tasks.isEmpty()) return null"
+- id: executor_calls_dequeue
+  selector:
+    path: worker/Executor.kt
+    anchor: "queue.dequeue()"
+- id: no_limits
+  selector:
+    path: config/Limits.kt
+    anchor: "object Limits"
+oracle:
+  required:
+  - empty_guard
+  - executor_calls_dequeue
+  allowed: []
+  forbidden:
+  - no_limits

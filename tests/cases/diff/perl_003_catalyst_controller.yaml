@@ -1,4 +1,10 @@
 name: perl_003_catalyst_controller
+tags:
+- lang:perl
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     lib/MyApp/Model/User.pm: |

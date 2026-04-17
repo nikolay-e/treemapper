@@ -1,4 +1,12 @@
 name: json_009_vscode_settings
+tags:
+- lang:python
+- lang:shell
+- change:single_file
+- change:config
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     config/settings.json: |

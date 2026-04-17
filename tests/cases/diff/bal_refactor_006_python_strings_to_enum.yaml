@@ -1,0 +1,207 @@
+name: bal_refactor_006_python_strings_to_enum
+tags:
+- lang:python
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:medium
+repo:
+  initial_files:
+    models/order.py: |
+      class Order:
+          def __init__(self, order_id, items):
+              self.order_id = order_id
+              self.items = items
+              self.status = "pending"
+
+          def confirm(self):
+              if self.status != "pending":
+                  raise ValueError("can only confirm pending orders")
+              self.status = "confirmed"
+
+          def ship(self):
+              if self.status != "confirmed":
+                  raise ValueError("can only ship confirmed orders")
+              self.status = "shipped"
+
+          def deliver(self):
+              if self.status != "shipped":
+                  raise ValueError("can only deliver shipped orders")
+              self.status = "delivered"
+    services/order_service.py: |
+      from models.order import Order
+
+      class OrderService:
+          def __init__(self, repo):
+              self.repo = repo
+
+          def get_pending_orders(self):
+              return [o for o in self.repo.all() if o.status == "pending"]
+
+          def get_shipped_orders(self):
+              return [o for o in self.repo.all() if o.status == "shipped"]
+    views/order_view.py: |
+      from models.order import Order
+
+      def render_status_badge(order):
+          colors = {
+              "pending": "yellow",
+              "confirmed": "blue",
+              "shipped": "purple",
+              "delivered": "green",
+          }
+          return f'<span class="{colors.get(order.status, "gray")}">{order.status}</span>'
+    utils/helpers.py: |
+      GARBAGE_REFACTOR_006_HELPER_MARKER_A = "helpers"
+      GARBAGE_REFACTOR_006_ROUND_MARKER_B = 2
+
+      def round_price(price):
+          return round(price, 2)
+    garbage_notifications.py: |
+      GARBAGE_REFACTOR_006_NOTIF_MARKER_C = "notifications"
+      GARBAGE_REFACTOR_006_CHANNEL_MARKER_D = "email"
+
+      class NotificationSender:
+          GARBAGE_REFACTOR_006_SENDER_E = True
+
+          def send(self, to, msg):
+              pass
+  changed_files:
+    models/status.py: |
+      from enum import Enum
+
+      class OrderStatus(Enum):
+          PENDING = "pending"
+          CONFIRMED = "confirmed"
+          SHIPPED = "shipped"
+          DELIVERED = "delivered"
+    models/order.py: |
+      from models.status import OrderStatus
+
+      class Order:
+          def __init__(self, order_id, items):
+              self.order_id = order_id
+              self.items = items
+              self.status = OrderStatus.PENDING
+
+          def confirm(self):
+              if self.status != OrderStatus.PENDING:
+                  raise ValueError("can only confirm pending orders")
+              self.status = OrderStatus.CONFIRMED
+
+          def ship(self):
+              if self.status != OrderStatus.CONFIRMED:
+                  raise ValueError("can only ship confirmed orders")
+              self.status = OrderStatus.SHIPPED
+
+          def deliver(self):
+              if self.status != OrderStatus.SHIPPED:
+                  raise ValueError("can only deliver shipped orders")
+              self.status = OrderStatus.DELIVERED
+    services/order_service.py: |
+      from models.order import Order
+      from models.status import OrderStatus
+
+      class OrderService:
+          def __init__(self, repo):
+              self.repo = repo
+
+          def get_pending_orders(self):
+              return [o for o in self.repo.all() if o.status == OrderStatus.PENDING]
+
+          def get_shipped_orders(self):
+              return [o for o in self.repo.all() if o.status == OrderStatus.SHIPPED]
+    views/order_view.py: |
+      from models.order import Order
+      from models.status import OrderStatus
+
+      STATUS_COLORS = {
+          OrderStatus.PENDING: "yellow",
+          OrderStatus.CONFIRMED: "blue",
+          OrderStatus.SHIPPED: "purple",
+          OrderStatus.DELIVERED: "green",
+      }
+
+      def render_status_badge(order):
+          color = STATUS_COLORS.get(order.status, "gray")
+          return f'<span class="{color}">{order.status.value}</span>'
+    utils/helpers.py: |
+      GARBAGE_REFACTOR_006_HELPER_MARKER_A = "helpers"
+      GARBAGE_REFACTOR_006_ROUND_MARKER_B = 2
+
+      def round_price(price):
+          return round(price, 2)
+    garbage_notifications.py: |
+      GARBAGE_REFACTOR_006_NOTIF_MARKER_C = "notifications"
+      GARBAGE_REFACTOR_006_CHANNEL_MARKER_D = "email"
+
+      class NotificationSender:
+          GARBAGE_REFACTOR_006_SENDER_E = True
+
+          def send(self, to, msg):
+              pass
+  commit_message: "refactor: replace string status with OrderStatus enum"
+fragments:
+- id: new_enum_module
+  selector:
+    path: models/status.py
+    anchor: "class OrderStatus(Enum)"
+- id: order_imports_enum
+  selector:
+    path: models/order.py
+    anchor: "from models.status import OrderStatus"
+- id: order_uses_enum
+  selector:
+    path: models/order.py
+    anchor: "self.status = OrderStatus.PENDING"
+- id: service_imports_enum
+  selector:
+    path: services/order_service.py
+    anchor: "from models.status import OrderStatus"
+- id: view_imports_enum
+  selector:
+    path: views/order_view.py
+    anchor: "from models.status import OrderStatus"
+- id: view_uses_enum
+  selector:
+    path: views/order_view.py
+    anchor: "OrderStatus.PENDING"
+- id: no_helpers
+  selector:
+    path: utils/helpers.py
+- id: no_garbage_notifications
+  selector:
+    path: garbage_notifications.py
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_006_HELPER_MARKER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_006_ROUND_MARKER_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_006_NOTIF_MARKER_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_006_CHANNEL_MARKER_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_006_SENDER_E
+oracle:
+  required:
+  - new_enum_module
+  - order_imports_enum
+  - order_uses_enum
+  - service_imports_enum
+  - view_imports_enum
+  - view_uses_enum
+  allowed: []
+  forbidden:
+  - no_helpers
+  - no_garbage_notifications
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4

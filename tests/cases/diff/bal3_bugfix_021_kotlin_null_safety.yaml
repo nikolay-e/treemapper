@@ -1,0 +1,65 @@
+name: bal3_bugfix_021_kotlin_null_safety
+tags:
+- lang:kotlin
+- change:single_file
+- change:bug_fix
+- context:same_file
+- distance:0hop
+- difficulty:trivial
+repo:
+  initial_files:
+    src/main/kotlin/model/Profile.kt: |
+      package model
+
+      data class Profile(
+          val name: String,
+          val email: String?,
+          val bio: String?
+      )
+
+      fun displayEmail(profile: Profile): String {
+          return profile.email!!.lowercase()
+      }
+
+      fun displayBio(profile: Profile): String {
+          return profile.bio ?: "No bio"
+      }
+    src/main/kotlin/util/Validator.kt: |
+      package util
+
+      fun isValidEmail(email: String): Boolean {
+          return email.contains("@")
+      }
+  changed_files:
+    src/main/kotlin/model/Profile.kt: |
+      package model
+
+      data class Profile(
+          val name: String,
+          val email: String?,
+          val bio: String?
+      )
+
+      fun displayEmail(profile: Profile): String {
+          return profile.email?.lowercase() ?: "No email"
+      }
+
+      fun displayBio(profile: Profile): String {
+          return profile.bio ?: "No bio"
+      }
+  commit_message: "fix: use safe call instead of !! to prevent NPE on null email"
+fragments:
+- id: safe_call_fix
+  selector:
+    path: model/Profile.kt
+    anchor: "profile.email?.lowercase()"
+- id: no_validator
+  selector:
+    path: util/Validator.kt
+    anchor: "fun isValidEmail"
+oracle:
+  required:
+  - safe_call_fix
+  allowed: []
+  forbidden:
+  - no_validator

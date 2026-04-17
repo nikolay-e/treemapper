@@ -1,4 +1,10 @@
 name: rust_023_macro_rules
+tags:
+- lang:rust
+- change:multi_file
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
     src/macros.rs: |

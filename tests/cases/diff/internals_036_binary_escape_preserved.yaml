@@ -1,4 +1,10 @@
 name: internals_036_binary_escape_preserved
+tags:
+- lang:python
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     binary_escape.py: |

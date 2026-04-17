@@ -1,4 +1,10 @@
 name: csharp_013_linq_method
+tags:
+- lang:csharp
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     Models/Order.cs: |

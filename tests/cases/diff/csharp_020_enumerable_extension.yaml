@@ -1,4 +1,10 @@
 name: csharp_020_enumerable_extension
+tags:
+- lang:csharp
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
     Extensions/EnumerableExtensions.cs: |

@@ -1,0 +1,194 @@
+name: bal3_1hop_020_ruby_serializer
+tags:
+- lang:ruby
+- change:multi_file
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    lib/serializers/base_serializer.rb: |
+      module Serializers
+        class BaseSerializer
+          attr_reader :object
+
+          def initialize(object)
+            @object = object
+          end
+
+          def serialize
+            attributes.each_with_object({}) do |attr, hash|
+              hash[attr] = object.send(attr)
+            end
+          end
+
+          def attributes
+            raise NotImplementedError
+          end
+        end
+      end
+    lib/serializers/user_serializer.rb: |
+      require_relative 'base_serializer'
+
+      module Serializers
+        class UserSerializer < BaseSerializer
+          def attributes
+            [:id, :email, :name]
+          end
+        end
+      end
+    lib/serializers/product_serializer.rb: |
+      require_relative 'base_serializer'
+
+      module Serializers
+        class ProductSerializer < BaseSerializer
+          def attributes
+            [:id, :name, :price]
+          end
+        end
+      end
+    lib/serializers/order_serializer.rb: |
+      require_relative 'base_serializer'
+
+      module Serializers
+        class OrderSerializer < BaseSerializer
+          def attributes
+            [:id, :status, :total]
+          end
+        end
+      end
+    lib/validators/presence.rb: |
+      GARBAGE_020_PRESENCE_A = "presence"
+
+      module Validators
+        class Presence
+          def validate(value)
+            !value.nil? && !value.empty?
+          end
+        end
+      end
+    lib/validators/format.rb: |
+      GARBAGE_020_FORMAT_B = "format"
+
+      module Validators
+        class Format
+          def validate(value, pattern)
+            value.match?(pattern)
+          end
+        end
+      end
+    lib/validators/range.rb: |
+      GARBAGE_020_RANGE_C = "range"
+
+      module Validators
+        class Range
+          def validate(value, min, max)
+            value >= min && value <= max
+          end
+        end
+      end
+  changed_files:
+    lib/serializers/base_serializer.rb: |
+      module Serializers
+        class BaseSerializer
+          attr_reader :object, :options
+
+          def initialize(object, options = {})
+            @object = object
+            @options = options
+          end
+
+          def serialize
+            result = attributes.each_with_object({}) do |attr, hash|
+              hash[attr] = object.send(attr)
+            end
+            result[:_type] = self.class.name if options[:include_type]
+            apply_transforms(result)
+          end
+
+          def attributes
+            raise NotImplementedError
+          end
+
+          def transforms
+            {}
+          end
+
+          private
+
+          def apply_transforms(hash)
+            transforms.each do |key, transformer|
+              hash[key] = transformer.call(hash[key]) if hash.key?(key)
+            end
+            hash
+          end
+        end
+      end
+  commit_message: "feat: add options, include_type, and transforms to BaseSerializer"
+fragments:
+- id: options_attr
+  selector:
+    path: lib/serializers/base_serializer.rb
+    anchor: ":object, :options"
+- id: options_param
+  selector:
+    path: lib/serializers/base_serializer.rb
+    anchor: "def initialize(object, options = {})"
+- id: include_type
+  selector:
+    path: lib/serializers/base_serializer.rb
+    anchor: "options[:include_type]"
+- id: apply_transforms
+  selector:
+    path: lib/serializers/base_serializer.rb
+    anchor: "def apply_transforms"
+- id: user_inherits_base
+  selector:
+    path: lib/serializers/user_serializer.rb
+    anchor: "class UserSerializer < BaseSerializer"
+- id: product_inherits_base
+  selector:
+    path: lib/serializers/product_serializer.rb
+    anchor: "class ProductSerializer < BaseSerializer"
+- id: order_inherits_base
+  selector:
+    path: lib/serializers/order_serializer.rb
+    anchor: "class OrderSerializer < BaseSerializer"
+- id: unrelated_presence
+  selector:
+    path: lib/validators/presence.rb
+    anchor: "class Presence"
+- id: unrelated_format
+  selector:
+    path: lib/validators/format.rb
+    anchor: "class Format"
+- id: unrelated_range
+  selector:
+    path: lib/validators/range.rb
+    anchor: "class Range"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_020_PRESENCE_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_020_FORMAT_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_020_RANGE_C
+oracle:
+  required:
+  - options_attr
+  - options_param
+  - include_type
+  - user_inherits_base
+  allowed:
+  - apply_transforms
+  - product_inherits_base
+  - order_inherits_base
+  forbidden:
+  - unrelated_presence
+  - unrelated_format
+  - unrelated_range
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

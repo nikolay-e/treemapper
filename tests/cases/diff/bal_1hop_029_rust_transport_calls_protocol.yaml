@@ -1,0 +1,243 @@
+name: bal_1hop_029_rust_transport_calls_protocol
+tags:
+- lang:rust
+- change:bug_fix
+- context:import_chain
+- distance:1hop
+- difficulty:hard
+repo:
+  initial_files:
+    src/protocol/frame.rs: |
+      pub struct Frame {
+          pub opcode: u8,
+          pub payload: Vec<u8>,
+          pub length: u32,
+      }
+
+      impl Frame {
+          pub fn new(opcode: u8, payload: Vec<u8>) -> Self {
+              let length = payload.len() as u32;
+              Frame { opcode, payload, length }
+          }
+
+          pub fn encode(&self) -> Vec<u8> {
+              let mut buf = Vec::new();
+              buf.push(self.opcode);
+              buf.extend_from_slice(&self.length.to_be_bytes());
+              buf.extend_from_slice(&self.payload);
+              buf
+          }
+
+          pub fn decode(data: &[u8]) -> Result<Self, String> {
+              if data.len() < 5 {
+                  return Err("frame too short".to_string());
+              }
+              let opcode = data[0];
+              let length = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
+              let payload = data[5..5 + length as usize].to_vec();
+              Ok(Frame { opcode, payload, length })
+          }
+      }
+    src/protocol/opcodes.rs: |
+      pub const OP_DATA: u8 = 0x01;
+      pub const OP_ACK: u8 = 0x02;
+      pub const OP_PING: u8 = 0x03;
+      pub const OP_PONG: u8 = 0x04;
+      pub const OP_CLOSE: u8 = 0x05;
+    src/transport/connection.rs: |
+      use crate::protocol::frame::Frame;
+      use crate::protocol::opcodes;
+
+      pub struct Connection {
+          buffer: Vec<u8>,
+          connected: bool,
+      }
+
+      impl Connection {
+          pub fn new() -> Self {
+              Connection {
+                  buffer: Vec::new(),
+                  connected: true,
+              }
+          }
+
+          pub fn send(&mut self, data: &[u8]) -> Result<(), String> {
+              if !self.connected {
+                  return Err("not connected".to_string());
+              }
+              let frame = Frame::new(opcodes::OP_DATA, data.to_vec());
+              self.buffer.extend_from_slice(&frame.encode());
+              Ok(())
+          }
+
+          pub fn recv(&mut self) -> Result<Frame, String> {
+              if self.buffer.is_empty() {
+                  return Err("no data".to_string());
+              }
+              Frame::decode(&self.buffer)
+          }
+
+          pub fn close(&mut self) {
+              self.connected = false;
+          }
+      }
+    src/transport/pool.rs: |
+      use super::connection::Connection;
+
+      pub struct ConnectionPool {
+          connections: Vec<Connection>,
+          max_size: usize,
+      }
+
+      impl ConnectionPool {
+          pub fn new(max_size: usize) -> Self {
+              ConnectionPool {
+                  connections: Vec::new(),
+                  max_size,
+              }
+          }
+
+          pub fn acquire(&mut self) -> Option<&mut Connection> {
+              self.connections.first_mut()
+          }
+      }
+    src/compression/lz4.rs: |
+      pub fn compress(data: &[u8]) -> Vec<u8> {
+          data.to_vec()
+      }
+
+      pub fn decompress(data: &[u8]) -> Vec<u8> {
+          data.to_vec()
+      }
+    src/tls/config.rs: |
+      pub struct TlsConfig {
+          pub cert_path: String,
+          pub key_path: String,
+      }
+
+      impl TlsConfig {
+          pub fn new(cert: &str, key: &str) -> Self {
+              TlsConfig {
+                  cert_path: cert.to_string(),
+                  key_path: key.to_string(),
+              }
+          }
+      }
+    src/dns/resolver.rs: |
+      pub fn resolve(hostname: &str) -> Result<String, String> {
+          Ok(format!("127.0.0.1 (resolved from {})", hostname))
+      }
+  changed_files:
+    src/protocol/frame.rs: |
+      pub const MAX_FRAME_SIZE: u32 = 1_048_576;
+
+      pub struct Frame {
+          pub opcode: u8,
+          pub payload: Vec<u8>,
+          pub length: u32,
+          pub checksum: u32,
+      }
+
+      impl Frame {
+          pub fn new(opcode: u8, payload: Vec<u8>) -> Self {
+              let length = payload.len() as u32;
+              let checksum = Self::compute_checksum(&payload);
+              Frame { opcode, payload, length, checksum }
+          }
+
+          fn compute_checksum(data: &[u8]) -> u32 {
+              data.iter().fold(0u32, |acc, &b| acc.wrapping_add(b as u32))
+          }
+
+          pub fn encode(&self) -> Vec<u8> {
+              let mut buf = Vec::new();
+              buf.push(self.opcode);
+              buf.extend_from_slice(&self.length.to_be_bytes());
+              buf.extend_from_slice(&self.checksum.to_be_bytes());
+              buf.extend_from_slice(&self.payload);
+              buf
+          }
+
+          pub fn decode(data: &[u8]) -> Result<Self, String> {
+              if data.len() < 9 {
+                  return Err("frame too short".to_string());
+              }
+              let opcode = data[0];
+              let length = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
+              if length > MAX_FRAME_SIZE {
+                  return Err(format!("frame too large: {} bytes", length));
+              }
+              let checksum = u32::from_be_bytes([data[5], data[6], data[7], data[8]]);
+              let end = 9 + length as usize;
+              if data.len() < end {
+                  return Err("incomplete frame".to_string());
+              }
+              let payload = data[9..end].to_vec();
+              let computed = Self::compute_checksum(&payload);
+              if computed != checksum {
+                  return Err("checksum mismatch".to_string());
+              }
+              Ok(Frame { opcode, payload, length, checksum })
+          }
+      }
+  commit_message: "fix: add checksum verification and max frame size to protocol"
+fragments:
+- id: checksum_field
+  selector:
+    path: src/protocol/frame.rs
+    anchor: "pub checksum: u32"
+- id: compute_checksum
+  selector:
+    path: src/protocol/frame.rs
+    anchor: "fn compute_checksum"
+- id: max_frame_size
+  selector:
+    path: src/protocol/frame.rs
+    anchor: "pub const MAX_FRAME_SIZE"
+- id: checksum_mismatch_err
+  selector:
+    path: src/protocol/frame.rs
+    anchor: "checksum mismatch"
+- id: conn_calls_frame_new
+  selector:
+    path: src/transport/connection.rs
+    anchor: "Frame::new(opcodes::OP_DATA"
+- id: conn_calls_decode
+  selector:
+    path: src/transport/connection.rs
+    anchor: "Frame::decode(&self.buffer)"
+- id: conn_calls_encode
+  selector:
+    path: src/transport/connection.rs
+    anchor: "frame.encode()"
+- id: pool_uses_connection
+  selector:
+    path: src/transport/pool.rs
+    anchor: "Connection"
+- id: unrelated_compression
+  selector:
+    path: src/compression/lz4.rs
+    anchor: "pub fn compress"
+- id: unrelated_tls
+  selector:
+    path: src/tls/config.rs
+    anchor: "pub struct TlsConfig"
+- id: unrelated_dns
+  selector:
+    path: src/dns/resolver.rs
+    anchor: "pub fn resolve"
+oracle:
+  required:
+  - checksum_field
+  - compute_checksum
+  - conn_calls_frame_new
+  - conn_calls_decode
+  allowed:
+  - max_frame_size
+  - checksum_mismatch_err
+  - conn_calls_encode
+  - pool_uses_connection
+  forbidden:
+  - unrelated_compression
+  - unrelated_tls
+  - unrelated_dns

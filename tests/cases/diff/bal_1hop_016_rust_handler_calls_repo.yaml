@@ -1,0 +1,117 @@
+name: bal_1hop_016_rust_handler_calls_repo
+tags:
+- lang:rust
+- change:signature
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/repo/user.rs: |
+      pub struct User {
+          pub id: u64,
+          pub name: String,
+          pub email: String,
+      }
+
+      pub struct UserRepo {
+          users: Vec<User>,
+      }
+
+      impl UserRepo {
+          pub fn new() -> Self {
+              UserRepo { users: Vec::new() }
+          }
+
+          pub fn find_by_id(&self, id: u64) -> Option<&User> {
+              self.users.iter().find(|u| u.id == id)
+          }
+
+          pub fn insert(&mut self, user: User) {
+              self.users.push(user);
+          }
+      }
+    src/handler/user.rs: |
+      use crate::repo::user::{UserRepo, User};
+
+      pub struct UserHandler {
+          repo: UserRepo,
+      }
+
+      impl UserHandler {
+          pub fn new(repo: UserRepo) -> Self {
+              UserHandler { repo }
+          }
+
+          pub fn get_user(&self, id: u64) -> String {
+              match self.repo.find_by_id(id) {
+                  Some(user) => format!("User: {}", user.name),
+                  None => "Not found".to_string(),
+              }
+          }
+      }
+    src/utils/hash.rs: |
+      use std::collections::hash_map::DefaultHasher;
+      use std::hash::{Hash, Hasher};
+
+      pub fn hash_string(s: &str) -> u64 {
+          let mut hasher = DefaultHasher::new();
+          s.hash(&mut hasher);
+          hasher.finish()
+      }
+  changed_files:
+    src/repo/user.rs: |
+      pub struct User {
+          pub id: u64,
+          pub name: String,
+          pub email: String,
+          pub active: bool,
+      }
+
+      pub struct UserRepo {
+          users: Vec<User>,
+      }
+
+      impl UserRepo {
+          pub fn new() -> Self {
+              UserRepo { users: Vec::new() }
+          }
+
+          pub fn find_by_id(&self, id: u64) -> Option<&User> {
+              self.users.iter().find(|u| u.id == id && u.active)
+          }
+
+          pub fn find_active(&self) -> Vec<&User> {
+              self.users.iter().filter(|u| u.active).collect()
+          }
+
+          pub fn insert(&mut self, user: User) {
+              self.users.push(user);
+          }
+      }
+  commit_message: "feat: add active flag and find_active to UserRepo"
+fragments:
+- id: user_active_field
+  selector:
+    path: src/repo/user.rs
+    anchor: "pub active: bool"
+- id: find_active_method
+  selector:
+    path: src/repo/user.rs
+    anchor: "pub fn find_active"
+- id: handler_calls_find
+  selector:
+    path: src/handler/user.rs
+    anchor: "self.repo.find_by_id(id)"
+- id: unrelated_hash
+  selector:
+    path: src/utils/hash.rs
+    anchor: "pub fn hash_string"
+oracle:
+  required:
+  - user_active_field
+  - handler_calls_find
+  allowed:
+  - find_active_method
+  forbidden:
+  - unrelated_hash

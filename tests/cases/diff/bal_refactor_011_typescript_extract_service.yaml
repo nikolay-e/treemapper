@@ -1,0 +1,203 @@
+name: bal_refactor_011_typescript_extract_service
+tags:
+- lang:typescript
+- change:multi_file
+- change:refactor
+- context:import_chain
+- distance:1hop
+- difficulty:easy
+repo:
+  initial_files:
+    src/controllers/userController.ts: |
+      import { Request, Response } from 'express';
+      import { db } from '../db';
+
+      export async function getUser(req: Request, res: Response) {
+          const user = await db.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+          if (!user.rows.length) {
+              return res.status(404).json({ error: 'not found' });
+          }
+          res.json(user.rows[0]);
+      }
+
+      export async function createUser(req: Request, res: Response) {
+          const { name, email } = req.body;
+          const result = await db.query(
+              'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+              [name, email]
+          );
+          res.status(201).json(result.rows[0]);
+      }
+
+      export async function deleteUser(req: Request, res: Response) {
+          await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+          res.status(204).send();
+      }
+    src/db.ts: |
+      export const db = {
+          query: async (sql: string, params: any[]) => {
+              return { rows: [] };
+          }
+      };
+    src/routes.ts: |
+      import { Router } from 'express';
+      import { getUser, createUser, deleteUser } from './controllers/userController';
+
+      const router = Router();
+      router.get('/users/:id', getUser);
+      router.post('/users', createUser);
+      router.delete('/users/:id', deleteUser);
+
+      export default router;
+    src/utils/logger.ts: |
+      const GARBAGE_REFACTOR_011_LOGGER_A = 'logger';
+      const GARBAGE_REFACTOR_011_LEVEL_B = 'info';
+
+      export function log(msg: string) {
+          console.log(msg);
+      }
+    garbage_config.ts: |
+      const GARBAGE_REFACTOR_011_CONFIG_C = 'config';
+      const GARBAGE_REFACTOR_011_PORT_D = 3000;
+
+      export const config = {
+          GARBAGE_REFACTOR_011_APP_E: true,
+          port: 3000,
+      };
+  changed_files:
+    src/services/userService.ts: |
+      import { db } from '../db';
+
+      export async function findUserById(id: string) {
+          const result = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+          return result.rows[0] || null;
+      }
+
+      export async function insertUser(name: string, email: string) {
+          const result = await db.query(
+              'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+              [name, email]
+          );
+          return result.rows[0];
+      }
+
+      export async function removeUser(id: string) {
+          await db.query('DELETE FROM users WHERE id = $1', [id]);
+      }
+    src/controllers/userController.ts: |
+      import { Request, Response } from 'express';
+      import { findUserById, insertUser, removeUser } from '../services/userService';
+
+      export async function getUser(req: Request, res: Response) {
+          const user = await findUserById(req.params.id);
+          if (!user) {
+              return res.status(404).json({ error: 'not found' });
+          }
+          res.json(user);
+      }
+
+      export async function createUser(req: Request, res: Response) {
+          const { name, email } = req.body;
+          const user = await insertUser(name, email);
+          res.status(201).json(user);
+      }
+
+      export async function deleteUser(req: Request, res: Response) {
+          await removeUser(req.params.id);
+          res.status(204).send();
+      }
+    src/db.ts: |
+      export const db = {
+          query: async (sql: string, params: any[]) => {
+              return { rows: [] };
+          }
+      };
+    src/routes.ts: |
+      import { Router } from 'express';
+      import { getUser, createUser, deleteUser } from './controllers/userController';
+
+      const router = Router();
+      router.get('/users/:id', getUser);
+      router.post('/users', createUser);
+      router.delete('/users/:id', deleteUser);
+
+      export default router;
+    src/utils/logger.ts: |
+      const GARBAGE_REFACTOR_011_LOGGER_A = 'logger';
+      const GARBAGE_REFACTOR_011_LEVEL_B = 'info';
+
+      export function log(msg: string) {
+          console.log(msg);
+      }
+    garbage_config.ts: |
+      const GARBAGE_REFACTOR_011_CONFIG_C = 'config';
+      const GARBAGE_REFACTOR_011_PORT_D = 3000;
+
+      export const config = {
+          GARBAGE_REFACTOR_011_APP_E: true,
+          port: 3000,
+      };
+  commit_message: "refactor: extract database queries into userService"
+fragments:
+- id: new_service_find
+  selector:
+    path: src/services/userService.ts
+    anchor: "export async function findUserById"
+- id: new_service_insert
+  selector:
+    path: src/services/userService.ts
+    anchor: "export async function insertUser"
+- id: new_service_remove
+  selector:
+    path: src/services/userService.ts
+    anchor: "export async function removeUser"
+- id: controller_imports_service
+  selector:
+    path: src/controllers/userController.ts
+    anchor: "from '../services/userService'"
+- id: controller_uses_find
+  selector:
+    path: src/controllers/userController.ts
+    anchor: "await findUserById(req.params.id)"
+- id: routes_uses_controller
+  selector:
+    path: src/routes.ts
+    anchor: "from './controllers/userController'"
+- id: no_logger
+  selector:
+    path: src/utils/logger.ts
+- id: no_garbage_config
+  selector:
+    path: garbage_config.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_REFACTOR_011_LOGGER_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_REFACTOR_011_LEVEL_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_REFACTOR_011_CONFIG_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_REFACTOR_011_PORT_D
+- id: no_global_4
+  selector:
+    anchor: GARBAGE_REFACTOR_011_APP_E
+oracle:
+  required:
+  - new_service_find
+  - new_service_insert
+  - new_service_remove
+  - controller_imports_service
+  - controller_uses_find
+  - routes_uses_controller
+  allowed: []
+  forbidden:
+  - no_logger
+  - no_garbage_config
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
