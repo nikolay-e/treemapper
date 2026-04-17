@@ -432,46 +432,34 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
             pass
         return False
 
-    def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
-        js_frags = [f for f in fragments if f.path.suffix.lower() in _JS_EXTS]
-        if not js_frags:
-            return {}
-
-        info_cache: dict[FragmentId, JsFragmentInfo] = {}
-        for f in js_frags:
-            info_cache[f.id] = analyze_javascript_fragment(f.content)
-
+    @staticmethod
+    def _build_def_index(js_frags: list[Fragment], info_cache: dict[FragmentId, JsFragmentInfo]):
         name_to_defs: dict[str, list[FragmentId]] = defaultdict(list)
         frag_defines: dict[FragmentId, frozenset[str]] = {}
-
         for f in js_frags:
             info = info_cache[f.id]
             frag_defines[f.id] = info.defines
             for name in info.defines:
                 name_to_defs[name].append(f.id)
+        return name_to_defs, frag_defines
+
+    def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
+        js_frags = [f for f in fragments if f.path.suffix.lower() in _JS_EXTS]
+        if not js_frags:
+            return {}
+
+        info_cache = {f.id: analyze_javascript_fragment(f.content) for f in js_frags}
+        name_to_defs, frag_defines = self._build_def_index(js_frags, info_cache)
 
         edges: EdgeDict = {}
-
         for f in js_frags:
             info = info_cache[f.id]
             self_defs = set(frag_defines.get(f.id, frozenset()))
             w = _TS_WEIGHTS if f.path.suffix.lower() in _TS_EXTS else _JS_WEIGHTS
-
-            add_semantic_edges(
-                edges,
-                f.id,
-                info,
-                name_to_defs,
-                w.call,
-                w.symbol_ref,
-                w.type_ref,
-                self.reverse_weight_factor,
-                self_defs,
-            )
+            add_semantic_edges(edges, f.id, info, name_to_defs, w.call, w.symbol_ref, w.type_ref, self.reverse_weight_factor, self_defs)
 
         tsconfig_resolver = _TsconfigResolver(repo_root) if repo_root else None
         self._add_import_edges(js_frags, info_cache, edges, tsconfig_resolver)
-
         return edges
 
     _IMPORT_WEIGHT = 0.55
