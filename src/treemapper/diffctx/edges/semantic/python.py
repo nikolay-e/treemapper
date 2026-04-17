@@ -64,7 +64,10 @@ def _resolve_relative(name: str, source_path: Path, repo_root: Path | None) -> s
 
 
 def _collect_import_from(
-    node: ast.ImportFrom, imports: set[str], source_path: Path | None, repo_root: Path | None,
+    node: ast.ImportFrom,
+    imports: set[str],
+    source_path: Path | None,
+    repo_root: Path | None,
 ) -> None:
     module = node.module or ""
     if node.level and node.level > 0:
@@ -288,7 +291,13 @@ class PythonEdgeBuilder(EdgeBuilder):
 
         for _depth in range(self._DISCOVERY_MAX_DEPTH):
             next_frontier = self._expand_frontier(
-                frontier, changed_set, discovered, file_to_imports, file_to_module, module_to_files, repo_root,
+                frontier,
+                changed_set,
+                discovered,
+                file_to_imports,
+                file_to_module,
+                module_to_files,
+                repo_root,
             )
             frontier = next_frontier
             if not frontier:
@@ -432,7 +441,9 @@ class PythonEdgeBuilder(EdgeBuilder):
         py_frags: list[Fragment],
         info_cache: dict[FragmentId, PyFragmentInfo],
         repo_root: Path | None,
-    ) -> tuple[dict[str, list[FragmentId]], dict[FragmentId, frozenset[str]], dict[str, list[FragmentId]], dict[Path, list[FragmentId]]]:
+    ) -> tuple[
+        dict[str, list[FragmentId]], dict[FragmentId, frozenset[str]], dict[str, list[FragmentId]], dict[Path, list[FragmentId]]
+    ]:
         name_to_defs: dict[str, list[FragmentId]] = defaultdict(list)
         frag_defines: dict[FragmentId, frozenset[str]] = {}
         for f in py_frags:
@@ -461,7 +472,9 @@ class PythonEdgeBuilder(EdgeBuilder):
             info_cache[f.id] = analyze_python_fragment(f.content)
 
         name_to_defs, frag_defines, module_to_frags, path_to_frags = self._build_frag_indexes(
-            py_frags, info_cache, repo_root,
+            py_frags,
+            info_cache,
+            repo_root,
         )
 
         file_cache: dict[Path, str] = {f.path: f.content for f in py_frags}

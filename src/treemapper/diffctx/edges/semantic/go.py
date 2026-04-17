@@ -228,8 +228,16 @@ class GoEdgeBuilder(EdgeBuilder):
                 f_pkg = _get_package_name_from_content(content, f).lower()
                 f_rel_dir = str(f.relative_to(repo_root).parent) if repo_root else None
                 self._match_candidates(
-                    candidates, changed_set, discovered, next_frontier,
-                    candidate_index, f_imports, f, f_pkg, f_rel_dir, repo_root,
+                    candidates,
+                    changed_set,
+                    discovered,
+                    next_frontier,
+                    candidate_index,
+                    f_imports,
+                    f,
+                    f_pkg,
+                    f_rel_dir,
+                    repo_root,
                 )
             frontier = next_frontier
             if not frontier:

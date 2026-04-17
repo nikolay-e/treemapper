@@ -313,7 +313,9 @@ class RustEdgeBuilder(EdgeBuilder):
 
     @staticmethod
     @staticmethod
-    def _collect_forward_targets(frontier: set[Path], file_uses: dict[Path, set[str]], file_mods: dict[Path, set[str]]) -> set[str]:
+    def _collect_forward_targets(
+        frontier: set[Path], file_uses: dict[Path, set[str]], file_mods: dict[Path, set[str]]
+    ) -> set[str]:
         targets: set[str] = set()
         for f in frontier:
             for use_path in file_uses.get(f, set()):

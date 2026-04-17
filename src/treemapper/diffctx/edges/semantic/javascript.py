@@ -225,7 +225,10 @@ class _TsconfigResolver:
 
     @staticmethod
     def _match_path_patterns(
-        paths: dict[str, object], import_source: str, base: Path, candidate_set: set[Path],
+        paths: dict[str, object],
+        import_source: str,
+        base: Path,
+        candidate_set: set[Path],
     ) -> Path | None:
         for pattern, targets in paths.items():
             if not isinstance(targets, list):
@@ -233,7 +236,7 @@ class _TsconfigResolver:
             prefix = pattern.replace("*", "")
             if not import_source.startswith(prefix):
                 continue
-            suffix = import_source[len(prefix):]
+            suffix = import_source[len(prefix) :]
             for target in targets:
                 if not isinstance(target, str):
                     continue
@@ -456,7 +459,9 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
             info = info_cache[f.id]
             self_defs = set(frag_defines.get(f.id, frozenset()))
             w = _TS_WEIGHTS if f.path.suffix.lower() in _TS_EXTS else _JS_WEIGHTS
-            add_semantic_edges(edges, f.id, info, name_to_defs, w.call, w.symbol_ref, w.type_ref, self.reverse_weight_factor, self_defs)
+            add_semantic_edges(
+                edges, f.id, info, name_to_defs, w.call, w.symbol_ref, w.type_ref, self.reverse_weight_factor, self_defs
+            )
 
         tsconfig_resolver = _TsconfigResolver(repo_root) if repo_root else None
         self._add_import_edges(js_frags, info_cache, edges, tsconfig_resolver)

@@ -378,7 +378,11 @@ class JVMEdgeBuilder(EdgeBuilder):
                 self._link_explicit_import(jf, imp, fqn_to_frags, class_to_frags, edges)
 
     def _link_wildcard_import(
-        self, jf: Fragment, imp: str, package_to_frags: dict[str, list[FragmentId]] | None, edges: EdgeDict,
+        self,
+        jf: Fragment,
+        imp: str,
+        package_to_frags: dict[str, list[FragmentId]] | None,
+        edges: EdgeDict,
     ) -> None:
         if package_to_frags is None:
             return
@@ -388,8 +392,12 @@ class JVMEdgeBuilder(EdgeBuilder):
                 self.add_edge(edges, jf.id, fid, self.import_weight)
 
     def _link_explicit_import(
-        self, jf: Fragment, imp: str, fqn_to_frags: dict[str, list[FragmentId]],
-        class_to_frags: dict[str, list[FragmentId]], edges: EdgeDict,
+        self,
+        jf: Fragment,
+        imp: str,
+        fqn_to_frags: dict[str, list[FragmentId]],
+        class_to_frags: dict[str, list[FragmentId]],
+        edges: EdgeDict,
     ) -> None:
         for fid in fqn_to_frags.get(imp.lower(), []):
             if fid != jf.id:
