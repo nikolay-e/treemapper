@@ -209,4 +209,12 @@ class TagsEdgeBuilder(EdgeBuilder):
                 continue
             self_defs = info.definitions
             for ref_set, weight in [(info.calls, 0.40), (info.type_refs, 0.30), (info.references, 0.35)]:
-                add_ref_edges(edges, f.id, ref_set, name_to_defs, weight, reverse_factor=self.reverse_weight_factor, skip_self_defs=self_defs)
+                add_ref_edges(
+                    edges,
+                    f.id,
+                    ref_set,
+                    name_to_defs,
+                    weight,
+                    reverse_factor=self.reverse_weight_factor,
+                    skip_self_defs=self_defs,
+                )

@@ -336,10 +336,14 @@ class TreeSitterStrategy:
         return None
 
     @staticmethod
-    @staticmethod
     def _emit_chunk(
-        path: Path, lines: list[str], start: int, end: int, parent_symbol: str | None,
-        fragments: list[Fragment], covered: set[tuple[int, int]],
+        path: Path,
+        lines: list[str],
+        start: int,
+        end: int,
+        parent_symbol: str | None,
+        fragments: list[Fragment],
+        covered: set[tuple[int, int]],
     ) -> None:
         if end < start:
             return
