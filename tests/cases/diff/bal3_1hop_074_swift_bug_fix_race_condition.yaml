@@ -5,8 +5,6 @@ tags:
 - context:import_chain
 - distance:1hop
 - difficulty:hard
-xfail:
-  category: swift-no-tree-sitter
 repo:
   initial_files:
     Sources/Cache/MemoryCache.swift: |

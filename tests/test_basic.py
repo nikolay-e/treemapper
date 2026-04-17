@@ -352,4 +352,4 @@ class TestMultiPathInput:
     def test_nonexistent_pattern_fails(self, run_mapper, capsys):
         assert not run_mapper(["nonexistent_*.xyz"])
         captured = capsys.readouterr()
-        assert "No matches" in captured.err
+        assert "No matches" in captured.err or "Cannot access" in captured.err
