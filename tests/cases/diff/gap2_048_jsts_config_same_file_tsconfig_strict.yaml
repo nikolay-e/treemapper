@@ -1,0 +1,107 @@
+name: gap2_048_jsts_config_same_file_tsconfig_strict
+tags:
+- change:config
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:javascript
+- lang:typescript
+repo:
+  initial_files:
+    tsconfig.json: |
+      {
+        "compilerOptions": {
+          "target": "ES2020",
+          "module": "commonjs",
+          "strict": false,
+          "esModuleInterop": true,
+          "outDir": "dist",
+          "rootDir": "src"
+        },
+        "include": ["src/**/*"],
+        "exclude": ["node_modules"]
+      }
+    src/auth/session.ts: |
+      const TRAP_GAP2_048_SESSION_A: string = "jwt_session";
+      const TRAP_GAP2_048_EXPIRY_B: number = 3600;
+
+      function createToken(userId: string): string {
+        return `token_${userId}_${Date.now()}`;
+      }
+
+      function isExpired(issuedAt: number, ttl: number): boolean {
+        return Date.now() - issuedAt > ttl * 1000;
+      }
+    src/auth/hash.js: |
+      const TRAP_GAP2_048_ALGO_C = "bcrypt";
+      const TRAP_GAP2_048_ROUNDS_D = 12;
+
+      function hashPassword(plain) {
+        return `hashed_${plain}`;
+      }
+
+      module.exports = { hashPassword };
+  changed_files:
+    tsconfig.json: |
+      {
+        "compilerOptions": {
+          "target": "ES2022",
+          "module": "commonjs",
+          "strict": true,
+          "noUncheckedIndexedAccess": true,
+          "esModuleInterop": true,
+          "outDir": "dist",
+          "rootDir": "src",
+          "declaration": true
+        },
+        "include": ["src/**/*"],
+        "exclude": ["node_modules", "dist"]
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: strict_enabled
+  selector:
+    path: tsconfig.json
+    anchor: '"strict": true'
+- id: unchecked_index
+  selector:
+    path: tsconfig.json
+    anchor: '"noUncheckedIndexedAccess": true'
+- id: declaration_enabled
+  selector:
+    path: tsconfig.json
+    anchor: '"declaration": true'
+- id: no_session
+  selector:
+    path: src/auth/session.ts
+- id: no_hash
+  selector:
+    path: src/auth/hash.js
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_048_SESSION_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_048_EXPIRY_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_048_ALGO_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_048_ROUNDS_D
+oracle:
+  required:
+  - strict_enabled
+  - unchecked_index
+  - declaration_enabled
+  allowed: []
+  forbidden:
+  - no_session
+  - no_hash
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

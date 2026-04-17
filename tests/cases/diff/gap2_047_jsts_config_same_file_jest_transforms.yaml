@@ -1,0 +1,105 @@
+name: gap2_047_jsts_config_same_file_jest_transforms
+tags:
+- change:config
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:javascript
+- lang:typescript
+repo:
+  initial_files:
+    jest.config.js: |
+      module.exports = {
+        testEnvironment: "node",
+        roots: ["<rootDir>/src"],
+        testMatch: ["**/*.test.ts"],
+        transform: {
+          "^.+\\.ts$": "ts-jest",
+        },
+        collectCoverage: false,
+        coverageDirectory: "coverage",
+      };
+    src/services/payment.ts: |
+      const TRAP_GAP2_047_GATEWAY_A: string = "stripe";
+      const TRAP_GAP2_047_CURRENCY_B: string = "USD";
+
+      function calculateTax(amount: number, rate: number): number {
+        return Math.round(amount * rate * 100) / 100;
+      }
+
+      function formatCurrency(cents: number): string {
+        return `$${(cents / 100).toFixed(2)}`;
+      }
+    src/services/inventory.js: |
+      const TRAP_GAP2_047_WAREHOUSE_C = "primary";
+      const TRAP_GAP2_047_THRESHOLD_D = 10;
+
+      function checkStock(productId, quantity) {
+        return quantity > 0;
+      }
+
+      module.exports = { checkStock };
+  changed_files:
+    jest.config.js: |
+      module.exports = {
+        testEnvironment: "node",
+        roots: ["<rootDir>/src"],
+        testMatch: ["**/*.test.ts", "**/*.test.js"],
+        transform: {
+          "^.+\\.ts$": "ts-jest",
+          "^.+\\.js$": "babel-jest",
+        },
+        collectCoverage: true,
+        coverageDirectory: "coverage",
+        coverageThreshold: {
+          global: { branches: 80, functions: 80, lines: 80 },
+        },
+      };
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: babel_transform
+  selector:
+    path: jest.config.js
+    anchor: '"babel-jest"'
+- id: coverage_enabled
+  selector:
+    path: jest.config.js
+    anchor: "collectCoverage: true"
+- id: coverage_threshold
+  selector:
+    path: jest.config.js
+    anchor: "branches: 80"
+- id: no_payment
+  selector:
+    path: src/services/payment.ts
+- id: no_inventory
+  selector:
+    path: src/services/inventory.js
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_047_GATEWAY_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_047_CURRENCY_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_047_WAREHOUSE_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_047_THRESHOLD_D
+oracle:
+  required:
+  - babel_transform
+  - coverage_enabled
+  - coverage_threshold
+  allowed: []
+  forbidden:
+  - no_payment
+  - no_inventory
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

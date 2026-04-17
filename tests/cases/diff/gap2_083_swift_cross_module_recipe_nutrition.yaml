@@ -1,0 +1,161 @@
+name: gap2_083_swift_cross_module_recipe_nutrition
+tags:
+- change:new_function
+- change:single_file
+- context:cross_module
+- difficulty:medium
+- distance:2hop
+- lang:swift
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    Sources/Cooking/RecipeAnalyzer.swift: |
+      import Foundation
+
+      struct NutritionSummary {
+          let calories: Double
+          let proteinGrams: Double
+          let fatGrams: Double
+      }
+
+      class RecipeAnalyzer {
+          private let ingredientDb: IngredientDatabase
+
+          init(ingredientDb: IngredientDatabase) {
+              self.ingredientDb = ingredientDb
+          }
+
+          func totalCalories(recipe: Recipe) -> Double {
+              recipe.ingredients.compactMap { ingredientDb.nutritionFor(name: $0.name) }
+                  .reduce(0.0) { $0 + $1.caloriesPer100g }
+          }
+      }
+    Sources/Cooking/IngredientDatabase.swift: |
+      import Foundation
+
+      class IngredientDatabase {
+          private let catalog: FoodCatalog
+
+          init(catalog: FoodCatalog) {
+              self.catalog = catalog
+          }
+
+          func nutritionFor(name: String) -> FoodEntry? {
+              catalog.search(query: name).first
+          }
+
+          func allIngredients() -> [FoodEntry] {
+              catalog.allFoods()
+          }
+      }
+    Sources/Cooking/FoodCatalog.swift: |
+      import Foundation
+
+      struct FoodEntry {
+          let name: String
+          let caloriesPer100g: Double
+          let proteinPer100g: Double
+          let fatPer100g: Double
+      }
+
+      class FoodCatalog {
+          private var foods: [FoodEntry] = []
+
+          func search(query: String) -> [FoodEntry] {
+              foods.filter { $0.name.localizedCaseInsensitiveContains(query) }
+          }
+
+          func allFoods() -> [FoodEntry] {
+              foods
+          }
+
+          func addFood(_ entry: FoodEntry) {
+              foods.append(entry)
+          }
+      }
+    Sources/Cooking/Recipe.swift: |
+      import Foundation
+
+      struct Ingredient {
+          let name: String
+          let quantityGrams: Double
+      }
+
+      struct Recipe {
+          let title: String
+          let ingredients: [Ingredient]
+          let servings: Int
+      }
+    Sources/Shipping/DeliveryTracker.swift: |
+      import Foundation
+
+      let TRAP_GAP2_083_DELIVERY_A: String = "delivery_noise"
+      let TRAP_GAP2_083_DELIVERY_B: Bool = false
+
+      class DeliveryTracker {
+          func estimateArrival() -> Date { Date() }
+          func trackPackage(id: String) -> String { "in_transit" }
+      }
+  changed_files:
+    Sources/Cooking/RecipeAnalyzer.swift: |
+      import Foundation
+
+      struct NutritionSummary {
+          let calories: Double
+          let proteinGrams: Double
+          let fatGrams: Double
+      }
+
+      class RecipeAnalyzer {
+          private let ingredientDb: IngredientDatabase
+
+          init(ingredientDb: IngredientDatabase) {
+              self.ingredientDb = ingredientDb
+          }
+
+          func totalCalories(recipe: Recipe) -> Double {
+              recipe.ingredients.compactMap { ingredientDb.nutritionFor(name: $0.name) }
+                  .reduce(0.0) { $0 + $1.caloriesPer100g }
+          }
+
+          func fullNutrition(recipe: Recipe) -> NutritionSummary {
+              let entries = recipe.ingredients.compactMap { ingredientDb.nutritionFor(name: $0.name) }
+              let cal = entries.reduce(0.0) { $0 + $1.caloriesPer100g }
+              let protein = entries.reduce(0.0) { $0 + $1.proteinPer100g }
+              let fat = entries.reduce(0.0) { $0 + $1.fatPer100g }
+              return NutritionSummary(calories: cal, proteinGrams: protein, fatGrams: fat)
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: full_nutrition_fn
+  selector:
+    path: Sources/Cooking/RecipeAnalyzer.swift
+    anchor: "func fullNutrition"
+- id: nutrition_for
+  selector:
+    path: Sources/Cooking/IngredientDatabase.swift
+    anchor: "func nutritionFor"
+- id: food_entry_struct
+  selector:
+    path: Sources/Cooking/FoodCatalog.swift
+    anchor: "struct FoodEntry"
+- id: no_delivery
+  selector:
+    path: Sources/Shipping/DeliveryTracker.swift
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_083_DELIVERY_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_083_DELIVERY_B
+oracle:
+  required:
+  - full_nutrition_fn
+  - nutrition_for
+  - food_entry_struct
+  forbidden:
+  - no_delivery
+  - no_global_0
+  - no_global_1

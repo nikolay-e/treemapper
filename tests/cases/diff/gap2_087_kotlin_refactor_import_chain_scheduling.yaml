@@ -1,0 +1,164 @@
+name: gap2_087_kotlin_refactor_import_chain_scheduling
+tags:
+- change:multi_file
+- change:refactor
+- context:import_chain
+- difficulty:hard
+- distance:2hop
+- lang:kotlin
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    src/main/kotlin/scheduler/JobScheduler.kt: |
+      package scheduler
+
+      import scheduler.executor.JobExecutor
+      import scheduler.model.JobDefinition
+
+      class JobScheduler(private val executor: JobExecutor) {
+          private val jobs = mutableListOf<JobDefinition>()
+
+          fun schedule(name: String, cronExpr: String, action: () -> Unit) {
+              val job = JobDefinition(name, cronExpr)
+              jobs.add(job)
+              executor.register(job, action)
+          }
+
+          fun cancel(name: String) {
+              jobs.removeAll { it.name == name }
+              executor.unregister(name)
+          }
+      }
+    src/main/kotlin/scheduler/executor/JobExecutor.kt: |
+      package scheduler.executor
+
+      import scheduler.model.JobDefinition
+
+      class JobExecutor {
+          private val registry = mutableMapOf<String, Pair<JobDefinition, () -> Unit>>()
+
+          fun register(job: JobDefinition, action: () -> Unit) {
+              registry[job.name] = Pair(job, action)
+          }
+
+          fun unregister(name: String) {
+              registry.remove(name)
+          }
+
+          fun runAll() {
+              registry.values.forEach { (_, action) -> action() }
+          }
+      }
+    src/main/kotlin/scheduler/model/JobDefinition.kt: |
+      package scheduler.model
+
+      data class JobDefinition(
+          val name: String,
+          val cronExpression: String
+      )
+    src/main/kotlin/cache/RedisAdapter.kt: |
+      package cache
+
+      val TRAP_GAP2_087_CACHE_A: String = "cache_noise"
+      val TRAP_GAP2_087_CACHE_B: Long = 3600
+
+      class RedisAdapter {
+          fun get(key: String): String? = null
+          fun set(key: String, value: String, ttl: Long) {}
+      }
+  changed_files:
+    src/main/kotlin/scheduler/JobScheduler.kt: |
+      package scheduler
+
+      import scheduler.executor.JobExecutor
+      import scheduler.model.ScheduledJob
+      import scheduler.model.JobPriority
+
+      class JobScheduler(private val executor: JobExecutor) {
+          private val jobs = mutableListOf<ScheduledJob>()
+
+          fun schedule(name: String, cronExpr: String, priority: JobPriority, action: () -> Unit) {
+              val job = ScheduledJob(name, cronExpr, priority)
+              jobs.add(job)
+              executor.register(job, action)
+          }
+
+          fun cancel(name: String) {
+              jobs.removeAll { it.name == name }
+              executor.unregister(name)
+          }
+
+          fun pendingByPriority(): Map<JobPriority, List<ScheduledJob>> {
+              return jobs.groupBy { it.priority }
+          }
+      }
+    src/main/kotlin/scheduler/executor/JobExecutor.kt: |
+      package scheduler.executor
+
+      import scheduler.model.ScheduledJob
+
+      class JobExecutor {
+          private val registry = mutableMapOf<String, Pair<ScheduledJob, () -> Unit>>()
+
+          fun register(job: ScheduledJob, action: () -> Unit) {
+              registry[job.name] = Pair(job, action)
+          }
+
+          fun unregister(name: String) {
+              registry.remove(name)
+          }
+
+          fun runAll() {
+              registry.entries
+                  .sortedByDescending { it.value.first.priority.ordinal }
+                  .forEach { (_, pair) -> pair.second() }
+          }
+      }
+    src/main/kotlin/scheduler/model/JobDefinition.kt: |
+      package scheduler.model
+
+      enum class JobPriority { LOW, MEDIUM, HIGH, CRITICAL }
+
+      data class ScheduledJob(
+          val name: String,
+          val cronExpression: String,
+          val priority: JobPriority
+      )
+  commit_message: Update files
+fragments:
+- id: scheduled_job
+  selector:
+    path: src/main/kotlin/scheduler/model/JobDefinition.kt
+    anchor: "data class ScheduledJob"
+- id: job_priority_enum
+  selector:
+    path: src/main/kotlin/scheduler/model/JobDefinition.kt
+    anchor: "enum class JobPriority"
+- id: scheduler_method
+  selector:
+    path: src/main/kotlin/scheduler/JobScheduler.kt
+    anchor: "fun schedule(name: String, cronExpr: String, priority: JobPriority"
+- id: executor_sorted
+  selector:
+    path: src/main/kotlin/scheduler/executor/JobExecutor.kt
+    anchor: sortedByDescending
+- id: no_cache
+  selector:
+    path: src/main/kotlin/cache/RedisAdapter.kt
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_087_CACHE_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_087_CACHE_B
+oracle:
+  required:
+  - scheduled_job
+  - job_priority_enum
+  - scheduler_method
+  - executor_sorted
+  forbidden:
+  - no_cache
+  - no_global_0
+  - no_global_1

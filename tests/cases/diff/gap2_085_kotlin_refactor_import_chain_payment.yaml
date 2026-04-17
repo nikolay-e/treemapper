@@ -1,0 +1,154 @@
+name: gap2_085_kotlin_refactor_import_chain_payment
+tags:
+- change:multi_file
+- change:refactor
+- context:import_chain
+- difficulty:hard
+- distance:2hop
+- lang:kotlin
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    src/main/kotlin/payment/PaymentProcessor.kt: |
+      package payment
+
+      import payment.gateway.GatewayClient
+      import payment.model.ChargeRequest
+      import payment.model.ChargeResponse
+
+      class PaymentProcessor(private val gateway: GatewayClient) {
+          fun charge(amount: Long, currency: String, cardToken: String): ChargeResponse {
+              val request = ChargeRequest(amount, currency, cardToken)
+              return gateway.submitCharge(request)
+          }
+
+          fun refund(chargeId: String, amount: Long): ChargeResponse {
+              return gateway.submitRefund(chargeId, amount)
+          }
+      }
+    src/main/kotlin/payment/gateway/GatewayClient.kt: |
+      package payment.gateway
+
+      import payment.model.ChargeRequest
+      import payment.model.ChargeResponse
+
+      class GatewayClient(private val endpoint: String) {
+          fun submitCharge(request: ChargeRequest): ChargeResponse {
+              return ChargeResponse(id = "ch_123", status = "succeeded", amount = request.amount)
+          }
+
+          fun submitRefund(chargeId: String, amount: Long): ChargeResponse {
+              return ChargeResponse(id = chargeId, status = "refunded", amount = amount)
+          }
+      }
+    src/main/kotlin/payment/model/ChargeRequest.kt: |
+      package payment.model
+
+      data class ChargeRequest(
+          val amount: Long,
+          val currency: String,
+          val cardToken: String
+      )
+    src/main/kotlin/payment/model/ChargeResponse.kt: |
+      package payment.model
+
+      data class ChargeResponse(
+          val id: String,
+          val status: String,
+          val amount: Long
+      )
+    src/main/kotlin/inventory/StockManager.kt: |
+      package inventory
+
+      val TRAP_GAP2_085_STOCK_A: String = "stock_noise"
+      val TRAP_GAP2_085_STOCK_B: Int = 500
+
+      class StockManager {
+          fun checkAvailability(sku: String): Boolean = true
+          fun reserve(sku: String, qty: Int) {}
+      }
+  changed_files:
+    src/main/kotlin/payment/PaymentProcessor.kt: |
+      package payment
+
+      import payment.gateway.GatewayClient
+      import payment.model.Money
+      import payment.model.ChargeResult
+
+      class PaymentProcessor(private val gateway: GatewayClient) {
+          fun charge(money: Money, cardToken: String): ChargeResult {
+              return gateway.submitCharge(money, cardToken)
+          }
+
+          fun refund(chargeId: String, money: Money): ChargeResult {
+              return gateway.submitRefund(chargeId, money)
+          }
+      }
+    src/main/kotlin/payment/gateway/GatewayClient.kt: |
+      package payment.gateway
+
+      import payment.model.Money
+      import payment.model.ChargeResult
+
+      class GatewayClient(private val endpoint: String) {
+          fun submitCharge(money: Money, cardToken: String): ChargeResult {
+              return ChargeResult(id = "ch_123", status = "succeeded", money = money)
+          }
+
+          fun submitRefund(chargeId: String, money: Money): ChargeResult {
+              return ChargeResult(id = chargeId, status = "refunded", money = money)
+          }
+      }
+    src/main/kotlin/payment/model/ChargeRequest.kt: |
+      package payment.model
+
+      data class Money(
+          val amount: Long,
+          val currency: String
+      )
+    src/main/kotlin/payment/model/ChargeResponse.kt: |
+      package payment.model
+
+      data class ChargeResult(
+          val id: String,
+          val status: String,
+          val money: Money
+      )
+  commit_message: Update files
+fragments:
+- id: money_class
+  selector:
+    path: src/main/kotlin/payment/model/ChargeRequest.kt
+    anchor: "data class Money"
+- id: charge_result
+  selector:
+    path: src/main/kotlin/payment/model/ChargeResponse.kt
+    anchor: "data class ChargeResult"
+- id: processor_charge
+  selector:
+    path: src/main/kotlin/payment/PaymentProcessor.kt
+    anchor: "fun charge(money: Money"
+- id: gateway_submit
+  selector:
+    path: src/main/kotlin/payment/gateway/GatewayClient.kt
+    anchor: "fun submitCharge(money: Money"
+- id: no_stock
+  selector:
+    path: src/main/kotlin/inventory/StockManager.kt
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_085_STOCK_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_085_STOCK_B
+oracle:
+  required:
+  - money_class
+  - charge_result
+  - processor_charge
+  - gateway_submit
+  forbidden:
+  - no_stock
+  - no_global_0
+  - no_global_1

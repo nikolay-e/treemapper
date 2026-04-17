@@ -1,0 +1,144 @@
+name: gap2_084_swift_cross_module_vehicle_diagnostic
+tags:
+- change:new_function
+- change:single_file
+- context:cross_module
+- difficulty:medium
+- distance:2hop
+- lang:swift
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    Sources/Vehicle/DiagnosticRunner.swift: |
+      import Foundation
+
+      struct DiagnosticReport {
+          let vehicleId: String
+          let faults: [String]
+          let passed: Bool
+      }
+
+      class DiagnosticRunner {
+          private let sensorHub: SensorHub
+
+          init(sensorHub: SensorHub) {
+              self.sensorHub = sensorHub
+          }
+
+          func runCheck(vehicleId: String) -> DiagnosticReport {
+              let readings = sensorHub.latestReadings(vehicleId: vehicleId)
+              let faults = readings.filter { $0.value > $0.threshold }.map { $0.sensorName }
+              return DiagnosticReport(vehicleId: vehicleId, faults: faults, passed: faults.isEmpty)
+          }
+      }
+    Sources/Vehicle/SensorHub.swift: |
+      import Foundation
+
+      class SensorHub {
+          private let canBus: CANBusReader
+
+          init(canBus: CANBusReader) {
+              self.canBus = canBus
+          }
+
+          func latestReadings(vehicleId: String) -> [SensorReading] {
+              let raw = canBus.readFrames(busId: vehicleId)
+              return raw.map { SensorReading(sensorName: $0.label, value: $0.payload, threshold: $0.maxPayload) }
+          }
+      }
+    Sources/Vehicle/CANBusReader.swift: |
+      import Foundation
+
+      struct CANFrame {
+          let label: String
+          let payload: Double
+          let maxPayload: Double
+      }
+
+      class CANBusReader {
+          func readFrames(busId: String) -> [CANFrame] {
+              return []
+          }
+
+          func resetBus(busId: String) {
+          }
+      }
+    Sources/Vehicle/SensorReading.swift: |
+      import Foundation
+
+      struct SensorReading {
+          let sensorName: String
+          let value: Double
+          let threshold: Double
+      }
+    Sources/Fleet/RouteOptimizer.swift: |
+      import Foundation
+
+      let TRAP_GAP2_084_ROUTE_A: String = "route_noise"
+      let TRAP_GAP2_084_ROUTE_B: Int = 42
+
+      class RouteOptimizer {
+          func optimize(stops: [String]) -> [String] { stops }
+          func estimateETA(from: String, to: String) -> Int { 0 }
+      }
+  changed_files:
+    Sources/Vehicle/DiagnosticRunner.swift: |
+      import Foundation
+
+      struct DiagnosticReport {
+          let vehicleId: String
+          let faults: [String]
+          let passed: Bool
+      }
+
+      class DiagnosticRunner {
+          private let sensorHub: SensorHub
+
+          init(sensorHub: SensorHub) {
+              self.sensorHub = sensorHub
+          }
+
+          func runCheck(vehicleId: String) -> DiagnosticReport {
+              let readings = sensorHub.latestReadings(vehicleId: vehicleId)
+              let faults = readings.filter { $0.value > $0.threshold }.map { $0.sensorName }
+              return DiagnosticReport(vehicleId: vehicleId, faults: faults, passed: faults.isEmpty)
+          }
+
+          func criticalFaults(vehicleId: String, criticalThreshold: Double) -> [String] {
+              let readings = sensorHub.latestReadings(vehicleId: vehicleId)
+              return readings.filter { $0.value > $0.threshold * criticalThreshold }.map { $0.sensorName }
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: critical_faults_fn
+  selector:
+    path: Sources/Vehicle/DiagnosticRunner.swift
+    anchor: "func criticalFaults"
+- id: latest_readings
+  selector:
+    path: Sources/Vehicle/SensorHub.swift
+    anchor: "func latestReadings"
+- id: sensor_reading_struct
+  selector:
+    path: Sources/Vehicle/SensorReading.swift
+    anchor: "struct SensorReading"
+- id: no_route
+  selector:
+    path: Sources/Fleet/RouteOptimizer.swift
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_084_ROUTE_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_084_ROUTE_B
+oracle:
+  required:
+  - critical_faults_fn
+  - latest_readings
+  - sensor_reading_struct
+  forbidden:
+  - no_route
+  - no_global_0
+  - no_global_1

@@ -1,0 +1,225 @@
+name: gap_061_pyts_multifile_sensor_calibration
+tags:
+- change:multi_file
+- change:new_function
+- change:new_function
+- change:signature
+- context:same_file
+- difficulty:easy
+- distance:0hop
+- lang:python
+- lang:typescript
+repo:
+  initial_files:
+    src/calibration/sensor.py: |
+      from typing import List, Tuple
+      from dataclasses import dataclass
+
+      @dataclass
+      class SensorReading:
+          raw_value: float
+          unit: str
+          timestamp: float
+
+      class SensorCalibrator:
+          def __init__(self, offset: float = 0.0):
+              self.offset = offset
+              self._readings: List[SensorReading] = []
+
+          def record(self, reading: SensorReading) -> None:
+              self._readings.append(reading)
+
+          def average(self) -> float:
+              if not self._readings:
+                  return 0.0
+              total = sum(r.raw_value for r in self._readings)
+              return total / len(self._readings)
+
+          def reset(self) -> None:
+              self._readings.clear()
+    src/calibration/display.ts: |
+      interface CalibrationResult {
+        correctedValue: number;
+        deviation: number;
+      }
+
+      function formatDeviation(deviation: number): string {
+        const sign = deviation >= 0 ? "+" : "";
+        return `${sign}${deviation.toFixed(3)}`;
+      }
+
+      function renderCalibrationRow(label: string, result: CalibrationResult): string {
+        const devStr = formatDeviation(result.deviation);
+        return `${label}: ${result.correctedValue.toFixed(2)} (${devStr})`;
+      }
+
+      function renderCalibrationTable(entries: Map<string, CalibrationResult>): string {
+        const rows: string[] = [];
+        entries.forEach((result, label) => {
+          rows.push(renderCalibrationRow(label, result));
+        });
+        return rows.join("\n");
+      }
+    src/calibration/exporter.py: |
+      import csv
+      from typing import List
+      TRAP_GAP061_EXPORTER_A = "exporter"
+      TRAP_GAP061_FORMAT_B = "csv"
+
+      class CalibrationExporter:
+          def __init__(self, delimiter: str = ","):
+              self.delimiter = delimiter
+
+          def export_readings(self, readings: list) -> str:
+              lines = [f"{r['label']}{self.delimiter}{r['value']}" for r in readings]
+              return "\n".join(lines)
+    src/calibration/logger.ts: |
+      const TRAP_GAP061_LOGGER_C: string = "calibration_logger";
+      const TRAP_GAP061_LEVEL_D: string = "info";
+
+      function logCalibration(sensorId: string, value: number): void {
+        console.log(`[CAL] ${sensorId}: ${value}`);
+      }
+
+      function logBatch(entries: Array<[string, number]>): void {
+        entries.forEach(([id, val]) => logCalibration(id, val));
+      }
+  changed_files:
+    src/calibration/sensor.py: |
+      from typing import List, Tuple
+      from dataclasses import dataclass
+
+      @dataclass
+      class SensorReading:
+          raw_value: float
+          unit: str
+          timestamp: float
+
+      class SensorCalibrator:
+          def __init__(self, offset: float = 0.0, gain: float = 1.0):
+              self.offset = offset
+              self.gain = gain
+              self._readings: List[SensorReading] = []
+
+          def record(self, reading: SensorReading) -> None:
+              self._readings.append(reading)
+
+          def calibrate(self, reading: SensorReading) -> float:
+              return (reading.raw_value * self.gain) + self.offset
+
+          def calibrate_batch(self, readings: List[SensorReading]) -> List[float]:
+              return [self.calibrate(r) for r in readings]
+
+          def average(self) -> float:
+              if not self._readings:
+                  return 0.0
+              total = sum(r.raw_value for r in self._readings)
+              return total / len(self._readings)
+
+          def reset(self) -> None:
+              self._readings.clear()
+    src/calibration/display.ts: |
+      interface CalibrationResult {
+        correctedValue: number;
+        deviation: number;
+        confidence: number;
+      }
+
+      function formatDeviation(deviation: number): string {
+        const sign = deviation >= 0 ? "+" : "";
+        return `${sign}${deviation.toFixed(3)}`;
+      }
+
+      function formatConfidence(confidence: number): string {
+        return `${(confidence * 100).toFixed(1)}%`;
+      }
+
+      function renderCalibrationRow(label: string, result: CalibrationResult): string {
+        const devStr = formatDeviation(result.deviation);
+        const confStr = formatConfidence(result.confidence);
+        return `${label}: ${result.correctedValue.toFixed(2)} (${devStr}) [${confStr}]`;
+      }
+
+      function renderCalibrationTable(entries: Map<string, CalibrationResult>): string {
+        const rows: string[] = [];
+        entries.forEach((result, label) => {
+          rows.push(renderCalibrationRow(label, result));
+        });
+        return rows.join("\n");
+      }
+    src/calibration/exporter.py: |
+      import csv
+      from typing import List
+      TRAP_GAP061_EXPORTER_A = "exporter"
+      TRAP_GAP061_FORMAT_B = "csv"
+
+      class CalibrationExporter:
+          def __init__(self, delimiter: str = ","):
+              self.delimiter = delimiter
+
+          def export_readings(self, readings: list) -> str:
+              lines = [f"{r['label']}{self.delimiter}{r['value']}" for r in readings]
+              return "\n".join(lines)
+    src/calibration/logger.ts: |
+      const TRAP_GAP061_LOGGER_C: string = "calibration_logger";
+      const TRAP_GAP061_LEVEL_D: string = "info";
+
+      function logCalibration(sensorId: string, value: number): void {
+        console.log(`[CAL] ${sensorId}: ${value}`);
+      }
+
+      function logBatch(entries: Array<[string, number]>): void {
+        entries.forEach(([id, val]) => logCalibration(id, val));
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: sensor_calibrate
+  selector:
+    path: src/calibration/sensor.py
+    anchor: 'def calibrate(self, reading: SensorReading) -> float:'
+- id: sensor_batch
+  selector:
+    path: src/calibration/sensor.py
+    anchor: 'def calibrate_batch(self, readings: List[SensorReading]) -> List[float]:'
+- id: sensor_gain
+  selector:
+    path: src/calibration/sensor.py
+    anchor: self.gain = gain
+- id: display_confidence
+  selector:
+    path: src/calibration/display.ts
+    anchor: 'function formatConfidence(confidence: number): string'
+- id: no_exporter
+  selector:
+    path: src/calibration/exporter.py
+- id: no_logger
+  selector:
+    path: src/calibration/logger.ts
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP061_EXPORTER_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP061_FORMAT_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP061_LOGGER_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP061_LEVEL_D
+oracle:
+  required:
+  - sensor_calibrate
+  - sensor_batch
+  - sensor_gain
+  - display_confidence
+  allowed: []
+  forbidden:
+  - no_exporter
+  - no_logger
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

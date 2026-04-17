@@ -1,0 +1,174 @@
+name: gap2_050_julia_multifile_same_file_signal_filter
+tags:
+- change:multi_file
+- context:same_file
+- difficulty:easy
+- distance:0hop
+- lang:julia
+repo:
+  initial_files:
+    src/Filter.jl: |
+      module Filter
+
+      export lowpass, highpass
+
+      function lowpass(signal::Vector{Float64}, cutoff::Float64)::Vector{Float64}
+          n = length(signal)
+          filtered = zeros(n)
+          alpha = cutoff / (cutoff + 1.0)
+          filtered[1] = signal[1]
+          for i in 2:n
+              filtered[i] = alpha * signal[i] + (1 - alpha) * filtered[i-1]
+          end
+          return filtered
+      end
+
+      function highpass(signal::Vector{Float64}, cutoff::Float64)::Vector{Float64}
+          lp = lowpass(signal, cutoff)
+          return signal .- lp
+      end
+
+      end
+    src/Window.jl: |
+      module Window
+
+      export hamming, hanning
+
+      function hamming(n::Int)::Vector{Float64}
+          return [0.54 - 0.46 * cos(2 * pi * k / (n - 1)) for k in 0:n-1]
+      end
+
+      function hanning(n::Int)::Vector{Float64}
+          return [0.5 * (1 - cos(2 * pi * k / (n - 1))) for k in 0:n-1]
+      end
+
+      end
+    src/Spectrum.jl: |
+      module Spectrum
+
+      GARBAGE_GAP2_050_FFT_A = "radix2"
+      GARBAGE_GAP2_050_PAD_B = true
+
+      function power_spectrum(signal::Vector{Float64})::Vector{Float64}
+          n = length(signal)
+          return abs.(signal) .^ 2 ./ n
+      end
+
+      function peak_frequency(spectrum::Vector{Float64}, sample_rate::Float64)::Float64
+          idx = argmax(spectrum)
+          return (idx - 1) * sample_rate / length(spectrum)
+      end
+
+      end
+    src/Noise.jl: |
+      module Noise
+
+      GARBAGE_GAP2_050_SEED_C = 42
+      GARBAGE_GAP2_050_DIST_D = "gaussian"
+
+      function white_noise(n::Int, amplitude::Float64)::Vector{Float64}
+          return amplitude .* randn(n)
+      end
+
+      function add_noise(signal::Vector{Float64}, snr_db::Float64)::Vector{Float64}
+          noise_power = 10^(-snr_db / 10)
+          return signal .+ sqrt(noise_power) .* randn(length(signal))
+      end
+
+      end
+  changed_files:
+    src/Filter.jl: |
+      module Filter
+
+      export lowpass, highpass, bandpass
+
+      function lowpass(signal::Vector{Float64}, cutoff::Float64)::Vector{Float64}
+          n = length(signal)
+          filtered = zeros(n)
+          alpha = cutoff / (cutoff + 1.0)
+          filtered[1] = signal[1]
+          for i in 2:n
+              filtered[i] = alpha * signal[i] + (1 - alpha) * filtered[i-1]
+          end
+          return filtered
+      end
+
+      function highpass(signal::Vector{Float64}, cutoff::Float64)::Vector{Float64}
+          lp = lowpass(signal, cutoff)
+          return signal .- lp
+      end
+
+      function bandpass(signal::Vector{Float64}, low::Float64, high::Float64)::Vector{Float64}
+          lp_result = lowpass(signal, high)
+          return highpass(lp_result, low)
+      end
+
+      end
+    src/Window.jl: |
+      module Window
+
+      export hamming, hanning, blackman
+
+      function hamming(n::Int)::Vector{Float64}
+          return [0.54 - 0.46 * cos(2 * pi * k / (n - 1)) for k in 0:n-1]
+      end
+
+      function hanning(n::Int)::Vector{Float64}
+          return [0.5 * (1 - cos(2 * pi * k / (n - 1))) for k in 0:n-1]
+      end
+
+      function blackman(n::Int)::Vector{Float64}
+          a0 = 0.42
+          a1 = 0.50
+          a2 = 0.08
+          return [a0 - a1 * cos(2 * pi * k / (n - 1)) + a2 * cos(4 * pi * k / (n - 1)) for k in 0:n-1]
+      end
+
+      end
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: filter_bandpass
+  selector:
+    path: src/Filter.jl
+    anchor: "function bandpass(signal::Vector{Float64}, low::Float64, high::Float64)"
+- id: filter_bandpass_body
+  selector:
+    path: src/Filter.jl
+    anchor: "lp_result = lowpass(signal, high)"
+- id: window_blackman
+  selector:
+    path: src/Window.jl
+    anchor: "function blackman(n::Int)::Vector{Float64}"
+- id: no_spectrum
+  selector:
+    path: src/Spectrum.jl
+- id: no_noise
+  selector:
+    path: src/Noise.jl
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_GAP2_050_FFT_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_GAP2_050_PAD_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_GAP2_050_SEED_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_GAP2_050_DIST_D
+oracle:
+  required:
+  - filter_bandpass
+  - filter_bandpass_body
+  - window_blackman
+  allowed: []
+  forbidden:
+  - no_spectrum
+  - no_noise
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

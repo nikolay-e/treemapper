@@ -1,0 +1,138 @@
+name: gap2_086_kotlin_refactor_import_chain_notification
+tags:
+- change:multi_file
+- change:refactor
+- context:import_chain
+- difficulty:hard
+- distance:2hop
+- lang:kotlin
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    src/main/kotlin/notify/NotificationService.kt: |
+      package notify
+
+      import notify.channel.EmailSender
+      import notify.channel.SmsSender
+
+      class NotificationService(
+          private val emailSender: EmailSender,
+          private val smsSender: SmsSender
+      ) {
+          fun sendEmail(to: String, subject: String, body: String) {
+              emailSender.send(to, subject, body)
+          }
+
+          fun sendSms(to: String, message: String) {
+              smsSender.send(to, message)
+          }
+      }
+    src/main/kotlin/notify/channel/EmailSender.kt: |
+      package notify.channel
+
+      class EmailSender(private val smtpHost: String) {
+          fun send(to: String, subject: String, body: String) {
+              println("Email to $to: $subject")
+          }
+      }
+    src/main/kotlin/notify/channel/SmsSender.kt: |
+      package notify.channel
+
+      class SmsSender(private val apiKey: String) {
+          fun send(to: String, message: String) {
+              println("SMS to $to: $message")
+          }
+      }
+    src/main/kotlin/billing/InvoiceGenerator.kt: |
+      package billing
+
+      val TRAP_GAP2_086_BILLING_A: String = "billing_noise"
+      val TRAP_GAP2_086_BILLING_B: Boolean = true
+
+      class InvoiceGenerator {
+          fun generate(orderId: String): String = "INV-$orderId"
+          fun send(invoiceId: String) {}
+      }
+  changed_files:
+    src/main/kotlin/notify/NotificationService.kt: |
+      package notify
+
+      import notify.channel.NotificationChannel
+      import notify.channel.ChannelType
+
+      class NotificationService(
+          private val channels: Map<ChannelType, NotificationChannel>
+      ) {
+          fun send(channelType: ChannelType, to: String, content: String) {
+              val channel = channels[channelType]
+                  ?: throw IllegalArgumentException("No channel for $channelType")
+              channel.deliver(to, content)
+          }
+      }
+    src/main/kotlin/notify/channel/EmailSender.kt: |
+      package notify.channel
+
+      class EmailSender(private val smtpHost: String) : NotificationChannel {
+          override val type: ChannelType = ChannelType.EMAIL
+
+          override fun deliver(to: String, content: String) {
+              println("Email to $to via $smtpHost: $content")
+          }
+      }
+    src/main/kotlin/notify/channel/SmsSender.kt: |
+      package notify.channel
+
+      class SmsSender(private val apiKey: String) : NotificationChannel {
+          override val type: ChannelType = ChannelType.SMS
+
+          override fun deliver(to: String, content: String) {
+              println("SMS to $to: $content")
+          }
+      }
+    src/main/kotlin/notify/channel/NotificationChannel.kt: |
+      package notify.channel
+
+      enum class ChannelType { EMAIL, SMS }
+
+      interface NotificationChannel {
+          val type: ChannelType
+          fun deliver(to: String, content: String)
+      }
+  commit_message: Update files
+fragments:
+- id: channel_interface
+  selector:
+    path: src/main/kotlin/notify/channel/NotificationChannel.kt
+    anchor: "interface NotificationChannel"
+- id: channel_type_enum
+  selector:
+    path: src/main/kotlin/notify/channel/NotificationChannel.kt
+    anchor: "enum class ChannelType"
+- id: service_send
+  selector:
+    path: src/main/kotlin/notify/NotificationService.kt
+    anchor: "fun send(channelType: ChannelType"
+- id: email_implements
+  selector:
+    path: src/main/kotlin/notify/channel/EmailSender.kt
+    anchor: "class EmailSender"
+- id: no_billing
+  selector:
+    path: src/main/kotlin/billing/InvoiceGenerator.kt
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_086_BILLING_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_086_BILLING_B
+oracle:
+  required:
+  - channel_interface
+  - channel_type_enum
+  - service_send
+  - email_implements
+  forbidden:
+  - no_billing
+  - no_global_0
+  - no_global_1

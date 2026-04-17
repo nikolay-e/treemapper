@@ -1,0 +1,213 @@
+name: gap2_023_java_refactor_split_notification_channels
+tags:
+- change:multi_file
+- change:refactor
+- context:cross_module
+- difficulty:medium
+- distance:2hop
+- lang:java
+repo:
+  initial_files:
+    src/main/java/com/clinic/AppointmentNotifier.java: |
+      package com.clinic;
+
+      public class AppointmentNotifier {
+          public void notifyPatient(String patientId, String message, String channel) {
+              if ("sms".equals(channel)) {
+                  System.out.println("SMS to " + patientId + ": " + message);
+              } else if ("email".equals(channel)) {
+                  System.out.println("Email to " + patientId + ": " + message);
+              }
+          }
+      }
+    src/main/java/com/clinic/AppointmentScheduler.java: |
+      package com.clinic;
+
+      import java.time.LocalDateTime;
+
+      public class AppointmentScheduler {
+          private final AppointmentNotifier notifier;
+
+          public AppointmentScheduler(AppointmentNotifier notifier) {
+              this.notifier = notifier;
+          }
+
+          public void schedule(String patientId, String doctorId, LocalDateTime time) {
+              String msg = "Appointment with Dr." + doctorId + " at " + time;
+              notifier.notifyPatient(patientId, msg, "sms");
+          }
+      }
+    src/main/java/com/clinic/PatientRecord.java: |
+      package com.clinic;
+
+      public class PatientRecord {
+          private final String id;
+          private final String name;
+
+          public PatientRecord(String id, String name) {
+              this.id = id;
+              this.name = name;
+          }
+
+          public String getId() { return id; }
+          public String getName() { return name; }
+      }
+    src/main/java/com/clinic/BillingService.java: |
+      package com.clinic;
+
+      public class BillingService {
+          private static final String TRAP_GAP2023_CURRENCY_A = "USD";
+          private static final double TRAP_GAP2023_TAX_B = 0.08;
+
+          public double calculateBill(double baseAmount) {
+              return baseAmount * (1 + TRAP_GAP2023_TAX_B);
+          }
+      }
+    src/main/java/com/clinic/WaitlistManager.java: |
+      package com.clinic;
+
+      import java.util.LinkedList;
+      import java.util.Queue;
+
+      public class WaitlistManager {
+          private static final String TRAP_GAP2023_PRIORITY_C = "fifo";
+          private static final int TRAP_GAP2023_MAX_D = 100;
+          private final Queue<String> queue = new LinkedList<>();
+
+          public void enqueue(String patientId) { queue.add(patientId); }
+          public String dequeue() { return queue.poll(); }
+      }
+  changed_files:
+    src/main/java/com/clinic/NotificationChannel.java: |
+      package com.clinic;
+
+      public interface NotificationChannel {
+          void send(String recipientId, String message);
+      }
+    src/main/java/com/clinic/SmsChannel.java: |
+      package com.clinic;
+
+      public class SmsChannel implements NotificationChannel {
+          @Override
+          public void send(String recipientId, String message) {
+              System.out.println("SMS to " + recipientId + ": " + message);
+          }
+      }
+    src/main/java/com/clinic/AppointmentNotifier.java: |
+      package com.clinic;
+
+      public class AppointmentNotifier {
+          private final NotificationChannel channel;
+
+          public AppointmentNotifier(NotificationChannel channel) {
+              this.channel = channel;
+          }
+
+          public void notifyPatient(String patientId, String message) {
+              channel.send(patientId, message);
+          }
+      }
+    src/main/java/com/clinic/AppointmentScheduler.java: |
+      package com.clinic;
+
+      import java.time.LocalDateTime;
+
+      public class AppointmentScheduler {
+          private final AppointmentNotifier notifier;
+
+          public AppointmentScheduler(AppointmentNotifier notifier) {
+              this.notifier = notifier;
+          }
+
+          public void schedule(String patientId, String doctorId, LocalDateTime time) {
+              String msg = "Appointment with Dr." + doctorId + " at " + time;
+              notifier.notifyPatient(patientId, msg);
+          }
+      }
+    src/main/java/com/clinic/PatientRecord.java: |
+      package com.clinic;
+
+      public class PatientRecord {
+          private final String id;
+          private final String name;
+
+          public PatientRecord(String id, String name) {
+              this.id = id;
+              this.name = name;
+          }
+
+          public String getId() { return id; }
+          public String getName() { return name; }
+      }
+    src/main/java/com/clinic/BillingService.java: |
+      package com.clinic;
+
+      public class BillingService {
+          private static final String TRAP_GAP2023_CURRENCY_A = "USD";
+          private static final double TRAP_GAP2023_TAX_B = 0.08;
+
+          public double calculateBill(double baseAmount) {
+              return baseAmount * (1 + TRAP_GAP2023_TAX_B);
+          }
+      }
+    src/main/java/com/clinic/WaitlistManager.java: |
+      package com.clinic;
+
+      import java.util.LinkedList;
+      import java.util.Queue;
+
+      public class WaitlistManager {
+          private static final String TRAP_GAP2023_PRIORITY_C = "fifo";
+          private static final int TRAP_GAP2023_MAX_D = 100;
+          private final Queue<String> queue = new LinkedList<>();
+
+          public void enqueue(String patientId) { queue.add(patientId); }
+          public String dequeue() { return queue.poll(); }
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: channel_interface
+  selector:
+    path: src/main/java/com/clinic/NotificationChannel.java
+    anchor: public interface NotificationChannel {
+- id: sms_send
+  selector:
+    path: src/main/java/com/clinic/SmsChannel.java
+    anchor: public void send(String recipientId, String message) {
+- id: notifier_channel_field
+  selector:
+    path: src/main/java/com/clinic/AppointmentNotifier.java
+    anchor: private final NotificationChannel channel;
+- id: no_billing
+  selector:
+    path: src/main/java/com/clinic/BillingService.java
+- id: no_waitlist
+  selector:
+    path: src/main/java/com/clinic/WaitlistManager.java
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2023_CURRENCY_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2023_TAX_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2023_PRIORITY_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2023_MAX_D
+oracle:
+  required:
+  - channel_interface
+  - sms_send
+  - notifier_channel_field
+  allowed: []
+  forbidden:
+  - no_billing
+  - no_waitlist
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

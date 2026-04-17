@@ -1,0 +1,166 @@
+name: gap_115_php_import_chain_session_manager
+tags:
+- lang:php
+- change:single_file
+- context:import_chain
+- difficulty:easy
+- distance:0hop
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    src/Auth/SessionManager.php: |
+      <?php
+
+      namespace App\Auth;
+
+      class SessionManager
+      {
+          private array $sessions = [];
+          private int $ttlSeconds;
+
+          public function __construct(int $ttlSeconds)
+          {
+              $this->ttlSeconds = $ttlSeconds;
+          }
+
+          public function create(string $userId): string
+          {
+              $token = bin2hex(random_bytes(16));
+              $this->sessions[$token] = [
+                  'user_id' => $userId,
+                  'created_at' => time(),
+              ];
+              return $token;
+          }
+
+          public function validate(string $token): bool
+          {
+              if (!isset($this->sessions[$token])) {
+                  return false;
+              }
+              $session = $this->sessions[$token];
+              return (time() - $session['created_at']) < $this->ttlSeconds;
+          }
+      }
+    src/Auth/PasswordHasher.php: |
+      <?php
+
+      namespace App\Auth;
+
+      class PasswordHasher
+      {
+          public function hash(string $password): string
+          {
+              return password_hash($password, PASSWORD_BCRYPT);
+          }
+
+          public function verify(string $password, string $hash): bool
+          {
+              return password_verify($password, $hash);
+          }
+      }
+    src/Queue/JobDispatcher.php: |
+      <?php
+
+      namespace App\Queue;
+
+      class JobDispatcher
+      {
+          private array $pending = [];
+
+          public function dispatch(string $jobClass, array $payload): void
+          {
+              $this->pending[] = ['class' => $jobClass, 'payload' => $payload];
+          }
+
+          public function pendingCount(): int
+          {
+              return count($this->pending);
+          }
+
+          public function flush(): array
+          {
+              $jobs = $this->pending;
+              $this->pending = [];
+              return $jobs;
+          }
+      }
+  changed_files:
+    src/Auth/SessionManager.php: |
+      <?php
+
+      namespace App\Auth;
+
+      class SessionManager
+      {
+          private array $sessions = [];
+          private int $ttlSeconds;
+
+          public function __construct(int $ttlSeconds)
+          {
+              $this->ttlSeconds = $ttlSeconds;
+          }
+
+          public function create(string $userId): string
+          {
+              $token = bin2hex(random_bytes(16));
+              $this->sessions[$token] = [
+                  'user_id' => $userId,
+                  'created_at' => time(),
+              ];
+              return $token;
+          }
+
+          public function validate(string $token): bool
+          {
+              if (!isset($this->sessions[$token])) {
+                  return false;
+              }
+              $session = $this->sessions[$token];
+              return (time() - $session['created_at']) < $this->ttlSeconds;
+          }
+
+          public function destroy(string $token): bool
+          {
+              if (isset($this->sessions[$token])) {
+                  unset($this->sessions[$token]);
+                  return true;
+              }
+              return false;
+          }
+
+          public function activeCount(): int
+          {
+              $now = time();
+              $count = 0;
+              foreach ($this->sessions as $session) {
+                  if (($now - $session['created_at']) < $this->ttlSeconds) {
+                      $count++;
+                  }
+              }
+              return $count;
+          }
+      }
+fragments:
+- id: session_destroy
+  selector:
+    path: src/Auth/SessionManager.php
+    anchor: "public function destroy"
+- id: session_active_count
+  selector:
+    path: src/Auth/SessionManager.php
+    anchor: "public function activeCount"
+- id: no_queue
+  selector:
+    path: src/Queue/JobDispatcher.php
+- id: no_job_dispatcher
+  selector:
+    anchor: JobDispatcher
+oracle:
+  required:
+  - session_destroy
+  - session_active_count
+  forbidden:
+  - no_queue
+  - no_job_dispatcher

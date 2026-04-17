@@ -1,0 +1,228 @@
+name: gap_063_pyts_multifile_color_palette
+tags:
+- change:multi_file
+- change:new_function
+- change:new_function
+- change:signature
+- context:same_file
+- difficulty:easy
+- distance:0hop
+- lang:python
+- lang:typescript
+repo:
+  initial_files:
+    src/palette/color.py: |
+      from typing import Tuple
+      from dataclasses import dataclass
+
+      @dataclass
+      class RGBColor:
+          red: int
+          green: int
+          blue: int
+
+      class PaletteGenerator:
+          def __init__(self, base_hue: int):
+              self.base_hue = base_hue
+              self._colors: list = []
+
+          def add_color(self, color: RGBColor) -> None:
+              self._colors.append(color)
+
+          def brightness(self, color: RGBColor) -> float:
+              return (color.red * 0.299 + color.green * 0.587 + color.blue * 0.114) / 255.0
+
+          def count(self) -> int:
+              return len(self._colors)
+    src/palette/preview.ts: |
+      interface ColorSwatch {
+        hex: string;
+        label: string;
+      }
+
+      function rgbToHex(r: number, g: number, b: number): string {
+        const toHex = (c: number) => c.toString(16).padStart(2, "0");
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      }
+
+      function renderSwatch(swatch: ColorSwatch): string {
+        return `[${swatch.hex}] ${swatch.label}`;
+      }
+
+      function renderPaletteGrid(swatches: ColorSwatch[]): string {
+        return swatches.map(renderSwatch).join(" | ");
+      }
+    src/palette/exporter.py: |
+      TRAP_GAP063_EXPORTER_A = "palette_export"
+      TRAP_GAP063_VERSION_B = "1.0"
+
+      class PaletteExporter:
+          def __init__(self, format_type: str = "hex"):
+              self.format_type = format_type
+
+          def export_single(self, r: int, g: int, b: int) -> str:
+              return f"#{r:02x}{g:02x}{b:02x}"
+
+          def export_list(self, colors: list) -> list:
+              return [self.export_single(*c) for c in colors]
+    src/palette/accessibility.ts: |
+      const TRAP_GAP063_A11Y_C: string = "accessibility";
+      const TRAP_GAP063_RATIO_D: number = 4.5;
+
+      function luminance(r: number, g: number, b: number): number {
+        const [rs, gs, bs] = [r, g, b].map((c) => {
+          const s = c / 255;
+          return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+      }
+
+      function contrastRatio(l1: number, l2: number): number {
+        const lighter = Math.max(l1, l2);
+        const darker = Math.min(l1, l2);
+        return (lighter + 0.05) / (darker + 0.05);
+      }
+  changed_files:
+    src/palette/color.py: |
+      from typing import Tuple, List
+      from dataclasses import dataclass
+
+      @dataclass
+      class RGBColor:
+          red: int
+          green: int
+          blue: int
+
+      class PaletteGenerator:
+          def __init__(self, base_hue: int, saturation: float = 0.7):
+              self.base_hue = base_hue
+              self.saturation = saturation
+              self._colors: list = []
+
+          def add_color(self, color: RGBColor) -> None:
+              self._colors.append(color)
+
+          def complementary(self, color: RGBColor) -> RGBColor:
+              return RGBColor(red=255 - color.red, green=255 - color.green, blue=255 - color.blue)
+
+          def generate_analogous(self, color: RGBColor, count: int = 3) -> List[RGBColor]:
+              step = 30
+              results = []
+              for i in range(count):
+                  shift = (i - count // 2) * step
+                  r = max(0, min(255, color.red + shift))
+                  g = max(0, min(255, color.green - shift))
+                  b = color.blue
+                  results.append(RGBColor(red=r, green=g, blue=b))
+              return results
+
+          def brightness(self, color: RGBColor) -> float:
+              return (color.red * 0.299 + color.green * 0.587 + color.blue * 0.114) / 255.0
+
+          def count(self) -> int:
+              return len(self._colors)
+    src/palette/preview.ts: |
+      interface ColorSwatch {
+        hex: string;
+        label: string;
+        isSelected: boolean;
+      }
+
+      function rgbToHex(r: number, g: number, b: number): string {
+        const toHex = (c: number) => c.toString(16).padStart(2, "0");
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+      }
+
+      function selectionMarker(isSelected: boolean): string {
+        return isSelected ? " *" : "";
+      }
+
+      function renderSwatch(swatch: ColorSwatch): string {
+        return `[${swatch.hex}] ${swatch.label}${selectionMarker(swatch.isSelected)}`;
+      }
+
+      function renderPaletteGrid(swatches: ColorSwatch[]): string {
+        return swatches.map(renderSwatch).join(" | ");
+      }
+    src/palette/exporter.py: |
+      TRAP_GAP063_EXPORTER_A = "palette_export"
+      TRAP_GAP063_VERSION_B = "1.0"
+
+      class PaletteExporter:
+          def __init__(self, format_type: str = "hex"):
+              self.format_type = format_type
+
+          def export_single(self, r: int, g: int, b: int) -> str:
+              return f"#{r:02x}{g:02x}{b:02x}"
+
+          def export_list(self, colors: list) -> list:
+              return [self.export_single(*c) for c in colors]
+    src/palette/accessibility.ts: |
+      const TRAP_GAP063_A11Y_C: string = "accessibility";
+      const TRAP_GAP063_RATIO_D: number = 4.5;
+
+      function luminance(r: number, g: number, b: number): number {
+        const [rs, gs, bs] = [r, g, b].map((c) => {
+          const s = c / 255;
+          return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+      }
+
+      function contrastRatio(l1: number, l2: number): number {
+        const lighter = Math.max(l1, l2);
+        const darker = Math.min(l1, l2);
+        return (lighter + 0.05) / (darker + 0.05);
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: color_complementary
+  selector:
+    path: src/palette/color.py
+    anchor: 'def complementary(self, color: RGBColor) -> RGBColor:'
+- id: color_analogous
+  selector:
+    path: src/palette/color.py
+    anchor: 'def generate_analogous(self, color: RGBColor, count: int = 3) -> List[RGBColor]:'
+- id: color_saturation
+  selector:
+    path: src/palette/color.py
+    anchor: self.saturation = saturation
+- id: preview_selection
+  selector:
+    path: src/palette/preview.ts
+    anchor: 'function selectionMarker(isSelected: boolean): string'
+- id: no_exporter
+  selector:
+    path: src/palette/exporter.py
+- id: no_accessibility
+  selector:
+    path: src/palette/accessibility.ts
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP063_EXPORTER_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP063_VERSION_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP063_A11Y_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP063_RATIO_D
+oracle:
+  required:
+  - color_complementary
+  - color_analogous
+  - color_saturation
+  - preview_selection
+  allowed: []
+  forbidden:
+  - no_exporter
+  - no_accessibility
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

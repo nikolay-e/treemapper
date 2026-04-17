@@ -1,0 +1,224 @@
+name: gap_062_pyts_multifile_recipe_scaling
+tags:
+- change:multi_file
+- change:new_function
+- change:new_function
+- change:signature
+- context:same_file
+- difficulty:easy
+- distance:0hop
+- lang:python
+- lang:typescript
+repo:
+  initial_files:
+    src/kitchen/recipe.py: |
+      from typing import List, Dict
+      from dataclasses import dataclass
+
+      @dataclass
+      class Ingredient:
+          name: str
+          quantity: float
+          unit: str
+
+      class RecipeScaler:
+          def __init__(self, servings: int):
+              self.servings = servings
+              self._ingredients: List[Ingredient] = []
+
+          def add_ingredient(self, ingredient: Ingredient) -> None:
+              self._ingredients.append(ingredient)
+
+          def total_weight(self) -> float:
+              return sum(i.quantity for i in self._ingredients)
+
+          def ingredient_count(self) -> int:
+              return len(self._ingredients)
+    src/kitchen/formatter.ts: |
+      interface ScaledIngredient {
+        name: string;
+        amount: number;
+        unit: string;
+      }
+
+      function pluralizeUnit(unit: string, amount: number): string {
+        if (amount <= 1) return unit;
+        const irregulars: Record<string, string> = { cup: "cups", leaf: "leaves" };
+        return irregulars[unit] || `${unit}s`;
+      }
+
+      function formatIngredientLine(item: ScaledIngredient): string {
+        const unitStr = pluralizeUnit(item.unit, item.amount);
+        return `${item.amount.toFixed(1)} ${unitStr} ${item.name}`;
+      }
+
+      function renderShoppingList(items: ScaledIngredient[]): string {
+        return items.map(formatIngredientLine).join("\n");
+      }
+    src/kitchen/nutrition.py: |
+      from typing import Dict
+      TRAP_GAP062_NUTRITION_A = "nutrition"
+      TRAP_GAP062_CALORIES_B = 2000
+
+      class NutritionCalculator:
+          def __init__(self, daily_limit: int = 2000):
+              self.daily_limit = daily_limit
+
+          def calories_per_serving(self, total_cal: float, servings: int) -> float:
+              return total_cal / max(servings, 1)
+
+          def is_within_limit(self, calories: float) -> bool:
+              return calories <= self.daily_limit
+    src/kitchen/timer.ts: |
+      const TRAP_GAP062_TIMER_C: string = "kitchen_timer";
+      const TRAP_GAP062_DEFAULT_D: number = 300;
+
+      function secondsToMinutes(seconds: number): string {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}m ${secs}s`;
+      }
+
+      function createCountdown(durationSec: number): () => number {
+        let remaining = durationSec;
+        return () => Math.max(0, --remaining);
+      }
+  changed_files:
+    src/kitchen/recipe.py: |
+      from typing import List, Dict
+      from dataclasses import dataclass
+
+      @dataclass
+      class Ingredient:
+          name: str
+          quantity: float
+          unit: str
+
+      class RecipeScaler:
+          def __init__(self, servings: int, scale_factor: float = 1.0):
+              self.servings = servings
+              self.scale_factor = scale_factor
+              self._ingredients: List[Ingredient] = []
+
+          def add_ingredient(self, ingredient: Ingredient) -> None:
+              self._ingredients.append(ingredient)
+
+          def scale_ingredient(self, ingredient: Ingredient) -> Ingredient:
+              scaled_qty = ingredient.quantity * self.scale_factor
+              return Ingredient(name=ingredient.name, quantity=scaled_qty, unit=ingredient.unit)
+
+          def scale_all(self) -> List[Ingredient]:
+              return [self.scale_ingredient(i) for i in self._ingredients]
+
+          def total_weight(self) -> float:
+              return sum(i.quantity for i in self._ingredients)
+
+          def ingredient_count(self) -> int:
+              return len(self._ingredients)
+    src/kitchen/formatter.ts: |
+      interface ScaledIngredient {
+        name: string;
+        amount: number;
+        unit: string;
+        isOptional: boolean;
+      }
+
+      function pluralizeUnit(unit: string, amount: number): string {
+        if (amount <= 1) return unit;
+        const irregulars: Record<string, string> = { cup: "cups", leaf: "leaves" };
+        return irregulars[unit] || `${unit}s`;
+      }
+
+      function formatOptionalTag(isOptional: boolean): string {
+        return isOptional ? " (optional)" : "";
+      }
+
+      function formatIngredientLine(item: ScaledIngredient): string {
+        const unitStr = pluralizeUnit(item.unit, item.amount);
+        const tag = formatOptionalTag(item.isOptional);
+        return `${item.amount.toFixed(1)} ${unitStr} ${item.name}${tag}`;
+      }
+
+      function renderShoppingList(items: ScaledIngredient[]): string {
+        return items.map(formatIngredientLine).join("\n");
+      }
+    src/kitchen/nutrition.py: |
+      from typing import Dict
+      TRAP_GAP062_NUTRITION_A = "nutrition"
+      TRAP_GAP062_CALORIES_B = 2000
+
+      class NutritionCalculator:
+          def __init__(self, daily_limit: int = 2000):
+              self.daily_limit = daily_limit
+
+          def calories_per_serving(self, total_cal: float, servings: int) -> float:
+              return total_cal / max(servings, 1)
+
+          def is_within_limit(self, calories: float) -> bool:
+              return calories <= self.daily_limit
+    src/kitchen/timer.ts: |
+      const TRAP_GAP062_TIMER_C: string = "kitchen_timer";
+      const TRAP_GAP062_DEFAULT_D: number = 300;
+
+      function secondsToMinutes(seconds: number): string {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}m ${secs}s`;
+      }
+
+      function createCountdown(durationSec: number): () => number {
+        let remaining = durationSec;
+        return () => Math.max(0, --remaining);
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: recipe_scale_ingredient
+  selector:
+    path: src/kitchen/recipe.py
+    anchor: 'def scale_ingredient(self, ingredient: Ingredient) -> Ingredient:'
+- id: recipe_scale_all
+  selector:
+    path: src/kitchen/recipe.py
+    anchor: 'def scale_all(self) -> List[Ingredient]:'
+- id: recipe_scale_factor
+  selector:
+    path: src/kitchen/recipe.py
+    anchor: self.scale_factor = scale_factor
+- id: formatter_optional
+  selector:
+    path: src/kitchen/formatter.ts
+    anchor: 'function formatOptionalTag(isOptional: boolean): string'
+- id: no_nutrition
+  selector:
+    path: src/kitchen/nutrition.py
+- id: no_timer
+  selector:
+    path: src/kitchen/timer.ts
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP062_NUTRITION_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP062_CALORIES_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP062_TIMER_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP062_DEFAULT_D
+oracle:
+  required:
+  - recipe_scale_ingredient
+  - recipe_scale_all
+  - recipe_scale_factor
+  - formatter_optional
+  allowed: []
+  forbidden:
+  - no_nutrition
+  - no_timer
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

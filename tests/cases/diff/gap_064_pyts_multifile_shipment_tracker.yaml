@@ -1,0 +1,242 @@
+name: gap_064_pyts_multifile_shipment_tracker
+tags:
+- change:multi_file
+- change:new_function
+- change:new_function
+- change:signature
+- context:same_file
+- difficulty:easy
+- distance:0hop
+- lang:python
+- lang:typescript
+repo:
+  initial_files:
+    src/logistics/shipment.py: |
+      from typing import List, Optional
+      from dataclasses import dataclass
+      from enum import Enum
+
+      class ShipmentStatus(Enum):
+          PENDING = "pending"
+          IN_TRANSIT = "in_transit"
+          DELIVERED = "delivered"
+
+      @dataclass
+      class Parcel:
+          tracking_id: str
+          weight_kg: float
+          destination: str
+
+      class ShipmentTracker:
+          def __init__(self, warehouse: str):
+              self.warehouse = warehouse
+              self._parcels: List[Parcel] = []
+
+          def register(self, parcel: Parcel) -> None:
+              self._parcels.append(parcel)
+
+          def total_weight(self) -> float:
+              return sum(p.weight_kg for p in self._parcels)
+
+          def find_by_id(self, tracking_id: str) -> Optional[Parcel]:
+              for p in self._parcels:
+                  if p.tracking_id == tracking_id:
+                      return p
+              return None
+    src/logistics/dashboard.ts: |
+      interface ShipmentSummary {
+        trackingId: string;
+        status: string;
+        eta: string;
+      }
+
+      function formatEta(hoursRemaining: number): string {
+        if (hoursRemaining < 1) return "< 1 hour";
+        return `${Math.ceil(hoursRemaining)} hours`;
+      }
+
+      function renderShipmentCard(summary: ShipmentSummary): string {
+        return `[${summary.trackingId}] ${summary.status} - ETA: ${summary.eta}`;
+      }
+
+      function renderDashboard(summaries: ShipmentSummary[]): string {
+        const header = `Shipments: ${summaries.length}`;
+        const cards = summaries.map(renderShipmentCard).join("\n");
+        return `${header}\n${cards}`;
+      }
+    src/logistics/invoice.py: |
+      TRAP_GAP064_INVOICE_A = "shipping_invoice"
+      TRAP_GAP064_CURRENCY_B = "USD"
+
+      class ShippingInvoice:
+          def __init__(self, rate_per_kg: float = 2.5):
+              self.rate_per_kg = rate_per_kg
+
+          def calculate(self, weight_kg: float) -> float:
+              return weight_kg * self.rate_per_kg
+
+          def format_total(self, total: float) -> str:
+              return f"${total:.2f}"
+    src/logistics/notifications.ts: |
+      const TRAP_GAP064_NOTIFY_C: string = "shipping_notify";
+      const TRAP_GAP064_CHANNEL_D: string = "email";
+
+      function buildSubject(trackingId: string): string {
+        return `Shipment Update: ${trackingId}`;
+      }
+
+      function buildBody(trackingId: string, status: string): string {
+        return `Your shipment ${trackingId} is now ${status}.`;
+      }
+  changed_files:
+    src/logistics/shipment.py: |
+      from typing import List, Optional
+      from dataclasses import dataclass
+      from enum import Enum
+
+      class ShipmentStatus(Enum):
+          PENDING = "pending"
+          IN_TRANSIT = "in_transit"
+          DELIVERED = "delivered"
+          RETURNED = "returned"
+
+      @dataclass
+      class Parcel:
+          tracking_id: str
+          weight_kg: float
+          destination: str
+
+      class ShipmentTracker:
+          def __init__(self, warehouse: str, max_weight: float = 1000.0):
+              self.warehouse = warehouse
+              self.max_weight = max_weight
+              self._parcels: List[Parcel] = []
+
+          def register(self, parcel: Parcel) -> None:
+              self._parcels.append(parcel)
+
+          def bulk_register(self, parcels: List[Parcel]) -> int:
+              added = 0
+              for p in parcels:
+                  if self.total_weight() + p.weight_kg <= self.max_weight:
+                      self._parcels.append(p)
+                      added += 1
+              return added
+
+          def filter_by_destination(self, destination: str) -> List[Parcel]:
+              return [p for p in self._parcels if p.destination == destination]
+
+          def total_weight(self) -> float:
+              return sum(p.weight_kg for p in self._parcels)
+
+          def find_by_id(self, tracking_id: str) -> Optional[Parcel]:
+              for p in self._parcels:
+                  if p.tracking_id == tracking_id:
+                      return p
+              return None
+    src/logistics/dashboard.ts: |
+      interface ShipmentSummary {
+        trackingId: string;
+        status: string;
+        eta: string;
+        priority: number;
+      }
+
+      function formatEta(hoursRemaining: number): string {
+        if (hoursRemaining < 1) return "< 1 hour";
+        return `${Math.ceil(hoursRemaining)} hours`;
+      }
+
+      function priorityBadge(priority: number): string {
+        if (priority >= 3) return "[URGENT]";
+        if (priority >= 2) return "[HIGH]";
+        return "";
+      }
+
+      function renderShipmentCard(summary: ShipmentSummary): string {
+        const badge = priorityBadge(summary.priority);
+        return `${badge} [${summary.trackingId}] ${summary.status} - ETA: ${summary.eta}`;
+      }
+
+      function renderDashboard(summaries: ShipmentSummary[]): string {
+        const sorted = [...summaries].sort((a, b) => b.priority - a.priority);
+        const header = `Shipments: ${sorted.length}`;
+        const cards = sorted.map(renderShipmentCard).join("\n");
+        return `${header}\n${cards}`;
+      }
+    src/logistics/invoice.py: |
+      TRAP_GAP064_INVOICE_A = "shipping_invoice"
+      TRAP_GAP064_CURRENCY_B = "USD"
+
+      class ShippingInvoice:
+          def __init__(self, rate_per_kg: float = 2.5):
+              self.rate_per_kg = rate_per_kg
+
+          def calculate(self, weight_kg: float) -> float:
+              return weight_kg * self.rate_per_kg
+
+          def format_total(self, total: float) -> str:
+              return f"${total:.2f}"
+    src/logistics/notifications.ts: |
+      const TRAP_GAP064_NOTIFY_C: string = "shipping_notify";
+      const TRAP_GAP064_CHANNEL_D: string = "email";
+
+      function buildSubject(trackingId: string): string {
+        return `Shipment Update: ${trackingId}`;
+      }
+
+      function buildBody(trackingId: string, status: string): string {
+        return `Your shipment ${trackingId} is now ${status}.`;
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: shipment_bulk
+  selector:
+    path: src/logistics/shipment.py
+    anchor: 'def bulk_register(self, parcels: List[Parcel]) -> int:'
+- id: shipment_filter
+  selector:
+    path: src/logistics/shipment.py
+    anchor: 'def filter_by_destination(self, destination: str) -> List[Parcel]:'
+- id: shipment_max_weight
+  selector:
+    path: src/logistics/shipment.py
+    anchor: self.max_weight = max_weight
+- id: dashboard_priority
+  selector:
+    path: src/logistics/dashboard.ts
+    anchor: 'function priorityBadge(priority: number): string'
+- id: no_invoice
+  selector:
+    path: src/logistics/invoice.py
+- id: no_notifications
+  selector:
+    path: src/logistics/notifications.ts
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP064_INVOICE_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP064_CURRENCY_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP064_NOTIFY_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP064_CHANNEL_D
+oracle:
+  required:
+  - shipment_bulk
+  - shipment_filter
+  - shipment_max_weight
+  - dashboard_priority
+  allowed: []
+  forbidden:
+  - no_invoice
+  - no_notifications
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

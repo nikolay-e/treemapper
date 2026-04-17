@@ -1,0 +1,266 @@
+name: gap2_024_java_refactor_extract_permission_checker
+tags:
+- change:multi_file
+- change:refactor
+- context:cross_module
+- difficulty:medium
+- distance:2hop
+- lang:java
+repo:
+  initial_files:
+    src/main/java/com/library/LoanService.java: |
+      package com.library;
+
+      import java.time.LocalDate;
+
+      public class LoanService {
+          private final BookCatalog catalog;
+
+          public LoanService(BookCatalog catalog) {
+              this.catalog = catalog;
+          }
+
+          public Loan checkoutBook(String memberId, String isbn) {
+              Book book = catalog.findByIsbn(isbn);
+              if (!book.isAvailable()) {
+                  throw new IllegalStateException("Book not available");
+              }
+              if (memberId == null || memberId.isBlank()) {
+                  throw new IllegalArgumentException("Member ID required");
+              }
+              book.setAvailable(false);
+              return new Loan(memberId, isbn, LocalDate.now(), LocalDate.now().plusDays(14));
+          }
+      }
+    src/main/java/com/library/BookCatalog.java: |
+      package com.library;
+
+      public interface BookCatalog {
+          Book findByIsbn(String isbn);
+      }
+    src/main/java/com/library/Book.java: |
+      package com.library;
+
+      public class Book {
+          private final String isbn;
+          private final String title;
+          private boolean available;
+
+          public Book(String isbn, String title) {
+              this.isbn = isbn;
+              this.title = title;
+              this.available = true;
+          }
+
+          public String getIsbn() { return isbn; }
+          public String getTitle() { return title; }
+          public boolean isAvailable() { return available; }
+          public void setAvailable(boolean available) { this.available = available; }
+      }
+    src/main/java/com/library/Loan.java: |
+      package com.library;
+
+      import java.time.LocalDate;
+
+      public class Loan {
+          private final String memberId;
+          private final String isbn;
+          private final LocalDate borrowDate;
+          private final LocalDate dueDate;
+
+          public Loan(String memberId, String isbn, LocalDate borrowDate, LocalDate dueDate) {
+              this.memberId = memberId;
+              this.isbn = isbn;
+              this.borrowDate = borrowDate;
+              this.dueDate = dueDate;
+          }
+
+          public String getMemberId() { return memberId; }
+          public LocalDate getDueDate() { return dueDate; }
+      }
+    src/main/java/com/library/FineCalculator.java: |
+      package com.library;
+
+      public class FineCalculator {
+          private static final String TRAP_GAP2024_POLICY_A = "standard";
+          private static final double TRAP_GAP2024_RATE_B = 0.25;
+
+          public double calculateFine(long overdueDays) {
+              return overdueDays * TRAP_GAP2024_RATE_B;
+          }
+      }
+    src/main/java/com/library/ShelfOrganizer.java: |
+      package com.library;
+
+      public class ShelfOrganizer {
+          private static final String TRAP_GAP2024_SORT_C = "dewey";
+          private static final int TRAP_GAP2024_CAPACITY_D = 200;
+
+          public String assignShelf(String genre) {
+              return genre.substring(0, 2).toUpperCase() + "-" + TRAP_GAP2024_CAPACITY_D;
+          }
+      }
+  changed_files:
+    src/main/java/com/library/LoanService.java: |
+      package com.library;
+
+      import com.library.policy.LoanPolicy;
+      import java.time.LocalDate;
+
+      public class LoanService {
+          private final BookCatalog catalog;
+          private final LoanPolicy policy;
+
+          public LoanService(BookCatalog catalog, LoanPolicy policy) {
+              this.catalog = catalog;
+              this.policy = policy;
+          }
+
+          public Loan checkoutBook(String memberId, String isbn) {
+              policy.validateCheckout(memberId, isbn);
+              Book book = catalog.findByIsbn(isbn);
+              book.setAvailable(false);
+              return new Loan(memberId, isbn, LocalDate.now(), LocalDate.now().plusDays(14));
+          }
+      }
+    src/main/java/com/library/policy/LoanPolicy.java: |
+      package com.library.policy;
+
+      import com.library.BookCatalog;
+
+      public class LoanPolicy {
+          private final BookCatalog catalog;
+
+          public LoanPolicy(BookCatalog catalog) {
+              this.catalog = catalog;
+          }
+
+          public void validateCheckout(String memberId, String isbn) {
+              if (memberId == null || memberId.isBlank()) {
+                  throw new IllegalArgumentException("Member ID required");
+              }
+              if (!catalog.findByIsbn(isbn).isAvailable()) {
+                  throw new IllegalStateException("Book not available");
+              }
+          }
+      }
+    src/main/java/com/library/BookCatalog.java: |
+      package com.library;
+
+      public interface BookCatalog {
+          Book findByIsbn(String isbn);
+      }
+    src/main/java/com/library/Book.java: |
+      package com.library;
+
+      public class Book {
+          private final String isbn;
+          private final String title;
+          private boolean available;
+
+          public Book(String isbn, String title) {
+              this.isbn = isbn;
+              this.title = title;
+              this.available = true;
+          }
+
+          public String getIsbn() { return isbn; }
+          public String getTitle() { return title; }
+          public boolean isAvailable() { return available; }
+          public void setAvailable(boolean available) { this.available = available; }
+      }
+    src/main/java/com/library/Loan.java: |
+      package com.library;
+
+      import java.time.LocalDate;
+
+      public class Loan {
+          private final String memberId;
+          private final String isbn;
+          private final LocalDate borrowDate;
+          private final LocalDate dueDate;
+
+          public Loan(String memberId, String isbn, LocalDate borrowDate, LocalDate dueDate) {
+              this.memberId = memberId;
+              this.isbn = isbn;
+              this.borrowDate = borrowDate;
+              this.dueDate = dueDate;
+          }
+
+          public String getMemberId() { return memberId; }
+          public LocalDate getDueDate() { return dueDate; }
+      }
+    src/main/java/com/library/FineCalculator.java: |
+      package com.library;
+
+      public class FineCalculator {
+          private static final String TRAP_GAP2024_POLICY_A = "standard";
+          private static final double TRAP_GAP2024_RATE_B = 0.25;
+
+          public double calculateFine(long overdueDays) {
+              return overdueDays * TRAP_GAP2024_RATE_B;
+          }
+      }
+    src/main/java/com/library/ShelfOrganizer.java: |
+      package com.library;
+
+      public class ShelfOrganizer {
+          private static final String TRAP_GAP2024_SORT_C = "dewey";
+          private static final int TRAP_GAP2024_CAPACITY_D = 200;
+
+          public String assignShelf(String genre) {
+              return genre.substring(0, 2).toUpperCase() + "-" + TRAP_GAP2024_CAPACITY_D;
+          }
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: service_policy_field
+  selector:
+    path: src/main/java/com/library/LoanService.java
+    anchor: private final LoanPolicy policy;
+- id: service_validate_call
+  selector:
+    path: src/main/java/com/library/LoanService.java
+    anchor: policy.validateCheckout(memberId, isbn);
+- id: policy_class
+  selector:
+    path: src/main/java/com/library/policy/LoanPolicy.java
+    anchor: public class LoanPolicy {
+- id: policy_validate
+  selector:
+    path: src/main/java/com/library/policy/LoanPolicy.java
+    anchor: public void validateCheckout(String memberId, String isbn) {
+- id: no_fine
+  selector:
+    path: src/main/java/com/library/FineCalculator.java
+- id: no_shelf
+  selector:
+    path: src/main/java/com/library/ShelfOrganizer.java
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2024_POLICY_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2024_RATE_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2024_SORT_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2024_CAPACITY_D
+oracle:
+  required:
+  - service_policy_field
+  - service_validate_call
+  - policy_class
+  - policy_validate
+  allowed: []
+  forbidden:
+  - no_fine
+  - no_shelf
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

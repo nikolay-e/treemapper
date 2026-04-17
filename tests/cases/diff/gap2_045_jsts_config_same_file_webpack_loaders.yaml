@@ -1,0 +1,126 @@
+name: gap2_045_jsts_config_same_file_webpack_loaders
+tags:
+- change:config
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:javascript
+- lang:typescript
+repo:
+  initial_files:
+    webpack.config.js: |
+      const path = require("path");
+
+      const outputDir = path.resolve(__dirname, "dist");
+
+      const jsLoader = {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: "babel-loader",
+      };
+
+      const cssLoader = {
+        test: /\.css$/,
+        use: ["style-loader", "css-loader"],
+      };
+
+      module.exports = {
+        entry: "./src/index.js",
+        output: { path: outputDir, filename: "bundle.js" },
+        module: { rules: [jsLoader, cssLoader] },
+      };
+    src/index.ts: |
+      const TRAP_GAP2_045_ENTRY_A: string = "app_entry";
+      const TRAP_GAP2_045_VERSION_B: string = "1.0.0";
+
+      function bootstrap(): void {
+        console.log("Application started");
+      }
+
+      bootstrap();
+    src/utils/logger.js: |
+      const TRAP_GAP2_045_LOG_C = "file_logger";
+      const TRAP_GAP2_045_LEVEL_D = "info";
+
+      function log(level, message) {
+        console.log(`[${level}] ${message}`);
+      }
+
+      module.exports = { log };
+  changed_files:
+    webpack.config.js: |
+      const path = require("path");
+
+      const outputDir = path.resolve(__dirname, "dist");
+
+      const jsLoader = {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: "babel-loader",
+      };
+
+      const tsLoader = {
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
+        use: "ts-loader",
+      };
+
+      const cssLoader = {
+        test: /\.css$/,
+        use: ["style-loader", "css-loader"],
+      };
+
+      module.exports = {
+        entry: "./src/index.ts",
+        output: { path: outputDir, filename: "bundle.js" },
+        resolve: { extensions: [".ts", ".tsx", ".js"] },
+        module: { rules: [jsLoader, tsLoader, cssLoader] },
+      };
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: ts_loader_rule
+  selector:
+    path: webpack.config.js
+    anchor: 'use: "ts-loader"'
+- id: resolve_extensions
+  selector:
+    path: webpack.config.js
+    anchor: 'extensions: [".ts", ".tsx", ".js"]'
+- id: entry_changed
+  selector:
+    path: webpack.config.js
+    anchor: '"./src/index.ts"'
+- id: no_index
+  selector:
+    path: src/index.ts
+- id: no_logger
+  selector:
+    path: src/utils/logger.js
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_045_ENTRY_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_045_VERSION_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_045_LOG_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_045_LEVEL_D
+oracle:
+  required:
+  - ts_loader_rule
+  - resolve_extensions
+  - entry_changed
+  allowed: []
+  forbidden:
+  - no_index
+  - no_logger
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

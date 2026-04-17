@@ -1,0 +1,158 @@
+name: gap_113_php_import_chain_cart_service
+tags:
+- lang:php
+- change:single_file
+- context:import_chain
+- difficulty:easy
+- distance:0hop
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    src/Cart/CartService.php: |
+      <?php
+
+      namespace App\Cart;
+
+      use App\Cart\CartItem;
+
+      class CartService
+      {
+          private array $items = [];
+
+          public function addItem(CartItem $item): void
+          {
+              $this->items[] = $item;
+          }
+
+          public function total(): float
+          {
+              $sum = 0.0;
+              foreach ($this->items as $item) {
+                  $sum += $item->price() * $item->quantity();
+              }
+              return $sum;
+          }
+
+          public function itemCount(): int
+          {
+              return count($this->items);
+          }
+      }
+    src/Cart/CartItem.php: |
+      <?php
+
+      namespace App\Cart;
+
+      class CartItem
+      {
+          private string $sku;
+          private float $unitPrice;
+          private int $qty;
+
+          public function __construct(string $sku, float $unitPrice, int $qty)
+          {
+              $this->sku = $sku;
+              $this->unitPrice = $unitPrice;
+              $this->qty = $qty;
+          }
+
+          public function price(): float
+          {
+              return $this->unitPrice;
+          }
+
+          public function quantity(): int
+          {
+              return $this->qty;
+          }
+
+          public function sku(): string
+          {
+              return $this->sku;
+          }
+      }
+    src/Shipping/ShippingCalculator.php: |
+      <?php
+
+      namespace App\Shipping;
+
+      class ShippingCalculator
+      {
+          private float $baseRate;
+
+          public function __construct(float $baseRate)
+          {
+              $this->baseRate = $baseRate;
+          }
+
+          public function calculate(float $weight): float
+          {
+              return $this->baseRate * $weight;
+          }
+      }
+  changed_files:
+    src/Cart/CartService.php: |
+      <?php
+
+      namespace App\Cart;
+
+      use App\Cart\CartItem;
+
+      class CartService
+      {
+          private array $items = [];
+
+          public function addItem(CartItem $item): void
+          {
+              $this->items[] = $item;
+          }
+
+          public function removeItem(string $sku): bool
+          {
+              foreach ($this->items as $index => $item) {
+                  if ($item->sku() === $sku) {
+                      unset($this->items[$index]);
+                      $this->items = array_values($this->items);
+                      return true;
+                  }
+              }
+              return false;
+          }
+
+          public function total(): float
+          {
+              $sum = 0.0;
+              foreach ($this->items as $item) {
+                  $sum += $item->price() * $item->quantity();
+              }
+              return $sum;
+          }
+
+          public function itemCount(): int
+          {
+              return count($this->items);
+          }
+      }
+fragments:
+- id: remove_item
+  selector:
+    path: src/Cart/CartService.php
+    anchor: "public function removeItem"
+- id: cart_item_sku
+  selector:
+    path: src/Cart/CartService.php
+    anchor: "$item->sku()"
+- id: no_shipping
+  selector:
+    path: src/Shipping/ShippingCalculator.php
+- id: no_shipping_calc
+  selector:
+    anchor: ShippingCalculator
+oracle:
+  required:
+  - remove_item
+  - cart_item_sku
+  forbidden:
+  - no_shipping
+  - no_shipping_calc

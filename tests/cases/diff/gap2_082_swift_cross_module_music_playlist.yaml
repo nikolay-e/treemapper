@@ -1,0 +1,159 @@
+name: gap2_082_swift_cross_module_music_playlist
+tags:
+- change:new_function
+- change:single_file
+- context:cross_module
+- difficulty:medium
+- distance:2hop
+- lang:swift
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    Sources/Music/PlaylistManager.swift: |
+      import Foundation
+
+      class PlaylistManager {
+          private let library: TrackLibrary
+
+          init(library: TrackLibrary) {
+              self.library = library
+          }
+
+          func createPlaylist(name: String, trackIds: [String]) -> Playlist {
+              let tracks = trackIds.compactMap { library.findTrack(id: $0) }
+              return Playlist(name: name, tracks: tracks)
+          }
+      }
+    Sources/Music/TrackLibrary.swift: |
+      import Foundation
+
+      class TrackLibrary {
+          private let metadata: MetadataStore
+
+          init(metadata: MetadataStore) {
+              self.metadata = metadata
+          }
+
+          func findTrack(id: String) -> Track? {
+              guard let meta = metadata.lookup(trackId: id) else { return nil }
+              return Track(id: id, title: meta.title, artist: meta.artist, durationSec: meta.durationSec)
+          }
+
+          func allTracks() -> [Track] {
+              metadata.allEntries().map { Track(id: $0.id, title: $0.title, artist: $0.artist, durationSec: $0.durationSec) }
+          }
+      }
+    Sources/Music/MetadataStore.swift: |
+      import Foundation
+
+      struct TrackMetadata {
+          let id: String
+          let title: String
+          let artist: String
+          let durationSec: Int
+      }
+
+      class MetadataStore {
+          private var entries: [String: TrackMetadata] = [:]
+
+          func lookup(trackId: String) -> TrackMetadata? {
+              entries[trackId]
+          }
+
+          func allEntries() -> [TrackMetadata] {
+              Array(entries.values)
+          }
+
+          func store(_ meta: TrackMetadata) {
+              entries[meta.id] = meta
+          }
+      }
+    Sources/Music/Models.swift: |
+      import Foundation
+
+      struct Track {
+          let id: String
+          let title: String
+          let artist: String
+          let durationSec: Int
+      }
+
+      struct Playlist {
+          let name: String
+          let tracks: [Track]
+
+          var totalDuration: Int {
+              tracks.reduce(0) { $0 + $1.durationSec }
+          }
+      }
+    Sources/Analytics/PlaybackTracker.swift: |
+      import Foundation
+
+      let TRAP_GAP2_082_TRACKER_A: String = "playback_noise"
+      let TRAP_GAP2_082_TRACKER_B: Int = 999
+
+      class PlaybackTracker {
+          func recordPlay(trackId: String) {}
+          func topPlayed() -> [String] { return [] }
+      }
+  changed_files:
+    Sources/Music/PlaylistManager.swift: |
+      import Foundation
+
+      class PlaylistManager {
+          private let library: TrackLibrary
+
+          init(library: TrackLibrary) {
+              self.library = library
+          }
+
+          func createPlaylist(name: String, trackIds: [String]) -> Playlist {
+              let tracks = trackIds.compactMap { library.findTrack(id: $0) }
+              return Playlist(name: name, tracks: tracks)
+          }
+
+          func shufflePlaylist(name: String, maxDurationSec: Int) -> Playlist {
+              let all = library.allTracks().shuffled()
+              var selected: [Track] = []
+              var total = 0
+              for track in all {
+                  if total + track.durationSec > maxDurationSec { break }
+                  selected.append(track)
+                  total += track.durationSec
+              }
+              return Playlist(name: name, tracks: selected)
+          }
+      }
+  commit_message: Update files
+fragments:
+- id: shuffle_fn
+  selector:
+    path: Sources/Music/PlaylistManager.swift
+    anchor: "func shufflePlaylist"
+- id: all_tracks
+  selector:
+    path: Sources/Music/TrackLibrary.swift
+    anchor: "func allTracks"
+- id: track_struct
+  selector:
+    path: Sources/Music/Models.swift
+    anchor: "struct Track"
+- id: no_playback
+  selector:
+    path: Sources/Analytics/PlaybackTracker.swift
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_082_TRACKER_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_082_TRACKER_B
+oracle:
+  required:
+  - shuffle_fn
+  - all_tracks
+  - track_struct
+  forbidden:
+  - no_playback
+  - no_global_0
+  - no_global_1

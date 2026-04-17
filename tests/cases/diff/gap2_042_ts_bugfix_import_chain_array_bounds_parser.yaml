@@ -1,0 +1,158 @@
+name: gap2_042_ts_bugfix_import_chain_array_bounds_parser
+tags:
+- change:bug_fix
+- change:single_file
+- context:import_chain
+- difficulty:easy
+- distance:0hop
+- lang:typescript
+repo:
+  initial_files:
+    src/parser/token.ts: |
+      export enum TokenKind {
+        Number = "NUMBER",
+        Operator = "OPERATOR",
+        Paren = "PAREN",
+        Whitespace = "WHITESPACE",
+      }
+
+      export interface Token {
+        kind: TokenKind;
+        value: string;
+        position: number;
+      }
+    src/parser/lexer.ts: |
+      import { Token, TokenKind } from "./token";
+
+      function isDigit(ch: string): boolean {
+        return ch >= "0" && ch <= "9";
+      }
+
+      function tokenize(input: string): Token[] {
+        const tokens: Token[] = [];
+        let pos = 0;
+        while (pos < input.length) {
+          const ch = input[pos];
+          if (isDigit(ch)) {
+            let num = "";
+            const start = pos;
+            while (pos < input.length && isDigit(input[pos])) {
+              num += input[pos];
+              pos++;
+            }
+            tokens.push({ kind: TokenKind.Number, value: num, position: start });
+          } else if ("+-*/".includes(ch)) {
+            tokens.push({ kind: TokenKind.Operator, value: ch, position: pos });
+            pos++;
+          } else {
+            pos++;
+          }
+        }
+        return tokens;
+      }
+
+      function peekToken(tokens: Token[], index: number): Token {
+        return tokens[index];
+      }
+    src/parser/evaluator.ts: |
+      const TRAP_GAP2_042_EVAL_A: string = "evaluator_v2";
+      const TRAP_GAP2_042_PREC_B: number = 10;
+
+      function evaluate(expression: string): number {
+        return 0;
+      }
+
+      function precedence(op: string): number {
+        if (op === "+" || op === "-") return 1;
+        return 2;
+      }
+    src/parser/formatter.ts: |
+      const TRAP_GAP2_042_FMT_C: string = "formatter";
+      const TRAP_GAP2_042_PAD_D: number = 2;
+
+      function formatExpression(tokens: string[]): string {
+        return tokens.join(" ");
+      }
+
+      function padOperator(op: string): string {
+        return ` ${op} `;
+      }
+  changed_files:
+    src/parser/lexer.ts: |
+      import { Token, TokenKind } from "./token";
+
+      function isDigit(ch: string): boolean {
+        return ch >= "0" && ch <= "9";
+      }
+
+      function tokenize(input: string): Token[] {
+        const tokens: Token[] = [];
+        let pos = 0;
+        while (pos < input.length) {
+          const ch = input[pos];
+          if (isDigit(ch)) {
+            let num = "";
+            const start = pos;
+            while (pos < input.length && isDigit(input[pos])) {
+              num += input[pos];
+              pos++;
+            }
+            tokens.push({ kind: TokenKind.Number, value: num, position: start });
+          } else if ("+-*/".includes(ch)) {
+            tokens.push({ kind: TokenKind.Operator, value: ch, position: pos });
+            pos++;
+          } else {
+            pos++;
+          }
+        }
+        return tokens;
+      }
+
+      function peekToken(tokens: Token[], index: number): Token | null {
+        if (index < 0 || index >= tokens.length) {
+          return null;
+        }
+        return tokens[index];
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: lexer_bounds_check
+  selector:
+    path: src/parser/lexer.ts
+    anchor: "if (index < 0 || index >= tokens.length)"
+- id: lexer_return_null
+  selector:
+    path: src/parser/lexer.ts
+    anchor: "Token | null"
+- id: no_evaluator
+  selector:
+    path: src/parser/evaluator.ts
+- id: no_formatter
+  selector:
+    path: src/parser/formatter.ts
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_042_EVAL_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_042_PREC_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_042_FMT_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_042_PAD_D
+oracle:
+  required:
+  - lexer_bounds_check
+  - lexer_return_null
+  allowed: []
+  forbidden:
+  - no_evaluator
+  - no_formatter
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

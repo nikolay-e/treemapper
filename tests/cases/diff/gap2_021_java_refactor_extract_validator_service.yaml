@@ -1,0 +1,249 @@
+name: gap2_021_java_refactor_extract_validator_service
+tags:
+- change:multi_file
+- change:refactor
+- context:cross_module
+- difficulty:medium
+- distance:2hop
+- lang:java
+repo:
+  initial_files:
+    src/main/java/com/warehouse/InventoryService.java: |
+      package com.warehouse;
+
+      import java.util.List;
+      import java.util.stream.Collectors;
+
+      public class InventoryService {
+          private final InventoryRepository repository;
+
+          public InventoryService(InventoryRepository repository) {
+              this.repository = repository;
+          }
+
+          public void receiveShipment(String sku, int quantity) {
+              if (sku == null || sku.isEmpty()) {
+                  throw new IllegalArgumentException("SKU must not be empty");
+              }
+              if (quantity <= 0) {
+                  throw new IllegalArgumentException("Quantity must be positive");
+              }
+              Item item = repository.findBySku(sku);
+              item.addStock(quantity);
+              repository.save(item);
+          }
+
+          public List<Item> getLowStockItems(int threshold) {
+              return repository.findAll().stream()
+                  .filter(i -> i.getStock() < threshold)
+                  .collect(Collectors.toList());
+          }
+      }
+    src/main/java/com/warehouse/InventoryRepository.java: |
+      package com.warehouse;
+
+      import java.util.List;
+
+      public interface InventoryRepository {
+          Item findBySku(String sku);
+          void save(Item item);
+          List<Item> findAll();
+      }
+    src/main/java/com/warehouse/Item.java: |
+      package com.warehouse;
+
+      public class Item {
+          private final String sku;
+          private int stock;
+
+          public Item(String sku, int stock) {
+              this.sku = sku;
+              this.stock = stock;
+          }
+
+          public String getSku() { return sku; }
+          public int getStock() { return stock; }
+
+          public void addStock(int quantity) {
+              this.stock += quantity;
+          }
+      }
+    src/main/java/com/warehouse/ReportGenerator.java: |
+      package com.warehouse;
+
+      import java.util.List;
+
+      public class ReportGenerator {
+          private static final String TRAP_GAP2021_REPORT_A = "weekly";
+          private static final int TRAP_GAP2021_PAGE_B = 50;
+
+          public String generateStockReport(List<Item> items) {
+              StringBuilder sb = new StringBuilder("Stock Report\n");
+              for (Item item : items) {
+                  sb.append(item.getSku()).append(": ").append(item.getStock()).append("\n");
+              }
+              return sb.toString();
+          }
+      }
+    src/main/java/com/warehouse/AuditLogger.java: |
+      package com.warehouse;
+
+      public class AuditLogger {
+          private static final String TRAP_GAP2021_AUDIT_C = "inventory_audit";
+          private static final boolean TRAP_GAP2021_ENABLED_D = true;
+
+          public void logAction(String action, String detail) {
+              System.out.println("[AUDIT] " + action + ": " + detail);
+          }
+      }
+  changed_files:
+    src/main/java/com/warehouse/InventoryService.java: |
+      package com.warehouse;
+
+      import java.util.List;
+      import java.util.stream.Collectors;
+
+      public class InventoryService {
+          private final InventoryRepository repository;
+          private final ShipmentValidator validator;
+
+          public InventoryService(InventoryRepository repository, ShipmentValidator validator) {
+              this.repository = repository;
+              this.validator = validator;
+          }
+
+          public void receiveShipment(String sku, int quantity) {
+              validator.validate(sku, quantity);
+              Item item = repository.findBySku(sku);
+              item.addStock(quantity);
+              repository.save(item);
+          }
+
+          public List<Item> getLowStockItems(int threshold) {
+              return repository.findAll().stream()
+                  .filter(i -> i.getStock() < threshold)
+                  .collect(Collectors.toList());
+          }
+      }
+    src/main/java/com/warehouse/ShipmentValidator.java: |
+      package com.warehouse;
+
+      public class ShipmentValidator {
+          public void validate(String sku, int quantity) {
+              if (sku == null || sku.isEmpty()) {
+                  throw new IllegalArgumentException("SKU must not be empty");
+              }
+              if (quantity <= 0) {
+                  throw new IllegalArgumentException("Quantity must be positive");
+              }
+          }
+      }
+    src/main/java/com/warehouse/InventoryRepository.java: |
+      package com.warehouse;
+
+      import java.util.List;
+
+      public interface InventoryRepository {
+          Item findBySku(String sku);
+          void save(Item item);
+          List<Item> findAll();
+      }
+    src/main/java/com/warehouse/Item.java: |
+      package com.warehouse;
+
+      public class Item {
+          private final String sku;
+          private int stock;
+
+          public Item(String sku, int stock) {
+              this.sku = sku;
+              this.stock = stock;
+          }
+
+          public String getSku() { return sku; }
+          public int getStock() { return stock; }
+
+          public void addStock(int quantity) {
+              this.stock += quantity;
+          }
+      }
+    src/main/java/com/warehouse/ReportGenerator.java: |
+      package com.warehouse;
+
+      import java.util.List;
+
+      public class ReportGenerator {
+          private static final String TRAP_GAP2021_REPORT_A = "weekly";
+          private static final int TRAP_GAP2021_PAGE_B = 50;
+
+          public String generateStockReport(List<Item> items) {
+              StringBuilder sb = new StringBuilder("Stock Report\n");
+              for (Item item : items) {
+                  sb.append(item.getSku()).append(": ").append(item.getStock()).append("\n");
+              }
+              return sb.toString();
+          }
+      }
+    src/main/java/com/warehouse/AuditLogger.java: |
+      package com.warehouse;
+
+      public class AuditLogger {
+          private static final String TRAP_GAP2021_AUDIT_C = "inventory_audit";
+          private static final boolean TRAP_GAP2021_ENABLED_D = true;
+
+          public void logAction(String action, String detail) {
+              System.out.println("[AUDIT] " + action + ": " + detail);
+          }
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: service_validator_field
+  selector:
+    path: src/main/java/com/warehouse/InventoryService.java
+    anchor: private final ShipmentValidator validator;
+- id: service_validate_call
+  selector:
+    path: src/main/java/com/warehouse/InventoryService.java
+    anchor: validator.validate(sku, quantity);
+- id: validator_class
+  selector:
+    path: src/main/java/com/warehouse/ShipmentValidator.java
+    anchor: public class ShipmentValidator {
+- id: validator_validate_method
+  selector:
+    path: src/main/java/com/warehouse/ShipmentValidator.java
+    anchor: public void validate(String sku, int quantity) {
+- id: no_report
+  selector:
+    path: src/main/java/com/warehouse/ReportGenerator.java
+- id: no_audit
+  selector:
+    path: src/main/java/com/warehouse/AuditLogger.java
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2021_REPORT_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2021_PAGE_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2021_AUDIT_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2021_ENABLED_D
+oracle:
+  required:
+  - service_validator_field
+  - service_validate_call
+  - validator_class
+  - validator_validate_method
+  allowed: []
+  forbidden:
+  - no_report
+  - no_audit
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

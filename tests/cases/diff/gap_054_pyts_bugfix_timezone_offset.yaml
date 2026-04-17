@@ -1,0 +1,209 @@
+name: gap_054_pyts_bugfix_timezone_offset
+tags:
+- lang:python
+- lang:typescript
+- change:bug_fix
+- change:single_file
+- context:cross_module
+- distance:2hop
+- difficulty:hard
+repo:
+  initial_files:
+    backend/scheduling/slots.py: |
+      from datetime import datetime, timedelta, timezone
+
+      class SlotGenerator:
+          def __init__(self, start_hour: int, end_hour: int, duration_minutes: int):
+              self._start_hour = start_hour
+              self._end_hour = end_hour
+              self._duration = timedelta(minutes=duration_minutes)
+
+          def generate(self, date: datetime) -> list[tuple[datetime, datetime]]:
+              slots = []
+              current = date.replace(hour=self._start_hour, minute=0, second=0)
+              end = date.replace(hour=self._end_hour, minute=0, second=0)
+              while current + self._duration <= end:
+                  slots.append((current, current + self._duration))
+                  current += self._duration
+              return slots
+
+          def is_available(self, slot_start: datetime, booked: list[tuple[datetime, datetime]]) -> bool:
+              slot_end = slot_start + self._duration
+              for start, end in booked:
+                  if slot_start < end and slot_end > start:
+                      return False
+              return True
+    backend/scheduling/calendar.py: |
+      from datetime import datetime, timezone
+
+      class CalendarService:
+          def __init__(self):
+              self._events: list[dict] = []
+
+          def add_event(self, title: str, start: datetime, end: datetime) -> dict:
+              event = {
+                  "title": title,
+                  "start": start.isoformat(),
+                  "end": end.isoformat(),
+              }
+              self._events.append(event)
+              return event
+
+          def events_on(self, date: datetime) -> list[dict]:
+              target = date.date()
+              return [e for e in self._events if e["start"].startswith(str(target))]
+    frontend/src/booking/scheduler.ts: |
+      interface TimeSlot {
+        start: string;
+        end: string;
+      }
+
+      interface BookingRequest {
+        slotStart: string;
+        userId: string;
+        serviceId: string;
+      }
+
+      function parseSlot(slot: TimeSlot): { start: Date; end: Date } {
+        return {
+          start: new Date(slot.start),
+          end: new Date(slot.end),
+        };
+      }
+
+      function formatSlotTime(isoString: string): string {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function slotDurationMinutes(slot: TimeSlot): number {
+        const parsed = parseSlot(slot);
+        return (parsed.end.getTime() - parsed.start.getTime()) / 60000;
+      }
+    frontend/src/booking/display.ts: |
+      function renderTimeSlot(label: string, time: string): string {
+        return `<div class="slot">${label}: ${time}</div>`;
+      }
+
+      function renderSlotList(slots: TimeSlot[]): string {
+        return slots
+          .map((s, i) => renderTimeSlot(`Slot ${i + 1}`, formatSlotTime(s.start)))
+          .join("");
+      }
+  changed_files:
+    backend/scheduling/slots.py: |
+      from datetime import datetime, timedelta, timezone
+
+      class SlotGenerator:
+          def __init__(self, start_hour: int, end_hour: int, duration_minutes: int):
+              self._start_hour = start_hour
+              self._end_hour = end_hour
+              self._duration = timedelta(minutes=duration_minutes)
+
+          def generate(self, date: datetime) -> list[tuple[datetime, datetime]]:
+              slots = []
+              current = date.replace(hour=self._start_hour, minute=0, second=0, microsecond=0)
+              end = date.replace(hour=self._end_hour, minute=0, second=0, microsecond=0)
+              if current.tzinfo is None:
+                  current = current.replace(tzinfo=timezone.utc)
+                  end = end.replace(tzinfo=timezone.utc)
+              while current + self._duration <= end:
+                  slots.append((current, current + self._duration))
+                  current += self._duration
+              return slots
+
+          def is_available(self, slot_start: datetime, booked: list[tuple[datetime, datetime]]) -> bool:
+              slot_end = slot_start + self._duration
+              for start, end in booked:
+                  if slot_start < end and slot_end > start:
+                      return False
+              return True
+    backend/scheduling/calendar.py: |
+      from datetime import datetime, timezone
+
+      class CalendarService:
+          def __init__(self):
+              self._events: list[dict] = []
+
+          def add_event(self, title: str, start: datetime, end: datetime) -> dict:
+              if start.tzinfo is None:
+                  start = start.replace(tzinfo=timezone.utc)
+              if end.tzinfo is None:
+                  end = end.replace(tzinfo=timezone.utc)
+              event = {
+                  "title": title,
+                  "start": start.isoformat(),
+                  "end": end.isoformat(),
+              }
+              self._events.append(event)
+              return event
+
+          def events_on(self, date: datetime) -> list[dict]:
+              target = date.date()
+              return [e for e in self._events if e["start"].startswith(str(target))]
+    frontend/src/booking/scheduler.ts: |
+      interface TimeSlot {
+        start: string;
+        end: string;
+      }
+
+      interface BookingRequest {
+        slotStart: string;
+        userId: string;
+        serviceId: string;
+      }
+
+      function parseSlot(slot: TimeSlot): { start: Date; end: Date } {
+        return {
+          start: new Date(slot.start),
+          end: new Date(slot.end),
+        };
+      }
+
+      function formatSlotTime(isoString: string): string {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function slotDurationMinutes(slot: TimeSlot): number {
+        const parsed = parseSlot(slot);
+        return (parsed.end.getTime() - parsed.start.getTime()) / 60000;
+      }
+    frontend/src/booking/display.ts: |
+      function renderTimeSlot(label: string, time: string): string {
+        return `<div class="slot">${label}: ${time}</div>`;
+      }
+
+      function renderSlotList(slots: TimeSlot[]): string {
+        return slots
+          .map((s, i) => renderTimeSlot(`Slot ${i + 1}`, formatSlotTime(s.start)))
+          .join("");
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: slots_tz_fix
+  selector:
+    path: backend/scheduling/slots.py
+    anchor: "current = current.replace(tzinfo=timezone.utc)"
+- id: slots_microsecond_fix
+  selector:
+    path: backend/scheduling/slots.py
+    anchor: "microsecond=0"
+- id: calendar_tz_start
+  selector:
+    path: backend/scheduling/calendar.py
+    anchor: "start = start.replace(tzinfo=timezone.utc)"
+- id: calendar_tz_end
+  selector:
+    path: backend/scheduling/calendar.py
+    anchor: "end = end.replace(tzinfo=timezone.utc)"
+oracle:
+  required:
+  - slots_tz_fix
+  - slots_microsecond_fix
+  - calendar_tz_start
+  - calendar_tz_end
+  allowed: []
+  forbidden: []

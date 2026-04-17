@@ -1,0 +1,118 @@
+name: gap2_044_ts_bugfix_import_chain_map_key_lookup_router
+tags:
+- change:bug_fix
+- change:single_file
+- context:import_chain
+- difficulty:easy
+- distance:0hop
+- lang:typescript
+repo:
+  initial_files:
+    src/router/route.ts: |
+      export interface RouteDefinition {
+        path: string;
+        handler: string;
+        method: "GET" | "POST" | "PUT" | "DELETE";
+      }
+
+      export type RouteMap = Map<string, RouteDefinition>;
+    src/router/dispatcher.ts: |
+      import { RouteDefinition, RouteMap } from "./route";
+
+      function createRouteKey(method: string, path: string): string {
+        return `${method}:${path}`;
+      }
+
+      function registerRoute(routes: RouteMap, def: RouteDefinition): void {
+        const key = createRouteKey(def.method, def.path);
+        routes.set(key, def);
+      }
+
+      function dispatch(routes: RouteMap, method: string, path: string): string {
+        const key = createRouteKey(method, path);
+        const route = routes.get(key);
+        return route.handler;
+      }
+    src/router/middleware.ts: |
+      const TRAP_GAP2_044_MW_A: string = "cors_middleware";
+      const TRAP_GAP2_044_ORIGIN_B: string = "*";
+
+      function corsHeaders(): Record<string, string> {
+        return { "Access-Control-Allow-Origin": "*" };
+      }
+
+      function logRequest(method: string, path: string): void {}
+    src/router/validator.ts: |
+      const TRAP_GAP2_044_VALID_C: string = "path_validator";
+      const TRAP_GAP2_044_MAX_D: number = 255;
+
+      function isValidPath(path: string): boolean {
+        return path.startsWith("/") && path.length < 255;
+      }
+
+      function sanitizePath(path: string): string {
+        return path.replace(/\/+/g, "/");
+      }
+  changed_files:
+    src/router/dispatcher.ts: |
+      import { RouteDefinition, RouteMap } from "./route";
+
+      function createRouteKey(method: string, path: string): string {
+        return `${method}:${path}`;
+      }
+
+      function registerRoute(routes: RouteMap, def: RouteDefinition): void {
+        const key = createRouteKey(def.method, def.path);
+        routes.set(key, def);
+      }
+
+      function dispatch(routes: RouteMap, method: string, path: string): string | null {
+        const key = createRouteKey(method, path);
+        const route = routes.get(key);
+        if (route === undefined) {
+          return null;
+        }
+        return route.handler;
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: dispatch_undef_check
+  selector:
+    path: src/router/dispatcher.ts
+    anchor: "if (route === undefined)"
+- id: dispatch_return_null
+  selector:
+    path: src/router/dispatcher.ts
+    anchor: "string | null"
+- id: no_middleware
+  selector:
+    path: src/router/middleware.ts
+- id: no_validator
+  selector:
+    path: src/router/validator.ts
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_044_MW_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_044_ORIGIN_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_044_VALID_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_044_MAX_D
+oracle:
+  required:
+  - dispatch_undef_check
+  - dispatch_return_null
+  allowed: []
+  forbidden:
+  - no_middleware
+  - no_validator
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

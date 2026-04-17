@@ -1,0 +1,151 @@
+name: gap_114_php_import_chain_invoice_generator
+tags:
+- lang:php
+- change:single_file
+- context:import_chain
+- difficulty:easy
+- distance:0hop
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    src/Billing/InvoiceGenerator.php: |
+      <?php
+
+      namespace App\Billing;
+
+      use App\Billing\LineItem;
+
+      class InvoiceGenerator
+      {
+          private string $customerName;
+          private array $lineItems = [];
+
+          public function __construct(string $customerName)
+          {
+              $this->customerName = $customerName;
+          }
+
+          public function addLine(LineItem $item): void
+          {
+              $this->lineItems[] = $item;
+          }
+
+          public function subtotal(): float
+          {
+              $total = 0.0;
+              foreach ($this->lineItems as $line) {
+                  $total += $line->amount();
+              }
+              return $total;
+          }
+      }
+    src/Billing/LineItem.php: |
+      <?php
+
+      namespace App\Billing;
+
+      class LineItem
+      {
+          private string $description;
+          private float $unitCost;
+          private int $qty;
+
+          public function __construct(string $description, float $unitCost, int $qty)
+          {
+              $this->description = $description;
+              $this->unitCost = $unitCost;
+              $this->qty = $qty;
+          }
+
+          public function amount(): float
+          {
+              return $this->unitCost * $this->qty;
+          }
+
+          public function description(): string
+          {
+              return $this->description;
+          }
+      }
+    src/Notification/Mailer.php: |
+      <?php
+
+      namespace App\Notification;
+
+      class Mailer
+      {
+          private string $smtpHost;
+
+          public function __construct(string $smtpHost)
+          {
+              $this->smtpHost = $smtpHost;
+          }
+
+          public function send(string $to, string $subject, string $body): bool
+          {
+              return !empty($to) && !empty($subject);
+          }
+      }
+  changed_files:
+    src/Billing/InvoiceGenerator.php: |
+      <?php
+
+      namespace App\Billing;
+
+      use App\Billing\LineItem;
+
+      class InvoiceGenerator
+      {
+          private string $customerName;
+          private array $lineItems = [];
+          private float $taxRate;
+
+          public function __construct(string $customerName, float $taxRate = 0.0)
+          {
+              $this->customerName = $customerName;
+              $this->taxRate = $taxRate;
+          }
+
+          public function addLine(LineItem $item): void
+          {
+              $this->lineItems[] = $item;
+          }
+
+          public function subtotal(): float
+          {
+              $total = 0.0;
+              foreach ($this->lineItems as $line) {
+                  $total += $line->amount();
+              }
+              return $total;
+          }
+
+          public function totalWithTax(): float
+          {
+              $sub = $this->subtotal();
+              return $sub + ($sub * $this->taxRate);
+          }
+      }
+fragments:
+- id: total_with_tax
+  selector:
+    path: src/Billing/InvoiceGenerator.php
+    anchor: "public function totalWithTax"
+- id: tax_rate_field
+  selector:
+    path: src/Billing/InvoiceGenerator.php
+    anchor: "private float $taxRate"
+- id: no_mailer
+  selector:
+    path: src/Notification/Mailer.php
+- id: no_mailer_class
+  selector:
+    anchor: "class Mailer"
+oracle:
+  required:
+  - total_with_tax
+  - tax_rate_field
+  forbidden:
+  - no_mailer
+  - no_mailer_class

@@ -1,0 +1,128 @@
+name: gap2_071_xml_yaml_same_file_spring_bean_config
+tags:
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:xml
+- lang:yaml
+repo:
+  initial_files:
+    src/beans.xml: |
+      <beans>
+        <bean id="dataSource" class="com.example.DataSource">
+          <property name="url" value="jdbc:mysql://localhost/app"/>
+          <property name="maxPool" value="10"/>
+        </bean>
+        <bean id="userDao" class="com.example.UserDao">
+          <property name="dataSource" ref="dataSource"/>
+        </bean>
+      </beans>
+    src/application.yml: |
+      spring:
+        datasource:
+          url: jdbc:mysql://localhost/app
+          pool-size: 10
+    other/security.xml: |
+      <security>
+        <TRAP_GAP2_071_SEC_A>security_noise</TRAP_GAP2_071_SEC_A>
+        <TRAP_GAP2_071_SEC_B>256</TRAP_GAP2_071_SEC_B>
+        <encryption>AES</encryption>
+      </security>
+    other/routes.yml: |
+      TRAP_GAP2_071_ROUTE_C: routes_noise
+      TRAP_GAP2_071_ROUTE_D: false
+      defaultPath: /home
+    other/plugins.xml: |
+      <plugins>
+        <TRAP_GAP2_071_PLUG_E>plugin_noise</TRAP_GAP2_071_PLUG_E>
+        <TRAP_GAP2_071_PLUG_F>3</TRAP_GAP2_071_PLUG_F>
+      </plugins>
+  changed_files:
+    src/beans.xml: |
+      <beans>
+        <bean id="dataSource" class="com.example.DataSource">
+          <property name="url" value="jdbc:mysql://localhost/app"/>
+          <property name="maxPool" value="10"/>
+        </bean>
+        <bean id="userDao" class="com.example.UserDao">
+          <property name="dataSource" ref="dataSource"/>
+        </bean>
+        <bean id="cacheManager" class="com.example.CacheManager">
+          <property name="ttl" value="300"/>
+        </bean>
+      </beans>
+    src/application.yml: |
+      spring:
+        datasource:
+          url: jdbc:mysql://localhost/app
+          pool-size: 10
+    other/security.xml: |
+      <security>
+        <TRAP_GAP2_071_SEC_A>security_noise</TRAP_GAP2_071_SEC_A>
+        <TRAP_GAP2_071_SEC_B>256</TRAP_GAP2_071_SEC_B>
+        <encryption>AES</encryption>
+      </security>
+    other/routes.yml: |
+      TRAP_GAP2_071_ROUTE_C: routes_noise
+      TRAP_GAP2_071_ROUTE_D: false
+      defaultPath: /home
+    other/plugins.xml: |
+      <plugins>
+        <TRAP_GAP2_071_PLUG_E>plugin_noise</TRAP_GAP2_071_PLUG_E>
+        <TRAP_GAP2_071_PLUG_F>3</TRAP_GAP2_071_PLUG_F>
+      </plugins>
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: cache_bean
+  selector:
+    path: src/beans.xml
+    anchor: 'id="cacheManager"'
+- id: cache_ttl
+  selector:
+    path: src/beans.xml
+    anchor: 'name="ttl" value="300"'
+- id: no_security
+  selector:
+    path: other/security.xml
+- id: no_routes
+  selector:
+    path: other/routes.yml
+- id: no_plugins
+  selector:
+    path: other/plugins.xml
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_071_SEC_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_071_SEC_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_071_ROUTE_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_071_ROUTE_D
+- id: no_global_4
+  selector:
+    anchor: TRAP_GAP2_071_PLUG_E
+- id: no_global_5
+  selector:
+    anchor: TRAP_GAP2_071_PLUG_F
+oracle:
+  required:
+  - cache_bean
+  - cache_ttl
+  allowed: []
+  forbidden:
+  - no_security
+  - no_routes
+  - no_plugins
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

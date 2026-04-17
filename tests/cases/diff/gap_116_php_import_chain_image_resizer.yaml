@@ -1,0 +1,154 @@
+name: gap_116_php_import_chain_image_resizer
+tags:
+- lang:php
+- change:single_file
+- context:import_chain
+- difficulty:easy
+- distance:0hop
+fixtures:
+  auto_garbage: true
+repo:
+  initial_files:
+    src/Media/ImageResizer.php: |
+      <?php
+
+      namespace App\Media;
+
+      class ImageResizer
+      {
+          private int $maxWidth;
+          private int $maxHeight;
+
+          public function __construct(int $maxWidth, int $maxHeight)
+          {
+              $this->maxWidth = $maxWidth;
+              $this->maxHeight = $maxHeight;
+          }
+
+          public function resize(int $width, int $height): array
+          {
+              $ratio = min($this->maxWidth / $width, $this->maxHeight / $height);
+              if ($ratio >= 1.0) {
+                  return ['width' => $width, 'height' => $height];
+              }
+              return [
+                  'width' => (int)($width * $ratio),
+                  'height' => (int)($height * $ratio),
+              ];
+          }
+      }
+    src/Media/ThumbnailCache.php: |
+      <?php
+
+      namespace App\Media;
+
+      class ThumbnailCache
+      {
+          private array $cache = [];
+
+          public function get(string $key): ?string
+          {
+              return $this->cache[$key] ?? null;
+          }
+
+          public function set(string $key, string $path): void
+          {
+              $this->cache[$key] = $path;
+          }
+
+          public function has(string $key): bool
+          {
+              return isset($this->cache[$key]);
+          }
+      }
+    src/Storage/FileUploader.php: |
+      <?php
+
+      namespace App\Storage;
+
+      class FileUploader
+      {
+          private string $basePath;
+
+          public function __construct(string $basePath)
+          {
+              $this->basePath = $basePath;
+          }
+
+          public function upload(string $filename, string $content): string
+          {
+              $path = $this->basePath . '/' . $filename;
+              return $path;
+          }
+
+          public function exists(string $filename): bool
+          {
+              return false;
+          }
+      }
+  changed_files:
+    src/Media/ImageResizer.php: |
+      <?php
+
+      namespace App\Media;
+
+      class ImageResizer
+      {
+          private int $maxWidth;
+          private int $maxHeight;
+          private int $quality;
+
+          public function __construct(int $maxWidth, int $maxHeight, int $quality = 85)
+          {
+              $this->maxWidth = $maxWidth;
+              $this->maxHeight = $maxHeight;
+              $this->quality = $quality;
+          }
+
+          public function resize(int $width, int $height): array
+          {
+              $ratio = min($this->maxWidth / $width, $this->maxHeight / $height);
+              if ($ratio >= 1.0) {
+                  return ['width' => $width, 'height' => $height];
+              }
+              return [
+                  'width' => (int)($width * $ratio),
+                  'height' => (int)($height * $ratio),
+              ];
+          }
+
+          public function crop(int $width, int $height, int $x, int $y): array
+          {
+              $cropWidth = min($width, $this->maxWidth);
+              $cropHeight = min($height, $this->maxHeight);
+              return [
+                  'x' => $x,
+                  'y' => $y,
+                  'width' => $cropWidth,
+                  'height' => $cropHeight,
+                  'quality' => $this->quality,
+              ];
+          }
+      }
+fragments:
+- id: crop_method
+  selector:
+    path: src/Media/ImageResizer.php
+    anchor: "public function crop"
+- id: quality_field
+  selector:
+    path: src/Media/ImageResizer.php
+    anchor: "private int $quality"
+- id: no_uploader
+  selector:
+    path: src/Storage/FileUploader.php
+- id: no_file_uploader
+  selector:
+    anchor: FileUploader
+oracle:
+  required:
+  - crop_method
+  - quality_field
+  forbidden:
+  - no_uploader
+  - no_file_uploader

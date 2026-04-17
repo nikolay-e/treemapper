@@ -1,0 +1,176 @@
+name: gap2_025_js_new_func_recipe_scaling
+tags:
+- change:new_function
+- change:single_file
+- context:import_chain
+- difficulty:medium
+- distance:2hop
+- lang:javascript
+repo:
+  initial_files:
+    src/recipe/ingredients.js: |
+      const UNIT_CONVERSIONS = {
+        cup_to_ml: 236.588,
+        tbsp_to_ml: 14.787,
+        tsp_to_ml: 4.929,
+      };
+
+      function convertUnit(amount, fromUnit) {
+        const key = fromUnit + "_to_ml";
+        if (!UNIT_CONVERSIONS[key]) return amount;
+        return amount * UNIT_CONVERSIONS[key];
+      }
+
+      module.exports = { UNIT_CONVERSIONS, convertUnit };
+    src/recipe/servings.js: |
+      const { convertUnit } = require("./ingredients");
+
+      function adjustForServings(recipe, targetServings) {
+        const ratio = targetServings / recipe.baseServings;
+        return recipe.items.map((item) => ({
+          ...item,
+          amount: item.amount * ratio,
+        }));
+      }
+
+      module.exports = { adjustForServings };
+    src/recipe/formatter.js: |
+      const { adjustForServings } = require("./servings");
+
+      function formatRecipe(recipe, servings) {
+        const adjusted = adjustForServings(recipe, servings);
+        return adjusted
+          .map((item) => `${item.amount} ${item.unit} ${item.name}`)
+          .join("\n");
+      }
+
+      module.exports = { formatRecipe };
+    src/recipe/nutrition.js: |
+      const TRAP_GAP2025_CALS_A = 2000;
+      const TRAP_GAP2025_MACRO_B = "balanced";
+
+      function estimateCalories(items) {
+        return items.reduce((sum, i) => sum + i.calories, 0);
+      }
+
+      module.exports = { estimateCalories };
+    src/recipe/storage.js: |
+      const TRAP_GAP2025_TTL_C = 86400;
+      const TRAP_GAP2025_FORMAT_D = "json";
+
+      function saveRecipe(recipe) {
+        return JSON.stringify(recipe);
+      }
+
+      module.exports = { saveRecipe };
+  changed_files:
+    src/recipe/ingredients.js: |
+      const UNIT_CONVERSIONS = {
+        cup_to_ml: 236.588,
+        tbsp_to_ml: 14.787,
+        tsp_to_ml: 4.929,
+      };
+
+      function convertUnit(amount, fromUnit) {
+        const key = fromUnit + "_to_ml";
+        if (!UNIT_CONVERSIONS[key]) return amount;
+        return amount * UNIT_CONVERSIONS[key];
+      }
+
+      function scaleIngredient(ingredient, factor) {
+        return {
+          ...ingredient,
+          amount: ingredient.amount * factor,
+          mlEquivalent: convertUnit(ingredient.amount * factor, ingredient.unit),
+        };
+      }
+
+      module.exports = { UNIT_CONVERSIONS, convertUnit, scaleIngredient };
+    src/recipe/servings.js: |
+      const { convertUnit } = require("./ingredients");
+
+      function adjustForServings(recipe, targetServings) {
+        const ratio = targetServings / recipe.baseServings;
+        return recipe.items.map((item) => ({
+          ...item,
+          amount: item.amount * ratio,
+        }));
+      }
+
+      module.exports = { adjustForServings };
+    src/recipe/formatter.js: |
+      const { adjustForServings } = require("./servings");
+
+      function formatRecipe(recipe, servings) {
+        const adjusted = adjustForServings(recipe, servings);
+        return adjusted
+          .map((item) => `${item.amount} ${item.unit} ${item.name}`)
+          .join("\n");
+      }
+
+      module.exports = { formatRecipe };
+    src/recipe/nutrition.js: |
+      const TRAP_GAP2025_CALS_A = 2000;
+      const TRAP_GAP2025_MACRO_B = "balanced";
+
+      function estimateCalories(items) {
+        return items.reduce((sum, i) => sum + i.calories, 0);
+      }
+
+      module.exports = { estimateCalories };
+    src/recipe/storage.js: |
+      const TRAP_GAP2025_TTL_C = 86400;
+      const TRAP_GAP2025_FORMAT_D = "json";
+
+      function saveRecipe(recipe) {
+        return JSON.stringify(recipe);
+      }
+
+      module.exports = { saveRecipe };
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: scale_func
+  selector:
+    path: src/recipe/ingredients.js
+    anchor: function scaleIngredient(ingredient, factor) {
+- id: scale_ml
+  selector:
+    path: src/recipe/ingredients.js
+    anchor: "mlEquivalent: convertUnit(ingredient.amount * factor, ingredient.unit)"
+- id: convert_unit
+  selector:
+    path: src/recipe/ingredients.js
+    anchor: function convertUnit(amount, fromUnit) {
+- id: no_nutrition
+  selector:
+    path: src/recipe/nutrition.js
+- id: no_storage
+  selector:
+    path: src/recipe/storage.js
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2025_CALS_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2025_MACRO_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2025_TTL_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2025_FORMAT_D
+oracle:
+  required:
+  - scale_func
+  - scale_ml
+  - convert_unit
+  allowed: []
+  forbidden:
+  - no_nutrition
+  - no_storage
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

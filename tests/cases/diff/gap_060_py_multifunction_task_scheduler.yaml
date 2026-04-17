@@ -1,0 +1,240 @@
+name: gap_060_py_multifunction_task_scheduler
+tags:
+- lang:python
+- change:multi_file
+- change:new_function
+- change:new_function
+- change:new_function
+- change:new_function
+- change:new_function
+- change:signature
+- context:same_file
+- distance:0hop
+- difficulty:medium
+repo:
+  initial_files:
+    scheduler/task.py: |
+      from dataclasses import dataclass, field
+      from enum import Enum
+      from typing import Optional
+
+      class Status(Enum):
+          PENDING = "pending"
+          RUNNING = "running"
+          DONE = "done"
+
+      @dataclass
+      class Task:
+          task_id: str
+          name: str
+          status: Status = Status.PENDING
+          depends_on: list[str] = field(default_factory=list)
+
+      class TaskQueue:
+          def __init__(self):
+              self._tasks: dict[str, Task] = {}
+
+          def add(self, task: Task) -> None:
+              self._tasks[task.task_id] = task
+
+          def get(self, task_id: str) -> Optional[Task]:
+              return self._tasks.get(task_id)
+
+          def ready(self) -> list[Task]:
+              result = []
+              for task in self._tasks.values():
+                  if task.status != Status.PENDING:
+                      continue
+                  deps_met = all(
+                      self._tasks.get(d, Task("", "")).status == Status.DONE
+                      for d in task.depends_on
+                  )
+                  if deps_met:
+                      result.append(task)
+              return result
+    scheduler/executor.py: |
+      from scheduler.task import Task, Status
+
+      class Executor:
+          def __init__(self, concurrency: int = 4):
+              self._concurrency = concurrency
+              self._completed: list[str] = []
+
+          def run(self, task: Task) -> None:
+              task.status = Status.RUNNING
+              task.status = Status.DONE
+              self._completed.append(task.task_id)
+
+          def completed(self) -> list[str]:
+              return list(self._completed)
+    scheduler/reporter.py: |
+      from scheduler.task import Task, Status
+
+      def summary(tasks: list[Task]) -> dict[str, int]:
+          counts: dict[str, int] = {}
+          for task in tasks:
+              key = task.status.value
+              counts[key] = counts.get(key, 0) + 1
+          return counts
+  changed_files:
+    scheduler/task.py: |
+      from dataclasses import dataclass, field
+      from enum import Enum
+      from typing import Optional
+
+      class Status(Enum):
+          PENDING = "pending"
+          RUNNING = "running"
+          DONE = "done"
+          FAILED = "failed"
+          CANCELLED = "cancelled"
+
+      @dataclass
+      class Task:
+          task_id: str
+          name: str
+          priority: int = 0
+          status: Status = Status.PENDING
+          depends_on: list[str] = field(default_factory=list)
+          error_message: Optional[str] = None
+
+      class TaskQueue:
+          def __init__(self):
+              self._tasks: dict[str, Task] = {}
+
+          def add(self, task: Task) -> None:
+              self._tasks[task.task_id] = task
+
+          def get(self, task_id: str) -> Optional[Task]:
+              return self._tasks.get(task_id)
+
+          def ready(self) -> list[Task]:
+              result = []
+              for task in self._tasks.values():
+                  if task.status != Status.PENDING:
+                      continue
+                  deps_met = all(
+                      self._tasks.get(d, Task("", "")).status == Status.DONE
+                      for d in task.depends_on
+                  )
+                  if deps_met:
+                      result.append(task)
+              return sorted(result, key=lambda t: t.priority, reverse=True)
+
+          def cancel(self, task_id: str) -> bool:
+              task = self._tasks.get(task_id)
+              if task and task.status == Status.PENDING:
+                  task.status = Status.CANCELLED
+                  return True
+              return False
+
+          def retry_failed(self) -> list[Task]:
+              retried = []
+              for task in self._tasks.values():
+                  if task.status == Status.FAILED:
+                      task.status = Status.PENDING
+                      task.error_message = None
+                      retried.append(task)
+              return retried
+
+          def fail(self, task_id: str, error: str) -> bool:
+              task = self._tasks.get(task_id)
+              if task and task.status == Status.RUNNING:
+                  task.status = Status.FAILED
+                  task.error_message = error
+                  return True
+              return False
+
+          def blocked(self) -> list[Task]:
+              result = []
+              for task in self._tasks.values():
+                  if task.status != Status.PENDING:
+                      continue
+                  for dep_id in task.depends_on:
+                      dep = self._tasks.get(dep_id)
+                      if dep and dep.status in (Status.FAILED, Status.CANCELLED):
+                          result.append(task)
+                          break
+              return result
+
+          def progress(self) -> float:
+              if not self._tasks:
+                  return 0.0
+              done = sum(1 for t in self._tasks.values() if t.status == Status.DONE)
+              return done / len(self._tasks)
+    scheduler/executor.py: |
+      from scheduler.task import Task, Status
+
+      class Executor:
+          def __init__(self, concurrency: int = 4):
+              self._concurrency = concurrency
+              self._completed: list[str] = []
+
+          def run(self, task: Task) -> None:
+              task.status = Status.RUNNING
+              task.status = Status.DONE
+              self._completed.append(task.task_id)
+
+          def completed(self) -> list[str]:
+              return list(self._completed)
+    scheduler/reporter.py: |
+      from scheduler.task import Task, Status
+
+      def summary(tasks: list[Task]) -> dict[str, int]:
+          counts: dict[str, int] = {}
+          for task in tasks:
+              key = task.status.value
+              counts[key] = counts.get(key, 0) + 1
+          return counts
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: failed_status
+  selector:
+    path: scheduler/task.py
+    anchor: 'FAILED = "failed"'
+- id: cancelled_status
+  selector:
+    path: scheduler/task.py
+    anchor: 'CANCELLED = "cancelled"'
+- id: priority_field
+  selector:
+    path: scheduler/task.py
+    anchor: "priority: int = 0"
+- id: error_message_field
+  selector:
+    path: scheduler/task.py
+    anchor: "error_message: Optional[str] = None"
+- id: cancel_method
+  selector:
+    path: scheduler/task.py
+    anchor: "def cancel(self, task_id: str) -> bool:"
+- id: retry_failed_method
+  selector:
+    path: scheduler/task.py
+    anchor: "def retry_failed(self) -> list[Task]:"
+- id: fail_method
+  selector:
+    path: scheduler/task.py
+    anchor: "def fail(self, task_id: str, error: str) -> bool:"
+- id: blocked_method
+  selector:
+    path: scheduler/task.py
+    anchor: "def blocked(self) -> list[Task]:"
+- id: progress_method
+  selector:
+    path: scheduler/task.py
+    anchor: "def progress(self) -> float:"
+oracle:
+  required:
+  - failed_status
+  - cancelled_status
+  - priority_field
+  - cancel_method
+  - retry_failed_method
+  - fail_method
+  - blocked_method
+  - progress_method
+  allowed: []
+  forbidden: []

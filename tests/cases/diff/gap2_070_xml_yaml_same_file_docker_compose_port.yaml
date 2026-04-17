@@ -1,0 +1,137 @@
+name: gap2_070_xml_yaml_same_file_docker_compose_port
+tags:
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:xml
+- lang:yaml
+repo:
+  initial_files:
+    docker-compose.yml: |
+      version: "3.8"
+      services:
+        web:
+          image: nginx:alpine
+          ports:
+            - "80:80"
+          environment:
+            - NODE_ENV=production
+        db:
+          image: postgres:15
+          ports:
+            - "5432:5432"
+    web.config: |
+      <configuration>
+        <system.web>
+          <compilation debug="false"/>
+          <httpRuntime targetFramework="4.8"/>
+        </system.web>
+      </configuration>
+    infra/monitoring.yml: |
+      TRAP_GAP2_070_MON_A: monitoring_noise
+      TRAP_GAP2_070_MON_B: 9090
+      prometheus:
+        scrapeInterval: 15s
+    infra/alerting.xml: |
+      <alerts>
+        <TRAP_GAP2_070_ALERT_C>alert_noise</TRAP_GAP2_070_ALERT_C>
+        <TRAP_GAP2_070_ALERT_D>60</TRAP_GAP2_070_ALERT_D>
+      </alerts>
+    infra/backup.yml: |
+      TRAP_GAP2_070_BACK_E: backup_noise
+      TRAP_GAP2_070_BACK_F: true
+      schedule: daily
+  changed_files:
+    docker-compose.yml: |
+      version: "3.8"
+      services:
+        web:
+          image: nginx:alpine
+          ports:
+            - "8080:80"
+          environment:
+            - NODE_ENV=production
+        db:
+          image: postgres:15
+          ports:
+            - "5432:5432"
+        redis:
+          image: redis:7
+          ports:
+            - "6379:6379"
+    web.config: |
+      <configuration>
+        <system.web>
+          <compilation debug="false"/>
+          <httpRuntime targetFramework="4.8"/>
+        </system.web>
+      </configuration>
+    infra/monitoring.yml: |
+      TRAP_GAP2_070_MON_A: monitoring_noise
+      TRAP_GAP2_070_MON_B: 9090
+      prometheus:
+        scrapeInterval: 15s
+    infra/alerting.xml: |
+      <alerts>
+        <TRAP_GAP2_070_ALERT_C>alert_noise</TRAP_GAP2_070_ALERT_C>
+        <TRAP_GAP2_070_ALERT_D>60</TRAP_GAP2_070_ALERT_D>
+      </alerts>
+    infra/backup.yml: |
+      TRAP_GAP2_070_BACK_E: backup_noise
+      TRAP_GAP2_070_BACK_F: true
+      schedule: daily
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: port_change
+  selector:
+    path: docker-compose.yml
+    anchor: '"8080:80"'
+- id: redis_service
+  selector:
+    path: docker-compose.yml
+    anchor: "redis:7"
+- id: no_monitoring
+  selector:
+    path: infra/monitoring.yml
+- id: no_alerting
+  selector:
+    path: infra/alerting.xml
+- id: no_backup
+  selector:
+    path: infra/backup.yml
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_070_MON_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_070_MON_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_070_ALERT_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_070_ALERT_D
+- id: no_global_4
+  selector:
+    anchor: TRAP_GAP2_070_BACK_E
+- id: no_global_5
+  selector:
+    anchor: TRAP_GAP2_070_BACK_F
+oracle:
+  required:
+  - port_change
+  - redis_service
+  allowed: []
+  forbidden:
+  - no_monitoring
+  - no_alerting
+  - no_backup
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

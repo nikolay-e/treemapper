@@ -1,0 +1,156 @@
+name: gap2_030_ts_bugfix_currency_rounding
+tags:
+- change:bug_fix
+- change:single_file
+- context:import_chain
+- difficulty:easy
+- distance:2hop
+- lang:typescript
+repo:
+  initial_files:
+    src/finance/currency.ts: |
+      export interface ExchangeRate {
+        from: string;
+        to: string;
+        rate: number;
+      }
+
+      export function convert(amount: number, rate: ExchangeRate): number {
+        return amount * rate.rate;
+      }
+
+      export function formatAmount(value: number, currency: string): string {
+        return `${currency} ${value.toFixed(2)}`;
+      }
+    src/finance/invoice.ts: |
+      import { convert, formatAmount, ExchangeRate } from "./currency";
+
+      export interface LineItem {
+        description: string;
+        amount: number;
+      }
+
+      export function calculateTotal(items: LineItem[], rate: ExchangeRate): string {
+        const sum = items.reduce((acc, i) => acc + convert(i.amount, rate), 0);
+        return formatAmount(sum, rate.to);
+      }
+    src/finance/report.ts: |
+      import { calculateTotal } from "./invoice";
+
+      export function monthlyReport(months: { name: string; items: any[]; rate: any }[]): string[] {
+        return months.map((m) => `${m.name}: ${calculateTotal(m.items, m.rate)}`);
+      }
+    src/finance/tax.ts: |
+      const TRAP_GAP2030_BRACKET_A: string = "progressive";
+      const TRAP_GAP2030_EXEMPT_B: number = 12000;
+
+      export function calculateTax(income: number): number {
+        if (income <= TRAP_GAP2030_EXEMPT_B) return 0;
+        return (income - TRAP_GAP2030_EXEMPT_B) * 0.2;
+      }
+    src/finance/ledger.ts: |
+      const TRAP_GAP2030_JOURNAL_C: string = "double_entry";
+      const TRAP_GAP2030_PERIOD_D: string = "monthly";
+
+      export function balanceSheet(debits: number[], credits: number[]): number {
+        const totalDebits = debits.reduce((s, d) => s + d, 0);
+        const totalCredits = credits.reduce((s, c) => s + c, 0);
+        return totalDebits - totalCredits;
+      }
+  changed_files:
+    src/finance/currency.ts: |
+      export interface ExchangeRate {
+        from: string;
+        to: string;
+        rate: number;
+      }
+
+      export function convert(amount: number, rate: ExchangeRate): number {
+        return Math.round(amount * rate.rate * 100) / 100;
+      }
+
+      export function formatAmount(value: number, currency: string): string {
+        return `${currency} ${value.toFixed(2)}`;
+      }
+    src/finance/invoice.ts: |
+      import { convert, formatAmount, ExchangeRate } from "./currency";
+
+      export interface LineItem {
+        description: string;
+        amount: number;
+      }
+
+      export function calculateTotal(items: LineItem[], rate: ExchangeRate): string {
+        const sum = items.reduce((acc, i) => acc + convert(i.amount, rate), 0);
+        return formatAmount(sum, rate.to);
+      }
+    src/finance/report.ts: |
+      import { calculateTotal } from "./invoice";
+
+      export function monthlyReport(months: { name: string; items: any[]; rate: any }[]): string[] {
+        return months.map((m) => `${m.name}: ${calculateTotal(m.items, m.rate)}`);
+      }
+    src/finance/tax.ts: |
+      const TRAP_GAP2030_BRACKET_A: string = "progressive";
+      const TRAP_GAP2030_EXEMPT_B: number = 12000;
+
+      export function calculateTax(income: number): number {
+        if (income <= TRAP_GAP2030_EXEMPT_B) return 0;
+        return (income - TRAP_GAP2030_EXEMPT_B) * 0.2;
+      }
+    src/finance/ledger.ts: |
+      const TRAP_GAP2030_JOURNAL_C: string = "double_entry";
+      const TRAP_GAP2030_PERIOD_D: string = "monthly";
+
+      export function balanceSheet(debits: number[], credits: number[]): number {
+        const totalDebits = debits.reduce((s, d) => s + d, 0);
+        const totalCredits = credits.reduce((s, c) => s + c, 0);
+        return totalDebits - totalCredits;
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: convert_fix
+  selector:
+    path: src/finance/currency.ts
+    anchor: "Math.round(amount * rate.rate * 100) / 100"
+- id: convert_func
+  selector:
+    path: src/finance/currency.ts
+    anchor: "export function convert(amount: number, rate: ExchangeRate): number {"
+- id: exchange_rate_type
+  selector:
+    path: src/finance/currency.ts
+    anchor: "export interface ExchangeRate {"
+- id: no_tax
+  selector:
+    path: src/finance/tax.ts
+- id: no_ledger
+  selector:
+    path: src/finance/ledger.ts
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2030_BRACKET_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2030_EXEMPT_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2030_JOURNAL_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2030_PERIOD_D
+oracle:
+  required:
+  - convert_fix
+  - convert_func
+  - exchange_rate_type
+  allowed: []
+  forbidden:
+  - no_tax
+  - no_ledger
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

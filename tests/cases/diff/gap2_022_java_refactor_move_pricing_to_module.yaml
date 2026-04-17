@@ -1,0 +1,263 @@
+name: gap2_022_java_refactor_move_pricing_to_module
+tags:
+- change:multi_file
+- change:refactor
+- context:cross_module
+- difficulty:medium
+- distance:2hop
+- lang:java
+repo:
+  initial_files:
+    src/main/java/com/hotel/BookingService.java: |
+      package com.hotel;
+
+      import java.time.LocalDate;
+      import java.time.temporal.ChronoUnit;
+
+      public class BookingService {
+          private final RoomRepository rooms;
+
+          public BookingService(RoomRepository rooms) {
+              this.rooms = rooms;
+          }
+
+          public double calculatePrice(String roomId, LocalDate checkIn, LocalDate checkOut) {
+              Room room = rooms.findById(roomId);
+              long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
+              return room.getBaseRate() * nights;
+          }
+
+          public Booking createBooking(String guestName, String roomId, LocalDate checkIn, LocalDate checkOut) {
+              double total = calculatePrice(roomId, checkIn, checkOut);
+              return new Booking(guestName, roomId, checkIn, checkOut, total);
+          }
+      }
+    src/main/java/com/hotel/Room.java: |
+      package com.hotel;
+
+      public class Room {
+          private final String id;
+          private final String type;
+          private final double baseRate;
+
+          public Room(String id, String type, double baseRate) {
+              this.id = id;
+              this.type = type;
+              this.baseRate = baseRate;
+          }
+
+          public String getId() { return id; }
+          public String getType() { return type; }
+          public double getBaseRate() { return baseRate; }
+      }
+    src/main/java/com/hotel/RoomRepository.java: |
+      package com.hotel;
+
+      public interface RoomRepository {
+          Room findById(String id);
+      }
+    src/main/java/com/hotel/Booking.java: |
+      package com.hotel;
+
+      import java.time.LocalDate;
+
+      public class Booking {
+          private final String guestName;
+          private final String roomId;
+          private final LocalDate checkIn;
+          private final LocalDate checkOut;
+          private final double totalPrice;
+
+          public Booking(String guestName, String roomId, LocalDate checkIn, LocalDate checkOut, double totalPrice) {
+              this.guestName = guestName;
+              this.roomId = roomId;
+              this.checkIn = checkIn;
+              this.checkOut = checkOut;
+              this.totalPrice = totalPrice;
+          }
+
+          public String getGuestName() { return guestName; }
+          public double getTotalPrice() { return totalPrice; }
+      }
+    src/main/java/com/hotel/HousekeepingScheduler.java: |
+      package com.hotel;
+
+      import java.time.LocalDate;
+
+      public class HousekeepingScheduler {
+          private static final String TRAP_GAP2022_SCHED_A = "daily";
+          private static final int TRAP_GAP2022_CREW_B = 5;
+
+          public String scheduleClean(String roomId, LocalDate date) {
+              return "Clean " + roomId + " on " + date;
+          }
+      }
+    src/main/java/com/hotel/LoyaltyTracker.java: |
+      package com.hotel;
+
+      public class LoyaltyTracker {
+          private static final String TRAP_GAP2022_TIER_C = "gold";
+          private static final int TRAP_GAP2022_POINTS_D = 1000;
+
+          public int calculatePoints(double spent) {
+              return (int) (spent * 10);
+          }
+      }
+  changed_files:
+    src/main/java/com/hotel/BookingService.java: |
+      package com.hotel;
+
+      import com.hotel.pricing.PricingEngine;
+      import java.time.LocalDate;
+
+      public class BookingService {
+          private final RoomRepository rooms;
+          private final PricingEngine pricing;
+
+          public BookingService(RoomRepository rooms, PricingEngine pricing) {
+              this.rooms = rooms;
+              this.pricing = pricing;
+          }
+
+          public Booking createBooking(String guestName, String roomId, LocalDate checkIn, LocalDate checkOut) {
+              Room room = rooms.findById(roomId);
+              double total = pricing.calculate(room, checkIn, checkOut);
+              return new Booking(guestName, roomId, checkIn, checkOut, total);
+          }
+      }
+    src/main/java/com/hotel/pricing/PricingEngine.java: |
+      package com.hotel.pricing;
+
+      import com.hotel.Room;
+      import java.time.LocalDate;
+      import java.time.temporal.ChronoUnit;
+
+      public class PricingEngine {
+          public double calculate(Room room, LocalDate checkIn, LocalDate checkOut) {
+              long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
+              return room.getBaseRate() * nights;
+          }
+      }
+    src/main/java/com/hotel/Room.java: |
+      package com.hotel;
+
+      public class Room {
+          private final String id;
+          private final String type;
+          private final double baseRate;
+
+          public Room(String id, String type, double baseRate) {
+              this.id = id;
+              this.type = type;
+              this.baseRate = baseRate;
+          }
+
+          public String getId() { return id; }
+          public String getType() { return type; }
+          public double getBaseRate() { return baseRate; }
+      }
+    src/main/java/com/hotel/RoomRepository.java: |
+      package com.hotel;
+
+      public interface RoomRepository {
+          Room findById(String id);
+      }
+    src/main/java/com/hotel/Booking.java: |
+      package com.hotel;
+
+      import java.time.LocalDate;
+
+      public class Booking {
+          private final String guestName;
+          private final String roomId;
+          private final LocalDate checkIn;
+          private final LocalDate checkOut;
+          private final double totalPrice;
+
+          public Booking(String guestName, String roomId, LocalDate checkIn, LocalDate checkOut, double totalPrice) {
+              this.guestName = guestName;
+              this.roomId = roomId;
+              this.checkIn = checkIn;
+              this.checkOut = checkOut;
+              this.totalPrice = totalPrice;
+          }
+
+          public String getGuestName() { return guestName; }
+          public double getTotalPrice() { return totalPrice; }
+      }
+    src/main/java/com/hotel/HousekeepingScheduler.java: |
+      package com.hotel;
+
+      import java.time.LocalDate;
+
+      public class HousekeepingScheduler {
+          private static final String TRAP_GAP2022_SCHED_A = "daily";
+          private static final int TRAP_GAP2022_CREW_B = 5;
+
+          public String scheduleClean(String roomId, LocalDate date) {
+              return "Clean " + roomId + " on " + date;
+          }
+      }
+    src/main/java/com/hotel/LoyaltyTracker.java: |
+      package com.hotel;
+
+      public class LoyaltyTracker {
+          private static final String TRAP_GAP2022_TIER_C = "gold";
+          private static final int TRAP_GAP2022_POINTS_D = 1000;
+
+          public int calculatePoints(double spent) {
+              return (int) (spent * 10);
+          }
+      }
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: service_pricing_field
+  selector:
+    path: src/main/java/com/hotel/BookingService.java
+    anchor: private final PricingEngine pricing;
+- id: service_pricing_call
+  selector:
+    path: src/main/java/com/hotel/BookingService.java
+    anchor: pricing.calculate(room, checkIn, checkOut);
+- id: engine_class
+  selector:
+    path: src/main/java/com/hotel/pricing/PricingEngine.java
+    anchor: public class PricingEngine {
+- id: engine_calculate
+  selector:
+    path: src/main/java/com/hotel/pricing/PricingEngine.java
+    anchor: public double calculate(Room room, LocalDate checkIn, LocalDate checkOut) {
+- id: no_housekeeping
+  selector:
+    path: src/main/java/com/hotel/HousekeepingScheduler.java
+- id: no_loyalty
+  selector:
+    path: src/main/java/com/hotel/LoyaltyTracker.java
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2022_SCHED_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2022_CREW_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2022_TIER_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2022_POINTS_D
+oracle:
+  required:
+  - service_pricing_field
+  - service_pricing_call
+  - engine_class
+  - engine_calculate
+  allowed: []
+  forbidden:
+  - no_housekeeping
+  - no_loyalty
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

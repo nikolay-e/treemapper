@@ -1,0 +1,139 @@
+name: gap2_069_xml_yaml_same_file_maven_pom_version
+tags:
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:xml
+- lang:yaml
+repo:
+  initial_files:
+    pom.xml: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.example</groupId>
+        <artifactId>weather-api</artifactId>
+        <version>1.2.0</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>5.3.20</version>
+          </dependency>
+        </dependencies>
+      </project>
+    config.yml: |
+      server:
+        port: 8080
+        host: localhost
+      api:
+        version: v1
+        rateLimit: 100
+    other/settings.xml: |
+      <settings>
+        <TRAP_GAP2_069_SET_A>noise_settings</TRAP_GAP2_069_SET_A>
+        <TRAP_GAP2_069_SET_B>42</TRAP_GAP2_069_SET_B>
+        <localRepository>/home/user/.m2</localRepository>
+      </settings>
+    other/defaults.yml: |
+      TRAP_GAP2_069_DEF_C: noise_defaults
+      TRAP_GAP2_069_DEF_D: true
+      timeout: 30
+      retries: 3
+    other/profiles.xml: |
+      <profiles>
+        <TRAP_GAP2_069_PROF_E>noise_profiles</TRAP_GAP2_069_PROF_E>
+        <TRAP_GAP2_069_PROF_F>99</TRAP_GAP2_069_PROF_F>
+      </profiles>
+  changed_files:
+    pom.xml: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.example</groupId>
+        <artifactId>weather-api</artifactId>
+        <version>1.3.0</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>6.0.0</version>
+          </dependency>
+        </dependencies>
+      </project>
+    config.yml: |
+      server:
+        port: 8080
+        host: localhost
+      api:
+        version: v1
+        rateLimit: 100
+    other/settings.xml: |
+      <settings>
+        <TRAP_GAP2_069_SET_A>noise_settings</TRAP_GAP2_069_SET_A>
+        <TRAP_GAP2_069_SET_B>42</TRAP_GAP2_069_SET_B>
+        <localRepository>/home/user/.m2</localRepository>
+      </settings>
+    other/defaults.yml: |
+      TRAP_GAP2_069_DEF_C: noise_defaults
+      TRAP_GAP2_069_DEF_D: true
+      timeout: 30
+      retries: 3
+    other/profiles.xml: |
+      <profiles>
+        <TRAP_GAP2_069_PROF_E>noise_profiles</TRAP_GAP2_069_PROF_E>
+        <TRAP_GAP2_069_PROF_F>99</TRAP_GAP2_069_PROF_F>
+      </profiles>
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: version_bump
+  selector:
+    path: pom.xml
+    anchor: "<version>1.3.0</version>"
+- id: spring_upgrade
+  selector:
+    path: pom.xml
+    anchor: "<version>6.0.0</version>"
+- id: no_settings
+  selector:
+    path: other/settings.xml
+- id: no_defaults
+  selector:
+    path: other/defaults.yml
+- id: no_profiles
+  selector:
+    path: other/profiles.xml
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_069_SET_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_069_SET_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_069_DEF_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_069_DEF_D
+- id: no_global_4
+  selector:
+    anchor: TRAP_GAP2_069_PROF_E
+- id: no_global_5
+  selector:
+    anchor: TRAP_GAP2_069_PROF_F
+oracle:
+  required:
+  - version_bump
+  - spring_upgrade
+  allowed: []
+  forbidden:
+  - no_settings
+  - no_defaults
+  - no_profiles
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5

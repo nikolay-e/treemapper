@@ -1,0 +1,105 @@
+name: gap2_046_jsts_config_same_file_eslint_rules
+tags:
+- change:config
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:javascript
+- lang:typescript
+repo:
+  initial_files:
+    .eslintrc.js: |
+      module.exports = {
+        parser: "@typescript-eslint/parser",
+        plugins: ["@typescript-eslint"],
+        env: { browser: true, node: true, es2021: true },
+        rules: {
+          "no-console": "warn",
+          "no-unused-vars": "off",
+          "@typescript-eslint/no-unused-vars": "error",
+        },
+        ignorePatterns: ["dist/", "node_modules/"],
+      };
+    src/validators/email.ts: |
+      const TRAP_GAP2_046_REGEX_A: string = "email_pattern";
+      const TRAP_GAP2_046_MAX_B: number = 254;
+
+      function isValidEmail(email: string): boolean {
+        return email.includes("@") && email.includes(".");
+      }
+
+      function normalizeEmail(email: string): string {
+        return email.trim().toLowerCase();
+      }
+    src/validators/phone.js: |
+      const TRAP_GAP2_046_COUNTRY_C = "US";
+      const TRAP_GAP2_046_MIN_D = 10;
+
+      function formatPhone(digits) {
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      }
+
+      module.exports = { formatPhone };
+  changed_files:
+    .eslintrc.js: |
+      module.exports = {
+        parser: "@typescript-eslint/parser",
+        plugins: ["@typescript-eslint"],
+        env: { browser: true, node: true, es2021: true },
+        rules: {
+          "no-console": "warn",
+          "no-unused-vars": "off",
+          "@typescript-eslint/no-unused-vars": "error",
+          "@typescript-eslint/explicit-function-return-type": "warn",
+          "eqeqeq": ["error", "always"],
+        },
+        ignorePatterns: ["dist/", "node_modules/", "coverage/"],
+      };
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: return_type_rule
+  selector:
+    path: .eslintrc.js
+    anchor: "explicit-function-return-type"
+- id: eqeqeq_rule
+  selector:
+    path: .eslintrc.js
+    anchor: '"eqeqeq"'
+- id: coverage_ignore
+  selector:
+    path: .eslintrc.js
+    anchor: '"coverage/"'
+- id: no_email
+  selector:
+    path: src/validators/email.ts
+- id: no_phone
+  selector:
+    path: src/validators/phone.js
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_046_REGEX_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_046_MAX_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_046_COUNTRY_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_046_MIN_D
+oracle:
+  required:
+  - return_type_rule
+  - eqeqeq_rule
+  - coverage_ignore
+  allowed: []
+  forbidden:
+  - no_email
+  - no_phone
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

@@ -1,0 +1,142 @@
+name: gap2_072_xml_yaml_same_file_ci_pipeline_stage
+tags:
+- change:single_file
+- context:same_file
+- difficulty:trivial
+- distance:0hop
+- lang:xml
+- lang:yaml
+repo:
+  initial_files:
+    .gitlab-ci.yml: |
+      stages:
+        - build
+        - test
+        - deploy
+      build:
+        stage: build
+        script:
+          - make build
+      test:
+        stage: test
+        script:
+          - make test
+    checkstyle.xml: |
+      <module name="Checker">
+        <module name="TreeWalker">
+          <module name="Indentation">
+            <property name="tabWidth" value="4"/>
+          </module>
+        </module>
+      </module>
+    ops/inventory.yml: |
+      TRAP_GAP2_072_INV_A: inventory_noise
+      TRAP_GAP2_072_INV_B: 22
+      webservers:
+        hosts:
+          web01: {}
+    ops/playbook.xml: |
+      <playbook>
+        <TRAP_GAP2_072_PLAY_C>playbook_noise</TRAP_GAP2_072_PLAY_C>
+        <TRAP_GAP2_072_PLAY_D>120</TRAP_GAP2_072_PLAY_D>
+      </playbook>
+    ops/vars.yml: |
+      TRAP_GAP2_072_VARS_E: vars_noise
+      TRAP_GAP2_072_VARS_F: false
+      region: us-east-1
+  changed_files:
+    .gitlab-ci.yml: |
+      stages:
+        - build
+        - test
+        - lint
+        - deploy
+      build:
+        stage: build
+        script:
+          - make build
+      test:
+        stage: test
+        script:
+          - make test
+      lint:
+        stage: lint
+        script:
+          - make lint
+    checkstyle.xml: |
+      <module name="Checker">
+        <module name="TreeWalker">
+          <module name="Indentation">
+            <property name="tabWidth" value="4"/>
+          </module>
+        </module>
+      </module>
+    ops/inventory.yml: |
+      TRAP_GAP2_072_INV_A: inventory_noise
+      TRAP_GAP2_072_INV_B: 22
+      webservers:
+        hosts:
+          web01: {}
+    ops/playbook.xml: |
+      <playbook>
+        <TRAP_GAP2_072_PLAY_C>playbook_noise</TRAP_GAP2_072_PLAY_C>
+        <TRAP_GAP2_072_PLAY_D>120</TRAP_GAP2_072_PLAY_D>
+      </playbook>
+    ops/vars.yml: |
+      TRAP_GAP2_072_VARS_E: vars_noise
+      TRAP_GAP2_072_VARS_F: false
+      region: us-east-1
+  commit_message: Update files
+fixtures:
+  auto_garbage: true
+fragments:
+- id: lint_stage
+  selector:
+    path: .gitlab-ci.yml
+    anchor: "- lint"
+- id: lint_job
+  selector:
+    path: .gitlab-ci.yml
+    anchor: "make lint"
+- id: no_inventory
+  selector:
+    path: ops/inventory.yml
+- id: no_playbook
+  selector:
+    path: ops/playbook.xml
+- id: no_vars
+  selector:
+    path: ops/vars.yml
+- id: no_global_0
+  selector:
+    anchor: TRAP_GAP2_072_INV_A
+- id: no_global_1
+  selector:
+    anchor: TRAP_GAP2_072_INV_B
+- id: no_global_2
+  selector:
+    anchor: TRAP_GAP2_072_PLAY_C
+- id: no_global_3
+  selector:
+    anchor: TRAP_GAP2_072_PLAY_D
+- id: no_global_4
+  selector:
+    anchor: TRAP_GAP2_072_VARS_E
+- id: no_global_5
+  selector:
+    anchor: TRAP_GAP2_072_VARS_F
+oracle:
+  required:
+  - lint_stage
+  - lint_job
+  allowed: []
+  forbidden:
+  - no_inventory
+  - no_playbook
+  - no_vars
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3
+  - no_global_4
+  - no_global_5
