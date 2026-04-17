@@ -9,8 +9,6 @@ xfail:
   category: low-relevance-threshold-tuning
 fixtures:
   auto_garbage: true
-xfail:
-  category: low-relevance-threshold-tuning
 repo:
   initial_files:
     bin/resolve.sh: |

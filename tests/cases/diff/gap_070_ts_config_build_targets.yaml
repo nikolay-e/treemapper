@@ -135,8 +135,6 @@ repo:
         return `Watching: ${glob}`;
       }
   commit_message: Update files
-xfail:
-  category: low-relevance-threshold-tuning
 fixtures:
   auto_garbage: true
 fragments:
