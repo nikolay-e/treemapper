@@ -1,127 +1,180 @@
 name: gap2_041_ts_bugfix_import_chain_null_guard_api_client
 tags:
-- change:bug_fix
-- change:single_file
+- lang:clojure
+- change:multi_file
 - context:import_chain
-- difficulty:easy
-- distance:0hop
-- lang:typescript
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
-    src/api/types.ts: |
-      export interface ApiResponse<T> {
-        data: T | null;
-        status: number;
-        message: string;
-      }
+    src/model/product.clj: |
+      (ns model.product)
 
-      export interface UserProfile {
-        id: string;
-        displayName: string;
-        email: string;
-        avatarUrl: string | null;
-      }
-    src/api/client.ts: |
-      import { ApiResponse, UserProfile } from "./types";
+      (defrecord Product [id sku name price stock])
 
-      function buildUrl(path: string): string {
-        return `https://api.example.com${path}`;
-      }
+      (defn create [id sku name price]
+        (->Product id sku name price 0))
 
-      function fetchUserProfile(userId: string): ApiResponse<UserProfile> {
-        const url = buildUrl(`/users/${userId}`);
-        return {
-          data: { id: userId, displayName: "Test", email: "test@test.com", avatarUrl: null },
-          status: 200,
-          message: "ok",
-        };
-      }
+      (defn in-stock? [product]
+        (pos? (:stock product)))
+    src/catalog/service.clj: |
+      (ns catalog.service
+        (:require [model.product :as p]))
 
-      function formatProfileSummary(response: ApiResponse<UserProfile>): string {
-        return `${response.data.displayName} (${response.data.email})`;
-      }
-    src/api/cache.ts: |
-      const TRAP_GAP2_041_CACHE_A: string = "response_cache";
-      const TRAP_GAP2_041_TTL_B: number = 300;
+      (defn find-product [catalog sku]
+        (first (filter #(= sku (:sku %)) catalog)))
 
-      function getCached(key: string): unknown | null {
-        return null;
-      }
+      (defn available-products [catalog]
+        (filter p/in-stock? catalog))
 
-      function setCached(key: string, value: unknown, ttl: number): void {}
-    src/api/retry.ts: |
-      const TRAP_GAP2_041_RETRY_C: string = "retry_handler";
-      const TRAP_GAP2_041_MAX_D: number = 3;
+      (defn add-to-catalog [catalog product]
+        (conj catalog product))
+    src/api/catalog_handler.clj: |
+      (ns api.catalog-handler
+        (:require [catalog.service :as svc]))
 
-      function withRetry<T>(fn: () => T, maxRetries: number): T {
-        return fn();
-      }
+      (defn get-available [catalog]
+        {:status 200 :body (svc/available-products catalog)})
 
-      function exponentialBackoff(attempt: number): number {
-        return Math.pow(2, attempt) * 1000;
-      }
+      (defn get-product [catalog sku]
+        (if-let [product (svc/find-product catalog sku)]
+          {:status 200 :body product}
+          {:status 404 :body {:error "not found"}}))
+    garbage/pricing.clj: |
+      (ns garbage.pricing)
+
+      (def ^:const GARBAGE_GAP2041_A "discount_marker")
+      (def ^:const GARBAGE_GAP2041_B "tax_marker")
+
+      (defn apply-tax [price rate]
+        (* price (+ 1 rate)))
+    garbage/shipping.clj: |
+      (ns garbage.shipping)
+
+      (def ^:const GARBAGE_GAP2041_C "carrier_marker")
+      (def ^:const GARBAGE_GAP2041_D "rate_marker")
+
+      (defn estimate [weight zone]
+        GARBAGE_GAP2041_C)
+    garbage/promo.clj: |
+      (ns garbage.promo)
+
+      (def ^:const GARBAGE_GAP2041_E "voucher_marker")
+
+      (defn apply-promo [price code]
+        GARBAGE_GAP2041_E)
   changed_files:
-    src/api/client.ts: |
-      import { ApiResponse, UserProfile } from "./types";
+    src/model/product.clj: |
+      (ns model.product)
 
-      function buildUrl(path: string): string {
-        return `https://api.example.com${path}`;
-      }
+      (defrecord Product [id sku name price stock category])
 
-      function fetchUserProfile(userId: string): ApiResponse<UserProfile> {
-        const url = buildUrl(`/users/${userId}`);
-        return {
-          data: { id: userId, displayName: "Test", email: "test@test.com", avatarUrl: null },
-          status: 200,
-          message: "ok",
-        };
-      }
+      (defn create [id sku name price]
+        (->Product id sku name price 0 :general))
 
-      function formatProfileSummary(response: ApiResponse<UserProfile>): string {
-        if (response.data === null) {
-          return "No profile available";
-        }
-        return `${response.data.displayName} (${response.data.email})`;
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      (defn create-with-category [id sku name price category]
+        (->Product id sku name price 0 category))
+
+      (defn in-stock? [product]
+        (pos? (:stock product)))
+
+      (defn by-category [catalog category]
+        (filter #(= category (:category %)) catalog))
+    src/catalog/service.clj: |
+      (ns catalog.service
+        (:require [model.product :as p]))
+
+      (defn find-product [catalog sku]
+        (first (filter #(= sku (:sku %)) catalog)))
+
+      (defn available-products [catalog]
+        (filter p/in-stock? catalog))
+
+      (defn add-to-catalog [catalog product]
+        (conj catalog product))
+
+      (defn products-by-category [catalog category]
+        (p/by-category catalog category))
+    src/api/catalog_handler.clj: |
+      (ns api.catalog-handler
+        (:require [catalog.service :as svc]))
+
+      (defn get-available [catalog]
+        {:status 200 :body (svc/available-products catalog)})
+
+      (defn get-product [catalog sku]
+        (if-let [product (svc/find-product catalog sku)]
+          {:status 200 :body product}
+          {:status 404 :body {:error "not found"}}))
+
+      (defn get-by-category [catalog category]
+        {:status 200 :body (svc/products-by-category catalog category)})
+    garbage/pricing.clj: |
+      (ns garbage.pricing)
+
+      (def ^:const GARBAGE_GAP2041_A "discount_marker")
+      (def ^:const GARBAGE_GAP2041_B "tax_marker")
+
+      (defn apply-tax [price rate]
+        (* price (+ 1 rate)))
+    garbage/shipping.clj: |
+      (ns garbage.shipping)
+
+      (def ^:const GARBAGE_GAP2041_C "carrier_marker")
+      (def ^:const GARBAGE_GAP2041_D "rate_marker")
+
+      (defn estimate [weight zone]
+        GARBAGE_GAP2041_C)
+    garbage/promo.clj: |
+      (ns garbage.promo)
+
+      (def ^:const GARBAGE_GAP2041_E "voucher_marker")
+
+      (defn apply-promo [price code]
+        GARBAGE_GAP2041_E)
+  commit_message: "feat: add category field to Product and category-based catalog queries"
 fragments:
-- id: client_null_check
+- id: product_category_field
   selector:
-    path: src/api/client.ts
-    anchor: "if (response.data === null)"
-- id: client_fallback
+    path: src/model/product.clj
+    anchor: "(defrecord Product [id sku name price stock category])"
+- id: product_by_category
   selector:
-    path: src/api/client.ts
-    anchor: "No profile available"
-- id: no_cache
+    path: src/model/product.clj
+    anchor: "(defn by-category"
+- id: service_products_by_category
   selector:
-    path: src/api/cache.ts
-- id: no_retry
+    path: src/catalog/service.clj
+    anchor: "(defn products-by-category"
+- id: handler_get_by_category
   selector:
-    path: src/api/retry.ts
-- id: no_global_0
+    path: src/api/catalog_handler.clj
+    anchor: "(defn get-by-category"
+- id: no_garbage_a
   selector:
-    anchor: TRAP_GAP2_041_CACHE_A
-- id: no_global_1
+    anchor: GARBAGE_GAP2041_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2_041_TTL_B
-- id: no_global_2
+    anchor: GARBAGE_GAP2041_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_041_RETRY_C
-- id: no_global_3
+    anchor: GARBAGE_GAP2041_C
+- id: no_garbage_d
   selector:
-    anchor: TRAP_GAP2_041_MAX_D
+    anchor: GARBAGE_GAP2041_D
+- id: no_garbage_e
+  selector:
+    anchor: GARBAGE_GAP2041_E
 oracle:
   required:
-  - client_null_check
-  - client_fallback
+  - product_category_field
+  - product_by_category
+  - service_products_by_category
+  - handler_get_by_category
   allowed: []
   forbidden:
-  - no_cache
-  - no_retry
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

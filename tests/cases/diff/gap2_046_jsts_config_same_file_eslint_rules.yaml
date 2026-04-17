@@ -1,105 +1,199 @@
 name: gap2_046_jsts_config_same_file_eslint_rules
 tags:
-- change:config
-- change:single_file
-- context:same_file
-- difficulty:trivial
-- distance:0hop
-- lang:javascript
-- lang:typescript
+- lang:java
+- change:multi_file
+- change:new_function
+- context:test_file
+- distance:1hop
+- difficulty:hard
 repo:
   initial_files:
-    .eslintrc.js: |
-      module.exports = {
-        parser: "@typescript-eslint/parser",
-        plugins: ["@typescript-eslint"],
-        env: { browser: true, node: true, es2021: true },
-        rules: {
-          "no-console": "warn",
-          "no-unused-vars": "off",
-          "@typescript-eslint/no-unused-vars": "error",
-        },
-        ignorePatterns: ["dist/", "node_modules/"],
-      };
-    src/validators/email.ts: |
-      const TRAP_GAP2_046_REGEX_A: string = "email_pattern";
-      const TRAP_GAP2_046_MAX_B: number = 254;
+    src/main/java/com/notify/email/EmailService.java: |
+      package com.notify.email;
 
-      function isValidEmail(email: string): boolean {
-        return email.includes("@") && email.includes(".");
+      import java.util.List;
+      import java.util.ArrayList;
+
+      public class EmailService {
+          private final List<String> sent = new ArrayList<>();
+
+          public void send(String to, String subject, String body) {
+              sent.add(to + "|" + subject);
+          }
+
+          public List<String> getSentLog() {
+              return sent;
+          }
       }
+    src/main/java/com/notify/email/EmailTemplate.java: |
+      package com.notify.email;
 
-      function normalizeEmail(email: string): string {
-        return email.trim().toLowerCase();
+      public class EmailTemplate {
+          private final String name;
+          private final String bodyPattern;
+
+          public EmailTemplate(String name, String bodyPattern) {
+              this.name = name;
+              this.bodyPattern = bodyPattern;
+          }
+
+          public String render(String recipient) {
+              return bodyPattern.replace("{{recipient}}", recipient);
+          }
+
+          public String getName() { return name; }
       }
-    src/validators/phone.js: |
-      const TRAP_GAP2_046_COUNTRY_C = "US";
-      const TRAP_GAP2_046_MIN_D = 10;
+    src/test/java/com/notify/email/EmailServiceTest.java: |
+      package com.notify.email;
 
-      function formatPhone(digits) {
-        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+      import org.junit.jupiter.api.Test;
+      import static org.junit.jupiter.api.Assertions.*;
+
+      public class EmailServiceTest {
+          @Test
+          void sendRecordsLog() {
+              EmailService svc = new EmailService();
+              svc.send("a@example.com", "Hello", "body");
+              assertEquals(1, svc.getSentLog().size());
+          }
       }
-
-      module.exports = { formatPhone };
+    garbage/SmsService.java: |
+      // GARBAGE_JMAIL_A = "sms_marker"
+      public class SmsService {
+          public void send(String phone, String msg) {}
+      }
+    garbage/PushNotifier.java: |
+      // GARBAGE_JMAIL_B = "push_marker"
+      public class PushNotifier {
+          public void push(String deviceId, String msg) {}
+      }
+    garbage/SlackBot.java: |
+      // GARBAGE_JMAIL_C = "slack_marker"
+      public class SlackBot {
+          public void post(String channel, String msg) {}
+      }
   changed_files:
-    .eslintrc.js: |
-      module.exports = {
-        parser: "@typescript-eslint/parser",
-        plugins: ["@typescript-eslint"],
-        env: { browser: true, node: true, es2021: true },
-        rules: {
-          "no-console": "warn",
-          "no-unused-vars": "off",
-          "@typescript-eslint/no-unused-vars": "error",
-          "@typescript-eslint/explicit-function-return-type": "warn",
-          "eqeqeq": ["error", "always"],
-        },
-        ignorePatterns: ["dist/", "node_modules/", "coverage/"],
-      };
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    src/main/java/com/notify/email/EmailService.java: |
+      package com.notify.email;
+
+      import java.util.List;
+      import java.util.ArrayList;
+
+      public class EmailService {
+          private final List<String> sent = new ArrayList<>();
+
+          public void send(String to, String subject, String body) {
+              sent.add(to + "|" + subject);
+          }
+
+          public void sendFromTemplate(String to, EmailTemplate template) {
+              String body = template.render(to);
+              send(to, template.getName(), body);
+          }
+
+          public int sentCount() {
+              return sent.size();
+          }
+
+          public List<String> getSentLog() {
+              return sent;
+          }
+      }
+    src/main/java/com/notify/email/EmailTemplate.java: |
+      package com.notify.email;
+
+      public class EmailTemplate {
+          private final String name;
+          private final String bodyPattern;
+
+          public EmailTemplate(String name, String bodyPattern) {
+              this.name = name;
+              this.bodyPattern = bodyPattern;
+          }
+
+          public String render(String recipient) {
+              return bodyPattern.replace("{{recipient}}", recipient);
+          }
+
+          public String getName() { return name; }
+      }
+    src/test/java/com/notify/email/EmailServiceTest.java: |
+      package com.notify.email;
+
+      import org.junit.jupiter.api.Test;
+      import static org.junit.jupiter.api.Assertions.*;
+
+      public class EmailServiceTest {
+          @Test
+          void sendRecordsLog() {
+              EmailService svc = new EmailService();
+              svc.send("a@example.com", "Hello", "body");
+              assertEquals(1, svc.getSentLog().size());
+          }
+
+          @Test
+          void sendFromTemplateUsesRenderedBody() {
+              EmailService svc = new EmailService();
+              EmailTemplate tpl = new EmailTemplate("Welcome", "Hi {{recipient}}!");
+              svc.sendFromTemplate("user@example.com", tpl);
+              assertEquals(1, svc.sentCount());
+              assertTrue(svc.getSentLog().get(0).contains("Welcome"));
+          }
+
+          @Test
+          void sentCountMatchesSentLog() {
+              EmailService svc = new EmailService();
+              svc.send("x@x.com", "A", "body");
+              svc.send("y@y.com", "B", "body");
+              assertEquals(svc.getSentLog().size(), svc.sentCount());
+          }
+      }
+    garbage/SmsService.java: |
+      // GARBAGE_JMAIL_A = "sms_marker"
+      public class SmsService {
+          public void send(String phone, String msg) {}
+      }
+    garbage/PushNotifier.java: |
+      // GARBAGE_JMAIL_B = "push_marker"
+      public class PushNotifier {
+          public void push(String deviceId, String msg) {}
+      }
+    garbage/SlackBot.java: |
+      // GARBAGE_JMAIL_C = "slack_marker"
+      public class SlackBot {
+          public void post(String channel, String msg) {}
+      }
+  commit_message: "feat: add sendFromTemplate and sentCount to EmailService"
 fragments:
-- id: return_type_rule
+- id: send_from_template
   selector:
-    path: .eslintrc.js
-    anchor: "explicit-function-return-type"
-- id: eqeqeq_rule
+    anchor: "public void sendFromTemplate(String to, EmailTemplate template)"
+- id: sent_count
   selector:
-    path: .eslintrc.js
-    anchor: '"eqeqeq"'
-- id: coverage_ignore
+    anchor: "public int sentCount()"
+- id: test_send_from_template
   selector:
-    path: .eslintrc.js
-    anchor: '"coverage/"'
-- id: no_email
+    anchor: "void sendFromTemplateUsesRenderedBody()"
+- id: test_sent_count
   selector:
-    path: src/validators/email.ts
-- id: no_phone
+    anchor: "void sentCountMatchesSentLog()"
+- id: no_garbage_a
   selector:
-    path: src/validators/phone.js
-- id: no_global_0
+    anchor: GARBAGE_JMAIL_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2_046_REGEX_A
-- id: no_global_1
+    anchor: GARBAGE_JMAIL_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_046_MAX_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP2_046_COUNTRY_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2_046_MIN_D
+    anchor: GARBAGE_JMAIL_C
 oracle:
   required:
-  - return_type_rule
-  - eqeqeq_rule
-  - coverage_ignore
+  - send_from_template
+  - sent_count
+  - test_send_from_template
+  - test_sent_count
   allowed: []
   forbidden:
-  - no_email
-  - no_phone
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

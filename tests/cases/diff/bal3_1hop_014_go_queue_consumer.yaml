@@ -1,239 +1,235 @@
 name: bal3_1hop_014_go_queue_consumer
 tags:
-- lang:go
-- change:bug_fix
-- context:import_chain
-- distance:1hop
+- lang:scala
+- change:multi_file
+- change:new_function
+- context:cross_module
+- distance:3hop+
 - difficulty:hard
 repo:
   initial_files:
-    pkg/queue/message.go: |
-      package queue
+    src/main/scala/fleet/Vehicle.scala: |
+      package fleet
 
-      type Message struct {
-          ID      string
-          Topic   string
-          Payload []byte
+      case class Vehicle(
+        id: String,
+        plateNumber: String,
+        capacityKg: Double,
+        status: String
+      )
+    src/main/scala/fleet/VehicleRepository.scala: |
+      package fleet
+
+      class VehicleRepository {
+        private var store: Map[String, Vehicle] = Map.empty
+
+        def save(v: Vehicle): Unit = {
+          store = store + (v.id -> v)
+        }
+
+        def find(id: String): Option[Vehicle] = store.get(id)
+
+        def all(): List[Vehicle] = store.values.toList
       }
+    src/main/scala/fleet/DispatchService.scala: |
+      package fleet
 
-      type Consumer interface {
-          Consume(msg *Message) error
-      }
-
-      type Broker struct {
-          consumers map[string][]Consumer
-      }
-
-      func NewBroker() *Broker {
-          return &Broker{consumers: make(map[string][]Consumer)}
-      }
-
-      func (b *Broker) Register(topic string, c Consumer) {
-          b.consumers[topic] = append(b.consumers[topic], c)
-      }
-
-      func (b *Broker) Dispatch(msg *Message) {
-          for _, c := range b.consumers[msg.Topic] {
-              c.Consume(msg)
+      class DispatchService(repo: VehicleRepository) {
+        def assignDelivery(vehicleId: String): Either[String, Vehicle] = {
+          repo.find(vehicleId) match {
+            case None    => Left(s"Vehicle $vehicleId not found")
+            case Some(v) => Right(v.copy(status = "on_route"))
           }
+        }
       }
-    internal/worker/email_worker.go: |
-      package worker
+    src/main/scala/fleet/api/DispatchController.scala: |
+      package fleet.api
 
-      import "pkg/queue"
+      import fleet.{DispatchService, VehicleRepository, Vehicle}
 
-      type EmailWorker struct{}
-
-      func (w *EmailWorker) Consume(msg *queue.Message) error {
-          _ = string(msg.Payload)
-          return nil
+      class DispatchController(service: DispatchService) {
+        def handleAssign(vehicleId: String): String = {
+          service.assignDelivery(vehicleId) match {
+            case Right(v) => s"Vehicle ${v.id} assigned"
+            case Left(e)  => s"ERROR: $e"
+          }
+        }
       }
+    src/main/scala/BAL014_GPS.scala: |
+      package gps
 
-      func SetupEmailWorker(broker *queue.Broker) {
-          broker.Register("email.send", &EmailWorker{})
+      object BAL014_GPS {
+        val BAL014_GARBAGE_A = "gps_marker"
+        val BAL014_GARBAGE_B = "api_key"
+
+        def getCurrentLocation(vehicleId: String): (Double, Double) = (0.0, 0.0)
       }
-    internal/worker/sms_worker.go: |
-      package worker
+    src/main/scala/BAL014_Fuel.scala: |
+      package fuel
 
-      import "pkg/queue"
+      object BAL014_Fuel {
+        val BAL014_GARBAGE_C = "fuel_marker"
+        val BAL014_GARBAGE_D = "price_per_liter"
 
-      type SMSWorker struct{}
-
-      func (w *SMSWorker) Consume(msg *queue.Message) error {
-          _ = string(msg.Payload)
-          return nil
+        def estimateCost(distanceKm: Double): Double = distanceKm * 0.12
       }
+    src/main/scala/BAL014_Maintenance.scala: |
+      package maintenance
 
-      func SetupSMSWorker(broker *queue.Broker) {
-          broker.Register("sms.send", &SMSWorker{})
-      }
-    internal/worker/push_worker.go: |
-      package worker
+      object BAL014_Maintenance {
+        val BAL014_GARBAGE_E = "maintenance_marker"
 
-      import "pkg/queue"
-
-      type PushWorker struct{}
-
-      func (w *PushWorker) Consume(msg *queue.Message) error {
-          _ = string(msg.Payload)
-          return nil
-      }
-
-      func SetupPushWorker(broker *queue.Broker) {
-          broker.Register("push.send", &PushWorker{})
-      }
-    internal/scheduler/daily.go: |
-      package scheduler
-
-      GARBAGE_014_DAILY_A = "daily"
-
-      type DailyJob struct {
-          Hour int
-      }
-
-      func (d *DailyJob) Run() error {
-          return nil
-      }
-    internal/debug/profiler.go: |
-      package debug
-
-      GARBAGE_014_PROFILER_B = "profiler"
-
-      type Profiler struct {
-          Port int
-      }
-
-      func (p *Profiler) Start() error {
-          return nil
-      }
-    internal/migration/schema.go: |
-      package migration
-
-      GARBAGE_014_SCHEMA_C = "schema"
-
-      type SchemaMigration struct {
-          Version int
-      }
-
-      func (s *SchemaMigration) Apply() error {
-          return nil
+        def isDue(vehicleId: String): Boolean = false
       }
   changed_files:
-    pkg/queue/message.go: |
-      package queue
+    src/main/scala/fleet/Vehicle.scala: |
+      package fleet
 
-      import "fmt"
+      case class Vehicle(
+        id: String,
+        plateNumber: String,
+        capacityKg: Double,
+        status: String,
+        currentLoadKg: Double
+      )
+    src/main/scala/fleet/VehicleRepository.scala: |
+      package fleet
 
-      type Message struct {
-          ID        string
-          Topic     string
-          Payload   []byte
-          Attempts  int
-          MaxRetries int
+      class VehicleRepository {
+        private var store: Map[String, Vehicle] = Map.empty
+
+        def save(v: Vehicle): Unit = {
+          store = store + (v.id -> v)
+        }
+
+        def find(id: String): Option[Vehicle] = store.get(id)
+
+        def all(): List[Vehicle] = store.values.toList
+
+        def available(): List[Vehicle] =
+          store.values.filter(_.status == "idle").toList
       }
+    src/main/scala/fleet/DispatchService.scala: |
+      package fleet
 
-      type Consumer interface {
-          Consume(msg *Message) error
-      }
-
-      type Broker struct {
-          consumers map[string][]Consumer
-          deadLetter []*Message
-      }
-
-      func NewBroker() *Broker {
-          return &Broker{consumers: make(map[string][]Consumer)}
-      }
-
-      func (b *Broker) Register(topic string, c Consumer) {
-          b.consumers[topic] = append(b.consumers[topic], c)
-      }
-
-      func (b *Broker) Dispatch(msg *Message) error {
-          consumers := b.consumers[msg.Topic]
-          if len(consumers) == 0 {
-              return fmt.Errorf("no consumers for topic %s", msg.Topic)
+      class DispatchService(repo: VehicleRepository) {
+        def assignDelivery(vehicleId: String): Either[String, Vehicle] = {
+          repo.find(vehicleId) match {
+            case None    => Left(s"Vehicle $vehicleId not found")
+            case Some(v) => Right(v.copy(status = "on_route"))
           }
-          for _, c := range consumers {
-              if err := c.Consume(msg); err != nil {
-                  msg.Attempts++
-                  if msg.Attempts >= msg.MaxRetries {
-                      b.deadLetter = append(b.deadLetter, msg)
-                  }
-                  return err
+        }
+
+        def loadCargo(vehicleId: String, weightKg: Double): Either[String, Vehicle] = {
+          repo.find(vehicleId) match {
+            case None    => Left(s"Vehicle $vehicleId not found")
+            case Some(v) =>
+              if (v.currentLoadKg + weightKg > v.capacityKg)
+                Left(s"Overload: capacity ${v.capacityKg}kg exceeded")
+              else {
+                val updated = v.copy(currentLoadKg = v.currentLoadKg + weightKg)
+                repo.save(updated)
+                Right(updated)
               }
           }
-          return nil
-      }
+        }
 
-      func (b *Broker) DeadLetters() []*Message {
-          return b.deadLetter
+        def listAvailable(): List[Vehicle] = repo.available()
       }
-  commit_message: "fix: add retry tracking and dead letter queue to Broker"
+    src/main/scala/fleet/api/DispatchController.scala: |
+      package fleet.api
+
+      import fleet.{DispatchService, VehicleRepository, Vehicle}
+
+      class DispatchController(service: DispatchService) {
+        def handleAssign(vehicleId: String): String = {
+          service.assignDelivery(vehicleId) match {
+            case Right(v) => s"Vehicle ${v.id} assigned"
+            case Left(e)  => s"ERROR: $e"
+          }
+        }
+
+        def handleLoadCargo(vehicleId: String, weightKg: Double): String = {
+          service.loadCargo(vehicleId, weightKg) match {
+            case Right(v) => s"Loaded ${weightKg}kg onto ${v.id}"
+            case Left(e)  => s"ERROR: $e"
+          }
+        }
+      }
+    src/main/scala/BAL014_GPS.scala: |
+      package gps
+
+      object BAL014_GPS {
+        val BAL014_GARBAGE_A = "gps_marker"
+        val BAL014_GARBAGE_B = "api_key"
+
+        def getCurrentLocation(vehicleId: String): (Double, Double) = (0.0, 0.0)
+      }
+    src/main/scala/BAL014_Fuel.scala: |
+      package fuel
+
+      object BAL014_Fuel {
+        val BAL014_GARBAGE_C = "fuel_marker"
+        val BAL014_GARBAGE_D = "price_per_liter"
+
+        def estimateCost(distanceKm: Double): Double = distanceKm * 0.12
+      }
+    src/main/scala/BAL014_Maintenance.scala: |
+      package maintenance
+
+      object BAL014_Maintenance {
+        val BAL014_GARBAGE_E = "maintenance_marker"
+
+        def isDue(vehicleId: String): Boolean = false
+      }
+  commit_message: "feat: add currentLoadKg to Vehicle, loadCargo and listAvailable to DispatchService"
 fragments:
-- id: attempts_field
+- id: vehicle_current_load
   selector:
-    path: pkg/queue/message.go
-    anchor: "Attempts  int"
-- id: max_retries_field
+    path: src/main/scala/fleet/Vehicle.scala
+    anchor: "currentLoadKg: Double"
+- id: repo_available
   selector:
-    path: pkg/queue/message.go
-    anchor: "MaxRetries int"
-- id: dead_letter_field
+    path: src/main/scala/fleet/VehicleRepository.scala
+    anchor: "def available()"
+- id: service_load_cargo
   selector:
-    path: pkg/queue/message.go
-    anchor: "deadLetter []*Message"
-- id: dispatch_error_handling
+    path: src/main/scala/fleet/DispatchService.scala
+    anchor: "def loadCargo(vehicleId: String, weightKg: Double)"
+- id: service_list_available
   selector:
-    path: pkg/queue/message.go
-    anchor: "msg.Attempts >= msg.MaxRetries"
-- id: email_worker_consumes
+    path: src/main/scala/fleet/DispatchService.scala
+    anchor: "def listAvailable()"
+- id: controller_handle_load
   selector:
-    path: internal/worker/email_worker.go
-    anchor: "broker.Register(\"email.send\""
-- id: sms_worker_consumes
-  selector:
-    path: internal/worker/sms_worker.go
-    anchor: "broker.Register(\"sms.send\""
-- id: push_worker_consumes
-  selector:
-    path: internal/worker/push_worker.go
-    anchor: "broker.Register(\"push.send\""
-- id: unrelated_daily
-  selector:
-    path: internal/scheduler/daily.go
-    anchor: "type DailyJob struct"
-- id: unrelated_profiler
-  selector:
-    path: internal/debug/profiler.go
-    anchor: "type Profiler struct"
-- id: unrelated_schema
-  selector:
-    path: internal/migration/schema.go
-    anchor: "type SchemaMigration struct"
+    path: src/main/scala/fleet/api/DispatchController.scala
+    anchor: "def handleLoadCargo(vehicleId: String, weightKg: Double)"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_014_DAILY_A
+    anchor: BAL014_GARBAGE_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_014_PROFILER_B
+    anchor: BAL014_GARBAGE_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_014_SCHEMA_C
+    anchor: BAL014_GARBAGE_C
+- id: no_garbage_d
+  selector:
+    anchor: BAL014_GARBAGE_D
+- id: no_garbage_e
+  selector:
+    anchor: BAL014_GARBAGE_E
 oracle:
   required:
-  - attempts_field
-  - max_retries_field
-  - dead_letter_field
-  - dispatch_error_handling
-  allowed:
-  - email_worker_consumes
-  - sms_worker_consumes
-  - push_worker_consumes
+  - vehicle_current_load
+  - repo_available
+  - service_load_cargo
+  - service_list_available
+  - controller_handle_load
+  allowed: []
   forbidden:
-  - unrelated_daily
-  - unrelated_profiler
-  - unrelated_schema
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

@@ -1,194 +1,219 @@
 name: bal3_1hop_020_ruby_serializer
 tags:
-- lang:ruby
-- change:multi_file
+- lang:kotlin
+- change:bug_fix
 - context:import_chain
-- distance:1hop
-- difficulty:hard
+- distance:3hop+
+- difficulty:easy
 repo:
   initial_files:
-    lib/serializers/base_serializer.rb: |
-      module Serializers
-        class BaseSerializer
-          attr_reader :object
+    core/src/main/kotlin/com/store/money/Currency.kt: |
+      package com.store.money
 
-          def initialize(object)
-            @object = object
-          end
+      enum class Currency(val code: String, val symbol: String, val decimalPlaces: Int) {
+          USD("USD", "$", 2),
+          EUR("EUR", "€", 2),
+          JPY("JPY", "¥", 0),
+          GBP("GBP", "£", 2);
 
-          def serialize
-            attributes.each_with_object({}) do |attr, hash|
-              hash[attr] = object.send(attr)
-            end
-          end
+          fun format(amount: Long): String {
+              val divisor = Math.pow(10.0, decimalPlaces.toDouble()).toLong()
+              return if (decimalPlaces == 0) {
+                  "$symbol${amount}"
+              } else {
+                  "$symbol${amount / divisor}.${"%0${decimalPlaces}d".format(amount % divisor)}"
+              }
+          }
+      }
+    core/src/main/kotlin/com/store/money/Money.kt: |
+      package com.store.money
 
-          def attributes
-            raise NotImplementedError
-          end
-        end
-      end
-    lib/serializers/user_serializer.rb: |
-      require_relative 'base_serializer'
+      data class Money(val amount: Long, val currency: Currency) {
+          operator fun plus(other: Money): Money {
+              require(currency == other.currency) { "currency mismatch" }
+              return Money(amount + other.amount, currency)
+          }
 
-      module Serializers
-        class UserSerializer < BaseSerializer
-          def attributes
-            [:id, :email, :name]
-          end
-        end
-      end
-    lib/serializers/product_serializer.rb: |
-      require_relative 'base_serializer'
+          operator fun minus(other: Money): Money {
+              require(currency == other.currency) { "currency mismatch" }
+              return Money(amount - other.amount, currency)
+          }
 
-      module Serializers
-        class ProductSerializer < BaseSerializer
-          def attributes
-            [:id, :name, :price]
-          end
-        end
-      end
-    lib/serializers/order_serializer.rb: |
-      require_relative 'base_serializer'
+          fun format(): String = currency.format(amount)
+      }
+    domain/src/main/kotlin/com/store/cart/CartItem.kt: |
+      package com.store.cart
 
-      module Serializers
-        class OrderSerializer < BaseSerializer
-          def attributes
-            [:id, :status, :total]
-          end
-        end
-      end
-    lib/validators/presence.rb: |
-      GARBAGE_020_PRESENCE_A = "presence"
+      import com.store.money.Money
 
-      module Validators
-        class Presence
-          def validate(value)
-            !value.nil? && !value.empty?
-          end
-        end
-      end
-    lib/validators/format.rb: |
-      GARBAGE_020_FORMAT_B = "format"
+      data class CartItem(
+          val productId: String,
+          val name: String,
+          val unitPrice: Money,
+          val quantity: Int,
+      ) {
+          fun subtotal(): Money = Money(unitPrice.amount * quantity, unitPrice.currency)
+      }
+    api/src/main/kotlin/com/store/cart/CartSummaryService.kt: |
+      package com.store.cart
 
-      module Validators
-        class Format
-          def validate(value, pattern)
-            value.match?(pattern)
-          end
-        end
-      end
-    lib/validators/range.rb: |
-      GARBAGE_020_RANGE_C = "range"
+      import com.store.money.Money
 
-      module Validators
-        class Range
-          def validate(value, min, max)
-            value >= min && value <= max
-          end
-        end
-      end
+      class CartSummaryService {
+          fun total(items: List<CartItem>): Money {
+              require(items.isNotEmpty()) { "cart is empty" }
+              return items.map { it.subtotal() }.reduce { acc, m -> acc + m }
+          }
+      }
+    garbage/src/main/kotlin/com/store/promo/PromoEngine.kt: |
+      package com.store.promo
+
+      // GARBAGE_RBSER_A = "promo_engine_unrelated"
+      class PromoEngine {
+          fun apply(code: String, discountPct: Int): Boolean = false
+      }
+    garbage/src/main/kotlin/com/store/loyalty/LoyaltyService.kt: |
+      package com.store.loyalty
+
+      // GARBAGE_RBSER_B = "loyalty_service_unrelated"
+      class LoyaltyService {
+          fun addPoints(userId: String, points: Int) {}
+          fun getBalance(userId: String): Int = 0
+      }
+    garbage/src/main/kotlin/com/store/tax/TaxCalculator.kt: |
+      package com.store.tax
+
+      // GARBAGE_RBSER_C = "tax_calculator_unrelated"
+      object TaxCalculator {
+          fun compute(amount: Long, ratePercent: Int): Long = amount * ratePercent / 100
+      }
   changed_files:
-    lib/serializers/base_serializer.rb: |
-      module Serializers
-        class BaseSerializer
-          attr_reader :object, :options
+    core/src/main/kotlin/com/store/money/Currency.kt: |
+      package com.store.money
 
-          def initialize(object, options = {})
-            @object = object
-            @options = options
-          end
+      enum class Currency(val code: String, val symbol: String, val decimalPlaces: Int) {
+          USD("USD", "$", 2),
+          EUR("EUR", "€", 2),
+          JPY("JPY", "¥", 0),
+          GBP("GBP", "£", 2);
 
-          def serialize
-            result = attributes.each_with_object({}) do |attr, hash|
-              hash[attr] = object.send(attr)
-            end
-            result[:_type] = self.class.name if options[:include_type]
-            apply_transforms(result)
-          end
+          fun format(amount: Long): String {
+              val divisor = Math.pow(10.0, decimalPlaces.toDouble()).toLong()
+              return if (decimalPlaces == 0) {
+                  "$symbol${amount}"
+              } else {
+                  val major = amount / divisor
+                  val minor = Math.abs(amount % divisor)
+                  "$symbol${major}.${"%0${decimalPlaces}d".format(minor)}"
+              }
+          }
+      }
+    core/src/main/kotlin/com/store/money/Money.kt: |
+      package com.store.money
 
-          def attributes
-            raise NotImplementedError
-          end
+      data class Money(val amount: Long, val currency: Currency) {
+          init {
+              require(amount >= 0) { "money amount must be non-negative" }
+          }
 
-          def transforms
-            {}
-          end
+          operator fun plus(other: Money): Money {
+              require(currency == other.currency) { "currency mismatch" }
+              return Money(amount + other.amount, currency)
+          }
 
-          private
+          operator fun minus(other: Money): Money {
+              require(currency == other.currency) { "currency mismatch" }
+              require(amount >= other.amount) { "result would be negative" }
+              return Money(amount - other.amount, currency)
+          }
 
-          def apply_transforms(hash)
-            transforms.each do |key, transformer|
-              hash[key] = transformer.call(hash[key]) if hash.key?(key)
-            end
-            hash
-          end
-        end
-      end
-  commit_message: "feat: add options, include_type, and transforms to BaseSerializer"
+          fun format(): String = currency.format(amount)
+      }
+    domain/src/main/kotlin/com/store/cart/CartItem.kt: |
+      package com.store.cart
+
+      import com.store.money.Money
+
+      data class CartItem(
+          val productId: String,
+          val name: String,
+          val unitPrice: Money,
+          val quantity: Int,
+      ) {
+          init {
+              require(quantity > 0) { "quantity must be positive" }
+          }
+
+          fun subtotal(): Money = Money(unitPrice.amount * quantity, unitPrice.currency)
+      }
+    api/src/main/kotlin/com/store/cart/CartSummaryService.kt: |
+      package com.store.cart
+
+      import com.store.money.Money
+
+      class CartSummaryService {
+          fun total(items: List<CartItem>): Money {
+              require(items.isNotEmpty()) { "cart is empty" }
+              return items.map { it.subtotal() }.reduce { acc, m -> acc + m }
+          }
+      }
+    garbage/src/main/kotlin/com/store/promo/PromoEngine.kt: |
+      package com.store.promo
+
+      // GARBAGE_RBSER_A = "promo_engine_unrelated"
+      class PromoEngine {
+          fun apply(code: String, discountPct: Int): Boolean = false
+      }
+    garbage/src/main/kotlin/com/store/loyalty/LoyaltyService.kt: |
+      package com.store.loyalty
+
+      // GARBAGE_RBSER_B = "loyalty_service_unrelated"
+      class LoyaltyService {
+          fun addPoints(userId: String, points: Int) {}
+          fun getBalance(userId: String): Int = 0
+      }
+    garbage/src/main/kotlin/com/store/tax/TaxCalculator.kt: |
+      package com.store.tax
+
+      // GARBAGE_RBSER_C = "tax_calculator_unrelated"
+      object TaxCalculator {
+          fun compute(amount: Long, ratePercent: Int): Long = amount * ratePercent / 100
+      }
+  commit_message: "fix: guard negative Money amount, prevent negative subtraction, validate CartItem quantity"
 fragments:
-- id: options_attr
+- id: money_init_guard
   selector:
-    path: lib/serializers/base_serializer.rb
-    anchor: ":object, :options"
-- id: options_param
+    path: core/src/main/kotlin/com/store/money/Money.kt
+    anchor: "money amount must be non-negative"
+- id: minus_negative_guard
   selector:
-    path: lib/serializers/base_serializer.rb
-    anchor: "def initialize(object, options = {})"
-- id: include_type
+    path: core/src/main/kotlin/com/store/money/Money.kt
+    anchor: "result would be negative"
+- id: cart_item_quantity_guard
   selector:
-    path: lib/serializers/base_serializer.rb
-    anchor: "options[:include_type]"
-- id: apply_transforms
+    path: domain/src/main/kotlin/com/store/cart/CartItem.kt
+    anchor: "quantity must be positive"
+- id: cart_uses_money
   selector:
-    path: lib/serializers/base_serializer.rb
-    anchor: "def apply_transforms"
-- id: user_inherits_base
-  selector:
-    path: lib/serializers/user_serializer.rb
-    anchor: "class UserSerializer < BaseSerializer"
-- id: product_inherits_base
-  selector:
-    path: lib/serializers/product_serializer.rb
-    anchor: "class ProductSerializer < BaseSerializer"
-- id: order_inherits_base
-  selector:
-    path: lib/serializers/order_serializer.rb
-    anchor: "class OrderSerializer < BaseSerializer"
-- id: unrelated_presence
-  selector:
-    path: lib/validators/presence.rb
-    anchor: "class Presence"
-- id: unrelated_format
-  selector:
-    path: lib/validators/format.rb
-    anchor: "class Format"
-- id: unrelated_range
-  selector:
-    path: lib/validators/range.rb
-    anchor: "class Range"
+    path: domain/src/main/kotlin/com/store/cart/CartItem.kt
+    anchor: "fun subtotal"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_020_PRESENCE_A
+    anchor: GARBAGE_RBSER_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_020_FORMAT_B
+    anchor: GARBAGE_RBSER_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_020_RANGE_C
+    anchor: GARBAGE_RBSER_C
 oracle:
   required:
-  - options_attr
-  - options_param
-  - include_type
-  - user_inherits_base
+  - money_init_guard
+  - minus_negative_guard
+  - cart_item_quantity_guard
   allowed:
-  - apply_transforms
-  - product_inherits_base
-  - order_inherits_base
+  - cart_uses_money
   forbidden:
-  - unrelated_presence
-  - unrelated_format
-  - unrelated_range
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

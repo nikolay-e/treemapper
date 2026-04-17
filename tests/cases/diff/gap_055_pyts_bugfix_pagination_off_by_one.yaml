@@ -1,226 +1,172 @@
 name: gap_055_pyts_bugfix_pagination_off_by_one
 tags:
-- lang:python
-- lang:typescript
+- lang:rust
 - change:bug_fix
 - change:single_file
-- context:cross_module
-- distance:2hop
-- difficulty:hard
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
-    backend/search/paginator.py: |
-      from dataclasses import dataclass
-      from typing import TypeVar, Generic
-
-      T = TypeVar("T")
-
-      @dataclass
-      class Page(Generic[T]):
-          items: list[T]
-          total: int
-          page: int
-          page_size: int
-          has_next: bool
-
-      class Paginator:
-          def __init__(self, page_size: int = 20):
-              self._page_size = page_size
-
-          def paginate(self, items: list, page: int) -> Page:
-              start = page * self._page_size
-              end = start + self._page_size
-              page_items = items[start:end]
-              has_next = end < len(items)
-              return Page(
-                  items=page_items,
-                  total=len(items),
-                  page=page,
-                  page_size=self._page_size,
-                  has_next=has_next,
-              )
-
-          def total_pages(self, total_items: int) -> int:
-              return total_items // self._page_size
-    backend/search/engine.py: |
-      class SearchEngine:
-          def __init__(self, index: dict[str, list[str]]):
-              self._index = index
-
-          def search(self, query: str) -> list[str]:
-              tokens = query.lower().split()
-              results: set[str] = set()
-              for token in tokens:
-                  if token in self._index:
-                      results.update(self._index[token])
-              return sorted(results)
-
-          def suggest(self, prefix: str) -> list[str]:
-              return sorted(k for k in self._index if k.startswith(prefix.lower()))
-    frontend/src/search/pagination.ts: |
-      interface PageInfo {
-        currentPage: number;
-        totalPages: number;
-        hasNext: boolean;
-        hasPrevious: boolean;
+    src/parser/token.rs: |
+      #[derive(Debug, Clone, PartialEq)]
+      pub enum Token {
+          Number(f64),
+          Plus,
+          Minus,
+          Star,
+          Slash,
+          LParen,
+          RParen,
       }
 
-      function computePageInfo(
-        total: number,
-        pageSize: number,
-        currentPage: number
-      ): PageInfo {
-        const totalPages = Math.floor(total / pageSize);
-        return {
-          currentPage,
-          totalPages,
-          hasNext: currentPage < totalPages - 1,
-          hasPrevious: currentPage > 0,
-        };
+      pub struct Lexer {
+          input: Vec<char>,
+          pos: usize,
       }
 
-      function pageRange(pageInfo: PageInfo, window: number): number[] {
-        const start = Math.max(0, pageInfo.currentPage - window);
-        const end = Math.min(pageInfo.totalPages, pageInfo.currentPage + window + 1);
-        const pages: number[] = [];
-        for (let i = start; i < end; i++) {
-          pages.push(i);
-        }
-        return pages;
-      }
-    frontend/src/search/results.ts: |
-      interface SearchResult {
-        id: string;
-        title: string;
-        score: number;
-      }
+      impl Lexer {
+          pub fn new(input: &str) -> Self {
+              Lexer { input: input.chars().collect(), pos: 0 }
+          }
 
-      function renderResult(result: SearchResult): string {
-        return `<li>${result.title} (${result.score.toFixed(2)})</li>`;
-      }
+          pub fn tokenize(&mut self) -> Vec<Token> {
+              let mut tokens = Vec::new();
+              while self.pos < self.input.len() {
+                  let ch = self.input[self.pos];
+                  match ch {
+                      ' ' | '\t' => self.pos += 1,
+                      '+' => { tokens.push(Token::Plus); self.pos += 1; }
+                      '-' => { tokens.push(Token::Minus); self.pos += 1; }
+                      '*' => { tokens.push(Token::Star); self.pos += 1; }
+                      '/' => { tokens.push(Token::Slash); self.pos += 1; }
+                      '(' => { tokens.push(Token::LParen); self.pos += 1; }
+                      ')' => { tokens.push(Token::RParen); self.pos += 1; }
+                      '0'..='9' | '.' => {
+                          let start = self.pos;
+                          while self.pos < self.input.len()
+                              && (self.input[self.pos].is_numeric() || self.input[self.pos] == '.')
+                          {
+                              self.pos += 1;
+                          }
+                          let s: String = self.input[start..self.pos].iter().collect();
+                          tokens.push(Token::Number(s.parse().unwrap_or(0.0)));
+                      }
+                      _ => self.pos += 1,
+                  }
+              }
+              tokens
+          }
 
-      function renderResultList(results: SearchResult[]): string {
-        return `<ul>${results.map(renderResult).join("")}</ul>`;
+          pub fn peek(&self) -> Option<char> {
+              if self.pos < self.input.len() {
+                  Some(self.input[self.pos])  // BUG: should peek next, not current
+              } else {
+                  None
+              }
+          }
       }
+    garbage/optimizer.rs: |
+      // GARBAGE_GAP55_OPTIM_A = "optimizer_marker"
+    garbage/bytecode.rs: |
+      // GARBAGE_GAP55_BYTE_B = "bytecode_marker"
+    garbage/runtime.rs: |
+      // GARBAGE_GAP55_RUN_C = "runtime_marker"
   changed_files:
-    backend/search/paginator.py: |
-      from dataclasses import dataclass
-      from typing import TypeVar, Generic
-      import math
-
-      T = TypeVar("T")
-
-      @dataclass
-      class Page(Generic[T]):
-          items: list[T]
-          total: int
-          page: int
-          page_size: int
-          has_next: bool
-
-      class Paginator:
-          def __init__(self, page_size: int = 20):
-              self._page_size = page_size
-
-          def paginate(self, items: list, page: int) -> Page:
-              start = page * self._page_size
-              end = start + self._page_size
-              page_items = items[start:end]
-              has_next = end < len(items)
-              return Page(
-                  items=page_items,
-                  total=len(items),
-                  page=page,
-                  page_size=self._page_size,
-                  has_next=has_next,
-              )
-
-          def total_pages(self, total_items: int) -> int:
-              return math.ceil(total_items / self._page_size)
-    backend/search/engine.py: |
-      class SearchEngine:
-          def __init__(self, index: dict[str, list[str]]):
-              self._index = index
-
-          def search(self, query: str) -> list[str]:
-              tokens = query.lower().split()
-              results: set[str] = set()
-              for token in tokens:
-                  if token in self._index:
-                      results.update(self._index[token])
-              return sorted(results)
-
-          def suggest(self, prefix: str) -> list[str]:
-              return sorted(k for k in self._index if k.startswith(prefix.lower()))
-    frontend/src/search/pagination.ts: |
-      interface PageInfo {
-        currentPage: number;
-        totalPages: number;
-        hasNext: boolean;
-        hasPrevious: boolean;
+    src/parser/token.rs: |
+      #[derive(Debug, Clone, PartialEq)]
+      pub enum Token {
+          Number(f64),
+          Plus,
+          Minus,
+          Star,
+          Slash,
+          LParen,
+          RParen,
       }
 
-      function computePageInfo(
-        total: number,
-        pageSize: number,
-        currentPage: number
-      ): PageInfo {
-        const totalPages = Math.ceil(total / pageSize);
-        return {
-          currentPage,
-          totalPages,
-          hasNext: currentPage < totalPages - 1,
-          hasPrevious: currentPage > 0,
-        };
+      pub struct Lexer {
+          input: Vec<char>,
+          pos: usize,
       }
 
-      function pageRange(pageInfo: PageInfo, window: number): number[] {
-        const start = Math.max(0, pageInfo.currentPage - window);
-        const end = Math.min(pageInfo.totalPages, pageInfo.currentPage + window + 1);
-        const pages: number[] = [];
-        for (let i = start; i < end; i++) {
-          pages.push(i);
-        }
-        return pages;
-      }
-    frontend/src/search/results.ts: |
-      interface SearchResult {
-        id: string;
-        title: string;
-        score: number;
-      }
+      impl Lexer {
+          pub fn new(input: &str) -> Self {
+              Lexer { input: input.chars().collect(), pos: 0 }
+          }
 
-      function renderResult(result: SearchResult): string {
-        return `<li>${result.title} (${result.score.toFixed(2)})</li>`;
-      }
+          pub fn tokenize(&mut self) -> Vec<Token> {
+              let mut tokens = Vec::new();
+              while self.pos < self.input.len() {
+                  let ch = self.input[self.pos];
+                  match ch {
+                      ' ' | '\t' => self.pos += 1,
+                      '+' => { tokens.push(Token::Plus); self.pos += 1; }
+                      '-' => { tokens.push(Token::Minus); self.pos += 1; }
+                      '*' => { tokens.push(Token::Star); self.pos += 1; }
+                      '/' => { tokens.push(Token::Slash); self.pos += 1; }
+                      '(' => { tokens.push(Token::LParen); self.pos += 1; }
+                      ')' => { tokens.push(Token::RParen); self.pos += 1; }
+                      '0'..='9' | '.' => {
+                          let start = self.pos;
+                          while self.pos < self.input.len()
+                              && (self.input[self.pos].is_numeric() || self.input[self.pos] == '.')
+                          {
+                              self.pos += 1;
+                          }
+                          let s: String = self.input[start..self.pos].iter().collect();
+                          tokens.push(Token::Number(s.parse().unwrap_or(0.0)));
+                      }
+                      _ => self.pos += 1,
+                  }
+              }
+              tokens
+          }
 
-      function renderResultList(results: SearchResult[]): string {
-        return `<ul>${results.map(renderResult).join("")}</ul>`;
+          pub fn peek(&self) -> Option<char> {
+              if self.pos + 1 < self.input.len() {
+                  Some(self.input[self.pos + 1])
+              } else {
+                  None
+              }
+          }
       }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    garbage/optimizer.rs: |
+      // GARBAGE_GAP55_OPTIM_A = "optimizer_marker"
+    garbage/bytecode.rs: |
+      // GARBAGE_GAP55_BYTE_B = "bytecode_marker"
+    garbage/runtime.rs: |
+      // GARBAGE_GAP55_RUN_C = "runtime_marker"
+  commit_message: "fix: peek returns next char, not current position"
 fragments:
-- id: py_ceil_fix
+- id: peek_fix
   selector:
-    path: backend/search/paginator.py
-    anchor: "return math.ceil(total_items / self._page_size)"
-- id: py_math_import
+    path: src/parser/token.rs
+    anchor: "if self.pos + 1 < self.input.len() {"
+- id: peek_return
   selector:
-    path: backend/search/paginator.py
-    anchor: "import math"
-- id: ts_ceil_fix
+    path: src/parser/token.rs
+    anchor: "Some(self.input[self.pos + 1])"
+- id: tokenize_method
   selector:
-    path: frontend/src/search/pagination.ts
-    anchor: "Math.ceil(total / pageSize)"
-- id: paginator_class
+    path: src/parser/token.rs
+    anchor: "pub fn tokenize(&mut self) -> Vec<Token> {"
+- id: no_garbage_a
   selector:
-    path: backend/search/paginator.py
-    anchor: "class Paginator:"
+    anchor: GARBAGE_GAP55_OPTIM_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_GAP55_BYTE_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_GAP55_RUN_C
 oracle:
   required:
-  - py_ceil_fix
-  - py_math_import
-  - ts_ceil_fix
-  allowed: []
-  forbidden: []
+  - peek_fix
+  - peek_return
+  allowed:
+  - tokenize_method
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

@@ -1,105 +1,144 @@
 name: gap2_047_jsts_config_same_file_jest_transforms
 tags:
-- change:config
-- change:single_file
-- context:same_file
-- difficulty:trivial
-- distance:0hop
-- lang:javascript
-- lang:typescript
+- lang:python
+- change:bug_fix
+- change:multi_file
+- context:test_file
+- distance:1hop
+- difficulty:medium
 repo:
   initial_files:
-    jest.config.js: |
-      module.exports = {
-        testEnvironment: "node",
-        roots: ["<rootDir>/src"],
-        testMatch: ["**/*.test.ts"],
-        transform: {
-          "^.+\\.ts$": "ts-jest",
-        },
-        collectCoverage: false,
-        coverageDirectory: "coverage",
-      };
-    src/services/payment.ts: |
-      const TRAP_GAP2_047_GATEWAY_A: string = "stripe";
-      const TRAP_GAP2_047_CURRENCY_B: string = "USD";
+    src/search/indexer.py: |
+      from src.search.tokenizer import tokenize
 
-      function calculateTax(amount: number, rate: number): number {
-        return Math.round(amount * rate * 100) / 100;
-      }
+      class Indexer:
+          def __init__(self) -> None:
+              self._index: dict[str, set[int]] = {}
 
-      function formatCurrency(cents: number): string {
-        return `$${(cents / 100).toFixed(2)}`;
-      }
-    src/services/inventory.js: |
-      const TRAP_GAP2_047_WAREHOUSE_C = "primary";
-      const TRAP_GAP2_047_THRESHOLD_D = 10;
+          def add(self, doc_id: int, text: str) -> None:
+              for token in tokenize(text):
+                  # BUG: overwrites existing doc set instead of updating
+                  self._index[token] = {doc_id}
 
-      function checkStock(productId, quantity) {
-        return quantity > 0;
-      }
+          def search(self, query: str) -> set[int]:
+              tokens = tokenize(query)
+              if not tokens:
+                  return set()
+              results = None
+              for token in tokens:
+                  hits = self._index.get(token, set())
+                  results = hits if results is None else results & hits
+              return results or set()
+    src/search/tokenizer.py: |
+      import re
 
-      module.exports = { checkStock };
+      def tokenize(text: str) -> list[str]:
+          return re.findall(r'\w+', text.lower())
+    tests/test_indexer.py: |
+      from src.search.indexer import Indexer
+
+      def test_single_doc_search():
+          idx = Indexer()
+          idx.add(1, "hello world")
+          assert 1 in idx.search("hello")
+    garbage/ranker.py: |
+      # GARBAGE_SIDX_A = "ranker_marker"
+      def rank(results: list) -> list:
+          return results
+    garbage/highlighter.py: |
+      # GARBAGE_SIDX_B = "highlighter_marker"
+      def highlight(text: str, query: str) -> str:
+          return text
+    garbage/suggester.py: |
+      # GARBAGE_SIDX_C = "suggester_marker"
+      def suggest(prefix: str) -> list[str]:
+          return []
   changed_files:
-    jest.config.js: |
-      module.exports = {
-        testEnvironment: "node",
-        roots: ["<rootDir>/src"],
-        testMatch: ["**/*.test.ts", "**/*.test.js"],
-        transform: {
-          "^.+\\.ts$": "ts-jest",
-          "^.+\\.js$": "babel-jest",
-        },
-        collectCoverage: true,
-        coverageDirectory: "coverage",
-        coverageThreshold: {
-          global: { branches: 80, functions: 80, lines: 80 },
-        },
-      };
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    src/search/indexer.py: |
+      from src.search.tokenizer import tokenize
+
+      class Indexer:
+          def __init__(self) -> None:
+              self._index: dict[str, set[int]] = {}
+
+          def add(self, doc_id: int, text: str) -> None:
+              for token in tokenize(text):
+                  self._index.setdefault(token, set()).add(doc_id)
+
+          def search(self, query: str) -> set[int]:
+              tokens = tokenize(query)
+              if not tokens:
+                  return set()
+              results = None
+              for token in tokens:
+                  hits = self._index.get(token, set())
+                  results = hits if results is None else results & hits
+              return results or set()
+    src/search/tokenizer.py: |
+      import re
+
+      def tokenize(text: str) -> list[str]:
+          return re.findall(r'\w+', text.lower())
+    tests/test_indexer.py: |
+      from src.search.indexer import Indexer
+
+      def test_single_doc_search():
+          idx = Indexer()
+          idx.add(1, "hello world")
+          assert 1 in idx.search("hello")
+
+      def test_multiple_docs_same_token():
+          idx = Indexer()
+          idx.add(1, "python rocks")
+          idx.add(2, "python rules")
+          results = idx.search("python")
+          assert 1 in results
+          assert 2 in results
+
+      def test_overwrite_bug_fixed():
+          idx = Indexer()
+          idx.add(1, "shared token")
+          idx.add(2, "shared token")
+          assert idx.search("shared") == {1, 2}
+    garbage/ranker.py: |
+      # GARBAGE_SIDX_A = "ranker_marker"
+      def rank(results: list) -> list:
+          return results
+    garbage/highlighter.py: |
+      # GARBAGE_SIDX_B = "highlighter_marker"
+      def highlight(text: str, query: str) -> str:
+          return text
+    garbage/suggester.py: |
+      # GARBAGE_SIDX_C = "suggester_marker"
+      def suggest(prefix: str) -> list[str]:
+          return []
+  commit_message: "fix: use setdefault to accumulate doc ids instead of overwriting"
 fragments:
-- id: babel_transform
+- id: setdefault_fix
   selector:
-    path: jest.config.js
-    anchor: '"babel-jest"'
-- id: coverage_enabled
+    anchor: "self._index.setdefault(token, set()).add(doc_id)"
+- id: test_multiple_docs
   selector:
-    path: jest.config.js
-    anchor: "collectCoverage: true"
-- id: coverage_threshold
+    anchor: "def test_multiple_docs_same_token()"
+- id: test_overwrite_fixed
   selector:
-    path: jest.config.js
-    anchor: "branches: 80"
-- id: no_payment
+    anchor: "def test_overwrite_bug_fixed()"
+- id: no_garbage_a
   selector:
-    path: src/services/payment.ts
-- id: no_inventory
+    anchor: GARBAGE_SIDX_A
+- id: no_garbage_b
   selector:
-    path: src/services/inventory.js
-- id: no_global_0
+    anchor: GARBAGE_SIDX_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_047_GATEWAY_A
-- id: no_global_1
-  selector:
-    anchor: TRAP_GAP2_047_CURRENCY_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP2_047_WAREHOUSE_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2_047_THRESHOLD_D
+    anchor: GARBAGE_SIDX_C
 oracle:
   required:
-  - babel_transform
-  - coverage_enabled
-  - coverage_threshold
+  - setdefault_fix
+  - test_multiple_docs
+  - test_overwrite_fixed
   allowed: []
   forbidden:
-  - no_payment
-  - no_inventory
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

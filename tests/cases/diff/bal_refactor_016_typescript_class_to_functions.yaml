@@ -1,177 +1,208 @@
 name: bal_refactor_016_typescript_class_to_functions
 tags:
-- lang:typescript
-- change:multi_file
-- change:refactor
-- context:import_chain
+- lang:cpp
+- change:single_file
+- context:cross_module
 - distance:2hop
 - difficulty:medium
 repo:
   initial_files:
-    src/StringHelper.ts: |
-      export class StringHelper {
-          static capitalize(s: string): string {
-              return s.charAt(0).toUpperCase() + s.slice(1);
-          }
+    include/db/connection_pool.h: |
+      #pragma once
+      #include <string>
+      #include <memory>
 
-          static slugify(s: string): string {
-              return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-          }
+      namespace db {
 
-          static truncate(s: string, len: number): string {
-              return s.length > len ? s.slice(0, len) + '...' : s;
-          }
-      }
-    src/formatters/titleFormatter.ts: |
-      import { StringHelper } from '../StringHelper';
-
-      export function formatTitle(raw: string): string {
-          const capitalized = StringHelper.capitalize(raw.trim());
-          return StringHelper.truncate(capitalized, 100);
-      }
-    src/formatters/urlFormatter.ts: |
-      import { StringHelper } from '../StringHelper';
-
-      export function formatUrl(title: string): string {
-          return `/posts/${StringHelper.slugify(title)}`;
-      }
-    src/pages/postEditor.ts: |
-      import { formatTitle } from '../formatters/titleFormatter';
-      import { formatUrl } from '../formatters/urlFormatter';
-
-      export function preparePost(rawTitle: string) {
-          return {
-              title: formatTitle(rawTitle),
-              url: formatUrl(rawTitle),
-          };
-      }
-    src/styles/theme.ts: |
-      const GARBAGE_REFACTOR_016_THEME_A = 'theme';
-      const GARBAGE_REFACTOR_016_COLOR_B = '#fff';
-
-      export const colors = {
-          GARBAGE_REFACTOR_016_COLORS_C: true,
-          primary: '#007bff',
+      struct PoolConfig {
+          std::string dsn;
+          int min_connections;
+          int max_connections;
+          int idle_timeout_ms;
       };
-    garbage_auth.ts: |
-      const GARBAGE_REFACTOR_016_AUTH_D = 'auth';
-      const GARBAGE_REFACTOR_016_SESSION_E = 'jwt';
 
-      export function isAuthenticated(): boolean {
-          return false;
+      class ConnectionPool {
+      public:
+          explicit ConnectionPool(const PoolConfig& cfg);
+          ~ConnectionPool();
+          struct Connection* acquire();
+          void release(struct Connection* conn);
+          int active_count() const;
+      private:
+          PoolConfig cfg_;
+      };
+
       }
+    src/services/user_service.cpp: |
+      #include "db/connection_pool.h"
+      #include <string>
+
+      namespace services {
+
+      class UserService {
+          db::ConnectionPool& pool_;
+      public:
+          explicit UserService(db::ConnectionPool& pool) : pool_(pool) {}
+
+          std::string find_by_id(int id) {
+              auto* conn = pool_.acquire();
+              // query
+              pool_.release(conn);
+              return "";
+          }
+      };
+
+      }
+    src/services/order_service.cpp: |
+      #include "db/connection_pool.h"
+      #include <vector>
+
+      namespace services {
+
+      class OrderService {
+          db::ConnectionPool& pool_;
+      public:
+          explicit OrderService(db::ConnectionPool& pool) : pool_(pool) {}
+
+          std::vector<int> list_orders(int user_id) {
+              auto* conn = pool_.acquire();
+              // query
+              pool_.release(conn);
+              return {};
+          }
+      };
+
+      }
+    garbage/cache.cpp: |
+      // GARBAGE_TS016_CACHE_A = "cache_marker"
+      namespace cache { void invalidate(const char* key) {} }
+    garbage/metrics.cpp: |
+      // GARBAGE_TS016_METRICS_B = "metrics_marker"
+      namespace metrics { void record(const char* name, double v) {} }
+    garbage/config.cpp: |
+      // GARBAGE_TS016_CONFIG_C = "config_marker"
+      namespace config { const char* get(const char* key) { return ""; } }
   changed_files:
-    src/stringUtils.ts: |
-      export function capitalize(s: string): string {
-          return s.charAt(0).toUpperCase() + s.slice(1);
-      }
+    include/db/connection_pool.h: |
+      #pragma once
+      #include <string>
+      #include <memory>
+      #include <chrono>
 
-      export function slugify(s: string): string {
-          return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      }
+      namespace db {
 
-      export function truncate(s: string, len: number): string {
-          return s.length > len ? s.slice(0, len) + '...' : s;
-      }
-    src/formatters/titleFormatter.ts: |
-      import { capitalize, truncate } from '../stringUtils';
-
-      export function formatTitle(raw: string): string {
-          const capitalized = capitalize(raw.trim());
-          return truncate(capitalized, 100);
-      }
-    src/formatters/urlFormatter.ts: |
-      import { slugify } from '../stringUtils';
-
-      export function formatUrl(title: string): string {
-          return `/posts/${slugify(title)}`;
-      }
-    src/pages/postEditor.ts: |
-      import { formatTitle } from '../formatters/titleFormatter';
-      import { formatUrl } from '../formatters/urlFormatter';
-
-      export function preparePost(rawTitle: string) {
-          return {
-              title: formatTitle(rawTitle),
-              url: formatUrl(rawTitle),
-          };
-      }
-    src/styles/theme.ts: |
-      const GARBAGE_REFACTOR_016_THEME_A = 'theme';
-      const GARBAGE_REFACTOR_016_COLOR_B = '#fff';
-
-      export const colors = {
-          GARBAGE_REFACTOR_016_COLORS_C: true,
-          primary: '#007bff',
+      struct PoolConfig {
+          std::string dsn;
+          int min_connections;
+          int max_connections;
+          int idle_timeout_ms;
+          int acquire_timeout_ms;
+          bool health_check_enabled;
       };
-    garbage_auth.ts: |
-      const GARBAGE_REFACTOR_016_AUTH_D = 'auth';
-      const GARBAGE_REFACTOR_016_SESSION_E = 'jwt';
 
-      export function isAuthenticated(): boolean {
-          return false;
+      class ConnectionPool {
+      public:
+          explicit ConnectionPool(const PoolConfig& cfg);
+          ~ConnectionPool();
+          struct Connection* acquire();
+          void release(struct Connection* conn);
+          int active_count() const;
+          int idle_count() const;
+          bool is_healthy() const;
+      private:
+          PoolConfig cfg_;
+      };
+
       }
-  commit_message: "refactor: convert StringHelper class to standalone functions"
+    src/services/user_service.cpp: |
+      #include "db/connection_pool.h"
+      #include <string>
+
+      namespace services {
+
+      class UserService {
+          db::ConnectionPool& pool_;
+      public:
+          explicit UserService(db::ConnectionPool& pool) : pool_(pool) {}
+
+          std::string find_by_id(int id) {
+              auto* conn = pool_.acquire();
+              // query
+              pool_.release(conn);
+              return "";
+          }
+      };
+
+      }
+    src/services/order_service.cpp: |
+      #include "db/connection_pool.h"
+      #include <vector>
+
+      namespace services {
+
+      class OrderService {
+          db::ConnectionPool& pool_;
+      public:
+          explicit OrderService(db::ConnectionPool& pool) : pool_(pool) {}
+
+          std::vector<int> list_orders(int user_id) {
+              auto* conn = pool_.acquire();
+              // query
+              pool_.release(conn);
+              return {};
+          }
+      };
+
+      }
+    garbage/cache.cpp: |
+      // GARBAGE_TS016_CACHE_A = "cache_marker"
+      namespace cache { void invalidate(const char* key) {} }
+    garbage/metrics.cpp: |
+      // GARBAGE_TS016_METRICS_B = "metrics_marker"
+      namespace metrics { void record(const char* name, double v) {} }
+    garbage/config.cpp: |
+      // GARBAGE_TS016_CONFIG_C = "config_marker"
+      namespace config { const char* get(const char* key) { return ""; } }
+  commit_message: "feat: add acquire_timeout, health_check, idle_count and is_healthy to pool"
 fragments:
-- id: new_capitalize_fn
+- id: pool_acquire_timeout
   selector:
-    path: src/stringUtils.ts
-    anchor: "export function capitalize"
-- id: new_slugify_fn
+    path: include/db/connection_pool.h
+    anchor: "acquire_timeout_ms"
+- id: pool_health_check_field
   selector:
-    path: src/stringUtils.ts
-    anchor: "export function slugify"
-- id: new_truncate_fn
+    path: include/db/connection_pool.h
+    anchor: "health_check_enabled"
+- id: pool_is_healthy_method
   selector:
-    path: src/stringUtils.ts
-    anchor: "export function truncate"
-- id: title_imports_functions
+    path: include/db/connection_pool.h
+    anchor: "bool is_healthy"
+- id: user_service_uses_pool
   selector:
-    path: src/formatters/titleFormatter.ts
-    anchor: "from '../stringUtils'"
-- id: url_imports_slugify
+    path: src/services/user_service.cpp
+    anchor: "db::ConnectionPool"
+- id: order_service_uses_pool
   selector:
-    path: src/formatters/urlFormatter.ts
-    anchor: "from '../stringUtils'"
-- id: editor_uses_formatters
+    path: src/services/order_service.cpp
+    anchor: "db::ConnectionPool"
+- id: no_garbage_a
   selector:
-    path: src/pages/postEditor.ts
-    anchor: "from '../formatters/titleFormatter'"
-- id: no_theme
+    anchor: GARBAGE_TS016_CACHE_A
+- id: no_garbage_b
   selector:
-    path: src/styles/theme.ts
-- id: no_garbage_auth
+    anchor: GARBAGE_TS016_METRICS_B
+- id: no_garbage_c
   selector:
-    path: garbage_auth.ts
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_016_THEME_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_016_COLOR_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_016_COLORS_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_016_AUTH_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_016_SESSION_E
+    anchor: GARBAGE_TS016_CONFIG_C
 oracle:
   required:
-  - new_capitalize_fn
-  - new_slugify_fn
-  - new_truncate_fn
-  - title_imports_functions
-  - url_imports_slugify
-  - editor_uses_formatters
+  - pool_acquire_timeout
+  - pool_health_check_field
+  - pool_is_healthy_method
+  - user_service_uses_pool
+  - order_service_uses_pool
   allowed: []
   forbidden:
-  - no_theme
-  - no_garbage_auth
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

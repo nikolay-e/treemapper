@@ -1,203 +1,130 @@
 name: bal_refactor_017_typescript_strings_to_enum
 tags:
-- lang:typescript
+- lang:python
+- lang:shell
 - change:multi_file
-- change:refactor
-- context:import_chain
-- distance:1hop
-- difficulty:medium
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
-    src/models/task.ts: |
-      export interface Task {
-          id: string;
-          title: string;
-          priority: string;
-          assignee: string;
-      }
+    scripts/sync.py: |
+      import os
+      import shutil
 
-      export function createTask(title: string, priority: string, assignee: string): Task {
-          return { id: crypto.randomUUID(), title, priority, assignee };
-      }
-    src/services/taskService.ts: |
-      import { Task, createTask } from '../models/task';
+      SOURCE_DIR = "/data/source"
+      DEST_DIR = "/data/dest"
 
-      export class TaskService {
-          private tasks: Task[] = [];
 
-          addTask(title: string, priority: string, assignee: string): Task {
-              const task = createTask(title, priority, assignee);
-              this.tasks.push(task);
-              return task;
-          }
+      def sync_directory(source: str = SOURCE_DIR, dest: str = DEST_DIR) -> int:
+          count = 0
+          for item in os.listdir(source):
+              src_path = os.path.join(source, item)
+              dst_path = os.path.join(dest, item)
+              shutil.copy2(src_path, dst_path)
+              count += 1
+          return count
+    scripts/sync.sh: |
+      #!/usr/bin/env bash
+      python3 scripts/sync.py
+    garbage/compress.py: |
+      GARBAGE_TS017_COMPRESS_A = "compress_marker"
 
-          getHighPriority(): Task[] {
-              return this.tasks.filter(t => t.priority === 'high');
-          }
 
-          getMediumPriority(): Task[] {
-              return this.tasks.filter(t => t.priority === 'medium');
-          }
-      }
-    src/views/taskBoard.ts: |
-      import { Task } from '../models/task';
+      def compress_file(path: str) -> str:
+          return path + ".gz"
+    garbage/encrypt.py: |
+      GARBAGE_TS017_ENCRYPT_B = "encrypt_marker"
 
-      export function renderPriorityBadge(task: Task): string {
-          const colors: Record<string, string> = {
-              'high': 'red',
-              'medium': 'orange',
-              'low': 'green',
-          };
-          return `<span style="color:${colors[task.priority] || 'gray'}">${task.priority}</span>`;
-      }
-    src/utils/dates.ts: |
-      const GARBAGE_REFACTOR_017_DATES_A = 'dates';
-      const GARBAGE_REFACTOR_017_TZ_B = 'UTC';
 
-      export function today(): string {
-          return new Date().toISOString().split('T')[0];
-      }
-    garbage_events.ts: |
-      const GARBAGE_REFACTOR_017_EVENTS_C = 'events';
-      const GARBAGE_REFACTOR_017_BUS_D = 'memory';
+      def encrypt(data: bytes) -> bytes:
+          return data
+    garbage/checksum.py: |
+      GARBAGE_TS017_CHECKSUM_C = "checksum_marker"
 
-      export class EventBus {
-          static GARBAGE_REFACTOR_017_BUS_CLASS_E = true;
 
-          emit(name: string, data: unknown): void {}
-      }
+      def md5(path: str) -> str:
+          return ""
   changed_files:
-    src/models/priority.ts: |
-      export enum Priority {
-          HIGH = 'high',
-          MEDIUM = 'medium',
-          LOW = 'low',
-      }
-    src/models/task.ts: |
-      import { Priority } from './priority';
+    scripts/sync.py: |
+      import os
+      import shutil
 
-      export interface Task {
-          id: string;
-          title: string;
-          priority: Priority;
-          assignee: string;
-      }
+      SOURCE_DIR = "/data/source"
+      DEST_DIR = "/data/dest"
 
-      export function createTask(title: string, priority: Priority, assignee: string): Task {
-          return { id: crypto.randomUUID(), title, priority, assignee };
-      }
-    src/services/taskService.ts: |
-      import { Task, createTask } from '../models/task';
-      import { Priority } from '../models/priority';
 
-      export class TaskService {
-          private tasks: Task[] = [];
+      def sync_directory(source: str = SOURCE_DIR, dest: str = DEST_DIR) -> int:
+          count = 0
+          for item in os.listdir(source):
+              src_path = os.path.join(source, item)
+              dst_path = os.path.join(dest, item)
+              shutil.copy2(src_path, dst_path)
+              count += 1
+          return count
 
-          addTask(title: string, priority: Priority, assignee: string): Task {
-              const task = createTask(title, priority, assignee);
-              this.tasks.push(task);
-              return task;
-          }
 
-          getHighPriority(): Task[] {
-              return this.tasks.filter(t => t.priority === Priority.HIGH);
-          }
+      def dry_run(source: str = SOURCE_DIR) -> list[str]:
+          return [
+              os.path.join(source, item)
+              for item in sorted(os.listdir(source))
+          ]
+    scripts/sync.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      if [[ "${DRY_RUN:-0}" == "1" ]]; then
+          python3 -c "import scripts.sync; print('\n'.join(scripts.sync.dry_run()))"
+      else
+          python3 scripts/sync.py
+      fi
+    garbage/compress.py: |
+      GARBAGE_TS017_COMPRESS_A = "compress_marker"
 
-          getMediumPriority(): Task[] {
-              return this.tasks.filter(t => t.priority === Priority.MEDIUM);
-          }
-      }
-    src/views/taskBoard.ts: |
-      import { Task } from '../models/task';
-      import { Priority } from '../models/priority';
 
-      const PRIORITY_COLORS: Record<Priority, string> = {
-          [Priority.HIGH]: 'red',
-          [Priority.MEDIUM]: 'orange',
-          [Priority.LOW]: 'green',
-      };
+      def compress_file(path: str) -> str:
+          return path + ".gz"
+    garbage/encrypt.py: |
+      GARBAGE_TS017_ENCRYPT_B = "encrypt_marker"
 
-      export function renderPriorityBadge(task: Task): string {
-          const color = PRIORITY_COLORS[task.priority] || 'gray';
-          return `<span style="color:${color}">${task.priority}</span>`;
-      }
-    src/utils/dates.ts: |
-      const GARBAGE_REFACTOR_017_DATES_A = 'dates';
-      const GARBAGE_REFACTOR_017_TZ_B = 'UTC';
 
-      export function today(): string {
-          return new Date().toISOString().split('T')[0];
-      }
-    garbage_events.ts: |
-      const GARBAGE_REFACTOR_017_EVENTS_C = 'events';
-      const GARBAGE_REFACTOR_017_BUS_D = 'memory';
+      def encrypt(data: bytes) -> bytes:
+          return data
+    garbage/checksum.py: |
+      GARBAGE_TS017_CHECKSUM_C = "checksum_marker"
 
-      export class EventBus {
-          static GARBAGE_REFACTOR_017_BUS_CLASS_E = true;
 
-          emit(name: string, data: unknown): void {}
-      }
-  commit_message: "refactor: replace priority strings with Priority enum"
+      def md5(path: str) -> str:
+          return ""
+  commit_message: "feat: add dry_run mode to sync script"
 fragments:
-- id: new_enum
+- id: dry_run_fn
   selector:
-    path: src/models/priority.ts
-    anchor: "export enum Priority"
-- id: task_imports_enum
+    path: scripts/sync.py
+    anchor: "def dry_run"
+- id: sync_directory_fn
   selector:
-    path: src/models/task.ts
-    anchor: "from './priority'"
-- id: task_uses_enum_type
+    path: scripts/sync.py
+    anchor: "def sync_directory"
+- id: shell_dry_run_check
   selector:
-    path: src/models/task.ts
-    anchor: "priority: Priority"
-- id: service_imports_enum
+    path: scripts/sync.sh
+    anchor: 'DRY_RUN'
+- id: no_garbage_a
   selector:
-    path: src/services/taskService.ts
-    anchor: "from '../models/priority'"
-- id: service_uses_enum
+    anchor: GARBAGE_TS017_COMPRESS_A
+- id: no_garbage_b
   selector:
-    path: src/services/taskService.ts
-    anchor: "Priority.HIGH"
-- id: view_imports_enum
+    anchor: GARBAGE_TS017_ENCRYPT_B
+- id: no_garbage_c
   selector:
-    path: src/views/taskBoard.ts
-    anchor: "from '../models/priority'"
-- id: no_dates
-  selector:
-    path: src/utils/dates.ts
-- id: no_garbage_events
-  selector:
-    path: garbage_events.ts
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_017_DATES_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_017_TZ_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_017_EVENTS_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_017_BUS_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_017_BUS_CLASS_E
+    anchor: GARBAGE_TS017_CHECKSUM_C
 oracle:
   required:
-  - new_enum
-  - task_imports_enum
-  - task_uses_enum_type
-  - service_imports_enum
-  - service_uses_enum
-  - view_imports_enum
+  - dry_run_fn
+  - sync_directory_fn
+  - shell_dry_run_check
   allowed: []
   forbidden:
-  - no_dates
-  - no_garbage_events
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

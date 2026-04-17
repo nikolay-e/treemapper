@@ -1,197 +1,214 @@
 name: bal3_1hop_004_go_worker_pool
 tags:
-- lang:go
-- change:new_function
+- lang:clojure
+- change:multi_file
 - context:import_chain
-- distance:1hop
+- distance:2hop
 - difficulty:hard
 repo:
   initial_files:
-    pkg/task/task.go: |
-      package task
+    src/queue/protocol.clj: |
+      (ns queue.protocol)
 
-      type Priority int
+      (defprotocol Queue
+        (enqueue! [this item])
+        (dequeue! [this])
+        (size [this]))
+    src/queue/bounded.clj: |
+      (ns queue.bounded
+        (:require [queue.protocol :as q]))
 
-      const (
-          Low    Priority = iota
-          Medium
-          High
-      )
+      (defrecord BoundedQueue [store capacity]
+        q/Queue
+        (enqueue! [this item]
+          (if (< (count @store) capacity)
+            (do (swap! store conj item) true)
+            false))
+        (dequeue! [this]
+          (when (seq @store)
+            (let [item (first @store)]
+              (swap! store rest)
+              item)))
+        (size [this]
+          (count @store)))
 
-      type Task struct {
-          ID       string
-          Payload  []byte
-          Priority Priority
-      }
+      (defn create [capacity]
+        (->BoundedQueue (atom []) capacity))
+    src/worker/processor.clj: |
+      (ns worker.processor
+        (:require [queue.bounded :as bq]
+                  [queue.protocol :as q]))
 
-      func New(id string, payload []byte) *Task {
-          return &Task{ID: id, Payload: payload, Priority: Medium}
-      }
-    pkg/worker/pool.go: |
-      package worker
+      (defn process-all [queue handler]
+        (loop []
+          (when-let [item (q/dequeue! queue)]
+            (handler item)
+            (recur))))
 
-      import "pkg/task"
+      (defn submit-batch [queue items]
+        (mapv #(q/enqueue! queue %) items))
+    src/app/runner.clj: |
+      (ns app.runner
+        (:require [queue.bounded :as bq]
+                  [worker.processor :as proc]))
 
-      type Pool struct {
-          Size  int
-          queue chan *task.Task
-      }
+      (defn run [items handler]
+        (let [q (bq/create 100)]
+          (proc/submit-batch q items)
+          (proc/process-all q handler)))
+    garbage/search.clj: |
+      (ns garbage.search)
 
-      func NewPool(size int) *Pool {
-          return &Pool{Size: size, queue: make(chan *task.Task, 100)}
-      }
+      (def ^:const GARBAGE_BAL31HOP004_A "es_marker")
+      (def ^:const GARBAGE_BAL31HOP004_B "index_marker")
 
-      func (p *Pool) Submit(t *task.Task) {
-          p.queue <- t
-      }
+      (defn search [query]
+        GARBAGE_BAL31HOP004_A)
+    garbage/notify.clj: |
+      (ns garbage.notify)
 
-      func (p *Pool) Start() {
-          for i := 0; i < p.Size; i++ {
-              go p.work()
-          }
-      }
+      (def ^:const GARBAGE_BAL31HOP004_C "push_marker")
+      (def ^:const GARBAGE_BAL31HOP004_D "sms_marker")
 
-      func (p *Pool) work() {
-          for t := range p.queue {
-              _ = t
-          }
-      }
-    pkg/scheduler/cron.go: |
-      package scheduler
+      (defn notify [user message]
+        GARBAGE_BAL31HOP004_C)
+    garbage/audit.clj: |
+      (ns garbage.audit)
 
-      import "pkg/task"
+      (def ^:const GARBAGE_BAL31HOP004_E "audit_marker")
 
-      type CronScheduler struct {
-          tasks []*task.Task
-      }
-
-      func NewCronScheduler() *CronScheduler {
-          return &CronScheduler{}
-      }
-
-      func (c *CronScheduler) Schedule(t *task.Task) {
-          c.tasks = append(c.tasks, t)
-      }
-    pkg/metrics/counter.go: |
-      package metrics
-
-      GARBAGE_004_COUNTER_A = "counter"
-
-      type Counter struct {
-          Name  string
-          Value int64
-      }
-
-      func (c *Counter) Inc() {
-          c.Value++
-      }
-    pkg/retry/backoff.go: |
-      package retry
-
-      GARBAGE_004_BACKOFF_B = "backoff"
-
-      type Backoff struct {
-          MaxRetries int
-      }
-
-      func (b *Backoff) Execute(fn func() error) error {
-          return fn()
-      }
-    pkg/circuitbreaker/breaker.go: |
-      package circuitbreaker
-
-      GARBAGE_004_BREAKER_C = "breaker"
-
-      type Breaker struct {
-          Threshold int
-          Failures  int
-      }
-
-      func (b *Breaker) Allow() bool {
-          return b.Failures < b.Threshold
-      }
+      (defn record [event]
+        GARBAGE_BAL31HOP004_E)
   changed_files:
-    pkg/task/task.go: |
-      package task
+    src/queue/protocol.clj: |
+      (ns queue.protocol)
 
-      type Priority int
+      (defprotocol Queue
+        (enqueue! [this item])
+        (dequeue! [this])
+        (size [this])
+        (drain! [this]))
+    src/queue/bounded.clj: |
+      (ns queue.bounded
+        (:require [queue.protocol :as q]))
 
-      const (
-          Low    Priority = iota
-          Medium
-          High
-          Critical
-      )
+      (defrecord BoundedQueue [store capacity]
+        q/Queue
+        (enqueue! [this item]
+          (if (< (count @store) capacity)
+            (do (swap! store conj item) true)
+            false))
+        (dequeue! [this]
+          (when (seq @store)
+            (let [item (first @store)]
+              (swap! store rest)
+              item)))
+        (size [this]
+          (count @store))
+        (drain! [this]
+          (let [items @store]
+            (reset! store [])
+            items)))
 
-      type Task struct {
-          ID       string
-          Payload  []byte
-          Priority Priority
-          Retries  int
-      }
+      (defn create [capacity]
+        (->BoundedQueue (atom []) capacity))
+    src/worker/processor.clj: |
+      (ns worker.processor
+        (:require [queue.bounded :as bq]
+                  [queue.protocol :as q]))
 
-      func New(id string, payload []byte) *Task {
-          return &Task{ID: id, Payload: payload, Priority: Medium, Retries: 0}
-      }
+      (defn process-all [queue handler]
+        (loop []
+          (when-let [item (q/dequeue! queue)]
+            (handler item)
+            (recur))))
 
-      func NewWithPriority(id string, payload []byte, p Priority) *Task {
-          return &Task{ID: id, Payload: payload, Priority: p, Retries: 0}
-      }
-  commit_message: "feat: add Critical priority, Retries field, and NewWithPriority"
+      (defn submit-batch [queue items]
+        (mapv #(q/enqueue! queue %) items))
+
+      (defn drain-and-process [queue handler]
+        (doseq [item (q/drain! queue)]
+          (handler item)))
+    src/app/runner.clj: |
+      (ns app.runner
+        (:require [queue.bounded :as bq]
+                  [worker.processor :as proc]))
+
+      (defn run [items handler]
+        (let [q (bq/create 100)]
+          (proc/submit-batch q items)
+          (proc/process-all q handler)))
+
+      (defn run-drain [items handler]
+        (let [q (bq/create 100)]
+          (proc/submit-batch q items)
+          (proc/drain-and-process q handler)))
+    garbage/search.clj: |
+      (ns garbage.search)
+
+      (def ^:const GARBAGE_BAL31HOP004_A "es_marker")
+      (def ^:const GARBAGE_BAL31HOP004_B "index_marker")
+
+      (defn search [query]
+        GARBAGE_BAL31HOP004_A)
+    garbage/notify.clj: |
+      (ns garbage.notify)
+
+      (def ^:const GARBAGE_BAL31HOP004_C "push_marker")
+      (def ^:const GARBAGE_BAL31HOP004_D "sms_marker")
+
+      (defn notify [user message]
+        GARBAGE_BAL31HOP004_C)
+    garbage/audit.clj: |
+      (ns garbage.audit)
+
+      (def ^:const GARBAGE_BAL31HOP004_E "audit_marker")
+
+      (defn record [event]
+        GARBAGE_BAL31HOP004_E)
+  commit_message: "feat: add drain! to Queue protocol and drain-and-process to processor"
 fragments:
-- id: critical_priority
+- id: protocol_drain
   selector:
-    path: pkg/task/task.go
-    anchor: "Critical"
-- id: retries_field
+    path: src/queue/protocol.clj
+    anchor: "(drain! [this])"
+- id: bounded_drain_impl
   selector:
-    path: pkg/task/task.go
-    anchor: "Retries  int"
-- id: new_with_priority
+    path: src/queue/bounded.clj
+    anchor: "(drain! [this]"
+- id: processor_drain_fn
   selector:
-    path: pkg/task/task.go
-    anchor: "func NewWithPriority"
-- id: pool_imports_task
+    path: src/worker/processor.clj
+    anchor: "(defn drain-and-process"
+- id: runner_drain_fn
   selector:
-    path: pkg/worker/pool.go
-    anchor: "task.Task"
-- id: cron_imports_task
-  selector:
-    path: pkg/scheduler/cron.go
-    anchor: "task.Task"
-- id: unrelated_counter
-  selector:
-    path: pkg/metrics/counter.go
-    anchor: "type Counter struct"
-- id: unrelated_backoff
-  selector:
-    path: pkg/retry/backoff.go
-    anchor: "type Backoff struct"
-- id: unrelated_breaker
-  selector:
-    path: pkg/circuitbreaker/breaker.go
-    anchor: "type Breaker struct"
+    path: src/app/runner.clj
+    anchor: "(defn run-drain"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_004_COUNTER_A
+    anchor: GARBAGE_BAL31HOP004_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_004_BACKOFF_B
+    anchor: GARBAGE_BAL31HOP004_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_004_BREAKER_C
+    anchor: GARBAGE_BAL31HOP004_C
+- id: no_garbage_d
+  selector:
+    anchor: GARBAGE_BAL31HOP004_D
+- id: no_garbage_e
+  selector:
+    anchor: GARBAGE_BAL31HOP004_E
 oracle:
   required:
-  - critical_priority
-  - retries_field
-  - new_with_priority
-  - pool_imports_task
-  allowed:
-  - cron_imports_task
+  - protocol_drain
+  - bounded_drain_impl
+  - processor_drain_fn
+  - runner_drain_fn
+  allowed: []
   forbidden:
-  - unrelated_counter
-  - unrelated_backoff
-  - unrelated_breaker
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

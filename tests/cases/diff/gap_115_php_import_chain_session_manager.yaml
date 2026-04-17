@@ -1,166 +1,196 @@
 name: gap_115_php_import_chain_session_manager
 tags:
-- lang:php
-- change:single_file
-- context:import_chain
-- difficulty:easy
-- distance:0hop
-fixtures:
-  auto_garbage: true
+- lang:java
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:medium
 repo:
   initial_files:
-    src/Auth/SessionManager.php: |
-      <?php
+    src/main/java/com/ecommerce/CartService.java: |
+      package com.ecommerce;
 
-      namespace App\Auth;
+      import java.util.ArrayList;
+      import java.util.List;
 
-      class SessionManager
-      {
-          private array $sessions = [];
-          private int $ttlSeconds;
+      public class CartService {
+          private final ProductRepository products;
 
-          public function __construct(int $ttlSeconds)
-          {
-              $this->ttlSeconds = $ttlSeconds;
+          public CartService(ProductRepository products) {
+              this.products = products;
           }
 
-          public function create(string $userId): string
-          {
-              $token = bin2hex(random_bytes(16));
-              $this->sessions[$token] = [
-                  'user_id' => $userId,
-                  'created_at' => time(),
-              ];
-              return $token;
-          }
-
-          public function validate(string $token): bool
-          {
-              if (!isset($this->sessions[$token])) {
-                  return false;
+          public Cart addItem(Cart cart, String productId, int quantity) {
+              if (productId == null || productId.isBlank()) {
+                  throw new IllegalArgumentException("Product ID required");
               }
-              $session = $this->sessions[$token];
-              return (time() - $session['created_at']) < $this->ttlSeconds;
+              if (quantity <= 0) {
+                  throw new IllegalArgumentException("Quantity must be positive");
+              }
+              Product product = products.findById(productId);
+              if (product == null) {
+                  throw new IllegalStateException("Product not found: " + productId);
+              }
+              cart.addItem(new CartItem(product, quantity));
+              return cart;
           }
       }
-    src/Auth/PasswordHasher.php: |
-      <?php
+    src/main/java/com/ecommerce/WishlistService.java: |
+      package com.ecommerce;
 
-      namespace App\Auth;
+      public class WishlistService {
+          private final ProductRepository products;
 
-      class PasswordHasher
-      {
-          public function hash(string $password): string
-          {
-              return password_hash($password, PASSWORD_BCRYPT);
+          public WishlistService(ProductRepository products) {
+              this.products = products;
           }
 
-          public function verify(string $password, string $hash): bool
-          {
-              return password_verify($password, $hash);
-          }
-      }
-    src/Queue/JobDispatcher.php: |
-      <?php
-
-      namespace App\Queue;
-
-      class JobDispatcher
-      {
-          private array $pending = [];
-
-          public function dispatch(string $jobClass, array $payload): void
-          {
-              $this->pending[] = ['class' => $jobClass, 'payload' => $payload];
-          }
-
-          public function pendingCount(): int
-          {
-              return count($this->pending);
-          }
-
-          public function flush(): array
-          {
-              $jobs = $this->pending;
-              $this->pending = [];
-              return $jobs;
+          public Wishlist addToWishlist(Wishlist wishlist, String productId) {
+              if (productId == null || productId.isBlank()) {
+                  throw new IllegalArgumentException("Product ID required");
+              }
+              Product product = products.findById(productId);
+              if (product == null) {
+                  throw new IllegalStateException("Product not found: " + productId);
+              }
+              wishlist.add(product);
+              return wishlist;
           }
       }
+    src/main/java/com/ecommerce/ProductRepository.java: |
+      package com.ecommerce;
+
+      public interface ProductRepository {
+          Product findById(String productId);
+      }
+    garbage/RecommendationEngine.java: |
+      // GARBAGE_GAP115_RECOM_A = "recommendation_engine_marker"
+    garbage/LoyaltyProgram.java: |
+      // GARBAGE_GAP115_LOYAL_B = "loyalty_program_marker"
+    garbage/ReviewService.java: |
+      // GARBAGE_GAP115_REVIEW_C = "review_service_marker"
   changed_files:
-    src/Auth/SessionManager.php: |
-      <?php
+    src/main/java/com/ecommerce/CartService.java: |
+      package com.ecommerce;
 
-      namespace App\Auth;
+      import com.ecommerce.validation.ProductLookup;
 
-      class SessionManager
-      {
-          private array $sessions = [];
-          private int $ttlSeconds;
+      public class CartService {
+          private final ProductLookup productLookup;
 
-          public function __construct(int $ttlSeconds)
-          {
-              $this->ttlSeconds = $ttlSeconds;
+          public CartService(ProductLookup productLookup) {
+              this.productLookup = productLookup;
           }
 
-          public function create(string $userId): string
-          {
-              $token = bin2hex(random_bytes(16));
-              $this->sessions[$token] = [
-                  'user_id' => $userId,
-                  'created_at' => time(),
-              ];
-              return $token;
-          }
-
-          public function validate(string $token): bool
-          {
-              if (!isset($this->sessions[$token])) {
-                  return false;
+          public Cart addItem(Cart cart, String productId, int quantity) {
+              if (quantity <= 0) {
+                  throw new IllegalArgumentException("Quantity must be positive");
               }
-              $session = $this->sessions[$token];
-              return (time() - $session['created_at']) < $this->ttlSeconds;
-          }
-
-          public function destroy(string $token): bool
-          {
-              if (isset($this->sessions[$token])) {
-                  unset($this->sessions[$token]);
-                  return true;
-              }
-              return false;
-          }
-
-          public function activeCount(): int
-          {
-              $now = time();
-              $count = 0;
-              foreach ($this->sessions as $session) {
-                  if (($now - $session['created_at']) < $this->ttlSeconds) {
-                      $count++;
-                  }
-              }
-              return $count;
+              Product product = productLookup.requireProduct(productId);
+              cart.addItem(new CartItem(product, quantity));
+              return cart;
           }
       }
+    src/main/java/com/ecommerce/WishlistService.java: |
+      package com.ecommerce;
+
+      import com.ecommerce.validation.ProductLookup;
+
+      public class WishlistService {
+          private final ProductLookup productLookup;
+
+          public WishlistService(ProductLookup productLookup) {
+              this.productLookup = productLookup;
+          }
+
+          public Wishlist addToWishlist(Wishlist wishlist, String productId) {
+              Product product = productLookup.requireProduct(productId);
+              wishlist.add(product);
+              return wishlist;
+          }
+      }
+    src/main/java/com/ecommerce/validation/ProductLookup.java: |
+      package com.ecommerce.validation;
+
+      import com.ecommerce.Product;
+      import com.ecommerce.ProductRepository;
+
+      public class ProductLookup {
+          private final ProductRepository repository;
+
+          public ProductLookup(ProductRepository repository) {
+              this.repository = repository;
+          }
+
+          public Product requireProduct(String productId) {
+              if (productId == null || productId.isBlank()) {
+                  throw new IllegalArgumentException("Product ID required");
+              }
+              Product product = repository.findById(productId);
+              if (product == null) {
+                  throw new IllegalStateException("Product not found: " + productId);
+              }
+              return product;
+          }
+      }
+    src/main/java/com/ecommerce/ProductRepository.java: |
+      package com.ecommerce;
+
+      public interface ProductRepository {
+          Product findById(String productId);
+      }
+    garbage/RecommendationEngine.java: |
+      // GARBAGE_GAP115_RECOM_A = "recommendation_engine_marker"
+    garbage/LoyaltyProgram.java: |
+      // GARBAGE_GAP115_LOYAL_B = "loyalty_program_marker"
+    garbage/ReviewService.java: |
+      // GARBAGE_GAP115_REVIEW_C = "review_service_marker"
+  commit_message: "refactor: extract ProductLookup shared by CartService and WishlistService"
 fragments:
-- id: session_destroy
+- id: cart_uses_product_lookup
   selector:
-    path: src/Auth/SessionManager.php
-    anchor: "public function destroy"
-- id: session_active_count
+    path: src/main/java/com/ecommerce/CartService.java
+    anchor: "private final ProductLookup productLookup;"
+- id: cart_calls_require_product
   selector:
-    path: src/Auth/SessionManager.php
-    anchor: "public function activeCount"
-- id: no_queue
+    path: src/main/java/com/ecommerce/CartService.java
+    anchor: "productLookup.requireProduct(productId);"
+- id: wishlist_uses_product_lookup
   selector:
-    path: src/Queue/JobDispatcher.php
-- id: no_job_dispatcher
+    path: src/main/java/com/ecommerce/WishlistService.java
+    anchor: "import com.ecommerce.validation.ProductLookup;"
+- id: product_lookup_class
   selector:
-    anchor: JobDispatcher
+    path: src/main/java/com/ecommerce/validation/ProductLookup.java
+    anchor: "public class ProductLookup {"
+- id: product_lookup_require
+  selector:
+    path: src/main/java/com/ecommerce/validation/ProductLookup.java
+    anchor: "public Product requireProduct(String productId) {"
+- id: unrelated_repo_interface
+  selector:
+    path: src/main/java/com/ecommerce/ProductRepository.java
+    anchor: "Product findById(String productId);"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_GAP115_RECOM_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_GAP115_LOYAL_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_GAP115_REVIEW_C
 oracle:
   required:
-  - session_destroy
-  - session_active_count
+  - cart_uses_product_lookup
+  - cart_calls_require_product
+  - product_lookup_class
+  - product_lookup_require
+  allowed:
+  - wishlist_uses_product_lookup
   forbidden:
-  - no_queue
-  - no_job_dispatcher
+  - unrelated_repo_interface
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

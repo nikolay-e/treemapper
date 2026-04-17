@@ -1,244 +1,194 @@
 name: bal_rare_026_perl_dbi_wrapper
 tags:
-- lang:perl
+- lang:rust
 - change:multi_file
-- change:bug_fix
+- change:refactor
 - context:import_chain
-- distance:1hop
-- difficulty:medium
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
-    lib/DB.pm: |
-      package DB;
-      use strict;
-      use warnings;
-      use Exporter 'import';
-      our @EXPORT_OK = qw(connect query);
-
-      my $connection;
-
-      sub connect {
-          my ($dsn, $user, $pass) = @_;
-          $connection = {
-              dsn  => $dsn,
-              user => $user,
-              connected => 1,
-          };
-          return $connection;
+    src/render/renderer.rs: |
+      pub struct RenderOptions {
+          pub width: u32,
+          pub height: u32,
+          pub samples: u32,
       }
 
-      sub query {
-          my ($sql) = @_;
-          die "Not connected" unless $connection && $connection->{connected};
-          return { sql => $sql, rows => [] };
+      pub struct FrameBuffer {
+          pub pixels: Vec<u32>,
+          pub width: u32,
+          pub height: u32,
       }
 
-      1;
-    lib/UserRepo.pm: |
-      package UserRepo;
-      use strict;
-      use warnings;
-      use DB qw(query);
-
-      sub find_by_id {
-          my ($id) = @_;
-          my $result = query("SELECT * FROM users WHERE id = $id");
-          return $result->{rows}->[0];
+      impl FrameBuffer {
+          pub fn new(width: u32, height: u32) -> Self {
+              Self { pixels: vec![0u32; (width * height) as usize], width, height }
+          }
       }
 
-      sub find_all {
-          my $result = query("SELECT * FROM users");
-          return $result->{rows};
+      pub fn render_frame(options: &RenderOptions) -> FrameBuffer {
+          let buf = FrameBuffer::new(options.width, options.height);
+          buf
+      }
+    src/scene/camera.rs: |
+      use crate::render::renderer::RenderOptions;
+
+      pub struct Camera {
+          pub fov: f32,
+          pub near: f32,
+          pub far: f32,
       }
 
-      1;
-    lib/App.pm: |
-      package App;
-      use strict;
-      use warnings;
-      use DB qw(connect);
-      use UserRepo;
+      impl Camera {
+          pub fn new(fov: f32) -> Self {
+              Self { fov, near: 0.1, far: 1000.0 }
+          }
 
-      sub run {
-          connect("dbi:Pg:dbname=app", "admin", "secret");
-          my $users = UserRepo::find_all();
-          return $users;
+          pub fn to_render_options(&self, width: u32, height: u32) -> RenderOptions {
+              RenderOptions { width, height, samples: 1 }
+          }
+      }
+    src/engine/game_loop.rs: |
+      use crate::scene::camera::Camera;
+      use crate::render::renderer::render_frame;
+
+      pub struct GameLoop {
+          camera: Camera,
       }
 
-      1;
-    garbage_logger.pm: |
-      package GarbageLogger;
-      our $GARBAGE_RARE_026_LEVEL_A = "info";
-      our $GARBAGE_RARE_026_FILE_B = "/var/log/app.log";
+      impl GameLoop {
+          pub fn new() -> Self {
+              Self { camera: Camera::new(90.0) }
+          }
 
-      sub garbage_log {
-          return $GARBAGE_RARE_026_LEVEL_A;
+          pub fn tick(&self, width: u32, height: u32) {
+              let options = self.camera.to_render_options(width, height);
+              let _frame = render_frame(&options);
+          }
       }
-
-      our $GARBAGE_RARE_026_ROTATE_C = 1;
-      1;
-    garbage_config.pm: |
-      package GarbageConfig;
-      our $GARBAGE_RARE_026_ENV_D = "production";
-      our $GARBAGE_RARE_026_DEBUG_E = 0;
-
-      sub garbage_load {
-          return $GARBAGE_RARE_026_ENV_D;
-      }
-
-      our $GARBAGE_RARE_026_STRICT_F = 1;
-      1;
+    garbage/audio.rs: |
+      // GARBAGE_DBIWRAP_A = "audio_engine_marker"
+    garbage/physics.rs: |
+      // GARBAGE_DBIWRAP_B = "physics_world_marker"
+    garbage/networking.rs: |
+      // GARBAGE_DBIWRAP_C = "network_sync_marker"
   changed_files:
-    lib/DB.pm: |
-      package DB;
-      use strict;
-      use warnings;
-      use Exporter 'import';
-      our @EXPORT_OK = qw(connect query execute);
-
-      my $connection;
-
-      sub connect {
-          my ($dsn, $user, $pass) = @_;
-          $connection = {
-              dsn  => $dsn,
-              user => $user,
-              connected => 1,
-          };
-          return $connection;
+    src/render/renderer.rs: |
+      pub struct RenderOptions {
+          pub width: u32,
+          pub height: u32,
+          pub samples: u32,
+          pub hdr: bool,
       }
 
-      sub query {
-          my ($sql, @params) = @_;
-          die "Not connected" unless $connection && $connection->{connected};
-          return { sql => $sql, params => \@params, rows => [] };
+      pub trait Renderer {
+          fn render(&self, options: &RenderOptions) -> FrameBuffer;
+          fn name(&self) -> &'static str;
       }
 
-      sub execute {
-          my ($sql, @params) = @_;
-          die "Not connected" unless $connection && $connection->{connected};
-          return { sql => $sql, params => \@params, affected => 0 };
+      pub struct FrameBuffer {
+          pub pixels: Vec<u32>,
+          pub width: u32,
+          pub height: u32,
       }
 
-      1;
-    lib/UserRepo.pm: |
-      package UserRepo;
-      use strict;
-      use warnings;
-      use DB qw(query execute);
-
-      sub find_by_id {
-          my ($id) = @_;
-          my $result = query("SELECT * FROM users WHERE id = ?", $id);
-          return $result->{rows}->[0];
+      impl FrameBuffer {
+          pub fn new(width: u32, height: u32) -> Self {
+              Self { pixels: vec![0u32; (width * height) as usize], width, height }
+          }
       }
 
-      sub find_all {
-          my $result = query("SELECT * FROM users");
-          return $result->{rows};
+      pub struct DefaultRenderer;
+
+      impl Renderer for DefaultRenderer {
+          fn render(&self, options: &RenderOptions) -> FrameBuffer {
+              FrameBuffer::new(options.width, options.height)
+          }
+
+          fn name(&self) -> &'static str {
+              "default"
+          }
+      }
+    src/scene/camera.rs: |
+      use crate::render::renderer::RenderOptions;
+
+      pub struct Camera {
+          pub fov: f32,
+          pub near: f32,
+          pub far: f32,
+          pub hdr: bool,
       }
 
-      sub delete_by_id {
-          my ($id) = @_;
-          return execute("DELETE FROM users WHERE id = ?", $id);
+      impl Camera {
+          pub fn new(fov: f32) -> Self {
+              Self { fov, near: 0.1, far: 1000.0, hdr: false }
+          }
+
+          pub fn to_render_options(&self, width: u32, height: u32) -> RenderOptions {
+              RenderOptions { width, height, samples: 1, hdr: self.hdr }
+          }
+      }
+    src/engine/game_loop.rs: |
+      use crate::scene::camera::Camera;
+      use crate::render::renderer::{Renderer, DefaultRenderer};
+
+      pub struct GameLoop<R: Renderer> {
+          camera: Camera,
+          renderer: R,
       }
 
-      1;
-    lib/App.pm: |
-      package App;
-      use strict;
-      use warnings;
-      use DB qw(connect);
-      use UserRepo;
-
-      sub run {
-          connect("dbi:Pg:dbname=app", "admin", "secret");
-          my $users = UserRepo::find_all();
-          return $users;
+      impl GameLoop<DefaultRenderer> {
+          pub fn new() -> Self {
+              Self { camera: Camera::new(90.0), renderer: DefaultRenderer }
+          }
       }
 
-      1;
-    garbage_logger.pm: |
-      package GarbageLogger;
-      our $GARBAGE_RARE_026_LEVEL_A = "info";
-      our $GARBAGE_RARE_026_FILE_B = "/var/log/app.log";
-
-      sub garbage_log {
-          return $GARBAGE_RARE_026_LEVEL_A;
+      impl<R: Renderer> GameLoop<R> {
+          pub fn tick(&self, width: u32, height: u32) {
+              let options = self.camera.to_render_options(width, height);
+              let _frame = self.renderer.render(&options);
+          }
       }
-
-      our $GARBAGE_RARE_026_ROTATE_C = 1;
-      1;
-    garbage_config.pm: |
-      package GarbageConfig;
-      our $GARBAGE_RARE_026_ENV_D = "production";
-      our $GARBAGE_RARE_026_DEBUG_E = 0;
-
-      sub garbage_load {
-          return $GARBAGE_RARE_026_ENV_D;
-      }
-
-      our $GARBAGE_RARE_026_STRICT_F = 1;
-      1;
-  commit_message: "fix: use parameterized queries to prevent SQL injection"
+    garbage/audio.rs: |
+      // GARBAGE_DBIWRAP_A = "audio_engine_marker"
+    garbage/physics.rs: |
+      // GARBAGE_DBIWRAP_B = "physics_world_marker"
+    garbage/networking.rs: |
+      // GARBAGE_DBIWRAP_C = "network_sync_marker"
+  commit_message: "refactor: introduce Renderer trait and hdr flag in RenderOptions"
 fragments:
-- id: query_params
+- id: renderer_trait
   selector:
-    path: lib/DB.pm
-    anchor: "my ($sql, @params) = @_"
-- id: execute_fn
+    anchor: "pub trait Renderer"
+- id: hdr_field_added
   selector:
-    path: lib/DB.pm
-    anchor: "sub execute"
-- id: repo_parameterized
+    anchor: "pub hdr: bool"
+- id: camera_passes_hdr
   selector:
-    path: lib/UserRepo.pm
-    anchor: 'query("SELECT * FROM users WHERE id = ?", $id)'
-- id: repo_delete
+    path: src/scene/camera.rs
+    anchor: "hdr: self.hdr"
+- id: game_loop_uses_trait
   selector:
-    path: lib/UserRepo.pm
-    anchor: "sub delete_by_id"
-- id: no_app
+    path: src/engine/game_loop.rs
+    anchor: "use crate::render::renderer::{Renderer, DefaultRenderer}"
+- id: no_garbage_a
   selector:
-    path: lib/App.pm
-- id: no_garbage_logger
+    anchor: GARBAGE_DBIWRAP_A
+- id: no_garbage_b
   selector:
-    path: garbage_logger.pm
-- id: no_garbage_config
+    anchor: GARBAGE_DBIWRAP_B
+- id: no_garbage_c
   selector:
-    path: garbage_config.pm
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_RARE_026_LEVEL_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_RARE_026_FILE_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_RARE_026_ROTATE_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_RARE_026_ENV_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_026_DEBUG_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_026_STRICT_F
+    anchor: GARBAGE_DBIWRAP_C
 oracle:
   required:
-  - query_params
-  - execute_fn
-  - repo_parameterized
-  - repo_delete
+  - renderer_trait
+  - hdr_field_added
+  - camera_passes_hdr
+  - game_loop_uses_trait
   allowed: []
   forbidden:
-  - no_app
-  - no_garbage_logger
-  - no_garbage_config
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

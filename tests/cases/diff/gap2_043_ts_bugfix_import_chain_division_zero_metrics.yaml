@@ -1,140 +1,182 @@
 name: gap2_043_ts_bugfix_import_chain_division_zero_metrics
 tags:
-- change:bug_fix
+- lang:erlang
+- change:refactor
 - change:single_file
-- context:import_chain
-- difficulty:easy
-- distance:0hop
-- lang:typescript
+- context:call_graph
+- distance:1hop
+- difficulty:hard
 repo:
   initial_files:
-    src/metrics/types.ts: |
-      export interface MetricSample {
-        timestamp: number;
-        value: number;
-        label: string;
-      }
+    src/leaderboard_server.erl: |
+      -module(leaderboard_server).
+      -behaviour(gen_server).
+      -export([start_link/0, submit_score/3, top_n/2, player_rank/2]).
+      -export([init/1, handle_call/3, handle_cast/2]).
 
-      export interface AggregatedMetric {
-        label: string;
-        average: number;
-        count: number;
-      }
-    src/metrics/aggregator.ts: |
-      import { MetricSample, AggregatedMetric } from "./types";
+      start_link() ->
+          gen_server:start_link({local, ?MODULE}, ?MODULE, #{}, []).
 
-      function groupByLabel(samples: MetricSample[]): Map<string, MetricSample[]> {
-        const groups = new Map<string, MetricSample[]>();
-        for (const sample of samples) {
-          const existing = groups.get(sample.label) ?? [];
-          existing.push(sample);
-          groups.set(sample.label, existing);
-        }
-        return groups;
-      }
+      submit_score(GameId, PlayerId, Score) ->
+          gen_server:cast(?MODULE, {submit, GameId, PlayerId, Score}).
 
-      function computeAverage(samples: MetricSample[]): number {
-        const total = samples.reduce((sum, s) => sum + s.value, 0);
-        return total / samples.length;
-      }
+      top_n(GameId, N) ->
+          gen_server:call(?MODULE, {top_n, GameId, N}).
 
-      function aggregate(samples: MetricSample[]): AggregatedMetric[] {
-        const grouped = groupByLabel(samples);
-        const results: AggregatedMetric[] = [];
-        for (const [label, group] of grouped) {
-          results.push({ label, average: computeAverage(group), count: group.length });
-        }
-        return results;
-      }
-    src/metrics/exporter.ts: |
-      const TRAP_GAP2_043_EXPORT_A: string = "prometheus";
-      const TRAP_GAP2_043_PORT_B: number = 9090;
+      player_rank(GameId, PlayerId) ->
+          gen_server:call(?MODULE, {rank, GameId, PlayerId}).
 
-      function formatPrometheus(name: string, value: number): string {
-        return `${name} ${value}`;
-      }
+      init(_) -> {ok, #{}}.
 
-      function exportBatch(metrics: Array<{ name: string; value: number }>): string {
-        return metrics.map((m) => formatPrometheus(m.name, m.value)).join("\n");
-      }
-    src/metrics/alerting.ts: |
-      const TRAP_GAP2_043_ALERT_C: string = "threshold_alert";
-      const TRAP_GAP2_043_THRESHOLD_D: number = 95;
+      handle_call({top_n, GameId, N}, _From, State) ->
+          Scores = maps:get(GameId, State, []),
+          Sorted = lists:sort(fun({_, S1}, {_, S2}) -> S1 > S2 end, Scores),
+          {reply, lists:sublist(Sorted, N), State};
+      handle_call({rank, GameId, PlayerId}, _From, State) ->
+          Scores = maps:get(GameId, State, []),
+          Sorted = lists:sort(fun({_, S1}, {_, S2}) -> S1 > S2 end, Scores),
+          Rank = find_rank(PlayerId, Sorted, 1),
+          {reply, Rank, State}.
 
-      function checkThreshold(value: number, limit: number): boolean {
-        return value > limit;
-      }
+      handle_cast({submit, GameId, PlayerId, Score}, State) ->
+          Existing = maps:get(GameId, State, []),
+          Updated = lists:keystore(PlayerId, 1, Existing, {PlayerId, Score}),
+          {noreply, maps:put(GameId, Updated, State)}.
 
-      function triggerAlert(metric: string, value: number): void {}
+      find_rank(_, [], _) -> not_found;
+      find_rank(PlayerId, [{PlayerId, _} | _], Rank) -> Rank;
+      find_rank(PlayerId, [_ | Rest], Rank) -> find_rank(PlayerId, Rest, Rank + 1).
+    src/game_api.erl: |
+      -module(game_api).
+      -export([record_score/3, get_leaderboard/2]).
+
+      record_score(GameId, PlayerId, Score) ->
+          leaderboard_server:submit_score(GameId, PlayerId, Score).
+
+      get_leaderboard(GameId, Limit) ->
+          leaderboard_server:top_n(GameId, Limit).
+    garbage/item_catalog.erl: |
+      -module(item_catalog).
+      %% GARBAGE_GAP043_A = "item_catalog_marker"
+      -export([find/1]).
+
+      find(ItemId) -> {ok, ItemId}.
+    garbage/match_history.erl: |
+      -module(match_history).
+      %% GARBAGE_GAP043_B = "match_history_marker"
+      -export([last_n/2]).
+
+      last_n(PlayerId, N) -> {ok, PlayerId, N}.
+    garbage/achievement_engine.erl: |
+      -module(achievement_engine).
+      %% GARBAGE_GAP043_C = "achievement_engine_marker"
+      -export([check/2]).
+
+      check(PlayerId, AchievementId) -> {ok, PlayerId, AchievementId}.
   changed_files:
-    src/metrics/aggregator.ts: |
-      import { MetricSample, AggregatedMetric } from "./types";
+    src/leaderboard_server.erl: |
+      -module(leaderboard_server).
+      -behaviour(gen_server).
+      -export([start_link/0, submit_score/3, top_n/2, player_rank/2, reset_game/1]).
+      -export([init/1, handle_call/3, handle_cast/2]).
 
-      function groupByLabel(samples: MetricSample[]): Map<string, MetricSample[]> {
-        const groups = new Map<string, MetricSample[]>();
-        for (const sample of samples) {
-          const existing = groups.get(sample.label) ?? [];
-          existing.push(sample);
-          groups.set(sample.label, existing);
-        }
-        return groups;
-      }
+      start_link() ->
+          gen_server:start_link({local, ?MODULE}, ?MODULE, #{}, []).
 
-      function computeAverage(samples: MetricSample[]): number {
-        if (samples.length === 0) {
-          return 0;
-        }
-        const total = samples.reduce((sum, s) => sum + s.value, 0);
-        return total / samples.length;
-      }
+      submit_score(GameId, PlayerId, Score) ->
+          gen_server:cast(?MODULE, {submit, GameId, PlayerId, Score}).
 
-      function aggregate(samples: MetricSample[]): AggregatedMetric[] {
-        const grouped = groupByLabel(samples);
-        const results: AggregatedMetric[] = [];
-        for (const [label, group] of grouped) {
-          results.push({ label, average: computeAverage(group), count: group.length });
-        }
-        return results;
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      top_n(GameId, N) ->
+          gen_server:call(?MODULE, {top_n, GameId, N}).
+
+      player_rank(GameId, PlayerId) ->
+          gen_server:call(?MODULE, {rank, GameId, PlayerId}).
+
+      reset_game(GameId) ->
+          gen_server:cast(?MODULE, {reset, GameId}).
+
+      init(_) -> {ok, #{}}.
+
+      handle_call({top_n, GameId, N}, _From, State) ->
+          Scores = maps:get(GameId, State, []),
+          Sorted = lists:sort(fun({_, S1}, {_, S2}) -> S1 > S2 end, Scores),
+          {reply, lists:sublist(Sorted, N), State};
+      handle_call({rank, GameId, PlayerId}, _From, State) ->
+          Scores = maps:get(GameId, State, []),
+          Sorted = lists:sort(fun({_, S1}, {_, S2}) -> S1 > S2 end, Scores),
+          Rank = find_rank(PlayerId, Sorted, 1),
+          {reply, Rank, State}.
+
+      handle_cast({submit, GameId, PlayerId, Score}, State) ->
+          Existing = maps:get(GameId, State, []),
+          Updated = lists:keystore(PlayerId, 1, Existing, {PlayerId, Score}),
+          {noreply, maps:put(GameId, Updated, State)};
+      handle_cast({reset, GameId}, State) ->
+          {noreply, maps:remove(GameId, State)}.
+
+      find_rank(_, [], _) -> not_found;
+      find_rank(PlayerId, [{PlayerId, _} | _], Rank) -> Rank;
+      find_rank(PlayerId, [_ | Rest], Rank) -> find_rank(PlayerId, Rest, Rank + 1).
+    src/game_api.erl: |
+      -module(game_api).
+      -export([record_score/3, get_leaderboard/2, end_game/1]).
+
+      record_score(GameId, PlayerId, Score) ->
+          leaderboard_server:submit_score(GameId, PlayerId, Score).
+
+      get_leaderboard(GameId, Limit) ->
+          leaderboard_server:top_n(GameId, Limit).
+
+      end_game(GameId) ->
+          leaderboard_server:reset_game(GameId).
+    garbage/item_catalog.erl: |
+      -module(item_catalog).
+      %% GARBAGE_GAP043_A = "item_catalog_marker"
+      -export([find/1]).
+
+      find(ItemId) -> {ok, ItemId}.
+    garbage/match_history.erl: |
+      -module(match_history).
+      %% GARBAGE_GAP043_B = "match_history_marker"
+      -export([last_n/2]).
+
+      last_n(PlayerId, N) -> {ok, PlayerId, N}.
+    garbage/achievement_engine.erl: |
+      -module(achievement_engine).
+      %% GARBAGE_GAP043_C = "achievement_engine_marker"
+      -export([check/2]).
+
+      check(PlayerId, AchievementId) -> {ok, PlayerId, AchievementId}.
+  commit_message: "refactor: add reset_game/1 to leaderboard_server, expose end_game in game_api"
 fragments:
-- id: aggregator_zero_guard
+- id: reset_game_export
   selector:
-    path: src/metrics/aggregator.ts
-    anchor: "if (samples.length === 0)"
-- id: aggregator_return_zero
+    path: src/leaderboard_server.erl
+    anchor: "reset_game(GameId) ->"
+- id: handle_cast_reset
   selector:
-    path: src/metrics/aggregator.ts
-    anchor: "return 0;"
-- id: no_exporter
+    path: src/leaderboard_server.erl
+    anchor: "handle_cast({reset, GameId}, State) ->"
+- id: end_game_fn
   selector:
-    path: src/metrics/exporter.ts
-- id: no_alerting
+    path: src/game_api.erl
+    anchor: "end_game(GameId) ->"
+- id: no_garbage_a
   selector:
-    path: src/metrics/alerting.ts
-- id: no_global_0
+    anchor: GARBAGE_GAP043_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2_043_EXPORT_A
-- id: no_global_1
+    anchor: GARBAGE_GAP043_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_043_PORT_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP2_043_ALERT_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2_043_THRESHOLD_D
+    anchor: GARBAGE_GAP043_C
 oracle:
   required:
-  - aggregator_zero_guard
-  - aggregator_return_zero
+  - reset_game_export
+  - handle_cast_reset
+  - end_game_fn
   allowed: []
   forbidden:
-  - no_exporter
-  - no_alerting
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

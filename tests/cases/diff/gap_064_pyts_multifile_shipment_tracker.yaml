@@ -1,242 +1,178 @@
 name: gap_064_pyts_multifile_shipment_tracker
 tags:
-- change:multi_file
-- change:new_function
-- change:new_function
-- change:signature
-- context:same_file
-- difficulty:easy
-- distance:0hop
-- lang:python
-- lang:typescript
+- lang:erlang
+- change:refactor
+- change:single_file
+- context:call_graph
+- distance:1hop
+- difficulty:hard
 repo:
   initial_files:
-    src/logistics/shipment.py: |
-      from typing import List, Optional
-      from dataclasses import dataclass
-      from enum import Enum
+    src/inventory_server.erl: |
+      -module(inventory_server).
+      -behaviour(gen_server).
+      -export([start_link/0, reserve/2, release/2, stock/1]).
+      -export([init/1, handle_call/3, handle_cast/2]).
 
-      class ShipmentStatus(Enum):
-          PENDING = "pending"
-          IN_TRANSIT = "in_transit"
-          DELIVERED = "delivered"
+      start_link() ->
+          gen_server:start_link({local, ?MODULE}, ?MODULE, #{}, []).
 
-      @dataclass
-      class Parcel:
-          tracking_id: str
-          weight_kg: float
-          destination: str
+      reserve(ProductId, Qty) ->
+          gen_server:call(?MODULE, {reserve, ProductId, Qty}).
 
-      class ShipmentTracker:
-          def __init__(self, warehouse: str):
-              self.warehouse = warehouse
-              self._parcels: List[Parcel] = []
+      release(ProductId, Qty) ->
+          gen_server:cast(?MODULE, {release, ProductId, Qty}).
 
-          def register(self, parcel: Parcel) -> None:
-              self._parcels.append(parcel)
+      stock(ProductId) ->
+          gen_server:call(?MODULE, {stock, ProductId}).
 
-          def total_weight(self) -> float:
-              return sum(p.weight_kg for p in self._parcels)
+      init(_Args) ->
+          {ok, #{}}.
 
-          def find_by_id(self, tracking_id: str) -> Optional[Parcel]:
-              for p in self._parcels:
-                  if p.tracking_id == tracking_id:
-                      return p
-              return None
-    src/logistics/dashboard.ts: |
-      interface ShipmentSummary {
-        trackingId: string;
-        status: string;
-        eta: string;
-      }
+      handle_call({reserve, ProductId, Qty}, _From, State) ->
+          Current = maps:get(ProductId, State, 0),
+          if
+              Current >= Qty ->
+                  {reply, ok, maps:put(ProductId, Current - Qty, State)};
+              true ->
+                  {reply, {error, insufficient_stock}, State}
+          end;
+      handle_call({stock, ProductId}, _From, State) ->
+          {reply, maps:get(ProductId, State, 0), State}.
 
-      function formatEta(hoursRemaining: number): string {
-        if (hoursRemaining < 1) return "< 1 hour";
-        return `${Math.ceil(hoursRemaining)} hours`;
-      }
+      handle_cast({release, ProductId, Qty}, State) ->
+          Current = maps:get(ProductId, State, 0),
+          {noreply, maps:put(ProductId, Current + Qty, State)}.
+    src/order_handler.erl: |
+      -module(order_handler).
+      -export([place_order/2]).
 
-      function renderShipmentCard(summary: ShipmentSummary): string {
-        return `[${summary.trackingId}] ${summary.status} - ETA: ${summary.eta}`;
-      }
+      place_order(ProductId, Qty) ->
+          case inventory_server:reserve(ProductId, Qty) of
+              ok -> {ok, order_placed};
+              {error, Reason} -> {error, Reason}
+          end.
+    garbage/payment_processor.erl: |
+      -module(payment_processor).
+      %% GARBAGE_GAP064_A = "payment_processor_marker"
+      -export([charge/2]).
 
-      function renderDashboard(summaries: ShipmentSummary[]): string {
-        const header = `Shipments: ${summaries.length}`;
-        const cards = summaries.map(renderShipmentCard).join("\n");
-        return `${header}\n${cards}`;
-      }
-    src/logistics/invoice.py: |
-      TRAP_GAP064_INVOICE_A = "shipping_invoice"
-      TRAP_GAP064_CURRENCY_B = "USD"
+      charge(UserId, Amount) -> {ok, UserId, Amount}.
+    garbage/email_notifier.erl: |
+      -module(email_notifier).
+      %% GARBAGE_GAP064_B = "email_notifier_marker"
+      -export([notify/2]).
 
-      class ShippingInvoice:
-          def __init__(self, rate_per_kg: float = 2.5):
-              self.rate_per_kg = rate_per_kg
+      notify(To, Msg) -> {sent, To, Msg}.
+    garbage/iot_sensor_agent.erl: |
+      -module(iot_sensor_agent).
+      %% GARBAGE_GAP064_C = "iot_sensor_agent_marker"
+      -export([read/1]).
 
-          def calculate(self, weight_kg: float) -> float:
-              return weight_kg * self.rate_per_kg
-
-          def format_total(self, total: float) -> str:
-              return f"${total:.2f}"
-    src/logistics/notifications.ts: |
-      const TRAP_GAP064_NOTIFY_C: string = "shipping_notify";
-      const TRAP_GAP064_CHANNEL_D: string = "email";
-
-      function buildSubject(trackingId: string): string {
-        return `Shipment Update: ${trackingId}`;
-      }
-
-      function buildBody(trackingId: string, status: string): string {
-        return `Your shipment ${trackingId} is now ${status}.`;
-      }
+      read(SensorId) -> {ok, SensorId, 42}.
   changed_files:
-    src/logistics/shipment.py: |
-      from typing import List, Optional
-      from dataclasses import dataclass
-      from enum import Enum
+    src/inventory_server.erl: |
+      -module(inventory_server).
+      -behaviour(gen_server).
+      -export([start_link/0, reserve/2, release/2, stock/1, restock/2]).
+      -export([init/1, handle_call/3, handle_cast/2]).
 
-      class ShipmentStatus(Enum):
-          PENDING = "pending"
-          IN_TRANSIT = "in_transit"
-          DELIVERED = "delivered"
-          RETURNED = "returned"
+      start_link() ->
+          gen_server:start_link({local, ?MODULE}, ?MODULE, #{}, []).
 
-      @dataclass
-      class Parcel:
-          tracking_id: str
-          weight_kg: float
-          destination: str
+      reserve(ProductId, Qty) ->
+          gen_server:call(?MODULE, {reserve, ProductId, Qty}).
 
-      class ShipmentTracker:
-          def __init__(self, warehouse: str, max_weight: float = 1000.0):
-              self.warehouse = warehouse
-              self.max_weight = max_weight
-              self._parcels: List[Parcel] = []
+      release(ProductId, Qty) ->
+          gen_server:cast(?MODULE, {release, ProductId, Qty}).
 
-          def register(self, parcel: Parcel) -> None:
-              self._parcels.append(parcel)
+      stock(ProductId) ->
+          gen_server:call(?MODULE, {stock, ProductId}).
 
-          def bulk_register(self, parcels: List[Parcel]) -> int:
-              added = 0
-              for p in parcels:
-                  if self.total_weight() + p.weight_kg <= self.max_weight:
-                      self._parcels.append(p)
-                      added += 1
-              return added
+      restock(ProductId, Qty) ->
+          gen_server:cast(?MODULE, {restock, ProductId, Qty}).
 
-          def filter_by_destination(self, destination: str) -> List[Parcel]:
-              return [p for p in self._parcels if p.destination == destination]
+      init(_Args) ->
+          {ok, #{}}.
 
-          def total_weight(self) -> float:
-              return sum(p.weight_kg for p in self._parcels)
+      handle_call({reserve, ProductId, Qty}, _From, State) ->
+          Current = maps:get(ProductId, State, 0),
+          if
+              Current >= Qty ->
+                  {reply, ok, maps:put(ProductId, Current - Qty, State)};
+              true ->
+                  {reply, {error, insufficient_stock}, State}
+          end;
+      handle_call({stock, ProductId}, _From, State) ->
+          {reply, maps:get(ProductId, State, 0), State}.
 
-          def find_by_id(self, tracking_id: str) -> Optional[Parcel]:
-              for p in self._parcels:
-                  if p.tracking_id == tracking_id:
-                      return p
-              return None
-    src/logistics/dashboard.ts: |
-      interface ShipmentSummary {
-        trackingId: string;
-        status: string;
-        eta: string;
-        priority: number;
-      }
+      handle_cast({release, ProductId, Qty}, State) ->
+          Current = maps:get(ProductId, State, 0),
+          {noreply, maps:put(ProductId, Current + Qty, State)};
+      handle_cast({restock, ProductId, Qty}, State) ->
+          Current = maps:get(ProductId, State, 0),
+          {noreply, maps:put(ProductId, Current + Qty, State)}.
+    src/order_handler.erl: |
+      -module(order_handler).
+      -export([place_order/2, cancel_order/2]).
 
-      function formatEta(hoursRemaining: number): string {
-        if (hoursRemaining < 1) return "< 1 hour";
-        return `${Math.ceil(hoursRemaining)} hours`;
-      }
+      place_order(ProductId, Qty) ->
+          case inventory_server:reserve(ProductId, Qty) of
+              ok -> {ok, order_placed};
+              {error, Reason} -> {error, Reason}
+          end.
 
-      function priorityBadge(priority: number): string {
-        if (priority >= 3) return "[URGENT]";
-        if (priority >= 2) return "[HIGH]";
-        return "";
-      }
+      cancel_order(ProductId, Qty) ->
+          inventory_server:restock(ProductId, Qty),
+          {ok, order_cancelled}.
+    garbage/payment_processor.erl: |
+      -module(payment_processor).
+      %% GARBAGE_GAP064_A = "payment_processor_marker"
+      -export([charge/2]).
 
-      function renderShipmentCard(summary: ShipmentSummary): string {
-        const badge = priorityBadge(summary.priority);
-        return `${badge} [${summary.trackingId}] ${summary.status} - ETA: ${summary.eta}`;
-      }
+      charge(UserId, Amount) -> {ok, UserId, Amount}.
+    garbage/email_notifier.erl: |
+      -module(email_notifier).
+      %% GARBAGE_GAP064_B = "email_notifier_marker"
+      -export([notify/2]).
 
-      function renderDashboard(summaries: ShipmentSummary[]): string {
-        const sorted = [...summaries].sort((a, b) => b.priority - a.priority);
-        const header = `Shipments: ${sorted.length}`;
-        const cards = sorted.map(renderShipmentCard).join("\n");
-        return `${header}\n${cards}`;
-      }
-    src/logistics/invoice.py: |
-      TRAP_GAP064_INVOICE_A = "shipping_invoice"
-      TRAP_GAP064_CURRENCY_B = "USD"
+      notify(To, Msg) -> {sent, To, Msg}.
+    garbage/iot_sensor_agent.erl: |
+      -module(iot_sensor_agent).
+      %% GARBAGE_GAP064_C = "iot_sensor_agent_marker"
+      -export([read/1]).
 
-      class ShippingInvoice:
-          def __init__(self, rate_per_kg: float = 2.5):
-              self.rate_per_kg = rate_per_kg
-
-          def calculate(self, weight_kg: float) -> float:
-              return weight_kg * self.rate_per_kg
-
-          def format_total(self, total: float) -> str:
-              return f"${total:.2f}"
-    src/logistics/notifications.ts: |
-      const TRAP_GAP064_NOTIFY_C: string = "shipping_notify";
-      const TRAP_GAP064_CHANNEL_D: string = "email";
-
-      function buildSubject(trackingId: string): string {
-        return `Shipment Update: ${trackingId}`;
-      }
-
-      function buildBody(trackingId: string, status: string): string {
-        return `Your shipment ${trackingId} is now ${status}.`;
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      read(SensorId) -> {ok, SensorId, 42}.
+  commit_message: "refactor: add restock/2 gen_server handler, expose cancel_order in order_handler"
 fragments:
-- id: shipment_bulk
+- id: restock_export
   selector:
-    path: src/logistics/shipment.py
-    anchor: 'def bulk_register(self, parcels: List[Parcel]) -> int:'
-- id: shipment_filter
+    path: src/inventory_server.erl
+    anchor: "restock(ProductId, Qty) ->"
+- id: handle_cast_restock
   selector:
-    path: src/logistics/shipment.py
-    anchor: 'def filter_by_destination(self, destination: str) -> List[Parcel]:'
-- id: shipment_max_weight
+    path: src/inventory_server.erl
+    anchor: "handle_cast({restock, ProductId, Qty}, State) ->"
+- id: cancel_order_fn
   selector:
-    path: src/logistics/shipment.py
-    anchor: self.max_weight = max_weight
-- id: dashboard_priority
+    path: src/order_handler.erl
+    anchor: "cancel_order(ProductId, Qty) ->"
+- id: no_garbage_a
   selector:
-    path: src/logistics/dashboard.ts
-    anchor: 'function priorityBadge(priority: number): string'
-- id: no_invoice
+    anchor: GARBAGE_GAP064_A
+- id: no_garbage_b
   selector:
-    path: src/logistics/invoice.py
-- id: no_notifications
+    anchor: GARBAGE_GAP064_B
+- id: no_garbage_c
   selector:
-    path: src/logistics/notifications.ts
-- id: no_global_0
-  selector:
-    anchor: TRAP_GAP064_INVOICE_A
-- id: no_global_1
-  selector:
-    anchor: TRAP_GAP064_CURRENCY_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP064_NOTIFY_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP064_CHANNEL_D
+    anchor: GARBAGE_GAP064_C
 oracle:
   required:
-  - shipment_bulk
-  - shipment_filter
-  - shipment_max_weight
-  - dashboard_priority
+  - restock_export
+  - handle_cast_restock
+  - cancel_order_fn
   allowed: []
   forbidden:
-  - no_invoice
-  - no_notifications
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

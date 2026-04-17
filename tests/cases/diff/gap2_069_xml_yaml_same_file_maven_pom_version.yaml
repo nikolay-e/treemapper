@@ -1,139 +1,241 @@
 name: gap2_069_xml_yaml_same_file_maven_pom_version
 tags:
-- change:single_file
-- context:same_file
-- difficulty:trivial
-- distance:0hop
-- lang:xml
-- lang:yaml
+- lang:scala
+- change:multi_file
+- change:refactor
+- context:cross_module
+- distance:1hop
+- difficulty:medium
 repo:
   initial_files:
-    pom.xml: |
-      <project>
-        <modelVersion>4.0.0</modelVersion>
-        <groupId>com.example</groupId>
-        <artifactId>weather-api</artifactId>
-        <version>1.2.0</version>
-        <dependencies>
-          <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
-            <version>5.3.20</version>
-          </dependency>
-        </dependencies>
-      </project>
-    config.yml: |
-      server:
-        port: 8080
-        host: localhost
-      api:
-        version: v1
-        rateLimit: 100
-    other/settings.xml: |
-      <settings>
-        <TRAP_GAP2_069_SET_A>noise_settings</TRAP_GAP2_069_SET_A>
-        <TRAP_GAP2_069_SET_B>42</TRAP_GAP2_069_SET_B>
-        <localRepository>/home/user/.m2</localRepository>
-      </settings>
-    other/defaults.yml: |
-      TRAP_GAP2_069_DEF_C: noise_defaults
-      TRAP_GAP2_069_DEF_D: true
-      timeout: 30
-      retries: 3
-    other/profiles.xml: |
-      <profiles>
-        <TRAP_GAP2_069_PROF_E>noise_profiles</TRAP_GAP2_069_PROF_E>
-        <TRAP_GAP2_069_PROF_F>99</TRAP_GAP2_069_PROF_F>
-      </profiles>
+    src/main/scala/cache/CacheService.scala: |
+      package cache
+
+      import cache.backend.CacheBackend
+      import cache.model.CacheEntry
+
+      class CacheService(backend: CacheBackend) {
+        def get(key: String): Option[String] = {
+          backend.fetch(key).flatMap { entry =>
+            if (entry.isExpired) None else Some(entry.value)
+          }
+        }
+
+        def set(key: String, value: String, ttlSeconds: Long): Unit = {
+          val entry = CacheEntry(value, System.currentTimeMillis() + ttlSeconds * 1000)
+          backend.store(key, entry)
+        }
+
+        def evict(key: String): Unit = backend.delete(key)
+      }
+    src/main/scala/cache/model/CacheEntry.scala: |
+      package cache.model
+
+      case class CacheEntry(value: String, expiresAt: Long) {
+        def isExpired: Boolean = System.currentTimeMillis() > expiresAt
+      }
+    src/main/scala/cache/backend/CacheBackend.scala: |
+      package cache.backend
+
+      import cache.model.CacheEntry
+
+      trait CacheBackend {
+        def fetch(key: String): Option[CacheEntry]
+        def store(key: String, entry: CacheEntry): Unit
+        def delete(key: String): Unit
+      }
+
+      class InMemoryCacheBackend extends CacheBackend {
+        private var store: Map[String, CacheEntry] = Map.empty
+
+        def fetch(key: String): Option[CacheEntry] = store.get(key)
+
+        def store(key: String, entry: CacheEntry): Unit = {
+          store = store + (key -> entry)
+        }
+
+        def delete(key: String): Unit = {
+          store = store - key
+        }
+      }
+    src/main/scala/api/ProductController.scala: |
+      package api
+
+      import cache.CacheService
+
+      class ProductController(cache: CacheService) {
+        def getProduct(id: String): String = {
+          cache.get(s"product:$id").getOrElse(s"Product($id)")
+        }
+      }
+    src/main/scala/search/FullTextIndex.scala: |
+      package search
+
+      val GARBAGE_GAP069_A: String = "fulltext_index_v1"
+
+      class FullTextIndex {
+        def search(query: String): List[String] = List.empty
+      }
+    src/main/scala/export/CsvExporter.scala: |
+      package export
+
+      val GARBAGE_GAP069_B: String = "csv_exporter_separator"
+      val GARBAGE_GAP069_C: Char = ','
+
+      class CsvExporter {
+        def export(rows: List[List[String]]): String = rows.map(_.mkString(",")).mkString("\n")
+      }
+    src/main/scala/scheduler/JobRunner.scala: |
+      package scheduler
+
+      val GARBAGE_GAP069_D: String = "cron_job_runner_v2"
+
+      class JobRunner {
+        def run(jobId: String): Unit = println(s"Running $jobId")
+      }
   changed_files:
-    pom.xml: |
-      <project>
-        <modelVersion>4.0.0</modelVersion>
-        <groupId>com.example</groupId>
-        <artifactId>weather-api</artifactId>
-        <version>1.3.0</version>
-        <dependencies>
-          <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
-            <version>6.0.0</version>
-          </dependency>
-        </dependencies>
-      </project>
-    config.yml: |
-      server:
-        port: 8080
-        host: localhost
-      api:
-        version: v1
-        rateLimit: 100
-    other/settings.xml: |
-      <settings>
-        <TRAP_GAP2_069_SET_A>noise_settings</TRAP_GAP2_069_SET_A>
-        <TRAP_GAP2_069_SET_B>42</TRAP_GAP2_069_SET_B>
-        <localRepository>/home/user/.m2</localRepository>
-      </settings>
-    other/defaults.yml: |
-      TRAP_GAP2_069_DEF_C: noise_defaults
-      TRAP_GAP2_069_DEF_D: true
-      timeout: 30
-      retries: 3
-    other/profiles.xml: |
-      <profiles>
-        <TRAP_GAP2_069_PROF_E>noise_profiles</TRAP_GAP2_069_PROF_E>
-        <TRAP_GAP2_069_PROF_F>99</TRAP_GAP2_069_PROF_F>
-      </profiles>
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    src/main/scala/cache/CacheService.scala: |
+      package cache
+
+      import cache.backend.CacheBackend
+      import cache.model.CacheEntry
+
+      class CacheService(backend: CacheBackend) {
+        def get(key: String): Option[String] = {
+          backend.fetch(key).flatMap { entry =>
+            if (entry.isExpired) {
+              backend.delete(key)
+              None
+            } else Some(entry.value)
+          }
+        }
+
+        def set(key: String, value: String, ttlSeconds: Long): Unit = {
+          val entry = CacheEntry(value, System.currentTimeMillis() + ttlSeconds * 1000)
+          backend.store(key, entry)
+        }
+
+        def evict(key: String): Unit = backend.delete(key)
+
+        def getOrSet(key: String, ttlSeconds: Long)(compute: => String): String = {
+          get(key).getOrElse {
+            val value = compute
+            set(key, value, ttlSeconds)
+            value
+          }
+        }
+      }
+    src/main/scala/cache/model/CacheEntry.scala: |
+      package cache.model
+
+      case class CacheEntry(value: String, expiresAt: Long) {
+        def isExpired: Boolean = System.currentTimeMillis() > expiresAt
+      }
+    src/main/scala/cache/backend/CacheBackend.scala: |
+      package cache.backend
+
+      import cache.model.CacheEntry
+
+      trait CacheBackend {
+        def fetch(key: String): Option[CacheEntry]
+        def store(key: String, entry: CacheEntry): Unit
+        def delete(key: String): Unit
+      }
+
+      class InMemoryCacheBackend extends CacheBackend {
+        private var store: Map[String, CacheEntry] = Map.empty
+
+        def fetch(key: String): Option[CacheEntry] = store.get(key)
+
+        def store(key: String, entry: CacheEntry): Unit = {
+          store = store + (key -> entry)
+        }
+
+        def delete(key: String): Unit = {
+          store = store - key
+        }
+      }
+    src/main/scala/api/ProductController.scala: |
+      package api
+
+      import cache.CacheService
+
+      class ProductController(cache: CacheService) {
+        def getProduct(id: String): String = {
+          cache.getOrSet(s"product:$id", 300) { s"Product($id)" }
+        }
+      }
+    src/main/scala/search/FullTextIndex.scala: |
+      package search
+
+      val GARBAGE_GAP069_A: String = "fulltext_index_v1"
+
+      class FullTextIndex {
+        def search(query: String): List[String] = List.empty
+      }
+    src/main/scala/export/CsvExporter.scala: |
+      package export
+
+      val GARBAGE_GAP069_B: String = "csv_exporter_separator"
+      val GARBAGE_GAP069_C: Char = ','
+
+      class CsvExporter {
+        def export(rows: List[List[String]]): String = rows.map(_.mkString(",")).mkString("\n")
+      }
+    src/main/scala/scheduler/JobRunner.scala: |
+      package scheduler
+
+      val GARBAGE_GAP069_D: String = "cron_job_runner_v2"
+
+      class JobRunner {
+        def run(jobId: String): Unit = println(s"Running $jobId")
+      }
+  commit_message: "refactor: add lazy getOrSet and auto-evict expired entries in CacheService"
 fragments:
-- id: version_bump
+- id: cache_service_get_or_set
   selector:
-    path: pom.xml
-    anchor: "<version>1.3.0</version>"
-- id: spring_upgrade
+    path: src/main/scala/cache/CacheService.scala
+    anchor: "def getOrSet"
+- id: cache_service_evict_expired
   selector:
-    path: pom.xml
-    anchor: "<version>6.0.0</version>"
-- id: no_settings
+    path: src/main/scala/cache/CacheService.scala
+    anchor: "backend.delete(key)"
+- id: product_controller_get_or_set
   selector:
-    path: other/settings.xml
-- id: no_defaults
+    path: src/main/scala/api/ProductController.scala
+    anchor: "cache.getOrSet"
+- id: no_fulltext
   selector:
-    path: other/defaults.yml
-- id: no_profiles
+    path: src/main/scala/search/FullTextIndex.scala
+- id: no_csv
   selector:
-    path: other/profiles.xml
+    path: src/main/scala/export/CsvExporter.scala
+- id: no_job_runner
+  selector:
+    path: src/main/scala/scheduler/JobRunner.scala
 - id: no_global_0
   selector:
-    anchor: TRAP_GAP2_069_SET_A
+    anchor: GARBAGE_GAP069_A
 - id: no_global_1
   selector:
-    anchor: TRAP_GAP2_069_SET_B
+    anchor: GARBAGE_GAP069_B
 - id: no_global_2
   selector:
-    anchor: TRAP_GAP2_069_DEF_C
+    anchor: GARBAGE_GAP069_C
 - id: no_global_3
   selector:
-    anchor: TRAP_GAP2_069_DEF_D
-- id: no_global_4
-  selector:
-    anchor: TRAP_GAP2_069_PROF_E
-- id: no_global_5
-  selector:
-    anchor: TRAP_GAP2_069_PROF_F
+    anchor: GARBAGE_GAP069_D
 oracle:
   required:
-  - version_bump
-  - spring_upgrade
+  - cache_service_get_or_set
+  - cache_service_evict_expired
+  - product_controller_get_or_set
   allowed: []
   forbidden:
-  - no_settings
-  - no_defaults
-  - no_profiles
+  - no_fulltext
+  - no_csv
+  - no_job_runner
   - no_global_0
   - no_global_1
   - no_global_2
   - no_global_3
-  - no_global_4
-  - no_global_5

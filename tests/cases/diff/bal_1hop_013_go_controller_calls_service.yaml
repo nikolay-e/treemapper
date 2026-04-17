@@ -1,310 +1,106 @@
 name: bal_1hop_013_go_controller_calls_service
 tags:
-- lang:go
-- change:multi_file
-- context:import_chain
-- distance:1hop
-- difficulty:hard
+- lang:rust
+- change:bug_fix
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
-    internal/service/inventory.go: |
-      package service
-
-      import "fmt"
-
-      type Product struct {
-          SKU      string
-          Name     string
-          Quantity int
+    src/pricing/discount.rs: |
+      pub struct DiscountEngine {
+          tiers: Vec<(u32, f64)>,
       }
 
-      type InventoryService struct {
-          products map[string]*Product
-      }
-
-      func NewInventoryService() *InventoryService {
-          return &InventoryService{products: make(map[string]*Product)}
-      }
-
-      func (s *InventoryService) AddProduct(p *Product) {
-          s.products[p.SKU] = p
-      }
-
-      func (s *InventoryService) GetStock(sku string) (int, error) {
-          p, ok := s.products[sku]
-          if !ok {
-              return 0, fmt.Errorf("product not found: %s", sku)
+      impl DiscountEngine {
+          pub fn new(tiers: Vec<(u32, f64)>) -> Self {
+              DiscountEngine { tiers }
           }
-          return p.Quantity, nil
-      }
 
-      func (s *InventoryService) Deduct(sku string, qty int) error {
-          p, ok := s.products[sku]
-          if !ok {
-              return fmt.Errorf("product not found: %s", sku)
+          pub fn rate_for_quantity(&self, qty: u32) -> f64 {
+              // BUG: iterates forward and returns first match instead of best match
+              for (threshold, rate) in &self.tiers {
+                  if qty >= *threshold {
+                      return *rate;
+                  }
+              }
+              0.0
           }
-          if p.Quantity < qty {
-              return fmt.Errorf("insufficient stock")
+
+          pub fn apply(&self, unit_price: f64, qty: u32) -> f64 {
+              let rate = self.rate_for_quantity(qty);
+              unit_price * qty as f64 * (1.0 - rate)
           }
-          p.Quantity -= qty
-          return nil
       }
-    internal/service/pricing.go: |
-      package service
-
-      type PriceRule struct {
-          SKU      string
-          BasePrice float64
-          Discount  float64
-      }
-
-      type PricingService struct {
-          rules map[string]*PriceRule
-      }
-
-      func NewPricingService() *PricingService {
-          return &PricingService{rules: make(map[string]*PriceRule)}
-      }
-
-      func (s *PricingService) GetPrice(sku string) float64 {
-          rule, ok := s.rules[sku]
-          if !ok {
-              return 0
-          }
-          return rule.BasePrice * (1 - rule.Discount)
-      }
-    internal/controller/order.go: |
-      package controller
-
-      import (
-          "encoding/json"
-          "net/http"
-          "myapp/internal/service"
-      )
-
-      type OrderController struct {
-          inventory *service.InventoryService
-          pricing   *service.PricingService
-      }
-
-      func NewOrderController(inv *service.InventoryService, pr *service.PricingService) *OrderController {
-          return &OrderController{inventory: inv, pricing: pr}
-      }
-
-      type OrderRequest struct {
-          SKU string `json:"sku"`
-          Qty int    `json:"qty"`
-      }
-
-      func (c *OrderController) PlaceOrder(w http.ResponseWriter, r *http.Request) {
-          var req OrderRequest
-          json.NewDecoder(r.Body).Decode(&req)
-          stock, err := c.inventory.GetStock(req.SKU)
-          if err != nil || stock < req.Qty {
-              http.Error(w, "cannot fulfill order", 400)
-              return
-          }
-          c.inventory.Deduct(req.SKU, req.Qty)
-          price := c.pricing.GetPrice(req.SKU)
-          total := price * float64(req.Qty)
-          json.NewEncoder(w).Encode(map[string]float64{"total": total})
-      }
-    internal/email/sender.go: |
-      package email
-
-      import "fmt"
-
-      type Mailer struct {
-          SMTPHost string
-      }
-
-      func NewMailer(host string) *Mailer {
-          return &Mailer{SMTPHost: host}
-      }
-
-      func (m *Mailer) Send(to, subject, body string) error {
-          fmt.Printf("sending to %s via %s\n", to, m.SMTPHost)
-          return nil
-      }
-    internal/shipping/calculator.go: |
-      package shipping
-
-      type ShippingRate struct {
-          Zone   string
-          Weight float64
-          Cost   float64
-      }
-
-      func Calculate(zone string, weight float64) float64 {
-          rates := map[string]float64{"domestic": 5.0, "international": 15.0}
-          base, ok := rates[zone]
-          if !ok {
-              return 20.0
-          }
-          return base + weight*0.5
-      }
-    internal/analytics/events.go: |
-      package analytics
-
-      import "time"
-
-      type Event struct {
-          Name      string
-          UserID    string
-          Timestamp time.Time
-      }
-
-      func Track(name, userID string) *Event {
-          return &Event{Name: name, UserID: userID, Timestamp: time.Now()}
-      }
+    garbage/voucher.rs: |
+      // GARBAGE_1HOP13_VOUCH_A = "voucher_marker"
+    garbage/loyalty.rs: |
+      // GARBAGE_1HOP13_LOYAL_B = "loyalty_marker"
+    garbage/promo.rs: |
+      // GARBAGE_1HOP13_PROMO_C = "promo_marker"
   changed_files:
-    internal/service/inventory.go: |
-      package service
-
-      import "fmt"
-
-      type Product struct {
-          SKU        string
-          Name       string
-          Quantity   int
-          Reserved   int
-          Warehouse  string
+    src/pricing/discount.rs: |
+      pub struct DiscountEngine {
+          tiers: Vec<(u32, f64)>,
       }
 
-      type InventoryService struct {
-          products map[string]*Product
-      }
-
-      func NewInventoryService() *InventoryService {
-          return &InventoryService{products: make(map[string]*Product)}
-      }
-
-      func (s *InventoryService) AddProduct(p *Product) {
-          s.products[p.SKU] = p
-      }
-
-      func (s *InventoryService) GetStock(sku string) (int, error) {
-          p, ok := s.products[sku]
-          if !ok {
-              return 0, fmt.Errorf("product not found: %s", sku)
+      impl DiscountEngine {
+          pub fn new(mut tiers: Vec<(u32, f64)>) -> Self {
+              tiers.sort_by(|a, b| b.0.cmp(&a.0));
+              DiscountEngine { tiers }
           }
-          return p.Quantity - p.Reserved, nil
-      }
 
-      func (s *InventoryService) Reserve(sku string, qty int) error {
-          p, ok := s.products[sku]
-          if !ok {
-              return fmt.Errorf("product not found: %s", sku)
+          pub fn rate_for_quantity(&self, qty: u32) -> f64 {
+              for (threshold, rate) in &self.tiers {
+                  if qty >= *threshold {
+                      return *rate;
+                  }
+              }
+              0.0
           }
-          available := p.Quantity - p.Reserved
-          if available < qty {
-              return fmt.Errorf("insufficient stock: need %d, have %d", qty, available)
-          }
-          p.Reserved += qty
-          return nil
-      }
 
-      func (s *InventoryService) Deduct(sku string, qty int) error {
-          p, ok := s.products[sku]
-          if !ok {
-              return fmt.Errorf("product not found: %s", sku)
+          pub fn apply(&self, unit_price: f64, qty: u32) -> f64 {
+              let rate = self.rate_for_quantity(qty);
+              unit_price * qty as f64 * (1.0 - rate)
           }
-          if p.Quantity < qty {
-              return fmt.Errorf("insufficient stock")
-          }
-          p.Quantity -= qty
-          if p.Reserved >= qty {
-              p.Reserved -= qty
-          }
-          return nil
       }
-    internal/service/pricing.go: |
-      package service
-
-      type PriceRule struct {
-          SKU       string
-          BasePrice float64
-          Discount  float64
-          TaxRate   float64
-      }
-
-      type PricingService struct {
-          rules map[string]*PriceRule
-      }
-
-      func NewPricingService() *PricingService {
-          return &PricingService{rules: make(map[string]*PriceRule)}
-      }
-
-      func (s *PricingService) GetPrice(sku string) float64 {
-          rule, ok := s.rules[sku]
-          if !ok {
-              return 0
-          }
-          return rule.BasePrice * (1 - rule.Discount)
-      }
-
-      func (s *PricingService) GetPriceWithTax(sku string) float64 {
-          rule, ok := s.rules[sku]
-          if !ok {
-              return 0
-          }
-          net := rule.BasePrice * (1 - rule.Discount)
-          return net * (1 + rule.TaxRate)
-      }
-  commit_message: "feat: add reservation system and tax calculation"
+    garbage/voucher.rs: |
+      // GARBAGE_1HOP13_VOUCH_A = "voucher_marker"
+    garbage/loyalty.rs: |
+      // GARBAGE_1HOP13_LOYAL_B = "loyalty_marker"
+    garbage/promo.rs: |
+      // GARBAGE_1HOP13_PROMO_C = "promo_marker"
+  commit_message: "fix: sort discount tiers descending so highest threshold matches first"
 fragments:
-- id: product_reserved_field
+- id: tiers_sort
   selector:
-    path: internal/service/inventory.go
-    anchor: "Reserved   int"
-- id: reserve_method
+    path: src/pricing/discount.rs
+    anchor: "tiers.sort_by(|a, b| b.0.cmp(&a.0));"
+- id: rate_for_quantity
   selector:
-    path: internal/service/inventory.go
-    anchor: "func (s *InventoryService) Reserve"
-- id: get_stock_minus_reserved
+    path: src/pricing/discount.rs
+    anchor: "pub fn rate_for_quantity(&self, qty: u32) -> f64 {"
+- id: apply_method
   selector:
-    path: internal/service/inventory.go
-    anchor: "p.Quantity - p.Reserved"
-- id: price_with_tax
+    path: src/pricing/discount.rs
+    anchor: "pub fn apply(&self, unit_price: f64, qty: u32) -> f64 {"
+- id: no_garbage_a
   selector:
-    path: internal/service/pricing.go
-    anchor: "func (s *PricingService) GetPriceWithTax"
-- id: controller_calls_getstock
+    anchor: GARBAGE_1HOP13_VOUCH_A
+- id: no_garbage_b
   selector:
-    path: internal/controller/order.go
-    anchor: "c.inventory.GetStock(req.SKU)"
-- id: controller_calls_deduct
+    anchor: GARBAGE_1HOP13_LOYAL_B
+- id: no_garbage_c
   selector:
-    path: internal/controller/order.go
-    anchor: "c.inventory.Deduct(req.SKU, req.Qty)"
-- id: controller_calls_pricing
-  selector:
-    path: internal/controller/order.go
-    anchor: "c.pricing.GetPrice(req.SKU)"
-- id: unrelated_email
-  selector:
-    path: internal/email/sender.go
-    anchor: "func NewMailer"
-- id: unrelated_shipping
-  selector:
-    path: internal/shipping/calculator.go
-    anchor: "func Calculate"
-- id: unrelated_analytics
-  selector:
-    path: internal/analytics/events.go
-    anchor: "func Track"
+    anchor: GARBAGE_1HOP13_PROMO_C
 oracle:
   required:
-  - reserve_method
-  - get_stock_minus_reserved
-  - controller_calls_getstock
-  - controller_calls_deduct
+  - tiers_sort
+  - rate_for_quantity
   allowed:
-  - product_reserved_field
-  - price_with_tax
-  - controller_calls_pricing
+  - apply_method
   forbidden:
-  - unrelated_email
-  - unrelated_shipping
-  - unrelated_analytics
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

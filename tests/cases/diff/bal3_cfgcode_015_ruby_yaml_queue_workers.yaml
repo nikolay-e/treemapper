@@ -1,179 +1,147 @@
 name: bal3_cfgcode_015_ruby_yaml_queue_workers
 tags:
-- lang:ruby
+- lang:rust
+- change:bug_fix
 - change:single_file
-- change:config
-- context:config_to_code
+- context:import_chain
 - distance:1hop
-- difficulty:hard
+- difficulty:easy
 repo:
   initial_files:
-    config/queue.yml: |
-      queue:
-        backend: inline
-        concurrency: 1
-        retry_attempts: 3
-        queues:
-          - default
-          - mailers
-    lib/queue/config.rb: |
-      require 'yaml'
+    src/http/client.rs: |
+      use std::time::Duration;
 
-      module Queue
-        class Config
-          attr_reader :backend, :concurrency, :retry_attempts, :queues
+      pub struct HttpClient {
+          base_url: String,
+          timeout: Duration,
+      }
 
-          def initialize(config_path)
-            data = YAML.load_file(config_path)
-            cfg = data['queue']
-            @backend = cfg['backend']
-            @concurrency = cfg['concurrency']
-            @retry_attempts = cfg['retry_attempts']
-            @queues = cfg['queues']
-          end
+      impl HttpClient {
+          pub fn new(base_url: &str) -> Self {
+              HttpClient {
+                  base_url: base_url.to_string(),
+                  timeout: Duration::from_secs(30),
+              }
+          }
 
-          def async?
-            @backend != 'inline'
-          end
+          pub fn get(&self, path: &str) -> Result<String, String> {
+              // BUG: base_url and path concatenated without separator check
+              let url = format!("{}{}", self.base_url, path);
+              Ok(url)
+          }
 
-          def queue_names
-            @queues.join(',')
-          end
-        end
-      end
-    lib/queue/worker.rb: |
-      module Queue
-        class Worker
-          def initialize(config)
-            @config = config
-          end
+          pub fn post(&self, path: &str, body: &str) -> Result<String, String> {
+              let url = format!("{}{}", self.base_url, path);
+              Ok(format!("POST {} body={}", url, body))
+          }
+      }
+    src/api/weather.rs: |
+      use crate::http::client::HttpClient;
 
-          def start
-            threads = @config.concurrency
-            queues = @config.queue_names
-            { threads: threads, queues: queues, async: @config.async? }
-          end
+      pub struct WeatherApi {
+          client: HttpClient,
+      }
 
-          def process(job)
-            attempts = 0
-            loop do
-              attempts += 1
-              break if attempts > @config.retry_attempts
-            end
-          end
-        end
-      end
-    lib/notifications/slack.rb: |
-      GARBAGE_CFGCODE_015_SLACK_A = "webhook"
-      GARBAGE_CFGCODE_015_CHANNEL_B = "general"
+      impl WeatherApi {
+          pub fn new(base_url: &str) -> Self {
+              WeatherApi { client: HttpClient::new(base_url) }
+          }
 
-      module Notifications
-        class Slack
-          def post(message); end
-        end
-      end
-    lib/reports/csv.rb: |
-      GARBAGE_CFGCODE_015_CSV_C = "export"
-      GARBAGE_CFGCODE_015_DELIM_D = ","
-
-      module Reports
-        class CSV
-          def generate(data); end
-        end
-      end
-    lib/audit/trail.rb: |
-      GARBAGE_CFGCODE_015_AUDIT_E = "trail"
-      GARBAGE_CFGCODE_015_RETAIN_F = 90
-
-      module Audit
-        class Trail
-          def log(event); end
-        end
-      end
+          pub fn fetch_forecast(&self, city: &str) -> Result<String, String> {
+              self.client.get(&format!("/forecast/{}", city))
+          }
+      }
+    garbage/auth.rs: |
+      // GARBAGE_HCLI_A = "auth_marker"
+      pub fn get_bearer() -> &'static str { "token" }
+    garbage/retry.rs: |
+      // GARBAGE_HCLI_B = "retry_marker"
+      pub fn with_retry<F: Fn() -> bool>(f: F, _n: u8) -> bool { f() }
+    garbage/logger.rs: |
+      // GARBAGE_HCLI_C = "logger_marker"
+      pub fn log(_msg: &str) {}
   changed_files:
-    config/queue.yml: |
-      queue:
-        backend: sidekiq
-        concurrency: 10
-        retry_attempts: 5
-        queues:
-          - critical
-          - default
-          - mailers
-          - reports
-        redis_url: redis://queue:6379/1
-  commit_message: "switch to sidekiq with higher concurrency"
+    src/http/client.rs: |
+      use std::time::Duration;
+
+      pub struct HttpClient {
+          base_url: String,
+          timeout: Duration,
+      }
+
+      impl HttpClient {
+          pub fn new(base_url: &str) -> Self {
+              let normalized = base_url.trim_end_matches('/').to_string();
+              HttpClient {
+                  base_url: normalized,
+                  timeout: Duration::from_secs(30),
+              }
+          }
+
+          pub fn get(&self, path: &str) -> Result<String, String> {
+              let path = path.trim_start_matches('/');
+              let url = format!("{}/{}", self.base_url, path);
+              Ok(url)
+          }
+
+          pub fn post(&self, path: &str, body: &str) -> Result<String, String> {
+              let path = path.trim_start_matches('/');
+              let url = format!("{}/{}", self.base_url, path);
+              Ok(format!("POST {} body={}", url, body))
+          }
+      }
+    src/api/weather.rs: |
+      use crate::http::client::HttpClient;
+
+      pub struct WeatherApi {
+          client: HttpClient,
+      }
+
+      impl WeatherApi {
+          pub fn new(base_url: &str) -> Self {
+              WeatherApi { client: HttpClient::new(base_url) }
+          }
+
+          pub fn fetch_forecast(&self, city: &str) -> Result<String, String> {
+              self.client.get(&format!("/forecast/{}", city))
+          }
+      }
+    garbage/auth.rs: |
+      // GARBAGE_HCLI_A = "auth_marker"
+      pub fn get_bearer() -> &'static str { "token" }
+    garbage/retry.rs: |
+      // GARBAGE_HCLI_B = "retry_marker"
+      pub fn with_retry<F: Fn() -> bool>(f: F, _n: u8) -> bool { f() }
+    garbage/logger.rs: |
+      // GARBAGE_HCLI_C = "logger_marker"
+      pub fn log(_msg: &str) {}
+  commit_message: "fix: normalize URL separator in HttpClient::get and ::new"
 fragments:
-- id: queue_config
+- id: trim_trailing_slash
   selector:
-    path: lib/queue/config.rb
-    anchor: "class Config"
-- id: concurrency_read
+    anchor: "let normalized = base_url.trim_end_matches('/')"
+- id: trim_leading_slash
   selector:
-    path: lib/queue/config.rb
-    anchor: "@concurrency = cfg['concurrency']"
-- id: async_check
+    anchor: "let path = path.trim_start_matches('/')"
+- id: weather_uses_client
   selector:
-    path: lib/queue/config.rb
-    anchor: "def async?"
-- id: queue_names
+    anchor: "use crate::http::client::HttpClient"
+- id: no_garbage_a
   selector:
-    path: lib/queue/config.rb
-    anchor: "def queue_names"
-- id: worker_start
+    anchor: GARBAGE_HCLI_A
+- id: no_garbage_b
   selector:
-    path: lib/queue/worker.rb
-    anchor: "def start"
-- id: worker_retry
+    anchor: GARBAGE_HCLI_B
+- id: no_garbage_c
   selector:
-    path: lib/queue/worker.rb
-    anchor: "@config.retry_attempts"
-- id: no_slack
-  selector:
-    path: lib/notifications/slack.rb
-    anchor: "class Slack"
-- id: no_csv
-  selector:
-    path: lib/reports/csv.rb
-    anchor: "class CSV"
-- id: no_audit
-  selector:
-    path: lib/audit/trail.rb
-    anchor: "class Trail"
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_CFGCODE_015_SLACK_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_CFGCODE_015_CHANNEL_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_CFGCODE_015_CSV_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_CFGCODE_015_DELIM_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_CFGCODE_015_AUDIT_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_CFGCODE_015_RETAIN_F
+    anchor: GARBAGE_HCLI_C
 oracle:
   required:
-  - queue_config
-  - concurrency_read
-  - async_check
-  - queue_names
-  - worker_start
-  - worker_retry
+  - trim_trailing_slash
+  - trim_leading_slash
+  - weather_uses_client
   allowed: []
   forbidden:
-  - no_slack
-  - no_csv
-  - no_audit
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

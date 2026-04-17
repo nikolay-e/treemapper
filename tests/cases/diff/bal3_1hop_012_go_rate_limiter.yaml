@@ -1,221 +1,146 @@
 name: bal3_1hop_012_go_rate_limiter
 tags:
-- lang:go
-- change:signature
+- lang:rust
+- change:bug_fix
+- change:single_file
 - context:import_chain
 - distance:1hop
-- difficulty:hard
+- difficulty:easy
 repo:
   initial_files:
-    pkg/ratelimit/limiter.go: |
-      package ratelimit
+    src/cache/store.rs: |
+      use std::collections::HashMap;
 
-      import "time"
-
-      type Limiter struct {
-          Rate     int
-          Window   time.Duration
-          counters map[string]int
+      pub struct CacheStore {
+          data: HashMap<String, String>,
+          max_size: usize,
       }
 
-      func NewLimiter(rate int, window time.Duration) *Limiter {
-          return &Limiter{Rate: rate, Window: window, counters: make(map[string]int)}
-      }
-
-      func (l *Limiter) Allow(key string) bool {
-          l.counters[key]++
-          return l.counters[key] <= l.Rate
-      }
-    internal/gateway/proxy.go: |
-      package gateway
-
-      import "pkg/ratelimit"
-
-      type Proxy struct {
-          limiter *ratelimit.Limiter
-          Target  string
-      }
-
-      func NewProxy(target string, limiter *ratelimit.Limiter) *Proxy {
-          return &Proxy{limiter: limiter, Target: target}
-      }
-
-      func (p *Proxy) Forward(clientIP string) bool {
-          return p.limiter.Allow(clientIP)
-      }
-    internal/gateway/loadbalancer.go: |
-      package gateway
-
-      import "pkg/ratelimit"
-
-      type LoadBalancer struct {
-          limiter  *ratelimit.Limiter
-          Backends []string
-      }
-
-      func NewLoadBalancer(backends []string, limiter *ratelimit.Limiter) *LoadBalancer {
-          return &LoadBalancer{limiter: limiter, Backends: backends}
-      }
-
-      func (lb *LoadBalancer) Route(clientIP string) string {
-          if !lb.limiter.Allow(clientIP) {
-              return ""
+      impl CacheStore {
+          pub fn new(max_size: usize) -> Self {
+              CacheStore { data: HashMap::new(), max_size }
           }
-          return lb.Backends[0]
+
+          pub fn get(&self, key: &str) -> Option<&String> {
+              // BUG: no capacity check before insert
+              self.data.get(key)
+          }
+
+          pub fn set(&mut self, key: String, value: String) {
+              self.data.insert(key, value);
+          }
       }
-    internal/gateway/circuit.go: |
-      package gateway
+    src/api/session.rs: |
+      use crate::cache::store::CacheStore;
 
-      import "pkg/ratelimit"
-
-      type CircuitGateway struct {
-          limiter *ratelimit.Limiter
-      }
-
-      func NewCircuitGateway(limiter *ratelimit.Limiter) *CircuitGateway {
-          return &CircuitGateway{limiter: limiter}
-      }
-
-      func (c *CircuitGateway) Check(key string) bool {
-          return c.limiter.Allow(key)
-      }
-    pkg/discovery/consul.go: |
-      package discovery
-
-      GARBAGE_012_CONSUL_A = "consul"
-
-      type ConsulClient struct {
-          Addr string
+      pub struct SessionManager {
+          store: CacheStore,
       }
 
-      func (c *ConsulClient) Register(name string) error {
-          return nil
+      impl SessionManager {
+          pub fn new() -> Self {
+              SessionManager { store: CacheStore::new(1000) }
+          }
+
+          pub fn put_session(&mut self, id: String, token: String) {
+              self.store.set(id, token);
+          }
+
+          pub fn get_session(&self, id: &str) -> Option<&String> {
+              self.store.get(id)
+          }
       }
-    pkg/tracing/jaeger.go: |
-      package tracing
-
-      GARBAGE_012_JAEGER_B = "jaeger"
-
-      type JaegerTracer struct {
-          Endpoint string
-      }
-
-      func (j *JaegerTracer) StartSpan(name string) string {
-          return "span-" + name
-      }
-    pkg/feature/flags.go: |
-      package feature
-
-      GARBAGE_012_FLAGS_C = "flags"
-
-      type FlagStore struct {
-          Flags map[string]bool
-      }
-
-      func (f *FlagStore) IsEnabled(name string) bool {
-          return f.Flags[name]
-      }
+    garbage/metrics.rs: |
+      // GARBAGE_RLIM_A = "metrics_marker"
+      pub fn record_metric(_name: &str) {}
+    garbage/logger.rs: |
+      // GARBAGE_RLIM_B = "logger_marker"
+      pub fn log_event(_msg: &str) {}
+    garbage/config.rs: |
+      // GARBAGE_RLIM_C = "config_marker"
+      pub struct AppConfig { pub port: u16 }
   changed_files:
-    pkg/ratelimit/limiter.go: |
-      package ratelimit
+    src/cache/store.rs: |
+      use std::collections::HashMap;
 
-      import "time"
-
-      type Decision struct {
-          Allowed   bool
-          Remaining int
-          ResetAt   time.Time
+      pub struct CacheStore {
+          data: HashMap<String, String>,
+          max_size: usize,
       }
 
-      type Limiter struct {
-          Rate     int
-          Burst    int
-          Window   time.Duration
-          counters map[string]int
-      }
-
-      func NewLimiter(rate, burst int, window time.Duration) *Limiter {
-          return &Limiter{Rate: rate, Burst: burst, Window: window, counters: make(map[string]int)}
-      }
-
-      func (l *Limiter) Allow(key string) Decision {
-          l.counters[key]++
-          allowed := l.counters[key] <= l.Rate+l.Burst
-          remaining := l.Rate + l.Burst - l.counters[key]
-          if remaining < 0 {
-              remaining = 0
+      impl CacheStore {
+          pub fn new(max_size: usize) -> Self {
+              CacheStore { data: HashMap::new(), max_size }
           }
-          return Decision{
-              Allowed:   allowed,
-              Remaining: remaining,
-              ResetAt:   time.Now().Add(l.Window),
+
+          pub fn get(&self, key: &str) -> Option<&String> {
+              self.data.get(key)
+          }
+
+          pub fn set(&mut self, key: String, value: String) -> bool {
+              if self.data.len() >= self.max_size {
+                  return false;
+              }
+              self.data.insert(key, value);
+              true
           }
       }
-  commit_message: "feat: return Decision struct from Allow with burst support"
+    src/api/session.rs: |
+      use crate::cache::store::CacheStore;
+
+      pub struct SessionManager {
+          store: CacheStore,
+      }
+
+      impl SessionManager {
+          pub fn new() -> Self {
+              SessionManager { store: CacheStore::new(1000) }
+          }
+
+          pub fn put_session(&mut self, id: String, token: String) {
+              self.store.set(id, token);
+          }
+
+          pub fn get_session(&self, id: &str) -> Option<&String> {
+              self.store.get(id)
+          }
+      }
+    garbage/metrics.rs: |
+      // GARBAGE_RLIM_A = "metrics_marker"
+      pub fn record_metric(_name: &str) {}
+    garbage/logger.rs: |
+      // GARBAGE_RLIM_B = "logger_marker"
+      pub fn log_event(_msg: &str) {}
+    garbage/config.rs: |
+      // GARBAGE_RLIM_C = "config_marker"
+      pub struct AppConfig { pub port: u16 }
+  commit_message: "fix: enforce max_size capacity check in CacheStore::set"
 fragments:
-- id: decision_type
+- id: cache_set_func
   selector:
-    path: pkg/ratelimit/limiter.go
-    anchor: "type Decision struct"
-- id: burst_field
+    anchor: "pub fn set(&mut self, key: String, value: String) -> bool"
+- id: capacity_check
   selector:
-    path: pkg/ratelimit/limiter.go
-    anchor: "Burst    int"
-- id: allow_returns_decision
+    anchor: "if self.data.len() >= self.max_size"
+- id: session_uses_store
   selector:
-    path: pkg/ratelimit/limiter.go
-    anchor: "func (l *Limiter) Allow(key string) Decision"
-- id: remaining_calc
-  selector:
-    path: pkg/ratelimit/limiter.go
-    anchor: "l.Rate + l.Burst - l.counters[key]"
-- id: proxy_calls_allow
-  selector:
-    path: internal/gateway/proxy.go
-    anchor: "p.limiter.Allow(clientIP)"
-- id: lb_calls_allow
-  selector:
-    path: internal/gateway/loadbalancer.go
-    anchor: "lb.limiter.Allow(clientIP)"
-- id: circuit_calls_allow
-  selector:
-    path: internal/gateway/circuit.go
-    anchor: "c.limiter.Allow(key)"
-- id: unrelated_consul
-  selector:
-    path: pkg/discovery/consul.go
-    anchor: "type ConsulClient struct"
-- id: unrelated_jaeger
-  selector:
-    path: pkg/tracing/jaeger.go
-    anchor: "type JaegerTracer struct"
-- id: unrelated_flags
-  selector:
-    path: pkg/feature/flags.go
-    anchor: "type FlagStore struct"
+    anchor: "use crate::cache::store::CacheStore"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_012_CONSUL_A
+    anchor: GARBAGE_RLIM_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_012_JAEGER_B
+    anchor: GARBAGE_RLIM_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_012_FLAGS_C
+    anchor: GARBAGE_RLIM_C
 oracle:
   required:
-  - decision_type
-  - burst_field
-  - allow_returns_decision
-  - proxy_calls_allow
-  allowed:
-  - remaining_calc
-  - lb_calls_allow
-  - circuit_calls_allow
+  - cache_set_func
+  - capacity_check
+  - session_uses_store
+  allowed: []
   forbidden:
-  - unrelated_consul
-  - unrelated_jaeger
-  - unrelated_flags
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

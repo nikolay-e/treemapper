@@ -1,177 +1,149 @@
 name: bal3_cfgcode_004_go_json_rate_limit
 tags:
-- lang:go
+- lang:php
+- change:bug_fix
 - change:single_file
-- change:config
-- context:config_to_code
-- distance:1hop
-- difficulty:medium
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
-    config/ratelimit.json: |
+    src/Media/ImageResizer.php: |
+      <?php
+      namespace App\Media;
+
+      class ImageResizer
       {
-        "rate_limit": {
-          "requests_per_second": 100,
-          "burst_size": 50,
-          "enabled": true
-        }
-      }
-    internal/middleware/ratelimit.go: |
-      package middleware
+          public function resize(string $path, int $width, int $height): array
+          {
+              $info = getimagesize($path);
+              $origWidth = $info[0];
+              $origHeight = $info[1];
 
-      import (
-          "encoding/json"
-          "net/http"
-          "os"
-          "sync"
-          "time"
-      )
+              $ratio = $origWidth / $origHeight;
+              if ($width / $height > $ratio) {
+                  $width = (int)($height * $ratio);
+              } else {
+                  $height = (int)($width / $ratio);
+              }
 
-      type RateLimitConfig struct {
-          RequestsPerSecond int  `json:"requests_per_second"`
-          BurstSize         int  `json:"burst_size"`
-          Enabled           bool `json:"enabled"`
-      }
-
-      func LoadRateLimitConfig(path string) (*RateLimitConfig, error) {
-          data, err := os.ReadFile(path)
-          if err != nil {
-              return nil, err
+              return ['width' => $width, 'height' => $height];
           }
-          var wrapper struct {
-              RateLimit RateLimitConfig `json:"rate_limit"`
-          }
-          if err := json.Unmarshal(data, &wrapper); err != nil {
-              return nil, err
-          }
-          return &wrapper.RateLimit, nil
-      }
 
-      type RateLimiter struct {
-          config *RateLimitConfig
-          mu     sync.Mutex
-          tokens int
-          last   time.Time
-      }
-
-      func NewRateLimiter(cfg *RateLimitConfig) *RateLimiter {
-          return &RateLimiter{
-              config: cfg,
-              tokens: cfg.BurstSize,
-              last:   time.Now(),
+          public function thumbnail(string $path, int $size): array
+          {
+              return $this->resize($path, $size, $size);
           }
       }
+    src/Media/VideoTranscoder.php: |
+      <?php
+      namespace App\Media;
 
-      func (rl *RateLimiter) Allow() bool {
-          if !rl.config.Enabled {
-              return true
-          }
-          rl.mu.Lock()
-          defer rl.mu.Unlock()
-          return rl.tokens > 0
-      }
-
-      func RateLimitMiddleware(rl *RateLimiter) func(http.Handler) http.Handler {
-          return func(next http.Handler) http.Handler {
-              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-                  if !rl.Allow() {
-                      http.Error(w, "rate limited", http.StatusTooManyRequests)
-                      return
-                  }
-                  next.ServeHTTP(w, r)
-              })
+      class VideoTranscoder
+      {
+          public function transcode(string $input, string $format): string
+          {
+              return $input . '.' . $format;
           }
       }
-    internal/middleware/auth.go: |
-      package middleware
-
-      GARBAGE_CFGCODE_004_AUTH_A = "auth"
-      GARBAGE_CFGCODE_004_JWT_B = "bearer"
-
-      func AuthMiddleware() {}
-    internal/storage/cache.go: |
-      package storage
-
-      GARBAGE_CFGCODE_004_CACHE_C = "cache"
-      GARBAGE_CFGCODE_004_EVICT_D = 100
-
-      type Cache struct {
-          MaxSize int
-      }
-    internal/queue/worker.go: |
-      package queue
-
-      GARBAGE_CFGCODE_004_WORKER_E = "worker"
-      GARBAGE_CFGCODE_004_RETRY_F = 3
-
-      func ProcessQueue() {}
+    garbage/StorageDriver.php: |
+      <?php
+      // GARBAGE_RATELIM_A = "s3_storage_driver_marker"
+    garbage/CdnPurger.php: |
+      <?php
+      // GARBAGE_RATELIM_B = "cdn_purge_marker"
+    garbage/MetadataExtractor.php: |
+      <?php
+      // GARBAGE_RATELIM_C = "exif_metadata_marker"
   changed_files:
-    config/ratelimit.json: |
+    src/Media/ImageResizer.php: |
+      <?php
+      namespace App\Media;
+
+      class ImageResizer
       {
-        "rate_limit": {
-          "requests_per_second": 500,
-          "burst_size": 200,
-          "enabled": true,
-          "whitelist_ips": ["10.0.0.0/8"]
-        }
+          public function resize(string $path, int $width, int $height): array
+          {
+              if ($width <= 0 || $height <= 0) {
+                  throw new \InvalidArgumentException("Width and height must be positive");
+              }
+
+              $info = getimagesize($path);
+              if ($info === false) {
+                  throw new \RuntimeException("Cannot read image: $path");
+              }
+
+              $origWidth = $info[0];
+              $origHeight = $info[1];
+
+              if ($origHeight === 0) {
+                  throw new \RuntimeException("Image has zero height");
+              }
+
+              $ratio = $origWidth / $origHeight;
+              if ($width / $height > $ratio) {
+                  $width = (int)($height * $ratio);
+              } else {
+                  $height = (int)($width / $ratio);
+              }
+
+              return ['width' => max(1, $width), 'height' => max(1, $height)];
+          }
+
+          public function thumbnail(string $path, int $size): array
+          {
+              return $this->resize($path, $size, $size);
+          }
       }
-  commit_message: "increase rate limits and add IP whitelist"
+    src/Media/VideoTranscoder.php: |
+      <?php
+      namespace App\Media;
+
+      class VideoTranscoder
+      {
+          public function transcode(string $input, string $format): string
+          {
+              return $input . '.' . $format;
+          }
+      }
+    garbage/StorageDriver.php: |
+      <?php
+      // GARBAGE_RATELIM_A = "s3_storage_driver_marker"
+    garbage/CdnPurger.php: |
+      <?php
+      // GARBAGE_RATELIM_B = "cdn_purge_marker"
+    garbage/MetadataExtractor.php: |
+      <?php
+      // GARBAGE_RATELIM_C = "exif_metadata_marker"
+  commit_message: "fix: validate dimensions and guard against zero-height image in resize"
 fragments:
-- id: ratelimit_struct
+- id: dimension_guard
   selector:
-    path: internal/middleware/ratelimit.go
-    anchor: "type RateLimitConfig struct"
-- id: load_ratelimit
+    path: src/Media/ImageResizer.php
+    anchor: "if ($width <= 0 || $height <= 0)"
+- id: zero_height_guard
   selector:
-    path: internal/middleware/ratelimit.go
-    anchor: "func LoadRateLimitConfig"
-- id: ratelimiter_allow
+    path: src/Media/ImageResizer.php
+    anchor: "if ($origHeight === 0)"
+- id: no_video_transcoder
   selector:
-    path: internal/middleware/ratelimit.go
-    anchor: "func (rl *RateLimiter) Allow"
-- id: no_auth
+    path: src/Media/VideoTranscoder.php
+- id: no_garbage_a
   selector:
-    path: internal/middleware/auth.go
-    anchor: "AuthMiddleware"
-- id: no_cache
+    anchor: GARBAGE_RATELIM_A
+- id: no_garbage_b
   selector:
-    path: internal/storage/cache.go
-    anchor: "type Cache struct"
-- id: no_worker
+    anchor: GARBAGE_RATELIM_B
+- id: no_garbage_c
   selector:
-    path: internal/queue/worker.go
-    anchor: "ProcessQueue"
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_CFGCODE_004_AUTH_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_CFGCODE_004_JWT_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_CFGCODE_004_CACHE_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_CFGCODE_004_EVICT_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_CFGCODE_004_WORKER_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_CFGCODE_004_RETRY_F
+    anchor: GARBAGE_RATELIM_C
 oracle:
   required:
-  - ratelimit_struct
-  - load_ratelimit
-  - ratelimiter_allow
+  - dimension_guard
+  - zero_height_guard
   allowed: []
   forbidden:
-  - no_auth
-  - no_cache
-  - no_worker
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_video_transcoder
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

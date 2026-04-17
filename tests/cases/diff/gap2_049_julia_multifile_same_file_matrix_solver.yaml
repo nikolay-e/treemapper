@@ -1,228 +1,128 @@
 name: gap2_049_julia_multifile_same_file_matrix_solver
 tags:
+- lang:python
+- change:bug_fix
 - change:multi_file
-- context:same_file
-- difficulty:easy
-- distance:0hop
-- lang:julia
+- context:test_file
+- distance:1hop
+- difficulty:medium
 repo:
   initial_files:
-    src/LinearSolver.jl: |
-      module LinearSolver
+    src/billing/calculator.py: |
+      from src.billing.rules import apply_discount
 
-      export solve_system, determinant
+      def calculate_invoice(items: list[dict], discount_code: str) -> float:
+          subtotal = sum(item["price"] * item["qty"] for item in items)
+          # BUG: discount applied even when subtotal is 0
+          return apply_discount(subtotal, discount_code)
 
-      function solve_system(A::Matrix{Float64}, b::Vector{Float64})::Vector{Float64}
-          return A \ b
-      end
+      def line_item_total(price: float, qty: int) -> float:
+          return price * qty
+    src/billing/rules.py: |
+      DISCOUNT_RATES = {
+          "SAVE10": 0.10,
+          "SAVE20": 0.20,
+      }
 
-      function determinant(A::Matrix{Float64})::Float64
-          n = size(A, 1)
-          if n == 1
-              return A[1, 1]
-          end
-          return det_recursive(A, n)
-      end
+      def apply_discount(amount: float, code: str) -> float:
+          rate = DISCOUNT_RATES.get(code, 0.0)
+          return amount * (1 - rate)
+    tests/test_calculator.py: |
+      from src.billing.calculator import calculate_invoice, line_item_total
 
-      function det_recursive(A::Matrix{Float64}, n::Int)::Float64
-          if n == 2
-              return A[1,1] * A[2,2] - A[1,2] * A[2,1]
-          end
-          result = 0.0
-          for j in 1:n
-              result += (-1)^(j+1) * A[1,j] * determinant(A[2:end, [1:j-1; j+1:end]])
-          end
-          return result
-      end
+      def test_basic_invoice():
+          items = [{"price": 10.0, "qty": 2}]
+          assert calculate_invoice(items, "") == 20.0
 
-      end
-    src/Decomposition.jl: |
-      module Decomposition
-
-      export lu_decompose, cholesky_decompose
-
-      function lu_decompose(A::Matrix{Float64})::Tuple{Matrix{Float64}, Matrix{Float64}}
-          n = size(A, 1)
-          L = zeros(n, n)
-          U = copy(A)
-          for i in 1:n
-              L[i, i] = 1.0
-          end
-          return (L, U)
-      end
-
-      function cholesky_decompose(A::Matrix{Float64})::Matrix{Float64}
-          n = size(A, 1)
-          L = zeros(n, n)
-          for i in 1:n
-              L[i, i] = sqrt(A[i, i])
-          end
-          return L
-      end
-
-      end
-    src/Interpolation.jl: |
-      module Interpolation
-
-      GARBAGE_GAP2_049_INTERP_A = "lagrange"
-      GARBAGE_GAP2_049_DEGREE_B = 3
-
-      function lagrange(x::Vector{Float64}, y::Vector{Float64}, t::Float64)::Float64
-          n = length(x)
-          result = 0.0
-          for i in 1:n
-              term = y[i]
-              for j in 1:n
-                  if i != j
-                      term *= (t - x[j]) / (x[i] - x[j])
-                  end
-              end
-              result += term
-          end
-          return result
-      end
-
-      end
-    src/Regression.jl: |
-      module Regression
-
-      GARBAGE_GAP2_049_FIT_C = "least_squares"
-      GARBAGE_GAP2_049_ITER_D = 100
-
-      function fit_linear(x::Vector{Float64}, y::Vector{Float64})::Tuple{Float64, Float64}
-          n = length(x)
-          sx = sum(x)
-          sy = sum(y)
-          slope = (n * sum(x .* y) - sx * sy) / (n * sum(x .^ 2) - sx^2)
-          intercept = (sy - slope * sx) / n
-          return (slope, intercept)
-      end
-
-      end
+      def test_discount_applied():
+          items = [{"price": 50.0, "qty": 1}]
+          assert calculate_invoice(items, "SAVE10") == 45.0
+    garbage/emailer.py: |
+      # GARBAGE_JMAT_A = "emailer_marker"
+      def send_receipt(email: str) -> None:
+          pass
+    garbage/exporter.py: |
+      # GARBAGE_JMAT_B = "exporter_marker"
+      def export_pdf(data: dict) -> bytes:
+          return b""
+    garbage/notifier.py: |
+      # GARBAGE_JMAT_C = "notifier_marker"
+      def push_notification(msg: str) -> None:
+          pass
   changed_files:
-    src/LinearSolver.jl: |
-      module LinearSolver
+    src/billing/calculator.py: |
+      from src.billing.rules import apply_discount
 
-      export solve_system, determinant, is_singular
+      def calculate_invoice(items: list[dict], discount_code: str) -> float:
+          subtotal = sum(item["price"] * item["qty"] for item in items)
+          if subtotal <= 0:
+              return 0.0
+          return apply_discount(subtotal, discount_code)
 
-      function solve_system(A::Matrix{Float64}, b::Vector{Float64})::Vector{Float64}
-          if is_singular(A)
-              error("Matrix is singular")
-          end
-          return A \ b
-      end
+      def line_item_total(price: float, qty: int) -> float:
+          return price * qty
+    src/billing/rules.py: |
+      DISCOUNT_RATES = {
+          "SAVE10": 0.10,
+          "SAVE20": 0.20,
+      }
 
-      function is_singular(A::Matrix{Float64})::Bool
-          return abs(determinant(A)) < 1e-12
-      end
+      def apply_discount(amount: float, code: str) -> float:
+          rate = DISCOUNT_RATES.get(code, 0.0)
+          return amount * (1 - rate)
+    tests/test_calculator.py: |
+      from src.billing.calculator import calculate_invoice, line_item_total
 
-      function determinant(A::Matrix{Float64})::Float64
-          n = size(A, 1)
-          if n == 1
-              return A[1, 1]
-          end
-          return det_recursive(A, n)
-      end
+      def test_basic_invoice():
+          items = [{"price": 10.0, "qty": 2}]
+          assert calculate_invoice(items, "") == 20.0
 
-      function det_recursive(A::Matrix{Float64}, n::Int)::Float64
-          if n == 2
-              return A[1,1] * A[2,2] - A[1,2] * A[2,1]
-          end
-          result = 0.0
-          for j in 1:n
-              result += (-1)^(j+1) * A[1,j] * determinant(A[2:end, [1:j-1; j+1:end]])
-          end
-          return result
-      end
+      def test_discount_applied():
+          items = [{"price": 50.0, "qty": 1}]
+          assert calculate_invoice(items, "SAVE10") == 45.0
 
-      end
-    src/Decomposition.jl: |
-      module Decomposition
-
-      export lu_decompose, cholesky_decompose, is_positive_definite
-
-      function lu_decompose(A::Matrix{Float64})::Tuple{Matrix{Float64}, Matrix{Float64}}
-          n = size(A, 1)
-          L = zeros(n, n)
-          U = copy(A)
-          for i in 1:n
-              L[i, i] = 1.0
-          end
-          return (L, U)
-      end
-
-      function is_positive_definite(A::Matrix{Float64})::Bool
-          n = size(A, 1)
-          for i in 1:n
-              if A[i, i] <= 0.0
-                  return false
-              end
-          end
-          return true
-      end
-
-      function cholesky_decompose(A::Matrix{Float64})::Matrix{Float64}
-          if !is_positive_definite(A)
-              error("Matrix is not positive definite")
-          end
-          n = size(A, 1)
-          L = zeros(n, n)
-          for i in 1:n
-              L[i, i] = sqrt(A[i, i])
-          end
-          return L
-      end
-
-      end
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      def test_zero_subtotal_no_discount():
+          items = [{"price": 0.0, "qty": 5}]
+          assert calculate_invoice(items, "SAVE20") == 0.0
+    garbage/emailer.py: |
+      # GARBAGE_JMAT_A = "emailer_marker"
+      def send_receipt(email: str) -> None:
+          pass
+    garbage/exporter.py: |
+      # GARBAGE_JMAT_B = "exporter_marker"
+      def export_pdf(data: dict) -> bytes:
+          return b""
+    garbage/notifier.py: |
+      # GARBAGE_JMAT_C = "notifier_marker"
+      def push_notification(msg: str) -> None:
+          pass
+  commit_message: "fix: skip discount when subtotal is zero in calculate_invoice"
 fragments:
-- id: solver_singular_check
+- id: calculate_invoice_guard
   selector:
-    path: src/LinearSolver.jl
-    anchor: "if is_singular(A)"
-- id: solver_is_singular
+    anchor: "if subtotal <= 0"
+- id: test_zero_subtotal
   selector:
-    path: src/LinearSolver.jl
-    anchor: "function is_singular(A::Matrix{Float64})::Bool"
-- id: decomp_pos_def
+    anchor: "def test_zero_subtotal_no_discount()"
+- id: apply_discount_func
   selector:
-    path: src/Decomposition.jl
-    anchor: "function is_positive_definite(A::Matrix{Float64})::Bool"
-- id: decomp_cholesky_guard
+    anchor: "def apply_discount(amount: float, code: str) -> float"
+- id: no_garbage_a
   selector:
-    path: src/Decomposition.jl
-    anchor: "if !is_positive_definite(A)"
-- id: no_interpolation
+    anchor: GARBAGE_JMAT_A
+- id: no_garbage_b
   selector:
-    path: src/Interpolation.jl
-- id: no_regression
+    anchor: GARBAGE_JMAT_B
+- id: no_garbage_c
   selector:
-    path: src/Regression.jl
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_GAP2_049_INTERP_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_GAP2_049_DEGREE_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_GAP2_049_FIT_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_GAP2_049_ITER_D
+    anchor: GARBAGE_JMAT_C
 oracle:
   required:
-  - solver_singular_check
-  - solver_is_singular
-  - decomp_pos_def
-  - decomp_cholesky_guard
-  allowed: []
+  - calculate_invoice_guard
+  - test_zero_subtotal
+  allowed:
+  - apply_discount_func
   forbidden:
-  - no_interpolation
-  - no_regression
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

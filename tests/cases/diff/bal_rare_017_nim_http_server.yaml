@@ -1,206 +1,203 @@
 name: bal_rare_017_nim_http_server
 tags:
-- lang:nim
-- change:multi_file
-- change:new_function
+- lang:rust
+- change:bug_fix
 - context:import_chain
 - distance:1hop
-- difficulty:medium
+- difficulty:hard
 repo:
   initial_files:
-    src/router.nim: |
-      import tables
+    src/cdn/invalidator.rs: |
+      use crate::cache::manifest::CacheManifest;
 
-      type
-        Handler* = proc(path: string): string
-        Router* = object
-          routes: Table[string, Handler]
+      pub struct CdnInvalidator {
+          manifest: CacheManifest,
+          base_url: String,
+      }
 
-      proc newRouter*(): Router =
-        Router(routes: initTable[string, Handler]())
+      impl CdnInvalidator {
+          pub fn new(manifest: CacheManifest, base_url: &str) -> Self {
+              CdnInvalidator { manifest, base_url: base_url.to_string() }
+          }
 
-      proc addRoute*(r: var Router, path: string, handler: Handler) =
-        r.routes[path] = handler
+          pub fn invalidate(&mut self, path: &str) -> Vec<String> {
+              let patterns = self.manifest.patterns_for(path);
+              patterns.iter().map(|p| format!("{}/{}", self.base_url, p)).collect()
+              // BUG: does not remove invalidated entries from manifest
+          }
 
-      proc dispatch*(r: Router, path: string): string =
-        if r.routes.hasKey(path):
-          return r.routes[path](path)
-        return "404 Not Found"
-    src/server.nim: |
-      import router
+          pub fn invalidate_all(&mut self) -> usize {
+              let count = self.manifest.len();
+              self.manifest.clear();
+              count
+          }
+      }
+    src/cache/manifest.rs: |
+      use std::collections::HashMap;
 
-      type
-        Server* = object
-          router: Router
-          port: int
+      pub struct CacheManifest {
+          entries: HashMap<String, Vec<String>>,
+      }
 
-      proc newServer*(port: int): Server =
-        Server(router: newRouter(), port: port)
+      impl CacheManifest {
+          pub fn new() -> Self {
+              CacheManifest { entries: HashMap::new() }
+          }
 
-      proc route*(s: var Server, path: string, handler: Handler) =
-        s.router.addRoute(path, handler)
+          pub fn register(&mut self, path: &str, patterns: Vec<String>) {
+              self.entries.insert(path.to_string(), patterns);
+          }
 
-      proc handle*(s: Server, path: string): string =
-        s.router.dispatch(path)
-    src/app.nim: |
-      import server
+          pub fn patterns_for(&self, path: &str) -> Vec<String> {
+              self.entries.get(path).cloned().unwrap_or_default()
+          }
 
-      proc main() =
-        var s = newServer(8080)
-        s.route("/", proc(p: string): string = "Hello World")
-        s.route("/health", proc(p: string): string = "OK")
-        echo s.handle("/")
+          pub fn remove(&mut self, path: &str) {
+              self.entries.remove(path);
+          }
 
-      main()
-    garbage_validator.nim: |
-      const GARBAGE_RARE_017_MAXLEN_A = 255
-      const GARBAGE_RARE_017_MINLEN_B = 1
+          pub fn clear(&mut self) {
+              self.entries.clear();
+          }
 
-      proc garbage_validate*() =
-        discard GARBAGE_RARE_017_MAXLEN_A
+          pub fn len(&self) -> usize {
+              self.entries.len()
+          }
+      }
+    src/metrics/counters.rs: |
+      use crate::cdn::invalidator::CdnInvalidator;
 
-      const GARBAGE_RARE_017_PATTERN_C = "^[a-z]+$"
-    garbage_cache.nim: |
-      const GARBAGE_RARE_017_SIZE_D = 1024
-      const GARBAGE_RARE_017_POLICY_E = "lru"
-
-      proc garbage_cache_get*() =
-        discard GARBAGE_RARE_017_SIZE_D
-
-      const GARBAGE_RARE_017_SHARD_F = 4
+      pub fn count_pending(invalidator: &CdnInvalidator) -> usize {
+          invalidator.manifest_len()
+      }
+    garbage/purge_worker.rs: |
+      // GARBAGE_RARE017_PURGE_A = "purge_worker_marker"
+    garbage/origin.rs: |
+      // GARBAGE_RARE017_ORIGIN_B = "origin_marker"
+    garbage/prefetch.rs: |
+      // GARBAGE_RARE017_PREF_C = "prefetch_marker"
+    garbage/edge_node.rs: |
+      // GARBAGE_RARE017_EDGE_D = "edge_node_marker"
   changed_files:
-    src/router.nim: |
-      import tables
+    src/cdn/invalidator.rs: |
+      use crate::cache::manifest::CacheManifest;
 
-      type
-        Handler* = proc(path: string): string
-        MiddlewareProc* = proc(path: string, next: Handler): string
-        Router* = object
-          routes: Table[string, Handler]
-          middlewares: seq[MiddlewareProc]
+      pub struct CdnInvalidator {
+          manifest: CacheManifest,
+          base_url: String,
+      }
 
-      proc newRouter*(): Router =
-        Router(routes: initTable[string, Handler](), middlewares: @[])
+      impl CdnInvalidator {
+          pub fn new(manifest: CacheManifest, base_url: &str) -> Self {
+              CdnInvalidator { manifest, base_url: base_url.to_string() }
+          }
 
-      proc addRoute*(r: var Router, path: string, handler: Handler) =
-        r.routes[path] = handler
+          pub fn invalidate(&mut self, path: &str) -> Vec<String> {
+              let patterns = self.manifest.patterns_for(path);
+              self.manifest.remove(path);
+              patterns.iter().map(|p| format!("{}/{}", self.base_url, p)).collect()
+          }
 
-      proc use*(r: var Router, mw: MiddlewareProc) =
-        r.middlewares.add(mw)
+          pub fn invalidate_all(&mut self) -> usize {
+              let count = self.manifest.len();
+              self.manifest.clear();
+              count
+          }
 
-      proc dispatch*(r: Router, path: string): string =
-        if not r.routes.hasKey(path):
-          return "404 Not Found"
-        var handler = r.routes[path]
-        for i in countdown(r.middlewares.len - 1, 0):
-          let mw = r.middlewares[i]
-          let prevHandler = handler
-          handler = proc(p: string): string = mw(p, prevHandler)
-        return handler(path)
-    src/server.nim: |
-      import router
+          pub fn manifest_len(&self) -> usize {
+              self.manifest.len()
+          }
+      }
+    src/cache/manifest.rs: |
+      use std::collections::HashMap;
 
-      type
-        Server* = object
-          router: Router
-          port: int
+      pub struct CacheManifest {
+          entries: HashMap<String, Vec<String>>,
+      }
 
-      proc newServer*(port: int): Server =
-        Server(router: newRouter(), port: port)
+      impl CacheManifest {
+          pub fn new() -> Self {
+              CacheManifest { entries: HashMap::new() }
+          }
 
-      proc route*(s: var Server, path: string, handler: Handler) =
-        s.router.addRoute(path, handler)
+          pub fn register(&mut self, path: &str, patterns: Vec<String>) {
+              self.entries.insert(path.to_string(), patterns);
+          }
 
-      proc middleware*(s: var Server, mw: MiddlewareProc) =
-        s.router.use(mw)
+          pub fn patterns_for(&self, path: &str) -> Vec<String> {
+              self.entries.get(path).cloned().unwrap_or_default()
+          }
 
-      proc handle*(s: Server, path: string): string =
-        s.router.dispatch(path)
-    src/app.nim: |
-      import server
+          pub fn remove(&mut self, path: &str) {
+              self.entries.remove(path);
+          }
 
-      proc main() =
-        var s = newServer(8080)
-        s.route("/", proc(p: string): string = "Hello World")
-        s.route("/health", proc(p: string): string = "OK")
-        echo s.handle("/")
+          pub fn clear(&mut self) {
+              self.entries.clear();
+          }
 
-      main()
-    garbage_validator.nim: |
-      const GARBAGE_RARE_017_MAXLEN_A = 255
-      const GARBAGE_RARE_017_MINLEN_B = 1
+          pub fn len(&self) -> usize {
+              self.entries.len()
+          }
+      }
+    src/metrics/counters.rs: |
+      use crate::cdn::invalidator::CdnInvalidator;
 
-      proc garbage_validate*() =
-        discard GARBAGE_RARE_017_MAXLEN_A
-
-      const GARBAGE_RARE_017_PATTERN_C = "^[a-z]+$"
-    garbage_cache.nim: |
-      const GARBAGE_RARE_017_SIZE_D = 1024
-      const GARBAGE_RARE_017_POLICY_E = "lru"
-
-      proc garbage_cache_get*() =
-        discard GARBAGE_RARE_017_SIZE_D
-
-      const GARBAGE_RARE_017_SHARD_F = 4
-  commit_message: "feat: add middleware chain support to router"
+      pub fn count_pending(invalidator: &CdnInvalidator) -> usize {
+          invalidator.manifest_len()
+      }
+    garbage/purge_worker.rs: |
+      // GARBAGE_RARE017_PURGE_A = "purge_worker_marker"
+    garbage/origin.rs: |
+      // GARBAGE_RARE017_ORIGIN_B = "origin_marker"
+    garbage/prefetch.rs: |
+      // GARBAGE_RARE017_PREF_C = "prefetch_marker"
+    garbage/edge_node.rs: |
+      // GARBAGE_RARE017_EDGE_D = "edge_node_marker"
+  commit_message: "fix: remove manifest entry after invalidation to prevent stale re-serve"
 fragments:
-- id: middleware_type
+- id: invalidate_remove_call
   selector:
-    path: src/router.nim
-    anchor: "MiddlewareProc* = proc"
-- id: router_use
+    path: src/cdn/invalidator.rs
+    anchor: "self.manifest.remove(path);"
+- id: manifest_len_method
   selector:
-    path: src/router.nim
-    anchor: "proc use*(r: var Router, mw: MiddlewareProc)"
-- id: dispatch_chain
+    path: src/cdn/invalidator.rs
+    anchor: "pub fn manifest_len(&self) -> usize {"
+- id: manifest_remove_method
   selector:
-    path: src/router.nim
-    anchor: "for i in countdown"
-- id: server_middleware
+    path: src/cache/manifest.rs
+    anchor: "pub fn remove(&mut self, path: &str) {"
+- id: metrics_calls_manifest_len
   selector:
-    path: src/server.nim
-    anchor: "proc middleware*(s: var Server, mw: MiddlewareProc)"
-- id: no_app
+    path: src/metrics/counters.rs
+    anchor: "invalidator.manifest_len()"
+- id: manifest_patterns_for
   selector:
-    path: src/app.nim
-- id: no_garbage_validator
+    path: src/cache/manifest.rs
+    anchor: "pub fn patterns_for(&self, path: &str) -> Vec<String> {"
+- id: no_garbage_a
   selector:
-    path: garbage_validator.nim
-- id: no_garbage_cache
+    anchor: GARBAGE_RARE017_PURGE_A
+- id: no_garbage_b
   selector:
-    path: garbage_cache.nim
-- id: no_global_0
+    anchor: GARBAGE_RARE017_ORIGIN_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_RARE_017_MAXLEN_A
-- id: no_global_1
+    anchor: GARBAGE_RARE017_PREF_C
+- id: no_garbage_d
   selector:
-    anchor: GARBAGE_RARE_017_MINLEN_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_RARE_017_PATTERN_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_RARE_017_SIZE_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_017_POLICY_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_017_SHARD_F
+    anchor: GARBAGE_RARE017_EDGE_D
 oracle:
   required:
-  - middleware_type
-  - router_use
-  - dispatch_chain
-  - server_middleware
-  allowed: []
+  - invalidate_remove_call
+  - manifest_remove_method
+  - metrics_calls_manifest_len
+  allowed:
+  - manifest_len_method
+  - manifest_patterns_for
   forbidden:
-  - no_app
-  - no_garbage_validator
-  - no_garbage_cache
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

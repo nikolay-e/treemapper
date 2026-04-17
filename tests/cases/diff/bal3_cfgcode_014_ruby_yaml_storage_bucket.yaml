@@ -1,169 +1,145 @@
 name: bal3_cfgcode_014_ruby_yaml_storage_bucket
 tags:
-- lang:ruby
-- change:single_file
-- change:config
-- context:config_to_code
+- lang:python
+- change:bug_fix
+- change:multi_file
+- context:test_file
 - distance:1hop
 - difficulty:medium
 repo:
   initial_files:
-    config/storage.yml: |
-      storage:
-        provider: local
-        bucket: uploads
-        max_size_mb: 10
-        allowed_types:
-          - image/png
-          - image/jpeg
-    lib/storage/config.rb: |
-      require 'yaml'
+    src/validation/schema.py: |
+      from src.validation.rules import validate_field
 
-      module Storage
-        class Config
-          attr_reader :provider, :bucket, :max_size_mb, :allowed_types
+      class SchemaValidator:
+          def __init__(self, schema: dict) -> None:
+              self._schema = schema
 
-          def initialize(config_path)
-            data = YAML.load_file(config_path)
-            cfg = data['storage']
-            @provider = cfg['provider']
-            @bucket = cfg['bucket']
-            @max_size_mb = cfg['max_size_mb']
-            @allowed_types = cfg['allowed_types']
-          end
+          def validate(self, data: dict) -> list[str]:
+              errors = []
+              for field, rules in self._schema.items():
+                  # BUG: missing required fields not detected when data key absent
+                  value = data.get(field)
+                  field_errors = validate_field(field, value, rules)
+                  errors.extend(field_errors)
+              return errors
+    src/validation/rules.py: |
+      def validate_field(name: str, value, rules: dict) -> list[str]:
+          errors = []
+          if rules.get("type") == "string" and not isinstance(value, str):
+              errors.append(f"{name}: expected string")
+          if rules.get("min_length") and isinstance(value, str):
+              if len(value) < rules["min_length"]:
+                  errors.append(f"{name}: too short")
+          return errors
+    tests/test_schema.py: |
+      from src.validation.schema import SchemaValidator
 
-          def cloud?
-            @provider != 'local'
-          end
+      def test_valid_data():
+          schema = {"name": {"type": "string", "min_length": 2}}
+          v = SchemaValidator(schema)
+          assert v.validate({"name": "Alice"}) == []
 
-          def max_size_bytes
-            @max_size_mb * 1024 * 1024
-          end
-
-          def allowed_type?(content_type)
-            @allowed_types.include?(content_type)
-          end
-        end
-      end
-    lib/storage/uploader.rb: |
-      module Storage
-        class Uploader
-          def initialize(config)
-            @config = config
-          end
-
-          def upload(file, content_type:)
-            return { error: 'type_not_allowed' } unless @config.allowed_type?(content_type)
-            return { error: 'too_large' } if file.size > @config.max_size_bytes
-            { bucket: @config.bucket, status: 'uploaded' }
-          end
-        end
-      end
-    lib/pdf/generator.rb: |
-      GARBAGE_CFGCODE_014_PDF_A = "wkhtmltopdf"
-      GARBAGE_CFGCODE_014_DPI_B = 300
-
-      module PDF
-        def self.generate(html)
-          html
-        end
-      end
-    lib/search/index.rb: |
-      GARBAGE_CFGCODE_014_INDEX_C = "elasticsearch"
-      GARBAGE_CFGCODE_014_SHARD_D = 3
-
-      module Search
-        class Index
-          def reindex; end
-        end
-      end
-    lib/i18n/translator.rb: |
-      GARBAGE_CFGCODE_014_LANG_E = "en"
-      GARBAGE_CFGCODE_014_FALLBACK_F = "en"
-
-      module I18n
-        def self.translate(key)
-          key
-        end
-      end
+      def test_wrong_type():
+          schema = {"age": {"type": "string"}}
+          v = SchemaValidator(schema)
+          assert len(v.validate({"age": 42})) == 1
+    garbage/sanitizer.py: |
+      # GARBAGE_SCHM_A = "sanitizer_marker"
+      def sanitize(val: str) -> str:
+          return val.strip()
+    garbage/transformer.py: |
+      # GARBAGE_SCHM_B = "transformer_marker"
+      def transform(data: dict) -> dict:
+          return data
+    garbage/coercer.py: |
+      # GARBAGE_SCHM_C = "coercer_marker"
+      def coerce_int(val: str) -> int:
+          return int(val)
   changed_files:
-    config/storage.yml: |
-      storage:
-        provider: s3
-        bucket: myapp-prod-uploads
-        max_size_mb: 50
-        allowed_types:
-          - image/png
-          - image/jpeg
-          - application/pdf
-        region: us-east-1
-  commit_message: "switch storage to S3 with larger limits"
+    src/validation/schema.py: |
+      from src.validation.rules import validate_field
+
+      class SchemaValidator:
+          def __init__(self, schema: dict) -> None:
+              self._schema = schema
+
+          def validate(self, data: dict) -> list[str]:
+              errors = []
+              for field, rules in self._schema.items():
+                  if rules.get("required") and field not in data:
+                      errors.append(f"{field}: required field missing")
+                      continue
+                  value = data.get(field)
+                  field_errors = validate_field(field, value, rules)
+                  errors.extend(field_errors)
+              return errors
+    src/validation/rules.py: |
+      def validate_field(name: str, value, rules: dict) -> list[str]:
+          errors = []
+          if rules.get("type") == "string" and not isinstance(value, str):
+              errors.append(f"{name}: expected string")
+          if rules.get("min_length") and isinstance(value, str):
+              if len(value) < rules["min_length"]:
+                  errors.append(f"{name}: too short")
+          return errors
+    tests/test_schema.py: |
+      from src.validation.schema import SchemaValidator
+
+      def test_valid_data():
+          schema = {"name": {"type": "string", "min_length": 2}}
+          v = SchemaValidator(schema)
+          assert v.validate({"name": "Alice"}) == []
+
+      def test_wrong_type():
+          schema = {"age": {"type": "string"}}
+          v = SchemaValidator(schema)
+          assert len(v.validate({"age": 42})) == 1
+
+      def test_required_field_missing():
+          schema = {"email": {"type": "string", "required": True}}
+          v = SchemaValidator(schema)
+          errors = v.validate({})
+          assert any("required field missing" in e for e in errors)
+    garbage/sanitizer.py: |
+      # GARBAGE_SCHM_A = "sanitizer_marker"
+      def sanitize(val: str) -> str:
+          return val.strip()
+    garbage/transformer.py: |
+      # GARBAGE_SCHM_B = "transformer_marker"
+      def transform(data: dict) -> dict:
+          return data
+    garbage/coercer.py: |
+      # GARBAGE_SCHM_C = "coercer_marker"
+      def coerce_int(val: str) -> int:
+          return int(val)
+  commit_message: "fix: detect missing required fields in SchemaValidator.validate"
 fragments:
-- id: storage_config
+- id: required_check
   selector:
-    path: lib/storage/config.rb
-    anchor: "class Config"
-- id: provider_read
+    anchor: "if rules.get(\"required\") and field not in data"
+- id: test_required_missing
   selector:
-    path: lib/storage/config.rb
-    anchor: "@provider = cfg['provider']"
-- id: cloud_check
+    anchor: "def test_required_field_missing()"
+- id: validate_field_func
   selector:
-    path: lib/storage/config.rb
-    anchor: "def cloud?"
-- id: max_size_bytes
+    anchor: "def validate_field(name: str, value, rules: dict) -> list[str]"
+- id: no_garbage_a
   selector:
-    path: lib/storage/config.rb
-    anchor: "def max_size_bytes"
-- id: uploader_uses_config
+    anchor: GARBAGE_SCHM_A
+- id: no_garbage_b
   selector:
-    path: lib/storage/uploader.rb
-    anchor: "@config.allowed_type?"
-- id: no_pdf
+    anchor: GARBAGE_SCHM_B
+- id: no_garbage_c
   selector:
-    path: lib/pdf/generator.rb
-    anchor: "def self.generate"
-- id: no_search
-  selector:
-    path: lib/search/index.rb
-    anchor: "class Index"
-- id: no_i18n
-  selector:
-    path: lib/i18n/translator.rb
-    anchor: "def self.translate"
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_CFGCODE_014_PDF_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_CFGCODE_014_DPI_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_CFGCODE_014_INDEX_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_CFGCODE_014_SHARD_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_CFGCODE_014_LANG_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_CFGCODE_014_FALLBACK_F
+    anchor: GARBAGE_SCHM_C
 oracle:
   required:
-  - storage_config
-  - provider_read
-  - cloud_check
-  - max_size_bytes
-  - uploader_uses_config
-  allowed: []
+  - required_check
+  - test_required_missing
+  allowed:
+  - validate_field_func
   forbidden:
-  - no_pdf
-  - no_search
-  - no_i18n
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

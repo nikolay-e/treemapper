@@ -1,191 +1,127 @@
 name: gap2_052_julia_multifile_same_file_color_space
 tags:
-- change:multi_file
+- lang:lua
+- change:bug_fix
+- change:single_file
 - context:same_file
-- difficulty:easy
 - distance:0hop
-- lang:julia
+- difficulty:trivial
 repo:
   initial_files:
-    src/RGB.jl: |
-      module RGB
+    src/pathfinding.lua: |
+      local M = {}
 
-      export RGBColor, to_hex, blend
+      function M.find_path(grid, start, goal)
+          local open = {start}
+          local came_from = {}
 
-      struct RGBColor
-          r::UInt8
-          g::UInt8
-          b::UInt8
+          while #open > 0 do
+              local current = table.remove(open, 1)
+              if current == goal then
+                  return M.reconstruct(came_from, start, goal)
+              end
+              for _, neighbor in ipairs(M.neighbors(grid, current)) do
+                  table.insert(open, neighbor)
+                  came_from[neighbor] = current
+              end
+          end
+          return nil
       end
 
-      function to_hex(c::RGBColor)::String
-          return "#" * string(c.r, base=16, pad=2) *
-                 string(c.g, base=16, pad=2) *
-                 string(c.b, base=16, pad=2)
+      function M.neighbors(grid, node)
+          return {}
       end
 
-      function blend(a::RGBColor, b::RGBColor, t::Float64)::RGBColor
-          r = round(UInt8, a.r * (1 - t) + b.r * t)
-          g = round(UInt8, a.g * (1 - t) + b.g * t)
-          bl = round(UInt8, a.b * (1 - t) + b.b * t)
-          return RGBColor(r, g, bl)
+      function M.reconstruct(came_from, start, goal)
+          local path = {goal}
+          local current = goal
+          while current ~= start do
+              current = came_from[current]
+              if not current then return nil end
+              table.insert(path, 1, current)
+          end
+          return path
       end
 
-      end
-    src/HSL.jl: |
-      module HSL
-
-      export HSLColor, rotate_hue
-
-      struct HSLColor
-          h::Float64
-          s::Float64
-          l::Float64
-      end
-
-      function rotate_hue(c::HSLColor, degrees::Float64)::HSLColor
-          new_h = mod(c.h + degrees, 360.0)
-          return HSLColor(new_h, c.s, c.l)
-      end
-
-      function saturate(c::HSLColor, amount::Float64)::HSLColor
-          new_s = clamp(c.s + amount, 0.0, 1.0)
-          return HSLColor(c.h, new_s, c.l)
-      end
-
-      end
-    src/Palette.jl: |
-      module Palette
-
-      GARBAGE_GAP2_052_SCHEME_A = "complementary"
-      GARBAGE_GAP2_052_COUNT_B = 5
-
-      function generate_palette(base_hue::Float64, count::Int)::Vector{Float64}
-          step = 360.0 / count
-          return [mod(base_hue + i * step, 360.0) for i in 0:count-1]
-      end
-
-      function warm_palette()::Vector{Float64}
-          return [0.0, 30.0, 45.0, 60.0]
-      end
-
-      end
-    src/Gradient.jl: |
-      module Gradient
-
-      GARBAGE_GAP2_052_STOPS_C = 10
-      GARBAGE_GAP2_052_MODE_D = "linear"
-
-      function linear_gradient(steps::Int)::Vector{Float64}
-          return [i / (steps - 1) for i in 0:steps-1]
-      end
-
-      function ease_gradient(steps::Int)::Vector{Float64}
-          return [sin(pi / 2 * i / (steps - 1)) for i in 0:steps-1]
-      end
-
-      end
+      return M
+    garbage/GAP052_renderer.lua: |
+      -- GAP052_GARBAGE_A = "renderer_marker"
+    garbage/GAP052_physics.lua: |
+      -- GAP052_GARBAGE_B = "physics_marker"
+    garbage/GAP052_input.lua: |
+      -- GAP052_GARBAGE_C = "input_marker"
   changed_files:
-    src/RGB.jl: |
-      module RGB
+    src/pathfinding.lua: |
+      local M = {}
 
-      export RGBColor, to_hex, blend, luminance
+      function M.find_path(grid, start, goal)
+          local open = {start}
+          local came_from = {}
+          local visited = {}
 
-      struct RGBColor
-          r::UInt8
-          g::UInt8
-          b::UInt8
+          while #open > 0 do
+              local current = table.remove(open, 1)
+              if current == goal then
+                  return M.reconstruct(came_from, start, goal)
+              end
+              if not visited[current] then
+                  visited[current] = true
+                  for _, neighbor in ipairs(M.neighbors(grid, current)) do
+                      if not visited[neighbor] then
+                          table.insert(open, neighbor)
+                          came_from[neighbor] = current
+                      end
+                  end
+              end
+          end
+          return nil
       end
 
-      function to_hex(c::RGBColor)::String
-          return "#" * string(c.r, base=16, pad=2) *
-                 string(c.g, base=16, pad=2) *
-                 string(c.b, base=16, pad=2)
+      function M.neighbors(grid, node)
+          return {}
       end
 
-      function blend(a::RGBColor, b::RGBColor, t::Float64)::RGBColor
-          r = round(UInt8, a.r * (1 - t) + b.r * t)
-          g = round(UInt8, a.g * (1 - t) + b.g * t)
-          bl = round(UInt8, a.b * (1 - t) + b.b * t)
-          return RGBColor(r, g, bl)
+      function M.reconstruct(came_from, start, goal)
+          local path = {goal}
+          local current = goal
+          while current ~= start do
+              current = came_from[current]
+              if not current then return nil end
+              table.insert(path, 1, current)
+          end
+          return path
       end
 
-      function luminance(c::RGBColor)::Float64
-          return 0.2126 * (c.r / 255.0) + 0.7152 * (c.g / 255.0) + 0.0722 * (c.b / 255.0)
-      end
-
-      end
-    src/HSL.jl: |
-      module HSL
-
-      export HSLColor, rotate_hue, lighten
-
-      struct HSLColor
-          h::Float64
-          s::Float64
-          l::Float64
-      end
-
-      function rotate_hue(c::HSLColor, degrees::Float64)::HSLColor
-          new_h = mod(c.h + degrees, 360.0)
-          return HSLColor(new_h, c.s, c.l)
-      end
-
-      function saturate(c::HSLColor, amount::Float64)::HSLColor
-          new_s = clamp(c.s + amount, 0.0, 1.0)
-          return HSLColor(c.h, new_s, c.l)
-      end
-
-      function lighten(c::HSLColor, amount::Float64)::HSLColor
-          new_l = clamp(c.l + amount, 0.0, 1.0)
-          return HSLColor(c.h, c.s, new_l)
-      end
-
-      end
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      return M
+    garbage/GAP052_renderer.lua: |
+      -- GAP052_GARBAGE_A = "renderer_marker"
+    garbage/GAP052_physics.lua: |
+      -- GAP052_GARBAGE_B = "physics_marker"
+    garbage/GAP052_input.lua: |
+      -- GAP052_GARBAGE_C = "input_marker"
+  commit_message: "fix: add visited set to find_path to prevent infinite loops on cyclic graphs"
 fragments:
-- id: rgb_luminance
+- id: find_path_func
   selector:
-    path: src/RGB.jl
-    anchor: "function luminance(c::RGBColor)::Float64"
-- id: rgb_luminance_formula
+    anchor: "function M.find_path"
+- id: visited_set
   selector:
-    path: src/RGB.jl
-    anchor: "0.2126"
-- id: hsl_lighten
+    anchor: "local visited = {}"
+- id: no_garbage_a
   selector:
-    path: src/HSL.jl
-    anchor: "function lighten(c::HSLColor, amount::Float64)::HSLColor"
-- id: no_palette
+    anchor: GAP052_GARBAGE_A
+- id: no_garbage_b
   selector:
-    path: src/Palette.jl
-- id: no_gradient
+    anchor: GAP052_GARBAGE_B
+- id: no_garbage_c
   selector:
-    path: src/Gradient.jl
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_GAP2_052_SCHEME_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_GAP2_052_COUNT_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_GAP2_052_STOPS_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_GAP2_052_MODE_D
+    anchor: GAP052_GARBAGE_C
 oracle:
   required:
-  - rgb_luminance
-  - rgb_luminance_formula
-  - hsl_lighten
+  - find_path_func
+  - visited_set
   allowed: []
   forbidden:
-  - no_palette
-  - no_gradient
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

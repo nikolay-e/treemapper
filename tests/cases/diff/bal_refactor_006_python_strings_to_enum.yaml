@@ -1,207 +1,214 @@
 name: bal_refactor_006_python_strings_to_enum
 tags:
-- lang:python
+- lang:java
 - change:multi_file
-- change:refactor
-- context:import_chain
+- change:new_function
+- context:test_file
 - distance:1hop
-- difficulty:medium
+- difficulty:hard
 repo:
   initial_files:
-    models/order.py: |
-      class Order:
-          def __init__(self, order_id, items):
-              self.order_id = order_id
-              self.items = items
-              self.status = "pending"
+    src/main/java/com/inventory/product/ProductRepository.java: |
+      package com.inventory.product;
 
-          def confirm(self):
-              if self.status != "pending":
-                  raise ValueError("can only confirm pending orders")
-              self.status = "confirmed"
+      import java.util.List;
+      import java.util.ArrayList;
+      import java.util.Optional;
 
-          def ship(self):
-              if self.status != "confirmed":
-                  raise ValueError("can only ship confirmed orders")
-              self.status = "shipped"
+      public class ProductRepository {
+          private final List<Product> products = new ArrayList<>();
 
-          def deliver(self):
-              if self.status != "shipped":
-                  raise ValueError("can only deliver shipped orders")
-              self.status = "delivered"
-    services/order_service.py: |
-      from models.order import Order
-
-      class OrderService:
-          def __init__(self, repo):
-              self.repo = repo
-
-          def get_pending_orders(self):
-              return [o for o in self.repo.all() if o.status == "pending"]
-
-          def get_shipped_orders(self):
-              return [o for o in self.repo.all() if o.status == "shipped"]
-    views/order_view.py: |
-      from models.order import Order
-
-      def render_status_badge(order):
-          colors = {
-              "pending": "yellow",
-              "confirmed": "blue",
-              "shipped": "purple",
-              "delivered": "green",
+          public void save(Product p) {
+              products.add(p);
           }
-          return f'<span class="{colors.get(order.status, "gray")}">{order.status}</span>'
-    utils/helpers.py: |
-      GARBAGE_REFACTOR_006_HELPER_MARKER_A = "helpers"
-      GARBAGE_REFACTOR_006_ROUND_MARKER_B = 2
 
-      def round_price(price):
-          return round(price, 2)
-    garbage_notifications.py: |
-      GARBAGE_REFACTOR_006_NOTIF_MARKER_C = "notifications"
-      GARBAGE_REFACTOR_006_CHANNEL_MARKER_D = "email"
+          public Optional<Product> findById(String id) {
+              return products.stream().filter(p -> p.getId().equals(id)).findFirst();
+          }
 
-      class NotificationSender:
-          GARBAGE_REFACTOR_006_SENDER_E = True
-
-          def send(self, to, msg):
-              pass
-  changed_files:
-    models/status.py: |
-      from enum import Enum
-
-      class OrderStatus(Enum):
-          PENDING = "pending"
-          CONFIRMED = "confirmed"
-          SHIPPED = "shipped"
-          DELIVERED = "delivered"
-    models/order.py: |
-      from models.status import OrderStatus
-
-      class Order:
-          def __init__(self, order_id, items):
-              self.order_id = order_id
-              self.items = items
-              self.status = OrderStatus.PENDING
-
-          def confirm(self):
-              if self.status != OrderStatus.PENDING:
-                  raise ValueError("can only confirm pending orders")
-              self.status = OrderStatus.CONFIRMED
-
-          def ship(self):
-              if self.status != OrderStatus.CONFIRMED:
-                  raise ValueError("can only ship confirmed orders")
-              self.status = OrderStatus.SHIPPED
-
-          def deliver(self):
-              if self.status != OrderStatus.SHIPPED:
-                  raise ValueError("can only deliver shipped orders")
-              self.status = OrderStatus.DELIVERED
-    services/order_service.py: |
-      from models.order import Order
-      from models.status import OrderStatus
-
-      class OrderService:
-          def __init__(self, repo):
-              self.repo = repo
-
-          def get_pending_orders(self):
-              return [o for o in self.repo.all() if o.status == OrderStatus.PENDING]
-
-          def get_shipped_orders(self):
-              return [o for o in self.repo.all() if o.status == OrderStatus.SHIPPED]
-    views/order_view.py: |
-      from models.order import Order
-      from models.status import OrderStatus
-
-      STATUS_COLORS = {
-          OrderStatus.PENDING: "yellow",
-          OrderStatus.CONFIRMED: "blue",
-          OrderStatus.SHIPPED: "purple",
-          OrderStatus.DELIVERED: "green",
+          public List<Product> findAll() {
+              return products;
+          }
       }
+    src/main/java/com/inventory/product/Product.java: |
+      package com.inventory.product;
 
-      def render_status_badge(order):
-          color = STATUS_COLORS.get(order.status, "gray")
-          return f'<span class="{color}">{order.status.value}</span>'
-    utils/helpers.py: |
-      GARBAGE_REFACTOR_006_HELPER_MARKER_A = "helpers"
-      GARBAGE_REFACTOR_006_ROUND_MARKER_B = 2
+      public class Product {
+          private final String id;
+          private final String name;
+          private int stock;
 
-      def round_price(price):
-          return round(price, 2)
-    garbage_notifications.py: |
-      GARBAGE_REFACTOR_006_NOTIF_MARKER_C = "notifications"
-      GARBAGE_REFACTOR_006_CHANNEL_MARKER_D = "email"
+          public Product(String id, String name, int stock) {
+              this.id = id;
+              this.name = name;
+              this.stock = stock;
+          }
 
-      class NotificationSender:
-          GARBAGE_REFACTOR_006_SENDER_E = True
+          public String getId() { return id; }
+          public String getName() { return name; }
+          public int getStock() { return stock; }
+          public void setStock(int stock) { this.stock = stock; }
+      }
+    src/test/java/com/inventory/product/ProductRepositoryTest.java: |
+      package com.inventory.product;
 
-          def send(self, to, msg):
-              pass
-  commit_message: "refactor: replace string status with OrderStatus enum"
+      import org.junit.jupiter.api.Test;
+      import static org.junit.jupiter.api.Assertions.*;
+
+      public class ProductRepositoryTest {
+          @Test
+          void saveAndFind() {
+              ProductRepository repo = new ProductRepository();
+              repo.save(new Product("p1", "Widget", 10));
+              assertTrue(repo.findById("p1").isPresent());
+          }
+      }
+    garbage/ShippingService.java: |
+      // GARBAGE_JINV_A = "shipping_marker"
+      public class ShippingService {
+          public void ship(String orderId) {}
+      }
+    garbage/TaxCalculator.java: |
+      // GARBAGE_JINV_B = "tax_marker"
+      public class TaxCalculator {
+          public double compute(double amount) { return amount * 0.2; }
+      }
+    garbage/InvoiceGenerator.java: |
+      // GARBAGE_JINV_C = "invoice_marker"
+      public class InvoiceGenerator {
+          public String generate(String id) { return "INV-" + id; }
+      }
+  changed_files:
+    src/main/java/com/inventory/product/ProductRepository.java: |
+      package com.inventory.product;
+
+      import java.util.List;
+      import java.util.ArrayList;
+      import java.util.Optional;
+      import java.util.stream.Collectors;
+
+      public class ProductRepository {
+          private final List<Product> products = new ArrayList<>();
+
+          public void save(Product p) {
+              products.add(p);
+          }
+
+          public Optional<Product> findById(String id) {
+              return products.stream().filter(p -> p.getId().equals(id)).findFirst();
+          }
+
+          public List<Product> findAll() {
+              return products;
+          }
+
+          public List<Product> findLowStock(int threshold) {
+              return products.stream()
+                  .filter(p -> p.getStock() < threshold)
+                  .collect(Collectors.toList());
+          }
+
+          public void restock(String id, int quantity) {
+              findById(id).ifPresent(p -> p.setStock(p.getStock() + quantity));
+          }
+      }
+    src/main/java/com/inventory/product/Product.java: |
+      package com.inventory.product;
+
+      public class Product {
+          private final String id;
+          private final String name;
+          private int stock;
+
+          public Product(String id, String name, int stock) {
+              this.id = id;
+              this.name = name;
+              this.stock = stock;
+          }
+
+          public String getId() { return id; }
+          public String getName() { return name; }
+          public int getStock() { return stock; }
+          public void setStock(int stock) { this.stock = stock; }
+      }
+    src/test/java/com/inventory/product/ProductRepositoryTest.java: |
+      package com.inventory.product;
+
+      import org.junit.jupiter.api.Test;
+      import static org.junit.jupiter.api.Assertions.*;
+
+      public class ProductRepositoryTest {
+          @Test
+          void saveAndFind() {
+              ProductRepository repo = new ProductRepository();
+              repo.save(new Product("p1", "Widget", 10));
+              assertTrue(repo.findById("p1").isPresent());
+          }
+
+          @Test
+          void findLowStockReturnsUnderThreshold() {
+              ProductRepository repo = new ProductRepository();
+              repo.save(new Product("p1", "Widget", 3));
+              repo.save(new Product("p2", "Gadget", 50));
+              List<Product> low = repo.findLowStock(10);
+              assertEquals(1, low.size());
+              assertEquals("p1", low.get(0).getId());
+          }
+
+          @Test
+          void restockIncreasesStock() {
+              ProductRepository repo = new ProductRepository();
+              repo.save(new Product("p1", "Widget", 5));
+              repo.restock("p1", 20);
+              assertEquals(25, repo.findById("p1").get().getStock());
+          }
+      }
+    garbage/ShippingService.java: |
+      // GARBAGE_JINV_A = "shipping_marker"
+      public class ShippingService {
+          public void ship(String orderId) {}
+      }
+    garbage/TaxCalculator.java: |
+      // GARBAGE_JINV_B = "tax_marker"
+      public class TaxCalculator {
+          public double compute(double amount) { return amount * 0.2; }
+      }
+    garbage/InvoiceGenerator.java: |
+      // GARBAGE_JINV_C = "invoice_marker"
+      public class InvoiceGenerator {
+          public String generate(String id) { return "INV-" + id; }
+      }
+  commit_message: "feat: add findLowStock and restock to ProductRepository"
 fragments:
-- id: new_enum_module
+- id: find_low_stock
   selector:
-    path: models/status.py
-    anchor: "class OrderStatus(Enum)"
-- id: order_imports_enum
+    anchor: "public List<Product> findLowStock(int threshold)"
+- id: restock_method
   selector:
-    path: models/order.py
-    anchor: "from models.status import OrderStatus"
-- id: order_uses_enum
+    anchor: "public void restock(String id, int quantity)"
+- id: test_low_stock
   selector:
-    path: models/order.py
-    anchor: "self.status = OrderStatus.PENDING"
-- id: service_imports_enum
+    anchor: "void findLowStockReturnsUnderThreshold()"
+- id: test_restock
   selector:
-    path: services/order_service.py
-    anchor: "from models.status import OrderStatus"
-- id: view_imports_enum
+    anchor: "void restockIncreasesStock()"
+- id: no_garbage_a
   selector:
-    path: views/order_view.py
-    anchor: "from models.status import OrderStatus"
-- id: view_uses_enum
+    anchor: GARBAGE_JINV_A
+- id: no_garbage_b
   selector:
-    path: views/order_view.py
-    anchor: "OrderStatus.PENDING"
-- id: no_helpers
+    anchor: GARBAGE_JINV_B
+- id: no_garbage_c
   selector:
-    path: utils/helpers.py
-- id: no_garbage_notifications
-  selector:
-    path: garbage_notifications.py
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_006_HELPER_MARKER_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_006_ROUND_MARKER_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_006_NOTIF_MARKER_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_006_CHANNEL_MARKER_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_006_SENDER_E
+    anchor: GARBAGE_JINV_C
 oracle:
   required:
-  - new_enum_module
-  - order_imports_enum
-  - order_uses_enum
-  - service_imports_enum
-  - view_imports_enum
-  - view_uses_enum
+  - find_low_stock
+  - restock_method
+  - test_low_stock
+  - test_restock
   allowed: []
   forbidden:
-  - no_helpers
-  - no_garbage_notifications
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

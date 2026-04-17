@@ -1,167 +1,149 @@
 name: bal3_rare_015_julia_config_constants
 tags:
-- lang:julia
-- change:single_file
-- change:config
-- context:config_to_code
-- distance:1hop
-- difficulty:easy
+- lang:typescript
+- change:multi_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
-    src/Constants.jl: |
-      module Constants
+    src/components/Tooltip.tsx: |
+      import React, { useState } from 'react';
 
-      export DB_HOST, DB_PORT, DB_NAME, MAX_RETRIES
+      interface TooltipProps {
+        text: string;
+        children: React.ReactNode;
+      }
 
-      const DB_HOST = "localhost"
-      const DB_PORT = 5432
-      const DB_NAME = "myapp_dev"
-      const MAX_RETRIES = 3
+      export const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
+        const [visible, setVisible] = useState(false);
+        return (
+          <span
+            onMouseEnter={() => setVisible(true)}
+            onMouseLeave={() => setVisible(false)}
+            style={{ position: 'relative' }}
+          >
+            {children}
+            {visible && <span className="tooltip">{text}</span>}
+          </span>
+        );
+      };
+    src/components/Spinner.tsx: |
+      import React from 'react';
 
-      end
-    src/Database.jl: |
-      module Database
+      interface SpinnerProps {
+        size?: number;
+      }
 
-      using ..Constants
-
-      export connect, connection_string
-
-      function connection_string()
-          "postgres://$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
-      end
-
-      function connect()
-          url = connection_string()
-          retries = 0
-          while retries < MAX_RETRIES
-              retries += 1
-          end
-          url
-      end
-
-      end
-    src/API.jl: |
-      module API
-
-      using ..Constants
-      using ..Database
-
-      export start_server
-
-      function start_server()
-          conn = connect()
-          "Server connected to $(conn) with max_retries=$(MAX_RETRIES)"
-      end
-
-      end
-    src/Logging.jl: |
-      module Logging
-
-      GARBAGE_RARE_015_LOG_A = "file"
-      GARBAGE_RARE_015_PATH_B = "/var/log/app.log"
-
-      log_info(msg) = println("INFO: $msg")
-
-      end
-    src/Metrics.jl: |
-      module Metrics
-
-      GARBAGE_RARE_015_METRIC_C = "counter"
-      GARBAGE_RARE_015_PREFIX_D = "app"
-
-      record(name, value) = nothing
-
-      end
-    src/Scheduler.jl: |
-      module Scheduler
-
-      GARBAGE_RARE_015_CRON_E = "daily"
-      GARBAGE_RARE_015_TZ_F = "UTC"
-
-      schedule(task) = nothing
-
-      end
+      export const Spinner: React.FC<SpinnerProps> = ({ size = 24 }) => (
+        <div className="spinner" style={{ width: size, height: size }} />
+      );
+    garbage/events.ts: |
+      const GARBAGE_JUL015_EVENTS_A = "events_marker";
+      export function emit(name: string): void {}
+    garbage/hooks.ts: |
+      const GARBAGE_JUL015_HOOKS_B = "hooks_marker";
+      export function useMount(fn: () => void): void {}
+    garbage/context.ts: |
+      const GARBAGE_JUL015_CONTEXT_C = "context_marker";
+      export const AppContext = React.createContext(null);
   changed_files:
-    src/Constants.jl: |
-      module Constants
+    src/components/Tooltip.tsx: |
+      import React, { useState } from 'react';
 
-      export DB_HOST, DB_PORT, DB_NAME, MAX_RETRIES, POOL_SIZE, TIMEOUT_MS
+      type TooltipPosition = 'top' | 'bottom' | 'left' | 'right';
 
-      const DB_HOST = "db-prod.internal"
-      const DB_PORT = 5432
-      const DB_NAME = "myapp_production"
-      const MAX_RETRIES = 5
-      const POOL_SIZE = 20
-      const TIMEOUT_MS = 30000
+      interface TooltipProps {
+        text: string;
+        children: React.ReactNode;
+        position?: TooltipPosition;
+        delay?: number;
+      }
 
-      end
-  commit_message: "update constants for production with pool and timeout"
+      export const Tooltip: React.FC<TooltipProps> = ({
+        text,
+        children,
+        position = 'top',
+        delay = 0,
+      }) => {
+        const [visible, setVisible] = useState(false);
+        return (
+          <span
+            onMouseEnter={() => setTimeout(() => setVisible(true), delay)}
+            onMouseLeave={() => setVisible(false)}
+            style={{ position: 'relative' }}
+          >
+            {children}
+            {visible && (
+              <span className={`tooltip tooltip-${position}`}>{text}</span>
+            )}
+          </span>
+        );
+      };
+    src/components/Spinner.tsx: |
+      import React from 'react';
+
+      interface SpinnerProps {
+        size?: number;
+        color?: string;
+        label?: string;
+      }
+
+      export const Spinner: React.FC<SpinnerProps> = ({
+        size = 24,
+        color = 'currentColor',
+        label = 'Loading...',
+      }) => (
+        <div
+          className="spinner"
+          style={{ width: size, height: size, borderColor: color }}
+          aria-label={label}
+        />
+      );
+    garbage/events.ts: |
+      const GARBAGE_JUL015_EVENTS_A = "events_marker";
+      export function emit(name: string): void {}
+    garbage/hooks.ts: |
+      const GARBAGE_JUL015_HOOKS_B = "hooks_marker";
+      export function useMount(fn: () => void): void {}
+    garbage/context.ts: |
+      const GARBAGE_JUL015_CONTEXT_C = "context_marker";
+      export const AppContext = React.createContext(null);
+  commit_message: "feat: add position/delay to Tooltip and color/label to Spinner"
 fragments:
-- id: database_uses_constants
+- id: tooltip_position_type
   selector:
-    path: src/Database.jl
-    anchor: "using ..Constants"
-- id: database_uses_host
+    path: src/components/Tooltip.tsx
+    anchor: "type TooltipPosition"
+- id: tooltip_delay_prop
   selector:
-    path: src/Database.jl
-    anchor: "DB_HOST"
-- id: database_uses_retries
+    path: src/components/Tooltip.tsx
+    anchor: "delay?: number"
+- id: spinner_color_prop
   selector:
-    path: src/Database.jl
-    anchor: "MAX_RETRIES"
-- id: api_uses_constants
+    path: src/components/Spinner.tsx
+    anchor: "color?: string"
+- id: spinner_label_prop
   selector:
-    path: src/API.jl
-    anchor: "using ..Constants"
-- id: api_uses_connect
+    path: src/components/Spinner.tsx
+    anchor: "label?: string"
+- id: no_garbage_a
   selector:
-    path: src/API.jl
-    anchor: "connect()"
-- id: no_logging
+    anchor: GARBAGE_JUL015_EVENTS_A
+- id: no_garbage_b
   selector:
-    path: src/Logging.jl
-    anchor: "log_info"
-- id: no_metrics
+    anchor: GARBAGE_JUL015_HOOKS_B
+- id: no_garbage_c
   selector:
-    path: src/Metrics.jl
-    anchor: "record(name, value)"
-- id: no_scheduler
-  selector:
-    path: src/Scheduler.jl
-    anchor: "schedule(task)"
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_RARE_015_LOG_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_RARE_015_PATH_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_RARE_015_METRIC_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_RARE_015_PREFIX_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_015_CRON_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_015_TZ_F
+    anchor: GARBAGE_JUL015_CONTEXT_C
 oracle:
   required:
-  - database_uses_constants
-  - database_uses_host
-  - database_uses_retries
-  - api_uses_constants
-  allowed:
-  - api_uses_connect
+  - tooltip_position_type
+  - tooltip_delay_prop
+  - spinner_color_prop
+  - spinner_label_prop
+  allowed: []
   forbidden:
-  - no_logging
-  - no_metrics
-  - no_scheduler
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

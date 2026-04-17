@@ -1,199 +1,153 @@
 name: bal_1hop_010_go_exporter_calls_formatter
 tags:
-- lang:go
+- lang:cpp
+- change:new_function
 - change:single_file
-- context:import_chain
+- context:cross_module
 - distance:1hop
-- difficulty:hard
+- difficulty:easy
 repo:
   initial_files:
-    internal/format/csv.go: |
-      package format
+    include/iot/sensor_aggregator.hpp: |
+      #pragma once
+      #include <vector>
+      #include <string>
+      #include <cstdint>
 
-      import (
-          "bytes"
-          "encoding/csv"
-      )
+      namespace iot {
 
-      type Record struct {
-          Fields []string
-      }
+      struct SensorReading {
+          uint32_t device_id;
+          double value;
+          int64_t timestamp_ms;
+      };
 
-      func ToCSV(records []Record) (string, error) {
-          var buf bytes.Buffer
-          w := csv.NewWriter(&buf)
-          for _, r := range records {
-              if err := w.Write(r.Fields); err != nil {
-                  return "", err
-              }
+      class SensorAggregator {
+      public:
+          void add_reading(const SensorReading& r);
+          double compute_mean() const;
+          double compute_max() const;
+          size_t count() const;
+          void clear();
+
+      private:
+          std::vector<SensorReading> readings_;
+      };
+
+      } // namespace iot
+    src/iot/telemetry_publisher.cpp: |
+      #include "iot/sensor_aggregator.hpp"
+      #include <string>
+
+      namespace iot {
+
+      class TelemetryPublisher {
+      public:
+          explicit TelemetryPublisher(const std::string& topic) : topic_(topic) {}
+
+          void publish_stats(SensorAggregator& agg) {
+              if (agg.count() == 0) return;
+              send_metric(topic_ + ".mean", agg.compute_mean());
+              send_metric(topic_ + ".max", agg.compute_max());
+              agg.clear();
           }
-          w.Flush()
-          return buf.String(), w.Error()
-      }
-    internal/format/json.go: |
-      package format
 
-      import "encoding/json"
+      private:
+          void send_metric(const std::string& name, double value);
+          std::string topic_;
+      };
 
-      func ToJSON(records []Record) (string, error) {
-          data, err := json.Marshal(records)
-          if err != nil {
-              return "", err
-          }
-          return string(data), nil
-      }
-    internal/export/report.go: |
-      package export
-
-      import (
-          "myapp/internal/format"
-      )
-
-      type ReportExporter struct {
-          Format string
-      }
-
-      func (e *ReportExporter) Export(records []format.Record) (string, error) {
-          switch e.Format {
-          case "csv":
-              return format.ToCSV(records)
-          case "json":
-              return format.ToJSON(records)
-          default:
-              return format.ToCSV(records)
-          }
-      }
-    internal/export/schedule.go: |
-      package export
-
-      import "time"
-
-      type Schedule struct {
-          Interval time.Duration
-          LastRun  time.Time
-      }
-
-      func (s *Schedule) IsDue() bool {
-          return time.Since(s.LastRun) >= s.Interval
-      }
-    internal/audit/log.go: |
-      package audit
-
-      import "time"
-
-      type Entry struct {
-          Action    string
-          Timestamp time.Time
-      }
-
-      func NewEntry(action string) *Entry {
-          return &Entry{Action: action, Timestamp: time.Now()}
-      }
-    cmd/exporter/main.go: |
-      package main
-
-      import "fmt"
-
-      func main() {
-          fmt.Println("exporter starting")
-      }
-    internal/notify/slack.go: |
-      package notify
-
-      import "fmt"
-
-      func SendSlack(channel, message string) error {
-          fmt.Printf("slack: #%s: %s\n", channel, message)
-          return nil
-      }
+      } // namespace iot
+    garbage/device_registry.cpp: |
+      // GARBAGE_IOTPUB_A = "device_registry_marker"
+    garbage/ota_updater.cpp: |
+      // GARBAGE_IOTPUB_B = "ota_updater_marker"
+    garbage/mqtt_broker.cpp: |
+      // GARBAGE_IOTPUB_C = "mqtt_broker_marker"
   changed_files:
-    internal/format/csv.go: |
-      package format
+    include/iot/sensor_aggregator.hpp: |
+      #pragma once
+      #include <vector>
+      #include <string>
+      #include <cstdint>
 
-      import (
-          "bytes"
-          "encoding/csv"
-          "fmt"
-      )
+      namespace iot {
 
-      type Record struct {
-          Fields []string
-      }
+      struct SensorReading {
+          uint32_t device_id;
+          double value;
+          int64_t timestamp_ms;
+      };
 
-      type CSVOptions struct {
-          Delimiter rune
-          Header    []string
-          QuoteAll  bool
-      }
+      class SensorAggregator {
+      public:
+          void add_reading(const SensorReading& r);
+          double compute_mean() const;
+          double compute_max() const;
+          double compute_min() const;
+          size_t count() const;
+          void clear();
 
-      func DefaultCSVOptions() CSVOptions {
-          return CSVOptions{Delimiter: ',', QuoteAll: false}
-      }
+      private:
+          std::vector<SensorReading> readings_;
+      };
 
-      func ToCSV(records []Record) (string, error) {
-          return ToCSVWithOptions(records, DefaultCSVOptions())
-      }
+      } // namespace iot
+    src/iot/telemetry_publisher.cpp: |
+      #include "iot/sensor_aggregator.hpp"
+      #include <string>
 
-      func ToCSVWithOptions(records []Record, opts CSVOptions) (string, error) {
-          var buf bytes.Buffer
-          w := csv.NewWriter(&buf)
-          w.Comma = opts.Delimiter
-          if len(opts.Header) > 0 {
-              if err := w.Write(opts.Header); err != nil {
-                  return "", fmt.Errorf("writing header: %w", err)
-              }
+      namespace iot {
+
+      class TelemetryPublisher {
+      public:
+          explicit TelemetryPublisher(const std::string& topic) : topic_(topic) {}
+
+          void publish_stats(SensorAggregator& agg) {
+              if (agg.count() == 0) return;
+              send_metric(topic_ + ".mean", agg.compute_mean());
+              send_metric(topic_ + ".max", agg.compute_max());
+              send_metric(topic_ + ".min", agg.compute_min());
+              agg.clear();
           }
-          for _, r := range records {
-              if err := w.Write(r.Fields); err != nil {
-                  return "", fmt.Errorf("writing record: %w", err)
-              }
-          }
-          w.Flush()
-          return buf.String(), w.Error()
-      }
-  commit_message: "feat: add CSVOptions with custom delimiter and header"
+
+      private:
+          void send_metric(const std::string& name, double value);
+          std::string topic_;
+      };
+
+      } // namespace iot
+    garbage/device_registry.cpp: |
+      // GARBAGE_IOTPUB_A = "device_registry_marker"
+    garbage/ota_updater.cpp: |
+      // GARBAGE_IOTPUB_B = "ota_updater_marker"
+    garbage/mqtt_broker.cpp: |
+      // GARBAGE_IOTPUB_C = "mqtt_broker_marker"
+  commit_message: "feat: add compute_min to SensorAggregator"
 fragments:
-- id: csv_options_struct
+- id: compute_min_decl
   selector:
-    path: internal/format/csv.go
-    anchor: "type CSVOptions struct"
-- id: to_csv_with_options
+    path: include/iot/sensor_aggregator.hpp
+    anchor: "double compute_min() const;"
+- id: publisher_uses_min
   selector:
-    path: internal/format/csv.go
-    anchor: "func ToCSVWithOptions"
-- id: report_calls_csv
+    path: src/iot/telemetry_publisher.cpp
+    anchor: "agg.compute_min()"
+- id: no_garbage_a
   selector:
-    path: internal/export/report.go
-    anchor: "format.ToCSV(records)"
-- id: report_calls_json
+    anchor: GARBAGE_IOTPUB_A
+- id: no_garbage_b
   selector:
-    path: internal/export/report.go
-    anchor: "format.ToJSON(records)"
-- id: unrelated_schedule
+    anchor: GARBAGE_IOTPUB_B
+- id: no_garbage_c
   selector:
-    path: internal/export/schedule.go
-    anchor: "func (s *Schedule) IsDue"
-- id: unrelated_audit
-  selector:
-    path: internal/audit/log.go
-    anchor: "func NewEntry"
-- id: unrelated_slack
-  selector:
-    path: internal/notify/slack.go
-    anchor: "func SendSlack"
-- id: unrelated_main
-  selector:
-    path: cmd/exporter/main.go
-    anchor: "func main()"
+    anchor: GARBAGE_IOTPUB_C
 oracle:
   required:
-  - csv_options_struct
-  - to_csv_with_options
-  - report_calls_csv
+  - compute_min_decl
   allowed:
-  - report_calls_json
+  - publisher_uses_min
   forbidden:
-  - unrelated_schedule
-  - unrelated_audit
-  - unrelated_slack
-  - unrelated_main
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

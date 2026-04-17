@@ -1,268 +1,186 @@
 name: bal_refactor_027_java_replace_loops_with_streams
 tags:
-- lang:java
-- change:multi_file
-- change:refactor
+- lang:cpp
+- change:single_file
 - context:cross_module
-- distance:1hop
+- distance:2hop
 - difficulty:medium
 repo:
   initial_files:
-    src/main/java/com/app/repository/EmployeeRepository.java: |
-      package com.app.repository;
+    include/audio/mixer.h: |
+      #pragma once
+      #include <vector>
+      #include <cstdint>
 
-      import java.util.ArrayList;
-      import java.util.List;
+      namespace audio {
 
-      public class EmployeeRepository {
-          private final List<Employee> employees = new ArrayList<>();
+      struct MixerConfig {
+          int sample_rate;
+          int channels;
+          int buffer_size;
+      };
 
-          public void add(Employee emp) {
-              employees.add(emp);
-          }
+      class Mixer {
+      public:
+          explicit Mixer(const MixerConfig& cfg);
+          void mix(const int16_t* input, int16_t* output, int frames);
+          float master_volume() const;
+          void set_master_volume(float v);
+      private:
+          MixerConfig cfg_;
+          float master_volume_;
+      };
 
-          public List<Employee> findByDepartment(String dept) {
-              List<Employee> result = new ArrayList<>();
-              for (Employee e : employees) {
-                  if (dept.equals(e.getDepartment())) {
-                      result.add(e);
-                  }
-              }
-              return result;
-          }
-
-          public List<String> getAllEmails() {
-              List<String> emails = new ArrayList<>();
-              for (Employee e : employees) {
-                  emails.add(e.getEmail());
-              }
-              return emails;
-          }
-
-          public double getTotalSalary() {
-              double total = 0;
-              for (Employee e : employees) {
-                  total += e.getSalary();
-              }
-              return total;
-          }
       }
-    src/main/java/com/app/repository/Employee.java: |
-      package com.app.repository;
+    src/playback/player.cpp: |
+      #include "audio/mixer.h"
 
-      public class Employee {
-          private String name;
-          private String email;
-          private String department;
-          private double salary;
+      namespace playback {
 
-          public Employee(String name, String email, String department, double salary) {
-              this.name = name;
-              this.email = email;
-              this.department = department;
-              this.salary = salary;
+      class Player {
+          audio::Mixer mixer_;
+      public:
+          explicit Player(const audio::MixerConfig& cfg) : mixer_(cfg) {}
+
+          void play(const int16_t* pcm, int frames) {
+              std::vector<int16_t> out(frames * 2);
+              mixer_.mix(pcm, out.data(), frames);
           }
+      };
 
-          public String getName() { return name; }
-          public String getEmail() { return email; }
-          public String getDepartment() { return department; }
-          public double getSalary() { return salary; }
       }
-    src/main/java/com/app/service/HRService.java: |
-      package com.app.service;
+    src/streaming/stream_decoder.cpp: |
+      #include "audio/mixer.h"
 
-      import com.app.repository.EmployeeRepository;
-      import java.util.List;
+      namespace streaming {
 
-      public class HRService {
-          private final EmployeeRepository repo;
+      class StreamDecoder {
+          audio::MixerConfig mixer_cfg_;
+      public:
+          explicit StreamDecoder(const audio::MixerConfig& cfg) : mixer_cfg_(cfg) {}
 
-          public HRService(EmployeeRepository repo) {
-              this.repo = repo;
-          }
+          audio::MixerConfig config() const { return mixer_cfg_; }
+      };
 
-          public List<String> getDepartmentEmails(String dept) {
-              List<String> emails = new java.util.ArrayList<>();
-              for (var emp : repo.findByDepartment(dept)) {
-                  emails.add(emp.getEmail());
-              }
-              return emails;
-          }
       }
-    src/main/java/com/app/GarbageImporter.java: |
-      package com.app;
-
-      public class GarbageImporter {
-          public static final String GARBAGE_REFACTOR_027_IMPORT_A = "importer";
-          public static final int GARBAGE_REFACTOR_027_CHUNK_B = 500;
-          public static final boolean GARBAGE_REFACTOR_027_VALIDATE_C = true;
-
-          public void importData() {}
-      }
-    src/main/java/com/app/GarbageEncryption.java: |
-      package com.app;
-
-      public class GarbageEncryption {
-          public static final String GARBAGE_REFACTOR_027_ENCRYPT_D = "encryption";
-          public static final boolean GARBAGE_REFACTOR_027_AES_E = true;
-
-          public byte[] encrypt(byte[] data) { return data; }
-      }
+    garbage/video.cpp: |
+      // GARBAGE_JAV027_VIDEO_A = "video_marker"
+      namespace video { void decode_frame() {} }
+    garbage/subtitles.cpp: |
+      // GARBAGE_JAV027_SUBS_B = "subtitles_marker"
+      namespace subtitles { void render() {} }
+    garbage/drm.cpp: |
+      // GARBAGE_JAV027_DRM_C = "drm_marker"
+      namespace drm { bool verify() { return true; } }
   changed_files:
-    src/main/java/com/app/repository/EmployeeRepository.java: |
-      package com.app.repository;
+    include/audio/mixer.h: |
+      #pragma once
+      #include <vector>
+      #include <cstdint>
 
-      import java.util.ArrayList;
-      import java.util.List;
-      import java.util.stream.Collectors;
+      namespace audio {
 
-      public class EmployeeRepository {
-          private final List<Employee> employees = new ArrayList<>();
+      struct MixerConfig {
+          int sample_rate;
+          int channels;
+          int buffer_size;
+          bool normalize_output;
+          float limiter_threshold;
+      };
 
-          public void add(Employee emp) {
-              employees.add(emp);
-          }
+      class Mixer {
+      public:
+          explicit Mixer(const MixerConfig& cfg);
+          void mix(const int16_t* input, int16_t* output, int frames);
+          float master_volume() const;
+          void set_master_volume(float v);
+          void set_limiter_threshold(float threshold);
+      private:
+          MixerConfig cfg_;
+          float master_volume_;
+      };
 
-          public List<Employee> findByDepartment(String dept) {
-              return employees.stream()
-                  .filter(e -> dept.equals(e.getDepartment()))
-                  .collect(Collectors.toList());
-          }
-
-          public List<String> getAllEmails() {
-              return employees.stream()
-                  .map(Employee::getEmail)
-                  .collect(Collectors.toList());
-          }
-
-          public double getTotalSalary() {
-              return employees.stream()
-                  .mapToDouble(Employee::getSalary)
-                  .sum();
-          }
       }
-    src/main/java/com/app/repository/Employee.java: |
-      package com.app.repository;
+    src/playback/player.cpp: |
+      #include "audio/mixer.h"
 
-      public class Employee {
-          private String name;
-          private String email;
-          private String department;
-          private double salary;
+      namespace playback {
 
-          public Employee(String name, String email, String department, double salary) {
-              this.name = name;
-              this.email = email;
-              this.department = department;
-              this.salary = salary;
+      class Player {
+          audio::Mixer mixer_;
+      public:
+          explicit Player(const audio::MixerConfig& cfg) : mixer_(cfg) {}
+
+          void play(const int16_t* pcm, int frames) {
+              std::vector<int16_t> out(frames * 2);
+              mixer_.mix(pcm, out.data(), frames);
           }
+      };
 
-          public String getName() { return name; }
-          public String getEmail() { return email; }
-          public String getDepartment() { return department; }
-          public double getSalary() { return salary; }
       }
-    src/main/java/com/app/service/HRService.java: |
-      package com.app.service;
+    src/streaming/stream_decoder.cpp: |
+      #include "audio/mixer.h"
 
-      import com.app.repository.Employee;
-      import com.app.repository.EmployeeRepository;
-      import java.util.List;
-      import java.util.stream.Collectors;
+      namespace streaming {
 
-      public class HRService {
-          private final EmployeeRepository repo;
+      class StreamDecoder {
+          audio::MixerConfig mixer_cfg_;
+      public:
+          explicit StreamDecoder(const audio::MixerConfig& cfg) : mixer_cfg_(cfg) {}
 
-          public HRService(EmployeeRepository repo) {
-              this.repo = repo;
-          }
+          audio::MixerConfig config() const { return mixer_cfg_; }
+      };
 
-          public List<String> getDepartmentEmails(String dept) {
-              return repo.findByDepartment(dept).stream()
-                  .map(Employee::getEmail)
-                  .collect(Collectors.toList());
-          }
       }
-    src/main/java/com/app/GarbageImporter.java: |
-      package com.app;
-
-      public class GarbageImporter {
-          public static final String GARBAGE_REFACTOR_027_IMPORT_A = "importer";
-          public static final int GARBAGE_REFACTOR_027_CHUNK_B = 500;
-          public static final boolean GARBAGE_REFACTOR_027_VALIDATE_C = true;
-
-          public void importData() {}
-      }
-    src/main/java/com/app/GarbageEncryption.java: |
-      package com.app;
-
-      public class GarbageEncryption {
-          public static final String GARBAGE_REFACTOR_027_ENCRYPT_D = "encryption";
-          public static final boolean GARBAGE_REFACTOR_027_AES_E = true;
-
-          public byte[] encrypt(byte[] data) { return data; }
-      }
-  commit_message: "refactor: replace manual loops with Stream API"
+    garbage/video.cpp: |
+      // GARBAGE_JAV027_VIDEO_A = "video_marker"
+      namespace video { void decode_frame() {} }
+    garbage/subtitles.cpp: |
+      // GARBAGE_JAV027_SUBS_B = "subtitles_marker"
+      namespace subtitles { void render() {} }
+    garbage/drm.cpp: |
+      // GARBAGE_JAV027_DRM_C = "drm_marker"
+      namespace drm { bool verify() { return true; } }
+  commit_message: "feat: add normalize_output, limiter_threshold to MixerConfig"
 fragments:
-- id: repo_stream_filter
+- id: mixer_config_normalize
   selector:
-    path: src/main/java/com/app/repository/EmployeeRepository.java
-    anchor: "employees.stream()"
-- id: repo_map_email
+    path: include/audio/mixer.h
+    anchor: "normalize_output"
+- id: mixer_config_limiter
   selector:
-    path: src/main/java/com/app/repository/EmployeeRepository.java
-    anchor: "Employee::getEmail"
-- id: repo_sum_salary
+    path: include/audio/mixer.h
+    anchor: "limiter_threshold"
+- id: set_limiter_method
   selector:
-    path: src/main/java/com/app/repository/EmployeeRepository.java
-    anchor: "Employee::getSalary"
-- id: employee_model
+    path: include/audio/mixer.h
+    anchor: "void set_limiter_threshold"
+- id: player_uses_mixer_config
   selector:
-    path: src/main/java/com/app/repository/Employee.java
-    anchor: "public class Employee"
-- id: hr_uses_stream
+    path: src/playback/player.cpp
+    anchor: "audio::MixerConfig"
+- id: decoder_uses_mixer_config
   selector:
-    path: src/main/java/com/app/service/HRService.java
-    anchor: "repo.findByDepartment(dept).stream()"
-- id: hr_imports_repo
+    path: src/streaming/stream_decoder.cpp
+    anchor: "audio::MixerConfig"
+- id: no_garbage_a
   selector:
-    path: src/main/java/com/app/service/HRService.java
-    anchor: "import com.app.repository.EmployeeRepository"
-- id: no_garbage_importer
+    anchor: GARBAGE_JAV027_VIDEO_A
+- id: no_garbage_b
   selector:
-    path: src/main/java/com/app/GarbageImporter.java
-- id: no_garbage_encryption
+    anchor: GARBAGE_JAV027_SUBS_B
+- id: no_garbage_c
   selector:
-    path: src/main/java/com/app/GarbageEncryption.java
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_027_IMPORT_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_027_CHUNK_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_027_VALIDATE_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_027_ENCRYPT_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_027_AES_E
+    anchor: GARBAGE_JAV027_DRM_C
 oracle:
   required:
-  - repo_stream_filter
-  - repo_map_email
-  - repo_sum_salary
-  - employee_model
-  - hr_uses_stream
-  - hr_imports_repo
+  - mixer_config_normalize
+  - mixer_config_limiter
+  - set_limiter_method
+  - player_uses_mixer_config
+  - decoder_uses_mixer_config
   allowed: []
   forbidden:
-  - no_garbage_importer
-  - no_garbage_encryption
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

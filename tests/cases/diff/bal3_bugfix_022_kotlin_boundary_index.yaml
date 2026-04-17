@@ -1,79 +1,132 @@
 name: bal3_bugfix_022_kotlin_boundary_index
 tags:
-- lang:kotlin
+- lang:json
+- lang:yaml
+- change:config
 - change:single_file
-- change:bug_fix
 - context:import_chain
-- distance:1hop
-- difficulty:easy
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
-    src/main/kotlin/data/Ring.kt: |
-      package data
-
-      class Ring<T>(private val items: List<T>) {
-          fun at(index: Int): T {
-              return items[index % items.size]
-          }
-
-          fun next(current: Int): T {
-              return items[current + 1]
-          }
-
-          fun size(): Int = items.size
+    config/worker.json: |
+      {
+        "worker": {
+          "concurrency": 4,
+          "queueCapacity": 500,
+          "retryLimit": 3,
+          "pollIntervalMs": 1000
+        }
       }
-    src/main/kotlin/game/Turns.kt: |
-      package game
+    src/worker/pool.py: |
+      import json
 
-      import data.Ring
+      def load_worker_config(path: str = "config/worker.json") -> dict:
+          with open(path) as f:
+              return json.load(f)
 
-      class Turns(players: List<String>) {
-          private val ring = Ring(players)
-          private var current = 0
+      def create_worker_pool(config: dict) -> "WorkerPool":
+          wc = config["worker"]
+          return WorkerPool(
+              concurrency=wc["concurrency"],
+              queue_capacity=wc["queueCapacity"],
+              retry_limit=wc["retryLimit"],
+              poll_interval_ms=wc["pollIntervalMs"],
+          )
+    src/worker/scheduler.py: |
+      from src.worker.pool import create_worker_pool, load_worker_config
 
-          fun nextPlayer(): String {
-              val player = ring.next(current)
-              current++
-              return player
-          }
-      }
-    src/main/kotlin/util/Random.kt: |
-      package util
+      class JobScheduler:
+          def __init__(self):
+              config = load_worker_config()
+              self.pool = create_worker_pool(config)
 
-      fun roll(sides: Int): Int = (1..sides).random()
+          def submit(self, job_fn, *args):
+              return self.pool.enqueue(job_fn, args)
+
+          def drain(self):
+              self.pool.wait_all()
+    garbage/DeadLetterQueue.py: |
+      # GARBAGE_WRK_A = "dead_letter_queue_marker"
+    garbage/JobPersistence.py: |
+      # GARBAGE_WRK_B = "job_persistence_marker"
+    garbage/Observability.py: |
+      # GARBAGE_WRK_C = "observability_marker"
   changed_files:
-    src/main/kotlin/data/Ring.kt: |
-      package data
-
-      class Ring<T>(private val items: List<T>) {
-          fun at(index: Int): T {
-              return items[index % items.size]
-          }
-
-          fun next(current: Int): T {
-              return items[(current + 1) % items.size]
-          }
-
-          fun size(): Int = items.size
+    config/worker.json: |
+      {
+        "worker": {
+          "concurrency": 8,
+          "queueCapacity": 2000,
+          "retryLimit": 5,
+          "pollIntervalMs": 500,
+          "backoffMultiplier": 2.0
+        }
       }
-  commit_message: "fix: wrap around index in next() to prevent IndexOutOfBoundsException"
+    src/worker/pool.py: |
+      import json
+
+      def load_worker_config(path: str = "config/worker.json") -> dict:
+          with open(path) as f:
+              return json.load(f)
+
+      def create_worker_pool(config: dict) -> "WorkerPool":
+          wc = config["worker"]
+          return WorkerPool(
+              concurrency=wc["concurrency"],
+              queue_capacity=wc["queueCapacity"],
+              retry_limit=wc["retryLimit"],
+              poll_interval_ms=wc["pollIntervalMs"],
+              backoff_multiplier=wc.get("backoffMultiplier", 1.0),
+          )
+    src/worker/scheduler.py: |
+      from src.worker.pool import create_worker_pool, load_worker_config
+
+      class JobScheduler:
+          def __init__(self):
+              config = load_worker_config()
+              self.pool = create_worker_pool(config)
+
+          def submit(self, job_fn, *args):
+              return self.pool.enqueue(job_fn, args)
+
+          def drain(self):
+              self.pool.wait_all()
+    garbage/DeadLetterQueue.py: |
+      # GARBAGE_WRK_A = "dead_letter_queue_marker"
+    garbage/JobPersistence.py: |
+      # GARBAGE_WRK_B = "job_persistence_marker"
+    garbage/Observability.py: |
+      # GARBAGE_WRK_C = "observability_marker"
+  commit_message: "config: scale up worker concurrency and add exponential backoff multiplier"
 fragments:
-- id: modulo_fix
+- id: worker_config
   selector:
-    path: data/Ring.kt
-    anchor: "(current + 1) % items.size"
-- id: turns_calls_next
+    path: config/worker.json
+    anchor: "concurrency"
+- id: create_pool
   selector:
-    path: game/Turns.kt
-    anchor: "ring.next(current)"
-- id: no_random
+    path: src/worker/pool.py
+    anchor: "def create_worker_pool"
+- id: no_scheduler
   selector:
-    path: util/Random.kt
-    anchor: "fun roll"
+    path: src/worker/scheduler.py
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_WRK_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_WRK_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_WRK_C
 oracle:
   required:
-  - modulo_fix
-  - turns_calls_next
+  - worker_config
+  - create_pool
   allowed: []
   forbidden:
-  - no_random
+  - no_scheduler
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

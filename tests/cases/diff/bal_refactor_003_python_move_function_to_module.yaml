@@ -1,171 +1,235 @@
 name: bal_refactor_003_python_move_function_to_module
 tags:
-- lang:python
-- change:multi_file
-- change:refactor
+- lang:go
+- change:new_function
+- change:single_file
 - context:import_chain
-- distance:1hop
-- difficulty:easy
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
-    core/handlers.py: |
-      import json
+    pkg/auth/jwt.go: |
+      package auth
 
-      def parse_request(raw_body):
-          data = json.loads(raw_body)
-          if "action" not in data:
-              raise KeyError("missing action")
-          return data
+      import (
+          "crypto/hmac"
+          "crypto/sha256"
+          "encoding/base64"
+          "strings"
+      )
 
-      def dispatch(action, payload):
-          if action == "create":
-              return {"status": "created", "data": payload}
-          elif action == "delete":
-              return {"status": "deleted"}
-          return {"status": "unknown"}
+      type Claims struct {
+          UserID string
+          Role   string
+      }
 
-      def handle(raw_body):
-          data = parse_request(raw_body)
-          return dispatch(data["action"], data.get("payload", {}))
-    core/router.py: |
-      from core.handlers import handle
+      func Sign(claims Claims, secret string) string {
+          payload := claims.UserID + ":" + claims.Role
+          mac := hmac.New(sha256.New, []byte(secret))
+          mac.Write([]byte(payload))
+          sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+          return payload + "." + sig
+      }
 
-      class Router:
-          def __init__(self):
-              self.routes = {}
+      func Verify(token, secret string) (Claims, bool) {
+          parts := strings.SplitN(token, ".", 2)
+          if len(parts) != 2 {
+              return Claims{}, false
+          }
+          return Claims{}, true
+      }
+    internal/middleware/auth_mw.go: |
+      package middleware
 
-          def add_route(self, path, handler):
-              self.routes[path] = handler
+      import "pkg/auth"
 
-          def process(self, path, body):
-              if path in self.routes:
-                  return self.routes[path](body)
-              return handle(body)
-    core/config.py: |
-      GARBAGE_REFACTOR_003_CONFIG_MARKER_A = "config"
-      GARBAGE_REFACTOR_003_ENV_MARKER_B = "production"
+      type AuthMiddleware struct {
+          secret string
+      }
 
-      class AppConfig:
-          GARBAGE_REFACTOR_003_APP_MARKER_C = True
-          debug = False
-          port = 8080
-    garbage_database.py: |
-      GARBAGE_REFACTOR_003_DB_MARKER_D = "database"
-      GARBAGE_REFACTOR_003_POOL_MARKER_E = 10
+      func NewAuthMiddleware(secret string) *AuthMiddleware {
+          return &AuthMiddleware{secret: secret}
+      }
 
-      class DatabasePool:
-          GARBAGE_REFACTOR_003_POOL_CLASS_F = True
+      func (m *AuthMiddleware) Authenticate(token string) (auth.Claims, bool) {
+          return auth.Verify(token, m.secret)
+      }
+    internal/api/user_handler.go: |
+      package api
 
-          def connect(self):
-              pass
+      import (
+          "internal/middleware"
+      )
+
+      type UserHandler struct {
+          auth *middleware.AuthMiddleware
+      }
+
+      func NewUserHandler(a *middleware.AuthMiddleware) *UserHandler {
+          return &UserHandler{auth: a}
+      }
+
+      func (h *UserHandler) GetProfile(token string) (string, error) {
+          claims, ok := h.auth.Authenticate(token)
+          if !ok {
+              return "", nil
+          }
+          return claims.UserID, nil
+      }
+    garbage/PaymentLedger.go: |
+      package garbage
+
+      // GARBAGE_REFACT003_A = "payment_ledger_marker"
+
+      type PaymentLedger struct{ Balance int64 }
+    garbage/IoTRegistry.go: |
+      package garbage
+
+      // GARBAGE_REFACT003_B = "iot_registry_marker"
+
+      type IoTRegistry struct{ Devices []string }
+    garbage/GameEngine.go: |
+      package garbage
+
+      // GARBAGE_REFACT003_C = "game_engine_marker"
+
+      type GameEngine struct{ FPS int }
   changed_files:
-    core/handlers.py: |
-      from core.parsing import parse_request
+    pkg/auth/jwt.go: |
+      package auth
 
-      def dispatch(action, payload):
-          if action == "create":
-              return {"status": "created", "data": payload}
-          elif action == "delete":
-              return {"status": "deleted"}
-          return {"status": "unknown"}
+      import (
+          "crypto/hmac"
+          "crypto/sha256"
+          "encoding/base64"
+          "errors"
+          "strings"
+      )
 
-      def handle(raw_body):
-          data = parse_request(raw_body)
-          return dispatch(data["action"], data.get("payload", {}))
-    core/parsing.py: |
-      import json
+      type Claims struct {
+          UserID string
+          Role   string
+      }
 
-      def parse_request(raw_body):
-          data = json.loads(raw_body)
-          if "action" not in data:
-              raise KeyError("missing action")
-          return data
-    core/router.py: |
-      from core.handlers import handle
+      var ErrInvalidToken = errors.New("invalid token")
 
-      class Router:
-          def __init__(self):
-              self.routes = {}
+      func Sign(claims Claims, secret string) string {
+          payload := claims.UserID + ":" + claims.Role
+          mac := hmac.New(sha256.New, []byte(secret))
+          mac.Write([]byte(payload))
+          sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+          return payload + "." + sig
+      }
 
-          def add_route(self, path, handler):
-              self.routes[path] = handler
+      func Verify(token, secret string) (Claims, bool) {
+          parts := strings.SplitN(token, ".", 2)
+          if len(parts) != 2 {
+              return Claims{}, false
+          }
+          return Claims{}, true
+      }
 
-          def process(self, path, body):
-              if path in self.routes:
-                  return self.routes[path](body)
-              return handle(body)
-    core/config.py: |
-      GARBAGE_REFACTOR_003_CONFIG_MARKER_A = "config"
-      GARBAGE_REFACTOR_003_ENV_MARKER_B = "production"
+      func VerifyStrict(token, secret string) (Claims, error) {
+          claims, ok := Verify(token, secret)
+          if !ok {
+              return Claims{}, ErrInvalidToken
+          }
+          return claims, nil
+      }
+    internal/middleware/auth_mw.go: |
+      package middleware
 
-      class AppConfig:
-          GARBAGE_REFACTOR_003_APP_MARKER_C = True
-          debug = False
-          port = 8080
-    garbage_database.py: |
-      GARBAGE_REFACTOR_003_DB_MARKER_D = "database"
-      GARBAGE_REFACTOR_003_POOL_MARKER_E = 10
+      import "pkg/auth"
 
-      class DatabasePool:
-          GARBAGE_REFACTOR_003_POOL_CLASS_F = True
+      type AuthMiddleware struct {
+          secret string
+      }
 
-          def connect(self):
-              pass
-  commit_message: "refactor: move parse_request to dedicated parsing module"
+      func NewAuthMiddleware(secret string) *AuthMiddleware {
+          return &AuthMiddleware{secret: secret}
+      }
+
+      func (m *AuthMiddleware) Authenticate(token string) (auth.Claims, bool) {
+          return auth.Verify(token, m.secret)
+      }
+
+      func (m *AuthMiddleware) AuthenticateStrict(token string) (auth.Claims, error) {
+          return auth.VerifyStrict(token, m.secret)
+      }
+    internal/api/user_handler.go: |
+      package api
+
+      import (
+          "internal/middleware"
+      )
+
+      type UserHandler struct {
+          auth *middleware.AuthMiddleware
+      }
+
+      func NewUserHandler(a *middleware.AuthMiddleware) *UserHandler {
+          return &UserHandler{auth: a}
+      }
+
+      func (h *UserHandler) GetProfile(token string) (string, error) {
+          claims, ok := h.auth.Authenticate(token)
+          if !ok {
+              return "", nil
+          }
+          return claims.UserID, nil
+      }
+    garbage/PaymentLedger.go: |
+      package garbage
+
+      // GARBAGE_REFACT003_A = "payment_ledger_marker"
+
+      type PaymentLedger struct{ Balance int64 }
+    garbage/IoTRegistry.go: |
+      package garbage
+
+      // GARBAGE_REFACT003_B = "iot_registry_marker"
+
+      type IoTRegistry struct{ Devices []string }
+    garbage/GameEngine.go: |
+      package garbage
+
+      // GARBAGE_REFACT003_C = "game_engine_marker"
+
+      type GameEngine struct{ FPS int }
+  commit_message: "feat: add VerifyStrict returning error, propagate to AuthMiddleware"
 fragments:
-- id: handlers_imports_parsing
+- id: verify_strict_fn
   selector:
-    path: core/handlers.py
-    anchor: "from core.parsing import parse_request"
-- id: new_parsing_module
+    path: pkg/auth/jwt.go
+    anchor: "func VerifyStrict"
+- id: err_invalid_token
   selector:
-    path: core/parsing.py
-    anchor: "def parse_request(raw_body)"
-- id: handle_uses_parse
+    path: pkg/auth/jwt.go
+    anchor: "ErrInvalidToken"
+- id: mw_authenticate_strict
   selector:
-    path: core/handlers.py
-    anchor: "def handle(raw_body)"
-- id: router_uses_handle
+    path: internal/middleware/auth_mw.go
+    anchor: "func (m *AuthMiddleware) AuthenticateStrict"
+- id: no_user_handler
   selector:
-    path: core/router.py
-    anchor: "from core.handlers import handle"
-- id: no_config
+    path: internal/api/user_handler.go
+- id: no_garbage_a
   selector:
-    path: core/config.py
-- id: no_garbage_database
+    anchor: GARBAGE_REFACT003_A
+- id: no_garbage_b
   selector:
-    path: garbage_database.py
-- id: no_global_0
+    anchor: GARBAGE_REFACT003_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_REFACTOR_003_CONFIG_MARKER_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_003_ENV_MARKER_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_003_APP_MARKER_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_003_DB_MARKER_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_003_POOL_MARKER_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_REFACTOR_003_POOL_CLASS_F
+    anchor: GARBAGE_REFACT003_C
 oracle:
   required:
-  - handlers_imports_parsing
-  - new_parsing_module
-  - handle_uses_parse
-  - router_uses_handle
+  - verify_strict_fn
+  - err_invalid_token
+  - mw_authenticate_strict
   allowed: []
   forbidden:
-  - no_config
-  - no_garbage_database
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_user_handler
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

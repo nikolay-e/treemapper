@@ -1,207 +1,232 @@
 name: gap_059_py_multifunction_image_pipeline
 tags:
-- lang:python
-- change:multi_file
-- change:new_function
-- change:new_function
-- change:new_function
-- change:new_function
-- change:new_function
+- lang:ruby
 - change:signature
-- context:same_file
-- distance:0hop
-- difficulty:medium
+- context:import_chain
+- distance:3hop+
+- difficulty:easy
 repo:
   initial_files:
-    pipeline/image.py: |
-      from dataclasses import dataclass
+    lib/iot/sensor.rb: |
+      module Iot
+        class Sensor
+          attr_reader :id, :unit
 
-      @dataclass
-      class Pixel:
-          r: int
-          g: int
-          b: int
+          def initialize(id, unit)
+            @id = id
+            @unit = unit
+          end
 
-      class Image:
-          def __init__(self, width: int, height: int):
-              self._width = width
-              self._height = height
-              self._pixels: list[list[Pixel]] = [
-                  [Pixel(0, 0, 0) for _ in range(width)]
-                  for _ in range(height)
-              ]
+          def read
+            raise NotImplementedError
+          end
+        end
+      end
+    lib/iot/thermometer.rb: |
+      require_relative 'sensor'
 
-          def dimensions(self) -> tuple[int, int]:
-              return (self._width, self._height)
+      module Iot
+        class Thermometer < Sensor
+          def initialize(id)
+            super(id, 'celsius')
+          end
 
-          def get_pixel(self, x: int, y: int) -> Pixel:
-              return self._pixels[y][x]
+          def read
+            20.0 + rand * 10
+          end
+        end
+      end
+    lib/monitoring/collector.rb: |
+      require_relative '../iot/thermometer'
 
-          def set_pixel(self, x: int, y: int, pixel: Pixel) -> None:
-              self._pixels[y][x] = pixel
+      module Monitoring
+        class Collector
+          def initialize
+            @sensors = []
+          end
 
-          def fill(self, pixel: Pixel) -> None:
-              for y in range(self._height):
-                  for x in range(self._width):
-                      self._pixels[y][x] = pixel
-    pipeline/export.py: |
-      from pipeline.image import Image
+          def add_sensor(sensor)
+            @sensors << sensor
+          end
 
-      def to_ppm(image: Image) -> str:
-          w, h = image.dimensions()
-          lines = [f"P3\n{w} {h}\n255"]
-          for y in range(h):
-              row = []
-              for x in range(w):
-                  p = image.get_pixel(x, y)
-                  row.append(f"{p.r} {p.g} {p.b}")
-              lines.append(" ".join(row))
-          return "\n".join(lines)
-    pipeline/loader.py: |
-      from pipeline.image import Image, Pixel
+          def collect
+            @sensors.map { |s| { id: s.id, value: s.read, unit: s.unit } }
+          end
+        end
+      end
+    lib/monitoring/aggregator.rb: |
+      require_relative 'collector'
 
-      def from_color(width: int, height: int, r: int, g: int, b: int) -> Image:
-          img = Image(width, height)
-          img.fill(Pixel(r, g, b))
-          return img
+      module Monitoring
+        class Aggregator
+          def initialize(collector)
+            @collector = collector
+          end
+
+          def average
+            readings = @collector.collect
+            return 0.0 if readings.empty?
+            readings.sum { |r| r[:value] } / readings.size.to_f
+          end
+        end
+      end
+    lib/api/telemetry_controller.rb: |
+      require_relative '../monitoring/aggregator'
+
+      module Api
+        class TelemetryController
+          def initialize(aggregator)
+            @aggregator = aggregator
+          end
+
+          def get_average
+            { average: @aggregator.average }
+          end
+        end
+      end
+    garbage/firmware.rb: |
+      # GARBAGE_IMGPIPE_A = "firmware_updater_marker"
+    garbage/provisioner.rb: |
+      # GARBAGE_IMGPIPE_B = "device_provisioner_marker"
+    garbage/dashboard.rb: |
+      # GARBAGE_IMGPIPE_C = "grafana_dashboard_marker"
   changed_files:
-    pipeline/image.py: |
-      from dataclasses import dataclass
-      import math
+    lib/iot/sensor.rb: |
+      module Iot
+        class Sensor
+          attr_reader :id, :unit, :location
 
-      @dataclass
-      class Pixel:
-          r: int
-          g: int
-          b: int
-          a: int = 255
+          def initialize(id, unit, location: 'unknown')
+            @id = id
+            @unit = unit
+            @location = location
+          end
 
-      class Image:
-          def __init__(self, width: int, height: int):
-              self._width = width
-              self._height = height
-              self._pixels: list[list[Pixel]] = [
-                  [Pixel(0, 0, 0) for _ in range(width)]
-                  for _ in range(height)
-              ]
+          def read
+            raise NotImplementedError
+          end
 
-          def dimensions(self) -> tuple[int, int]:
-              return (self._width, self._height)
+          def metadata
+            { id: @id, unit: @unit, location: @location }
+          end
+        end
+      end
+    lib/iot/thermometer.rb: |
+      require_relative 'sensor'
 
-          def get_pixel(self, x: int, y: int) -> Pixel:
-              return self._pixels[y][x]
+      module Iot
+        class Thermometer < Sensor
+          def initialize(id, location: 'unknown')
+            super(id, 'celsius', location: location)
+          end
 
-          def set_pixel(self, x: int, y: int, pixel: Pixel) -> None:
-              self._pixels[y][x] = pixel
+          def read
+            20.0 + rand * 10
+          end
+        end
+      end
+    lib/monitoring/collector.rb: |
+      require_relative '../iot/thermometer'
 
-          def fill(self, pixel: Pixel) -> None:
-              for y in range(self._height):
-                  for x in range(self._width):
-                      self._pixels[y][x] = pixel
+      module Monitoring
+        class Collector
+          def initialize
+            @sensors = []
+          end
 
-          def grayscale(self) -> "Image":
-              result = Image(self._width, self._height)
-              for y in range(self._height):
-                  for x in range(self._width):
-                      p = self._pixels[y][x]
-                      lum = int(0.299 * p.r + 0.587 * p.g + 0.114 * p.b)
-                      result.set_pixel(x, y, Pixel(lum, lum, lum, p.a))
-              return result
+          def add_sensor(sensor)
+            @sensors << sensor
+          end
 
-          def invert(self) -> "Image":
-              result = Image(self._width, self._height)
-              for y in range(self._height):
-                  for x in range(self._width):
-                      p = self._pixels[y][x]
-                      result.set_pixel(x, y, Pixel(255 - p.r, 255 - p.g, 255 - p.b, p.a))
-              return result
+          def collect
+            @sensors.map { |s| s.metadata.merge(value: s.read) }
+          end
+        end
+      end
+    lib/monitoring/aggregator.rb: |
+      require_relative 'collector'
 
-          def crop(self, x1: int, y1: int, x2: int, y2: int) -> "Image":
-              w = x2 - x1
-              h = y2 - y1
-              result = Image(w, h)
-              for y in range(h):
-                  for x in range(w):
-                      result.set_pixel(x, y, self._pixels[y1 + y][x1 + x])
-              return result
+      module Monitoring
+        class Aggregator
+          def initialize(collector)
+            @collector = collector
+          end
 
-          def brightness(self, factor: float) -> "Image":
-              result = Image(self._width, self._height)
-              for y in range(self._height):
-                  for x in range(self._width):
-                      p = self._pixels[y][x]
-                      r = min(255, int(p.r * factor))
-                      g = min(255, int(p.g * factor))
-                      b = min(255, int(p.b * factor))
-                      result.set_pixel(x, y, Pixel(r, g, b, p.a))
-              return result
+          def average
+            readings = @collector.collect
+            return 0.0 if readings.empty?
+            readings.sum { |r| r[:value] } / readings.size.to_f
+          end
 
-          def histogram(self) -> dict[str, list[int]]:
-              r_hist = [0] * 256
-              g_hist = [0] * 256
-              b_hist = [0] * 256
-              for y in range(self._height):
-                  for x in range(self._width):
-                      p = self._pixels[y][x]
-                      r_hist[p.r] += 1
-                      g_hist[p.g] += 1
-                      b_hist[p.b] += 1
-              return {"r": r_hist, "g": g_hist, "b": b_hist}
-    pipeline/export.py: |
-      from pipeline.image import Image
+          def by_location
+            @collector.collect.group_by { |r| r[:location] }
+          end
+        end
+      end
+    lib/api/telemetry_controller.rb: |
+      require_relative '../monitoring/aggregator'
 
-      def to_ppm(image: Image) -> str:
-          w, h = image.dimensions()
-          lines = [f"P3\n{w} {h}\n255"]
-          for y in range(h):
-              row = []
-              for x in range(w):
-                  p = image.get_pixel(x, y)
-                  row.append(f"{p.r} {p.g} {p.b}")
-              lines.append(" ".join(row))
-          return "\n".join(lines)
-    pipeline/loader.py: |
-      from pipeline.image import Image, Pixel
+      module Api
+        class TelemetryController
+          def initialize(aggregator)
+            @aggregator = aggregator
+          end
 
-      def from_color(width: int, height: int, r: int, g: int, b: int) -> Image:
-          img = Image(width, height)
-          img.fill(Pixel(r, g, b))
-          return img
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+          def get_average
+            { average: @aggregator.average }
+          end
+
+          def get_by_location
+            @aggregator.by_location
+          end
+        end
+      end
+    garbage/firmware.rb: |
+      # GARBAGE_IMGPIPE_A = "firmware_updater_marker"
+    garbage/provisioner.rb: |
+      # GARBAGE_IMGPIPE_B = "device_provisioner_marker"
+    garbage/dashboard.rb: |
+      # GARBAGE_IMGPIPE_C = "grafana_dashboard_marker"
+  commit_message: "feat: add location to Sensor and by_location aggregation"
 fragments:
-- id: alpha_field
+- id: sensor_location_field
   selector:
-    path: pipeline/image.py
-    anchor: "a: int = 255"
-- id: grayscale_method
+    path: lib/iot/sensor.rb
+    anchor: "attr_reader :id, :unit, :location"
+- id: thermometer_location_init
   selector:
-    path: pipeline/image.py
-    anchor: 'def grayscale(self) -> "Image":'
-- id: invert_method
+    path: lib/iot/thermometer.rb
+    anchor: "def initialize(id, location: 'unknown')"
+- id: collector_uses_metadata
   selector:
-    path: pipeline/image.py
-    anchor: 'def invert(self) -> "Image":'
-- id: crop_method
+    path: lib/monitoring/collector.rb
+    anchor: "s.metadata.merge(value: s.read)"
+- id: aggregator_by_location
   selector:
-    path: pipeline/image.py
-    anchor: "def crop(self, x1: int, y1: int, x2: int, y2: int)"
-- id: brightness_method
+    path: lib/monitoring/aggregator.rb
+    anchor: "def by_location"
+- id: controller_exposes_location
   selector:
-    path: pipeline/image.py
-    anchor: 'def brightness(self, factor: float) -> "Image":'
-- id: histogram_method
+    path: lib/api/telemetry_controller.rb
+    anchor: "get_by_location"
+- id: no_garbage_a
   selector:
-    path: pipeline/image.py
-    anchor: "def histogram(self) -> dict[str, list[int]]:"
+    anchor: GARBAGE_IMGPIPE_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_IMGPIPE_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_IMGPIPE_C
 oracle:
   required:
-  - alpha_field
-  - grayscale_method
-  - invert_method
-  - crop_method
-  - brightness_method
-  - histogram_method
-  allowed: []
-  forbidden: []
+  - sensor_location_field
+  - thermometer_location_init
+  - collector_uses_metadata
+  - aggregator_by_location
+  allowed:
+  - controller_exposes_location
+  forbidden:
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

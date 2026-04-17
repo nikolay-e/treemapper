@@ -1,161 +1,221 @@
 name: gap2_083_swift_cross_module_recipe_nutrition
 tags:
-- change:new_function
-- change:single_file
-- context:cross_module
-- difficulty:medium
-- distance:2hop
-- lang:swift
-fixtures:
-  auto_garbage: true
+- lang:typescript
+- change:multi_file
+- change:signature
+- context:import_chain
+- distance:1hop
+- difficulty:hard
 repo:
   initial_files:
-    Sources/Cooking/RecipeAnalyzer.swift: |
-      import Foundation
+    src/messaging/publisher.ts: |
+      import { MessageBroker } from './broker';
+      import { Message } from './message';
 
-      struct NutritionSummary {
-          let calories: Double
-          let proteinGrams: Double
-          let fatGrams: Double
-      }
+      export class Publisher {
+          constructor(private broker: MessageBroker) {}
 
-      class RecipeAnalyzer {
-          private let ingredientDb: IngredientDatabase
-
-          init(ingredientDb: IngredientDatabase) {
-              self.ingredientDb = ingredientDb
-          }
-
-          func totalCalories(recipe: Recipe) -> Double {
-              recipe.ingredients.compactMap { ingredientDb.nutritionFor(name: $0.name) }
-                  .reduce(0.0) { $0 + $1.caloriesPer100g }
+          async publish(topic: string, payload: unknown): Promise<void> {
+              const msg: Message = { topic, payload, timestamp: Date.now() };
+              await this.broker.send(msg);
           }
       }
-    Sources/Cooking/IngredientDatabase.swift: |
-      import Foundation
+    src/messaging/broker.ts: |
+      import { Message } from './message';
 
-      class IngredientDatabase {
-          private let catalog: FoodCatalog
-
-          init(catalog: FoodCatalog) {
-              self.catalog = catalog
-          }
-
-          func nutritionFor(name: String) -> FoodEntry? {
-              catalog.search(query: name).first
-          }
-
-          func allIngredients() -> [FoodEntry] {
-              catalog.allFoods()
-          }
-      }
-    Sources/Cooking/FoodCatalog.swift: |
-      import Foundation
-
-      struct FoodEntry {
-          let name: String
-          let caloriesPer100g: Double
-          let proteinPer100g: Double
-          let fatPer100g: Double
+      export interface MessageBroker {
+          send(message: Message): Promise<void>;
       }
 
-      class FoodCatalog {
-          private var foods: [FoodEntry] = []
+      export class InMemoryBroker implements MessageBroker {
+          private handlers = new Map<string, ((msg: Message) => void)[]>();
 
-          func search(query: String) -> [FoodEntry] {
-              foods.filter { $0.name.localizedCaseInsensitiveContains(query) }
+          async send(message: Message): Promise<void> {
+              const handlers = this.handlers.get(message.topic) ?? [];
+              handlers.forEach(h => h(message));
           }
 
-          func allFoods() -> [FoodEntry] {
-              foods
-          }
-
-          func addFood(_ entry: FoodEntry) {
-              foods.append(entry)
+          subscribe(topic: string, handler: (msg: Message) => void): void {
+              const existing = this.handlers.get(topic) ?? [];
+              this.handlers.set(topic, [...existing, handler]);
           }
       }
-    Sources/Cooking/Recipe.swift: |
-      import Foundation
-
-      struct Ingredient {
-          let name: String
-          let quantityGrams: Double
+    src/messaging/message.ts: |
+      export interface Message {
+          topic: string;
+          payload: unknown;
+          timestamp: number;
       }
+    src/events/order_publisher.ts: |
+      import { Publisher } from '../messaging/publisher';
 
-      struct Recipe {
-          let title: String
-          let ingredients: [Ingredient]
-          let servings: Int
+      export class OrderPublisher {
+          constructor(private publisher: Publisher) {}
+
+          async orderCreated(orderId: string, customerId: string): Promise<void> {
+              await this.publisher.publish('order.created', { orderId, customerId });
+          }
+
+          async orderShipped(orderId: string): Promise<void> {
+              await this.publisher.publish('order.shipped', { orderId });
+          }
       }
-    Sources/Shipping/DeliveryTracker.swift: |
-      import Foundation
+    src/integrations/webhook.ts: |
+      export const GARBAGE_GAP083_A = 'webhook_retry_limit';
 
-      let TRAP_GAP2_083_DELIVERY_A: String = "delivery_noise"
-      let TRAP_GAP2_083_DELIVERY_B: Bool = false
+      export class WebhookSender {
+          async send(url: string, body: unknown): Promise<boolean> { return true; }
+      }
+    src/auth/jwt.ts: |
+      export const GARBAGE_GAP083_B = 'jwt_algorithm_hs256';
+      export const GARBAGE_GAP083_C = 3600;
 
-      class DeliveryTracker {
-          func estimateArrival() -> Date { Date() }
-          func trackPackage(id: String) -> String { "in_transit" }
+      export function signJwt(payload: object, secret: string): string {
+          return `${JSON.stringify(payload)}.${secret}`;
+      }
+    src/storage/blob.ts: |
+      export const GARBAGE_GAP083_D = 'blob_storage_bucket';
+
+      export class BlobStorage {
+          async upload(key: string, data: Buffer): Promise<string> { return key; }
       }
   changed_files:
-    Sources/Cooking/RecipeAnalyzer.swift: |
-      import Foundation
+    src/messaging/publisher.ts: |
+      import { MessageBroker } from './broker';
+      import { Message, MessageOptions } from './message';
 
-      struct NutritionSummary {
-          let calories: Double
-          let proteinGrams: Double
-          let fatGrams: Double
-      }
+      export class Publisher {
+          constructor(private broker: MessageBroker) {}
 
-      class RecipeAnalyzer {
-          private let ingredientDb: IngredientDatabase
-
-          init(ingredientDb: IngredientDatabase) {
-              self.ingredientDb = ingredientDb
-          }
-
-          func totalCalories(recipe: Recipe) -> Double {
-              recipe.ingredients.compactMap { ingredientDb.nutritionFor(name: $0.name) }
-                  .reduce(0.0) { $0 + $1.caloriesPer100g }
-          }
-
-          func fullNutrition(recipe: Recipe) -> NutritionSummary {
-              let entries = recipe.ingredients.compactMap { ingredientDb.nutritionFor(name: $0.name) }
-              let cal = entries.reduce(0.0) { $0 + $1.caloriesPer100g }
-              let protein = entries.reduce(0.0) { $0 + $1.proteinPer100g }
-              let fat = entries.reduce(0.0) { $0 + $1.fatPer100g }
-              return NutritionSummary(calories: cal, proteinGrams: protein, fatGrams: fat)
+          async publish(topic: string, payload: unknown, options?: MessageOptions): Promise<string> {
+              const msg: Message = {
+                  id: crypto.randomUUID(),
+                  topic,
+                  payload,
+                  timestamp: Date.now(),
+                  priority: options?.priority ?? 0,
+              };
+              await this.broker.send(msg);
+              return msg.id;
           }
       }
-  commit_message: Update files
+    src/messaging/broker.ts: |
+      import { Message } from './message';
+
+      export interface MessageBroker {
+          send(message: Message): Promise<void>;
+      }
+
+      export class InMemoryBroker implements MessageBroker {
+          private handlers = new Map<string, ((msg: Message) => void)[]>();
+
+          async send(message: Message): Promise<void> {
+              const handlers = this.handlers.get(message.topic) ?? [];
+              handlers.forEach(h => h(message));
+          }
+
+          subscribe(topic: string, handler: (msg: Message) => void): void {
+              const existing = this.handlers.get(topic) ?? [];
+              this.handlers.set(topic, [...existing, handler]);
+          }
+      }
+    src/messaging/message.ts: |
+      export interface MessageOptions {
+          priority?: number;
+      }
+
+      export interface Message {
+          id: string;
+          topic: string;
+          payload: unknown;
+          timestamp: number;
+          priority: number;
+      }
+    src/events/order_publisher.ts: |
+      import { Publisher } from '../messaging/publisher';
+      import { MessageOptions } from '../messaging/message';
+
+      export class OrderPublisher {
+          constructor(private publisher: Publisher) {}
+
+          async orderCreated(orderId: string, customerId: string, options?: MessageOptions): Promise<string> {
+              return this.publisher.publish('order.created', { orderId, customerId }, options);
+          }
+
+          async orderShipped(orderId: string): Promise<string> {
+              return this.publisher.publish('order.shipped', { orderId }, { priority: 10 });
+          }
+      }
+    src/integrations/webhook.ts: |
+      export const GARBAGE_GAP083_A = 'webhook_retry_limit';
+
+      export class WebhookSender {
+          async send(url: string, body: unknown): Promise<boolean> { return true; }
+      }
+    src/auth/jwt.ts: |
+      export const GARBAGE_GAP083_B = 'jwt_algorithm_hs256';
+      export const GARBAGE_GAP083_C = 3600;
+
+      export function signJwt(payload: object, secret: string): string {
+          return `${JSON.stringify(payload)}.${secret}`;
+      }
+    src/storage/blob.ts: |
+      export const GARBAGE_GAP083_D = 'blob_storage_bucket';
+
+      export class BlobStorage {
+          async upload(key: string, data: Buffer): Promise<string> { return key; }
+      }
+  commit_message: "feat: add message ID and priority to publisher and Message type"
 fragments:
-- id: full_nutrition_fn
+- id: message_options
   selector:
-    path: Sources/Cooking/RecipeAnalyzer.swift
-    anchor: "func fullNutrition"
-- id: nutrition_for
+    path: src/messaging/message.ts
+    anchor: "export interface MessageOptions"
+- id: message_id_field
   selector:
-    path: Sources/Cooking/IngredientDatabase.swift
-    anchor: "func nutritionFor"
-- id: food_entry_struct
+    path: src/messaging/message.ts
+    anchor: "id: string"
+- id: publisher_publish_returns_id
   selector:
-    path: Sources/Cooking/FoodCatalog.swift
-    anchor: "struct FoodEntry"
-- id: no_delivery
+    path: src/messaging/publisher.ts
+    anchor: "async publish(topic: string, payload: unknown, options?: MessageOptions)"
+- id: order_publisher_order_created
   selector:
-    path: Sources/Shipping/DeliveryTracker.swift
+    path: src/events/order_publisher.ts
+    anchor: "async orderCreated"
+- id: no_webhook
+  selector:
+    path: src/integrations/webhook.ts
+- id: no_jwt
+  selector:
+    path: src/auth/jwt.ts
+- id: no_blob
+  selector:
+    path: src/storage/blob.ts
 - id: no_global_0
   selector:
-    anchor: TRAP_GAP2_083_DELIVERY_A
+    anchor: GARBAGE_GAP083_A
 - id: no_global_1
   selector:
-    anchor: TRAP_GAP2_083_DELIVERY_B
+    anchor: GARBAGE_GAP083_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_GAP083_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_GAP083_D
 oracle:
   required:
-  - full_nutrition_fn
-  - nutrition_for
-  - food_entry_struct
+  - message_options
+  - message_id_field
+  - publisher_publish_returns_id
+  - order_publisher_order_created
+  allowed: []
   forbidden:
-  - no_delivery
+  - no_webhook
+  - no_jwt
+  - no_blob
   - no_global_0
   - no_global_1
+  - no_global_2
+  - no_global_3

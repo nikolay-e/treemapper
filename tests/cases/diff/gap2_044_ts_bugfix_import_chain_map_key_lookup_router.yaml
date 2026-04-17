@@ -1,118 +1,166 @@
 name: gap2_044_ts_bugfix_import_chain_map_key_lookup_router
 tags:
-- change:bug_fix
+- lang:erlang
+- change:refactor
 - change:single_file
-- context:import_chain
-- difficulty:easy
-- distance:0hop
-- lang:typescript
+- context:call_graph
+- distance:1hop
+- difficulty:hard
 repo:
   initial_files:
-    src/router/route.ts: |
-      export interface RouteDefinition {
-        path: string;
-        handler: string;
-        method: "GET" | "POST" | "PUT" | "DELETE";
-      }
+    src/rate_limiter.erl: |
+      -module(rate_limiter).
+      -export([new/2, allow/2, reset/1]).
 
-      export type RouteMap = Map<string, RouteDefinition>;
-    src/router/dispatcher.ts: |
-      import { RouteDefinition, RouteMap } from "./route";
+      new(MaxRequests, WindowMs) ->
+          #{max => MaxRequests, window => WindowMs, count => 0, start_time => erlang:system_time(millisecond)}.
 
-      function createRouteKey(method: string, path: string): string {
-        return `${method}:${path}`;
-      }
+      allow(State = #{max := Max, count := Count, window := Window, start_time := Start}, _Key) ->
+          Now = erlang:system_time(millisecond),
+          Elapsed = Now - Start,
+          if
+              Elapsed > Window ->
+                  {allow, State#{count => 1, start_time => Now}};
+              Count < Max ->
+                  {allow, State#{count => Count + 1}};
+              true ->
+                  {deny, State}
+          end.
 
-      function registerRoute(routes: RouteMap, def: RouteDefinition): void {
-        const key = createRouteKey(def.method, def.path);
-        routes.set(key, def);
-      }
+      reset(State) ->
+          State#{count => 0, start_time => erlang:system_time(millisecond)}.
+    src/api_gateway.erl: |
+      -module(api_gateway).
+      -export([handle/3]).
 
-      function dispatch(routes: RouteMap, method: string, path: string): string {
-        const key = createRouteKey(method, path);
-        const route = routes.get(key);
-        return route.handler;
-      }
-    src/router/middleware.ts: |
-      const TRAP_GAP2_044_MW_A: string = "cors_middleware";
-      const TRAP_GAP2_044_ORIGIN_B: string = "*";
+      handle(Path, Method, State) ->
+          case rate_limiter:allow(State, Path) of
+              {allow, NewState} ->
+                  {ok, route(Path, Method), NewState};
+              {deny, NewState} ->
+                  {error, rate_limited, NewState}
+          end.
 
-      function corsHeaders(): Record<string, string> {
-        return { "Access-Control-Allow-Origin": "*" };
-      }
+      route("/health", _) -> health_check;
+      route("/api/v1/users", "GET") -> list_users;
+      route("/api/v1/users", "POST") -> create_user;
+      route(_, _) -> not_found.
+    garbage/cache_store.erl: |
+      -module(cache_store).
+      %% GARBAGE_GAP044_A = "cache_store_marker"
+      -export([get/1, put/2]).
 
-      function logRequest(method: string, path: string): void {}
-    src/router/validator.ts: |
-      const TRAP_GAP2_044_VALID_C: string = "path_validator";
-      const TRAP_GAP2_044_MAX_D: number = 255;
+      get(Key) -> {ok, Key}.
+      put(Key, Val) -> {ok, Key, Val}.
+    garbage/audit_log.erl: |
+      -module(audit_log).
+      %% GARBAGE_GAP044_B = "audit_log_marker"
+      -export([write/2]).
 
-      function isValidPath(path: string): boolean {
-        return path.startsWith("/") && path.length < 255;
-      }
+      write(Event, Data) -> {logged, Event, Data}.
+    garbage/feature_flags.erl: |
+      -module(feature_flags).
+      %% GARBAGE_GAP044_C = "feature_flags_marker"
+      -export([enabled/1]).
 
-      function sanitizePath(path: string): string {
-        return path.replace(/\/+/g, "/");
-      }
+      enabled(Flag) -> {ok, Flag, true}.
   changed_files:
-    src/router/dispatcher.ts: |
-      import { RouteDefinition, RouteMap } from "./route";
+    src/rate_limiter.erl: |
+      -module(rate_limiter).
+      -export([new/2, allow/2, reset/1, per_key_allow/3]).
 
-      function createRouteKey(method: string, path: string): string {
-        return `${method}:${path}`;
-      }
+      new(MaxRequests, WindowMs) ->
+          #{max => MaxRequests, window => WindowMs, count => 0, start_time => erlang:system_time(millisecond)}.
 
-      function registerRoute(routes: RouteMap, def: RouteDefinition): void {
-        const key = createRouteKey(def.method, def.path);
-        routes.set(key, def);
-      }
+      allow(State = #{max := Max, count := Count, window := Window, start_time := Start}, _Key) ->
+          Now = erlang:system_time(millisecond),
+          Elapsed = Now - Start,
+          if
+              Elapsed > Window ->
+                  {allow, State#{count => 1, start_time => Now}};
+              Count < Max ->
+                  {allow, State#{count => Count + 1}};
+              true ->
+                  {deny, State}
+          end.
 
-      function dispatch(routes: RouteMap, method: string, path: string): string | null {
-        const key = createRouteKey(method, path);
-        const route = routes.get(key);
-        if (route === undefined) {
-          return null;
-        }
-        return route.handler;
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      reset(State) ->
+          State#{count => 0, start_time => erlang:system_time(millisecond)}.
+
+      per_key_allow(Buckets, Key, Config = #{max := Max, window := Window}) ->
+          Bucket = maps:get(Key, Buckets, #{count => 0, start_time => erlang:system_time(millisecond)}),
+          case allow(Bucket#{max => Max, window => Window}, Key) of
+              {allow, NewBucket} -> {allow, maps:put(Key, NewBucket, Buckets)};
+              {deny,  NewBucket} -> {deny,  maps:put(Key, NewBucket, Buckets)}
+          end.
+    src/api_gateway.erl: |
+      -module(api_gateway).
+      -export([handle/3, handle_keyed/4]).
+
+      handle(Path, Method, State) ->
+          case rate_limiter:allow(State, Path) of
+              {allow, NewState} ->
+                  {ok, route(Path, Method), NewState};
+              {deny, NewState} ->
+                  {error, rate_limited, NewState}
+          end.
+
+      handle_keyed(Path, Method, Buckets, Config) ->
+          case rate_limiter:per_key_allow(Buckets, Path, Config) of
+              {allow, NewBuckets} ->
+                  {ok, route(Path, Method), NewBuckets};
+              {deny, NewBuckets} ->
+                  {error, rate_limited, NewBuckets}
+          end.
+
+      route("/health", _) -> health_check;
+      route("/api/v1/users", "GET") -> list_users;
+      route("/api/v1/users", "POST") -> create_user;
+      route(_, _) -> not_found.
+    garbage/cache_store.erl: |
+      -module(cache_store).
+      %% GARBAGE_GAP044_A = "cache_store_marker"
+      -export([get/1, put/2]).
+
+      get(Key) -> {ok, Key}.
+      put(Key, Val) -> {ok, Key, Val}.
+    garbage/audit_log.erl: |
+      -module(audit_log).
+      %% GARBAGE_GAP044_B = "audit_log_marker"
+      -export([write/2]).
+
+      write(Event, Data) -> {logged, Event, Data}.
+    garbage/feature_flags.erl: |
+      -module(feature_flags).
+      %% GARBAGE_GAP044_C = "feature_flags_marker"
+      -export([enabled/1]).
+
+      enabled(Flag) -> {ok, Flag, true}.
+  commit_message: "refactor: add per_key_allow to rate_limiter, expose handle_keyed in api_gateway"
 fragments:
-- id: dispatch_undef_check
+- id: per_key_allow_fn
   selector:
-    path: src/router/dispatcher.ts
-    anchor: "if (route === undefined)"
-- id: dispatch_return_null
+    path: src/rate_limiter.erl
+    anchor: "per_key_allow(Buckets, Key, Config"
+- id: handle_keyed_fn
   selector:
-    path: src/router/dispatcher.ts
-    anchor: "string | null"
-- id: no_middleware
+    path: src/api_gateway.erl
+    anchor: "handle_keyed(Path, Method, Buckets, Config) ->"
+- id: no_garbage_a
   selector:
-    path: src/router/middleware.ts
-- id: no_validator
+    anchor: GARBAGE_GAP044_A
+- id: no_garbage_b
   selector:
-    path: src/router/validator.ts
-- id: no_global_0
+    anchor: GARBAGE_GAP044_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_044_MW_A
-- id: no_global_1
-  selector:
-    anchor: TRAP_GAP2_044_ORIGIN_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP2_044_VALID_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2_044_MAX_D
+    anchor: GARBAGE_GAP044_C
 oracle:
   required:
-  - dispatch_undef_check
-  - dispatch_return_null
+  - per_key_allow_fn
+  - handle_keyed_fn
   allowed: []
   forbidden:
-  - no_middleware
-  - no_validator
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

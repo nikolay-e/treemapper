@@ -1,156 +1,151 @@
 name: bal_refactor_004_python_replace_loops_with_comprehensions
 tags:
-- lang:python
-- change:multi_file
-- change:refactor
-- context:cross_module
+- lang:rust
+- change:bug_fix
+- change:single_file
+- context:import_chain
 - distance:1hop
 - difficulty:easy
 repo:
   initial_files:
-    data/transform.py: |
-      def filter_active_users(users):
-          result = []
-          for user in users:
-              if user.is_active:
-                  result.append(user)
-          return result
+    src/graph/adjacency.rs: |
+      use std::collections::HashMap;
 
-      def extract_emails(users):
-          emails = []
-          for user in users:
-              emails.append(user.email)
-          return emails
+      pub struct AdjacencyList {
+          edges: HashMap<u32, Vec<u32>>,
+      }
 
-      def build_lookup(users):
-          lookup = {}
-          for user in users:
-              lookup[user.id] = user.name
-          return lookup
-    data/report.py: |
-      from data.transform import filter_active_users, extract_emails
+      impl AdjacencyList {
+          pub fn new() -> Self {
+              AdjacencyList { edges: HashMap::new() }
+          }
 
-      def generate_active_email_report(users):
-          active = filter_active_users(users)
-          emails = extract_emails(active)
-          return {"count": len(emails), "emails": emails}
-    data/export.py: |
-      from data.transform import build_lookup, filter_active_users
+          pub fn add_edge(&mut self, from: u32, to: u32) {
+              // BUG: allows self-loops (from == to)
+              self.edges.entry(from).or_default().push(to);
+          }
 
-      def export_active_lookup(users):
-          active = filter_active_users(users)
-          lookup = build_lookup(active)
-          return lookup
-    data/constants.py: |
-      GARBAGE_REFACTOR_004_CONST_MARKER_A = "constants"
-      GARBAGE_REFACTOR_004_VERSION_MARKER_B = "1.0"
+          pub fn neighbors(&self, node: u32) -> &[u32] {
+              self.edges.get(&node).map(|v| v.as_slice()).unwrap_or(&[])
+          }
 
-      MAX_EXPORT_SIZE = 10000
-      DEFAULT_FORMAT = "csv"
-    garbage_scheduler.py: |
-      GARBAGE_REFACTOR_004_SCHED_MARKER_C = "scheduler"
-      GARBAGE_REFACTOR_004_INTERVAL_MARKER_D = 60
+          pub fn node_count(&self) -> usize {
+              self.edges.len()
+          }
+      }
+    src/graph/bfs.rs: |
+      use crate::graph::adjacency::AdjacencyList;
+      use std::collections::{HashSet, VecDeque};
 
-      class Scheduler:
-          GARBAGE_REFACTOR_004_SCHED_CLASS_E = True
-
-          def run(self):
-              pass
+      pub fn bfs(graph: &AdjacencyList, start: u32) -> Vec<u32> {
+          let mut visited = HashSet::new();
+          let mut queue = VecDeque::new();
+          let mut order = Vec::new();
+          queue.push_back(start);
+          visited.insert(start);
+          while let Some(node) = queue.pop_front() {
+              order.push(node);
+              for &neighbor in graph.neighbors(node) {
+                  if visited.insert(neighbor) {
+                      queue.push_back(neighbor);
+                  }
+              }
+          }
+          order
+      }
+    garbage/renderer.rs: |
+      // GARBAGE_GADJ_A = "renderer_marker"
+      pub fn render_dot(_nodes: &[u32]) -> String { String::new() }
+    garbage/partitioner.rs: |
+      // GARBAGE_GADJ_B = "partitioner_marker"
+      pub fn partition(_nodes: &[u32], _k: usize) -> Vec<Vec<u32>> { vec![] }
+    garbage/serializer.rs: |
+      // GARBAGE_GADJ_C = "serializer_marker"
+      pub fn to_json(_edges: &[(u32, u32)]) -> String { String::new() }
   changed_files:
-    data/transform.py: |
-      def filter_active_users(users):
-          return [user for user in users if user.is_active]
+    src/graph/adjacency.rs: |
+      use std::collections::HashMap;
 
-      def extract_emails(users):
-          return [user.email for user in users]
+      pub struct AdjacencyList {
+          edges: HashMap<u32, Vec<u32>>,
+      }
 
-      def build_lookup(users):
-          return {user.id: user.name for user in users}
-    data/report.py: |
-      from data.transform import filter_active_users, extract_emails
+      impl AdjacencyList {
+          pub fn new() -> Self {
+              AdjacencyList { edges: HashMap::new() }
+          }
 
-      def generate_active_email_report(users):
-          active = filter_active_users(users)
-          emails = extract_emails(active)
-          return {"count": len(emails), "emails": emails}
-    data/export.py: |
-      from data.transform import build_lookup, filter_active_users
+          pub fn add_edge(&mut self, from: u32, to: u32) {
+              if from == to {
+                  return;
+              }
+              self.edges.entry(from).or_default().push(to);
+          }
 
-      def export_active_lookup(users):
-          active = filter_active_users(users)
-          lookup = build_lookup(active)
-          return lookup
-    data/constants.py: |
-      GARBAGE_REFACTOR_004_CONST_MARKER_A = "constants"
-      GARBAGE_REFACTOR_004_VERSION_MARKER_B = "1.0"
+          pub fn neighbors(&self, node: u32) -> &[u32] {
+              self.edges.get(&node).map(|v| v.as_slice()).unwrap_or(&[])
+          }
 
-      MAX_EXPORT_SIZE = 10000
-      DEFAULT_FORMAT = "csv"
-    garbage_scheduler.py: |
-      GARBAGE_REFACTOR_004_SCHED_MARKER_C = "scheduler"
-      GARBAGE_REFACTOR_004_INTERVAL_MARKER_D = 60
+          pub fn node_count(&self) -> usize {
+              self.edges.len()
+          }
+      }
+    src/graph/bfs.rs: |
+      use crate::graph::adjacency::AdjacencyList;
+      use std::collections::{HashSet, VecDeque};
 
-      class Scheduler:
-          GARBAGE_REFACTOR_004_SCHED_CLASS_E = True
-
-          def run(self):
-              pass
-  commit_message: "refactor: replace manual loops with comprehensions"
+      pub fn bfs(graph: &AdjacencyList, start: u32) -> Vec<u32> {
+          let mut visited = HashSet::new();
+          let mut queue = VecDeque::new();
+          let mut order = Vec::new();
+          queue.push_back(start);
+          visited.insert(start);
+          while let Some(node) = queue.pop_front() {
+              order.push(node);
+              for &neighbor in graph.neighbors(node) {
+                  if visited.insert(neighbor) {
+                      queue.push_back(neighbor);
+                  }
+              }
+          }
+          order
+      }
+    garbage/renderer.rs: |
+      // GARBAGE_GADJ_A = "renderer_marker"
+      pub fn render_dot(_nodes: &[u32]) -> String { String::new() }
+    garbage/partitioner.rs: |
+      // GARBAGE_GADJ_B = "partitioner_marker"
+      pub fn partition(_nodes: &[u32], _k: usize) -> Vec<Vec<u32>> { vec![] }
+    garbage/serializer.rs: |
+      // GARBAGE_GADJ_C = "serializer_marker"
+      pub fn to_json(_edges: &[(u32, u32)]) -> String { String::new() }
+  commit_message: "fix: reject self-loops in AdjacencyList::add_edge"
 fragments:
-- id: filter_comprehension
+- id: self_loop_check
   selector:
-    path: data/transform.py
-    anchor: "return [user for user in users if user.is_active]"
-- id: extract_comprehension
+    anchor: "if from == to"
+- id: add_edge_func
   selector:
-    path: data/transform.py
-    anchor: "return [user.email for user in users]"
-- id: lookup_comprehension
+    anchor: "pub fn add_edge(&mut self, from: u32, to: u32)"
+- id: bfs_uses_adjacency
   selector:
-    path: data/transform.py
-    anchor: "return {user.id: user.name for user in users}"
-- id: report_uses_transform
+    anchor: "use crate::graph::adjacency::AdjacencyList"
+- id: no_garbage_a
   selector:
-    path: data/report.py
-    anchor: "from data.transform import filter_active_users"
-- id: export_uses_transform
+    anchor: GARBAGE_GADJ_A
+- id: no_garbage_b
   selector:
-    path: data/export.py
-    anchor: "from data.transform import build_lookup"
-- id: no_constants
+    anchor: GARBAGE_GADJ_B
+- id: no_garbage_c
   selector:
-    path: data/constants.py
-- id: no_garbage_scheduler
-  selector:
-    path: garbage_scheduler.py
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_004_CONST_MARKER_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_004_VERSION_MARKER_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_004_SCHED_MARKER_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_004_INTERVAL_MARKER_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_004_SCHED_CLASS_E
+    anchor: GARBAGE_GADJ_C
 oracle:
   required:
-  - filter_comprehension
-  - extract_comprehension
-  - lookup_comprehension
-  - report_uses_transform
-  - export_uses_transform
+  - self_loop_check
+  - add_edge_func
+  - bfs_uses_adjacency
   allowed: []
   forbidden:
-  - no_constants
-  - no_garbage_scheduler
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

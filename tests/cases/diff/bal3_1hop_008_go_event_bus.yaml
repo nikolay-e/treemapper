@@ -1,226 +1,154 @@
 name: bal3_1hop_008_go_event_bus
 tags:
-- lang:go
-- change:new_function
-- context:import_chain
+- lang:erlang
+- change:refactor
+- change:single_file
+- context:call_graph
 - distance:1hop
 - difficulty:hard
 repo:
   initial_files:
-    pkg/events/bus.go: |
-      package events
+    src/session_store.erl: |
+      -module(session_store).
+      -export([start_link/0, put/2, get/1, delete/1]).
 
-      type Event struct {
-          Type    string
-          Payload map[string]string
-      }
+      start_link() ->
+          ets:new(sessions, [named_table, public, set]),
+          {ok, self()}.
 
-      type Handler func(Event)
+      put(SessionId, Data) ->
+          ets:insert(sessions, {SessionId, Data}).
 
-      type Bus struct {
-          handlers map[string][]Handler
-      }
+      get(SessionId) ->
+          case ets:lookup(sessions, SessionId) of
+              [{_, Data}] -> {ok, Data};
+              [] -> {error, not_found}
+          end.
 
-      func NewBus() *Bus {
-          return &Bus{handlers: make(map[string][]Handler)}
-      }
+      delete(SessionId) ->
+          ets:delete(sessions, SessionId).
+    src/auth_handler.erl: |
+      -module(auth_handler).
+      -export([handle_login/2, handle_logout/1]).
 
-      func (b *Bus) Subscribe(eventType string, h Handler) {
-          b.handlers[eventType] = append(b.handlers[eventType], h)
-      }
+      handle_login(UserId, Token) ->
+          session_store:put(Token, #{user_id => UserId, created_at => erlang:system_time()}).
 
-      func (b *Bus) Publish(e Event) {
-          for _, h := range b.handlers[e.Type] {
-              h(e)
-          }
-      }
-    internal/order/processor.go: |
-      package order
+      handle_logout(Token) ->
+          session_store:delete(Token).
+    garbage/billing_worker.erl: |
+      -module(billing_worker).
+      %% GARBAGE_BAL3BUS_A = "billing_worker_marker"
+      -export([process/1]).
 
-      import "pkg/events"
+      process(InvoiceId) ->
+          {ok, InvoiceId}.
+    garbage/email_dispatcher.erl: |
+      -module(email_dispatcher).
+      %% GARBAGE_BAL3BUS_B = "email_dispatcher_marker"
+      -export([send/2]).
 
-      type Processor struct {
-          bus *events.Bus
-      }
+      send(To, Subject) ->
+          {queued, To, Subject}.
+    garbage/metrics_sink.erl: |
+      -module(metrics_sink).
+      %% GARBAGE_BAL3BUS_C = "metrics_sink_marker"
+      -export([record/2]).
 
-      func NewProcessor(bus *events.Bus) *Processor {
-          return &Processor{bus: bus}
-      }
-
-      func (p *Processor) Process(orderID string) {
-          p.bus.Publish(events.Event{
-              Type:    "order.created",
-              Payload: map[string]string{"order_id": orderID},
-          })
-      }
-    internal/inventory/watcher.go: |
-      package inventory
-
-      import "pkg/events"
-
-      type Watcher struct {
-          bus *events.Bus
-      }
-
-      func NewWatcher(bus *events.Bus) *Watcher {
-          w := &Watcher{bus: bus}
-          bus.Subscribe("order.created", w.onOrderCreated)
-          return w
-      }
-
-      func (w *Watcher) onOrderCreated(e events.Event) {
-          _ = e.Payload["order_id"]
-      }
-    internal/notification/dispatcher.go: |
-      package notification
-
-      import "pkg/events"
-
-      type Dispatcher struct {
-          bus *events.Bus
-      }
-
-      func NewDispatcher(bus *events.Bus) *Dispatcher {
-          d := &Dispatcher{bus: bus}
-          bus.Subscribe("order.created", d.onOrderCreated)
-          return d
-      }
-
-      func (d *Dispatcher) onOrderCreated(e events.Event) {
-          _ = e.Payload["order_id"]
-      }
-    internal/billing/invoice.go: |
-      package billing
-
-      GARBAGE_008_INVOICE_A = "invoice"
-
-      type InvoiceGenerator struct {
-          Template string
-      }
-
-      func (g *InvoiceGenerator) Generate(orderID string) string {
-          return "INV-" + orderID
-      }
-    internal/shipping/tracker.go: |
-      package shipping
-
-      GARBAGE_008_SHIPPING_B = "shipping"
-
-      type Tracker struct {
-          Carrier string
-      }
-
-      func (t *Tracker) Track(shipmentID string) string {
-          return "tracking-" + shipmentID
-      }
-    internal/reporting/summary.go: |
-      package reporting
-
-      GARBAGE_008_REPORT_C = "report"
-
-      type SummaryBuilder struct {
-          Title string
-      }
-
-      func (s *SummaryBuilder) Build() string {
-          return s.Title
-      }
+      record(Name, Value) ->
+          {ok, Name, Value}.
   changed_files:
-    pkg/events/bus.go: |
-      package events
+    src/session_store.erl: |
+      -module(session_store).
+      -export([start_link/0, put/2, get/1, delete/1, exists/1, refresh/2]).
 
-      type Event struct {
-          Type    string
-          Payload map[string]string
-      }
+      start_link() ->
+          ets:new(sessions, [named_table, public, set]),
+          {ok, self()}.
 
-      type Handler func(Event)
+      put(SessionId, Data) ->
+          ets:insert(sessions, {SessionId, Data}).
 
-      type Bus struct {
-          handlers map[string][]Handler
-      }
+      get(SessionId) ->
+          case ets:lookup(sessions, SessionId) of
+              [{_, Data}] -> {ok, Data};
+              [] -> {error, not_found}
+          end.
 
-      func NewBus() *Bus {
-          return &Bus{handlers: make(map[string][]Handler)}
-      }
+      delete(SessionId) ->
+          ets:delete(sessions, SessionId).
 
-      func (b *Bus) Subscribe(eventType string, h Handler) {
-          b.handlers[eventType] = append(b.handlers[eventType], h)
-      }
+      exists(SessionId) ->
+          ets:member(sessions, SessionId).
 
-      func (b *Bus) Unsubscribe(eventType string) {
-          delete(b.handlers, eventType)
-      }
+      refresh(SessionId, NewData) ->
+          case exists(SessionId) of
+              true  -> put(SessionId, NewData);
+              false -> {error, not_found}
+          end.
+    src/auth_handler.erl: |
+      -module(auth_handler).
+      -export([handle_login/2, handle_logout/1, handle_refresh/2]).
 
-      func (b *Bus) Publish(e Event) {
-          for _, h := range b.handlers[e.Type] {
-              h(e)
-          }
-      }
+      handle_login(UserId, Token) ->
+          session_store:put(Token, #{user_id => UserId, created_at => erlang:system_time()}).
 
-      func (b *Bus) HasSubscribers(eventType string) bool {
-          return len(b.handlers[eventType]) > 0
-      }
-  commit_message: "feat: add Unsubscribe and HasSubscribers to event bus"
+      handle_logout(Token) ->
+          session_store:delete(Token).
+
+      handle_refresh(Token, NewData) ->
+          session_store:refresh(Token, NewData).
+    garbage/billing_worker.erl: |
+      -module(billing_worker).
+      %% GARBAGE_BAL3BUS_A = "billing_worker_marker"
+      -export([process/1]).
+
+      process(InvoiceId) ->
+          {ok, InvoiceId}.
+    garbage/email_dispatcher.erl: |
+      -module(email_dispatcher).
+      %% GARBAGE_BAL3BUS_B = "email_dispatcher_marker"
+      -export([send/2]).
+
+      send(To, Subject) ->
+          {queued, To, Subject}.
+    garbage/metrics_sink.erl: |
+      -module(metrics_sink).
+      %% GARBAGE_BAL3BUS_C = "metrics_sink_marker"
+      -export([process/1]).
+
+      record(Name, Value) ->
+          {ok, Name, Value}.
+  commit_message: "refactor: extract exists/refresh from session_store, update auth_handler"
 fragments:
-- id: unsubscribe_method
+- id: exists_fn
   selector:
-    path: pkg/events/bus.go
-    anchor: "func (b *Bus) Unsubscribe"
-- id: has_subscribers_method
+    path: src/session_store.erl
+    anchor: "exists(SessionId) ->"
+- id: refresh_fn
   selector:
-    path: pkg/events/bus.go
-    anchor: "func (b *Bus) HasSubscribers"
-- id: delete_handlers
+    path: src/session_store.erl
+    anchor: "refresh(SessionId, NewData) ->"
+- id: auth_refresh
   selector:
-    path: pkg/events/bus.go
-    anchor: "delete(b.handlers, eventType)"
-- id: processor_publishes
-  selector:
-    path: internal/order/processor.go
-    anchor: "bus.Publish(events.Event"
-- id: watcher_subscribes
-  selector:
-    path: internal/inventory/watcher.go
-    anchor: "bus.Subscribe(\"order.created\""
-- id: dispatcher_subscribes
-  selector:
-    path: internal/notification/dispatcher.go
-    anchor: "bus.Subscribe(\"order.created\""
-- id: unrelated_invoice
-  selector:
-    path: internal/billing/invoice.go
-    anchor: "type InvoiceGenerator struct"
-- id: unrelated_shipping
-  selector:
-    path: internal/shipping/tracker.go
-    anchor: "type Tracker struct"
-- id: unrelated_report
-  selector:
-    path: internal/reporting/summary.go
-    anchor: "type SummaryBuilder struct"
+    path: src/auth_handler.erl
+    anchor: "handle_refresh(Token, NewData) ->"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_008_INVOICE_A
+    anchor: GARBAGE_BAL3BUS_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_008_SHIPPING_B
+    anchor: GARBAGE_BAL3BUS_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_008_REPORT_C
+    anchor: GARBAGE_BAL3BUS_C
 oracle:
   required:
-  - unsubscribe_method
-  - has_subscribers_method
-  - delete_handlers
-  - processor_publishes
-  allowed:
-  - watcher_subscribes
-  - dispatcher_subscribes
+  - exists_fn
+  - refresh_fn
+  - auth_refresh
+  allowed: []
   forbidden:
-  - unrelated_invoice
-  - unrelated_shipping
-  - unrelated_report
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

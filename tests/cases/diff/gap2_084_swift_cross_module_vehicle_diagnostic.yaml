@@ -1,144 +1,233 @@
 name: gap2_084_swift_cross_module_vehicle_diagnostic
 tags:
-- change:new_function
-- change:single_file
-- context:cross_module
-- difficulty:medium
+- lang:typescript
+- change:multi_file
+- change:refactor
+- context:import_chain
 - distance:2hop
-- lang:swift
-fixtures:
-  auto_garbage: true
+- difficulty:hard
 repo:
   initial_files:
-    Sources/Vehicle/DiagnosticRunner.swift: |
-      import Foundation
+    src/search/index.ts: |
+      import { SearchAdapter } from './adapter';
+      import { SearchQuery, SearchResult } from './types';
 
-      struct DiagnosticReport {
-          let vehicleId: String
-          let faults: [String]
-          let passed: Bool
-      }
+      export class SearchIndex {
+          constructor(private adapter: SearchAdapter) {}
 
-      class DiagnosticRunner {
-          private let sensorHub: SensorHub
-
-          init(sensorHub: SensorHub) {
-              self.sensorHub = sensorHub
+          async search(query: SearchQuery): Promise<SearchResult[]> {
+              return this.adapter.query(query);
           }
 
-          func runCheck(vehicleId: String) -> DiagnosticReport {
-              let readings = sensorHub.latestReadings(vehicleId: vehicleId)
-              let faults = readings.filter { $0.value > $0.threshold }.map { $0.sensorName }
-              return DiagnosticReport(vehicleId: vehicleId, faults: faults, passed: faults.isEmpty)
+          async index(docId: string, content: Record<string, unknown>): Promise<void> {
+              await this.adapter.put(docId, content);
           }
       }
-    Sources/Vehicle/SensorHub.swift: |
-      import Foundation
+    src/search/adapter.ts: |
+      import { SearchQuery, SearchResult } from './types';
 
-      class SensorHub {
-          private let canBus: CANBusReader
-
-          init(canBus: CANBusReader) {
-              self.canBus = canBus
-          }
-
-          func latestReadings(vehicleId: String) -> [SensorReading] {
-              let raw = canBus.readFrames(busId: vehicleId)
-              return raw.map { SensorReading(sensorName: $0.label, value: $0.payload, threshold: $0.maxPayload) }
-          }
-      }
-    Sources/Vehicle/CANBusReader.swift: |
-      import Foundation
-
-      struct CANFrame {
-          let label: String
-          let payload: Double
-          let maxPayload: Double
+      export interface SearchAdapter {
+          query(q: SearchQuery): Promise<SearchResult[]>;
+          put(id: string, doc: Record<string, unknown>): Promise<void>;
       }
 
-      class CANBusReader {
-          func readFrames(busId: String) -> [CANFrame] {
-              return []
+      export class ElasticAdapter implements SearchAdapter {
+          constructor(private baseUrl: string) {}
+
+          async query(q: SearchQuery): Promise<SearchResult[]> {
+              const resp = await fetch(`${this.baseUrl}/search?q=${q.term}`);
+              return resp.json() as Promise<SearchResult[]>;
           }
 
-          func resetBus(busId: String) {
+          async put(id: string, doc: Record<string, unknown>): Promise<void> {
+              await fetch(`${this.baseUrl}/docs/${id}`, {
+                  method: 'PUT',
+                  body: JSON.stringify(doc),
+              });
           }
       }
-    Sources/Vehicle/SensorReading.swift: |
-      import Foundation
-
-      struct SensorReading {
-          let sensorName: String
-          let value: Double
-          let threshold: Double
+    src/search/types.ts: |
+      export interface SearchQuery {
+          term: string;
       }
-    Sources/Fleet/RouteOptimizer.swift: |
-      import Foundation
 
-      let TRAP_GAP2_084_ROUTE_A: String = "route_noise"
-      let TRAP_GAP2_084_ROUTE_B: Int = 42
+      export interface SearchResult {
+          id: string;
+          score: number;
+          content: Record<string, unknown>;
+      }
+    src/catalog/product_search.ts: |
+      import { SearchIndex } from '../search/index';
+      import { SearchQuery } from '../search/types';
 
-      class RouteOptimizer {
-          func optimize(stops: [String]) -> [String] { stops }
-          func estimateETA(from: String, to: String) -> Int { 0 }
+      export class ProductSearch {
+          constructor(private index: SearchIndex) {}
+
+          async findProducts(term: string) {
+              const query: SearchQuery = { term };
+              return this.index.search(query);
+          }
+      }
+    src/warehouse/stock.ts: |
+      export const GARBAGE_GAP084_A = 'stock_service_v1';
+
+      export class StockService {
+          available(sku: string): number { return 0; }
+      }
+    src/pricing/price_engine.ts: |
+      export const GARBAGE_GAP084_B = 'price_engine_v2';
+      export const GARBAGE_GAP084_C = 0.2;
+
+      export class PriceEngine {
+          calculate(base: number, tax: number): number { return base * (1 + tax); }
+      }
+    src/recommendations/engine.ts: |
+      export const GARBAGE_GAP084_D = 'recommendation_engine';
+
+      export class RecommendationEngine {
+          suggest(userId: string): string[] { return []; }
       }
   changed_files:
-    Sources/Vehicle/DiagnosticRunner.swift: |
-      import Foundation
+    src/search/index.ts: |
+      import { SearchAdapter } from './adapter';
+      import { SearchQuery, SearchResult, SearchOptions } from './types';
 
-      struct DiagnosticReport {
-          let vehicleId: String
-          let faults: [String]
-          let passed: Bool
-      }
+      export class SearchIndex {
+          constructor(private adapter: SearchAdapter) {}
 
-      class DiagnosticRunner {
-          private let sensorHub: SensorHub
-
-          init(sensorHub: SensorHub) {
-              self.sensorHub = sensorHub
+          async search(query: SearchQuery, options?: SearchOptions): Promise<SearchResult[]> {
+              const results = await this.adapter.query(query, options);
+              if (options?.sortBy === 'score') {
+                  return results.sort((a, b) => b.score - a.score);
+              }
+              return results;
           }
 
-          func runCheck(vehicleId: String) -> DiagnosticReport {
-              let readings = sensorHub.latestReadings(vehicleId: vehicleId)
-              let faults = readings.filter { $0.value > $0.threshold }.map { $0.sensorName }
-              return DiagnosticReport(vehicleId: vehicleId, faults: faults, passed: faults.isEmpty)
-          }
-
-          func criticalFaults(vehicleId: String, criticalThreshold: Double) -> [String] {
-              let readings = sensorHub.latestReadings(vehicleId: vehicleId)
-              return readings.filter { $0.value > $0.threshold * criticalThreshold }.map { $0.sensorName }
+          async index(docId: string, content: Record<string, unknown>): Promise<void> {
+              await this.adapter.put(docId, content);
           }
       }
-  commit_message: Update files
+    src/search/adapter.ts: |
+      import { SearchQuery, SearchResult, SearchOptions } from './types';
+
+      export interface SearchAdapter {
+          query(q: SearchQuery, options?: SearchOptions): Promise<SearchResult[]>;
+          put(id: string, doc: Record<string, unknown>): Promise<void>;
+      }
+
+      export class ElasticAdapter implements SearchAdapter {
+          constructor(private baseUrl: string) {}
+
+          async query(q: SearchQuery, options?: SearchOptions): Promise<SearchResult[]> {
+              const limit = options?.limit ?? 10;
+              const resp = await fetch(`${this.baseUrl}/search?q=${q.term}&size=${limit}`);
+              return resp.json() as Promise<SearchResult[]>;
+          }
+
+          async put(id: string, doc: Record<string, unknown>): Promise<void> {
+              await fetch(`${this.baseUrl}/docs/${id}`, {
+                  method: 'PUT',
+                  body: JSON.stringify(doc),
+              });
+          }
+      }
+    src/search/types.ts: |
+      export interface SearchQuery {
+          term: string;
+      }
+
+      export interface SearchOptions {
+          limit?: number;
+          sortBy?: 'score' | 'date';
+      }
+
+      export interface SearchResult {
+          id: string;
+          score: number;
+          content: Record<string, unknown>;
+      }
+    src/catalog/product_search.ts: |
+      import { SearchIndex } from '../search/index';
+      import { SearchQuery, SearchOptions } from '../search/types';
+
+      export class ProductSearch {
+          constructor(private index: SearchIndex) {}
+
+          async findProducts(term: string, options?: SearchOptions) {
+              const query: SearchQuery = { term };
+              return this.index.search(query, options);
+          }
+      }
+    src/warehouse/stock.ts: |
+      export const GARBAGE_GAP084_A = 'stock_service_v1';
+
+      export class StockService {
+          available(sku: string): number { return 0; }
+      }
+    src/pricing/price_engine.ts: |
+      export const GARBAGE_GAP084_B = 'price_engine_v2';
+      export const GARBAGE_GAP084_C = 0.2;
+
+      export class PriceEngine {
+          calculate(base: number, tax: number): number { return base * (1 + tax); }
+      }
+    src/recommendations/engine.ts: |
+      export const GARBAGE_GAP084_D = 'recommendation_engine';
+
+      export class RecommendationEngine {
+          suggest(userId: string): string[] { return []; }
+      }
+  commit_message: "refactor: add SearchOptions parameter to search pipeline"
 fragments:
-- id: critical_faults_fn
+- id: search_options_type
   selector:
-    path: Sources/Vehicle/DiagnosticRunner.swift
-    anchor: "func criticalFaults"
-- id: latest_readings
+    path: src/search/types.ts
+    anchor: "export interface SearchOptions"
+- id: adapter_query_signature
   selector:
-    path: Sources/Vehicle/SensorHub.swift
-    anchor: "func latestReadings"
-- id: sensor_reading_struct
+    path: src/search/adapter.ts
+    anchor: "query(q: SearchQuery, options?: SearchOptions)"
+- id: index_search_options
   selector:
-    path: Sources/Vehicle/SensorReading.swift
-    anchor: "struct SensorReading"
-- id: no_route
+    path: src/search/index.ts
+    anchor: "async search(query: SearchQuery, options?: SearchOptions)"
+- id: product_search_options
   selector:
-    path: Sources/Fleet/RouteOptimizer.swift
+    path: src/catalog/product_search.ts
+    anchor: "async findProducts(term: string, options?: SearchOptions)"
+- id: no_stock
+  selector:
+    path: src/warehouse/stock.ts
+- id: no_price_engine
+  selector:
+    path: src/pricing/price_engine.ts
+- id: no_recommendations
+  selector:
+    path: src/recommendations/engine.ts
 - id: no_global_0
   selector:
-    anchor: TRAP_GAP2_084_ROUTE_A
+    anchor: GARBAGE_GAP084_A
 - id: no_global_1
   selector:
-    anchor: TRAP_GAP2_084_ROUTE_B
+    anchor: GARBAGE_GAP084_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_GAP084_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_GAP084_D
 oracle:
   required:
-  - critical_faults_fn
-  - latest_readings
-  - sensor_reading_struct
+  - search_options_type
+  - adapter_query_signature
+  - index_search_options
+  - product_search_options
+  allowed: []
   forbidden:
-  - no_route
+  - no_stock
+  - no_price_engine
+  - no_recommendations
   - no_global_0
   - no_global_1
+  - no_global_2
+  - no_global_3

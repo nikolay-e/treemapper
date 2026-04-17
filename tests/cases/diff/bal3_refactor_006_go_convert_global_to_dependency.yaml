@@ -1,204 +1,113 @@
 name: bal3_refactor_006_go_convert_global_to_dependency
 tags:
-- lang:go
+- lang:python
+- lang:shell
 - change:multi_file
-- change:refactor
-- context:cross_module
-- distance:2hop
-- difficulty:hard
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
-    config/global.go: |
-      package config
+    scripts/backup.py: |
+      import os
+      import shutil
 
-      var DBHost = "localhost"
-      var DBPort = 5432
-      var DBName = "appdb"
-    services/user.go: |
-      package services
+      BACKUP_DIR = "/tmp/backups"
 
-      import (
-          "config"
-          "fmt"
-      )
 
-      type UserService struct{}
+      def run_backup(source: str) -> str:
+          dest = os.path.join(BACKUP_DIR, os.path.basename(source))
+          shutil.copy2(source, dest)
+          return dest
+    scripts/backup.sh: |
+      #!/usr/bin/env bash
+      python3 scripts/backup.py "$1"
+    garbage/cache.py: |
+      GARBAGE_R006_CACHE_A = "cache_marker"
 
-      func (s *UserService) ConnectionString() string {
-          return fmt.Sprintf("%s:%d/%s", config.DBHost, config.DBPort, config.DBName)
-      }
-    services/analytics.go: |
-      package services
 
-      import (
-          "config"
-          "fmt"
-      )
+      def get_cache():
+          return {}
+    garbage/queue.py: |
+      GARBAGE_R006_QUEUE_B = "queue_marker"
 
-      type AnalyticsService struct{}
 
-      func (s *AnalyticsService) DSN() string {
-          return fmt.Sprintf("host=%s port=%d dbname=%s", config.DBHost, config.DBPort, config.DBName)
-      }
-    cmd/main.go: |
-      package main
+      def enqueue(item):
+          pass
+    garbage/metrics.py: |
+      GARBAGE_R006_METRICS_C = "metrics_marker"
 
-      import "services"
 
-      func main() {
-          u := &services.UserService{}
-          a := &services.AnalyticsService{}
-          _ = u.ConnectionString()
-          _ = a.DSN()
-      }
-    pkg/upload/handler.go: |
-      package upload
-
-      GARBAGE_R006_UPLOAD_A = "handler"
-
-      type Handler struct {
-          MaxSize int64
-      }
-    pkg/session/store.go: |
-      package session
-
-      GARBAGE_R006_SESSION_B = "store"
-
-      type Store struct {
-          TTL int
-      }
-    pkg/cors/config.go: |
-      package cors
-
-      GARBAGE_R006_CORS_C = "config"
-
-      type Config struct {
-          Origins []string
-      }
+      def record(name, value):
+          pass
   changed_files:
-    config/database.go: |
-      package config
+    scripts/backup.py: |
+      import os
+      import shutil
 
-      type DatabaseConfig struct {
-          Host string
-          Port int
-          Name string
-      }
-    services/user.go: |
-      package services
+      BACKUP_DIR = "/var/data/backups"
+      BACKUP_COMPRESS = True
 
-      import (
-          "config"
-          "fmt"
-      )
 
-      type UserService struct {
-          db config.DatabaseConfig
-      }
+      def run_backup(source: str) -> str:
+          dest = os.path.join(BACKUP_DIR, os.path.basename(source))
+          shutil.copy2(source, dest)
+          return dest
 
-      func NewUserService(db config.DatabaseConfig) *UserService {
-          return &UserService{db: db}
-      }
 
-      func (s *UserService) ConnectionString() string {
-          return fmt.Sprintf("%s:%d/%s", s.db.Host, s.db.Port, s.db.Name)
-      }
-    services/analytics.go: |
-      package services
+      def list_backups() -> list[str]:
+          return sorted(os.listdir(BACKUP_DIR))
+    scripts/backup.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      python3 scripts/backup.py "$1"
+      echo "Backup complete for $1"
+    garbage/cache.py: |
+      GARBAGE_R006_CACHE_A = "cache_marker"
 
-      import (
-          "config"
-          "fmt"
-      )
 
-      type AnalyticsService struct {
-          db config.DatabaseConfig
-      }
+      def get_cache():
+          return {}
+    garbage/queue.py: |
+      GARBAGE_R006_QUEUE_B = "queue_marker"
 
-      func NewAnalyticsService(db config.DatabaseConfig) *AnalyticsService {
-          return &AnalyticsService{db: db}
-      }
 
-      func (s *AnalyticsService) DSN() string {
-          return fmt.Sprintf("host=%s port=%d dbname=%s", s.db.Host, s.db.Port, s.db.Name)
-      }
-    cmd/main.go: |
-      package main
+      def enqueue(item):
+          pass
+    garbage/metrics.py: |
+      GARBAGE_R006_METRICS_C = "metrics_marker"
 
-      import (
-          "config"
-          "services"
-      )
 
-      func main() {
-          dbCfg := config.DatabaseConfig{Host: "localhost", Port: 5432, Name: "appdb"}
-          u := services.NewUserService(dbCfg)
-          a := services.NewAnalyticsService(dbCfg)
-          _ = u.ConnectionString()
-          _ = a.DSN()
-      }
-    pkg/upload/handler.go: |
-      package upload
-
-      GARBAGE_R006_UPLOAD_A = "handler"
-
-      type Handler struct {
-          MaxSize int64
-      }
-    pkg/session/store.go: |
-      package session
-
-      GARBAGE_R006_SESSION_B = "store"
-
-      type Store struct {
-          TTL int
-      }
-    pkg/cors/config.go: |
-      package cors
-
-      GARBAGE_R006_CORS_C = "config"
-
-      type Config struct {
-          Origins []string
-      }
-  commit_message: "refactor: replace global config vars with dependency injection"
+      def record(name, value):
+          pass
+  commit_message: "feat: update backup dir and add list_backups helper"
 fragments:
-- id: database_config_struct
+- id: backup_dir_constant
   selector:
-    path: config/database.go
-    anchor: "type DatabaseConfig struct"
-- id: user_service_injected
+    path: scripts/backup.py
+    anchor: "BACKUP_DIR = "
+- id: list_backups_fn
   selector:
-    path: services/user.go
-    anchor: "db config.DatabaseConfig"
-- id: user_constructor
+    path: scripts/backup.py
+    anchor: "def list_backups"
+- id: shell_echo
   selector:
-    path: services/user.go
-    anchor: "func NewUserService(db config.DatabaseConfig)"
-- id: analytics_injected
-  selector:
-    path: services/analytics.go
-    anchor: "db config.DatabaseConfig"
-- id: main_wires_config
-  selector:
-    path: cmd/main.go
-    anchor: "config.DatabaseConfig{Host:"
+    path: scripts/backup.sh
+    anchor: "echo \"Backup complete"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_R006_UPLOAD_A
+    anchor: GARBAGE_R006_CACHE_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_R006_SESSION_B
+    anchor: GARBAGE_R006_QUEUE_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_R006_CORS_C
+    anchor: GARBAGE_R006_METRICS_C
 oracle:
   required:
-  - database_config_struct
-  - user_service_injected
-  - user_constructor
-  - analytics_injected
-  - main_wires_config
+  - backup_dir_constant
+  - list_backups_fn
+  - shell_echo
   allowed: []
   forbidden:
   - no_garbage_a

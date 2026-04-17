@@ -1,166 +1,170 @@
 name: bal3_rare_014_julia_matrix_solver
 tags:
-- lang:julia
+- lang:sql
 - change:single_file
-- change:refactor
-- context:call_graph
-- distance:1hop
-- difficulty:hard
+- context:cross_module
+- distance:0hop
+- difficulty:medium
 repo:
   initial_files:
-    src/LinAlg.jl: |
-      module LinAlg
+    db/schema.sql: |
+      CREATE TABLE employees (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          department_id INTEGER REFERENCES departments(id),
+          salary NUMERIC(12, 2) NOT NULL,
+          hired_at DATE NOT NULL
+      );
 
-      export solve_system, matrix_norm, is_singular
+      CREATE TABLE departments (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          manager_id INTEGER REFERENCES employees(id)
+      );
+    src/hr/employee_repo.py: |
+      def list_employees(conn, department_id: int | None = None) -> list:
+          cur = conn.cursor()
+          if department_id is not None:
+              cur.execute(
+                  "SELECT id, name, salary FROM employees WHERE department_id = %s",
+                  (department_id,)
+              )
+          else:
+              cur.execute("SELECT id, name, salary FROM employees")
+          return cur.fetchall()
+    src/hr/payroll.py: |
+      def total_payroll(conn, department_id: int | None = None) -> float:
+          cur = conn.cursor()
+          if department_id is not None:
+              cur.execute(
+                  "SELECT SUM(salary) FROM employees WHERE department_id = %s",
+                  (department_id,)
+              )
+          else:
+              cur.execute("SELECT SUM(salary) FROM employees")
+          row = cur.fetchone()
+          return float(row[0] or 0)
+    garbage/audit.py: |
+      GARBAGE_JUL014_AUDIT_A = "audit_marker"
 
-      function solve_system(A::Matrix{Float64}, b::Vector{Float64})
-          if is_singular(A)
-              error("Matrix is singular")
-          end
-          A \ b
-      end
 
-      function matrix_norm(A::Matrix{Float64})
-          sqrt(sum(A .^ 2))
-      end
+      def log_action(user_id: int, action: str) -> None:
+          pass
+    garbage/approvals.py: |
+      GARBAGE_JUL014_APPROV_B = "approvals_marker"
 
-      function is_singular(A::Matrix{Float64})
-          abs(det(A)) < 1e-10
-      end
 
-      end
-    src/Optimizer.jl: |
-      module Optimizer
+      def require_approval(level: int) -> bool:
+          return False
+    garbage/org_chart.py: |
+      GARBAGE_JUL014_ORG_C = "orgchart_marker"
 
-      using ..LinAlg
 
-      export gradient_descent
-
-      function gradient_descent(A::Matrix{Float64}, b::Vector{Float64}, lr::Float64, steps::Int)
-          x = zeros(size(A, 2))
-          for i in 1:steps
-              residual = A * x - b
-              gradient = A' * residual
-              norm_val = matrix_norm(reshape(gradient, :, 1))
-              if norm_val < 1e-8
-                  break
-              end
-              x -= lr * gradient
-          end
-          x
-      end
-
-      end
-    src/Plotter.jl: |
-      module Plotter
-
-      GARBAGE_RARE_014_PLOT_A = "matplotlib"
-      GARBAGE_RARE_014_DPI_B = 150
-
-      plot_vector(v) = nothing
-
-      end
-    src/DataLoader.jl: |
-      module DataLoader
-
-      GARBAGE_RARE_014_LOAD_C = "csv"
-      GARBAGE_RARE_014_HEADER_D = true
-
-      load_dataset(path) = nothing
-
-      end
-    src/Random.jl: |
-      module RandomUtils
-
-      GARBAGE_RARE_014_SEED_E = 42
-      GARBAGE_RARE_014_DIST_F = "normal"
-
-      random_matrix(n, m) = randn(n, m)
-
-      end
+      def build_tree(root_id: int) -> dict:
+          return {}
   changed_files:
-    src/LinAlg.jl: |
-      module LinAlg
+    db/schema.sql: |
+      CREATE TABLE employees (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          department_id INTEGER REFERENCES departments(id),
+          salary NUMERIC(12, 2) NOT NULL,
+          job_title VARCHAR(255),
+          employment_type VARCHAR(20) NOT NULL DEFAULT 'full_time',
+          hired_at DATE NOT NULL,
+          terminated_at DATE
+      );
 
-      export solve_system, matrix_norm, is_singular, condition_number, least_squares
+      CREATE TABLE departments (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          manager_id INTEGER REFERENCES employees(id),
+          cost_center VARCHAR(20)
+      );
 
-      function solve_system(A::Matrix{Float64}, b::Vector{Float64})
-          if is_singular(A)
-              return least_squares(A, b)
-          end
-          A \ b
-      end
+      CREATE INDEX idx_employees_department ON employees(department_id);
+      CREATE INDEX idx_employees_employment_type ON employees(employment_type);
+    src/hr/employee_repo.py: |
+      def list_employees(conn, department_id: int | None = None) -> list:
+          cur = conn.cursor()
+          if department_id is not None:
+              cur.execute(
+                  "SELECT id, name, salary FROM employees WHERE department_id = %s",
+                  (department_id,)
+              )
+          else:
+              cur.execute("SELECT id, name, salary FROM employees")
+          return cur.fetchall()
+    src/hr/payroll.py: |
+      def total_payroll(conn, department_id: int | None = None) -> float:
+          cur = conn.cursor()
+          if department_id is not None:
+              cur.execute(
+                  "SELECT SUM(salary) FROM employees WHERE department_id = %s",
+                  (department_id,)
+              )
+          else:
+              cur.execute("SELECT SUM(salary) FROM employees")
+          row = cur.fetchone()
+          return float(row[0] or 0)
+    garbage/audit.py: |
+      GARBAGE_JUL014_AUDIT_A = "audit_marker"
 
-      function matrix_norm(A::Matrix{Float64})
-          sqrt(sum(A .^ 2))
-      end
 
-      function is_singular(A::Matrix{Float64})
-          abs(det(A)) < 1e-10
-      end
+      def log_action(user_id: int, action: str) -> None:
+          pass
+    garbage/approvals.py: |
+      GARBAGE_JUL014_APPROV_B = "approvals_marker"
 
-      function condition_number(A::Matrix{Float64})
-          svd_vals = svdvals(A)
-          svd_vals[1] / svd_vals[end]
-      end
 
-      function least_squares(A::Matrix{Float64}, b::Vector{Float64})
-          (A' * A) \ (A' * b)
-      end
+      def require_approval(level: int) -> bool:
+          return False
+    garbage/org_chart.py: |
+      GARBAGE_JUL014_ORG_C = "orgchart_marker"
 
-      end
-  commit_message: "add condition number and least squares fallback"
+
+      def build_tree(root_id: int) -> dict:
+          return {}
+  commit_message: "feat: add job_title, employment_type, terminated_at and cost_center"
 fragments:
-- id: optimizer_uses_linalg
+- id: employees_job_title
   selector:
-    path: src/Optimizer.jl
-    anchor: "using ..LinAlg"
-- id: optimizer_uses_norm
+    path: db/schema.sql
+    anchor: "job_title VARCHAR"
+- id: employees_terminated_at
   selector:
-    path: src/Optimizer.jl
-    anchor: "matrix_norm"
-- id: no_plotter
+    path: db/schema.sql
+    anchor: "terminated_at DATE"
+- id: departments_cost_center
   selector:
-    path: src/Plotter.jl
-    anchor: "plot_vector"
-- id: no_dataloader
+    path: db/schema.sql
+    anchor: "cost_center VARCHAR"
+- id: employee_repo_query
   selector:
-    path: src/DataLoader.jl
-    anchor: "load_dataset"
-- id: no_random
+    path: src/hr/employee_repo.py
+    anchor: "SELECT id, name, salary FROM employees"
+- id: payroll_query
   selector:
-    path: src/Random.jl
-    anchor: "random_matrix"
-- id: no_global_0
+    path: src/hr/payroll.py
+    anchor: "SELECT SUM(salary) FROM employees"
+- id: no_garbage_a
   selector:
-    anchor: GARBAGE_RARE_014_PLOT_A
-- id: no_global_1
+    anchor: GARBAGE_JUL014_AUDIT_A
+- id: no_garbage_b
   selector:
-    anchor: GARBAGE_RARE_014_DPI_B
-- id: no_global_2
+    anchor: GARBAGE_JUL014_APPROV_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_RARE_014_LOAD_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_RARE_014_HEADER_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_014_SEED_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_014_DIST_F
+    anchor: GARBAGE_JUL014_ORG_C
 oracle:
   required:
-  - optimizer_uses_linalg
-  - optimizer_uses_norm
+  - employees_job_title
+  - employees_terminated_at
+  - departments_cost_center
+  - employee_repo_query
+  - payroll_query
   allowed: []
   forbidden:
-  - no_plotter
-  - no_dataloader
-  - no_random
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

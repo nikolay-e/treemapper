@@ -1,203 +1,230 @@
 name: bal_refactor_011_typescript_extract_service
 tags:
-- lang:typescript
+- lang:scala
 - change:multi_file
-- change:refactor
-- context:import_chain
-- distance:1hop
-- difficulty:easy
+- change:new_function
+- context:cross_module
+- distance:3hop+
+- difficulty:hard
 repo:
   initial_files:
-    src/controllers/userController.ts: |
-      import { Request, Response } from 'express';
-      import { db } from '../db';
+    src/main/scala/logistics/Shipment.scala: |
+      package logistics
 
-      export async function getUser(req: Request, res: Response) {
-          const user = await db.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
-          if (!user.rows.length) {
-              return res.status(404).json({ error: 'not found' });
+      case class Shipment(
+        id: String,
+        origin: String,
+        destination: String,
+        weightKg: Double,
+        status: String
+      )
+    src/main/scala/logistics/ShipmentRepository.scala: |
+      package logistics
+
+      class ShipmentRepository {
+        private var store: Map[String, Shipment] = Map.empty
+
+        def save(s: Shipment): Unit = {
+          store = store + (s.id -> s)
+        }
+
+        def find(id: String): Option[Shipment] = store.get(id)
+
+        def all(): List[Shipment] = store.values.toList
+      }
+    src/main/scala/logistics/ShipmentService.scala: |
+      package logistics
+
+      class ShipmentService(repo: ShipmentRepository) {
+        def dispatch(id: String): Either[String, Shipment] = {
+          repo.find(id) match {
+            case None    => Left(s"Shipment $id not found")
+            case Some(s) => Right(s.copy(status = "dispatched"))
           }
-          res.json(user.rows[0]);
+        }
       }
+    src/main/scala/logistics/api/ShipmentController.scala: |
+      package logistics.api
 
-      export async function createUser(req: Request, res: Response) {
-          const { name, email } = req.body;
-          const result = await db.query(
-              'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
-              [name, email]
-          );
-          res.status(201).json(result.rows[0]);
-      }
+      import logistics.{ShipmentService, ShipmentRepository, Shipment}
 
-      export async function deleteUser(req: Request, res: Response) {
-          await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
-          res.status(204).send();
-      }
-    src/db.ts: |
-      export const db = {
-          query: async (sql: string, params: any[]) => {
-              return { rows: [] };
+      class ShipmentController(service: ShipmentService) {
+        def handleDispatch(id: String): String = {
+          service.dispatch(id) match {
+            case Right(s) => s"OK: dispatched ${s.id}"
+            case Left(e)  => s"ERROR: $e"
           }
-      };
-    src/routes.ts: |
-      import { Router } from 'express';
-      import { getUser, createUser, deleteUser } from './controllers/userController';
-
-      const router = Router();
-      router.get('/users/:id', getUser);
-      router.post('/users', createUser);
-      router.delete('/users/:id', deleteUser);
-
-      export default router;
-    src/utils/logger.ts: |
-      const GARBAGE_REFACTOR_011_LOGGER_A = 'logger';
-      const GARBAGE_REFACTOR_011_LEVEL_B = 'info';
-
-      export function log(msg: string) {
-          console.log(msg);
+        }
       }
-    garbage_config.ts: |
-      const GARBAGE_REFACTOR_011_CONFIG_C = 'config';
-      const GARBAGE_REFACTOR_011_PORT_D = 3000;
+    src/main/scala/REFACTOR011_Audit.scala: |
+      package audit
 
-      export const config = {
-          GARBAGE_REFACTOR_011_APP_E: true,
-          port: 3000,
-      };
+      object REFACTOR011_Audit {
+        val REFACTOR011_GARBAGE_A = "audit_marker"
+        val REFACTOR011_GARBAGE_B = "log_level"
+
+        def log(msg: String): Unit = println(s"[AUDIT] $msg")
+      }
+    src/main/scala/REFACTOR011_Metrics.scala: |
+      package metrics
+
+      object REFACTOR011_Metrics {
+        val REFACTOR011_GARBAGE_C = "metrics_marker"
+        val REFACTOR011_GARBAGE_D = "statsd_host"
+
+        def record(name: String, value: Double): Unit = {}
+      }
+    src/main/scala/REFACTOR011_Cache.scala: |
+      package cache
+
+      object REFACTOR011_Cache {
+        val REFACTOR011_GARBAGE_E = "cache_marker"
+
+        def get(key: String): Option[String] = None
+      }
   changed_files:
-    src/services/userService.ts: |
-      import { db } from '../db';
+    src/main/scala/logistics/Shipment.scala: |
+      package logistics
 
-      export async function findUserById(id: string) {
-          const result = await db.query('SELECT * FROM users WHERE id = $1', [id]);
-          return result.rows[0] || null;
+      case class Shipment(
+        id: String,
+        origin: String,
+        destination: String,
+        weightKg: Double,
+        status: String,
+        estimatedDays: Int
+      )
+    src/main/scala/logistics/ShipmentRepository.scala: |
+      package logistics
+
+      class ShipmentRepository {
+        private var store: Map[String, Shipment] = Map.empty
+
+        def save(s: Shipment): Unit = {
+          store = store + (s.id -> s)
+        }
+
+        def find(id: String): Option[Shipment] = store.get(id)
+
+        def all(): List[Shipment] = store.values.toList
+
+        def findByStatus(status: String): List[Shipment] =
+          store.values.filter(_.status == status).toList
       }
+    src/main/scala/logistics/ShipmentService.scala: |
+      package logistics
 
-      export async function insertUser(name: string, email: string) {
-          const result = await db.query(
-              'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
-              [name, email]
-          );
-          return result.rows[0];
-      }
-
-      export async function removeUser(id: string) {
-          await db.query('DELETE FROM users WHERE id = $1', [id]);
-      }
-    src/controllers/userController.ts: |
-      import { Request, Response } from 'express';
-      import { findUserById, insertUser, removeUser } from '../services/userService';
-
-      export async function getUser(req: Request, res: Response) {
-          const user = await findUserById(req.params.id);
-          if (!user) {
-              return res.status(404).json({ error: 'not found' });
+      class ShipmentService(repo: ShipmentRepository) {
+        def dispatch(id: String): Either[String, Shipment] = {
+          repo.find(id) match {
+            case None    => Left(s"Shipment $id not found")
+            case Some(s) => Right(s.copy(status = "dispatched"))
           }
-          res.json(user);
-      }
+        }
 
-      export async function createUser(req: Request, res: Response) {
-          const { name, email } = req.body;
-          const user = await insertUser(name, email);
-          res.status(201).json(user);
-      }
-
-      export async function deleteUser(req: Request, res: Response) {
-          await removeUser(req.params.id);
-          res.status(204).send();
-      }
-    src/db.ts: |
-      export const db = {
-          query: async (sql: string, params: any[]) => {
-              return { rows: [] };
+        def estimateDelivery(id: String, speedFactor: Double): Either[String, Int] = {
+          repo.find(id) match {
+            case None    => Left(s"Shipment $id not found")
+            case Some(s) => Right(Math.ceil(s.estimatedDays / speedFactor).toInt)
           }
-      };
-    src/routes.ts: |
-      import { Router } from 'express';
-      import { getUser, createUser, deleteUser } from './controllers/userController';
+        }
 
-      const router = Router();
-      router.get('/users/:id', getUser);
-      router.post('/users', createUser);
-      router.delete('/users/:id', deleteUser);
-
-      export default router;
-    src/utils/logger.ts: |
-      const GARBAGE_REFACTOR_011_LOGGER_A = 'logger';
-      const GARBAGE_REFACTOR_011_LEVEL_B = 'info';
-
-      export function log(msg: string) {
-          console.log(msg);
+        def listPending(): List[Shipment] = repo.findByStatus("pending")
       }
-    garbage_config.ts: |
-      const GARBAGE_REFACTOR_011_CONFIG_C = 'config';
-      const GARBAGE_REFACTOR_011_PORT_D = 3000;
+    src/main/scala/logistics/api/ShipmentController.scala: |
+      package logistics.api
 
-      export const config = {
-          GARBAGE_REFACTOR_011_APP_E: true,
-          port: 3000,
-      };
-  commit_message: "refactor: extract database queries into userService"
+      import logistics.{ShipmentService, ShipmentRepository, Shipment}
+
+      class ShipmentController(service: ShipmentService) {
+        def handleDispatch(id: String): String = {
+          service.dispatch(id) match {
+            case Right(s) => s"OK: dispatched ${s.id}"
+            case Left(e)  => s"ERROR: $e"
+          }
+        }
+
+        def handleEstimate(id: String): String = {
+          service.estimateDelivery(id, 1.5) match {
+            case Right(days) => s"ETA: $days days"
+            case Left(e)     => s"ERROR: $e"
+          }
+        }
+      }
+    src/main/scala/REFACTOR011_Audit.scala: |
+      package audit
+
+      object REFACTOR011_Audit {
+        val REFACTOR011_GARBAGE_A = "audit_marker"
+        val REFACTOR011_GARBAGE_B = "log_level"
+
+        def log(msg: String): Unit = println(s"[AUDIT] $msg")
+      }
+    src/main/scala/REFACTOR011_Metrics.scala: |
+      package metrics
+
+      object REFACTOR011_Metrics {
+        val REFACTOR011_GARBAGE_C = "metrics_marker"
+        val REFACTOR011_GARBAGE_D = "statsd_host"
+
+        def record(name: String, value: Double): Unit = {}
+      }
+    src/main/scala/REFACTOR011_Cache.scala: |
+      package cache
+
+      object REFACTOR011_Cache {
+        val REFACTOR011_GARBAGE_E = "cache_marker"
+
+        def get(key: String): Option[String] = None
+      }
+  commit_message: "feat: add estimateDelivery, listPending to ShipmentService; estimatedDays to Shipment"
 fragments:
-- id: new_service_find
+- id: shipment_estimated_days
   selector:
-    path: src/services/userService.ts
-    anchor: "export async function findUserById"
-- id: new_service_insert
+    path: src/main/scala/logistics/Shipment.scala
+    anchor: "estimatedDays: Int"
+- id: repo_find_by_status
   selector:
-    path: src/services/userService.ts
-    anchor: "export async function insertUser"
-- id: new_service_remove
+    path: src/main/scala/logistics/ShipmentRepository.scala
+    anchor: "def findByStatus(status: String)"
+- id: service_estimate_delivery
   selector:
-    path: src/services/userService.ts
-    anchor: "export async function removeUser"
-- id: controller_imports_service
+    path: src/main/scala/logistics/ShipmentService.scala
+    anchor: "def estimateDelivery(id: String, speedFactor: Double)"
+- id: service_list_pending
   selector:
-    path: src/controllers/userController.ts
-    anchor: "from '../services/userService'"
-- id: controller_uses_find
+    path: src/main/scala/logistics/ShipmentService.scala
+    anchor: "def listPending()"
+- id: controller_handle_estimate
   selector:
-    path: src/controllers/userController.ts
-    anchor: "await findUserById(req.params.id)"
-- id: routes_uses_controller
+    path: src/main/scala/logistics/api/ShipmentController.scala
+    anchor: "def handleEstimate(id: String)"
+- id: no_garbage_a
   selector:
-    path: src/routes.ts
-    anchor: "from './controllers/userController'"
-- id: no_logger
+    anchor: REFACTOR011_GARBAGE_A
+- id: no_garbage_b
   selector:
-    path: src/utils/logger.ts
-- id: no_garbage_config
+    anchor: REFACTOR011_GARBAGE_B
+- id: no_garbage_c
   selector:
-    path: garbage_config.ts
-- id: no_global_0
+    anchor: REFACTOR011_GARBAGE_C
+- id: no_garbage_d
   selector:
-    anchor: GARBAGE_REFACTOR_011_LOGGER_A
-- id: no_global_1
+    anchor: REFACTOR011_GARBAGE_D
+- id: no_garbage_e
   selector:
-    anchor: GARBAGE_REFACTOR_011_LEVEL_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_011_CONFIG_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_011_PORT_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_011_APP_E
+    anchor: REFACTOR011_GARBAGE_E
 oracle:
   required:
-  - new_service_find
-  - new_service_insert
-  - new_service_remove
-  - controller_imports_service
-  - controller_uses_find
-  - routes_uses_controller
+  - shipment_estimated_days
+  - repo_find_by_status
+  - service_estimate_delivery
+  - service_list_pending
+  - controller_handle_estimate
   allowed: []
   forbidden:
-  - no_logger
-  - no_garbage_config
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

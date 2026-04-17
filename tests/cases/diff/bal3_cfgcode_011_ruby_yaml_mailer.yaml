@@ -1,154 +1,110 @@
 name: bal3_cfgcode_011_ruby_yaml_mailer
 tags:
-- lang:ruby
+- lang:kotlin
+- change:bug_fix
 - change:single_file
-- change:config
-- context:config_to_code
+- context:test_file
 - distance:1hop
-- difficulty:easy
+- difficulty:trivial
 repo:
   initial_files:
-    config/mailer.yml: |
-      mailer:
-        smtp_host: smtp.gmail.com
-        smtp_port: 587
-        from_address: noreply@example.com
-        enable_tls: true
-    lib/mailer/config.rb: |
-      require 'yaml'
+    src/main/kotlin/ecommerce/PriceEngine.kt: |
+      class PriceEngine {
+          fun applyDiscount(price: Double, discountPercent: Double): Double {
+              return price - (price * discountPercent / 100)
+          }
 
-      module Mailer
-        class Config
-          attr_reader :smtp_host, :smtp_port, :from_address, :enable_tls
+          fun applyVat(price: Double, vatRatePercent: Double): Double {
+              return price + (price * vatRatePercent)  // BUG: vatRatePercent should be /100
+          }
 
-          def initialize(path)
-            data = YAML.load_file(path)
-            cfg = data['mailer']
-            @smtp_host = cfg['smtp_host']
-            @smtp_port = cfg['smtp_port']
-            @from_address = cfg['from_address']
-            @enable_tls = cfg['enable_tls']
-          end
+          fun finalPrice(basePrice: Double, discountPercent: Double, vatRatePercent: Double): Double {
+              val discounted = applyDiscount(basePrice, discountPercent)
+              return applyVat(discounted, vatRatePercent)
+          }
+      }
+    src/test/kotlin/ecommerce/PriceEngineTest.kt: |
+      import org.junit.Test
+      import kotlin.test.assertEquals
 
-          def smtp_url
-            "smtp://#{@smtp_host}:#{@smtp_port}"
-          end
-        end
-      end
-    lib/mailer/sender.rb: |
-      module Mailer
-        class Sender
-          def initialize(config)
-            @config = config
-          end
+      class PriceEngineTest {
+          private val engine = PriceEngine()
 
-          def send_email(to:, subject:, body:)
-            {
-              from: @config.from_address,
-              to: to,
-              subject: subject,
-              body: body,
-              via: @config.smtp_url
-            }
-          end
-        end
-      end
-    lib/auth/password.rb: |
-      GARBAGE_CFGCODE_011_PASS_A = "bcrypt"
-      GARBAGE_CFGCODE_011_ROUNDS_B = 12
+          @Test fun discountReducesPrice() {
+              assertEquals(90.0, engine.applyDiscount(100.0, 10.0))
+          }
 
-      module Auth
-        def self.hash_password(plain)
-          plain
-        end
-      end
-    lib/jobs/scheduler.rb: |
-      GARBAGE_CFGCODE_011_SCHED_C = "cron"
-      GARBAGE_CFGCODE_011_INTERVAL_D = 60
-
-      module Jobs
-        def self.run_scheduler
-        end
-      end
-    lib/utils/format.rb: |
-      GARBAGE_CFGCODE_011_FMT_E = "json"
-      GARBAGE_CFGCODE_011_INDENT_F = 2
-
-      module Utils
-        def self.format_output(data)
-          data.to_s
-        end
-      end
+          @Test fun vatIncreasesPrice() {
+              assertEquals(121.0, engine.applyVat(100.0, 21.0), 0.01)
+          }
+      }
+    garbage/AuthTokenStore.kt: |
+      // GARBAGE_BAL3CFG011_A = "auth_token_store_marker"
+    garbage/ShipmentStatus.kt: |
+      // GARBAGE_BAL3CFG011_B = "shipment_status_marker"
+    garbage/IoTDeviceManager.kt: |
+      // GARBAGE_BAL3CFG011_C = "iot_device_manager_marker"
   changed_files:
-    config/mailer.yml: |
-      mailer:
-        smtp_host: smtp.sendgrid.net
-        smtp_port: 465
-        from_address: notifications@myapp.com
-        enable_tls: true
-        api_key_env: SENDGRID_API_KEY
-  commit_message: "switch mailer to SendGrid"
+    src/main/kotlin/ecommerce/PriceEngine.kt: |
+      class PriceEngine {
+          fun applyDiscount(price: Double, discountPercent: Double): Double {
+              return price - (price * discountPercent / 100)
+          }
+
+          fun applyVat(price: Double, vatRatePercent: Double): Double {
+              return price + (price * vatRatePercent / 100)
+          }
+
+          fun finalPrice(basePrice: Double, discountPercent: Double, vatRatePercent: Double): Double {
+              val discounted = applyDiscount(basePrice, discountPercent)
+              return applyVat(discounted, vatRatePercent)
+          }
+      }
+    src/test/kotlin/ecommerce/PriceEngineTest.kt: |
+      import org.junit.Test
+      import kotlin.test.assertEquals
+
+      class PriceEngineTest {
+          private val engine = PriceEngine()
+
+          @Test fun discountReducesPrice() {
+              assertEquals(90.0, engine.applyDiscount(100.0, 10.0))
+          }
+
+          @Test fun vatIncreasesPrice() {
+              assertEquals(121.0, engine.applyVat(100.0, 21.0), 0.01)
+          }
+      }
+    garbage/AuthTokenStore.kt: |
+      // GARBAGE_BAL3CFG011_A = "auth_token_store_marker"
+    garbage/ShipmentStatus.kt: |
+      // GARBAGE_BAL3CFG011_B = "shipment_status_marker"
+    garbage/IoTDeviceManager.kt: |
+      // GARBAGE_BAL3CFG011_C = "iot_device_manager_marker"
+  commit_message: "fix: divide vatRatePercent by 100 in PriceEngine.applyVat"
 fragments:
-- id: mailer_config
+- id: apply_vat_method
   selector:
-    path: lib/mailer/config.rb
-    anchor: "class Config"
-- id: smtp_host_read
+    path: src/main/kotlin/ecommerce/PriceEngine.kt
+    anchor: "fun applyVat(price: Double"
+- id: test_file
   selector:
-    path: lib/mailer/config.rb
-    anchor: "@smtp_host = cfg['smtp_host']"
-- id: smtp_url
+    path: src/test/kotlin/ecommerce/PriceEngineTest.kt
+- id: no_garbage_a
   selector:
-    path: lib/mailer/config.rb
-    anchor: "def smtp_url"
-- id: sender_uses_config
+    anchor: GARBAGE_BAL3CFG011_A
+- id: no_garbage_b
   selector:
-    path: lib/mailer/sender.rb
-    anchor: "@config.from_address"
-- id: no_password
+    anchor: GARBAGE_BAL3CFG011_B
+- id: no_garbage_c
   selector:
-    path: lib/auth/password.rb
-    anchor: "hash_password"
-- id: no_scheduler
-  selector:
-    path: lib/jobs/scheduler.rb
-    anchor: "run_scheduler"
-- id: no_format
-  selector:
-    path: lib/utils/format.rb
-    anchor: "format_output"
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_CFGCODE_011_PASS_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_CFGCODE_011_ROUNDS_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_CFGCODE_011_SCHED_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_CFGCODE_011_INTERVAL_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_CFGCODE_011_FMT_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_CFGCODE_011_INDENT_F
+    anchor: GARBAGE_BAL3CFG011_C
 oracle:
   required:
-  - mailer_config
-  - smtp_host_read
-  - smtp_url
-  - sender_uses_config
+  - apply_vat_method
+  - test_file
   allowed: []
   forbidden:
-  - no_password
-  - no_scheduler
-  - no_format
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

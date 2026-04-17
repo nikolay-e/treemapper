@@ -1,207 +1,205 @@
 name: bal_rare_024_ocaml_result_monad
 tags:
-- lang:ocaml
-- change:multi_file
-- change:bug_fix
-- context:cross_module
-- distance:2hop
-- difficulty:hard
+- lang:ruby
+- change:signature
+- context:import_chain
+- distance:3hop+
+- difficulty:easy
 repo:
   initial_files:
-    lib/result.ml: |
-      type ('a, 'e) t =
-        | Ok of 'a
-        | Error of 'e
+    lib/ml/model.rb: |
+      module Ml
+        class Model
+          attr_reader :name, :version
 
-      let map f = function
-        | Ok v -> Ok (f v)
-        | Error e -> Error e
+          def initialize(name, version)
+            @name = name
+            @version = version
+          end
 
-      let bind f = function
-        | Ok v -> f v
-        | Error e -> Error e
+          def predict(features)
+            raise NotImplementedError
+          end
+        end
+      end
+    lib/ml/classifier.rb: |
+      require_relative 'model'
 
-      let ( >>= ) r f = bind f r
-    lib/validate.ml: |
-      open Result
+      module Ml
+        class Classifier < Model
+          def predict(features)
+            features.values.sum > 0.5 ? 'positive' : 'negative'
+          end
+        end
+      end
+    lib/inference/pipeline.rb: |
+      require_relative '../ml/classifier'
 
-      let validate_age age =
-        if age < 0 then Error "Age cannot be negative"
-        else if age > 150 then Error "Age unreasonably high"
-        else Ok age
+      module Inference
+        class Pipeline
+          def initialize(model)
+            @model = model
+          end
 
-      let validate_name name =
-        if String.length name = 0 then Error "Name cannot be empty"
-        else Ok name
-    lib/user.ml: |
-      open Result
-      open Validate
+          def run(features)
+            @model.predict(features)
+          end
+        end
+      end
+    lib/inference/batch_runner.rb: |
+      require_relative 'pipeline'
 
-      type user = { name : string; age : int }
+      module Inference
+        class BatchRunner
+          def initialize(pipeline)
+            @pipeline = pipeline
+          end
 
-      let create_user name age =
-        validate_name name >>= fun valid_name ->
-        validate_age age >>= fun valid_age ->
-        Ok { name = valid_name; age = valid_age }
-    lib/app.ml: |
-      open User
+          def run_batch(records)
+            records.map { |r| { id: r[:id], label: @pipeline.run(r[:features]) } }
+          end
+        end
+      end
+    lib/api/prediction_controller.rb: |
+      require_relative '../inference/batch_runner'
 
-      let run () =
-        match create_user "Alice" 30 with
-        | Result.Ok u -> Printf.printf "Created user: %s, age %d\n" u.name u.age
-        | Result.Error e -> Printf.printf "Error: %s\n" e
-    garbage_http.ml: |
-      let garbage_rare_024_method_a = "GET"
-      let garbage_rare_024_status_b = 200
+      module Api
+        class PredictionController
+          def initialize(runner)
+            @runner = runner
+          end
 
-      let garbage_request () =
-        garbage_rare_024_method_a
-
-      let garbage_rare_024_timeout_c = 30
-    garbage_db.ml: |
-      let garbage_rare_024_driver_d = "postgresql"
-      let garbage_rare_024_pool_e = 5
-
-      let garbage_connect () =
-        garbage_rare_024_driver_d
-
-      let garbage_rare_024_ssl_f = true
+          def predict_batch(records)
+            @runner.run_batch(records)
+          end
+        end
+      end
+    garbage/trainer.rb: |
+      # GARBAGE_OCAMLRES_A = "model_trainer_marker"
+    garbage/evaluator.rb: |
+      # GARBAGE_OCAMLRES_B = "model_evaluator_marker"
+    garbage/registry.rb: |
+      # GARBAGE_OCAMLRES_C = "model_registry_marker"
   changed_files:
-    lib/result.ml: |
-      type ('a, 'e) t =
-        | Ok of 'a
-        | Error of 'e
+    lib/ml/model.rb: |
+      module Ml
+        class Model
+          attr_reader :name, :version, :threshold
 
-      let map f = function
-        | Ok v -> Ok (f v)
-        | Error e -> Error e
+          def initialize(name, version, threshold: 0.5)
+            @name = name
+            @version = version
+            @threshold = threshold
+          end
 
-      let bind f = function
-        | Ok v -> f v
-        | Error e -> Error e
+          def predict(features, context: {})
+            raise NotImplementedError
+          end
 
-      let map_error f = function
-        | Ok v -> Ok v
-        | Error e -> Error (f e)
+          def metadata
+            { name: @name, version: @version, threshold: @threshold }
+          end
+        end
+      end
+    lib/ml/classifier.rb: |
+      require_relative 'model'
 
-      let ( >>= ) r f = bind f r
+      module Ml
+        class Classifier < Model
+          def predict(features, context: {})
+            score = features.values.sum
+            score > @threshold ? 'positive' : 'negative'
+          end
+        end
+      end
+    lib/inference/pipeline.rb: |
+      require_relative '../ml/classifier'
 
-      let ( >|= ) r f = map f r
-    lib/validate.ml: |
-      open Result
+      module Inference
+        class Pipeline
+          def initialize(model)
+            @model = model
+          end
 
-      let validate_age age =
-        if age < 0 then Error "Age cannot be negative"
-        else if age > 150 then Error "Age unreasonably high"
-        else Ok age
+          def run(features, context: {})
+            @model.predict(features, context: context)
+          end
+        end
+      end
+    lib/inference/batch_runner.rb: |
+      require_relative 'pipeline'
 
-      let validate_name name =
-        if String.length name = 0 then Error "Name cannot be empty"
-        else if String.length name > 100 then Error "Name too long"
-        else Ok (String.trim name)
+      module Inference
+        class BatchRunner
+          def initialize(pipeline)
+            @pipeline = pipeline
+          end
 
-      let validate_email email =
-        if not (String.contains email '@') then Error "Invalid email"
-        else Ok email
-    lib/user.ml: |
-      open Result
-      open Validate
+          def run_batch(records, context: {})
+            records.map { |r| { id: r[:id], label: @pipeline.run(r[:features], context: context) } }
+          end
+        end
+      end
+    lib/api/prediction_controller.rb: |
+      require_relative '../inference/batch_runner'
 
-      type user = { name : string; age : int; email : string }
+      module Api
+        class PredictionController
+          def initialize(runner)
+            @runner = runner
+          end
 
-      let create_user name age email =
-        validate_name name >>= fun valid_name ->
-        validate_age age >>= fun valid_age ->
-        validate_email email >>= fun valid_email ->
-        Ok { name = valid_name; age = valid_age; email = valid_email }
-    lib/app.ml: |
-      open User
-
-      let run () =
-        match create_user "Alice" 30 "alice@example.com" with
-        | Result.Ok u -> Printf.printf "Created user: %s, age %d, email %s\n" u.name u.age u.email
-        | Result.Error e -> Printf.printf "Error: %s\n" e
-    garbage_http.ml: |
-      let garbage_rare_024_method_a = "GET"
-      let garbage_rare_024_status_b = 200
-
-      let garbage_request () =
-        garbage_rare_024_method_a
-
-      let garbage_rare_024_timeout_c = 30
-    garbage_db.ml: |
-      let garbage_rare_024_driver_d = "postgresql"
-      let garbage_rare_024_pool_e = 5
-
-      let garbage_connect () =
-        garbage_rare_024_driver_d
-
-      let garbage_rare_024_ssl_f = true
-  commit_message: "feat: add email validation and map_error to result monad"
+          def predict_batch(records, context: {})
+            @runner.run_batch(records, context: context)
+          end
+        end
+      end
+    garbage/trainer.rb: |
+      # GARBAGE_OCAMLRES_A = "model_trainer_marker"
+    garbage/evaluator.rb: |
+      # GARBAGE_OCAMLRES_B = "model_evaluator_marker"
+    garbage/registry.rb: |
+      # GARBAGE_OCAMLRES_C = "model_registry_marker"
+  commit_message: "feat: propagate context hash through predict/run/batch chain"
 fragments:
-- id: map_error_fn
+- id: model_context_sig
   selector:
-    path: lib/result.ml
-    anchor: "let map_error f"
-- id: map_operator
+    path: lib/ml/model.rb
+    anchor: "def predict(features, context: {})"
+- id: threshold_field
   selector:
-    path: lib/result.ml
-    anchor: "let ( >|= ) r f = map f r"
-- id: validate_email
+    path: lib/ml/model.rb
+    anchor: "attr_reader :name, :version, :threshold"
+- id: classifier_uses_threshold
   selector:
-    path: lib/validate.ml
-    anchor: "let validate_email email"
-- id: user_email_field
+    path: lib/ml/classifier.rb
+    anchor: "score > @threshold"
+- id: pipeline_passes_context
   selector:
-    path: lib/user.ml
-    anchor: "email : string"
-- id: create_user_email
+    path: lib/inference/pipeline.rb
+    anchor: "@model.predict(features, context: context)"
+- id: batch_runner_passes_context
   selector:
-    path: lib/user.ml
-    anchor: "validate_email email"
-- id: app_uses_email
+    path: lib/inference/batch_runner.rb
+    anchor: "@pipeline.run(r[:features], context: context)"
+- id: no_garbage_a
   selector:
-    path: lib/app.ml
-    anchor: 'create_user "Alice" 30 "alice@example.com"'
-- id: no_garbage_http
+    anchor: GARBAGE_OCAMLRES_A
+- id: no_garbage_b
   selector:
-    path: garbage_http.ml
-- id: no_garbage_db
+    anchor: GARBAGE_OCAMLRES_B
+- id: no_garbage_c
   selector:
-    path: garbage_db.ml
-- id: no_global_0
-  selector:
-    anchor: garbage_rare_024_method_a
-- id: no_global_1
-  selector:
-    anchor: garbage_rare_024_status_b
-- id: no_global_2
-  selector:
-    anchor: garbage_rare_024_timeout_c
-- id: no_global_3
-  selector:
-    anchor: garbage_rare_024_driver_d
-- id: no_global_4
-  selector:
-    anchor: garbage_rare_024_pool_e
-- id: no_global_5
-  selector:
-    anchor: garbage_rare_024_ssl_f
+    anchor: GARBAGE_OCAMLRES_C
 oracle:
   required:
-  - map_error_fn
-  - validate_email
-  - user_email_field
-  - create_user_email
-  - app_uses_email
-  allowed:
-  - map_operator
+  - model_context_sig
+  - threshold_field
+  - classifier_uses_threshold
+  - pipeline_passes_context
+  - batch_runner_passes_context
+  allowed: []
   forbidden:
-  - no_garbage_http
-  - no_garbage_db
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

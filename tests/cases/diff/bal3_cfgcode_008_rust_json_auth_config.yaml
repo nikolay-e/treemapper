@@ -1,154 +1,212 @@
 name: bal3_cfgcode_008_rust_json_auth_config
 tags:
-- lang:rust
-- change:single_file
-- change:config
-- context:config_to_code
+- lang:csharp
+- change:bug_fix
+- context:test_file
 - distance:1hop
-- difficulty:hard
+- difficulty:easy
 repo:
   initial_files:
-    config/auth.json: |
+    src/Payments/CurrencyConverter.cs: |
+      namespace Payments;
+
+      public class CurrencyConverter
       {
-        "auth": {
-          "jwt_secret": "dev-secret-key",
-          "token_expiry_secs": 3600,
-          "refresh_enabled": false
-        }
+          private readonly Dictionary<string, decimal> _rates;
+
+          public CurrencyConverter(Dictionary<string, decimal> rates)
+          {
+              _rates = rates;
+          }
+
+          public decimal Convert(decimal amount, string fromCurrency, string toCurrency)
+          {
+              if (fromCurrency == toCurrency) return amount;
+              var inUsd = amount / _rates[fromCurrency];
+              return inUsd * _rates[toCurrency];
+          }
+
+          public bool SupportsCurrency(string currency)
+          {
+              return _rates.ContainsKey(currency);
+          }
       }
-    src/auth/config.rs: |
-      use serde::Deserialize;
-      use std::fs;
+    tests/Payments/CurrencyConverterTests.cs: |
+      using Xunit;
+      using Payments;
 
-      #[derive(Deserialize, Clone)]
-      pub struct AuthConfig {
-          pub jwt_secret: String,
-          pub token_expiry_secs: u64,
-          pub refresh_enabled: bool,
+      public class CurrencyConverterTests
+      {
+          private static readonly Dictionary<string, decimal> Rates = new()
+          {
+              ["USD"] = 1.0m,
+              ["EUR"] = 0.92m,
+              ["GBP"] = 0.79m,
+          };
+
+          private readonly CurrencyConverter _converter = new(Rates);
+
+          [Fact]
+          public void Convert_SameCurrency_ReturnsSameAmount()
+          {
+              var result = _converter.Convert(100m, "USD", "USD");
+              Assert.Equal(100m, result);
+          }
+
+          [Fact]
+          public void Convert_UsdToEur_ReturnsCorrectAmount()
+          {
+              var result = _converter.Convert(100m, "USD", "EUR");
+              Assert.Equal(92m, result);
+          }
       }
+    garbage/Fx.cs: |
+      namespace Garbage;
 
-      #[derive(Deserialize)]
-      struct AuthConfigFile {
-          auth: AuthConfig,
+      public static class FxGarbage
+      {
+          public const string GARBAGE_BAL3CFG008_A = "forex_marker";
+          public const string GARBAGE_BAL3CFG008_B = "spot_marker";
       }
+    garbage/Hedge.cs: |
+      namespace Garbage;
 
-      pub fn load_auth_config(path: &str) -> Result<AuthConfig, Box<dyn std::error::Error>> {
-          let content = fs::read_to_string(path)?;
-          let file: AuthConfigFile = serde_json::from_str(&content)?;
-          Ok(file.auth)
+      public static class HedgeGarbage
+      {
+          public const string GARBAGE_BAL3CFG008_C = "hedge_marker";
       }
-    src/auth/jwt.rs: |
-      use super::config::AuthConfig;
-      use std::time::{SystemTime, UNIX_EPOCH};
+    garbage/Risk.cs: |
+      namespace Garbage;
 
-      pub struct TokenClaims {
-          pub sub: String,
-          pub exp: u64,
+      public static class RiskGarbage
+      {
+          public const string GARBAGE_BAL3CFG008_D = "risk_marker";
+          public const string GARBAGE_BAL3CFG008_E = "var_marker";
       }
-
-      pub fn generate_token(cfg: &AuthConfig, user_id: &str) -> String {
-          let exp = SystemTime::now()
-              .duration_since(UNIX_EPOCH)
-              .unwrap()
-              .as_secs() + cfg.token_expiry_secs;
-          format!("token_{}_{}", user_id, exp)
-      }
-
-      pub fn validate_token(cfg: &AuthConfig, token: &str) -> bool {
-          !token.is_empty() && !cfg.jwt_secret.is_empty()
-      }
-    src/handlers/login.rs: |
-      GARBAGE_CFGCODE_008_LOGIN_A: &str = "login";
-      GARBAGE_CFGCODE_008_FORM_B: &str = "form";
-
-      pub fn handle_login() {}
-    src/db/users.rs: |
-      GARBAGE_CFGCODE_008_USERS_C: &str = "users";
-      GARBAGE_CFGCODE_008_TABLE_D: &str = "user_accounts";
-
-      pub fn find_user_by_email(email: &str) {}
-    src/email/verify.rs: |
-      GARBAGE_CFGCODE_008_VERIFY_E: &str = "verify";
-      GARBAGE_CFGCODE_008_LINK_F: &str = "https://example.com";
-
-      pub fn send_verification_email(to: &str) {}
   changed_files:
-    config/auth.json: |
+    src/Payments/CurrencyConverter.cs: |
+      namespace Payments;
+
+      public class CurrencyConverter
       {
-        "auth": {
-          "jwt_secret": "prod-secret-rotated-2024",
-          "token_expiry_secs": 900,
-          "refresh_enabled": true,
-          "refresh_expiry_secs": 86400
-        }
+          private readonly Dictionary<string, decimal> _rates;
+
+          public CurrencyConverter(Dictionary<string, decimal> rates)
+          {
+              _rates = rates;
+          }
+
+          public decimal Convert(decimal amount, string fromCurrency, string toCurrency)
+          {
+              if (fromCurrency == toCurrency) return amount;
+              if (!_rates.ContainsKey(fromCurrency))
+                  throw new ArgumentException($"Unsupported currency: {fromCurrency}");
+              if (!_rates.ContainsKey(toCurrency))
+                  throw new ArgumentException($"Unsupported currency: {toCurrency}");
+              var inUsd = amount / _rates[fromCurrency];
+              return Math.Round(inUsd * _rates[toCurrency], 4);
+          }
+
+          public bool SupportsCurrency(string currency)
+          {
+              return _rates.ContainsKey(currency);
+          }
       }
-  commit_message: "enable refresh tokens and reduce JWT expiry"
+    tests/Payments/CurrencyConverterTests.cs: |
+      using Xunit;
+      using Payments;
+
+      public class CurrencyConverterTests
+      {
+          private static readonly Dictionary<string, decimal> Rates = new()
+          {
+              ["USD"] = 1.0m,
+              ["EUR"] = 0.92m,
+              ["GBP"] = 0.79m,
+          };
+
+          private readonly CurrencyConverter _converter = new(Rates);
+
+          [Fact]
+          public void Convert_SameCurrency_ReturnsSameAmount()
+          {
+              var result = _converter.Convert(100m, "USD", "USD");
+              Assert.Equal(100m, result);
+          }
+
+          [Fact]
+          public void Convert_UsdToEur_ReturnsCorrectAmount()
+          {
+              var result = _converter.Convert(100m, "USD", "EUR");
+              Assert.Equal(92m, result);
+          }
+
+          [Fact]
+          public void Convert_UnsupportedCurrency_ThrowsArgumentException()
+          {
+              Assert.Throws<ArgumentException>(() => _converter.Convert(100m, "USD", "XYZ"));
+          }
+      }
+    garbage/Fx.cs: |
+      namespace Garbage;
+
+      public static class FxGarbage
+      {
+          public const string GARBAGE_BAL3CFG008_A = "forex_marker";
+          public const string GARBAGE_BAL3CFG008_B = "spot_marker";
+      }
+    garbage/Hedge.cs: |
+      namespace Garbage;
+
+      public static class HedgeGarbage
+      {
+          public const string GARBAGE_BAL3CFG008_C = "hedge_marker";
+      }
+    garbage/Risk.cs: |
+      namespace Garbage;
+
+      public static class RiskGarbage
+      {
+          public const string GARBAGE_BAL3CFG008_D = "risk_marker";
+          public const string GARBAGE_BAL3CFG008_E = "var_marker";
+      }
+  commit_message: "fix: guard against unsupported currencies and round conversion result"
 fragments:
-- id: auth_struct
+- id: converter_guard_from
   selector:
-    path: src/auth/config.rs
-    anchor: "pub struct AuthConfig"
-- id: load_auth
+    path: src/Payments/CurrencyConverter.cs
+    anchor: "Unsupported currency: {fromCurrency}"
+- id: converter_round
   selector:
-    path: src/auth/config.rs
-    anchor: "pub fn load_auth_config"
-- id: generate_token
+    path: src/Payments/CurrencyConverter.cs
+    anchor: "Math.Round(inUsd * _rates[toCurrency], 4)"
+- id: test_file
   selector:
-    path: src/auth/jwt.rs
-    anchor: "pub fn generate_token"
-- id: validate_token
+    path: tests/Payments/CurrencyConverterTests.cs
+- id: no_garbage_a
   selector:
-    path: src/auth/jwt.rs
-    anchor: "pub fn validate_token"
-- id: token_expiry_usage
+    anchor: GARBAGE_BAL3CFG008_A
+- id: no_garbage_b
   selector:
-    path: src/auth/jwt.rs
-    anchor: "cfg.token_expiry_secs"
-- id: no_login
+    anchor: GARBAGE_BAL3CFG008_B
+- id: no_garbage_c
   selector:
-    path: src/handlers/login.rs
-    anchor: "handle_login"
-- id: no_users
+    anchor: GARBAGE_BAL3CFG008_C
+- id: no_garbage_d
   selector:
-    path: src/db/users.rs
-    anchor: "find_user_by_email"
-- id: no_verify
+    anchor: GARBAGE_BAL3CFG008_D
+- id: no_garbage_e
   selector:
-    path: src/email/verify.rs
-    anchor: "send_verification_email"
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_CFGCODE_008_LOGIN_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_CFGCODE_008_FORM_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_CFGCODE_008_USERS_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_CFGCODE_008_TABLE_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_CFGCODE_008_VERIFY_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_CFGCODE_008_LINK_F
+    anchor: GARBAGE_BAL3CFG008_E
 oracle:
   required:
-  - auth_struct
-  - load_auth
-  - generate_token
-  - token_expiry_usage
-  allowed:
-  - validate_token
+  - converter_guard_from
+  - converter_round
+  - test_file
+  allowed: []
   forbidden:
-  - no_login
-  - no_users
-  - no_verify
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

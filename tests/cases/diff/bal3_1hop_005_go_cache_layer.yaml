@@ -1,235 +1,240 @@
 name: bal3_1hop_005_go_cache_layer
 tags:
 - lang:go
-- change:bug_fix
+- change:new_function
+- change:single_file
 - context:import_chain
-- distance:1hop
-- difficulty:hard
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
-    pkg/cache/store.go: |
-      package cache
+    pkg/auth/rbac.go: |
+      package auth
 
-      import "time"
+      type Role string
 
-      type Entry struct {
-          Value     string
-          ExpiresAt time.Time
+      const (
+          RoleAdmin   Role = "admin"
+          RoleViewer  Role = "viewer"
+          RoleEditor  Role = "editor"
+      )
+
+      type Permission string
+
+      const (
+          PermRead   Permission = "read"
+          PermWrite  Permission = "write"
+          PermDelete Permission = "delete"
+      )
+
+      var rolePermissions = map[Role][]Permission{
+          RoleAdmin:  {PermRead, PermWrite, PermDelete},
+          RoleEditor: {PermRead, PermWrite},
+          RoleViewer: {PermRead},
       }
 
-      type Store struct {
-          data map[string]*Entry
-      }
-
-      func NewStore() *Store {
-          return &Store{data: make(map[string]*Entry)}
-      }
-
-      func (s *Store) Get(key string) (string, bool) {
-          e, ok := s.data[key]
+      func HasPermission(role Role, perm Permission) bool {
+          perms, ok := rolePermissions[role]
           if !ok {
-              return "", false
+              return false
           }
-          return e.Value, true
+          for _, p := range perms {
+              if p == perm {
+                  return true
+              }
+          }
+          return false
+      }
+    internal/middleware/rbac_mw.go: |
+      package middleware
+
+      import "pkg/auth"
+
+      type RBACMiddleware struct{}
+
+      func NewRBACMiddleware() *RBACMiddleware {
+          return &RBACMiddleware{}
       }
 
-      func (s *Store) Set(key, value string, ttl time.Duration) {
-          s.data[key] = &Entry{Value: value, ExpiresAt: time.Now().Add(ttl)}
+      func (m *RBACMiddleware) Check(role auth.Role, perm auth.Permission) bool {
+          return auth.HasPermission(role, perm)
       }
-    internal/api/user_handler.go: |
+    internal/api/resource_handler.go: |
       package api
 
-      import "pkg/cache"
+      import (
+          "internal/middleware"
+          "pkg/auth"
+      )
 
-      type UserHandler struct {
-          cache *cache.Store
+      type ResourceHandler struct {
+          rbac *middleware.RBACMiddleware
       }
 
-      func NewUserHandler(c *cache.Store) *UserHandler {
-          return &UserHandler{cache: c}
+      func NewResourceHandler(rbac *middleware.RBACMiddleware) *ResourceHandler {
+          return &ResourceHandler{rbac: rbac}
       }
 
-      func (h *UserHandler) GetUser(id string) string {
-          val, ok := h.cache.Get("user:" + id)
-          if ok {
-              return val
-          }
-          return "fetched-" + id
+      func (h *ResourceHandler) Handle(role auth.Role, perm auth.Permission) bool {
+          return h.rbac.Check(role, perm)
       }
-    internal/api/product_handler.go: |
-      package api
+    garbage/StreamBuffer.go: |
+      package garbage
 
-      import "pkg/cache"
+      // GARBAGE_BAL31HOP005_A = "stream_buffer_marker"
 
-      type ProductHandler struct {
-          cache *cache.Store
-      }
+      type StreamBuffer struct{ Cap int }
+    garbage/EcommerceCart.go: |
+      package garbage
 
-      func NewProductHandler(c *cache.Store) *ProductHandler {
-          return &ProductHandler{cache: c}
-      }
+      // GARBAGE_BAL31HOP005_B = "ecommerce_cart_marker"
 
-      func (h *ProductHandler) GetProduct(id string) string {
-          val, ok := h.cache.Get("product:" + id)
-          if ok {
-              return val
-          }
-          return "product-" + id
-      }
-    internal/api/search_handler.go: |
-      package api
+      type EcommerceCart struct{ Items []string }
+    garbage/IoTSensorArray.go: |
+      package garbage
 
-      import "pkg/cache"
+      // GARBAGE_BAL31HOP005_C = "iot_sensor_array_marker"
 
-      type SearchHandler struct {
-          cache *cache.Store
-      }
-
-      func NewSearchHandler(c *cache.Store) *SearchHandler {
-          return &SearchHandler{cache: c}
-      }
-
-      func (h *SearchHandler) Search(q string) string {
-          val, ok := h.cache.Get("search:" + q)
-          if ok {
-              return val
-          }
-          return "results-for-" + q
-      }
-    internal/queue/publisher.go: |
-      package queue
-
-      GARBAGE_005_PUBLISHER_A = "publisher"
-
-      type Publisher struct {
-          Topic string
-      }
-
-      func (p *Publisher) Publish(msg []byte) error {
-          return nil
-      }
-    internal/audit/trail.go: |
-      package audit
-
-      GARBAGE_005_AUDIT_B = "audit"
-
-      type Trail struct {
-          Entries []string
-      }
-
-      func (t *Trail) Record(action string) {
-          t.Entries = append(t.Entries, action)
-      }
-    internal/ratelimit/limiter.go: |
-      package ratelimit
-
-      GARBAGE_005_LIMITER_C = "limiter"
-
-      type Limiter struct {
-          MaxPerSec int
-      }
-
-      func (l *Limiter) Allow() bool {
-          return true
-      }
+      type IoTSensorArray struct{ Count int }
   changed_files:
-    pkg/cache/store.go: |
-      package cache
+    pkg/auth/rbac.go: |
+      package auth
 
-      import "time"
+      type Role string
 
-      type Entry struct {
-          Value     string
-          ExpiresAt time.Time
+      const (
+          RoleAdmin     Role = "admin"
+          RoleViewer    Role = "viewer"
+          RoleEditor    Role = "editor"
+          RoleModerator Role = "moderator"
+      )
+
+      type Permission string
+
+      const (
+          PermRead   Permission = "read"
+          PermWrite  Permission = "write"
+          PermDelete Permission = "delete"
+          PermBan    Permission = "ban"
+      )
+
+      var rolePermissions = map[Role][]Permission{
+          RoleAdmin:     {PermRead, PermWrite, PermDelete, PermBan},
+          RoleEditor:    {PermRead, PermWrite},
+          RoleModerator: {PermRead, PermWrite, PermBan},
+          RoleViewer:    {PermRead},
       }
 
-      type Store struct {
-          data map[string]*Entry
-      }
-
-      func NewStore() *Store {
-          return &Store{data: make(map[string]*Entry)}
-      }
-
-      func (s *Store) Get(key string) (string, bool) {
-          e, ok := s.data[key]
+      func HasPermission(role Role, perm Permission) bool {
+          perms, ok := rolePermissions[role]
           if !ok {
-              return "", false
+              return false
           }
-          if time.Now().After(e.ExpiresAt) {
-              delete(s.data, key)
-              return "", false
+          for _, p := range perms {
+              if p == perm {
+                  return true
+              }
           }
-          return e.Value, true
+          return false
       }
 
-      func (s *Store) Set(key, value string, ttl time.Duration) {
-          s.data[key] = &Entry{Value: value, ExpiresAt: time.Now().Add(ttl)}
+      func Permissions(role Role) []Permission {
+          return rolePermissions[role]
+      }
+    internal/middleware/rbac_mw.go: |
+      package middleware
+
+      import "pkg/auth"
+
+      type RBACMiddleware struct{}
+
+      func NewRBACMiddleware() *RBACMiddleware {
+          return &RBACMiddleware{}
       }
 
-      func (s *Store) Delete(key string) {
-          delete(s.data, key)
+      func (m *RBACMiddleware) Check(role auth.Role, perm auth.Permission) bool {
+          return auth.HasPermission(role, perm)
       }
-  commit_message: "fix: expire stale cache entries on Get and add Delete method"
+
+      func (m *RBACMiddleware) ListPermissions(role auth.Role) []auth.Permission {
+          return auth.Permissions(role)
+      }
+    internal/api/resource_handler.go: |
+      package api
+
+      import (
+          "internal/middleware"
+          "pkg/auth"
+      )
+
+      type ResourceHandler struct {
+          rbac *middleware.RBACMiddleware
+      }
+
+      func NewResourceHandler(rbac *middleware.RBACMiddleware) *ResourceHandler {
+          return &ResourceHandler{rbac: rbac}
+      }
+
+      func (h *ResourceHandler) Handle(role auth.Role, perm auth.Permission) bool {
+          return h.rbac.Check(role, perm)
+      }
+    garbage/StreamBuffer.go: |
+      package garbage
+
+      // GARBAGE_BAL31HOP005_A = "stream_buffer_marker"
+
+      type StreamBuffer struct{ Cap int }
+    garbage/EcommerceCart.go: |
+      package garbage
+
+      // GARBAGE_BAL31HOP005_B = "ecommerce_cart_marker"
+
+      type EcommerceCart struct{ Items []string }
+    garbage/IoTSensorArray.go: |
+      package garbage
+
+      // GARBAGE_BAL31HOP005_C = "iot_sensor_array_marker"
+
+      type IoTSensorArray struct{ Count int }
+  commit_message: "feat: add Moderator role with ban permission, expose Permissions and ListPermissions"
 fragments:
-- id: expiry_check
+- id: moderator_role
   selector:
-    path: pkg/cache/store.go
-    anchor: "time.Now().After(e.ExpiresAt)"
-- id: delete_on_expire
+    path: pkg/auth/rbac.go
+    anchor: "RoleModerator Role"
+- id: perm_ban
   selector:
-    path: pkg/cache/store.go
-    anchor: "delete(s.data, key)"
-- id: delete_method
+    path: pkg/auth/rbac.go
+    anchor: "PermBan Permission"
+- id: permissions_fn
   selector:
-    path: pkg/cache/store.go
-    anchor: "func (s *Store) Delete"
-- id: user_handler_imports_cache
+    path: pkg/auth/rbac.go
+    anchor: "func Permissions(role Role)"
+- id: mw_list_permissions
   selector:
-    path: internal/api/user_handler.go
-    anchor: "h.cache.Get(\"user:\""
-- id: product_handler_imports_cache
+    path: internal/middleware/rbac_mw.go
+    anchor: "func (m *RBACMiddleware) ListPermissions"
+- id: no_resource_handler
   selector:
-    path: internal/api/product_handler.go
-    anchor: "h.cache.Get(\"product:\""
-- id: search_handler_imports_cache
-  selector:
-    path: internal/api/search_handler.go
-    anchor: "h.cache.Get(\"search:\""
-- id: unrelated_publisher
-  selector:
-    path: internal/queue/publisher.go
-    anchor: "type Publisher struct"
-- id: unrelated_audit
-  selector:
-    path: internal/audit/trail.go
-    anchor: "type Trail struct"
-- id: unrelated_limiter
-  selector:
-    path: internal/ratelimit/limiter.go
-    anchor: "type Limiter struct"
+    path: internal/api/resource_handler.go
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_005_PUBLISHER_A
+    anchor: GARBAGE_BAL31HOP005_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_005_AUDIT_B
+    anchor: GARBAGE_BAL31HOP005_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_005_LIMITER_C
+    anchor: GARBAGE_BAL31HOP005_C
 oracle:
   required:
-  - expiry_check
-  - delete_on_expire
-  - delete_method
-  - user_handler_imports_cache
-  allowed:
-  - product_handler_imports_cache
-  - search_handler_imports_cache
+  - moderator_role
+  - perm_ban
+  - permissions_fn
+  - mw_list_permissions
+  allowed: []
   forbidden:
-  - unrelated_publisher
-  - unrelated_audit
-  - unrelated_limiter
+  - no_resource_handler
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

@@ -1,205 +1,293 @@
 name: bal3_refactor_005_go_move_helper_to_package
 tags:
-- lang:go
+- lang:rust
+- change:bug_fix
 - change:multi_file
-- change:refactor
-- context:import_chain
+- context:test_file
 - distance:2hop
 - difficulty:hard
 repo:
   initial_files:
-    api/handlers/auth.go: |
-      package handlers
+    src/payments/processor.rs: |
+      use crate::payments::gateway::PaymentGateway;
+      use crate::payments::types::{PaymentRequest, PaymentResult};
 
-      import (
-          "crypto/sha256"
-          "encoding/hex"
-          "net/http"
-      )
-
-      func hashPassword(password string) string {
-          h := sha256.Sum256([]byte(password))
-          return hex.EncodeToString(h[:])
+      pub struct PaymentProcessor {
+          gateway: PaymentGateway,
       }
 
-      func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-          pass := r.FormValue("password")
-          hashed := hashPassword(pass)
-          w.Write([]byte(hashed))
+      impl PaymentProcessor {
+          pub fn new(gateway: PaymentGateway) -> Self {
+              Self { gateway }
+          }
+
+          pub fn process(&self, req: PaymentRequest) -> PaymentResult {
+              if req.amount <= 0.0 {
+                  return PaymentResult::failure("Invalid amount");
+              }
+              self.gateway.charge(req)
+          }
       }
-    api/handlers/settings.go: |
-      package handlers
+    src/payments/gateway.rs: |
+      use crate::payments::types::{PaymentRequest, PaymentResult};
 
-      import (
-          "crypto/sha256"
-          "encoding/hex"
-          "net/http"
-      )
-
-      func hashPwd(pwd string) string {
-          h := sha256.Sum256([]byte(pwd))
-          return hex.EncodeToString(h[:])
-      }
-
-      func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
-          newPass := r.FormValue("new_password")
-          hashed := hashPwd(newPass)
-          w.Write([]byte(hashed))
-      }
-    services/admin.go: |
-      package services
-
-      import (
-          "crypto/sha256"
-          "encoding/hex"
-      )
-
-      type AdminService struct{}
-
-      func (a *AdminService) ResetPassword(userID string, newPwd string) string {
-          h := sha256.Sum256([]byte(newPwd))
-          return hex.EncodeToString(h[:])
-      }
-    pkg/billing/invoice.go: |
-      package billing
-
-      GARBAGE_R005_BILLING_A = "invoice"
-
-      type Invoice struct {
-          Amount float64
+      pub struct PaymentGateway {
+          api_key: String,
       }
 
-      func NewInvoice(amount float64) *Invoice {
-          return &Invoice{Amount: amount}
+      impl PaymentGateway {
+          pub fn new(api_key: String) -> Self {
+              Self { api_key }
+          }
+
+          pub fn charge(&self, req: PaymentRequest) -> PaymentResult {
+              if self.api_key.is_empty() {
+                  return PaymentResult::failure("Missing API key");
+              }
+              PaymentResult::success(req.amount)
+          }
       }
-    pkg/audit/log.go: |
-      package audit
-
-      GARBAGE_R005_AUDIT_B = "log"
-
-      type AuditLog struct {
-          Action string
+    src/payments/types.rs: |
+      #[derive(Debug)]
+      pub struct PaymentRequest {
+          pub amount: f64,
+          pub currency: String,
+          pub customer_id: String,
       }
-    pkg/i18n/translate.go: |
-      package i18n
 
-      GARBAGE_R005_I18N_C = "translate"
+      #[derive(Debug)]
+      pub struct PaymentResult {
+          pub success: bool,
+          pub amount: f64,
+          pub error: Option<String>,
+      }
 
-      type Translator struct {
-          Locale string
+      impl PaymentResult {
+          pub fn success(amount: f64) -> Self {
+              Self { success: true, amount, error: None }
+          }
+
+          pub fn failure(msg: &str) -> Self {
+              Self { success: false, amount: 0.0, error: Some(msg.to_string()) }
+          }
+      }
+    tests/test_processor.rs: |
+      use crate::payments::processor::PaymentProcessor;
+      use crate::payments::gateway::PaymentGateway;
+      use crate::payments::types::PaymentRequest;
+
+      #[test]
+      fn test_process_rejects_zero_amount() {
+          let gw = PaymentGateway::new("test_key".to_string());
+          let processor = PaymentProcessor::new(gw);
+          let req = PaymentRequest { amount: 0.0, currency: "USD".to_string(), customer_id: "c1".to_string() };
+          let result = processor.process(req);
+          assert!(!result.success);
+      }
+
+      #[test]
+      fn test_process_rejects_negative_amount() {
+          let gw = PaymentGateway::new("test_key".to_string());
+          let processor = PaymentProcessor::new(gw);
+          let req = PaymentRequest { amount: -10.0, currency: "USD".to_string(), customer_id: "c1".to_string() };
+          let result = processor.process(req);
+          assert!(!result.success);
+      }
+    src/analytics/events.rs: |
+      pub const GARBAGE_BAL3R005_A: &str = "payment_attempted";
+      pub const GARBAGE_BAL3R005_B: &str = "payment_succeeded";
+
+      pub struct EventEmitter;
+      impl EventEmitter {
+          pub fn emit(&self, _event: &str) {}
+      }
+    src/config/app_config.rs: |
+      pub const GARBAGE_BAL3R005_C: &str = "payment_processor_config";
+
+      pub struct AppConfig {
+          pub timeout_ms: u64,
+      }
+    src/storage/audit_log.rs: |
+      pub const GARBAGE_BAL3R005_D: &str = "payment_audit_log";
+
+      pub struct AuditLog;
+      impl AuditLog {
+          pub fn record(&self, _entry: &str) {}
       }
   changed_files:
-    pkg/crypto/hash.go: |
-      package crypto
+    src/payments/processor.rs: |
+      use crate::payments::gateway::PaymentGateway;
+      use crate::payments::types::{PaymentRequest, PaymentResult};
 
-      import (
-          "crypto/sha256"
-          "encoding/hex"
-      )
-
-      func HashPassword(password string) string {
-          h := sha256.Sum256([]byte(password))
-          return hex.EncodeToString(h[:])
-      }
-    api/handlers/auth.go: |
-      package handlers
-
-      import (
-          "net/http"
-          "pkg/crypto"
-      )
-
-      func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-          pass := r.FormValue("password")
-          hashed := crypto.HashPassword(pass)
-          w.Write([]byte(hashed))
-      }
-    api/handlers/settings.go: |
-      package handlers
-
-      import (
-          "net/http"
-          "pkg/crypto"
-      )
-
-      func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
-          newPass := r.FormValue("new_password")
-          hashed := crypto.HashPassword(newPass)
-          w.Write([]byte(hashed))
-      }
-    services/admin.go: |
-      package services
-
-      import "pkg/crypto"
-
-      type AdminService struct{}
-
-      func (a *AdminService) ResetPassword(userID string, newPwd string) string {
-          return crypto.HashPassword(newPwd)
-      }
-    pkg/billing/invoice.go: |
-      package billing
-
-      GARBAGE_R005_BILLING_A = "invoice"
-
-      type Invoice struct {
-          Amount float64
+      pub struct PaymentProcessor {
+          gateway: PaymentGateway,
       }
 
-      func NewInvoice(amount float64) *Invoice {
-          return &Invoice{Amount: amount}
+      impl PaymentProcessor {
+          pub fn new(gateway: PaymentGateway) -> Self {
+              Self { gateway }
+          }
+
+          pub fn process(&self, req: PaymentRequest) -> PaymentResult {
+              if req.amount <= 0.0 {
+                  return PaymentResult::failure("Invalid amount");
+              }
+              if req.currency.is_empty() {
+                  return PaymentResult::failure("Currency is required");
+              }
+              if req.customer_id.is_empty() {
+                  return PaymentResult::failure("Customer ID is required");
+              }
+              self.gateway.charge(req)
+          }
       }
-    pkg/audit/log.go: |
-      package audit
+    src/payments/gateway.rs: |
+      use crate::payments::types::{PaymentRequest, PaymentResult};
 
-      GARBAGE_R005_AUDIT_B = "log"
-
-      type AuditLog struct {
-          Action string
+      pub struct PaymentGateway {
+          api_key: String,
       }
-    pkg/i18n/translate.go: |
-      package i18n
 
-      GARBAGE_R005_I18N_C = "translate"
+      impl PaymentGateway {
+          pub fn new(api_key: String) -> Self {
+              Self { api_key }
+          }
 
-      type Translator struct {
-          Locale string
+          pub fn charge(&self, req: PaymentRequest) -> PaymentResult {
+              if self.api_key.is_empty() {
+                  return PaymentResult::failure("Missing API key");
+              }
+              PaymentResult::success(req.amount)
+          }
       }
-  commit_message: "refactor: deduplicate password hashing into crypto package"
+    src/payments/types.rs: |
+      #[derive(Debug)]
+      pub struct PaymentRequest {
+          pub amount: f64,
+          pub currency: String,
+          pub customer_id: String,
+      }
+
+      #[derive(Debug)]
+      pub struct PaymentResult {
+          pub success: bool,
+          pub amount: f64,
+          pub error: Option<String>,
+      }
+
+      impl PaymentResult {
+          pub fn success(amount: f64) -> Self {
+              Self { success: true, amount, error: None }
+          }
+
+          pub fn failure(msg: &str) -> Self {
+              Self { success: false, amount: 0.0, error: Some(msg.to_string()) }
+          }
+      }
+    tests/test_processor.rs: |
+      use crate::payments::processor::PaymentProcessor;
+      use crate::payments::gateway::PaymentGateway;
+      use crate::payments::types::PaymentRequest;
+
+      #[test]
+      fn test_process_rejects_zero_amount() {
+          let gw = PaymentGateway::new("test_key".to_string());
+          let processor = PaymentProcessor::new(gw);
+          let req = PaymentRequest { amount: 0.0, currency: "USD".to_string(), customer_id: "c1".to_string() };
+          let result = processor.process(req);
+          assert!(!result.success);
+      }
+
+      #[test]
+      fn test_process_rejects_negative_amount() {
+          let gw = PaymentGateway::new("test_key".to_string());
+          let processor = PaymentProcessor::new(gw);
+          let req = PaymentRequest { amount: -10.0, currency: "USD".to_string(), customer_id: "c1".to_string() };
+          let result = processor.process(req);
+          assert!(!result.success);
+      }
+
+      #[test]
+      fn test_process_rejects_empty_currency() {
+          let gw = PaymentGateway::new("test_key".to_string());
+          let processor = PaymentProcessor::new(gw);
+          let req = PaymentRequest { amount: 100.0, currency: "".to_string(), customer_id: "c1".to_string() };
+          let result = processor.process(req);
+          assert!(!result.success);
+          assert_eq!(result.error.unwrap(), "Currency is required");
+      }
+    src/analytics/events.rs: |
+      pub const GARBAGE_BAL3R005_A: &str = "payment_attempted";
+      pub const GARBAGE_BAL3R005_B: &str = "payment_succeeded";
+
+      pub struct EventEmitter;
+      impl EventEmitter {
+          pub fn emit(&self, _event: &str) {}
+      }
+    src/config/app_config.rs: |
+      pub const GARBAGE_BAL3R005_C: &str = "payment_processor_config";
+
+      pub struct AppConfig {
+          pub timeout_ms: u64,
+      }
+    src/storage/audit_log.rs: |
+      pub const GARBAGE_BAL3R005_D: &str = "payment_audit_log";
+
+      pub struct AuditLog;
+      impl AuditLog {
+          pub fn record(&self, _entry: &str) {}
+      }
+  commit_message: "fix: validate currency and customer_id fields in payment processor"
 fragments:
-- id: hash_password_func
+- id: processor_validate_currency
   selector:
-    path: pkg/crypto/hash.go
-    anchor: "func HashPassword(password string)"
-- id: auth_uses_crypto
+    path: src/payments/processor.rs
+    anchor: "Currency is required"
+- id: processor_validate_customer
   selector:
-    path: api/handlers/auth.go
-    anchor: "crypto.HashPassword(pass)"
-- id: settings_uses_crypto
+    path: src/payments/processor.rs
+    anchor: "Customer ID is required"
+- id: test_empty_currency
   selector:
-    path: api/handlers/settings.go
-    anchor: "crypto.HashPassword(newPass)"
-- id: admin_uses_crypto
+    path: tests/test_processor.rs
+    anchor: "fn test_process_rejects_empty_currency"
+- id: payment_request_struct
   selector:
-    path: services/admin.go
-    anchor: "crypto.HashPassword(newPwd)"
-- id: no_garbage_a
+    path: src/payments/types.rs
+    anchor: "pub struct PaymentRequest"
+- id: no_events
   selector:
-    anchor: GARBAGE_R005_BILLING_A
-- id: no_garbage_b
+    path: src/analytics/events.rs
+- id: no_config
   selector:
-    anchor: GARBAGE_R005_AUDIT_B
-- id: no_garbage_c
+    path: src/config/app_config.rs
+- id: no_audit
   selector:
-    anchor: GARBAGE_R005_I18N_C
+    path: src/storage/audit_log.rs
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_BAL3R005_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_BAL3R005_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_BAL3R005_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_BAL3R005_D
 oracle:
   required:
-  - hash_password_func
-  - auth_uses_crypto
-  - settings_uses_crypto
-  - admin_uses_crypto
+  - processor_validate_currency
+  - processor_validate_customer
+  - test_empty_currency
+  - payment_request_struct
   allowed: []
   forbidden:
-  - no_garbage_a
-  - no_garbage_b
-  - no_garbage_c
+  - no_events
+  - no_config
+  - no_audit
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

@@ -1,168 +1,278 @@
 name: bal3_rare_012_elixir_plug_pipeline
 tags:
-- lang:elixir
-- change:single_file
-- change:config
-- context:config_to_code
-- distance:1hop
-- difficulty:medium
+- lang:rust
+- change:bug_fix
+- change:multi_file
+- context:test_file
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
-    lib/auth_plug.ex: |
-      defmodule AuthPlug do
-        import Plug.Conn
+    src/auth/token.rs: |
+      use std::time::{SystemTime, UNIX_EPOCH};
 
-        def init(opts), do: opts
+      pub struct Token {
+          pub user_id: u64,
+          pub expires_at: u64,
+          pub scope: String,
+      }
 
-        def call(conn, _opts) do
-          case get_req_header(conn, "authorization") do
-            ["Bearer " <> token] ->
-              assign(conn, :current_user, verify_token(token))
-            _ ->
-              conn
-              |> send_resp(401, "Unauthorized")
-              |> halt()
-          end
-        end
+      pub fn verify_token(raw: &str) -> Result<Token, String> {
+          let parts: Vec<&str> = raw.splitn(3, '.').collect();
+          if parts.len() != 3 {
+              return Err("malformed token".to_string());
+          }
+          let expires_at: u64 = parts[1].parse().map_err(|_| "invalid expiry".to_string())?;
+          let now = SystemTime::now()
+              .duration_since(UNIX_EPOCH)
+              .unwrap()
+              .as_secs();
+          if now > expires_at {
+              return Err("token expired".to_string());
+          }
+          Ok(Token {
+              user_id: parts[0].parse().unwrap_or(0),
+              expires_at,
+              scope: parts[2].to_string(),
+          })
+      }
+    src/auth/middleware.rs: |
+      use crate::auth::token::verify_token;
 
-        defp verify_token(token) do
-          %{id: "user_1", token: token}
-        end
-      end
-    lib/router.ex: |
-      defmodule Router do
-        use Plug.Router
+      pub struct AuthContext {
+          pub user_id: u64,
+          pub scope: String,
+      }
 
-        plug :match
-        plug AuthPlug
-        plug :dispatch
+      pub fn authenticate(header: Option<&str>) -> Result<AuthContext, String> {
+          let header = header.ok_or("missing authorization header")?;
+          let raw = header.strip_prefix("Bearer ").ok_or("invalid scheme")?;
+          let token = verify_token(raw)?;
+          Ok(AuthContext {
+              user_id: token.user_id,
+              scope: token.scope,
+          })
+      }
+    src/handlers/profile.rs: |
+      use crate::auth::middleware::authenticate;
 
-        get "/profile" do
-          user = conn.assigns[:current_user]
-          send_resp(conn, 200, "Hello #{user.id}")
-        end
+      pub fn handle_profile(auth_header: Option<&str>) -> Result<String, String> {
+          let ctx = authenticate(auth_header)?;
+          Ok(format!("profile for user {}", ctx.user_id))
+      }
+    tests/auth_integration.rs: |
+      use crate::auth::token::verify_token;
+      use crate::auth::middleware::authenticate;
 
-        get "/settings" do
-          user = conn.assigns[:current_user]
-          send_resp(conn, 200, "Settings for #{user.id}")
-        end
+      #[test]
+      fn test_verify_valid_token() {
+          let far_future = 9999999999u64;
+          let raw = format!("42.{}.read:profile", far_future);
+          let token = verify_token(&raw).unwrap();
+          assert_eq!(token.user_id, 42);
+          assert_eq!(token.scope, "read:profile");
+      }
 
-        match _ do
-          send_resp(conn, 404, "Not found")
-        end
-      end
-    lib/rate_limiter.ex: |
-      defmodule RateLimiter do
-        @garbage_rare_012_rate_a 100
-        @garbage_rare_012_window_b 60
+      #[test]
+      fn test_authenticate_bearer() {
+          let far_future = 9999999999u64;
+          let raw = format!("Bearer 7.{}.write:data", far_future);
+          let ctx = authenticate(Some(&raw)).unwrap();
+          assert_eq!(ctx.user_id, 7);
+      }
 
-        def check(_conn), do: :ok
-      end
-    lib/metrics_plug.ex: |
-      defmodule MetricsPlug do
-        @garbage_rare_012_metric_c "prometheus"
-        @garbage_rare_012_prefix_d "http"
-
-        def init(opts), do: opts
-        def call(conn, _opts), do: conn
-      end
-    lib/cors_plug.ex: |
-      defmodule CorsPlug do
-        @garbage_rare_012_origin_e "*"
-        @garbage_rare_012_methods_f "GET,POST"
-
-        def init(opts), do: opts
-        def call(conn, _opts), do: conn
-      end
+      #[test]
+      fn test_expired_token_rejected() {
+          let raw = "5.1000000000.read:data";
+          assert!(verify_token(raw).is_err());
+      }
+    src/cache/lru.rs: |
+      // GARBAGE_R012_A = "lru_cache_unrelated"
+      pub struct LruCache {
+          capacity: usize,
+      }
+      impl LruCache {
+          pub fn new(capacity: usize) -> Self { LruCache { capacity } }
+          pub fn get(&self, _key: &str) -> Option<String> { None }
+      }
+    src/metrics/counter.rs: |
+      // GARBAGE_R012_B = "metrics_counter_unrelated"
+      pub struct Counter {
+          value: u64,
+      }
+      impl Counter {
+          pub fn new() -> Self { Counter { value: 0 } }
+          pub fn increment(&mut self) { self.value += 1; }
+          pub fn get(&self) -> u64 { self.value }
+      }
+    src/config/loader.rs: |
+      // GARBAGE_R012_C = "config_loader_unrelated"
+      pub fn load_config(path: &str) -> std::collections::HashMap<String, String> {
+          std::collections::HashMap::new()
+      }
+    src/db/pool.rs: |
+      // GARBAGE_R012_D = "db_pool_unrelated"
+      pub struct Pool {
+          size: usize,
+      }
+      impl Pool {
+          pub fn new(size: usize) -> Self { Pool { size } }
+          pub fn acquire(&self) -> Option<()> { Some(()) }
+      }
   changed_files:
-    lib/auth_plug.ex: |
-      defmodule AuthPlug do
-        import Plug.Conn
+    src/auth/token.rs: |
+      use std::time::{SystemTime, UNIX_EPOCH};
 
-        @allowed_roles ~w(admin editor viewer)
+      pub struct Token {
+          pub user_id: u64,
+          pub expires_at: u64,
+          pub scope: String,
+      }
 
-        def init(opts), do: opts
+      pub fn verify_token(raw: &str) -> Result<Token, String> {
+          let parts: Vec<&str> = raw.splitn(3, '.').collect();
+          if parts.len() != 3 {
+              return Err("malformed token".to_string());
+          }
+          let expires_at: u64 = parts[1].parse().map_err(|_| "invalid expiry".to_string())?;
+          let now = SystemTime::now()
+              .duration_since(UNIX_EPOCH)
+              .unwrap()
+              .as_secs();
+          if now >= expires_at {
+              return Err("token expired".to_string());
+          }
+          let user_id: u64 = parts[0].parse().map_err(|_| "invalid user_id".to_string())?;
+          Ok(Token {
+              user_id,
+              expires_at,
+              scope: parts[2].to_string(),
+          })
+      }
+    src/auth/middleware.rs: |
+      use crate::auth::token::verify_token;
 
-        def call(conn, _opts) do
-          case get_req_header(conn, "authorization") do
-            ["Bearer " <> token] ->
-              case verify_token(token) do
-                {:ok, user} ->
-                  conn
-                  |> assign(:current_user, user)
-                  |> assign(:user_role, user.role)
-                {:error, reason} ->
-                  conn
-                  |> send_resp(401, "Invalid token: #{reason}")
-                  |> halt()
-              end
-            _ ->
-              conn
-              |> send_resp(401, "Unauthorized")
-              |> halt()
-          end
-        end
+      pub struct AuthContext {
+          pub user_id: u64,
+          pub scope: String,
+      }
 
-        defp verify_token(token) do
-          if String.length(token) > 0 do
-            {:ok, %{id: "user_1", token: token, role: "viewer"}}
-          else
-            {:error, "empty token"}
-          end
-        end
-      end
-  commit_message: "add role-based auth and error handling to AuthPlug"
+      pub fn authenticate(header: Option<&str>) -> Result<AuthContext, String> {
+          let header = header.ok_or("missing authorization header")?;
+          let raw = header.strip_prefix("Bearer ").ok_or("invalid scheme")?;
+          let token = verify_token(raw)?;
+          Ok(AuthContext {
+              user_id: token.user_id,
+              scope: token.scope,
+          })
+      }
+    src/handlers/profile.rs: |
+      use crate::auth::middleware::authenticate;
+
+      pub fn handle_profile(auth_header: Option<&str>) -> Result<String, String> {
+          let ctx = authenticate(auth_header)?;
+          Ok(format!("profile for user {}", ctx.user_id))
+      }
+    tests/auth_integration.rs: |
+      use crate::auth::token::verify_token;
+      use crate::auth::middleware::authenticate;
+
+      #[test]
+      fn test_verify_valid_token() {
+          let far_future = 9999999999u64;
+          let raw = format!("42.{}.read:profile", far_future);
+          let token = verify_token(&raw).unwrap();
+          assert_eq!(token.user_id, 42);
+          assert_eq!(token.scope, "read:profile");
+      }
+
+      #[test]
+      fn test_authenticate_bearer() {
+          let far_future = 9999999999u64;
+          let raw = format!("Bearer 7.{}.write:data", far_future);
+          let ctx = authenticate(Some(&raw)).unwrap();
+          assert_eq!(ctx.user_id, 7);
+      }
+
+      #[test]
+      fn test_expired_token_rejected() {
+          let raw = "5.1000000000.read:data";
+          assert!(verify_token(raw).is_err());
+      }
+
+      #[test]
+      fn test_invalid_user_id_rejected() {
+          let far_future = 9999999999u64;
+          let raw = format!("notanumber.{}.read:data", far_future);
+          assert!(verify_token(&raw).is_err());
+      }
+    src/cache/lru.rs: |
+      // GARBAGE_R012_A = "lru_cache_unrelated"
+      pub struct LruCache {
+          capacity: usize,
+      }
+      impl LruCache {
+          pub fn new(capacity: usize) -> Self { LruCache { capacity } }
+          pub fn get(&self, _key: &str) -> Option<String> { None }
+      }
+    src/metrics/counter.rs: |
+      // GARBAGE_R012_B = "metrics_counter_unrelated"
+      pub struct Counter {
+          value: u64,
+      }
+      impl Counter {
+          pub fn new() -> Self { Counter { value: 0 } }
+          pub fn increment(&mut self) { self.value += 1; }
+          pub fn get(&self) -> u64 { self.value }
+      }
+    src/config/loader.rs: |
+      // GARBAGE_R012_C = "config_loader_unrelated"
+      pub fn load_config(path: &str) -> std::collections::HashMap<String, String> {
+          std::collections::HashMap::new()
+      }
+    src/db/pool.rs: |
+      // GARBAGE_R012_D = "db_pool_unrelated"
+      pub struct Pool {
+          size: usize,
+      }
+      impl Pool {
+          pub fn new(size: usize) -> Self { Pool { size } }
+          pub fn acquire(&self) -> Option<()> { Some(()) }
+      }
+  commit_message: "fix: use >= for expiry check and validate user_id parse in verify_token"
 fragments:
-- id: router_uses_authplug
+- id: verify_token_fn
   selector:
-    path: lib/router.ex
-    anchor: "plug AuthPlug"
-- id: router_reads_current_user
+    path: src/auth/token.rs
+    anchor: "pub fn verify_token"
+- id: test_expired_token
   selector:
-    path: lib/router.ex
-    anchor: "conn.assigns[:current_user]"
-- id: no_rate_limiter
+    path: tests/auth_integration.rs
+    anchor: "test_expired_token_rejected"
+- id: test_valid_token
   selector:
-    path: lib/rate_limiter.ex
-    anchor: "def check"
-- id: no_metrics
+    path: tests/auth_integration.rs
+    anchor: "test_verify_valid_token"
+- id: no_garbage_a
   selector:
-    path: lib/metrics_plug.ex
-    anchor: "def call(conn, _opts), do: conn"
-- id: no_cors
+    anchor: GARBAGE_R012_A
+- id: no_garbage_b
   selector:
-    path: lib/cors_plug.ex
-    anchor: "def call(conn, _opts), do: conn"
-- id: no_global_0
+    anchor: GARBAGE_R012_B
+- id: no_garbage_c
   selector:
-    anchor: garbage_rare_012_rate_a
-- id: no_global_1
+    anchor: GARBAGE_R012_C
+- id: no_garbage_d
   selector:
-    anchor: garbage_rare_012_window_b
-- id: no_global_2
-  selector:
-    anchor: garbage_rare_012_metric_c
-- id: no_global_3
-  selector:
-    anchor: garbage_rare_012_prefix_d
-- id: no_global_4
-  selector:
-    anchor: garbage_rare_012_origin_e
-- id: no_global_5
-  selector:
-    anchor: garbage_rare_012_methods_f
+    anchor: GARBAGE_R012_D
 oracle:
   required:
-  - router_uses_authplug
-  - router_reads_current_user
+  - verify_token_fn
+  - test_expired_token
+  - test_valid_token
   allowed: []
   forbidden:
-  - no_rate_limiter
-  - no_metrics
-  - no_cors
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

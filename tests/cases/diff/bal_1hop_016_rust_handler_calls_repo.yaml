@@ -1,117 +1,181 @@
 name: bal_1hop_016_rust_handler_calls_repo
 tags:
-- lang:rust
+- lang:java
 - change:signature
+- change:single_file
 - context:import_chain
 - distance:1hop
-- difficulty:easy
+- difficulty:hard
 repo:
   initial_files:
-    src/repo/user.rs: |
-      pub struct User {
-          pub id: u64,
-          pub name: String,
-          pub email: String,
-      }
+    src/main/java/com/gaming/leaderboard/ScoreRepository.java: |
+      package com.gaming.leaderboard;
 
-      pub struct UserRepo {
-          users: Vec<User>,
-      }
+      import java.util.List;
+      import java.util.Optional;
 
-      impl UserRepo {
-          pub fn new() -> Self {
-              UserRepo { users: Vec::new() }
+      public interface ScoreRepository {
+          void submit(String playerId, long score, String gameMode);
+          Optional<Long> getTopScore(String playerId);
+          List<ScoreEntry> getLeaderboard(String gameMode, int limit);
+      }
+    src/main/java/com/gaming/leaderboard/LeaderboardService.java: |
+      package com.gaming.leaderboard;
+
+      import java.util.List;
+      import java.util.Optional;
+
+      public class LeaderboardService {
+          private final ScoreRepository repository;
+
+          public LeaderboardService(ScoreRepository repository) {
+              this.repository = repository;
           }
 
-          pub fn find_by_id(&self, id: u64) -> Option<&User> {
-              self.users.iter().find(|u| u.id == id)
+          public void recordScore(String playerId, long score, String gameMode) {
+              repository.submit(playerId, score, gameMode);
           }
 
-          pub fn insert(&mut self, user: User) {
-              self.users.push(user);
-          }
-      }
-    src/handler/user.rs: |
-      use crate::repo::user::{UserRepo, User};
-
-      pub struct UserHandler {
-          repo: UserRepo,
-      }
-
-      impl UserHandler {
-          pub fn new(repo: UserRepo) -> Self {
-              UserHandler { repo }
+          public Optional<Long> getPersonalBest(String playerId) {
+              return repository.getTopScore(playerId);
           }
 
-          pub fn get_user(&self, id: u64) -> String {
-              match self.repo.find_by_id(id) {
-                  Some(user) => format!("User: {}", user.name),
-                  None => "Not found".to_string(),
-              }
+          public List<ScoreEntry> fetchLeaderboard(String gameMode, int limit) {
+              return repository.getLeaderboard(gameMode, limit);
           }
       }
-    src/utils/hash.rs: |
-      use std::collections::hash_map::DefaultHasher;
-      use std::hash::{Hash, Hasher};
+    src/main/java/com/gaming/leaderboard/ScoreEntry.java: |
+      package com.gaming.leaderboard;
 
-      pub fn hash_string(s: &str) -> u64 {
-          let mut hasher = DefaultHasher::new();
-          s.hash(&mut hasher);
-          hasher.finish()
+      public class ScoreEntry {
+          private final String playerId;
+          private final long score;
+          private final String gameMode;
+
+          public ScoreEntry(String playerId, long score, String gameMode) {
+              this.playerId = playerId;
+              this.score = score;
+              this.gameMode = gameMode;
+          }
+
+          public String getPlayerId() { return playerId; }
+          public long getScore() { return score; }
+          public String getGameMode() { return gameMode; }
       }
+    garbage/AchievementUnlocker.java: |
+      // GARBAGE_HANREPO_A = "achievement_unlocker_marker"
+    garbage/ReplayStorage.java: |
+      // GARBAGE_HANREPO_B = "replay_storage_marker"
+    garbage/AntiCheatService.java: |
+      // GARBAGE_HANREPO_C = "anti_cheat_marker"
   changed_files:
-    src/repo/user.rs: |
-      pub struct User {
-          pub id: u64,
-          pub name: String,
-          pub email: String,
-          pub active: bool,
+    src/main/java/com/gaming/leaderboard/ScoreRepository.java: |
+      package com.gaming.leaderboard;
+
+      import java.util.List;
+      import java.util.Optional;
+
+      public interface ScoreRepository {
+          void submit(String playerId, long score, String gameMode);
+          Optional<Long> getTopScore(String playerId, String gameMode);
+          List<ScoreEntry> getLeaderboard(String gameMode, int limit);
+          List<ScoreEntry> getLeaderboard(String gameMode, int limit, int offset);
+          void deleteScores(String playerId);
       }
+    src/main/java/com/gaming/leaderboard/LeaderboardService.java: |
+      package com.gaming.leaderboard;
 
-      pub struct UserRepo {
-          users: Vec<User>,
+      import java.util.List;
+      import java.util.Optional;
+
+      public class LeaderboardService {
+          private final ScoreRepository repository;
+
+          public LeaderboardService(ScoreRepository repository) {
+              this.repository = repository;
+          }
+
+          public void recordScore(String playerId, long score, String gameMode) {
+              repository.submit(playerId, score, gameMode);
+          }
+
+          public Optional<Long> getPersonalBest(String playerId, String gameMode) {
+              return repository.getTopScore(playerId, gameMode);
+          }
+
+          public List<ScoreEntry> fetchLeaderboard(String gameMode, int limit) {
+              return repository.getLeaderboard(gameMode, limit);
+          }
+
+          public List<ScoreEntry> fetchLeaderboardPaged(String gameMode, int limit, int offset) {
+              return repository.getLeaderboard(gameMode, limit, offset);
+          }
+
+          public void erasePlayerScores(String playerId) {
+              repository.deleteScores(playerId);
+          }
       }
+    src/main/java/com/gaming/leaderboard/ScoreEntry.java: |
+      package com.gaming.leaderboard;
 
-      impl UserRepo {
-          pub fn new() -> Self {
-              UserRepo { users: Vec::new() }
+      public class ScoreEntry {
+          private final String playerId;
+          private final long score;
+          private final String gameMode;
+
+          public ScoreEntry(String playerId, long score, String gameMode) {
+              this.playerId = playerId;
+              this.score = score;
+              this.gameMode = gameMode;
           }
 
-          pub fn find_by_id(&self, id: u64) -> Option<&User> {
-              self.users.iter().find(|u| u.id == id && u.active)
-          }
-
-          pub fn find_active(&self) -> Vec<&User> {
-              self.users.iter().filter(|u| u.active).collect()
-          }
-
-          pub fn insert(&mut self, user: User) {
-              self.users.push(user);
-          }
+          public String getPlayerId() { return playerId; }
+          public long getScore() { return score; }
+          public String getGameMode() { return gameMode; }
       }
-  commit_message: "feat: add active flag and find_active to UserRepo"
+    garbage/AchievementUnlocker.java: |
+      // GARBAGE_HANREPO_A = "achievement_unlocker_marker"
+    garbage/ReplayStorage.java: |
+      // GARBAGE_HANREPO_B = "replay_storage_marker"
+    garbage/AntiCheatService.java: |
+      // GARBAGE_HANREPO_C = "anti_cheat_marker"
+  commit_message: "feat: add gameMode to getTopScore, paged leaderboard, and deleteScores"
 fragments:
-- id: user_active_field
+- id: top_score_game_mode_sig
   selector:
-    path: src/repo/user.rs
-    anchor: "pub active: bool"
-- id: find_active_method
+    anchor: "Optional<Long> getTopScore(String playerId, String gameMode)"
+- id: delete_scores_sig
   selector:
-    path: src/repo/user.rs
-    anchor: "pub fn find_active"
-- id: handler_calls_find
+    anchor: "void deleteScores(String playerId)"
+- id: paged_leaderboard_sig
   selector:
-    path: src/handler/user.rs
-    anchor: "self.repo.find_by_id(id)"
-- id: unrelated_hash
+    anchor: "List<ScoreEntry> getLeaderboard(String gameMode, int limit, int offset)"
+- id: service_personal_best_updated
   selector:
-    path: src/utils/hash.rs
-    anchor: "pub fn hash_string"
+    path: src/main/java/com/gaming/leaderboard/LeaderboardService.java
+    anchor: "getPersonalBest(String playerId, String gameMode)"
+- id: service_erase_scores
+  selector:
+    path: src/main/java/com/gaming/leaderboard/LeaderboardService.java
+    anchor: "erasePlayerScores"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_HANREPO_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_HANREPO_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_HANREPO_C
 oracle:
   required:
-  - user_active_field
-  - handler_calls_find
-  allowed:
-  - find_active_method
+  - top_score_game_mode_sig
+  - delete_scores_sig
+  - paged_leaderboard_sig
+  - service_personal_best_updated
+  - service_erase_scores
+  allowed: []
   forbidden:
-  - unrelated_hash
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

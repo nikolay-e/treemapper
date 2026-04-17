@@ -1,174 +1,219 @@
 name: bal3_refactor_007_rust_extract_trait
 tags:
-- lang:rust
+- lang:typescript
 - change:multi_file
-- change:refactor
+- change:signature
 - context:import_chain
 - distance:1hop
-- difficulty:easy
+- difficulty:hard
 repo:
   initial_files:
-    src/storage/memory.rs: |
-      use std::collections::HashMap;
+    src/reports/generator.ts: |
+      import { DataSource } from './data_source';
+      import { ReportFormat } from './format';
 
-      pub struct MemoryStore {
-          data: HashMap<String, Vec<u8>>,
-      }
+      export class ReportGenerator {
+          constructor(private source: DataSource) {}
 
-      impl MemoryStore {
-          pub fn new() -> Self {
-              Self { data: HashMap::new() }
-          }
-
-          pub fn get(&self, key: &str) -> Option<&Vec<u8>> {
-              self.data.get(key)
-          }
-
-          pub fn set(&mut self, key: String, value: Vec<u8>) {
-              self.data.insert(key, value);
-          }
-
-          pub fn remove(&mut self, key: &str) {
-              self.data.remove(key);
+          async generate(reportType: string, format: ReportFormat): Promise<Buffer> {
+              const data = await this.source.fetch(reportType);
+              return format.render(data);
           }
       }
-    src/services/cache.rs: |
-      use crate::storage::memory::MemoryStore;
-
-      pub struct CacheService {
-          store: MemoryStore,
+    src/reports/data_source.ts: |
+      export interface DataSource {
+          fetch(reportType: string): Promise<Record<string, unknown>[]>;
       }
 
-      impl CacheService {
-          pub fn new(store: MemoryStore) -> Self {
-              Self { store }
-          }
+      export class DatabaseDataSource implements DataSource {
+          constructor(private connectionString: string) {}
 
-          pub fn cached_get(&self, key: &str) -> Option<&Vec<u8>> {
-              self.store.get(key)
+          async fetch(reportType: string): Promise<Record<string, unknown>[]> {
+              console.log(`Fetching ${reportType} from DB`);
+              return [];
           }
       }
-    src/utils/format.rs: |
-      pub const GARBAGE_R007_FORMAT_A: &str = "formatter";
-
-      pub fn format_bytes(data: &[u8]) -> String {
-          format!("{:?}", data)
+    src/reports/format.ts: |
+      export interface ReportFormat {
+          render(data: Record<string, unknown>[]): Buffer;
       }
-    src/utils/time.rs: |
-      pub const GARBAGE_R007_TIME_B: &str = "timer";
 
-      pub fn now_millis() -> u64 {
-          0
+      export class CsvFormat implements ReportFormat {
+          render(data: Record<string, unknown>[]): Buffer {
+              const csv = data.map(row => Object.values(row).join(',')).join('\n');
+              return Buffer.from(csv);
+          }
       }
-    src/utils/rand.rs: |
-      pub const GARBAGE_R007_RAND_C: &str = "random";
 
-      pub fn random_id() -> u64 {
-          42
+      export class JsonFormat implements ReportFormat {
+          render(data: Record<string, unknown>[]): Buffer {
+              return Buffer.from(JSON.stringify(data, null, 2));
+          }
+      }
+    src/api/report_endpoint.ts: |
+      import { ReportGenerator } from '../reports/generator';
+      import { CsvFormat } from '../reports/format';
+
+      export class ReportEndpoint {
+          constructor(private generator: ReportGenerator) {}
+
+          async handleRequest(reportType: string): Promise<{ contentType: string; body: Buffer }> {
+              const format = new CsvFormat();
+              const body = await this.generator.generate(reportType, format);
+              return { contentType: 'text/csv', body };
+          }
+      }
+    src/auth/permissions.ts: |
+      export const GARBAGE_BAL3R007_A = 'report_read_permission';
+
+      export function hasPermission(userId: string, perm: string): boolean { return true; }
+    src/email/attachment.ts: |
+      export const GARBAGE_BAL3R007_B = 'email_attachment_max_size';
+      export const GARBAGE_BAL3R007_C = 10485760;
+
+      export function createAttachment(name: string, data: Buffer) {
+          return { name, data, size: data.length };
+      }
+    src/storage/s3.ts: |
+      export const GARBAGE_BAL3R007_D = 's3_bucket_reports';
+
+      export class S3Client {
+          async upload(key: string, data: Buffer): Promise<string> { return `s3://${key}`; }
       }
   changed_files:
-    src/storage/traits.rs: |
-      pub trait KeyValueStore {
-          fn get(&self, key: &str) -> Option<&Vec<u8>>;
-          fn set(&mut self, key: String, value: Vec<u8>);
-          fn remove(&mut self, key: &str);
-      }
-    src/storage/memory.rs: |
-      use std::collections::HashMap;
-      use super::traits::KeyValueStore;
+    src/reports/generator.ts: |
+      import { DataSource } from './data_source';
+      import { ReportFormat, RenderOptions } from './format';
 
-      pub struct MemoryStore {
-          data: HashMap<String, Vec<u8>>,
+      export class ReportGenerator {
+          constructor(private source: DataSource) {}
+
+          async generate(reportType: string, format: ReportFormat, options?: RenderOptions): Promise<Buffer> {
+              const data = await this.source.fetch(reportType);
+              return format.render(data, options);
+          }
+      }
+    src/reports/data_source.ts: |
+      export interface DataSource {
+          fetch(reportType: string): Promise<Record<string, unknown>[]>;
       }
 
-      impl MemoryStore {
-          pub fn new() -> Self {
-              Self { data: HashMap::new() }
+      export class DatabaseDataSource implements DataSource {
+          constructor(private connectionString: string) {}
+
+          async fetch(reportType: string): Promise<Record<string, unknown>[]> {
+              console.log(`Fetching ${reportType} from DB`);
+              return [];
+          }
+      }
+    src/reports/format.ts: |
+      export interface RenderOptions {
+          includeHeaders?: boolean;
+          maxRows?: number;
+      }
+
+      export interface ReportFormat {
+          render(data: Record<string, unknown>[], options?: RenderOptions): Buffer;
+      }
+
+      export class CsvFormat implements ReportFormat {
+          render(data: Record<string, unknown>[], options?: RenderOptions): Buffer {
+              const rows = options?.maxRows ? data.slice(0, options.maxRows) : data;
+              const header = options?.includeHeaders !== false
+                  ? Object.keys(rows[0] ?? {}).join(',') + '\n'
+                  : '';
+              const csv = header + rows.map(row => Object.values(row).join(',')).join('\n');
+              return Buffer.from(csv);
           }
       }
 
-      impl KeyValueStore for MemoryStore {
-          fn get(&self, key: &str) -> Option<&Vec<u8>> {
-              self.data.get(key)
-          }
-
-          fn set(&mut self, key: String, value: Vec<u8>) {
-              self.data.insert(key, value);
-          }
-
-          fn remove(&mut self, key: &str) {
-              self.data.remove(key);
+      export class JsonFormat implements ReportFormat {
+          render(data: Record<string, unknown>[], options?: RenderOptions): Buffer {
+              const rows = options?.maxRows ? data.slice(0, options.maxRows) : data;
+              return Buffer.from(JSON.stringify(rows, null, 2));
           }
       }
-    src/services/cache.rs: |
-      use crate::storage::traits::KeyValueStore;
+    src/api/report_endpoint.ts: |
+      import { ReportGenerator } from '../reports/generator';
+      import { CsvFormat, RenderOptions } from '../reports/format';
 
-      pub struct CacheService<S: KeyValueStore> {
-          store: S,
-      }
+      export class ReportEndpoint {
+          constructor(private generator: ReportGenerator) {}
 
-      impl<S: KeyValueStore> CacheService<S> {
-          pub fn new(store: S) -> Self {
-              Self { store }
-          }
-
-          pub fn cached_get(&self, key: &str) -> Option<&Vec<u8>> {
-              self.store.get(key)
+          async handleRequest(reportType: string, options?: RenderOptions): Promise<{ contentType: string; body: Buffer }> {
+              const format = new CsvFormat();
+              const body = await this.generator.generate(reportType, format, options);
+              return { contentType: 'text/csv', body };
           }
       }
-    src/utils/format.rs: |
-      pub const GARBAGE_R007_FORMAT_A: &str = "formatter";
+    src/auth/permissions.ts: |
+      export const GARBAGE_BAL3R007_A = 'report_read_permission';
 
-      pub fn format_bytes(data: &[u8]) -> String {
-          format!("{:?}", data)
-      }
-    src/utils/time.rs: |
-      pub const GARBAGE_R007_TIME_B: &str = "timer";
+      export function hasPermission(userId: string, perm: string): boolean { return true; }
+    src/email/attachment.ts: |
+      export const GARBAGE_BAL3R007_B = 'email_attachment_max_size';
+      export const GARBAGE_BAL3R007_C = 10485760;
 
-      pub fn now_millis() -> u64 {
-          0
+      export function createAttachment(name: string, data: Buffer) {
+          return { name, data, size: data.length };
       }
-    src/utils/rand.rs: |
-      pub const GARBAGE_R007_RAND_C: &str = "random";
+    src/storage/s3.ts: |
+      export const GARBAGE_BAL3R007_D = 's3_bucket_reports';
 
-      pub fn random_id() -> u64 {
-          42
+      export class S3Client {
+          async upload(key: string, data: Buffer): Promise<string> { return `s3://${key}`; }
       }
-  commit_message: "refactor: extract KeyValueStore trait from MemoryStore"
+  commit_message: "feat: add RenderOptions to ReportFormat.render and ReportGenerator.generate"
 fragments:
-- id: kv_trait
+- id: render_options_interface
   selector:
-    path: src/storage/traits.rs
-    anchor: "pub trait KeyValueStore"
-- id: memory_implements_trait
+    path: src/reports/format.ts
+    anchor: "export interface RenderOptions"
+- id: report_format_render_signature
   selector:
-    path: src/storage/memory.rs
-    anchor: "impl KeyValueStore for MemoryStore"
-- id: cache_uses_generic
+    path: src/reports/format.ts
+    anchor: "render(data: Record<string, unknown>[], options?: RenderOptions): Buffer"
+- id: generator_generate_options
   selector:
-    path: src/services/cache.rs
-    anchor: "pub struct CacheService<S: KeyValueStore>"
-- id: cache_import_trait
+    path: src/reports/generator.ts
+    anchor: "async generate(reportType: string, format: ReportFormat, options?: RenderOptions)"
+- id: endpoint_handle_options
   selector:
-    path: src/services/cache.rs
-    anchor: "use crate::storage::traits::KeyValueStore"
-- id: no_garbage_a
+    path: src/api/report_endpoint.ts
+    anchor: "async handleRequest(reportType: string, options?: RenderOptions)"
+- id: no_permissions
   selector:
-    anchor: GARBAGE_R007_FORMAT_A
-- id: no_garbage_b
+    path: src/auth/permissions.ts
+- id: no_attachment
   selector:
-    anchor: GARBAGE_R007_TIME_B
-- id: no_garbage_c
+    path: src/email/attachment.ts
+- id: no_s3
   selector:
-    anchor: GARBAGE_R007_RAND_C
+    path: src/storage/s3.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_BAL3R007_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_BAL3R007_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_BAL3R007_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_BAL3R007_D
 oracle:
   required:
-  - kv_trait
-  - memory_implements_trait
-  - cache_uses_generic
-  - cache_import_trait
+  - render_options_interface
+  - report_format_render_signature
+  - generator_generate_options
+  - endpoint_handle_options
   allowed: []
   forbidden:
-  - no_garbage_a
-  - no_garbage_b
-  - no_garbage_c
+  - no_permissions
+  - no_attachment
+  - no_s3
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

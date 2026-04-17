@@ -1,191 +1,170 @@
 name: bal_refactor_012_typescript_callbacks_to_async
 tags:
-- lang:typescript
-- change:multi_file
-- change:refactor
-- context:import_chain
-- distance:1hop
-- difficulty:medium
+- lang:ruby
+- change:bug_fix
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
-    src/fileReader.ts: |
-      import fs from 'fs';
+    app/services/subscription_service.rb: |
+      class SubscriptionService
+        PLANS = {
+          "basic"    => { price: 9.99,  features: %w[read] },
+          "pro"      => { price: 29.99, features: %w[read write export] },
+          "enterprise" => { price: 99.99, features: %w[read write export admin api] },
+        }.freeze
 
-      export function readConfig(path: string, callback: (err: Error | null, data?: string) => void) {
-          fs.readFile(path, 'utf-8', (err, content) => {
-              if (err) {
-                  callback(err);
-                  return;
-              }
-              callback(null, content);
-          });
-      }
+        attr_reader :subscription
 
-      export function parseConfig(raw: string, callback: (err: Error | null, config?: Record<string, string>) => void) {
-          try {
-              const parsed = JSON.parse(raw);
-              callback(null, parsed);
-          } catch (e) {
-              callback(e as Error);
-          }
-      }
-    src/app.ts: |
-      import { readConfig, parseConfig } from './fileReader';
+        def initialize(subscription)
+          @subscription = subscription
+        end
 
-      export function loadApp(configPath: string, callback: (err: Error | null, config?: Record<string, string>) => void) {
-          readConfig(configPath, (err, raw) => {
-              if (err) {
-                  callback(err);
-                  return;
-              }
-              parseConfig(raw!, (err2, config) => {
-                  if (err2) {
-                      callback(err2);
-                      return;
-                  }
-                  callback(null, config);
-              });
-          });
-      }
-    src/server.ts: |
-      import { loadApp } from './app';
+        def upgrade_to(new_plan)
+          unless PLANS.key?(new_plan)
+            raise ArgumentError, "unknown plan: #{new_plan}"
+          end
+          @subscription.plan = new_plan
+          @subscription.save
+        end
 
-      export function startServer() {
-          loadApp('./config.json', (err, config) => {
-              if (err) {
-                  console.error('Failed to load config:', err);
-                  process.exit(1);
-              }
-              console.log('Server started with config:', config);
-          });
-      }
-    src/utils/paths.ts: |
-      const GARBAGE_REFACTOR_012_PATHS_A = 'paths';
-      const GARBAGE_REFACTOR_012_BASE_B = '/tmp';
+        def has_feature?(feature)
+          plan_config = PLANS[@subscription.plan]
+          plan_config && plan_config[:features].include?(feature)
+        end
 
-      export function resolvePath(p: string): string {
-          return p.startsWith('/') ? p : `/app/${p}`;
-      }
-    garbage_validator.ts: |
-      const GARBAGE_REFACTOR_012_VALID_C = 'validator';
-      const GARBAGE_REFACTOR_012_STRICT_D = true;
+        def monthly_price
+          PLANS.dig(@subscription.plan, :price) || 0.0
+        end
 
-      export class Validator {
-          static GARBAGE_REFACTOR_012_CLASS_E = true;
-
-          validate(input: string): boolean {
-              return input.length > 0;
-          }
-      }
+        def active?
+          @subscription.status == "active"
+        end
+      end
+    garbage/workers/renewal.rb: |
+      # GARBAGE_RF12_A = "renewal_worker_unrelated"
+      class RenewalWorker
+        def perform(subscription_id)
+          nil
+        end
+      end
+    garbage/workers/invoice.rb: |
+      # GARBAGE_RF12_B = "invoice_worker_unrelated"
+      class InvoiceWorker
+        def perform(subscription_id)
+          nil
+        end
+      end
+    garbage/workers/notification.rb: |
+      # GARBAGE_RF12_C = "notification_worker_unrelated"
+      class NotificationWorker
+        def perform(user_id, template)
+          nil
+        end
+      end
   changed_files:
-    src/fileReader.ts: |
-      import fs from 'fs/promises';
+    app/services/subscription_service.rb: |
+      class SubscriptionService
+        PLANS = {
+          "basic"    => { price: 9.99,  features: %w[read] },
+          "pro"      => { price: 29.99, features: %w[read write export] },
+          "enterprise" => { price: 99.99, features: %w[read write export admin api] },
+        }.freeze
 
-      export async function readConfig(path: string): Promise<string> {
-          return fs.readFile(path, 'utf-8');
-      }
+        attr_reader :subscription
 
-      export async function parseConfig(raw: string): Promise<Record<string, string>> {
-          return JSON.parse(raw);
-      }
-    src/app.ts: |
-      import { readConfig, parseConfig } from './fileReader';
+        def initialize(subscription)
+          @subscription = subscription
+        end
 
-      export async function loadApp(configPath: string): Promise<Record<string, string>> {
-          const raw = await readConfig(configPath);
-          return parseConfig(raw);
-      }
-    src/server.ts: |
-      import { loadApp } from './app';
+        def upgrade_to(new_plan)
+          unless PLANS.key?(new_plan)
+            raise ArgumentError, "unknown plan: #{new_plan}"
+          end
+          current_price = monthly_price
+          new_price = PLANS.dig(new_plan, :price)
+          if new_price < current_price
+            raise ArgumentError, "cannot downgrade via upgrade_to; use downgrade_to instead"
+          end
+          @subscription.plan = new_plan
+          @subscription.save
+        end
 
-      export async function startServer() {
-          try {
-              const config = await loadApp('./config.json');
-              console.log('Server started with config:', config);
-          } catch (err) {
-              console.error('Failed to load config:', err);
-              process.exit(1);
-          }
-      }
-    src/utils/paths.ts: |
-      const GARBAGE_REFACTOR_012_PATHS_A = 'paths';
-      const GARBAGE_REFACTOR_012_BASE_B = '/tmp';
+        def downgrade_to(new_plan)
+          unless PLANS.key?(new_plan)
+            raise ArgumentError, "unknown plan: #{new_plan}"
+          end
+          @subscription.plan = new_plan
+          @subscription.save
+        end
 
-      export function resolvePath(p: string): string {
-          return p.startsWith('/') ? p : `/app/${p}`;
-      }
-    garbage_validator.ts: |
-      const GARBAGE_REFACTOR_012_VALID_C = 'validator';
-      const GARBAGE_REFACTOR_012_STRICT_D = true;
+        def has_feature?(feature)
+          return false unless active?
+          plan_config = PLANS[@subscription.plan]
+          plan_config && plan_config[:features].include?(feature)
+        end
 
-      export class Validator {
-          static GARBAGE_REFACTOR_012_CLASS_E = true;
+        def monthly_price
+          PLANS.dig(@subscription.plan, :price) || 0.0
+        end
 
-          validate(input: string): boolean {
-              return input.length > 0;
-          }
-      }
-  commit_message: "refactor: convert callback-based file reading to async/await"
+        def active?
+          @subscription.status == "active"
+        end
+      end
+    garbage/workers/renewal.rb: |
+      # GARBAGE_RF12_A = "renewal_worker_unrelated"
+      class RenewalWorker
+        def perform(subscription_id)
+          nil
+        end
+      end
+    garbage/workers/invoice.rb: |
+      # GARBAGE_RF12_B = "invoice_worker_unrelated"
+      class InvoiceWorker
+        def perform(subscription_id)
+          nil
+        end
+      end
+    garbage/workers/notification.rb: |
+      # GARBAGE_RF12_C = "notification_worker_unrelated"
+      class NotificationWorker
+        def perform(user_id, template)
+          nil
+        end
+      end
+  commit_message: "fix: guard downgrade in upgrade_to and require active in has_feature?"
 fragments:
-- id: async_read_config
+- id: upgrade_downgrade_guard
   selector:
-    path: src/fileReader.ts
-    anchor: "export async function readConfig"
-- id: async_parse_config
+    path: app/services/subscription_service.rb
+    anchor: "cannot downgrade via upgrade_to"
+- id: has_feature_active_guard
   selector:
-    path: src/fileReader.ts
-    anchor: "export async function parseConfig"
-- id: async_load_app
+    path: app/services/subscription_service.rb
+    anchor: "return false unless active?"
+- id: downgrade_to_method
   selector:
-    path: src/app.ts
-    anchor: "export async function loadApp"
-- id: app_awaits_read
+    path: app/services/subscription_service.rb
+    anchor: "def downgrade_to"
+- id: no_garbage_a
   selector:
-    path: src/app.ts
-    anchor: "await readConfig(configPath)"
-- id: async_start_server
+    anchor: GARBAGE_RF12_A
+- id: no_garbage_b
   selector:
-    path: src/server.ts
-    anchor: "export async function startServer"
-- id: server_awaits_load
+    anchor: GARBAGE_RF12_B
+- id: no_garbage_c
   selector:
-    path: src/server.ts
-    anchor: "await loadApp"
-- id: no_paths
-  selector:
-    path: src/utils/paths.ts
-- id: no_garbage_validator
-  selector:
-    path: garbage_validator.ts
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_012_PATHS_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_012_BASE_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_012_VALID_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_012_STRICT_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_012_CLASS_E
+    anchor: GARBAGE_RF12_C
 oracle:
   required:
-  - async_read_config
-  - async_parse_config
-  - async_load_app
-  - app_awaits_read
-  - async_start_server
-  - server_awaits_load
-  allowed: []
+  - upgrade_downgrade_guard
+  - has_feature_active_guard
+  allowed:
+  - downgrade_to_method
   forbidden:
-  - no_paths
-  - no_garbage_validator
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

@@ -1,195 +1,187 @@
 name: bal3_1hop_006_go_middleware_chain
 tags:
-- lang:go
+- lang:python
+- change:config
 - change:single_file
-- context:import_chain
-- distance:1hop
+- context:cross_module
+- distance:2hop
 - difficulty:hard
 repo:
   initial_files:
-    pkg/middleware/cors.go: |
-      package middleware
+    config/auth_settings.py: |
+      JWT_SECRET = "change-me-in-production"
+      JWT_ALGORITHM = "HS256"
+      ACCESS_TOKEN_EXPIRE_MINUTES = 30
+      REFRESH_TOKEN_EXPIRE_DAYS = 7
+      PASSWORD_HASH_ROUNDS = 10
+    auth/token_service.py: |
+      from config.auth_settings import JWT_SECRET, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
-      import "net/http"
+      class TokenService:
+          def __init__(self):
+              self.secret = JWT_SECRET
+              self.algorithm = JWT_ALGORITHM
+              self.expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
 
-      type CORSConfig struct {
-          AllowOrigins []string
-          AllowMethods []string
-      }
+          def create_access_token(self, user_id: str) -> str:
+              return f"token:{user_id}:{self.expire_minutes}"
 
-      func CORS(cfg CORSConfig) func(http.Handler) http.Handler {
-          return func(next http.Handler) http.Handler {
-              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-                  w.Header().Set("Access-Control-Allow-Origin", "*")
-                  next.ServeHTTP(w, r)
-              })
-          }
-      }
-    cmd/api/server.go: |
-      package main
+          def verify_token(self, token: str) -> str:
+              parts = token.split(":")
+              return parts[1] if len(parts) == 3 else ""
+    auth/password_service.py: |
+      from config.auth_settings import PASSWORD_HASH_ROUNDS
 
-      import (
-          "net/http"
-          "pkg/middleware"
-      )
+      class PasswordService:
+          def __init__(self):
+              self.rounds = PASSWORD_HASH_ROUNDS
 
-      func buildServer() http.Handler {
-          mux := http.NewServeMux()
-          corsCfg := middleware.CORSConfig{
-              AllowOrigins: []string{"*"},
-              AllowMethods: []string{"GET", "POST"},
-          }
-          return middleware.CORS(corsCfg)(mux)
-      }
-    cmd/api/routes.go: |
-      package main
+          def hash_password(self, password: str) -> str:
+              return f"hashed:{password}:{self.rounds}"
 
-      import (
-          "net/http"
-          "pkg/middleware"
-      )
+          def verify_password(self, password: str, hashed: str) -> bool:
+              return hashed == self.hash_password(password)
+    api/auth_router.py: |
+      from auth.token_service import TokenService
+      from auth.password_service import PasswordService
 
-      func setupRoutes(mux *http.ServeMux) http.Handler {
-          corsCfg := middleware.CORSConfig{
-              AllowOrigins: []string{"https://example.com"},
-              AllowMethods: []string{"GET"},
-          }
-          return middleware.CORS(corsCfg)(mux)
-      }
-    internal/health/check.go: |
-      package health
+      token_svc = TokenService()
+      password_svc = PasswordService()
 
-      GARBAGE_006_HEALTH_A = "health"
+      def login(username: str, password: str):
+          if password_svc.verify_password(password, f"hashed:{password}:10"):
+              return token_svc.create_access_token(username)
+          return None
+    garbage/GameRanking.py: |
+      # GARBAGE_BAL31HOP006_A = "game_ranking_marker"
 
-      type Checker struct {
-          Services []string
-      }
+      class GameRanking:
+          tier = "gold"
+    garbage/ShipmentLabel.py: |
+      # GARBAGE_BAL31HOP006_B = "shipment_label_marker"
 
-      func (c *Checker) Run() bool {
-          return len(c.Services) > 0
-      }
-    internal/migrations/runner.go: |
-      package migrations
+      class ShipmentLabel:
+          carrier = "UPS"
+    garbage/IoTSensorCalibration.py: |
+      # GARBAGE_BAL31HOP006_C = "iot_sensor_calibration_marker"
 
-      GARBAGE_006_MIGRATE_B = "migrate"
-
-      type Runner struct {
-          Dir string
-      }
-
-      func (r *Runner) Execute() error {
-          return nil
-      }
-    internal/seed/loader.go: |
-      package seed
-
-      GARBAGE_006_SEED_C = "seed"
-
-      type Loader struct {
-          Path string
-      }
-
-      func (l *Loader) Load() error {
-          return nil
-      }
+      class IoTSensorCalibration:
+          offset = 0.0
   changed_files:
-    pkg/middleware/cors.go: |
-      package middleware
+    config/auth_settings.py: |
+      JWT_SECRET = "change-me-in-production"
+      JWT_ALGORITHM = "HS512"
+      ACCESS_TOKEN_EXPIRE_MINUTES = 15
+      REFRESH_TOKEN_EXPIRE_DAYS = 7
+      PASSWORD_HASH_ROUNDS = 12
+      REQUIRE_MFA = True
+    auth/token_service.py: |
+      from config.auth_settings import JWT_SECRET, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
-      import "net/http"
+      class TokenService:
+          def __init__(self):
+              self.secret = JWT_SECRET
+              self.algorithm = JWT_ALGORITHM
+              self.expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
 
-      type CORSConfig struct {
-          AllowOrigins  []string
-          AllowMethods  []string
-          AllowHeaders  []string
-          ExposeHeaders []string
-          MaxAge        int
-      }
+          def create_access_token(self, user_id: str) -> str:
+              return f"token:{user_id}:{self.expire_minutes}"
 
-      func CORS(cfg CORSConfig) func(http.Handler) http.Handler {
-          return func(next http.Handler) http.Handler {
-              return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-                  origin := r.Header.Get("Origin")
-                  if isAllowed(cfg.AllowOrigins, origin) {
-                      w.Header().Set("Access-Control-Allow-Origin", origin)
-                  }
-                  if r.Method == http.MethodOptions {
-                      w.WriteHeader(http.StatusNoContent)
-                      return
-                  }
-                  next.ServeHTTP(w, r)
-              })
-          }
-      }
+          def verify_token(self, token: str) -> str:
+              parts = token.split(":")
+              return parts[1] if len(parts) == 3 else ""
+    auth/password_service.py: |
+      from config.auth_settings import PASSWORD_HASH_ROUNDS, REQUIRE_MFA
 
-      func isAllowed(origins []string, origin string) bool {
-          for _, o := range origins {
-              if o == "*" || o == origin {
-                  return true
-              }
-          }
-          return false
-      }
-  commit_message: "feat: add preflight handling and origin validation to CORS"
+      class PasswordService:
+          def __init__(self):
+              self.rounds = PASSWORD_HASH_ROUNDS
+              self.require_mfa = REQUIRE_MFA
+
+          def hash_password(self, password: str) -> str:
+              return f"hashed:{password}:{self.rounds}"
+
+          def verify_password(self, password: str, hashed: str) -> bool:
+              return hashed == self.hash_password(password)
+    api/auth_router.py: |
+      from auth.token_service import TokenService
+      from auth.password_service import PasswordService
+
+      token_svc = TokenService()
+      password_svc = PasswordService()
+
+      def login(username: str, password: str):
+          if password_svc.verify_password(password, f"hashed:{password}:12"):
+              return token_svc.create_access_token(username)
+          return None
+    garbage/GameRanking.py: |
+      # GARBAGE_BAL31HOP006_A = "game_ranking_marker"
+
+      class GameRanking:
+          tier = "gold"
+    garbage/ShipmentLabel.py: |
+      # GARBAGE_BAL31HOP006_B = "shipment_label_marker"
+
+      class ShipmentLabel:
+          carrier = "UPS"
+    garbage/IoTSensorCalibration.py: |
+      # GARBAGE_BAL31HOP006_C = "iot_sensor_calibration_marker"
+
+      class IoTSensorCalibration:
+          offset = 0.0
+  commit_message: "config: upgrade JWT to HS512, shorten access token to 15min, bcrypt rounds to 12"
 fragments:
-- id: allow_headers_field
+- id: config_algorithm
   selector:
-    path: pkg/middleware/cors.go
-    anchor: "AllowHeaders  []string"
-- id: preflight_check
+    path: config/auth_settings.py
+    anchor: "JWT_ALGORITHM = \"HS512\""
+- id: config_expire
   selector:
-    path: pkg/middleware/cors.go
-    anchor: "r.Method == http.MethodOptions"
-- id: is_allowed_func
+    path: config/auth_settings.py
+    anchor: "ACCESS_TOKEN_EXPIRE_MINUTES = 15"
+- id: config_rounds
   selector:
-    path: pkg/middleware/cors.go
-    anchor: "func isAllowed"
-- id: origin_validation
+    path: config/auth_settings.py
+    anchor: "PASSWORD_HASH_ROUNDS = 12"
+- id: config_mfa
   selector:
-    path: pkg/middleware/cors.go
-    anchor: "isAllowed(cfg.AllowOrigins, origin)"
-- id: server_uses_cors
+    path: config/auth_settings.py
+    anchor: "REQUIRE_MFA = True"
+- id: password_mfa_import
   selector:
-    path: cmd/api/server.go
-    anchor: "middleware.CORS(corsCfg)"
-- id: routes_uses_cors
+    path: auth/password_service.py
+    anchor: "REQUIRE_MFA"
+- id: password_mfa_field
   selector:
-    path: cmd/api/routes.go
-    anchor: "middleware.CORS(corsCfg)"
-- id: unrelated_health
+    path: auth/password_service.py
+    anchor: "self.require_mfa = REQUIRE_MFA"
+- id: no_token_service
   selector:
-    path: internal/health/check.go
-    anchor: "type Checker struct"
-- id: unrelated_migrate
+    path: auth/token_service.py
+- id: no_auth_router
   selector:
-    path: internal/migrations/runner.go
-    anchor: "type Runner struct"
-- id: unrelated_seed
-  selector:
-    path: internal/seed/loader.go
-    anchor: "type Loader struct"
+    path: api/auth_router.py
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_006_HEALTH_A
+    anchor: GARBAGE_BAL31HOP006_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_006_MIGRATE_B
+    anchor: GARBAGE_BAL31HOP006_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_006_SEED_C
+    anchor: GARBAGE_BAL31HOP006_C
 oracle:
   required:
-  - allow_headers_field
-  - preflight_check
-  - is_allowed_func
-  - origin_validation
+  - config_algorithm
+  - config_mfa
+  - password_mfa_import
+  - password_mfa_field
   allowed:
-  - server_uses_cors
-  - routes_uses_cors
+  - config_expire
+  - config_rounds
   forbidden:
-  - unrelated_health
-  - unrelated_migrate
-  - unrelated_seed
+  - no_token_service
+  - no_auth_router
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

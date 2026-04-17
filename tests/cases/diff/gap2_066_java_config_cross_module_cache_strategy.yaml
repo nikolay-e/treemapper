@@ -1,223 +1,194 @@
 name: gap2_066_java_config_cross_module_cache_strategy
 tags:
-- change:config
+- lang:cpp
 - change:single_file
 - context:cross_module
-- difficulty:hard
 - distance:2hop
-- lang:java
+- difficulty:medium
 repo:
   initial_files:
-    src/main/resources/cache.yml: |
-      cache:
-        strategy: lru
-        maxEntries: 500
-        ttlSeconds: 300
-    src/main/java/config/CacheConfig.java: |
-      package config;
+    include/render/pipeline.h: |
+      #pragma once
+      #include <vector>
+      #include <string>
 
-      import java.util.Map;
+      namespace render {
 
-      public class CacheConfig {
-          private Map<String, Object> values;
+      struct PipelineConfig {
+          int width;
+          int height;
+          int msaa_samples;
+          bool vsync;
+      };
 
-          public CacheConfig(Map<String, Object> values) {
-              this.values = values;
+      class Pipeline {
+      public:
+          explicit Pipeline(const PipelineConfig& cfg);
+          void begin_frame();
+          void end_frame();
+          void draw_mesh(const std::string& mesh_id);
+      private:
+          PipelineConfig cfg_;
+      };
+
+      }
+    src/scene/renderer.cpp: |
+      #include "render/pipeline.h"
+      #include <memory>
+
+      namespace scene {
+
+      class SceneRenderer {
+          std::unique_ptr<render::Pipeline> pipeline_;
+      public:
+          explicit SceneRenderer(const render::PipelineConfig& cfg)
+              : pipeline_(std::make_unique<render::Pipeline>(cfg)) {}
+
+          void render_frame(const std::vector<std::string>& meshes) {
+              pipeline_->begin_frame();
+              for (const auto& m : meshes) pipeline_->draw_mesh(m);
+              pipeline_->end_frame();
           }
+      };
 
-          public String getStrategy() { return (String) values.get("strategy"); }
-          public int getMaxEntries() { return (int) values.get("maxEntries"); }
-          public int getTtlSeconds() { return (int) values.get("ttlSeconds"); }
       }
-    src/main/java/cache/CacheFactory.java: |
-      package cache;
+    src/ui/viewport.cpp: |
+      #include "render/pipeline.h"
 
-      import config.CacheConfig;
+      namespace ui {
 
-      public class CacheFactory {
-          public static Object create(CacheConfig config) {
-              switch (config.getStrategy()) {
-                  case "lru": return new LruCache(config.getMaxEntries());
-                  default: throw new IllegalArgumentException("Unknown strategy");
-              }
-          }
+      class Viewport {
+          render::PipelineConfig cfg_;
+      public:
+          explicit Viewport(int w, int h)
+              : cfg_{w, h, 4, true} {}
+
+          render::PipelineConfig config() const { return cfg_; }
+      };
+
       }
-    src/main/java/cache/LruCache.java: |
-      package cache;
-
-      import java.util.LinkedHashMap;
-
-      public class LruCache {
-          private final int capacity;
-
-          public LruCache(int capacity) {
-              this.capacity = capacity;
-          }
-
-          public void put(String key, Object value) { }
-          public Object get(String key) { return null; }
-      }
-    src/main/java/queue/MessageBroker.java: |
-      package queue;
-      static final String TRAP_GAP2_066_BROKER_A = "broker_noise";
-      static final int TRAP_GAP2_066_BROKER_B = 5672;
-
-      public class MessageBroker {
-          public void publish(String topic, byte[] payload) { }
-      }
-    src/main/java/migration/SchemaRunner.java: |
-      package migration;
-      static final String TRAP_GAP2_066_SCHEMA_C = "schema_noise";
-      static final boolean TRAP_GAP2_066_SCHEMA_D = false;
-
-      public class SchemaRunner {
-          public void migrate(String version) { }
-      }
-    src/main/java/health/HealthCheck.java: |
-      package health;
-      static final String TRAP_GAP2_066_HEALTH_E = "health_noise";
-      static final int TRAP_GAP2_066_HEALTH_F = 8080;
-
-      public class HealthCheck {
-          public boolean isHealthy() { return true; }
-      }
+    garbage/audio.cpp: |
+      // GARBAGE_JAV066_AUDIO_A = "audio_marker"
+      namespace audio { void init() {} }
+    garbage/physics.cpp: |
+      // GARBAGE_JAV066_PHYSICS_B = "physics_marker"
+      namespace physics { void step(float dt) {} }
+    garbage/scripting.cpp: |
+      // GARBAGE_JAV066_SCRIPT_C = "scripting_marker"
+      namespace scripting { void execute(const char* code) {} }
   changed_files:
-    src/main/resources/cache.yml: |
-      cache:
-        strategy: lfu
-        maxEntries: 2000
-        ttlSeconds: 600
-        evictionPolicy: size-based
-    src/main/java/config/CacheConfig.java: |
-      package config;
+    include/render/pipeline.h: |
+      #pragma once
+      #include <vector>
+      #include <string>
 
-      import java.util.Map;
+      namespace render {
 
-      public class CacheConfig {
-          private Map<String, Object> values;
+      struct PipelineConfig {
+          int width;
+          int height;
+          int msaa_samples;
+          bool vsync;
+          float render_scale;
+          bool hdr_enabled;
+      };
 
-          public CacheConfig(Map<String, Object> values) {
-              this.values = values;
+      class Pipeline {
+      public:
+          explicit Pipeline(const PipelineConfig& cfg);
+          void begin_frame();
+          void end_frame();
+          void draw_mesh(const std::string& mesh_id);
+          void set_render_scale(float scale);
+      private:
+          PipelineConfig cfg_;
+      };
+
+      }
+    src/scene/renderer.cpp: |
+      #include "render/pipeline.h"
+      #include <memory>
+
+      namespace scene {
+
+      class SceneRenderer {
+          std::unique_ptr<render::Pipeline> pipeline_;
+      public:
+          explicit SceneRenderer(const render::PipelineConfig& cfg)
+              : pipeline_(std::make_unique<render::Pipeline>(cfg)) {}
+
+          void render_frame(const std::vector<std::string>& meshes) {
+              pipeline_->begin_frame();
+              for (const auto& m : meshes) pipeline_->draw_mesh(m);
+              pipeline_->end_frame();
           }
+      };
 
-          public String getStrategy() { return (String) values.get("strategy"); }
-          public int getMaxEntries() { return (int) values.get("maxEntries"); }
-          public int getTtlSeconds() { return (int) values.get("ttlSeconds"); }
-          public String getEvictionPolicy() { return (String) values.get("evictionPolicy"); }
       }
-    src/main/java/cache/CacheFactory.java: |
-      package cache;
+    src/ui/viewport.cpp: |
+      #include "render/pipeline.h"
 
-      import config.CacheConfig;
+      namespace ui {
 
-      public class CacheFactory {
-          public static Object create(CacheConfig config) {
-              switch (config.getStrategy()) {
-                  case "lru": return new LruCache(config.getMaxEntries());
-                  default: throw new IllegalArgumentException("Unknown strategy");
-              }
-          }
+      class Viewport {
+          render::PipelineConfig cfg_;
+      public:
+          explicit Viewport(int w, int h)
+              : cfg_{w, h, 4, true, 1.0f, false} {}
+
+          render::PipelineConfig config() const { return cfg_; }
+      };
+
       }
-    src/main/java/cache/LruCache.java: |
-      package cache;
-
-      import java.util.LinkedHashMap;
-
-      public class LruCache {
-          private final int capacity;
-
-          public LruCache(int capacity) {
-              this.capacity = capacity;
-          }
-
-          public void put(String key, Object value) { }
-          public Object get(String key) { return null; }
-      }
-    src/main/java/queue/MessageBroker.java: |
-      package queue;
-      static final String TRAP_GAP2_066_BROKER_A = "broker_noise";
-      static final int TRAP_GAP2_066_BROKER_B = 5672;
-
-      public class MessageBroker {
-          public void publish(String topic, byte[] payload) { }
-      }
-    src/main/java/migration/SchemaRunner.java: |
-      package migration;
-      static final String TRAP_GAP2_066_SCHEMA_C = "schema_noise";
-      static final boolean TRAP_GAP2_066_SCHEMA_D = false;
-
-      public class SchemaRunner {
-          public void migrate(String version) { }
-      }
-    src/main/java/health/HealthCheck.java: |
-      package health;
-      static final String TRAP_GAP2_066_HEALTH_E = "health_noise";
-      static final int TRAP_GAP2_066_HEALTH_F = 8080;
-
-      public class HealthCheck {
-          public boolean isHealthy() { return true; }
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    garbage/audio.cpp: |
+      // GARBAGE_JAV066_AUDIO_A = "audio_marker"
+      namespace audio { void init() {} }
+    garbage/physics.cpp: |
+      // GARBAGE_JAV066_PHYSICS_B = "physics_marker"
+      namespace physics { void step(float dt) {} }
+    garbage/scripting.cpp: |
+      // GARBAGE_JAV066_SCRIPT_C = "scripting_marker"
+      namespace scripting { void execute(const char* code) {} }
+  commit_message: "feat: add render_scale and hdr_enabled to PipelineConfig"
 fragments:
-- id: strategy_lfu
+- id: pipeline_config_new_fields
   selector:
-    path: src/main/resources/cache.yml
-    anchor: "strategy: lfu"
-- id: eviction_policy
+    path: include/render/pipeline.h
+    anchor: "render_scale"
+- id: hdr_enabled_field
   selector:
-    path: src/main/resources/cache.yml
-    anchor: "evictionPolicy: size-based"
-- id: getter_eviction
+    path: include/render/pipeline.h
+    anchor: "hdr_enabled"
+- id: set_render_scale_method
   selector:
-    path: src/main/java/config/CacheConfig.java
-    anchor: "public String getEvictionPolicy()"
-- id: factory_uses_strategy
+    path: include/render/pipeline.h
+    anchor: "void set_render_scale"
+- id: scene_renderer_uses_config
   selector:
-    path: src/main/java/cache/CacheFactory.java
-    anchor: "config.getStrategy()"
-- id: no_broker
+    path: src/scene/renderer.cpp
+    anchor: "render::PipelineConfig"
+- id: viewport_uses_config
   selector:
-    path: src/main/java/queue/MessageBroker.java
-- id: no_schema
+    path: src/ui/viewport.cpp
+    anchor: "1.0f, false"
+- id: no_garbage_a
   selector:
-    path: src/main/java/migration/SchemaRunner.java
-- id: no_health
+    anchor: GARBAGE_JAV066_AUDIO_A
+- id: no_garbage_b
   selector:
-    path: src/main/java/health/HealthCheck.java
-- id: no_global_0
+    anchor: GARBAGE_JAV066_PHYSICS_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_066_BROKER_A
-- id: no_global_1
-  selector:
-    anchor: TRAP_GAP2_066_BROKER_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP2_066_SCHEMA_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2_066_SCHEMA_D
-- id: no_global_4
-  selector:
-    anchor: TRAP_GAP2_066_HEALTH_E
-- id: no_global_5
-  selector:
-    anchor: TRAP_GAP2_066_HEALTH_F
+    anchor: GARBAGE_JAV066_SCRIPT_C
 oracle:
   required:
-  - strategy_lfu
-  - eviction_policy
-  - getter_eviction
-  - factory_uses_strategy
+  - pipeline_config_new_fields
+  - hdr_enabled_field
+  - set_render_scale_method
+  - scene_renderer_uses_config
+  - viewport_uses_config
   allowed: []
   forbidden:
-  - no_broker
-  - no_schema
-  - no_health
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

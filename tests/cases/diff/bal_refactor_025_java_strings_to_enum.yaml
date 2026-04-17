@@ -1,289 +1,163 @@
 name: bal_refactor_025_java_strings_to_enum
 tags:
-- lang:java
-- change:multi_file
-- change:refactor
-- context:import_chain
-- distance:1hop
-- difficulty:medium
+- lang:ruby
+- change:bug_fix
+- change:single_file
+- context:same_file
+- distance:0hop
+- difficulty:trivial
 repo:
   initial_files:
-    src/main/java/com/app/model/Ticket.java: |
-      package com.app.model;
+    app/models/order.rb: |
+      class Order
+        STATUSES = %w[pending processing shipped delivered cancelled].freeze
 
-      public class Ticket {
-          private String id;
-          private String title;
-          private String status;
+        attr_reader :id, :status, :total
 
-          public Ticket(String id, String title) {
-              this.id = id;
-              this.title = title;
-              this.status = "open";
-          }
+        def initialize(id:, total:)
+          @id = id
+          @total = total
+          @status = "pending"
+        end
 
-          public void resolve() {
-              if (!"open".equals(status) && !"in_progress".equals(status)) {
-                  throw new IllegalStateException("cannot resolve");
-              }
-              this.status = "resolved";
-          }
+        def transition_to(new_status)
+          unless STATUSES.include?(new_status)
+            raise ArgumentError, "invalid status: #{new_status}"
+          end
+          @status = new_status
+        end
 
-          public void close() {
-              if (!"resolved".equals(status)) {
-                  throw new IllegalStateException("must resolve first");
-              }
-              this.status = "closed";
-          }
+        def shippable?
+          status == "processing"
+        end
 
-          public String getStatus() { return status; }
-          public String getId() { return id; }
-          public String getTitle() { return title; }
-      }
-    src/main/java/com/app/service/TicketService.java: |
-      package com.app.service;
+        def cancellable?
+          %w[pending processing].include?(status)
+        end
 
-      import com.app.model.Ticket;
-      import java.util.ArrayList;
-      import java.util.List;
+        def calculate_tax
+          total * 0.2
+        end
 
-      public class TicketService {
-          private final List<Ticket> tickets = new ArrayList<>();
-
-          public void addTicket(Ticket ticket) {
-              tickets.add(ticket);
-          }
-
-          public List<Ticket> getOpenTickets() {
-              List<Ticket> result = new ArrayList<>();
-              for (Ticket t : tickets) {
-                  if ("open".equals(t.getStatus())) {
-                      result.add(t);
-                  }
-              }
-              return result;
-          }
-
-          public List<Ticket> getResolvedTickets() {
-              List<Ticket> result = new ArrayList<>();
-              for (Ticket t : tickets) {
-                  if ("resolved".equals(t.getStatus())) {
-                      result.add(t);
-                  }
-              }
-              return result;
-          }
-      }
-    src/main/java/com/app/view/TicketView.java: |
-      package com.app.view;
-
-      import com.app.model.Ticket;
-
-      public class TicketView {
-          public String renderBadge(Ticket ticket) {
-              String color;
-              switch (ticket.getStatus()) {
-                  case "open": color = "blue"; break;
-                  case "in_progress": color = "yellow"; break;
-                  case "resolved": color = "green"; break;
-                  case "closed": color = "gray"; break;
-                  default: color = "white";
-              }
-              return "<badge color=\"" + color + "\">" + ticket.getStatus() + "</badge>";
-          }
-      }
-    src/main/java/com/app/GarbageSearch.java: |
-      package com.app;
-
-      public class GarbageSearch {
-          public static final String GARBAGE_REFACTOR_025_SEARCH_A = "search";
-          public static final int GARBAGE_REFACTOR_025_MAX_B = 100;
-          public static final boolean GARBAGE_REFACTOR_025_FUZZY_C = true;
-
-          public Object search(String query) { return null; }
-      }
-    src/main/java/com/app/GarbageBackup.java: |
-      package com.app;
-
-      public class GarbageBackup {
-          public static final String GARBAGE_REFACTOR_025_BACKUP_D = "backup";
-          public static final boolean GARBAGE_REFACTOR_025_COMPRESS_E = true;
-
-          public void backup() {}
-      }
+        def total_with_tax
+          total + calculate_tax
+        end
+      end
+    garbage/audit_log.rb: |
+      # GARBAGE_RF25_A = "audit_log_unrelated"
+      class AuditLog
+        def record(entity, action)
+          nil
+        end
+      end
+    garbage/mailer.rb: |
+      # GARBAGE_RF25_B = "mailer_unrelated"
+      class OrderMailer
+        def deliver(order, template)
+          nil
+        end
+      end
+    garbage/report.rb: |
+      # GARBAGE_RF25_C = "report_unrelated"
+      class SalesReport
+        def generate(from_date, to_date)
+          []
+        end
+      end
   changed_files:
-    src/main/java/com/app/model/TicketStatus.java: |
-      package com.app.model;
+    app/models/order.rb: |
+      class Order
+        STATUSES = %w[pending processing shipped delivered cancelled].freeze
+        VALID_TRANSITIONS = {
+          "pending"    => %w[processing cancelled],
+          "processing" => %w[shipped cancelled],
+          "shipped"    => %w[delivered],
+          "delivered"  => [],
+          "cancelled"  => [],
+        }.freeze
 
-      public enum TicketStatus {
-          OPEN, IN_PROGRESS, RESOLVED, CLOSED
-      }
-    src/main/java/com/app/model/Ticket.java: |
-      package com.app.model;
+        attr_reader :id, :status, :total
 
-      public class Ticket {
-          private String id;
-          private String title;
-          private TicketStatus status;
+        def initialize(id:, total:)
+          @id = id
+          @total = total
+          @status = "pending"
+        end
 
-          public Ticket(String id, String title) {
-              this.id = id;
-              this.title = title;
-              this.status = TicketStatus.OPEN;
-          }
+        def transition_to(new_status)
+          unless VALID_TRANSITIONS.fetch(status, []).include?(new_status)
+            raise ArgumentError, "cannot transition from #{status} to #{new_status}"
+          end
+          @status = new_status
+        end
 
-          public void resolve() {
-              if (status != TicketStatus.OPEN && status != TicketStatus.IN_PROGRESS) {
-                  throw new IllegalStateException("cannot resolve");
-              }
-              this.status = TicketStatus.RESOLVED;
-          }
+        def shippable?
+          status == "processing"
+        end
 
-          public void close() {
-              if (status != TicketStatus.RESOLVED) {
-                  throw new IllegalStateException("must resolve first");
-              }
-              this.status = TicketStatus.CLOSED;
-          }
+        def cancellable?
+          VALID_TRANSITIONS[status]&.include?("cancelled") || false
+        end
 
-          public TicketStatus getStatus() { return status; }
-          public String getId() { return id; }
-          public String getTitle() { return title; }
-      }
-    src/main/java/com/app/service/TicketService.java: |
-      package com.app.service;
+        def calculate_tax
+          total * 0.2
+        end
 
-      import com.app.model.Ticket;
-      import com.app.model.TicketStatus;
-      import java.util.ArrayList;
-      import java.util.List;
-
-      public class TicketService {
-          private final List<Ticket> tickets = new ArrayList<>();
-
-          public void addTicket(Ticket ticket) {
-              tickets.add(ticket);
-          }
-
-          public List<Ticket> getOpenTickets() {
-              List<Ticket> result = new ArrayList<>();
-              for (Ticket t : tickets) {
-                  if (t.getStatus() == TicketStatus.OPEN) {
-                      result.add(t);
-                  }
-              }
-              return result;
-          }
-
-          public List<Ticket> getResolvedTickets() {
-              List<Ticket> result = new ArrayList<>();
-              for (Ticket t : tickets) {
-                  if (t.getStatus() == TicketStatus.RESOLVED) {
-                      result.add(t);
-                  }
-              }
-              return result;
-          }
-      }
-    src/main/java/com/app/view/TicketView.java: |
-      package com.app.view;
-
-      import com.app.model.Ticket;
-      import com.app.model.TicketStatus;
-
-      public class TicketView {
-          public String renderBadge(Ticket ticket) {
-              String color;
-              switch (ticket.getStatus()) {
-                  case OPEN: color = "blue"; break;
-                  case IN_PROGRESS: color = "yellow"; break;
-                  case RESOLVED: color = "green"; break;
-                  case CLOSED: color = "gray"; break;
-                  default: color = "white";
-              }
-              return "<badge color=\"" + color + "\">" + ticket.getStatus() + "</badge>";
-          }
-      }
-    src/main/java/com/app/GarbageSearch.java: |
-      package com.app;
-
-      public class GarbageSearch {
-          public static final String GARBAGE_REFACTOR_025_SEARCH_A = "search";
-          public static final int GARBAGE_REFACTOR_025_MAX_B = 100;
-          public static final boolean GARBAGE_REFACTOR_025_FUZZY_C = true;
-
-          public Object search(String query) { return null; }
-      }
-    src/main/java/com/app/GarbageBackup.java: |
-      package com.app;
-
-      public class GarbageBackup {
-          public static final String GARBAGE_REFACTOR_025_BACKUP_D = "backup";
-          public static final boolean GARBAGE_REFACTOR_025_COMPRESS_E = true;
-
-          public void backup() {}
-      }
-  commit_message: "refactor: replace ticket status strings with TicketStatus enum"
+        def total_with_tax
+          total + calculate_tax
+        end
+      end
+    garbage/audit_log.rb: |
+      # GARBAGE_RF25_A = "audit_log_unrelated"
+      class AuditLog
+        def record(entity, action)
+          nil
+        end
+      end
+    garbage/mailer.rb: |
+      # GARBAGE_RF25_B = "mailer_unrelated"
+      class OrderMailer
+        def deliver(order, template)
+          nil
+        end
+      end
+    garbage/report.rb: |
+      # GARBAGE_RF25_C = "report_unrelated"
+      class SalesReport
+        def generate(from_date, to_date)
+          []
+        end
+      end
+  commit_message: "fix: enforce valid state transitions via VALID_TRANSITIONS table in Order"
 fragments:
-- id: new_enum
+- id: valid_transitions_table
   selector:
-    path: src/main/java/com/app/model/TicketStatus.java
-    anchor: "public enum TicketStatus"
-- id: ticket_uses_enum
+    path: app/models/order.rb
+    anchor: "VALID_TRANSITIONS"
+- id: transition_to_method
   selector:
-    path: src/main/java/com/app/model/Ticket.java
-    anchor: "private TicketStatus status"
-- id: ticket_init_enum
+    path: app/models/order.rb
+    anchor: "def transition_to"
+- id: cancellable_uses_table
   selector:
-    path: src/main/java/com/app/model/Ticket.java
-    anchor: "TicketStatus.OPEN"
-- id: service_imports_enum
+    path: app/models/order.rb
+    anchor: "def cancellable?"
+- id: no_garbage_a
   selector:
-    path: src/main/java/com/app/service/TicketService.java
-    anchor: "import com.app.model.TicketStatus"
-- id: service_compares_enum
+    anchor: GARBAGE_RF25_A
+- id: no_garbage_b
   selector:
-    path: src/main/java/com/app/service/TicketService.java
-    anchor: "TicketStatus.OPEN"
-- id: view_imports_enum
+    anchor: GARBAGE_RF25_B
+- id: no_garbage_c
   selector:
-    path: src/main/java/com/app/view/TicketView.java
-    anchor: "import com.app.model.TicketStatus"
-- id: no_garbage_search
-  selector:
-    path: src/main/java/com/app/GarbageSearch.java
-- id: no_garbage_backup
-  selector:
-    path: src/main/java/com/app/GarbageBackup.java
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_025_SEARCH_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_025_MAX_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_025_FUZZY_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_025_BACKUP_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_025_COMPRESS_E
+    anchor: GARBAGE_RF25_C
 oracle:
   required:
-  - new_enum
-  - ticket_uses_enum
-  - ticket_init_enum
-  - service_imports_enum
-  - service_compares_enum
-  - view_imports_enum
-  allowed: []
+  - valid_transitions_table
+  - transition_to_method
+  allowed:
+  - cancellable_uses_table
   forbidden:
-  - no_garbage_search
-  - no_garbage_backup
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

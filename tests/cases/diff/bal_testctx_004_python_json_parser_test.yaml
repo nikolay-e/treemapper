@@ -1,66 +1,230 @@
 name: bal_testctx_004_python_json_parser_test
 tags:
-- lang:python
-- change:single_file
-- change:new_function
-- context:test_file
+- lang:typescript
+- change:multi_file
+- change:signature
+- context:import_chain
 - distance:1hop
-- difficulty:easy
+- difficulty:hard
 repo:
   initial_files:
-    src/parser.py: |
-      import json
-      from typing import Any, Dict
+    src/queue/worker.ts: |
+      import { TaskQueue } from './task_queue';
+      import { Task } from './task';
 
-      def parse_json(raw: str) -> Dict[str, Any]:
-          return json.loads(raw)
-    tests/test_parser.py: |
-      from src.parser import parse_json
+      export class QueueWorker {
+          constructor(private queue: TaskQueue) {}
 
-      def test_parse_valid_json():
-          result = parse_json('{"key": "value"}')
-          assert result == {"key": "value"}
+          async processNext(): Promise<boolean> {
+              const task = await this.queue.dequeue();
+              if (!task) return false;
+              await task.execute();
+              return true;
+          }
+      }
+    src/queue/task_queue.ts: |
+      import { Task } from './task';
 
-      def test_parse_nested_json():
-          result = parse_json('{"a": {"b": 1}}')
-          assert result["a"]["b"] == 1
-    src/serializer.py: |
-      import json
-      from typing import Any
+      export class TaskQueue {
+          private items: Task[] = [];
 
-      def to_json(data: Any) -> str:
-          return json.dumps(data, indent=2)
+          enqueue(task: Task): void {
+              this.items.push(task);
+          }
+
+          async dequeue(): Promise<Task | null> {
+              return this.items.shift() ?? null;
+          }
+
+          get size(): number {
+              return this.items.length;
+          }
+      }
+    src/queue/task.ts: |
+      export interface Task {
+          id: string;
+          execute(): Promise<void>;
+      }
+    src/jobs/email_job.ts: |
+      import { Task } from '../queue/task';
+
+      export class EmailJob implements Task {
+          id: string;
+
+          constructor(id: string, private recipient: string) {
+              this.id = id;
+          }
+
+          async execute(): Promise<void> {
+              console.log(`Sending email to ${this.recipient}`);
+          }
+      }
+    src/metrics/gauge.ts: |
+      export const GARBAGE_TESTCTX004_A = 'queue_depth_gauge';
+
+      export class Gauge {
+          private value = 0;
+          set(v: number): void { this.value = v; }
+          get(): number { return this.value; }
+      }
+    src/config/queue_config.ts: |
+      export const GARBAGE_TESTCTX004_B = 'queue_config_defaults';
+      export const GARBAGE_TESTCTX004_C = 10;
+
+      export interface QueueConfig {
+          maxSize: number;
+          retries: number;
+      }
+    src/storage/dead_letter.ts: |
+      export const GARBAGE_TESTCTX004_D = 'dead_letter_queue';
+
+      export class DeadLetterQueue {
+          private failed: string[] = [];
+          push(id: string): void { this.failed.push(id); }
+      }
   changed_files:
-    src/parser.py: |
-      import json
-      from typing import Any, Dict, List
+    src/queue/worker.ts: |
+      import { TaskQueue } from './task_queue';
+      import { Task, TaskResult } from './task';
 
-      def parse_json(raw: str) -> Dict[str, Any]:
-          return json.loads(raw)
+      export class QueueWorker {
+          constructor(private queue: TaskQueue) {}
 
-      def parse_json_array(raw: str) -> List[Dict[str, Any]]:
-          data = json.loads(raw)
-          if not isinstance(data, list):
-              raise ValueError("Expected JSON array")
-          return data
-  commit_message: "feat: add parse_json_array function"
+          async processNext(): Promise<TaskResult | null> {
+              const task = await this.queue.dequeue();
+              if (!task) return null;
+              return task.execute();
+          }
+
+          async processBatch(limit: number): Promise<TaskResult[]> {
+              const results: TaskResult[] = [];
+              for (let i = 0; i < limit; i++) {
+                  const result = await this.processNext();
+                  if (!result) break;
+                  results.push(result);
+              }
+              return results;
+          }
+      }
+    src/queue/task_queue.ts: |
+      import { Task } from './task';
+
+      export class TaskQueue {
+          private items: Task[] = [];
+
+          enqueue(task: Task): void {
+              this.items.push(task);
+          }
+
+          async dequeue(): Promise<Task | null> {
+              return this.items.shift() ?? null;
+          }
+
+          get size(): number {
+              return this.items.length;
+          }
+      }
+    src/queue/task.ts: |
+      export interface TaskResult {
+          taskId: string;
+          success: boolean;
+          durationMs: number;
+      }
+
+      export interface Task {
+          id: string;
+          execute(): Promise<TaskResult>;
+      }
+    src/jobs/email_job.ts: |
+      import { Task, TaskResult } from '../queue/task';
+
+      export class EmailJob implements Task {
+          id: string;
+
+          constructor(id: string, private recipient: string) {
+              this.id = id;
+          }
+
+          async execute(): Promise<TaskResult> {
+              const start = Date.now();
+              console.log(`Sending email to ${this.recipient}`);
+              return { taskId: this.id, success: true, durationMs: Date.now() - start };
+          }
+      }
+    src/metrics/gauge.ts: |
+      export const GARBAGE_TESTCTX004_A = 'queue_depth_gauge';
+
+      export class Gauge {
+          private value = 0;
+          set(v: number): void { this.value = v; }
+          get(): number { return this.value; }
+      }
+    src/config/queue_config.ts: |
+      export const GARBAGE_TESTCTX004_B = 'queue_config_defaults';
+      export const GARBAGE_TESTCTX004_C = 10;
+
+      export interface QueueConfig {
+          maxSize: number;
+          retries: number;
+      }
+    src/storage/dead_letter.ts: |
+      export const GARBAGE_TESTCTX004_D = 'dead_letter_queue';
+
+      export class DeadLetterQueue {
+          private failed: string[] = [];
+          push(id: string): void { this.failed.push(id); }
+      }
+  commit_message: "feat: return TaskResult from task execute and worker processNext"
 fragments:
-- id: parse_json_array_fn
+- id: task_result_interface
   selector:
-    path: src/parser.py
-    anchor: "def parse_json_array(raw: str)"
-- id: test_imports_parser
+    path: src/queue/task.ts
+    anchor: "export interface TaskResult"
+- id: task_execute_signature
   selector:
-    path: tests/test_parser.py
-    anchor: "from src.parser import parse_json"
-- id: no_serializer
+    path: src/queue/task.ts
+    anchor: "execute(): Promise<TaskResult>"
+- id: worker_process_next
   selector:
-    path: src/serializer.py
-    anchor: "def to_json"
+    path: src/queue/worker.ts
+    anchor: "async processNext(): Promise<TaskResult | null>"
+- id: email_job_execute
+  selector:
+    path: src/jobs/email_job.ts
+    anchor: "async execute(): Promise<TaskResult>"
+- id: no_gauge
+  selector:
+    path: src/metrics/gauge.ts
+- id: no_config
+  selector:
+    path: src/config/queue_config.ts
+- id: no_dead_letter
+  selector:
+    path: src/storage/dead_letter.ts
+- id: no_global_0
+  selector:
+    anchor: GARBAGE_TESTCTX004_A
+- id: no_global_1
+  selector:
+    anchor: GARBAGE_TESTCTX004_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_TESTCTX004_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_TESTCTX004_D
 oracle:
   required:
-  - parse_json_array_fn
-  - test_imports_parser
+  - task_result_interface
+  - task_execute_signature
+  - worker_process_next
+  - email_job_execute
   allowed: []
   forbidden:
-  - no_serializer
+  - no_gauge
+  - no_config
+  - no_dead_letter
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

@@ -1,203 +1,142 @@
 name: bal_refactor_007_python_consolidate_duplicate_code
 tags:
-- lang:python
-- change:multi_file
-- change:refactor
-- context:cross_module
-- distance:1hop
-- difficulty:medium
+- lang:kotlin
+- change:bug_fix
+- context:import_chain
+- distance:3hop+
+- difficulty:easy
 repo:
   initial_files:
-    exporters/csv_exporter.py: |
-      import csv
-      import io
+    util/StringUtil.kt: |
+      package util
 
-      def sanitize_value(val):
-          if val is None:
-              return ""
-          text = str(val).strip()
-          text = text.replace('"', '""')
-          return text
+      object StringUtil {
+          // BUG: does not handle null-equivalent blank strings
+          fun normalize(input: String): String {
+              return input.trim().lowercase()
+          }
+      }
+    domain/UserProfile.kt: |
+      package domain
 
-      def export_csv(records, columns):
-          buf = io.StringIO()
-          writer = csv.writer(buf)
-          writer.writerow(columns)
-          for record in records:
-              row = [sanitize_value(record.get(col)) for col in columns]
-              writer.writerow(row)
-          return buf.getvalue()
-    exporters/json_exporter.py: |
-      import json
+      import util.StringUtil
 
-      def sanitize_value(val):
-          if val is None:
-              return ""
-          text = str(val).strip()
-          text = text.replace('"', '""')
-          return text
+      data class UserProfile(val rawName: String) {
+          val name: String get() = StringUtil.normalize(rawName)
+      }
+    service/ProfileService.kt: |
+      package service
 
-      def export_json(records, columns):
-          cleaned = []
-          for record in records:
-              row = {col: sanitize_value(record.get(col)) for col in columns}
-              cleaned.append(row)
-          return json.dumps(cleaned, indent=2)
-    exporters/xml_exporter.py: |
-      def sanitize_value(val):
-          if val is None:
-              return ""
-          text = str(val).strip()
-          text = text.replace('"', '""')
-          return text
+      import domain.UserProfile
 
-      def export_xml(records, columns):
-          lines = ['<?xml version="1.0"?>']
-          lines.append("<records>")
-          for record in records:
-              lines.append("  <record>")
-              for col in columns:
-                  val = sanitize_value(record.get(col))
-                  lines.append(f"    <{col}>{val}</{col}>")
-              lines.append("  </record>")
-          lines.append("</records>")
-          return "\n".join(lines)
-    garbage_auth.py: |
-      GARBAGE_REFACTOR_007_AUTH_MARKER_A = "auth"
-      GARBAGE_REFACTOR_007_TOKEN_MARKER_B = "jwt"
+      class ProfileService {
+          fun buildProfile(rawName: String): UserProfile {
+              return UserProfile(rawName)
+          }
+      }
+    api/ProfileController.kt: |
+      package api
 
-      class AuthProvider:
-          GARBAGE_REFACTOR_007_PROVIDER_C = True
+      import service.ProfileService
 
-          def authenticate(self, token):
-              return True
-    garbage_queue.py: |
-      GARBAGE_REFACTOR_007_QUEUE_MARKER_D = "queue"
-      GARBAGE_REFACTOR_007_SIZE_MARKER_E = 1000
-
-      class MessageQueue:
-          GARBAGE_REFACTOR_007_MQ_CLASS_F = True
-
-          def enqueue(self, msg):
-              pass
+      class ProfileController(private val svc: ProfileService) {
+          fun handleCreate(rawName: String): String {
+              val profile = svc.buildProfile(rawName)
+              return profile.name
+          }
+      }
+    garbage/Mailer.kt: |
+      // GARBAGE_KREF_A = "mailer_marker"
+      class Mailer { fun send(to: String) {} }
+    garbage/Logger.kt: |
+      // GARBAGE_KREF_B = "logger_marker"
+      object Logger { fun log(msg: String) {} }
+    garbage/Config.kt: |
+      // GARBAGE_KREF_C = "config_marker"
+      data class Config(val host: String)
   changed_files:
-    exporters/sanitizer.py: |
-      def sanitize_value(val):
-          if val is None:
-              return ""
-          text = str(val).strip()
-          text = text.replace('"', '""')
-          return text
-    exporters/csv_exporter.py: |
-      import csv
-      import io
-      from exporters.sanitizer import sanitize_value
+    util/StringUtil.kt: |
+      package util
 
-      def export_csv(records, columns):
-          buf = io.StringIO()
-          writer = csv.writer(buf)
-          writer.writerow(columns)
-          for record in records:
-              row = [sanitize_value(record.get(col)) for col in columns]
-              writer.writerow(row)
-          return buf.getvalue()
-    exporters/json_exporter.py: |
-      import json
-      from exporters.sanitizer import sanitize_value
+      object StringUtil {
+          fun normalize(input: String): String {
+              if (input.isBlank()) return ""
+              return input.trim().lowercase()
+          }
+      }
+    domain/UserProfile.kt: |
+      package domain
 
-      def export_json(records, columns):
-          cleaned = []
-          for record in records:
-              row = {col: sanitize_value(record.get(col)) for col in columns}
-              cleaned.append(row)
-          return json.dumps(cleaned, indent=2)
-    exporters/xml_exporter.py: |
-      from exporters.sanitizer import sanitize_value
+      import util.StringUtil
 
-      def export_xml(records, columns):
-          lines = ['<?xml version="1.0"?>']
-          lines.append("<records>")
-          for record in records:
-              lines.append("  <record>")
-              for col in columns:
-                  val = sanitize_value(record.get(col))
-                  lines.append(f"    <{col}>{val}</{col}>")
-              lines.append("  </record>")
-          lines.append("</records>")
-          return "\n".join(lines)
-    garbage_auth.py: |
-      GARBAGE_REFACTOR_007_AUTH_MARKER_A = "auth"
-      GARBAGE_REFACTOR_007_TOKEN_MARKER_B = "jwt"
+      data class UserProfile(val rawName: String) {
+          val name: String get() = StringUtil.normalize(rawName)
+      }
+    service/ProfileService.kt: |
+      package service
 
-      class AuthProvider:
-          GARBAGE_REFACTOR_007_PROVIDER_C = True
+      import domain.UserProfile
 
-          def authenticate(self, token):
-              return True
-    garbage_queue.py: |
-      GARBAGE_REFACTOR_007_QUEUE_MARKER_D = "queue"
-      GARBAGE_REFACTOR_007_SIZE_MARKER_E = 1000
+      class ProfileService {
+          fun buildProfile(rawName: String): UserProfile {
+              return UserProfile(rawName)
+          }
+      }
+    api/ProfileController.kt: |
+      package api
 
-      class MessageQueue:
-          GARBAGE_REFACTOR_007_MQ_CLASS_F = True
+      import service.ProfileService
 
-          def enqueue(self, msg):
-              pass
-  commit_message: "refactor: consolidate duplicate sanitize_value into shared module"
+      class ProfileController(private val svc: ProfileService) {
+          fun handleCreate(rawName: String): String {
+              val profile = svc.buildProfile(rawName)
+              return profile.name
+          }
+      }
+    garbage/Mailer.kt: |
+      // GARBAGE_KREF_A = "mailer_marker"
+      class Mailer { fun send(to: String) {} }
+    garbage/Logger.kt: |
+      // GARBAGE_KREF_B = "logger_marker"
+      object Logger { fun log(msg: String) {} }
+    garbage/Config.kt: |
+      // GARBAGE_KREF_C = "config_marker"
+      data class Config(val host: String)
+  commit_message: "fix: handle blank strings in StringUtil.normalize"
 fragments:
-- id: new_sanitizer_module
+- id: normalize_blank_check
   selector:
-    path: exporters/sanitizer.py
-    anchor: "def sanitize_value(val)"
-- id: csv_imports_sanitizer
+    anchor: "if (input.isBlank()) return \"\""
+- id: string_util_obj
   selector:
-    path: exporters/csv_exporter.py
-    anchor: "from exporters.sanitizer import sanitize_value"
-- id: json_imports_sanitizer
+    anchor: "object StringUtil"
+- id: user_profile_imports_util
   selector:
-    path: exporters/json_exporter.py
-    anchor: "from exporters.sanitizer import sanitize_value"
-- id: xml_imports_sanitizer
+    anchor: "import util.StringUtil"
+- id: profile_service_imports_domain
   selector:
-    path: exporters/xml_exporter.py
-    anchor: "from exporters.sanitizer import sanitize_value"
-- id: no_garbage_auth
+    anchor: "import domain.UserProfile"
+- id: controller_imports_service
   selector:
-    path: garbage_auth.py
-- id: no_garbage_queue
+    anchor: "import service.ProfileService"
+- id: no_garbage_a
   selector:
-    path: garbage_queue.py
-- id: no_global_0
+    anchor: GARBAGE_KREF_A
+- id: no_garbage_b
   selector:
-    anchor: GARBAGE_REFACTOR_007_AUTH_MARKER_A
-- id: no_global_1
+    anchor: GARBAGE_KREF_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_REFACTOR_007_TOKEN_MARKER_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_007_PROVIDER_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_007_QUEUE_MARKER_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_007_SIZE_MARKER_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_REFACTOR_007_MQ_CLASS_F
+    anchor: GARBAGE_KREF_C
 oracle:
   required:
-  - new_sanitizer_module
-  - csv_imports_sanitizer
-  - json_imports_sanitizer
-  - xml_imports_sanitizer
-  allowed: []
+  - normalize_blank_check
+  - string_util_obj
+  - user_profile_imports_util
+  allowed:
+  - profile_service_imports_domain
+  - controller_imports_service
   forbidden:
-  - no_garbage_auth
-  - no_garbage_queue
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

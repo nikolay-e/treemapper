@@ -1,233 +1,221 @@
 name: bal3_1hop_010_go_data_pipeline
 tags:
-- lang:go
+- lang:java
 - change:multi_file
-- context:import_chain
+- change:new_function
+- context:test_file
 - distance:1hop
 - difficulty:hard
 repo:
   initial_files:
-    pkg/transform/mapper.go: |
-      package transform
+    src/main/java/com/metrics/collector/MetricStore.java: |
+      package com.metrics.collector;
 
-      type Record struct {
-          Fields map[string]string
-      }
+      import java.util.HashMap;
+      import java.util.Map;
 
-      type Mapper struct {
-          FieldMapping map[string]string
-      }
+      public class MetricStore {
+          private final Map<String, Long> counters = new HashMap<>();
 
-      func NewMapper(mapping map[string]string) *Mapper {
-          return &Mapper{FieldMapping: mapping}
-      }
-
-      func (m *Mapper) Map(r Record) Record {
-          out := Record{Fields: make(map[string]string)}
-          for src, dst := range m.FieldMapping {
-              out.Fields[dst] = r.Fields[src]
+          public void increment(String name) {
+              counters.merge(name, 1L, Long::sum);
           }
-          return out
-      }
-    internal/pipeline/csv_ingester.go: |
-      package pipeline
 
-      import "pkg/transform"
-
-      type CSVIngester struct {
-          mapper *transform.Mapper
-      }
-
-      func NewCSVIngester(m *transform.Mapper) *CSVIngester {
-          return &CSVIngester{mapper: m}
-      }
-
-      func (c *CSVIngester) Ingest(rows []map[string]string) []transform.Record {
-          var results []transform.Record
-          for _, row := range rows {
-              r := transform.Record{Fields: row}
-              results = append(results, c.mapper.Map(r))
+          public long get(String name) {
+              return counters.getOrDefault(name, 0L);
           }
-          return results
-      }
-    internal/pipeline/json_ingester.go: |
-      package pipeline
 
-      import "pkg/transform"
-
-      type JSONIngester struct {
-          mapper *transform.Mapper
-      }
-
-      func NewJSONIngester(m *transform.Mapper) *JSONIngester {
-          return &JSONIngester{mapper: m}
-      }
-
-      func (j *JSONIngester) Ingest(items []map[string]string) []transform.Record {
-          var results []transform.Record
-          for _, item := range items {
-              r := transform.Record{Fields: item}
-              results = append(results, j.mapper.Map(r))
+          public Map<String, Long> snapshot() {
+              return new HashMap<>(counters);
           }
-          return results
       }
-    internal/pipeline/xml_ingester.go: |
-      package pipeline
+    src/main/java/com/metrics/collector/MetricReporter.java: |
+      package com.metrics.collector;
 
-      import "pkg/transform"
+      import java.util.Map;
 
-      type XMLIngester struct {
-          mapper *transform.Mapper
-      }
+      public class MetricReporter {
+          private final MetricStore store;
 
-      func NewXMLIngester(m *transform.Mapper) *XMLIngester {
-          return &XMLIngester{mapper: m}
-      }
-
-      func (x *XMLIngester) Ingest(elems []map[string]string) []transform.Record {
-          var results []transform.Record
-          for _, elem := range elems {
-              r := transform.Record{Fields: elem}
-              results = append(results, x.mapper.Map(r))
+          public MetricReporter(MetricStore store) {
+              this.store = store;
           }
-          return results
+
+          public String report() {
+              StringBuilder sb = new StringBuilder();
+              for (Map.Entry<String, Long> e : store.snapshot().entrySet()) {
+                  sb.append(e.getKey()).append("=").append(e.getValue()).append("\n");
+              }
+              return sb.toString();
+          }
       }
-    pkg/compress/gzip.go: |
-      package compress
+    src/test/java/com/metrics/collector/MetricStoreTest.java: |
+      package com.metrics.collector;
 
-      GARBAGE_010_GZIP_A = "gzip"
+      import org.junit.jupiter.api.Test;
+      import static org.junit.jupiter.api.Assertions.*;
 
-      type GzipCompressor struct {
-          Level int
+      public class MetricStoreTest {
+          @Test
+          void incrementAndGet() {
+              MetricStore store = new MetricStore();
+              store.increment("req.count");
+              store.increment("req.count");
+              assertEquals(2L, store.get("req.count"));
+          }
       }
-
-      func (g *GzipCompressor) Compress(data []byte) []byte {
-          return data
+    garbage/HealthCheck.java: |
+      // GARBAGE_JMET_A = "health_marker"
+      public class HealthCheck {
+          public boolean isHealthy() { return true; }
       }
-    pkg/encrypt/aes.go: |
-      package encrypt
-
-      GARBAGE_010_AES_B = "aes"
-
-      type AESEncryptor struct {
-          Key string
+    garbage/AlertSender.java: |
+      // GARBAGE_JMET_B = "alert_marker"
+      public class AlertSender {
+          public void send(String msg) {}
       }
-
-      func (a *AESEncryptor) Encrypt(data []byte) []byte {
-          return data
-      }
-    pkg/hash/sha256.go: |
-      package hash
-
-      GARBAGE_010_SHA_C = "sha256"
-
-      type SHA256Hasher struct{}
-
-      func (h *SHA256Hasher) Hash(data []byte) string {
-          return "hash"
+    garbage/Dashboard.java: |
+      // GARBAGE_JMET_C = "dashboard_marker"
+      public class Dashboard {
+          public String render() { return ""; }
       }
   changed_files:
-    pkg/transform/mapper.go: |
-      package transform
+    src/main/java/com/metrics/collector/MetricStore.java: |
+      package com.metrics.collector;
 
-      type Record struct {
-          Fields   map[string]string
-          Metadata map[string]string
+      import java.util.HashMap;
+      import java.util.Map;
+
+      public class MetricStore {
+          private final Map<String, Long> counters = new HashMap<>();
+
+          public void increment(String name) {
+              counters.merge(name, 1L, Long::sum);
+          }
+
+          public void incrementBy(String name, long delta) {
+              if (delta < 0) throw new IllegalArgumentException("delta must be non-negative");
+              counters.merge(name, delta, Long::sum);
+          }
+
+          public long get(String name) {
+              return counters.getOrDefault(name, 0L);
+          }
+
+          public void reset(String name) {
+              counters.put(name, 0L);
+          }
+
+          public Map<String, Long> snapshot() {
+              return new HashMap<>(counters);
+          }
       }
+    src/main/java/com/metrics/collector/MetricReporter.java: |
+      package com.metrics.collector;
 
-      type FilterFunc func(Record) bool
+      import java.util.Map;
 
-      type Mapper struct {
-          FieldMapping map[string]string
-          Filters      []FilterFunc
-      }
+      public class MetricReporter {
+          private final MetricStore store;
 
-      func NewMapper(mapping map[string]string) *Mapper {
-          return &Mapper{FieldMapping: mapping}
-      }
+          public MetricReporter(MetricStore store) {
+              this.store = store;
+          }
 
-      func (m *Mapper) WithFilter(f FilterFunc) *Mapper {
-          m.Filters = append(m.Filters, f)
-          return m
-      }
-
-      func (m *Mapper) Map(r Record) (Record, bool) {
-          for _, f := range m.Filters {
-              if !f(r) {
-                  return Record{}, false
+          public String report() {
+              StringBuilder sb = new StringBuilder();
+              for (Map.Entry<String, Long> e : store.snapshot().entrySet()) {
+                  sb.append(e.getKey()).append("=").append(e.getValue()).append("\n");
               }
+              return sb.toString();
           }
-          out := Record{Fields: make(map[string]string), Metadata: r.Metadata}
-          for src, dst := range m.FieldMapping {
-              out.Fields[dst] = r.Fields[src]
-          }
-          return out, true
       }
-  commit_message: "feat: add Metadata, FilterFunc, and filtering to Mapper"
+    src/test/java/com/metrics/collector/MetricStoreTest.java: |
+      package com.metrics.collector;
+
+      import org.junit.jupiter.api.Test;
+      import static org.junit.jupiter.api.Assertions.*;
+
+      public class MetricStoreTest {
+          @Test
+          void incrementAndGet() {
+              MetricStore store = new MetricStore();
+              store.increment("req.count");
+              store.increment("req.count");
+              assertEquals(2L, store.get("req.count"));
+          }
+
+          @Test
+          void incrementByDelta() {
+              MetricStore store = new MetricStore();
+              store.incrementBy("bytes.sent", 1024L);
+              assertEquals(1024L, store.get("bytes.sent"));
+          }
+
+          @Test
+          void resetZeroesCounter() {
+              MetricStore store = new MetricStore();
+              store.increment("req.count");
+              store.reset("req.count");
+              assertEquals(0L, store.get("req.count"));
+          }
+
+          @Test
+          void incrementByNegativeDeltaThrows() {
+              MetricStore store = new MetricStore();
+              assertThrows(IllegalArgumentException.class, () -> store.incrementBy("x", -1L));
+          }
+      }
+    garbage/HealthCheck.java: |
+      // GARBAGE_JMET_A = "health_marker"
+      public class HealthCheck {
+          public boolean isHealthy() { return true; }
+      }
+    garbage/AlertSender.java: |
+      // GARBAGE_JMET_B = "alert_marker"
+      public class AlertSender {
+          public void send(String msg) {}
+      }
+    garbage/Dashboard.java: |
+      // GARBAGE_JMET_C = "dashboard_marker"
+      public class Dashboard {
+          public String render() { return ""; }
+      }
+  commit_message: "feat: add incrementBy and reset to MetricStore"
 fragments:
-- id: metadata_field
+- id: increment_by_method
   selector:
-    path: pkg/transform/mapper.go
-    anchor: "Metadata map[string]string"
-- id: filter_func_type
+    anchor: "public void incrementBy(String name, long delta)"
+- id: reset_method
   selector:
-    path: pkg/transform/mapper.go
-    anchor: "type FilterFunc func(Record) bool"
-- id: with_filter_method
+    anchor: "public void reset(String name)"
+- id: test_increment_by
   selector:
-    path: pkg/transform/mapper.go
-    anchor: "func (m *Mapper) WithFilter"
-- id: map_returns_bool
+    anchor: "void incrementByDelta()"
+- id: test_reset
   selector:
-    path: pkg/transform/mapper.go
-    anchor: "func (m *Mapper) Map(r Record) (Record, bool)"
-- id: csv_calls_map
+    anchor: "void resetZeroesCounter()"
+- id: test_negative_throws
   selector:
-    path: internal/pipeline/csv_ingester.go
-    anchor: "c.mapper.Map(r)"
-- id: json_calls_map
-  selector:
-    path: internal/pipeline/json_ingester.go
-    anchor: "j.mapper.Map(r)"
-- id: xml_calls_map
-  selector:
-    path: internal/pipeline/xml_ingester.go
-    anchor: "x.mapper.Map(r)"
-- id: unrelated_gzip
-  selector:
-    path: pkg/compress/gzip.go
-    anchor: "type GzipCompressor struct"
-- id: unrelated_aes
-  selector:
-    path: pkg/encrypt/aes.go
-    anchor: "type AESEncryptor struct"
-- id: unrelated_sha
-  selector:
-    path: pkg/hash/sha256.go
-    anchor: "type SHA256Hasher struct"
+    anchor: "void incrementByNegativeDeltaThrows()"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_010_GZIP_A
+    anchor: GARBAGE_JMET_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_010_AES_B
+    anchor: GARBAGE_JMET_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_010_SHA_C
+    anchor: GARBAGE_JMET_C
 oracle:
   required:
-  - metadata_field
-  - filter_func_type
-  - with_filter_method
-  - map_returns_bool
+  - increment_by_method
+  - reset_method
+  - test_increment_by
+  - test_reset
   allowed:
-  - csv_calls_map
-  - json_calls_map
-  - xml_calls_map
+  - test_negative_throws
   forbidden:
-  - unrelated_gzip
-  - unrelated_aes
-  - unrelated_sha
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

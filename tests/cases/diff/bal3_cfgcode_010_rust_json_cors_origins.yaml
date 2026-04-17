@@ -1,141 +1,288 @@
 name: bal3_cfgcode_010_rust_json_cors_origins
 tags:
-- lang:rust
-- change:single_file
-- change:config
-- context:config_to_code
-- distance:1hop
-- difficulty:medium
+- lang:go
+- change:bug_fix
+- context:import_chain
+- distance:3hop+
+- difficulty:easy
 repo:
   initial_files:
-    config/cors.json: |
-      {
-        "cors": {
-          "allowed_origins": ["http://localhost:3000"],
-          "allowed_methods": ["GET", "POST"],
-          "max_age_secs": 3600
-        }
-      }
-    src/middleware/cors.rs: |
-      use serde::Deserialize;
-      use std::fs;
+    pkg/cache/lru.go: |
+      package cache
 
-      #[derive(Deserialize, Clone)]
-      pub struct CorsConfig {
-          pub allowed_origins: Vec<String>,
-          pub allowed_methods: Vec<String>,
-          pub max_age_secs: u64,
+      type entry struct {
+          key   string
+          value interface{}
       }
 
-      #[derive(Deserialize)]
-      struct CorsFile {
-          cors: CorsConfig,
+      type LRU struct {
+          cap   int
+          items []entry
       }
 
-      pub fn load_cors_config(path: &str) -> Result<CorsConfig, Box<dyn std::error::Error>> {
-          let content = fs::read_to_string(path)?;
-          let file: CorsFile = serde_json::from_str(&content)?;
-          Ok(file.cors)
+      func NewLRU(capacity int) *LRU {
+          return &LRU{cap: capacity}
       }
 
-      pub fn is_origin_allowed(cfg: &CorsConfig, origin: &str) -> bool {
-          cfg.allowed_origins.iter().any(|o| o == origin)
+      func (c *LRU) Get(key string) (interface{}, bool) {
+          for i, e := range c.items {
+              if e.key == key {
+                  c.items = append(c.items[:i], c.items[i+1:]...)
+                  c.items = append(c.items, e)
+                  return e.value, true
+              }
+          }
+          return nil, false
       }
 
-      pub fn build_cors_headers(cfg: &CorsConfig) -> Vec<(String, String)> {
-          vec![
-              ("Access-Control-Allow-Origin".into(), cfg.allowed_origins.join(", ")),
-              ("Access-Control-Allow-Methods".into(), cfg.allowed_methods.join(", ")),
-              ("Access-Control-Max-Age".into(), cfg.max_age_secs.to_string()),
-          ]
+      func (c *LRU) Set(key string, value interface{}) {
+          for i, e := range c.items {
+              if e.key == key {
+                  c.items[i].value = value
+                  return
+              }
+          }
+          if len(c.items) >= c.cap {
+              c.items = c.items[1:]  // BUG: evicts oldest, not LRU (last-accessed)
+          }
+          c.items = append(c.items, entry{key, value})
       }
-    src/middleware/rate_limit.rs: |
-      GARBAGE_CFGCODE_010_RATE_A: u32 = 100;
-      GARBAGE_CFGCODE_010_BURST_B: u32 = 50;
+    pkg/session/store.go: |
+      package session
 
-      pub fn check_rate_limit() -> bool { true }
-    src/handlers/upload.rs: |
-      GARBAGE_CFGCODE_010_UPLOAD_C: &str = "multipart";
-      GARBAGE_CFGCODE_010_MAXSIZE_D: u64 = 10485760;
+      import "pkg/cache"
 
-      pub fn handle_upload() {}
-    src/utils/crypto.rs: |
-      GARBAGE_CFGCODE_010_ALGO_E: &str = "aes256";
-      GARBAGE_CFGCODE_010_IV_F: &str = "random";
+      type Store struct {
+          lru *cache.LRU
+      }
 
-      pub fn encrypt(data: &[u8]) -> Vec<u8> { data.to_vec() }
+      func NewStore(capacity int) *Store {
+          return &Store{lru: cache.NewLRU(capacity)}
+      }
+
+      func (s *Store) Get(sid string) (interface{}, bool) {
+          return s.lru.Get(sid)
+      }
+
+      func (s *Store) Set(sid string, data interface{}) {
+          s.lru.Set(sid, data)
+      }
+    internal/middleware/session_mw.go: |
+      package middleware
+
+      import "pkg/session"
+
+      type SessionMiddleware struct {
+          store *session.Store
+      }
+
+      func NewSessionMiddleware(capacity int) *SessionMiddleware {
+          return &SessionMiddleware{store: session.NewStore(capacity)}
+      }
+
+      func (m *SessionMiddleware) Load(sid string) (interface{}, bool) {
+          return m.store.Get(sid)
+      }
+
+      func (m *SessionMiddleware) Save(sid string, data interface{}) {
+          m.store.Set(sid, data)
+      }
+    internal/api/user_api.go: |
+      package api
+
+      import "internal/middleware"
+
+      type UserAPI struct {
+          session *middleware.SessionMiddleware
+      }
+
+      func NewUserAPI(s *middleware.SessionMiddleware) *UserAPI {
+          return &UserAPI{session: s}
+      }
+
+      func (u *UserAPI) GetSession(sid string) (interface{}, bool) {
+          return u.session.Load(sid)
+      }
+    garbage/GameItemStore.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_A = "game_item_store_marker"
+
+      type GameItemStore struct{ Items []string }
+    garbage/PaymentVault.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_B = "payment_vault_marker"
+
+      type PaymentVault struct{ Keys []string }
+    garbage/StreamingPlaylist.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_C = "streaming_playlist_marker"
+
+      type StreamingPlaylist struct{ URLs []string }
+    garbage/IoTDeviceRegistry.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_D = "iot_device_registry_marker"
+
+      type IoTDeviceRegistry struct{ Devices map[string]bool }
   changed_files:
-    config/cors.json: |
-      {
-        "cors": {
-          "allowed_origins": ["https://app.example.com", "https://admin.example.com"],
-          "allowed_methods": ["GET", "POST", "PUT", "DELETE"],
-          "max_age_secs": 86400,
-          "allow_credentials": true
-        }
+    pkg/cache/lru.go: |
+      package cache
+
+      type entry struct {
+          key   string
+          value interface{}
       }
-  commit_message: "update CORS for production origins and methods"
+
+      type LRU struct {
+          cap   int
+          items []entry
+      }
+
+      func NewLRU(capacity int) *LRU {
+          return &LRU{cap: capacity}
+      }
+
+      func (c *LRU) Get(key string) (interface{}, bool) {
+          for i, e := range c.items {
+              if e.key == key {
+                  c.items = append(c.items[:i], c.items[i+1:]...)
+                  c.items = append(c.items, e)
+                  return e.value, true
+              }
+          }
+          return nil, false
+      }
+
+      func (c *LRU) Set(key string, value interface{}) {
+          for i, e := range c.items {
+              if e.key == key {
+                  c.items = append(c.items[:i], c.items[i+1:]...)
+                  c.items = append(c.items, entry{key, value})
+                  return
+              }
+          }
+          if len(c.items) >= c.cap {
+              c.items = c.items[1:]
+          }
+          c.items = append(c.items, entry{key, value})
+      }
+    pkg/session/store.go: |
+      package session
+
+      import "pkg/cache"
+
+      type Store struct {
+          lru *cache.LRU
+      }
+
+      func NewStore(capacity int) *Store {
+          return &Store{lru: cache.NewLRU(capacity)}
+      }
+
+      func (s *Store) Get(sid string) (interface{}, bool) {
+          return s.lru.Get(sid)
+      }
+
+      func (s *Store) Set(sid string, data interface{}) {
+          s.lru.Set(sid, data)
+      }
+    internal/middleware/session_mw.go: |
+      package middleware
+
+      import "pkg/session"
+
+      type SessionMiddleware struct {
+          store *session.Store
+      }
+
+      func NewSessionMiddleware(capacity int) *SessionMiddleware {
+          return &SessionMiddleware{store: session.NewStore(capacity)}
+      }
+
+      func (m *SessionMiddleware) Load(sid string) (interface{}, bool) {
+          return m.store.Get(sid)
+      }
+
+      func (m *SessionMiddleware) Save(sid string, data interface{}) {
+          m.store.Set(sid, data)
+      }
+    internal/api/user_api.go: |
+      package api
+
+      import "internal/middleware"
+
+      type UserAPI struct {
+          session *middleware.SessionMiddleware
+      }
+
+      func NewUserAPI(s *middleware.SessionMiddleware) *UserAPI {
+          return &UserAPI{session: s}
+      }
+
+      func (u *UserAPI) GetSession(sid string) (interface{}, bool) {
+          return u.session.Load(sid)
+      }
+    garbage/GameItemStore.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_A = "game_item_store_marker"
+
+      type GameItemStore struct{ Items []string }
+    garbage/PaymentVault.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_B = "payment_vault_marker"
+
+      type PaymentVault struct{ Keys []string }
+    garbage/StreamingPlaylist.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_C = "streaming_playlist_marker"
+
+      type StreamingPlaylist struct{ URLs []string }
+    garbage/IoTDeviceRegistry.go: |
+      package garbage
+
+      // GARBAGE_BAL3CFG010_D = "iot_device_registry_marker"
+
+      type IoTDeviceRegistry struct{ Devices map[string]bool }
+  commit_message: "fix: promote existing key to end-of-list in LRU.Set for correct eviction order"
 fragments:
-- id: cors_struct
+- id: lru_set_promote
   selector:
-    path: src/middleware/cors.rs
-    anchor: "pub struct CorsConfig"
-- id: load_cors
+    path: pkg/cache/lru.go
+    anchor: "c.items = append(c.items[:i], c.items[i+1:]...)"
+- id: session_store_set
   selector:
-    path: src/middleware/cors.rs
-    anchor: "pub fn load_cors_config"
-- id: is_origin_allowed
+    path: pkg/session/store.go
+    anchor: "func (s *Store) Set"
+- id: session_mw_save
   selector:
-    path: src/middleware/cors.rs
-    anchor: "fn is_origin_allowed"
-- id: build_headers
+    path: internal/middleware/session_mw.go
+    anchor: "func (m *SessionMiddleware) Save"
+- id: no_garbage_a
   selector:
-    path: src/middleware/cors.rs
-    anchor: "fn build_cors_headers"
-- id: no_rate_limit
+    anchor: GARBAGE_BAL3CFG010_A
+- id: no_garbage_b
   selector:
-    path: src/middleware/rate_limit.rs
-    anchor: "check_rate_limit"
-- id: no_upload
+    anchor: GARBAGE_BAL3CFG010_B
+- id: no_garbage_c
   selector:
-    path: src/handlers/upload.rs
-    anchor: "handle_upload"
-- id: no_crypto
+    anchor: GARBAGE_BAL3CFG010_C
+- id: no_garbage_d
   selector:
-    path: src/utils/crypto.rs
-    anchor: "encrypt"
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_CFGCODE_010_RATE_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_CFGCODE_010_BURST_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_CFGCODE_010_UPLOAD_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_CFGCODE_010_MAXSIZE_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_CFGCODE_010_ALGO_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_CFGCODE_010_IV_F
+    anchor: GARBAGE_BAL3CFG010_D
 oracle:
   required:
-  - cors_struct
-  - load_cors
-  - is_origin_allowed
-  - build_headers
-  allowed: []
+  - lru_set_promote
+  - session_store_set
+  allowed:
+  - session_mw_save
   forbidden:
-  - no_rate_limit
-  - no_upload
-  - no_crypto
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

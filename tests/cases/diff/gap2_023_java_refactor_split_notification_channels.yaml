@@ -1,213 +1,245 @@
 name: gap2_023_java_refactor_split_notification_channels
 tags:
+- lang:go
 - change:multi_file
-- change:refactor
-- context:cross_module
-- difficulty:medium
-- distance:2hop
-- lang:java
+- change:new_function
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
-    src/main/java/com/clinic/AppointmentNotifier.java: |
-      package com.clinic;
+    internal/pipeline/stage.go: |
+      package pipeline
 
-      public class AppointmentNotifier {
-          public void notifyPatient(String patientId, String message, String channel) {
-              if ("sms".equals(channel)) {
-                  System.out.println("SMS to " + patientId + ": " + message);
-              } else if ("email".equals(channel)) {
-                  System.out.println("Email to " + patientId + ": " + message);
+      import "context"
+
+      type StageFunc func(ctx context.Context, input interface{}) (interface{}, error)
+
+      type Stage struct {
+          name string
+          fn   StageFunc
+      }
+
+      func NewStage(name string, fn StageFunc) *Stage {
+          return &Stage{name: name, fn: fn}
+      }
+
+      func (s *Stage) Name() string {
+          return s.name
+      }
+
+      func (s *Stage) Run(ctx context.Context, input interface{}) (interface{}, error) {
+          return s.fn(ctx, input)
+      }
+    internal/pipeline/runner.go: |
+      package pipeline
+
+      import "context"
+
+      type Runner struct {
+          stages []*Stage
+      }
+
+      func NewRunner() *Runner {
+          return &Runner{}
+      }
+
+      func (r *Runner) Add(s *Stage) {
+          r.stages = append(r.stages, s)
+      }
+
+      func (r *Runner) Execute(ctx context.Context, input interface{}) (interface{}, error) {
+          current := input
+          for _, stage := range r.stages {
+              out, err := stage.Run(ctx, current)
+              if err != nil {
+                  return nil, err
               }
+              current = out
           }
+          return current, nil
       }
-    src/main/java/com/clinic/AppointmentScheduler.java: |
-      package com.clinic;
+    internal/storage/kv.go: |
+      package storage
 
-      import java.time.LocalDateTime;
+      import "sync"
 
-      public class AppointmentScheduler {
-          private final AppointmentNotifier notifier;
-
-          public AppointmentScheduler(AppointmentNotifier notifier) {
-              this.notifier = notifier;
-          }
-
-          public void schedule(String patientId, String doctorId, LocalDateTime time) {
-              String msg = "Appointment with Dr." + doctorId + " at " + time;
-              notifier.notifyPatient(patientId, msg, "sms");
-          }
+      type KVStore struct {
+          mu   sync.RWMutex
+          data map[string][]byte
       }
-    src/main/java/com/clinic/PatientRecord.java: |
-      package com.clinic;
 
-      public class PatientRecord {
-          private final String id;
-          private final String name;
-
-          public PatientRecord(String id, String name) {
-              this.id = id;
-              this.name = name;
-          }
-
-          public String getId() { return id; }
-          public String getName() { return name; }
+      func NewKVStore() *KVStore {
+          return &KVStore{data: make(map[string][]byte)}
       }
-    src/main/java/com/clinic/BillingService.java: |
-      package com.clinic;
 
-      public class BillingService {
-          private static final String TRAP_GAP2023_CURRENCY_A = "USD";
-          private static final double TRAP_GAP2023_TAX_B = 0.08;
-
-          public double calculateBill(double baseAmount) {
-              return baseAmount * (1 + TRAP_GAP2023_TAX_B);
-          }
+      func (s *KVStore) Set(key string, value []byte) {
+          s.mu.Lock()
+          defer s.mu.Unlock()
+          s.data[key] = value
       }
-    src/main/java/com/clinic/WaitlistManager.java: |
-      package com.clinic;
 
-      import java.util.LinkedList;
-      import java.util.Queue;
-
-      public class WaitlistManager {
-          private static final String TRAP_GAP2023_PRIORITY_C = "fifo";
-          private static final int TRAP_GAP2023_MAX_D = 100;
-          private final Queue<String> queue = new LinkedList<>();
-
-          public void enqueue(String patientId) { queue.add(patientId); }
-          public String dequeue() { return queue.poll(); }
+      func (s *KVStore) Get(key string) ([]byte, bool) {
+          s.mu.RLock()
+          defer s.mu.RUnlock()
+          v, ok := s.data[key]
+          return v, ok
       }
+    garbage/tracing.go: |
+      // GARBAGE_GAP23_TRACE_A = "tracing_marker"
+    garbage/profiling.go: |
+      // GARBAGE_GAP23_PROF_B = "profiling_marker"
+    garbage/feature_flags.go: |
+      // GARBAGE_GAP23_FLAGS_C = "feature_flags_marker"
+    garbage/config.go: |
+      // GARBAGE_GAP23_CONF_D = "config_marker"
   changed_files:
-    src/main/java/com/clinic/NotificationChannel.java: |
-      package com.clinic;
+    internal/pipeline/stage.go: |
+      package pipeline
 
-      public interface NotificationChannel {
-          void send(String recipientId, String message);
+      import "context"
+
+      type StageFunc func(ctx context.Context, input interface{}) (interface{}, error)
+
+      type Stage struct {
+          name    string
+          fn      StageFunc
+          timeout int
       }
-    src/main/java/com/clinic/SmsChannel.java: |
-      package com.clinic;
 
-      public class SmsChannel implements NotificationChannel {
-          @Override
-          public void send(String recipientId, String message) {
-              System.out.println("SMS to " + recipientId + ": " + message);
-          }
+      func NewStage(name string, fn StageFunc) *Stage {
+          return &Stage{name: name, fn: fn}
       }
-    src/main/java/com/clinic/AppointmentNotifier.java: |
-      package com.clinic;
 
-      public class AppointmentNotifier {
-          private final NotificationChannel channel;
-
-          public AppointmentNotifier(NotificationChannel channel) {
-              this.channel = channel;
-          }
-
-          public void notifyPatient(String patientId, String message) {
-              channel.send(patientId, message);
-          }
+      func WithTimeout(name string, fn StageFunc, timeoutMs int) *Stage {
+          return &Stage{name: name, fn: fn, timeout: timeoutMs}
       }
-    src/main/java/com/clinic/AppointmentScheduler.java: |
-      package com.clinic;
 
-      import java.time.LocalDateTime;
-
-      public class AppointmentScheduler {
-          private final AppointmentNotifier notifier;
-
-          public AppointmentScheduler(AppointmentNotifier notifier) {
-              this.notifier = notifier;
-          }
-
-          public void schedule(String patientId, String doctorId, LocalDateTime time) {
-              String msg = "Appointment with Dr." + doctorId + " at " + time;
-              notifier.notifyPatient(patientId, msg);
-          }
+      func (s *Stage) Name() string {
+          return s.name
       }
-    src/main/java/com/clinic/PatientRecord.java: |
-      package com.clinic;
 
-      public class PatientRecord {
-          private final String id;
-          private final String name;
+      func (s *Stage) HasTimeout() bool {
+          return s.timeout > 0
+      }
 
-          public PatientRecord(String id, String name) {
-              this.id = id;
-              this.name = name;
+      func (s *Stage) Run(ctx context.Context, input interface{}) (interface{}, error) {
+          return s.fn(ctx, input)
+      }
+    internal/pipeline/runner.go: |
+      package pipeline
+
+      import "context"
+
+      type Runner struct {
+          stages []*Stage
+      }
+
+      func NewRunner() *Runner {
+          return &Runner{}
+      }
+
+      func (r *Runner) Add(s *Stage) {
+          r.stages = append(r.stages, s)
+      }
+
+      func (r *Runner) StageNames() []string {
+          names := make([]string, len(r.stages))
+          for i, s := range r.stages {
+              names[i] = s.Name()
           }
-
-          public String getId() { return id; }
-          public String getName() { return name; }
+          return names
       }
-    src/main/java/com/clinic/BillingService.java: |
-      package com.clinic;
 
-      public class BillingService {
-          private static final String TRAP_GAP2023_CURRENCY_A = "USD";
-          private static final double TRAP_GAP2023_TAX_B = 0.08;
-
-          public double calculateBill(double baseAmount) {
-              return baseAmount * (1 + TRAP_GAP2023_TAX_B);
+      func (r *Runner) Execute(ctx context.Context, input interface{}) (interface{}, error) {
+          current := input
+          for _, stage := range r.stages {
+              out, err := stage.Run(ctx, current)
+              if err != nil {
+                  return nil, err
+              }
+              current = out
           }
+          return current, nil
       }
-    src/main/java/com/clinic/WaitlistManager.java: |
-      package com.clinic;
+    internal/storage/kv.go: |
+      package storage
 
-      import java.util.LinkedList;
-      import java.util.Queue;
+      import "sync"
 
-      public class WaitlistManager {
-          private static final String TRAP_GAP2023_PRIORITY_C = "fifo";
-          private static final int TRAP_GAP2023_MAX_D = 100;
-          private final Queue<String> queue = new LinkedList<>();
-
-          public void enqueue(String patientId) { queue.add(patientId); }
-          public String dequeue() { return queue.poll(); }
+      type KVStore struct {
+          mu   sync.RWMutex
+          data map[string][]byte
       }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+
+      func NewKVStore() *KVStore {
+          return &KVStore{data: make(map[string][]byte)}
+      }
+
+      func (s *KVStore) Set(key string, value []byte) {
+          s.mu.Lock()
+          defer s.mu.Unlock()
+          s.data[key] = value
+      }
+
+      func (s *KVStore) Get(key string) ([]byte, bool) {
+          s.mu.RLock()
+          defer s.mu.RUnlock()
+          v, ok := s.data[key]
+          return v, ok
+      }
+    garbage/tracing.go: |
+      // GARBAGE_GAP23_TRACE_A = "tracing_marker"
+    garbage/profiling.go: |
+      // GARBAGE_GAP23_PROF_B = "profiling_marker"
+    garbage/feature_flags.go: |
+      // GARBAGE_GAP23_FLAGS_C = "feature_flags_marker"
+    garbage/config.go: |
+      // GARBAGE_GAP23_CONF_D = "config_marker"
+  commit_message: "feat: add WithTimeout/HasTimeout to Stage and StageNames to Runner"
 fragments:
-- id: channel_interface
+- id: stage_with_timeout
   selector:
-    path: src/main/java/com/clinic/NotificationChannel.java
-    anchor: public interface NotificationChannel {
-- id: sms_send
+    path: internal/pipeline/stage.go
+    anchor: "func WithTimeout(name string, fn StageFunc, timeoutMs int) *Stage {"
+- id: stage_has_timeout
   selector:
-    path: src/main/java/com/clinic/SmsChannel.java
-    anchor: public void send(String recipientId, String message) {
-- id: notifier_channel_field
+    path: internal/pipeline/stage.go
+    anchor: "func (s *Stage) HasTimeout() bool {"
+- id: stage_timeout_field
   selector:
-    path: src/main/java/com/clinic/AppointmentNotifier.java
-    anchor: private final NotificationChannel channel;
-- id: no_billing
+    path: internal/pipeline/stage.go
+    anchor: "timeout int"
+- id: runner_stage_names
   selector:
-    path: src/main/java/com/clinic/BillingService.java
-- id: no_waitlist
+    path: internal/pipeline/runner.go
+    anchor: "func (r *Runner) StageNames() []string {"
+- id: unrelated_kvstore
   selector:
-    path: src/main/java/com/clinic/WaitlistManager.java
-- id: no_global_0
+    path: internal/storage/kv.go
+    anchor: "func NewKVStore()"
+- id: no_garbage_a
   selector:
-    anchor: TRAP_GAP2023_CURRENCY_A
-- id: no_global_1
+    anchor: GARBAGE_GAP23_TRACE_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2023_TAX_B
-- id: no_global_2
+    anchor: GARBAGE_GAP23_PROF_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2023_PRIORITY_C
-- id: no_global_3
+    anchor: GARBAGE_GAP23_FLAGS_C
+- id: no_garbage_d
   selector:
-    anchor: TRAP_GAP2023_MAX_D
+    anchor: GARBAGE_GAP23_CONF_D
 oracle:
   required:
-  - channel_interface
-  - sms_send
-  - notifier_channel_field
-  allowed: []
+  - stage_with_timeout
+  - stage_has_timeout
+  - runner_stage_names
+  allowed:
+  - stage_timeout_field
   forbidden:
-  - no_billing
-  - no_waitlist
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - unrelated_kvstore
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

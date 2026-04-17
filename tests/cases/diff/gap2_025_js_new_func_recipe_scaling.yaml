@@ -1,176 +1,178 @@
 name: gap2_025_js_new_func_recipe_scaling
 tags:
-- change:new_function
-- change:single_file
+- lang:rust
+- change:bug_fix
 - context:import_chain
-- difficulty:medium
-- distance:2hop
-- lang:javascript
+- distance:1hop
+- difficulty:hard
 repo:
   initial_files:
-    src/recipe/ingredients.js: |
-      const UNIT_CONVERSIONS = {
-        cup_to_ml: 236.588,
-        tbsp_to_ml: 14.787,
-        tsp_to_ml: 4.929,
-      };
+    src/payment/processor.rs: |
+      use crate::ledger::journal::Journal;
 
-      function convertUnit(amount, fromUnit) {
-        const key = fromUnit + "_to_ml";
-        if (!UNIT_CONVERSIONS[key]) return amount;
-        return amount * UNIT_CONVERSIONS[key];
+      pub struct PaymentProcessor {
+          journal: Journal,
+          fee_rate: f64,
       }
 
-      module.exports = { UNIT_CONVERSIONS, convertUnit };
-    src/recipe/servings.js: |
-      const { convertUnit } = require("./ingredients");
+      impl PaymentProcessor {
+          pub fn new(journal: Journal, fee_rate: f64) -> Self {
+              PaymentProcessor { journal, fee_rate }
+          }
 
-      function adjustForServings(recipe, targetServings) {
-        const ratio = targetServings / recipe.baseServings;
-        return recipe.items.map((item) => ({
-          ...item,
-          amount: item.amount * ratio,
-        }));
+          pub fn charge(&mut self, account_id: &str, amount_cents: i64) -> Result<(), String> {
+              let fee = (amount_cents as f64 * self.fee_rate) as i64;
+              self.journal.record(account_id, amount_cents + fee)
+          }
+
+          pub fn refund(&mut self, account_id: &str, amount_cents: i64) -> Result<(), String> {
+              self.journal.record(account_id, -amount_cents)
+              // BUG: fee not refunded — net balance drifts
+          }
+      }
+    src/ledger/journal.rs: |
+      pub struct Journal {
+          entries: Vec<(String, i64)>,
       }
 
-      module.exports = { adjustForServings };
-    src/recipe/formatter.js: |
-      const { adjustForServings } = require("./servings");
+      impl Journal {
+          pub fn new() -> Self {
+              Journal { entries: Vec::new() }
+          }
 
-      function formatRecipe(recipe, servings) {
-        const adjusted = adjustForServings(recipe, servings);
-        return adjusted
-          .map((item) => `${item.amount} ${item.unit} ${item.name}`)
-          .join("\n");
+          pub fn record(&mut self, account_id: &str, delta: i64) -> Result<(), String> {
+              if delta == 0 {
+                  return Err("zero-value entry rejected".to_string());
+              }
+              self.entries.push((account_id.to_string(), delta));
+              Ok(())
+          }
+
+          pub fn balance(&self, account_id: &str) -> i64 {
+              self.entries
+                  .iter()
+                  .filter(|(id, _)| id == account_id)
+                  .map(|(_, delta)| delta)
+                  .sum()
+          }
       }
+    src/ledger/audit.rs: |
+      use crate::ledger::journal::Journal;
 
-      module.exports = { formatRecipe };
-    src/recipe/nutrition.js: |
-      const TRAP_GAP2025_CALS_A = 2000;
-      const TRAP_GAP2025_MACRO_B = "balanced";
-
-      function estimateCalories(items) {
-        return items.reduce((sum, i) => sum + i.calories, 0);
+      pub fn audit_account(journal: &Journal, account_id: &str) -> i64 {
+          journal.balance(account_id)
       }
-
-      module.exports = { estimateCalories };
-    src/recipe/storage.js: |
-      const TRAP_GAP2025_TTL_C = 86400;
-      const TRAP_GAP2025_FORMAT_D = "json";
-
-      function saveRecipe(recipe) {
-        return JSON.stringify(recipe);
-      }
-
-      module.exports = { saveRecipe };
+    garbage/notifications.rs: |
+      // GARBAGE_GAP25JSA = "notification_marker"
+    garbage/scheduler.rs: |
+      // GARBAGE_GAP25JSB = "scheduler_marker"
+    garbage/reporting.rs: |
+      // GARBAGE_GAP25JSC = "reporting_marker"
+    garbage/archival.rs: |
+      // GARBAGE_GAP25JSD = "archival_marker"
   changed_files:
-    src/recipe/ingredients.js: |
-      const UNIT_CONVERSIONS = {
-        cup_to_ml: 236.588,
-        tbsp_to_ml: 14.787,
-        tsp_to_ml: 4.929,
-      };
+    src/payment/processor.rs: |
+      use crate::ledger::journal::Journal;
 
-      function convertUnit(amount, fromUnit) {
-        const key = fromUnit + "_to_ml";
-        if (!UNIT_CONVERSIONS[key]) return amount;
-        return amount * UNIT_CONVERSIONS[key];
+      pub struct PaymentProcessor {
+          journal: Journal,
+          fee_rate: f64,
       }
 
-      function scaleIngredient(ingredient, factor) {
-        return {
-          ...ingredient,
-          amount: ingredient.amount * factor,
-          mlEquivalent: convertUnit(ingredient.amount * factor, ingredient.unit),
-        };
+      impl PaymentProcessor {
+          pub fn new(journal: Journal, fee_rate: f64) -> Self {
+              PaymentProcessor { journal, fee_rate }
+          }
+
+          pub fn charge(&mut self, account_id: &str, amount_cents: i64) -> Result<(), String> {
+              let fee = (amount_cents as f64 * self.fee_rate) as i64;
+              self.journal.record(account_id, amount_cents + fee)
+          }
+
+          pub fn refund(&mut self, account_id: &str, amount_cents: i64) -> Result<(), String> {
+              let fee = (amount_cents as f64 * self.fee_rate) as i64;
+              self.journal.record(account_id, -(amount_cents + fee))
+          }
+      }
+    src/ledger/journal.rs: |
+      pub struct Journal {
+          entries: Vec<(String, i64)>,
       }
 
-      module.exports = { UNIT_CONVERSIONS, convertUnit, scaleIngredient };
-    src/recipe/servings.js: |
-      const { convertUnit } = require("./ingredients");
+      impl Journal {
+          pub fn new() -> Self {
+              Journal { entries: Vec::new() }
+          }
 
-      function adjustForServings(recipe, targetServings) {
-        const ratio = targetServings / recipe.baseServings;
-        return recipe.items.map((item) => ({
-          ...item,
-          amount: item.amount * ratio,
-        }));
+          pub fn record(&mut self, account_id: &str, delta: i64) -> Result<(), String> {
+              if delta == 0 {
+                  return Err("zero-value entry rejected".to_string());
+              }
+              self.entries.push((account_id.to_string(), delta));
+              Ok(())
+          }
+
+          pub fn balance(&self, account_id: &str) -> i64 {
+              self.entries
+                  .iter()
+                  .filter(|(id, _)| id == account_id)
+                  .map(|(_, delta)| delta)
+                  .sum()
+          }
       }
+    src/ledger/audit.rs: |
+      use crate::ledger::journal::Journal;
 
-      module.exports = { adjustForServings };
-    src/recipe/formatter.js: |
-      const { adjustForServings } = require("./servings");
-
-      function formatRecipe(recipe, servings) {
-        const adjusted = adjustForServings(recipe, servings);
-        return adjusted
-          .map((item) => `${item.amount} ${item.unit} ${item.name}`)
-          .join("\n");
+      pub fn audit_account(journal: &Journal, account_id: &str) -> i64 {
+          journal.balance(account_id)
       }
-
-      module.exports = { formatRecipe };
-    src/recipe/nutrition.js: |
-      const TRAP_GAP2025_CALS_A = 2000;
-      const TRAP_GAP2025_MACRO_B = "balanced";
-
-      function estimateCalories(items) {
-        return items.reduce((sum, i) => sum + i.calories, 0);
-      }
-
-      module.exports = { estimateCalories };
-    src/recipe/storage.js: |
-      const TRAP_GAP2025_TTL_C = 86400;
-      const TRAP_GAP2025_FORMAT_D = "json";
-
-      function saveRecipe(recipe) {
-        return JSON.stringify(recipe);
-      }
-
-      module.exports = { saveRecipe };
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    garbage/notifications.rs: |
+      // GARBAGE_GAP25JSA = "notification_marker"
+    garbage/scheduler.rs: |
+      // GARBAGE_GAP25JSB = "scheduler_marker"
+    garbage/reporting.rs: |
+      // GARBAGE_GAP25JSC = "reporting_marker"
+    garbage/archival.rs: |
+      // GARBAGE_GAP25JSD = "archival_marker"
+  commit_message: "fix: include fee in refund amount to prevent balance drift"
 fragments:
-- id: scale_func
+- id: refund_fee_fix
   selector:
-    path: src/recipe/ingredients.js
-    anchor: function scaleIngredient(ingredient, factor) {
-- id: scale_ml
+    path: src/payment/processor.rs
+    anchor: "let fee = (amount_cents as f64 * self.fee_rate) as i64;"
+- id: refund_record_call
   selector:
-    path: src/recipe/ingredients.js
-    anchor: "mlEquivalent: convertUnit(ingredient.amount * factor, ingredient.unit)"
-- id: convert_unit
+    path: src/payment/processor.rs
+    anchor: "self.journal.record(account_id, -(amount_cents + fee))"
+- id: journal_record_method
   selector:
-    path: src/recipe/ingredients.js
-    anchor: function convertUnit(amount, fromUnit) {
-- id: no_nutrition
+    path: src/ledger/journal.rs
+    anchor: "pub fn record(&mut self, account_id: &str, delta: i64)"
+- id: audit_uses_balance
   selector:
-    path: src/recipe/nutrition.js
-- id: no_storage
+    path: src/ledger/audit.rs
+    anchor: "journal.balance(account_id)"
+- id: no_garbage_a
   selector:
-    path: src/recipe/storage.js
-- id: no_global_0
+    anchor: GARBAGE_GAP25JSA
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2025_CALS_A
-- id: no_global_1
+    anchor: GARBAGE_GAP25JSB
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2025_MACRO_B
-- id: no_global_2
+    anchor: GARBAGE_GAP25JSC
+- id: no_garbage_d
   selector:
-    anchor: TRAP_GAP2025_TTL_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2025_FORMAT_D
+    anchor: GARBAGE_GAP25JSD
 oracle:
   required:
-  - scale_func
-  - scale_ml
-  - convert_unit
-  allowed: []
+  - refund_fee_fix
+  - refund_record_call
+  - journal_record_method
+  allowed:
+  - audit_uses_balance
   forbidden:
-  - no_nutrition
-  - no_storage
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

@@ -1,174 +1,238 @@
 name: bal_refactor_014_typescript_rename_across_files
 tags:
-- lang:typescript
+- lang:python
+- change:bug_fix
 - change:multi_file
-- change:refactor
-- context:import_chain
+- context:test_file
 - distance:1hop
-- difficulty:easy
+- difficulty:medium
 repo:
   initial_files:
-    src/models/item.ts: |
-      export interface Item {
-          id: string;
-          name: string;
-          price: number;
-          quantity: number;
-      }
+    src/sessions/store.py: |
+      import secrets
+      import time
+      from typing import Optional, Dict, Any
 
-      export function createItem(name: string, price: number, quantity: number): Item {
-          return { id: crypto.randomUUID(), name, price, quantity };
-      }
-    src/cart/cartManager.ts: |
-      import { Item, createItem } from '../models/item';
+      class SessionStore:
+          def __init__(self, ttl_seconds: int = 3600):
+              self._sessions: Dict[str, dict] = {}
+              self._ttl = ttl_seconds
 
-      export class CartManager {
-          private items: Item[] = [];
+          def create(self, user_id: str, data: Dict[str, Any] = None) -> str:
+              token = secrets.token_hex(32)
+              self._sessions[token] = {
+                  "user_id": user_id,
+                  "data": data or {},
+                  "created_at": time.time(),
+              }
+              return token
 
-          addItem(name: string, price: number, quantity: number): void {
-              this.items.push(createItem(name, price, quantity));
-          }
+          def get(self, token: str) -> Optional[dict]:
+              session = self._sessions.get(token)
+              if session is None:
+                  return None
+              return session
 
-          getTotal(): number {
-              return this.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-          }
+          def delete(self, token: str) -> None:
+              self._sessions.pop(token, None)
+    src/sessions/middleware.py: |
+      from src.sessions.store import SessionStore
 
-          getItems(): Item[] {
-              return [...this.items];
-          }
-      }
-    src/pages/checkout.ts: |
-      import { CartManager } from '../cart/cartManager';
+      class SessionMiddleware:
+          def __init__(self, store: SessionStore):
+              self.store = store
 
-      export function renderCheckout(cart: CartManager): string {
-          const items = cart.getItems();
-          const total = cart.getTotal();
-          return `Items: ${items.length}, Total: $${total.toFixed(2)}`;
-      }
-    src/analytics/tracker.ts: |
-      const GARBAGE_REFACTOR_014_TRACK_A = 'tracker';
-      const GARBAGE_REFACTOR_014_EVENT_B = 'click';
+          def process_request(self, request: dict) -> dict:
+              token = request.get("session_token")
+              if token:
+                  session = self.store.get(token)
+                  request["session"] = session
+              else:
+                  request["session"] = None
+              return request
+    tests/test_sessions.py: |
+      import pytest
+      import time
+      from src.sessions.store import SessionStore
 
-      export function trackEvent(name: string): void {
-          console.log(`Event: ${name}`);
-      }
-    garbage_theme.ts: |
-      const GARBAGE_REFACTOR_014_THEME_C = 'theme';
-      const GARBAGE_REFACTOR_014_MODE_D = 'dark';
+      def test_create_returns_token():
+          store = SessionStore(ttl_seconds=60)
+          token = store.create("user-1")
+          assert token is not None
+          assert len(token) == 64
 
-      export const theme = {
-          GARBAGE_REFACTOR_014_THEME_OBJ_E: true,
-          primary: '#333',
-      };
+      def test_get_returns_session_data():
+          store = SessionStore(ttl_seconds=60)
+          token = store.create("user-1", {"role": "admin"})
+          session = store.get(token)
+          assert session["user_id"] == "user-1"
+          assert session["data"]["role"] == "admin"
+
+      def test_delete_removes_session():
+          store = SessionStore(ttl_seconds=60)
+          token = store.create("user-2")
+          store.delete(token)
+          assert store.get(token) is None
+    src/auth/oauth.py: |
+      # GARBAGE_RF14_A = "oauth_provider_unrelated"
+      class OAuthProvider:
+          def exchange_code(self, code: str) -> str:
+              return "access_token"
+    src/cache/redis_cache.py: |
+      # GARBAGE_RF14_B = "redis_cache_unrelated"
+      class RedisCache:
+          def get(self, key: str):
+              return None
+          def set(self, key: str, value, ttl: int = None):
+              pass
+    src/audit/log.py: |
+      # GARBAGE_RF14_C = "audit_log_unrelated"
+      class AuditLog:
+          def record(self, action: str, actor: str, resource: str) -> None:
+              pass
   changed_files:
-    src/models/product.ts: |
-      export interface Product {
-          id: string;
-          name: string;
-          price: number;
-          quantity: number;
-      }
+    src/sessions/store.py: |
+      import secrets
+      import time
+      from typing import Optional, Dict, Any
 
-      export function createProduct(name: string, price: number, quantity: number): Product {
-          return { id: crypto.randomUUID(), name, price, quantity };
-      }
-    src/cart/cartManager.ts: |
-      import { Product, createProduct } from '../models/product';
+      class SessionStore:
+          def __init__(self, ttl_seconds: int = 3600):
+              self._sessions: Dict[str, dict] = {}
+              self._ttl = ttl_seconds
 
-      export class CartManager {
-          private items: Product[] = [];
+          def create(self, user_id: str, data: Dict[str, Any] = None) -> str:
+              token = secrets.token_hex(32)
+              self._sessions[token] = {
+                  "user_id": user_id,
+                  "data": data or {},
+                  "created_at": time.time(),
+              }
+              return token
 
-          addItem(name: string, price: number, quantity: number): void {
-              this.items.push(createProduct(name, price, quantity));
-          }
+          def get(self, token: str) -> Optional[dict]:
+              session = self._sessions.get(token)
+              if session is None:
+                  return None
+              age = time.time() - session["created_at"]
+              if age > self._ttl:
+                  self.delete(token)
+                  return None
+              return session
 
-          getTotal(): number {
-              return this.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-          }
+          def delete(self, token: str) -> None:
+              self._sessions.pop(token, None)
 
-          getItems(): Product[] {
-              return [...this.items];
-          }
-      }
-    src/pages/checkout.ts: |
-      import { CartManager } from '../cart/cartManager';
+          def purge_expired(self) -> int:
+              now = time.time()
+              expired = [t for t, s in self._sessions.items() if now - s["created_at"] > self._ttl]
+              for t in expired:
+                  del self._sessions[t]
+              return len(expired)
+    src/sessions/middleware.py: |
+      from src.sessions.store import SessionStore
 
-      export function renderCheckout(cart: CartManager): string {
-          const items = cart.getItems();
-          const total = cart.getTotal();
-          return `Items: ${items.length}, Total: $${total.toFixed(2)}`;
-      }
-    src/analytics/tracker.ts: |
-      const GARBAGE_REFACTOR_014_TRACK_A = 'tracker';
-      const GARBAGE_REFACTOR_014_EVENT_B = 'click';
+      class SessionMiddleware:
+          def __init__(self, store: SessionStore):
+              self.store = store
 
-      export function trackEvent(name: string): void {
-          console.log(`Event: ${name}`);
-      }
-    garbage_theme.ts: |
-      const GARBAGE_REFACTOR_014_THEME_C = 'theme';
-      const GARBAGE_REFACTOR_014_MODE_D = 'dark';
+          def process_request(self, request: dict) -> dict:
+              token = request.get("session_token")
+              if token:
+                  session = self.store.get(token)
+                  request["session"] = session
+              else:
+                  request["session"] = None
+              return request
+    tests/test_sessions.py: |
+      import pytest
+      import time
+      from src.sessions.store import SessionStore
 
-      export const theme = {
-          GARBAGE_REFACTOR_014_THEME_OBJ_E: true,
-          primary: '#333',
-      };
-  commit_message: "refactor: rename Item to Product across codebase"
+      def test_create_returns_token():
+          store = SessionStore(ttl_seconds=60)
+          token = store.create("user-1")
+          assert token is not None
+          assert len(token) == 64
+
+      def test_get_returns_session_data():
+          store = SessionStore(ttl_seconds=60)
+          token = store.create("user-1", {"role": "admin"})
+          session = store.get(token)
+          assert session["user_id"] == "user-1"
+          assert session["data"]["role"] == "admin"
+
+      def test_delete_removes_session():
+          store = SessionStore(ttl_seconds=60)
+          token = store.create("user-2")
+          store.delete(token)
+          assert store.get(token) is None
+
+      def test_get_expired_session_returns_none():
+          store = SessionStore(ttl_seconds=1)
+          token = store.create("user-3")
+          time.sleep(1.05)
+          assert store.get(token) is None
+
+      def test_purge_expired_removes_stale_sessions():
+          store = SessionStore(ttl_seconds=1)
+          store.create("user-4")
+          store.create("user-5")
+          time.sleep(1.05)
+          purged = store.purge_expired()
+          assert purged == 2
+    src/auth/oauth.py: |
+      # GARBAGE_RF14_A = "oauth_provider_unrelated"
+      class OAuthProvider:
+          def exchange_code(self, code: str) -> str:
+              return "access_token"
+    src/cache/redis_cache.py: |
+      # GARBAGE_RF14_B = "redis_cache_unrelated"
+      class RedisCache:
+          def get(self, key: str):
+              return None
+          def set(self, key: str, value, ttl: int = None):
+              pass
+    src/audit/log.py: |
+      # GARBAGE_RF14_C = "audit_log_unrelated"
+      class AuditLog:
+          def record(self, action: str, actor: str, resource: str) -> None:
+              pass
+  commit_message: "fix: expire sessions on get and add purge_expired to SessionStore"
 fragments:
-- id: new_product_interface
+- id: get_expiry_check
   selector:
-    path: src/models/product.ts
-    anchor: "export interface Product"
-- id: create_product_fn
+    path: src/sessions/store.py
+    anchor: "age > self._ttl"
+- id: purge_expired_fn
   selector:
-    path: src/models/product.ts
-    anchor: "export function createProduct"
-- id: cart_imports_product
+    path: src/sessions/store.py
+    anchor: "def purge_expired"
+- id: test_expired_returns_none
   selector:
-    path: src/cart/cartManager.ts
-    anchor: "from '../models/product'"
-- id: cart_uses_product_type
+    path: tests/test_sessions.py
+    anchor: "test_get_expired_session_returns_none"
+- id: test_purge_removes
   selector:
-    path: src/cart/cartManager.ts
-    anchor: "private items: Product[]"
-- id: checkout_uses_cart
+    path: tests/test_sessions.py
+    anchor: "test_purge_expired_removes_stale_sessions"
+- id: no_garbage_a
   selector:
-    path: src/pages/checkout.ts
-    anchor: "from '../cart/cartManager'"
-- id: no_tracker
+    anchor: GARBAGE_RF14_A
+- id: no_garbage_b
   selector:
-    path: src/analytics/tracker.ts
-- id: no_garbage_theme
+    anchor: GARBAGE_RF14_B
+- id: no_garbage_c
   selector:
-    path: garbage_theme.ts
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_014_TRACK_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_014_EVENT_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_014_THEME_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_014_MODE_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_014_THEME_OBJ_E
+    anchor: GARBAGE_RF14_C
 oracle:
   required:
-  - new_product_interface
-  - create_product_fn
-  - cart_imports_product
-  - cart_uses_product_type
-  - checkout_uses_cart
-  allowed: []
+  - get_expiry_check
+  - purge_expired_fn
+  - test_expired_returns_none
+  allowed:
+  - test_purge_removes
   forbidden:
-  - no_tracker
-  - no_garbage_theme
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

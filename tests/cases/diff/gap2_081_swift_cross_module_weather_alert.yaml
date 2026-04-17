@@ -1,153 +1,192 @@
 name: gap2_081_swift_cross_module_weather_alert
 tags:
-- change:new_function
+- lang:cpp
 - change:single_file
 - context:cross_module
-- difficulty:medium
 - distance:2hop
-- lang:swift
-fixtures:
-  auto_garbage: true
+- difficulty:medium
 repo:
   initial_files:
-    Sources/Weather/AlertService.swift: |
-      import Foundation
+    include/geometry/shape.h: |
+      #pragma once
 
-      struct WeatherAlert {
-          let severity: String
-          let region: String
-          let message: String
+      namespace geometry {
+
+      struct Point {
+          double x;
+          double y;
+      };
+
+      struct BoundingBox {
+          Point min;
+          Point max;
+          double width() const { return max.x - min.x; }
+          double height() const { return max.y - min.y; }
+      };
+
+      class Shape {
+      public:
+          virtual ~Shape() = default;
+          virtual BoundingBox bounding_box() const = 0;
+          virtual double area() const = 0;
+      };
+
       }
+    src/renderer/canvas.cpp: |
+      #include "geometry/shape.h"
+      #include <vector>
+      #include <memory>
 
-      class AlertService {
-          private let provider: WeatherProvider
+      namespace renderer {
 
-          init(provider: WeatherProvider) {
-              self.provider = provider
+      class Canvas {
+          std::vector<std::shared_ptr<geometry::Shape>> shapes;
+      public:
+          void add(std::shared_ptr<geometry::Shape> shape) {
+              shapes.push_back(shape);
           }
 
-          func activeAlerts(for region: String) -> [WeatherAlert] {
-              let readings = provider.currentReadings(region: region)
-              return readings.filter { $0.temperature > 40 }.map {
-                  WeatherAlert(severity: "high", region: region, message: "Temp \($0.temperature)C")
+          void render() {
+              for (auto& s : shapes) {
+                  auto bb = s->bounding_box();
+                  // draw at bb.min with bb.width() x bb.height()
               }
           }
+      };
+
       }
-    Sources/Weather/WeatherProvider.swift: |
-      import Foundation
+    src/physics/collision.cpp: |
+      #include "geometry/shape.h"
 
-      struct WeatherReading {
-          let temperature: Double
-          let humidity: Double
-          let windSpeed: Double
-          let stationId: String
-      }
+      namespace physics {
 
-      class WeatherProvider {
-          private let stationRegistry: StationRegistry
-
-          init(stationRegistry: StationRegistry) {
-              self.stationRegistry = stationRegistry
-          }
-
-          func currentReadings(region: String) -> [WeatherReading] {
-              let stations = stationRegistry.stationsInRegion(region)
-              return stations.map { station in
-                  WeatherReading(temperature: 25.0, humidity: 60.0, windSpeed: 12.0, stationId: station.id)
-              }
-          }
-      }
-    Sources/Weather/StationRegistry.swift: |
-      import Foundation
-
-      struct Station {
-          let id: String
-          let name: String
-          let latitude: Double
-          let longitude: Double
+      bool overlaps(const geometry::BoundingBox& a, const geometry::BoundingBox& b) {
+          return a.min.x < b.max.x && a.max.x > b.min.x &&
+                 a.min.y < b.max.y && a.max.y > b.min.y;
       }
 
-      class StationRegistry {
-          private var stations: [Station] = []
-
-          func stationsInRegion(_ region: String) -> [Station] {
-              stations.filter { $0.id.hasPrefix(region) }
-          }
-
-          func register(_ station: Station) {
-              stations.append(station)
-          }
       }
-    Sources/Logging/EventLogger.swift: |
-      import Foundation
-
-      let TRAP_GAP2_081_LOGGER_A: String = "event_logger"
-      let TRAP_GAP2_081_LOGGER_B: Bool = true
-
-      class EventLogger {
-          func log(_ event: String) {}
-          func flush() {}
-      }
+    garbage/audio.cpp: |
+      // GARBAGE_SW081_AUDIO_A = "audio_marker"
+      void play_sound(int id) {}
+    garbage/network.cpp: |
+      // GARBAGE_SW081_NETWORK_B = "network_marker"
+      void send_packet(const char* data, int len) {}
+    garbage/input.cpp: |
+      // GARBAGE_SW081_INPUT_C = "input_marker"
+      void poll_events() {}
   changed_files:
-    Sources/Weather/AlertService.swift: |
-      import Foundation
+    include/geometry/shape.h: |
+      #pragma once
 
-      struct WeatherAlert {
-          let severity: String
-          let region: String
-          let message: String
+      namespace geometry {
+
+      struct Point {
+          double x;
+          double y;
+      };
+
+      struct BoundingBox {
+          Point min;
+          Point max;
+          double width() const { return max.x - min.x; }
+          double height() const { return max.y - min.y; }
+          double area() const { return width() * height(); }
+          Point center() const { return {(min.x + max.x) / 2.0, (min.y + max.y) / 2.0}; }
+      };
+
+      class Shape {
+      public:
+          virtual ~Shape() = default;
+          virtual BoundingBox bounding_box() const = 0;
+          virtual double area() const = 0;
+          virtual bool contains(Point p) const = 0;
+      };
+
       }
+    src/renderer/canvas.cpp: |
+      #include "geometry/shape.h"
+      #include <vector>
+      #include <memory>
 
-      class AlertService {
-          private let provider: WeatherProvider
+      namespace renderer {
 
-          init(provider: WeatherProvider) {
-              self.provider = provider
+      class Canvas {
+          std::vector<std::shared_ptr<geometry::Shape>> shapes;
+      public:
+          void add(std::shared_ptr<geometry::Shape> shape) {
+              shapes.push_back(shape);
           }
 
-          func activeAlerts(for region: String) -> [WeatherAlert] {
-              let readings = provider.currentReadings(region: region)
-              return readings.filter { $0.temperature > 40 }.map {
-                  WeatherAlert(severity: "high", region: region, message: "Temp \($0.temperature)C")
+          void render() {
+              for (auto& s : shapes) {
+                  auto bb = s->bounding_box();
+                  // draw at bb.min with bb.width() x bb.height()
               }
           }
+      };
 
-          func frostWarnings(for region: String) -> [WeatherAlert] {
-              let readings = provider.currentReadings(region: region)
-              return readings.filter { $0.temperature < 0 }.map {
-                  WeatherAlert(severity: "medium", region: region, message: "Frost at \($0.stationId)")
-              }
-          }
       }
-  commit_message: Update files
+    src/physics/collision.cpp: |
+      #include "geometry/shape.h"
+
+      namespace physics {
+
+      bool overlaps(const geometry::BoundingBox& a, const geometry::BoundingBox& b) {
+          return a.min.x < b.max.x && a.max.x > b.min.x &&
+                 a.min.y < b.max.y && a.max.y > b.min.y;
+      }
+
+      bool point_in_box(geometry::Point p, const geometry::BoundingBox& box) {
+          return p.x >= box.min.x && p.x <= box.max.x &&
+                 p.y >= box.min.y && p.y <= box.max.y;
+      }
+
+      }
+    garbage/audio.cpp: |
+      // GARBAGE_SW081_AUDIO_A = "audio_marker"
+      void play_sound(int id) {}
+    garbage/network.cpp: |
+      // GARBAGE_SW081_NETWORK_B = "network_marker"
+      void send_packet(const char* data, int len) {}
+    garbage/input.cpp: |
+      // GARBAGE_SW081_INPUT_C = "input_marker"
+      void poll_events() {}
+  commit_message: "feat: add contains() to Shape, center/area to BoundingBox"
 fragments:
-- id: frost_fn
+- id: bounding_box_new_methods
   selector:
-    path: Sources/Weather/AlertService.swift
-    anchor: "func frostWarnings"
-- id: provider_readings
+    path: include/geometry/shape.h
+    anchor: "Point center() const"
+- id: shape_contains_pure_virtual
   selector:
-    path: Sources/Weather/WeatherProvider.swift
-    anchor: "func currentReadings"
-- id: weather_reading_struct
+    path: include/geometry/shape.h
+    anchor: "virtual bool contains"
+- id: canvas_uses_bounding_box
   selector:
-    path: Sources/Weather/WeatherProvider.swift
-    anchor: "struct WeatherReading"
-- id: no_logger
+    path: src/renderer/canvas.cpp
+    anchor: "auto bb = s->bounding_box()"
+- id: collision_uses_bounding_box
   selector:
-    path: Sources/Logging/EventLogger.swift
-- id: no_global_0
+    path: src/physics/collision.cpp
+    anchor: "bool overlaps"
+- id: no_garbage_a
   selector:
-    anchor: TRAP_GAP2_081_LOGGER_A
-- id: no_global_1
+    anchor: GARBAGE_SW081_AUDIO_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2_081_LOGGER_B
+    anchor: GARBAGE_SW081_NETWORK_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_SW081_INPUT_C
 oracle:
   required:
-  - frost_fn
-  - provider_readings
-  - weather_reading_struct
+  - bounding_box_new_methods
+  - shape_contains_pure_virtual
+  - canvas_uses_bounding_box
+  - collision_uses_bounding_box
+  allowed: []
   forbidden:
-  - no_logger
-  - no_global_0
-  - no_global_1
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

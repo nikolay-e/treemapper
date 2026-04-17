@@ -1,249 +1,134 @@
 name: gap2_021_java_refactor_extract_validator_service
 tags:
-- change:multi_file
-- change:refactor
-- context:cross_module
-- difficulty:medium
+- lang:elixir
+- change:new_function
+- change:single_file
+- context:import_chain
 - distance:2hop
-- lang:java
+- difficulty:medium
 repo:
   initial_files:
-    src/main/java/com/warehouse/InventoryService.java: |
-      package com.warehouse;
+    lib/iot/device.ex: |
+      defmodule IoT.Device do
+        defstruct [:id, :type, :firmware_version, :readings]
 
-      import java.util.List;
-      import java.util.stream.Collectors;
+        def latest_reading(%__MODULE__{readings: readings}) when readings != [] do
+          List.last(readings)
+        end
+        def latest_reading(_), do: nil
 
-      public class InventoryService {
-          private final InventoryRepository repository;
+        def add_reading(%__MODULE__{} = device, value) do
+          %{device | readings: device.readings ++ [value]}
+        end
+      end
+    lib/iot/aggregator.ex: |
+      defmodule IoT.Aggregator do
+        alias IoT.Device
 
-          public InventoryService(InventoryRepository repository) {
-              this.repository = repository;
-          }
+        def mean_reading(%Device{readings: readings}) when readings != [] do
+          Enum.sum(readings) / length(readings)
+        end
+        def mean_reading(_), do: nil
+      end
+    lib/iot/alert_engine.ex: |
+      defmodule IoT.AlertEngine do
+        alias IoT.Aggregator
 
-          public void receiveShipment(String sku, int quantity) {
-              if (sku == null || sku.isEmpty()) {
-                  throw new IllegalArgumentException("SKU must not be empty");
-              }
-              if (quantity <= 0) {
-                  throw new IllegalArgumentException("Quantity must be positive");
-              }
-              Item item = repository.findBySku(sku);
-              item.addStock(quantity);
-              repository.save(item);
-          }
-
-          public List<Item> getLowStockItems(int threshold) {
-              return repository.findAll().stream()
-                  .filter(i -> i.getStock() < threshold)
-                  .collect(Collectors.toList());
-          }
-      }
-    src/main/java/com/warehouse/InventoryRepository.java: |
-      package com.warehouse;
-
-      import java.util.List;
-
-      public interface InventoryRepository {
-          Item findBySku(String sku);
-          void save(Item item);
-          List<Item> findAll();
-      }
-    src/main/java/com/warehouse/Item.java: |
-      package com.warehouse;
-
-      public class Item {
-          private final String sku;
-          private int stock;
-
-          public Item(String sku, int stock) {
-              this.sku = sku;
-              this.stock = stock;
-          }
-
-          public String getSku() { return sku; }
-          public int getStock() { return stock; }
-
-          public void addStock(int quantity) {
-              this.stock += quantity;
-          }
-      }
-    src/main/java/com/warehouse/ReportGenerator.java: |
-      package com.warehouse;
-
-      import java.util.List;
-
-      public class ReportGenerator {
-          private static final String TRAP_GAP2021_REPORT_A = "weekly";
-          private static final int TRAP_GAP2021_PAGE_B = 50;
-
-          public String generateStockReport(List<Item> items) {
-              StringBuilder sb = new StringBuilder("Stock Report\n");
-              for (Item item : items) {
-                  sb.append(item.getSku()).append(": ").append(item.getStock()).append("\n");
-              }
-              return sb.toString();
-          }
-      }
-    src/main/java/com/warehouse/AuditLogger.java: |
-      package com.warehouse;
-
-      public class AuditLogger {
-          private static final String TRAP_GAP2021_AUDIT_C = "inventory_audit";
-          private static final boolean TRAP_GAP2021_ENABLED_D = true;
-
-          public void logAction(String action, String detail) {
-              System.out.println("[AUDIT] " + action + ": " + detail);
-          }
-      }
+        def check_threshold(device, threshold) do
+          case Aggregator.mean_reading(device) do
+            nil -> :no_data
+            mean when mean > threshold -> {:alert, mean}
+            _ -> :ok
+          end
+        end
+      end
+    garbage/Provisioner.ex: |
+      # GARBAGE_IOT_A = "provisioner_marker"
+    garbage/Firmware.ex: |
+      # GARBAGE_IOT_B = "firmware_marker"
+    garbage/Gateway.ex: |
+      # GARBAGE_IOT_C = "gateway_marker"
+    garbage/Registry.ex: |
+      # GARBAGE_IOT_D = "registry_marker"
   changed_files:
-    src/main/java/com/warehouse/InventoryService.java: |
-      package com.warehouse;
+    lib/iot/device.ex: |
+      defmodule IoT.Device do
+        defstruct [:id, :type, :firmware_version, :readings]
 
-      import java.util.List;
-      import java.util.stream.Collectors;
+        def latest_reading(%__MODULE__{readings: readings}) when readings != [] do
+          List.last(readings)
+        end
+        def latest_reading(_), do: nil
 
-      public class InventoryService {
-          private final InventoryRepository repository;
-          private final ShipmentValidator validator;
+        def add_reading(%__MODULE__{} = device, value) do
+          %{device | readings: device.readings ++ [value]}
+        end
 
-          public InventoryService(InventoryRepository repository, ShipmentValidator validator) {
-              this.repository = repository;
-              this.validator = validator;
-          }
+        def reading_count(%__MODULE__{readings: readings}), do: length(readings)
 
-          public void receiveShipment(String sku, int quantity) {
-              validator.validate(sku, quantity);
-              Item item = repository.findBySku(sku);
-              item.addStock(quantity);
-              repository.save(item);
-          }
+        def clear_readings(%__MODULE__{} = device), do: %{device | readings: []}
+      end
+    lib/iot/aggregator.ex: |
+      defmodule IoT.Aggregator do
+        alias IoT.Device
 
-          public List<Item> getLowStockItems(int threshold) {
-              return repository.findAll().stream()
-                  .filter(i -> i.getStock() < threshold)
-                  .collect(Collectors.toList());
-          }
-      }
-    src/main/java/com/warehouse/ShipmentValidator.java: |
-      package com.warehouse;
+        def mean_reading(%Device{readings: readings}) when readings != [] do
+          Enum.sum(readings) / length(readings)
+        end
+        def mean_reading(_), do: nil
+      end
+    lib/iot/alert_engine.ex: |
+      defmodule IoT.AlertEngine do
+        alias IoT.Aggregator
 
-      public class ShipmentValidator {
-          public void validate(String sku, int quantity) {
-              if (sku == null || sku.isEmpty()) {
-                  throw new IllegalArgumentException("SKU must not be empty");
-              }
-              if (quantity <= 0) {
-                  throw new IllegalArgumentException("Quantity must be positive");
-              }
-          }
-      }
-    src/main/java/com/warehouse/InventoryRepository.java: |
-      package com.warehouse;
-
-      import java.util.List;
-
-      public interface InventoryRepository {
-          Item findBySku(String sku);
-          void save(Item item);
-          List<Item> findAll();
-      }
-    src/main/java/com/warehouse/Item.java: |
-      package com.warehouse;
-
-      public class Item {
-          private final String sku;
-          private int stock;
-
-          public Item(String sku, int stock) {
-              this.sku = sku;
-              this.stock = stock;
-          }
-
-          public String getSku() { return sku; }
-          public int getStock() { return stock; }
-
-          public void addStock(int quantity) {
-              this.stock += quantity;
-          }
-      }
-    src/main/java/com/warehouse/ReportGenerator.java: |
-      package com.warehouse;
-
-      import java.util.List;
-
-      public class ReportGenerator {
-          private static final String TRAP_GAP2021_REPORT_A = "weekly";
-          private static final int TRAP_GAP2021_PAGE_B = 50;
-
-          public String generateStockReport(List<Item> items) {
-              StringBuilder sb = new StringBuilder("Stock Report\n");
-              for (Item item : items) {
-                  sb.append(item.getSku()).append(": ").append(item.getStock()).append("\n");
-              }
-              return sb.toString();
-          }
-      }
-    src/main/java/com/warehouse/AuditLogger.java: |
-      package com.warehouse;
-
-      public class AuditLogger {
-          private static final String TRAP_GAP2021_AUDIT_C = "inventory_audit";
-          private static final boolean TRAP_GAP2021_ENABLED_D = true;
-
-          public void logAction(String action, String detail) {
-              System.out.println("[AUDIT] " + action + ": " + detail);
-          }
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+        def check_threshold(device, threshold) do
+          case Aggregator.mean_reading(device) do
+            nil -> :no_data
+            mean when mean > threshold -> {:alert, mean}
+            _ -> :ok
+          end
+        end
+      end
+    garbage/Provisioner.ex: |
+      # GARBAGE_IOT_A = "provisioner_marker"
+    garbage/Firmware.ex: |
+      # GARBAGE_IOT_B = "firmware_marker"
+    garbage/Gateway.ex: |
+      # GARBAGE_IOT_C = "gateway_marker"
+    garbage/Registry.ex: |
+      # GARBAGE_IOT_D = "registry_marker"
+  commit_message: "feat: add reading_count and clear_readings to IoT.Device"
 fragments:
-- id: service_validator_field
+- id: reading_count
   selector:
-    path: src/main/java/com/warehouse/InventoryService.java
-    anchor: private final ShipmentValidator validator;
-- id: service_validate_call
+    anchor: "def reading_count"
+- id: clear_readings
   selector:
-    path: src/main/java/com/warehouse/InventoryService.java
-    anchor: validator.validate(sku, quantity);
-- id: validator_class
+    anchor: "def clear_readings"
+- id: aggregator_mean
   selector:
-    path: src/main/java/com/warehouse/ShipmentValidator.java
-    anchor: public class ShipmentValidator {
-- id: validator_validate_method
+    path: lib/iot/aggregator.ex
+    anchor: "def mean_reading"
+- id: no_garbage_a
   selector:
-    path: src/main/java/com/warehouse/ShipmentValidator.java
-    anchor: public void validate(String sku, int quantity) {
-- id: no_report
+    anchor: GARBAGE_IOT_A
+- id: no_garbage_b
   selector:
-    path: src/main/java/com/warehouse/ReportGenerator.java
-- id: no_audit
+    anchor: GARBAGE_IOT_B
+- id: no_garbage_c
   selector:
-    path: src/main/java/com/warehouse/AuditLogger.java
-- id: no_global_0
+    anchor: GARBAGE_IOT_C
+- id: no_garbage_d
   selector:
-    anchor: TRAP_GAP2021_REPORT_A
-- id: no_global_1
-  selector:
-    anchor: TRAP_GAP2021_PAGE_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP2021_AUDIT_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2021_ENABLED_D
+    anchor: GARBAGE_IOT_D
 oracle:
   required:
-  - service_validator_field
-  - service_validate_call
-  - validator_class
-  - validator_validate_method
-  allowed: []
+  - reading_count
+  - clear_readings
+  allowed:
+  - aggregator_mean
   forbidden:
-  - no_report
-  - no_audit
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

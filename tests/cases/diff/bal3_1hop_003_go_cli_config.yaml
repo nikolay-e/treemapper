@@ -1,193 +1,145 @@
 name: bal3_1hop_003_go_cli_config
 tags:
-- lang:go
+- lang:python
 - change:multi_file
+- change:refactor
 - context:import_chain
-- distance:1hop
-- difficulty:hard
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
-    internal/config/config.go: |
-      package config
+    src/billing/invoicer.py: |
+      from decimal import Decimal
 
-      type Config struct {
-          Host    string
-          Port    int
-          Verbose bool
-      }
+      def compute_line_total(quantity: int, unit_price: Decimal) -> Decimal:
+          return Decimal(quantity) * unit_price
 
-      func Load(path string) (*Config, error) {
-          return &Config{Host: "localhost", Port: 8080, Verbose: false}, nil
-      }
-    cmd/serve/main.go: |
-      package main
+      def compute_subtotal(lines: list[dict]) -> Decimal:
+          return sum(compute_line_total(l["quantity"], Decimal(str(l["unit_price"]))) for l in lines)
+    src/billing/tax.py: |
+      from decimal import Decimal
+      from src.billing.invoicer import compute_subtotal
 
-      import (
-          "fmt"
-          "internal/config"
-      )
+      def compute_tax(lines: list[dict], tax_rate: Decimal) -> Decimal:
+          subtotal = compute_subtotal(lines)
+          return (subtotal * tax_rate).quantize(Decimal("0.01"))
 
-      func runServer() error {
-          cfg, err := config.Load("config.yaml")
-          if err != nil {
-              return err
-          }
-          fmt.Printf("serving on %s:%d\n", cfg.Host, cfg.Port)
-          return nil
-      }
-    cmd/migrate/main.go: |
-      package main
+      def compute_total_with_tax(lines: list[dict], tax_rate: Decimal) -> Decimal:
+          subtotal = compute_subtotal(lines)
+          tax = compute_tax(lines, tax_rate)
+          return subtotal + tax
+    src/billing/formatter.py: |
+      from decimal import Decimal
+      from src.billing.tax import compute_total_with_tax
 
-      import (
-          "fmt"
-          "internal/config"
-      )
+      def format_invoice(lines: list[dict], tax_rate: Decimal) -> str:
+          total = compute_total_with_tax(lines, tax_rate)
+          return f"Total due: {total}"
+    garbage/auth.py: |
+      GARBAGE_BAL31HOP003_A = "auth_marker"
 
-      func runMigration() error {
-          cfg, err := config.Load("config.yaml")
-          if err != nil {
-              return err
-          }
-          fmt.Printf("migrating db at %s:%d\n", cfg.Host, cfg.Port)
-          return nil
-      }
-    cmd/healthcheck/main.go: |
-      package main
+      def noop():
+          pass
+    garbage/logger.py: |
+      GARBAGE_BAL31HOP003_B = "log_marker"
 
-      import (
-          "fmt"
-          "internal/config"
-      )
+      def noop():
+          pass
+    garbage/notify.py: |
+      GARBAGE_BAL31HOP003_C = "notify_marker"
 
-      func runHealthcheck() error {
-          cfg, err := config.Load("config.yaml")
-          if err != nil {
-              return err
-          }
-          fmt.Printf("checking %s:%d\n", cfg.Host, cfg.Port)
-          return nil
-      }
-    internal/logger/logger.go: |
-      package logger
-
-      GARBAGE_003_LOGGER_A = "logger"
-
-      type Logger struct {
-          Level string
-      }
-
-      func New(level string) *Logger {
-          return &Logger{Level: level}
-      }
-    internal/version/version.go: |
-      package version
-
-      GARBAGE_003_VERSION_B = "version"
-
-      var BuildVersion = "dev"
-
-      func Get() string {
-          return BuildVersion
-      }
-    internal/telemetry/otel.go: |
-      package telemetry
-
-      GARBAGE_003_OTEL_C = "otel"
-
-      type TracerProvider struct {
-          Endpoint string
-      }
-
-      func NewProvider(endpoint string) *TracerProvider {
-          return &TracerProvider{Endpoint: endpoint}
-      }
+      def noop():
+          pass
   changed_files:
-    internal/config/config.go: |
-      package config
+    src/billing/invoicer.py: |
+      from decimal import Decimal
 
-      import "os"
+      def compute_line_total(quantity: int, unit_price: Decimal) -> Decimal:
+          return Decimal(quantity) * unit_price
 
-      type Config struct {
-          Host      string
-          Port      int
-          Verbose   bool
-          LogLevel  string
-          MaxConns  int
-      }
+      def compute_subtotal(lines: list[dict]) -> Decimal:
+          return sum(compute_line_total(l["quantity"], Decimal(str(l["unit_price"]))) for l in lines)
 
-      func Load(path string) (*Config, error) {
-          logLevel := os.Getenv("LOG_LEVEL")
-          if logLevel == "" {
-              logLevel = "info"
-          }
-          return &Config{
-              Host:     "localhost",
-              Port:     8080,
-              Verbose:  false,
-              LogLevel: logLevel,
-              MaxConns: 100,
-          }, nil
-      }
-  commit_message: "feat: add LogLevel and MaxConns to config"
+      def compute_discount(subtotal: Decimal, discount_rate: Decimal) -> Decimal:
+          return (subtotal * discount_rate).quantize(Decimal("0.01"))
+    src/billing/tax.py: |
+      from decimal import Decimal
+      from src.billing.invoicer import compute_subtotal, compute_discount
+
+      def compute_tax(lines: list[dict], tax_rate: Decimal) -> Decimal:
+          subtotal = compute_subtotal(lines)
+          return (subtotal * tax_rate).quantize(Decimal("0.01"))
+
+      def compute_total_with_tax(
+          lines: list[dict],
+          tax_rate: Decimal,
+          discount_rate: Decimal = Decimal("0"),
+      ) -> Decimal:
+          subtotal = compute_subtotal(lines)
+          discount = compute_discount(subtotal, discount_rate)
+          tax = compute_tax(lines, tax_rate)
+          return subtotal - discount + tax
+    src/billing/formatter.py: |
+      from decimal import Decimal
+      from src.billing.tax import compute_total_with_tax
+
+      def format_invoice(
+          lines: list[dict],
+          tax_rate: Decimal,
+          discount_rate: Decimal = Decimal("0"),
+      ) -> str:
+          total = compute_total_with_tax(lines, tax_rate, discount_rate)
+          return f"Total due: {total}"
+    garbage/auth.py: |
+      GARBAGE_BAL31HOP003_A = "auth_marker"
+
+      def noop():
+          pass
+    garbage/logger.py: |
+      GARBAGE_BAL31HOP003_B = "log_marker"
+
+      def noop():
+          pass
+    garbage/notify.py: |
+      GARBAGE_BAL31HOP003_C = "notify_marker"
+
+      def noop():
+          pass
+  commit_message: "feat: add discount computation to billing pipeline"
 fragments:
-- id: log_level_field
+- id: invoicer_discount
   selector:
-    path: internal/config/config.go
-    anchor: "LogLevel  string"
-- id: max_conns_field
+    path: src/billing/invoicer.py
+    anchor: "def compute_discount("
+- id: tax_imports_discount
   selector:
-    path: internal/config/config.go
-    anchor: "MaxConns  int"
-- id: env_log_level
+    path: src/billing/tax.py
+    anchor: "from src.billing.invoicer import compute_subtotal, compute_discount"
+- id: tax_uses_discount
   selector:
-    path: internal/config/config.go
-    anchor: "os.Getenv(\"LOG_LEVEL\")"
-- id: serve_uses_config
+    path: src/billing/tax.py
+    anchor: "discount = compute_discount("
+- id: formatter_discount_param
   selector:
-    path: cmd/serve/main.go
-    anchor: "config.Load(\"config.yaml\")"
-- id: migrate_uses_config
-  selector:
-    path: cmd/migrate/main.go
-    anchor: "config.Load(\"config.yaml\")"
-- id: healthcheck_uses_config
-  selector:
-    path: cmd/healthcheck/main.go
-    anchor: "config.Load(\"config.yaml\")"
-- id: unrelated_logger
-  selector:
-    path: internal/logger/logger.go
-    anchor: "type Logger struct"
-- id: unrelated_version
-  selector:
-    path: internal/version/version.go
-    anchor: "var BuildVersion"
-- id: unrelated_otel
-  selector:
-    path: internal/telemetry/otel.go
-    anchor: "type TracerProvider struct"
+    path: src/billing/formatter.py
+    anchor: "discount_rate: Decimal = Decimal"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_003_LOGGER_A
+    anchor: GARBAGE_BAL31HOP003_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_003_VERSION_B
+    anchor: GARBAGE_BAL31HOP003_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_003_OTEL_C
+    anchor: GARBAGE_BAL31HOP003_C
 oracle:
   required:
-  - log_level_field
-  - max_conns_field
-  - env_log_level
-  - serve_uses_config
-  allowed:
-  - migrate_uses_config
-  - healthcheck_uses_config
+  - invoicer_discount
+  - tax_imports_discount
+  - tax_uses_discount
+  - formatter_discount_param
+  allowed: []
   forbidden:
-  - unrelated_logger
-  - unrelated_version
-  - unrelated_otel
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

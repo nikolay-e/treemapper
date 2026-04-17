@@ -1,234 +1,325 @@
 name: bal_refactor_022_java_rename_class_across_files
 tags:
-- lang:java
-- change:multi_file
-- change:refactor
+- lang:ruby
+- change:signature
 - context:import_chain
-- distance:1hop
-- difficulty:easy
+- distance:3hop+
+- difficulty:medium
 repo:
   initial_files:
-    src/main/java/com/app/data/DataManager.java: |
-      package com.app.data;
+    lib/core/pipeline.rb: |
+      require_relative 'stage'
+      require_relative 'context'
 
-      import java.util.HashMap;
-      import java.util.Map;
+      module Core
+        class Pipeline
+          def initialize
+            @stages = []
+          end
 
-      public class DataManager {
-          private final Map<String, Object> cache = new HashMap<>();
+          def add_stage(stage)
+            @stages << stage
+            self
+          end
 
-          public void put(String key, Object value) {
-              cache.put(key, value);
-          }
+          def run(input)
+            ctx = Context.new(input)
+            @stages.each { |s| s.process(ctx) }
+            ctx.output
+          end
+        end
+      end
+    lib/core/stage.rb: |
+      module Core
+        module Stage
+          def process(context)
+            raise NotImplementedError
+          end
+        end
+      end
+    lib/core/context.rb: |
+      module Core
+        class Context
+          attr_accessor :data, :errors
 
-          public Object get(String key) {
-              return cache.get(key);
-          }
+          def initialize(input)
+            @data = input
+            @errors = []
+          end
 
-          public boolean contains(String key) {
-              return cache.containsKey(key);
-          }
-      }
-    src/main/java/com/app/service/ProductService.java: |
-      package com.app.service;
+          def output
+            { data: @data, errors: @errors }
+          end
+        end
+      end
+    lib/stages/validation_stage.rb: |
+      require_relative '../core/stage'
+      require_relative '../core/context'
 
-      import com.app.data.DataManager;
+      module Stages
+        class ValidationStage
+          include Core::Stage
 
-      public class ProductService {
-          private final DataManager dataManager;
+          def initialize(schema)
+            @schema = schema
+          end
 
-          public ProductService(DataManager dataManager) {
-              this.dataManager = dataManager;
-          }
+          def process(context)
+            @schema.each do |key, required|
+              context.errors << "Missing: #{key}" if required && !context.data.key?(key)
+            end
+          end
+        end
+      end
+    lib/stages/transform_stage.rb: |
+      require_relative '../core/stage'
 
-          public void cacheProduct(String id, Object product) {
-              dataManager.put("product:" + id, product);
-          }
+      module Stages
+        class TransformStage
+          include Core::Stage
 
-          public Object getProduct(String id) {
-              return dataManager.get("product:" + id);
-          }
-      }
-    src/main/java/com/app/service/SessionService.java: |
-      package com.app.service;
+          def initialize(&block)
+            @transform = block
+          end
 
-      import com.app.data.DataManager;
+          def process(context)
+            context.data = @transform.call(context.data)
+          end
+        end
+      end
+    lib/app/document_processor.rb: |
+      require_relative '../core/pipeline'
+      require_relative '../stages/validation_stage'
+      require_relative '../stages/transform_stage'
 
-      public class SessionService {
-          private final DataManager dataManager;
+      module App
+        class DocumentProcessor
+          def initialize
+            schema = { title: true, body: true }
+            @pipeline = Core::Pipeline.new
+              .add_stage(Stages::ValidationStage.new(schema))
+              .add_stage(Stages::TransformStage.new { |d| d.transform_values(&:strip) })
+          end
 
-          public SessionService(DataManager dataManager) {
-              this.dataManager = dataManager;
-          }
+          def process(document)
+            @pipeline.run(document)
+          end
+        end
+      end
+    lib/storage/archive.rb: |
+      GARBAGE_REFACT022_A = 'archive_storage_v1'
 
-          public void storeSession(String sessionId, Object data) {
-              dataManager.put("session:" + sessionId, data);
-          }
+      module Storage
+        class Archive
+          def store(key, data)
+            puts "Archived #{key}"
+          end
+        end
+      end
+    lib/utils/encoder.rb: |
+      GARBAGE_REFACT022_B = 'base64_encoder'
+      GARBAGE_REFACT022_C = 'utf8'
 
-          public boolean hasSession(String sessionId) {
-              return dataManager.contains("session:" + sessionId);
-          }
-      }
-    src/main/java/com/app/util/StringUtils.java: |
-      package com.app.util;
+      module Utils
+        class Encoder
+          def self.encode(str)
+            Base64.strict_encode64(str)
+          end
+        end
+      end
+    lib/monitoring/health_check.rb: |
+      GARBAGE_REFACT022_D = 'health_check_endpoint'
 
-      public class StringUtils {
-          public static final String GARBAGE_REFACTOR_022_UTILS_A = "string_utils";
-          public static final boolean GARBAGE_REFACTOR_022_TRIM_B = true;
-
-          public static String trim(String s) {
-              return s == null ? "" : s.trim();
-          }
-      }
-    src/main/java/com/app/GarbageScheduler.java: |
-      package com.app;
-
-      public class GarbageScheduler {
-          public static final String GARBAGE_REFACTOR_022_SCHED_C = "scheduler";
-          public static final int GARBAGE_REFACTOR_022_DELAY_D = 1000;
-          public static final boolean GARBAGE_REFACTOR_022_REPEAT_E = true;
-
-          public void schedule(Runnable task) {}
-      }
+      module Monitoring
+        class HealthCheck
+          def status
+            :ok
+          end
+        end
+      end
   changed_files:
-    src/main/java/com/app/data/CacheStore.java: |
-      package com.app.data;
+    lib/core/pipeline.rb: |
+      require_relative 'stage'
+      require_relative 'context'
 
-      import java.util.HashMap;
-      import java.util.Map;
+      module Core
+        class Pipeline
+          def initialize
+            @stages = []
+          end
 
-      public class CacheStore {
-          private final Map<String, Object> cache = new HashMap<>();
+          def add_stage(stage)
+            @stages << stage
+            self
+          end
 
-          public void put(String key, Object value) {
-              cache.put(key, value);
-          }
+          def run(input, metadata: {})
+            ctx = Context.new(input, metadata: metadata)
+            @stages.each { |s| s.process(ctx) }
+            ctx.output
+          end
+        end
+      end
+    lib/core/stage.rb: |
+      module Core
+        module Stage
+          def process(context)
+            raise NotImplementedError
+          end
+        end
+      end
+    lib/core/context.rb: |
+      module Core
+        class Context
+          attr_accessor :data, :errors, :metadata
 
-          public Object get(String key) {
-              return cache.get(key);
-          }
+          def initialize(input, metadata: {})
+            @data = input
+            @errors = []
+            @metadata = metadata
+          end
 
-          public boolean contains(String key) {
-              return cache.containsKey(key);
-          }
-      }
-    src/main/java/com/app/service/ProductService.java: |
-      package com.app.service;
+          def output
+            { data: @data, errors: @errors, metadata: @metadata }
+          end
+        end
+      end
+    lib/stages/validation_stage.rb: |
+      require_relative '../core/stage'
+      require_relative '../core/context'
 
-      import com.app.data.CacheStore;
+      module Stages
+        class ValidationStage
+          include Core::Stage
 
-      public class ProductService {
-          private final CacheStore cacheStore;
+          def initialize(schema)
+            @schema = schema
+          end
 
-          public ProductService(CacheStore cacheStore) {
-              this.cacheStore = cacheStore;
-          }
+          def process(context)
+            @schema.each do |key, required|
+              context.errors << "Missing: #{key}" if required && !context.data.key?(key)
+            end
+          end
+        end
+      end
+    lib/stages/transform_stage.rb: |
+      require_relative '../core/stage'
 
-          public void cacheProduct(String id, Object product) {
-              cacheStore.put("product:" + id, product);
-          }
+      module Stages
+        class TransformStage
+          include Core::Stage
 
-          public Object getProduct(String id) {
-              return cacheStore.get("product:" + id);
-          }
-      }
-    src/main/java/com/app/service/SessionService.java: |
-      package com.app.service;
+          def initialize(&block)
+            @transform = block
+          end
 
-      import com.app.data.CacheStore;
+          def process(context)
+            context.data = @transform.call(context.data)
+          end
+        end
+      end
+    lib/app/document_processor.rb: |
+      require_relative '../core/pipeline'
+      require_relative '../stages/validation_stage'
+      require_relative '../stages/transform_stage'
 
-      public class SessionService {
-          private final CacheStore cacheStore;
+      module App
+        class DocumentProcessor
+          def initialize
+            schema = { title: true, body: true }
+            @pipeline = Core::Pipeline.new
+              .add_stage(Stages::ValidationStage.new(schema))
+              .add_stage(Stages::TransformStage.new { |d| d.transform_values(&:strip) })
+          end
 
-          public SessionService(CacheStore cacheStore) {
-              this.cacheStore = cacheStore;
-          }
+          def process(document, source: 'api')
+            @pipeline.run(document, metadata: { source: source, processed_at: Time.now.iso8601 })
+          end
+        end
+      end
+    lib/storage/archive.rb: |
+      GARBAGE_REFACT022_A = 'archive_storage_v1'
 
-          public void storeSession(String sessionId, Object data) {
-              cacheStore.put("session:" + sessionId, data);
-          }
+      module Storage
+        class Archive
+          def store(key, data)
+            puts "Archived #{key}"
+          end
+        end
+      end
+    lib/utils/encoder.rb: |
+      GARBAGE_REFACT022_B = 'base64_encoder'
+      GARBAGE_REFACT022_C = 'utf8'
 
-          public boolean hasSession(String sessionId) {
-              return cacheStore.contains("session:" + sessionId);
-          }
-      }
-    src/main/java/com/app/util/StringUtils.java: |
-      package com.app.util;
+      module Utils
+        class Encoder
+          def self.encode(str)
+            Base64.strict_encode64(str)
+          end
+        end
+      end
+    lib/monitoring/health_check.rb: |
+      GARBAGE_REFACT022_D = 'health_check_endpoint'
 
-      public class StringUtils {
-          public static final String GARBAGE_REFACTOR_022_UTILS_A = "string_utils";
-          public static final boolean GARBAGE_REFACTOR_022_TRIM_B = true;
-
-          public static String trim(String s) {
-              return s == null ? "" : s.trim();
-          }
-      }
-    src/main/java/com/app/GarbageScheduler.java: |
-      package com.app;
-
-      public class GarbageScheduler {
-          public static final String GARBAGE_REFACTOR_022_SCHED_C = "scheduler";
-          public static final int GARBAGE_REFACTOR_022_DELAY_D = 1000;
-          public static final boolean GARBAGE_REFACTOR_022_REPEAT_E = true;
-
-          public void schedule(Runnable task) {}
-      }
-  commit_message: "refactor: rename DataManager to CacheStore"
+      module Monitoring
+        class HealthCheck
+          def status
+            :ok
+          end
+        end
+      end
+  commit_message: "feat: add metadata support to Pipeline and Context"
 fragments:
-- id: renamed_class
+- id: context_metadata
   selector:
-    path: src/main/java/com/app/data/CacheStore.java
-    anchor: "public class CacheStore"
-- id: product_imports_renamed
+    path: lib/core/context.rb
+    anchor: "attr_accessor :data, :errors, :metadata"
+- id: context_initialize
   selector:
-    path: src/main/java/com/app/service/ProductService.java
-    anchor: "import com.app.data.CacheStore"
-- id: product_field_renamed
+    path: lib/core/context.rb
+    anchor: "def initialize(input, metadata:"
+- id: pipeline_run_metadata
   selector:
-    path: src/main/java/com/app/service/ProductService.java
-    anchor: "private final CacheStore cacheStore"
-- id: session_imports_renamed
+    path: lib/core/pipeline.rb
+    anchor: "def run(input, metadata:"
+- id: document_processor_process
   selector:
-    path: src/main/java/com/app/service/SessionService.java
-    anchor: "import com.app.data.CacheStore"
-- id: session_field_renamed
+    path: lib/app/document_processor.rb
+    anchor: "def process(document, source:"
+- id: no_archive
   selector:
-    path: src/main/java/com/app/service/SessionService.java
-    anchor: "private final CacheStore cacheStore"
-- id: no_string_utils
+    path: lib/storage/archive.rb
+- id: no_encoder
   selector:
-    path: src/main/java/com/app/util/StringUtils.java
-- id: no_garbage_scheduler
+    path: lib/utils/encoder.rb
+- id: no_health_check
   selector:
-    path: src/main/java/com/app/GarbageScheduler.java
+    path: lib/monitoring/health_check.rb
 - id: no_global_0
   selector:
-    anchor: GARBAGE_REFACTOR_022_UTILS_A
+    anchor: GARBAGE_REFACT022_A
 - id: no_global_1
   selector:
-    anchor: GARBAGE_REFACTOR_022_TRIM_B
+    anchor: GARBAGE_REFACT022_B
 - id: no_global_2
   selector:
-    anchor: GARBAGE_REFACTOR_022_SCHED_C
+    anchor: GARBAGE_REFACT022_C
 - id: no_global_3
   selector:
-    anchor: GARBAGE_REFACTOR_022_DELAY_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_022_REPEAT_E
+    anchor: GARBAGE_REFACT022_D
 oracle:
   required:
-  - renamed_class
-  - product_imports_renamed
-  - product_field_renamed
-  - session_imports_renamed
-  - session_field_renamed
+  - context_metadata
+  - context_initialize
+  - pipeline_run_metadata
+  - document_processor_process
   allowed: []
   forbidden:
-  - no_string_utils
-  - no_garbage_scheduler
+  - no_archive
+  - no_encoder
+  - no_health_check
   - no_global_0
   - no_global_1
   - no_global_2
   - no_global_3
-  - no_global_4

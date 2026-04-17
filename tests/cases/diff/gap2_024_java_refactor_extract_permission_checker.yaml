@@ -1,266 +1,242 @@
 name: gap2_024_java_refactor_extract_permission_checker
 tags:
+- lang:go
 - change:multi_file
-- change:refactor
-- context:cross_module
-- difficulty:medium
-- distance:2hop
-- lang:java
+- change:new_function
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
-    src/main/java/com/library/LoanService.java: |
-      package com.library;
+    internal/game/entity.go: |
+      package game
 
-      import java.time.LocalDate;
-
-      public class LoanService {
-          private final BookCatalog catalog;
-
-          public LoanService(BookCatalog catalog) {
-              this.catalog = catalog;
-          }
-
-          public Loan checkoutBook(String memberId, String isbn) {
-              Book book = catalog.findByIsbn(isbn);
-              if (!book.isAvailable()) {
-                  throw new IllegalStateException("Book not available");
-              }
-              if (memberId == null || memberId.isBlank()) {
-                  throw new IllegalArgumentException("Member ID required");
-              }
-              book.setAvailable(false);
-              return new Loan(memberId, isbn, LocalDate.now(), LocalDate.now().plusDays(14));
-          }
+      type Vector2 struct {
+          X, Y float64
       }
-    src/main/java/com/library/BookCatalog.java: |
-      package com.library;
 
-      public interface BookCatalog {
-          Book findByIsbn(String isbn);
+      type Entity struct {
+          ID       string
+          Position Vector2
+          Health   int
+          Active   bool
       }
-    src/main/java/com/library/Book.java: |
-      package com.library;
 
-      public class Book {
-          private final String isbn;
-          private final String title;
-          private boolean available;
-
-          public Book(String isbn, String title) {
-              this.isbn = isbn;
-              this.title = title;
-              this.available = true;
-          }
-
-          public String getIsbn() { return isbn; }
-          public String getTitle() { return title; }
-          public boolean isAvailable() { return available; }
-          public void setAvailable(boolean available) { this.available = available; }
+      func NewEntity(id string, x, y float64, health int) *Entity {
+          return &Entity{ID: id, Position: Vector2{x, y}, Health: health, Active: true}
       }
-    src/main/java/com/library/Loan.java: |
-      package com.library;
 
-      import java.time.LocalDate;
-
-      public class Loan {
-          private final String memberId;
-          private final String isbn;
-          private final LocalDate borrowDate;
-          private final LocalDate dueDate;
-
-          public Loan(String memberId, String isbn, LocalDate borrowDate, LocalDate dueDate) {
-              this.memberId = memberId;
-              this.isbn = isbn;
-              this.borrowDate = borrowDate;
-              this.dueDate = dueDate;
-          }
-
-          public String getMemberId() { return memberId; }
-          public LocalDate getDueDate() { return dueDate; }
+      func (e *Entity) IsAlive() bool {
+          return e.Active && e.Health > 0
       }
-    src/main/java/com/library/FineCalculator.java: |
-      package com.library;
 
-      public class FineCalculator {
-          private static final String TRAP_GAP2024_POLICY_A = "standard";
-          private static final double TRAP_GAP2024_RATE_B = 0.25;
-
-          public double calculateFine(long overdueDays) {
-              return overdueDays * TRAP_GAP2024_RATE_B;
+      func (e *Entity) TakeDamage(dmg int) {
+          e.Health -= dmg
+          if e.Health <= 0 {
+              e.Active = false
           }
       }
-    src/main/java/com/library/ShelfOrganizer.java: |
-      package com.library;
+    internal/game/world.go: |
+      package game
 
-      public class ShelfOrganizer {
-          private static final String TRAP_GAP2024_SORT_C = "dewey";
-          private static final int TRAP_GAP2024_CAPACITY_D = 200;
+      import "math"
 
-          public String assignShelf(String genre) {
-              return genre.substring(0, 2).toUpperCase() + "-" + TRAP_GAP2024_CAPACITY_D;
-          }
+      type World struct {
+          entities map[string]*Entity
       }
+
+      func NewWorld() *World {
+          return &World{entities: make(map[string]*Entity)}
+      }
+
+      func (w *World) AddEntity(e *Entity) {
+          w.entities[e.ID] = e
+      }
+
+      func (w *World) GetEntity(id string) *Entity {
+          return w.entities[id]
+      }
+
+      func (w *World) Distance(a, b *Entity) float64 {
+          dx := a.Position.X - b.Position.X
+          dy := a.Position.Y - b.Position.Y
+          return math.Sqrt(dx*dx + dy*dy)
+      }
+    internal/audio/mixer.go: |
+      package audio
+
+      import "fmt"
+
+      type AudioMixer struct {
+          volume float64
+      }
+
+      func NewMixer(volume float64) *AudioMixer {
+          return &AudioMixer{volume: volume}
+      }
+
+      func (m *AudioMixer) Play(sound string) {
+          fmt.Printf("playing %s at %.1f\n", sound, m.volume)
+      }
+    garbage/leaderboard.go: |
+      // GARBAGE_GAP24_LEAD_A = "leaderboard_marker"
+    garbage/achievements.go: |
+      // GARBAGE_GAP24_ACH_B = "achievements_marker"
+    garbage/replay.go: |
+      // GARBAGE_GAP24_REPLAY_C = "replay_marker"
+    garbage/analytics.go: |
+      // GARBAGE_GAP24_ANALY_D = "analytics_marker"
   changed_files:
-    src/main/java/com/library/LoanService.java: |
-      package com.library;
+    internal/game/entity.go: |
+      package game
 
-      import com.library.policy.LoanPolicy;
-      import java.time.LocalDate;
+      type Vector2 struct {
+          X, Y float64
+      }
 
-      public class LoanService {
-          private final BookCatalog catalog;
-          private final LoanPolicy policy;
+      type Entity struct {
+          ID       string
+          Position Vector2
+          Health   int
+          MaxHealth int
+          Active   bool
+      }
 
-          public LoanService(BookCatalog catalog, LoanPolicy policy) {
-              this.catalog = catalog;
-              this.policy = policy;
-          }
+      func NewEntity(id string, x, y float64, health int) *Entity {
+          return &Entity{ID: id, Position: Vector2{x, y}, Health: health, MaxHealth: health, Active: true}
+      }
 
-          public Loan checkoutBook(String memberId, String isbn) {
-              policy.validateCheckout(memberId, isbn);
-              Book book = catalog.findByIsbn(isbn);
-              book.setAvailable(false);
-              return new Loan(memberId, isbn, LocalDate.now(), LocalDate.now().plusDays(14));
+      func (e *Entity) IsAlive() bool {
+          return e.Active && e.Health > 0
+      }
+
+      func (e *Entity) TakeDamage(dmg int) {
+          e.Health -= dmg
+          if e.Health <= 0 {
+              e.Active = false
           }
       }
-    src/main/java/com/library/policy/LoanPolicy.java: |
-      package com.library.policy;
 
-      import com.library.BookCatalog;
-
-      public class LoanPolicy {
-          private final BookCatalog catalog;
-
-          public LoanPolicy(BookCatalog catalog) {
-              this.catalog = catalog;
+      func (e *Entity) Heal(amount int) {
+          if !e.IsAlive() {
+              return
           }
+          e.Health += amount
+          if e.Health > e.MaxHealth {
+              e.Health = e.MaxHealth
+          }
+      }
 
-          public void validateCheckout(String memberId, String isbn) {
-              if (memberId == null || memberId.isBlank()) {
-                  throw new IllegalArgumentException("Member ID required");
+      func (e *Entity) HealthPercent() float64 {
+          if e.MaxHealth == 0 {
+              return 0
+          }
+          return float64(e.Health) / float64(e.MaxHealth) * 100
+      }
+    internal/game/world.go: |
+      package game
+
+      import "math"
+
+      type World struct {
+          entities map[string]*Entity
+      }
+
+      func NewWorld() *World {
+          return &World{entities: make(map[string]*Entity)}
+      }
+
+      func (w *World) AddEntity(e *Entity) {
+          w.entities[e.ID] = e
+      }
+
+      func (w *World) GetEntity(id string) *Entity {
+          return w.entities[id]
+      }
+
+      func (w *World) Distance(a, b *Entity) float64 {
+          dx := a.Position.X - b.Position.X
+          dy := a.Position.Y - b.Position.Y
+          return math.Sqrt(dx*dx + dy*dy)
+      }
+
+      func (w *World) EntitiesInRange(origin *Entity, radius float64) []*Entity {
+          var result []*Entity
+          for _, e := range w.entities {
+              if e.ID != origin.ID && w.Distance(origin, e) <= radius {
+                  result = append(result, e)
               }
-              if (!catalog.findByIsbn(isbn).isAvailable()) {
-                  throw new IllegalStateException("Book not available");
-              }
           }
+          return result
       }
-    src/main/java/com/library/BookCatalog.java: |
-      package com.library;
+    internal/audio/mixer.go: |
+      package audio
 
-      public interface BookCatalog {
-          Book findByIsbn(String isbn);
+      import "fmt"
+
+      type AudioMixer struct {
+          volume float64
       }
-    src/main/java/com/library/Book.java: |
-      package com.library;
 
-      public class Book {
-          private final String isbn;
-          private final String title;
-          private boolean available;
-
-          public Book(String isbn, String title) {
-              this.isbn = isbn;
-              this.title = title;
-              this.available = true;
-          }
-
-          public String getIsbn() { return isbn; }
-          public String getTitle() { return title; }
-          public boolean isAvailable() { return available; }
-          public void setAvailable(boolean available) { this.available = available; }
+      func NewMixer(volume float64) *AudioMixer {
+          return &AudioMixer{volume: volume}
       }
-    src/main/java/com/library/Loan.java: |
-      package com.library;
 
-      import java.time.LocalDate;
-
-      public class Loan {
-          private final String memberId;
-          private final String isbn;
-          private final LocalDate borrowDate;
-          private final LocalDate dueDate;
-
-          public Loan(String memberId, String isbn, LocalDate borrowDate, LocalDate dueDate) {
-              this.memberId = memberId;
-              this.isbn = isbn;
-              this.borrowDate = borrowDate;
-              this.dueDate = dueDate;
-          }
-
-          public String getMemberId() { return memberId; }
-          public LocalDate getDueDate() { return dueDate; }
+      func (m *AudioMixer) Play(sound string) {
+          fmt.Printf("playing %s at %.1f\n", sound, m.volume)
       }
-    src/main/java/com/library/FineCalculator.java: |
-      package com.library;
-
-      public class FineCalculator {
-          private static final String TRAP_GAP2024_POLICY_A = "standard";
-          private static final double TRAP_GAP2024_RATE_B = 0.25;
-
-          public double calculateFine(long overdueDays) {
-              return overdueDays * TRAP_GAP2024_RATE_B;
-          }
-      }
-    src/main/java/com/library/ShelfOrganizer.java: |
-      package com.library;
-
-      public class ShelfOrganizer {
-          private static final String TRAP_GAP2024_SORT_C = "dewey";
-          private static final int TRAP_GAP2024_CAPACITY_D = 200;
-
-          public String assignShelf(String genre) {
-              return genre.substring(0, 2).toUpperCase() + "-" + TRAP_GAP2024_CAPACITY_D;
-          }
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    garbage/leaderboard.go: |
+      // GARBAGE_GAP24_LEAD_A = "leaderboard_marker"
+    garbage/achievements.go: |
+      // GARBAGE_GAP24_ACH_B = "achievements_marker"
+    garbage/replay.go: |
+      // GARBAGE_GAP24_REPLAY_C = "replay_marker"
+    garbage/analytics.go: |
+      // GARBAGE_GAP24_ANALY_D = "analytics_marker"
+  commit_message: "feat: add Entity.Heal/HealthPercent and World.EntitiesInRange"
 fragments:
-- id: service_policy_field
+- id: entity_heal
   selector:
-    path: src/main/java/com/library/LoanService.java
-    anchor: private final LoanPolicy policy;
-- id: service_validate_call
+    path: internal/game/entity.go
+    anchor: "func (e *Entity) Heal(amount int) {"
+- id: entity_health_percent
   selector:
-    path: src/main/java/com/library/LoanService.java
-    anchor: policy.validateCheckout(memberId, isbn);
-- id: policy_class
+    path: internal/game/entity.go
+    anchor: "func (e *Entity) HealthPercent() float64 {"
+- id: entity_max_health_field
   selector:
-    path: src/main/java/com/library/policy/LoanPolicy.java
-    anchor: public class LoanPolicy {
-- id: policy_validate
+    path: internal/game/entity.go
+    anchor: "MaxHealth int"
+- id: world_entities_in_range
   selector:
-    path: src/main/java/com/library/policy/LoanPolicy.java
-    anchor: public void validateCheckout(String memberId, String isbn) {
-- id: no_fine
+    path: internal/game/world.go
+    anchor: "func (w *World) EntitiesInRange(origin *Entity, radius float64) []*Entity {"
+- id: unrelated_audio
   selector:
-    path: src/main/java/com/library/FineCalculator.java
-- id: no_shelf
+    path: internal/audio/mixer.go
+    anchor: "func (m *AudioMixer) Play"
+- id: no_garbage_a
   selector:
-    path: src/main/java/com/library/ShelfOrganizer.java
-- id: no_global_0
+    anchor: GARBAGE_GAP24_LEAD_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2024_POLICY_A
-- id: no_global_1
+    anchor: GARBAGE_GAP24_ACH_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2024_RATE_B
-- id: no_global_2
+    anchor: GARBAGE_GAP24_REPLAY_C
+- id: no_garbage_d
   selector:
-    anchor: TRAP_GAP2024_SORT_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2024_CAPACITY_D
+    anchor: GARBAGE_GAP24_ANALY_D
 oracle:
   required:
-  - service_policy_field
-  - service_validate_call
-  - policy_class
-  - policy_validate
-  allowed: []
+  - entity_heal
+  - entity_health_percent
+  - world_entities_in_range
+  allowed:
+  - entity_max_health_field
   forbidden:
-  - no_fine
-  - no_shelf
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - unrelated_audio
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

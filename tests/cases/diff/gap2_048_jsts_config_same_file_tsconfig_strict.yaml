@@ -1,107 +1,119 @@
 name: gap2_048_jsts_config_same_file_tsconfig_strict
 tags:
-- change:config
+- lang:rust
+- change:bug_fix
 - change:single_file
-- context:same_file
-- difficulty:trivial
-- distance:0hop
-- lang:javascript
-- lang:typescript
+- context:import_chain
+- distance:1hop
+- difficulty:easy
 repo:
   initial_files:
-    tsconfig.json: |
-      {
-        "compilerOptions": {
-          "target": "ES2020",
-          "module": "commonjs",
-          "strict": false,
-          "esModuleInterop": true,
-          "outDir": "dist",
-          "rootDir": "src"
-        },
-        "include": ["src/**/*"],
-        "exclude": ["node_modules"]
-      }
-    src/auth/session.ts: |
-      const TRAP_GAP2_048_SESSION_A: string = "jwt_session";
-      const TRAP_GAP2_048_EXPIRY_B: number = 3600;
+    src/parser/json_parser.rs: |
+      use serde_json::Value;
 
-      function createToken(userId: string): string {
-        return `token_${userId}_${Date.now()}`;
-      }
+      pub struct JsonParser;
 
-      function isExpired(issuedAt: number, ttl: number): boolean {
-        return Date.now() - issuedAt > ttl * 1000;
-      }
-    src/auth/hash.js: |
-      const TRAP_GAP2_048_ALGO_C = "bcrypt";
-      const TRAP_GAP2_048_ROUNDS_D = 12;
+      impl JsonParser {
+          pub fn parse(input: &str) -> Result<Value, String> {
+              // BUG: panics on empty input instead of returning error
+              serde_json::from_str(input).map_err(|e| e.to_string())
+          }
 
-      function hashPassword(plain) {
-        return `hashed_${plain}`;
+          pub fn extract_field(value: &Value, key: &str) -> Option<&Value> {
+              value.get(key)
+          }
       }
+    src/ingestion/pipeline.rs: |
+      use crate::parser::json_parser::JsonParser;
 
-      module.exports = { hashPassword };
+      pub struct IngestionPipeline;
+
+      impl IngestionPipeline {
+          pub fn ingest(raw: &str) -> Result<String, String> {
+              let parsed = JsonParser::parse(raw)?;
+              let name = JsonParser::extract_field(&parsed, "name")
+                  .and_then(|v| v.as_str())
+                  .unwrap_or("unknown");
+              Ok(name.to_string())
+          }
+      }
+    garbage/auth.rs: |
+      // GARBAGE_JPAR_A = "auth_marker"
+      pub fn verify_token(_tok: &str) -> bool { true }
+    garbage/db.rs: |
+      // GARBAGE_JPAR_B = "db_marker"
+      pub struct DbConn { pub dsn: String }
+    garbage/cache.rs: |
+      // GARBAGE_JPAR_C = "cache_marker"
+      pub fn get_cached(_key: &str) -> Option<String> { None }
   changed_files:
-    tsconfig.json: |
-      {
-        "compilerOptions": {
-          "target": "ES2022",
-          "module": "commonjs",
-          "strict": true,
-          "noUncheckedIndexedAccess": true,
-          "esModuleInterop": true,
-          "outDir": "dist",
-          "rootDir": "src",
-          "declaration": true
-        },
-        "include": ["src/**/*"],
-        "exclude": ["node_modules", "dist"]
+    src/parser/json_parser.rs: |
+      use serde_json::Value;
+
+      pub struct JsonParser;
+
+      impl JsonParser {
+          pub fn parse(input: &str) -> Result<Value, String> {
+              if input.is_empty() {
+                  return Err("input must not be empty".to_string());
+              }
+              serde_json::from_str(input).map_err(|e| e.to_string())
+          }
+
+          pub fn extract_field(value: &Value, key: &str) -> Option<&Value> {
+              value.get(key)
+          }
       }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    src/ingestion/pipeline.rs: |
+      use crate::parser::json_parser::JsonParser;
+
+      pub struct IngestionPipeline;
+
+      impl IngestionPipeline {
+          pub fn ingest(raw: &str) -> Result<String, String> {
+              let parsed = JsonParser::parse(raw)?;
+              let name = JsonParser::extract_field(&parsed, "name")
+                  .and_then(|v| v.as_str())
+                  .unwrap_or("unknown");
+              Ok(name.to_string())
+          }
+      }
+    garbage/auth.rs: |
+      // GARBAGE_JPAR_A = "auth_marker"
+      pub fn verify_token(_tok: &str) -> bool { true }
+    garbage/db.rs: |
+      // GARBAGE_JPAR_B = "db_marker"
+      pub struct DbConn { pub dsn: String }
+    garbage/cache.rs: |
+      // GARBAGE_JPAR_C = "cache_marker"
+      pub fn get_cached(_key: &str) -> Option<String> { None }
+  commit_message: "fix: return Err on empty input in JsonParser::parse"
 fragments:
-- id: strict_enabled
+- id: parse_empty_guard
   selector:
-    path: tsconfig.json
-    anchor: '"strict": true'
-- id: unchecked_index
+    anchor: "if input.is_empty()"
+- id: parse_func
   selector:
-    path: tsconfig.json
-    anchor: '"noUncheckedIndexedAccess": true'
-- id: declaration_enabled
+    anchor: "pub fn parse(input: &str) -> Result<Value, String>"
+- id: pipeline_uses_parser
   selector:
-    path: tsconfig.json
-    anchor: '"declaration": true'
-- id: no_session
+    anchor: "use crate::parser::json_parser::JsonParser"
+- id: no_garbage_a
   selector:
-    path: src/auth/session.ts
-- id: no_hash
+    anchor: GARBAGE_JPAR_A
+- id: no_garbage_b
   selector:
-    path: src/auth/hash.js
-- id: no_global_0
+    anchor: GARBAGE_JPAR_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_048_SESSION_A
-- id: no_global_1
-  selector:
-    anchor: TRAP_GAP2_048_EXPIRY_B
-- id: no_global_2
-  selector:
-    anchor: TRAP_GAP2_048_ALGO_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2_048_ROUNDS_D
+    anchor: GARBAGE_JPAR_C
 oracle:
   required:
-  - strict_enabled
-  - unchecked_index
-  - declaration_enabled
+  - parse_empty_guard
+  - parse_func
+  - pipeline_uses_parser
   allowed: []
   forbidden:
-  - no_session
-  - no_hash
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

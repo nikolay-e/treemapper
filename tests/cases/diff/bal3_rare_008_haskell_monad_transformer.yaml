@@ -1,162 +1,187 @@
 name: bal3_rare_008_haskell_monad_transformer
 tags:
-- lang:haskell
-- change:single_file
-- change:refactor
-- context:call_graph
-- distance:1hop
-- difficulty:hard
+- lang:kotlin
+- change:bug_fix
+- context:import_chain
+- distance:3hop+
+- difficulty:easy
 repo:
   initial_files:
-    src/AppMonad.hs: |
-      module AppMonad where
+    core/src/main/kotlin/com/platform/pagination/PageRequest.kt: |
+      package com.platform.pagination
 
-      import Control.Monad.Reader
+      data class PageRequest(
+          val page: Int,
+          val size: Int,
+          val sortBy: String = "id",
+          val ascending: Boolean = true,
+      ) {
+          fun offset(): Int = page * size
+      }
+    core/src/main/kotlin/com/platform/pagination/Page.kt: |
+      package com.platform.pagination
 
-      data AppEnv = AppEnv
-        { appName    :: String
-        , appVersion :: String
-        , appDebug   :: Bool
-        }
+      data class Page<T>(
+          val items: List<T>,
+          val totalCount: Long,
+          val request: PageRequest,
+      ) {
+          val totalPages: Int get() = ((totalCount + request.size - 1) / request.size).toInt()
+          val hasNext: Boolean get() = request.page < totalPages - 1
+          val hasPrev: Boolean get() = request.page > 0
+      }
+    data/src/main/kotlin/com/platform/user/UserRepository.kt: |
+      package com.platform.user
 
-      type AppM a = ReaderT AppEnv IO a
+      import com.platform.pagination.Page
+      import com.platform.pagination.PageRequest
 
-      runApp :: AppEnv -> AppM a -> IO a
-      runApp env action = runReaderT action env
+      interface UserRepository {
+          fun findAll(request: PageRequest): Page<User>
+          fun findById(id: Long): User?
+          fun save(user: User): User
+      }
+    api/src/main/kotlin/com/platform/user/UserListService.kt: |
+      package com.platform.user
 
-      getAppName :: AppM String
-      getAppName = asks appName
+      import com.platform.pagination.Page
+      import com.platform.pagination.PageRequest
 
-      isDebug :: AppM Bool
-      isDebug = asks appDebug
-    src/Service.hs: |
-      module Service where
+      class UserListService(private val repo: UserRepository) {
+          fun listUsers(page: Int, size: Int): Page<User> {
+              val request = PageRequest(page = page, size = size)
+              return repo.findAll(request)
+          }
+      }
+    garbage/src/main/kotlin/com/platform/audit/AuditWriter.kt: |
+      package com.platform.audit
 
-      import AppMonad (AppM, getAppName, isDebug)
+      // GARBAGE_HSK8_A = "audit_writer_unrelated"
+      class AuditWriter {
+          fun write(event: String, actor: String) {}
+      }
+    garbage/src/main/kotlin/com/platform/notify/PushSender.kt: |
+      package com.platform.notify
 
-      greet :: String -> AppM String
-      greet user = do
-          name <- getAppName
-          debug <- isDebug
-          let prefix = if debug then "[DEBUG] " else ""
-          return $ prefix ++ "Welcome to " ++ name ++ ", " ++ user
+      // GARBAGE_HSK8_B = "push_sender_unrelated"
+      class PushSender {
+          fun send(deviceToken: String, message: String) {}
+      }
+    garbage/src/main/kotlin/com/platform/export/CsvExporter.kt: |
+      package com.platform.export
 
-      healthCheck :: AppM String
-      healthCheck = do
-          name <- getAppName
-          return $ name ++ " is running"
-    src/Networking.hs: |
-      module Networking where
-
-      gARBAGE_RARE_008_NET_A = "http"
-      gARBAGE_RARE_008_PORT_B = 443
-
-      fetchUrl :: String -> IO String
-      fetchUrl url = return $ "response from " ++ url
-    src/Parsing.hs: |
-      module Parsing where
-
-      gARBAGE_RARE_008_PARSE_C = "json"
-      gARBAGE_RARE_008_STRICT_D = True
-
-      parseInput :: String -> Maybe String
-      parseInput "" = Nothing
-      parseInput s = Just s
-    src/Crypto.hs: |
-      module Crypto where
-
-      gARBAGE_RARE_008_HASH_E = "sha256"
-      gARBAGE_RARE_008_ROUNDS_F = 10000
-
-      hashValue :: String -> String
-      hashValue = reverse
+      // GARBAGE_HSK8_C = "csv_exporter_unrelated"
+      class CsvExporter {
+          fun export(rows: List<List<String>>): String = ""
+      }
   changed_files:
-    src/AppMonad.hs: |
-      module AppMonad where
+    core/src/main/kotlin/com/platform/pagination/PageRequest.kt: |
+      package com.platform.pagination
 
-      import Control.Monad.Reader
-      import Control.Monad.Except
+      data class PageRequest(
+          val page: Int,
+          val size: Int,
+          val sortBy: String = "id",
+          val ascending: Boolean = true,
+      ) {
+          init {
+              require(page >= 0) { "page must be non-negative" }
+              require(size in 1..1000) { "size must be between 1 and 1000" }
+          }
 
-      data AppEnv = AppEnv
-        { appName    :: String
-        , appVersion :: String
-        , appDebug   :: Bool
-        , appMaxRetries :: Int
-        }
+          fun offset(): Int = page * size
+      }
+    core/src/main/kotlin/com/platform/pagination/Page.kt: |
+      package com.platform.pagination
 
-      data AppError = NotFound String | Unauthorized | InternalError String
-        deriving (Show)
+      data class Page<T>(
+          val items: List<T>,
+          val totalCount: Long,
+          val request: PageRequest,
+      ) {
+          val totalPages: Int get() = ((totalCount + request.size - 1) / request.size).toInt()
+          val hasNext: Boolean get() = request.page < totalPages - 1
+          val hasPrev: Boolean get() = request.page > 0
+      }
+    data/src/main/kotlin/com/platform/user/UserRepository.kt: |
+      package com.platform.user
 
-      type AppM a = ExceptT AppError (ReaderT AppEnv IO) a
+      import com.platform.pagination.Page
+      import com.platform.pagination.PageRequest
 
-      runApp :: AppEnv -> AppM a -> IO (Either AppError a)
-      runApp env action = runReaderT (runExceptT action) env
+      interface UserRepository {
+          fun findAll(request: PageRequest): Page<User>
+          fun findById(id: Long): User?
+          fun save(user: User): User
+      }
+    api/src/main/kotlin/com/platform/user/UserListService.kt: |
+      package com.platform.user
 
-      getAppName :: AppM String
-      getAppName = lift $ asks appName
+      import com.platform.pagination.Page
+      import com.platform.pagination.PageRequest
 
-      isDebug :: AppM Bool
-      isDebug = lift $ asks appDebug
+      class UserListService(private val repo: UserRepository) {
+          fun listUsers(page: Int, size: Int): Page<User> {
+              val request = PageRequest(page = page, size = size)
+              return repo.findAll(request)
+          }
+      }
+    garbage/src/main/kotlin/com/platform/audit/AuditWriter.kt: |
+      package com.platform.audit
 
-      throwAppError :: AppError -> AppM a
-      throwAppError = throwError
-  commit_message: "add ExceptT error handling to AppM monad stack"
+      // GARBAGE_HSK8_A = "audit_writer_unrelated"
+      class AuditWriter {
+          fun write(event: String, actor: String) {}
+      }
+    garbage/src/main/kotlin/com/platform/notify/PushSender.kt: |
+      package com.platform.notify
+
+      // GARBAGE_HSK8_B = "push_sender_unrelated"
+      class PushSender {
+          fun send(deviceToken: String, message: String) {}
+      }
+    garbage/src/main/kotlin/com/platform/export/CsvExporter.kt: |
+      package com.platform.export
+
+      // GARBAGE_HSK8_C = "csv_exporter_unrelated"
+      class CsvExporter {
+          fun export(rows: List<List<String>>): String = ""
+      }
+  commit_message: "fix: add init validation to PageRequest to reject bad page/size values"
 fragments:
-- id: service_imports_appmonad
+- id: page_request_init
   selector:
-    path: src/Service.hs
-    anchor: "import AppMonad"
-- id: service_uses_getappname
+    path: core/src/main/kotlin/com/platform/pagination/PageRequest.kt
+    anchor: "page must be non-negative"
+- id: page_request_size_check
   selector:
-    path: src/Service.hs
-    anchor: "getAppName"
-- id: service_uses_isdebug
+    path: core/src/main/kotlin/com/platform/pagination/PageRequest.kt
+    anchor: "size must be between"
+- id: service_creates_page_request
   selector:
-    path: src/Service.hs
-    anchor: "isDebug"
-- id: no_networking
+    path: api/src/main/kotlin/com/platform/user/UserListService.kt
+    anchor: "PageRequest(page = page"
+- id: repo_find_all
   selector:
-    path: src/Networking.hs
-    anchor: "fetchUrl"
-- id: no_parsing
+    path: data/src/main/kotlin/com/platform/user/UserRepository.kt
+    anchor: "fun findAll"
+- id: no_garbage_a
   selector:
-    path: src/Parsing.hs
-    anchor: "parseInput"
-- id: no_crypto
+    anchor: GARBAGE_HSK8_A
+- id: no_garbage_b
   selector:
-    path: src/Crypto.hs
-    anchor: "hashValue"
-- id: no_global_0
+    anchor: GARBAGE_HSK8_B
+- id: no_garbage_c
   selector:
-    anchor: gARBAGE_RARE_008_NET_A
-- id: no_global_1
-  selector:
-    anchor: gARBAGE_RARE_008_PORT_B
-- id: no_global_2
-  selector:
-    anchor: gARBAGE_RARE_008_PARSE_C
-- id: no_global_3
-  selector:
-    anchor: gARBAGE_RARE_008_STRICT_D
-- id: no_global_4
-  selector:
-    anchor: gARBAGE_RARE_008_HASH_E
-- id: no_global_5
-  selector:
-    anchor: gARBAGE_RARE_008_ROUNDS_F
+    anchor: GARBAGE_HSK8_C
 oracle:
   required:
-  - service_imports_appmonad
-  - service_uses_getappname
-  - service_uses_isdebug
-  allowed: []
+  - page_request_init
+  - page_request_size_check
+  - service_creates_page_request
+  allowed:
+  - repo_find_all
   forbidden:
-  - no_networking
-  - no_parsing
-  - no_crypto
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

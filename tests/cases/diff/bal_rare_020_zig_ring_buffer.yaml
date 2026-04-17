@@ -1,260 +1,186 @@
 name: bal_rare_020_zig_ring_buffer
 tags:
-- lang:zig
+- lang:java
 - change:multi_file
-- change:new_function
-- context:import_chain
+- change:refactor
+- context:cross_module
 - distance:1hop
 - difficulty:medium
 repo:
   initial_files:
-    src/ring.zig: |
-      const std = @import("std");
+    src/main/java/com/logistics/TrackingService.java: |
+      package com.logistics;
 
-      pub fn RingBuffer(comptime T: type, comptime capacity: usize) type {
-          return struct {
-              const Self = @This();
-              buf: [capacity]T = undefined,
-              head: usize = 0,
-              tail: usize = 0,
-              count: usize = 0,
+      import java.util.HashMap;
+      import java.util.Map;
 
-              pub fn push(self: *Self, item: T) !void {
-                  if (self.count == capacity) return error.BufferFull;
-                  self.buf[self.tail] = item;
-                  self.tail = (self.tail + 1) % capacity;
-                  self.count += 1;
+      public class TrackingService {
+          private final Map<String, String> shipmentStatus = new HashMap<>();
+
+          public void updateStatus(String shipmentId, String status) {
+              if (shipmentId == null || shipmentId.isBlank()) {
+                  throw new IllegalArgumentException("Shipment ID required");
               }
-
-              pub fn pop(self: *Self) !T {
-                  if (self.count == 0) return error.BufferEmpty;
-                  const item = self.buf[self.head];
-                  self.head = (self.head + 1) % capacity;
-                  self.count -= 1;
-                  return item;
+              if (!isValidStatus(status)) {
+                  throw new IllegalArgumentException("Invalid status: " + status);
               }
-
-              pub fn len(self: *const Self) usize {
-                  return self.count;
-              }
-          };
-      }
-    src/logger.zig: |
-      const std = @import("std");
-      const RingBuffer = @import("ring.zig").RingBuffer;
-
-      pub const LogEntry = struct {
-          level: u8,
-          message: [256]u8,
-          msg_len: usize,
-      };
-
-      pub const Logger = struct {
-          buffer: RingBuffer(LogEntry, 64),
-
-          pub fn init() Logger {
-              return Logger{ .buffer = .{} };
+              shipmentStatus.put(shipmentId, status);
           }
 
-          pub fn log(self: *Logger, level: u8, msg: []const u8) void {
-              var entry = LogEntry{ .level = level, .message = undefined, .msg_len = msg.len };
-              @memcpy(entry.message[0..msg.len], msg);
-              self.buffer.push(entry) catch {};
+          private boolean isValidStatus(String status) {
+              return status != null && !status.isBlank();
           }
-      };
-    src/app.zig: |
-      const Logger = @import("logger.zig").Logger;
 
-      pub fn main() !void {
-          var logger = Logger.init();
-          logger.log(1, "Application started");
-          logger.log(2, "Processing request");
+          public String getStatus(String shipmentId) {
+              return shipmentStatus.getOrDefault(shipmentId, "UNKNOWN");
+          }
       }
-    garbage_timer.zig: |
-      const GARBAGE_RARE_020_INTERVAL_A: u64 = 1000;
-      const GARBAGE_RARE_020_PRECISION_B: u32 = 1;
+    src/main/java/com/logistics/NotificationSender.java: |
+      package com.logistics;
 
-      fn garbage_tick() void {
-          _ = GARBAGE_RARE_020_INTERVAL_A;
+      import java.util.HashMap;
+      import java.util.Map;
+
+      public class NotificationSender {
+          public void notifyStatusChange(String shipmentId, String status) {
+              if (shipmentId == null || shipmentId.isBlank()) {
+                  throw new IllegalArgumentException("Shipment ID required");
+              }
+              System.out.println("Notify: " + shipmentId + " -> " + status);
+          }
       }
+    src/main/java/com/logistics/RouteCalculator.java: |
+      package com.logistics;
 
-      const GARBAGE_RARE_020_MONOTONIC_C: bool = true;
-    garbage_net.zig: |
-      const GARBAGE_RARE_020_PORT_D: u16 = 8080;
-      const GARBAGE_RARE_020_BACKLOG_E: u32 = 128;
-
-      fn garbage_listen() void {
-          _ = GARBAGE_RARE_020_PORT_D;
+      public class RouteCalculator {
+          public double estimateDeliveryDays(String origin, String destination) {
+              return 3.0;
+          }
       }
-
-      const GARBAGE_RARE_020_REUSE_F: bool = true;
+    garbage/CacheWarmer.java: |
+      // GARBAGE_RARE020_WARMUP_A = "cache_warmer_marker"
+    garbage/MetricsCollector.java: |
+      // GARBAGE_RARE020_METRICS_B = "metrics_collector_marker"
+    garbage/AuditLogger.java: |
+      // GARBAGE_RARE020_AUDIT_C = "audit_logger_marker"
   changed_files:
-    src/ring.zig: |
-      const std = @import("std");
+    src/main/java/com/logistics/TrackingService.java: |
+      package com.logistics;
 
-      pub fn RingBuffer(comptime T: type, comptime capacity: usize) type {
-          return struct {
-              const Self = @This();
-              buf: [capacity]T = undefined,
-              head: usize = 0,
-              tail: usize = 0,
-              count: usize = 0,
+      import com.logistics.validation.ShipmentValidator;
+      import java.util.HashMap;
+      import java.util.Map;
 
-              pub fn push(self: *Self, item: T) !void {
-                  if (self.count == capacity) return error.BufferFull;
-                  self.buf[self.tail] = item;
-                  self.tail = (self.tail + 1) % capacity;
-                  self.count += 1;
-              }
+      public class TrackingService {
+          private final Map<String, String> shipmentStatus = new HashMap<>();
+          private final ShipmentValidator validator;
 
-              pub fn pop(self: *Self) !T {
-                  if (self.count == 0) return error.BufferEmpty;
-                  const item = self.buf[self.head];
-                  self.head = (self.head + 1) % capacity;
-                  self.count -= 1;
-                  return item;
-              }
-
-              pub fn peek(self: *const Self) !T {
-                  if (self.count == 0) return error.BufferEmpty;
-                  return self.buf[self.head];
-              }
-
-              pub fn clear(self: *Self) void {
-                  self.head = 0;
-                  self.tail = 0;
-                  self.count = 0;
-              }
-
-              pub fn len(self: *const Self) usize {
-                  return self.count;
-              }
-
-              pub fn isFull(self: *const Self) bool {
-                  return self.count == capacity;
-              }
-          };
-      }
-    src/logger.zig: |
-      const std = @import("std");
-      const RingBuffer = @import("ring.zig").RingBuffer;
-
-      pub const LogEntry = struct {
-          level: u8,
-          message: [256]u8,
-          msg_len: usize,
-      };
-
-      pub const Logger = struct {
-          buffer: RingBuffer(LogEntry, 64),
-
-          pub fn init() Logger {
-              return Logger{ .buffer = .{} };
+          public TrackingService(ShipmentValidator validator) {
+              this.validator = validator;
           }
 
-          pub fn log(self: *Logger, level: u8, msg: []const u8) void {
-              if (self.buffer.isFull()) {
-                  _ = self.buffer.pop() catch {};
+          public void updateStatus(String shipmentId, String status) {
+              validator.validateShipmentId(shipmentId);
+              validator.validateStatus(status);
+              shipmentStatus.put(shipmentId, status);
+          }
+
+          public String getStatus(String shipmentId) {
+              return shipmentStatus.getOrDefault(shipmentId, "UNKNOWN");
+          }
+      }
+    src/main/java/com/logistics/NotificationSender.java: |
+      package com.logistics;
+
+      import com.logistics.validation.ShipmentValidator;
+
+      public class NotificationSender {
+          private final ShipmentValidator validator;
+
+          public NotificationSender(ShipmentValidator validator) {
+              this.validator = validator;
+          }
+
+          public void notifyStatusChange(String shipmentId, String status) {
+              validator.validateShipmentId(shipmentId);
+              System.out.println("Notify: " + shipmentId + " -> " + status);
+          }
+      }
+    src/main/java/com/logistics/validation/ShipmentValidator.java: |
+      package com.logistics.validation;
+
+      public class ShipmentValidator {
+          public void validateShipmentId(String shipmentId) {
+              if (shipmentId == null || shipmentId.isBlank()) {
+                  throw new IllegalArgumentException("Shipment ID required");
               }
-              var entry = LogEntry{ .level = level, .message = undefined, .msg_len = msg.len };
-              @memcpy(entry.message[0..msg.len], msg);
-              self.buffer.push(entry) catch {};
           }
 
-          pub fn flush(self: *Logger) void {
-              self.buffer.clear();
+          public void validateStatus(String status) {
+              if (status == null || status.isBlank()) {
+                  throw new IllegalArgumentException("Status must not be blank");
+              }
           }
-      };
-    src/app.zig: |
-      const Logger = @import("logger.zig").Logger;
-
-      pub fn main() !void {
-          var logger = Logger.init();
-          logger.log(1, "Application started");
-          logger.log(2, "Processing request");
       }
-    garbage_timer.zig: |
-      const GARBAGE_RARE_020_INTERVAL_A: u64 = 1000;
-      const GARBAGE_RARE_020_PRECISION_B: u32 = 1;
+    src/main/java/com/logistics/RouteCalculator.java: |
+      package com.logistics;
 
-      fn garbage_tick() void {
-          _ = GARBAGE_RARE_020_INTERVAL_A;
+      public class RouteCalculator {
+          public double estimateDeliveryDays(String origin, String destination) {
+              return 3.0;
+          }
       }
-
-      const GARBAGE_RARE_020_MONOTONIC_C: bool = true;
-    garbage_net.zig: |
-      const GARBAGE_RARE_020_PORT_D: u16 = 8080;
-      const GARBAGE_RARE_020_BACKLOG_E: u32 = 128;
-
-      fn garbage_listen() void {
-          _ = GARBAGE_RARE_020_PORT_D;
-      }
-
-      const GARBAGE_RARE_020_REUSE_F: bool = true;
-  commit_message: "feat: add peek, clear, isFull to ring buffer; auto-evict in logger"
+    garbage/CacheWarmer.java: |
+      // GARBAGE_RARE020_WARMUP_A = "cache_warmer_marker"
+    garbage/MetricsCollector.java: |
+      // GARBAGE_RARE020_METRICS_B = "metrics_collector_marker"
+    garbage/AuditLogger.java: |
+      // GARBAGE_RARE020_AUDIT_C = "audit_logger_marker"
+  commit_message: "refactor: extract ShipmentValidator used by TrackingService and NotificationSender"
 fragments:
-- id: ring_peek
+- id: tracking_uses_validator
   selector:
-    path: src/ring.zig
-    anchor: "pub fn peek"
-- id: ring_clear
+    path: src/main/java/com/logistics/TrackingService.java
+    anchor: "private final ShipmentValidator validator;"
+- id: tracking_validate_call
   selector:
-    path: src/ring.zig
-    anchor: "pub fn clear"
-- id: ring_is_full
+    path: src/main/java/com/logistics/TrackingService.java
+    anchor: "validator.validateShipmentId(shipmentId);"
+- id: notification_uses_validator
   selector:
-    path: src/ring.zig
-    anchor: "pub fn isFull"
-- id: logger_auto_evict
+    path: src/main/java/com/logistics/NotificationSender.java
+    anchor: "import com.logistics.validation.ShipmentValidator;"
+- id: validator_class
   selector:
-    path: src/logger.zig
-    anchor: "if (self.buffer.isFull())"
-- id: logger_flush
+    path: src/main/java/com/logistics/validation/ShipmentValidator.java
+    anchor: "public class ShipmentValidator {"
+- id: validator_validate_id
   selector:
-    path: src/logger.zig
-    anchor: "pub fn flush"
-- id: no_app
+    path: src/main/java/com/logistics/validation/ShipmentValidator.java
+    anchor: "public void validateShipmentId(String shipmentId) {"
+- id: unrelated_route
   selector:
-    path: src/app.zig
-- id: no_garbage_timer
+    path: src/main/java/com/logistics/RouteCalculator.java
+    anchor: "public double estimateDeliveryDays"
+- id: no_garbage_a
   selector:
-    path: garbage_timer.zig
-- id: no_garbage_net
+    anchor: GARBAGE_RARE020_WARMUP_A
+- id: no_garbage_b
   selector:
-    path: garbage_net.zig
-- id: no_global_0
+    anchor: GARBAGE_RARE020_METRICS_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_RARE_020_INTERVAL_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_RARE_020_PRECISION_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_RARE_020_MONOTONIC_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_RARE_020_PORT_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_020_BACKLOG_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_020_REUSE_F
+    anchor: GARBAGE_RARE020_AUDIT_C
 oracle:
   required:
-  - ring_peek
-  - ring_clear
-  - ring_is_full
-  - logger_auto_evict
-  - logger_flush
-  allowed: []
+  - tracking_uses_validator
+  - tracking_validate_call
+  - validator_class
+  - validator_validate_id
+  allowed:
+  - notification_uses_validator
   forbidden:
-  - no_app
-  - no_garbage_timer
-  - no_garbage_net
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - unrelated_route
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

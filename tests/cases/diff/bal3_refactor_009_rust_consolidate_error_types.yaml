@@ -1,191 +1,232 @@
 name: bal3_refactor_009_rust_consolidate_error_types
 tags:
-- lang:rust
+- lang:typescript
 - change:multi_file
 - change:refactor
-- context:cross_module
-- distance:1hop
-- difficulty:medium
+- context:import_chain
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
-    src/parser/mod.rs: |
-      use std::fmt;
+    src/forms/validator.ts: |
+      import { ValidationRule } from './rules';
+      import { FieldError } from './field_error';
 
-      #[derive(Debug)]
-      pub struct ParseError {
-          pub message: String,
-          pub line: usize,
-      }
+      export class FormValidator {
+          private rules: Map<string, ValidationRule[]> = new Map();
 
-      impl fmt::Display for ParseError {
-          fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-              write!(f, "parse error at line {}: {}", self.line, self.message)
+          addRule(field: string, rule: ValidationRule): this {
+              const existing = this.rules.get(field) ?? [];
+              this.rules.set(field, [...existing, rule]);
+              return this;
+          }
+
+          validate(data: Record<string, unknown>): FieldError[] {
+              const errors: FieldError[] = [];
+              this.rules.forEach((fieldRules, field) => {
+                  const value = data[field];
+                  fieldRules.forEach(rule => {
+                      if (!rule.check(value)) {
+                          errors.push({ field, message: rule.message });
+                      }
+                  });
+              });
+              return errors;
           }
       }
+    src/forms/rules.ts: |
+      export interface ValidationRule {
+          check(value: unknown): boolean;
+          message: string;
+      }
 
-      pub fn parse(input: &str) -> Result<Vec<String>, ParseError> {
-          if input.is_empty() {
-              return Err(ParseError { message: "empty input".into(), line: 0 });
+      export const required: ValidationRule = {
+          check: (v) => v !== null && v !== undefined && v !== '',
+          message: 'This field is required',
+      };
+
+      export const minLength = (n: number): ValidationRule => ({
+          check: (v) => typeof v === 'string' && v.length >= n,
+          message: `Minimum length is ${n}`,
+      });
+    src/forms/field_error.ts: |
+      export interface FieldError {
+          field: string;
+          message: string;
+      }
+    src/ui/registration_form.ts: |
+      import { FormValidator } from '../forms/validator';
+      import { required, minLength } from '../forms/rules';
+      import { FieldError } from '../forms/field_error';
+
+      export class RegistrationForm {
+          private validator: FormValidator;
+
+          constructor() {
+              this.validator = new FormValidator()
+                  .addRule('username', required)
+                  .addRule('username', minLength(3))
+                  .addRule('password', required)
+                  .addRule('password', minLength(8));
           }
-          Ok(vec![input.to_string()])
-      }
-    src/validator/mod.rs: |
-      use std::fmt;
 
-      #[derive(Debug)]
-      pub struct ValidationError {
-          pub field: String,
-          pub reason: String,
-      }
-
-      impl fmt::Display for ValidationError {
-          fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-              write!(f, "validation error on {}: {}", self.field, self.reason)
+          submit(data: Record<string, unknown>): { success: boolean; errors: FieldError[] } {
+              const errors = this.validator.validate(data);
+              return { success: errors.length === 0, errors };
           }
       }
+    src/analytics/funnel.ts: |
+      export const GARBAGE_BAL3R009_A = 'registration_funnel';
 
-      pub fn validate(data: &str) -> Result<(), ValidationError> {
-          if data.len() < 3 {
-              return Err(ValidationError { field: "data".into(), reason: "too short".into() });
-          }
-          Ok(())
+      export class FunnelTracker {
+          track(step: string): void { console.log(`Funnel: ${step}`); }
       }
-    src/pipeline/mod.rs: |
-      use crate::parser;
-      use crate::validator;
+    src/session/cookie.ts: |
+      export const GARBAGE_BAL3R009_B = 'session_cookie_name';
+      export const GARBAGE_BAL3R009_C = 7;
 
-      pub fn process(input: &str) -> Result<Vec<String>, String> {
-          validator::validate(input).map_err(|e| e.to_string())?;
-          parser::parse(input).map_err(|e| e.to_string())
+      export function setCookie(name: string, value: string): void {
+          document.cookie = `${name}=${value}`;
       }
-    src/export/csv.rs: |
-      pub const GARBAGE_R009_CSV_A: &str = "csv_export";
+    src/config/feature_flags.ts: |
+      export const GARBAGE_BAL3R009_D = 'feature_flag_registration_v2';
 
-      pub fn to_csv(rows: &[Vec<String>]) -> String {
-          String::new()
-      }
-    src/export/json.rs: |
-      pub const GARBAGE_R009_JSON_B: &str = "json_export";
-
-      pub fn to_json(data: &str) -> String {
-          format!("{{{}}}", data)
-      }
-    src/export/xml.rs: |
-      pub const GARBAGE_R009_XML_C: &str = "xml_export";
-
-      pub fn to_xml(data: &str) -> String {
-          format!("<data>{}</data>", data)
-      }
+      export function isEnabled(flag: string): boolean { return false; }
   changed_files:
-    src/errors.rs: |
-      use std::fmt;
+    src/forms/validator.ts: |
+      import { ValidationRule } from './rules';
+      import { ValidationResult, FieldError } from './field_error';
 
-      #[derive(Debug)]
-      pub enum AppError {
-          Parse { message: String, line: usize },
-          Validation { field: String, reason: String },
-      }
+      export class FormValidator {
+          private rules: Map<string, ValidationRule[]> = new Map();
 
-      impl fmt::Display for AppError {
-          fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-              match self {
-                  AppError::Parse { message, line } =>
-                      write!(f, "parse error at line {}: {}", line, message),
-                  AppError::Validation { field, reason } =>
-                      write!(f, "validation error on {}: {}", field, reason),
-              }
+          addRule(field: string, rule: ValidationRule): this {
+              const existing = this.rules.get(field) ?? [];
+              this.rules.set(field, [...existing, rule]);
+              return this;
+          }
+
+          validate(data: Record<string, unknown>): ValidationResult {
+              const errors: FieldError[] = [];
+              this.rules.forEach((fieldRules, field) => {
+                  const value = data[field];
+                  fieldRules.forEach(rule => {
+                      if (!rule.check(value)) {
+                          errors.push({ field, message: rule.message });
+                      }
+                  });
+              });
+              return { valid: errors.length === 0, errors };
           }
       }
-    src/parser/mod.rs: |
-      use crate::errors::AppError;
+    src/forms/rules.ts: |
+      export interface ValidationRule {
+          check(value: unknown): boolean;
+          message: string;
+      }
 
-      pub fn parse(input: &str) -> Result<Vec<String>, AppError> {
-          if input.is_empty() {
-              return Err(AppError::Parse { message: "empty input".into(), line: 0 });
+      export const required: ValidationRule = {
+          check: (v) => v !== null && v !== undefined && v !== '',
+          message: 'This field is required',
+      };
+
+      export const minLength = (n: number): ValidationRule => ({
+          check: (v) => typeof v === 'string' && v.length >= n,
+          message: `Minimum length is ${n}`,
+      });
+    src/forms/field_error.ts: |
+      export interface FieldError {
+          field: string;
+          message: string;
+      }
+
+      export interface ValidationResult {
+          valid: boolean;
+          errors: FieldError[];
+      }
+    src/ui/registration_form.ts: |
+      import { FormValidator } from '../forms/validator';
+      import { required, minLength } from '../forms/rules';
+      import { ValidationResult } from '../forms/field_error';
+
+      export class RegistrationForm {
+          private validator: FormValidator;
+
+          constructor() {
+              this.validator = new FormValidator()
+                  .addRule('username', required)
+                  .addRule('username', minLength(3))
+                  .addRule('password', required)
+                  .addRule('password', minLength(8));
           }
-          Ok(vec![input.to_string()])
-      }
-    src/validator/mod.rs: |
-      use crate::errors::AppError;
 
-      pub fn validate(data: &str) -> Result<(), AppError> {
-          if data.len() < 3 {
-              return Err(AppError::Validation { field: "data".into(), reason: "too short".into() });
+          submit(data: Record<string, unknown>): ValidationResult {
+              return this.validator.validate(data);
           }
-          Ok(())
       }
-    src/pipeline/mod.rs: |
-      use crate::errors::AppError;
-      use crate::parser;
-      use crate::validator;
+    src/analytics/funnel.ts: |
+      export const GARBAGE_BAL3R009_A = 'registration_funnel';
 
-      pub fn process(input: &str) -> Result<Vec<String>, AppError> {
-          validator::validate(input)?;
-          parser::parse(input)
+      export class FunnelTracker {
+          track(step: string): void { console.log(`Funnel: ${step}`); }
       }
-    src/export/csv.rs: |
-      pub const GARBAGE_R009_CSV_A: &str = "csv_export";
+    src/session/cookie.ts: |
+      export const GARBAGE_BAL3R009_B = 'session_cookie_name';
+      export const GARBAGE_BAL3R009_C = 7;
 
-      pub fn to_csv(rows: &[Vec<String>]) -> String {
-          String::new()
+      export function setCookie(name: string, value: string): void {
+          document.cookie = `${name}=${value}`;
       }
-    src/export/json.rs: |
-      pub const GARBAGE_R009_JSON_B: &str = "json_export";
+    src/config/feature_flags.ts: |
+      export const GARBAGE_BAL3R009_D = 'feature_flag_registration_v2';
 
-      pub fn to_json(data: &str) -> String {
-          format!("{{{}}}", data)
-      }
-    src/export/xml.rs: |
-      pub const GARBAGE_R009_XML_C: &str = "xml_export";
-
-      pub fn to_xml(data: &str) -> String {
-          format!("<data>{}</data>", data)
-      }
-  commit_message: "refactor: consolidate error types into unified AppError enum"
+      export function isEnabled(flag: string): boolean { return false; }
+  commit_message: "refactor: introduce ValidationResult type to replace bare FieldError array"
 fragments:
-- id: app_error_enum
+- id: validation_result_type
   selector:
-    path: src/errors.rs
-    anchor: "pub enum AppError"
-- id: parse_variant
+    path: src/forms/field_error.ts
+    anchor: "export interface ValidationResult"
+- id: validator_validate_result
   selector:
-    path: src/errors.rs
-    anchor: "Parse { message: String, line: usize }"
-- id: validation_variant
+    path: src/forms/validator.ts
+    anchor: "validate(data: Record<string, unknown>): ValidationResult"
+- id: registration_form_submit
   selector:
-    path: src/errors.rs
-    anchor: "Validation { field: String, reason: String }"
-- id: parser_uses_app_error
+    path: src/ui/registration_form.ts
+    anchor: "submit(data: Record<string, unknown>): ValidationResult"
+- id: no_funnel
   selector:
-    path: src/parser/mod.rs
-    anchor: "use crate::errors::AppError"
-- id: validator_uses_app_error
+    path: src/analytics/funnel.ts
+- id: no_cookie
   selector:
-    path: src/validator/mod.rs
-    anchor: "use crate::errors::AppError"
-- id: pipeline_uses_app_error
+    path: src/session/cookie.ts
+- id: no_feature_flags
   selector:
-    path: src/pipeline/mod.rs
-    anchor: "Result<Vec<String>, AppError>"
-- id: no_garbage_a
+    path: src/config/feature_flags.ts
+- id: no_global_0
   selector:
-    anchor: GARBAGE_R009_CSV_A
-- id: no_garbage_b
+    anchor: GARBAGE_BAL3R009_A
+- id: no_global_1
   selector:
-    anchor: GARBAGE_R009_JSON_B
-- id: no_garbage_c
+    anchor: GARBAGE_BAL3R009_B
+- id: no_global_2
   selector:
-    anchor: GARBAGE_R009_XML_C
+    anchor: GARBAGE_BAL3R009_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_BAL3R009_D
 oracle:
   required:
-  - app_error_enum
-  - parse_variant
-  - validation_variant
-  - parser_uses_app_error
-  - validator_uses_app_error
-  - pipeline_uses_app_error
+  - validation_result_type
+  - validator_validate_result
+  - registration_form_submit
   allowed: []
   forbidden:
-  - no_garbage_a
-  - no_garbage_b
-  - no_garbage_c
+  - no_funnel
+  - no_cookie
+  - no_feature_flags
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

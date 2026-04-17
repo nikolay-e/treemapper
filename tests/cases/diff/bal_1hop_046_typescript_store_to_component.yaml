@@ -1,89 +1,122 @@
 name: bal_1hop_046_typescript_store_to_component
 tags:
-- lang:typescript
-- change:new_function
-- change:single_file
-- context:import_chain
-- distance:1hop
+- lang:python
+- lang:shell
+- change:multi_file
+- context:same_file
+- distance:0hop
 - difficulty:easy
 repo:
   initial_files:
-    src/store/userStore.ts: |
-      export interface User {
-        id: string;
-        name: string;
-        email: string;
-      }
+    deploy/package.py: |
+      import os
+      import tarfile
 
-      let currentUser: User | null = null;
+      OUTPUT_DIR = "dist"
 
-      export function setUser(user: User): void {
-        currentUser = user;
-      }
 
-      export function getUser(): User | null {
-        return currentUser;
-      }
-    src/components/UserProfile.ts: |
-      import { getUser } from '../store/userStore';
+      def create_package(source_dir: str, version: str) -> str:
+          archive = os.path.join(OUTPUT_DIR, f"app-{version}.tar.gz")
+          with tarfile.open(archive, "w:gz") as tar:
+              tar.add(source_dir, arcname="app")
+          return archive
+    deploy/publish.sh: |
+      #!/usr/bin/env bash
+      python3 deploy/package.py "$VERSION"
+    garbage/monitor.py: |
+      GARBAGE_BAL046_MONITOR_A = "monitor_marker"
 
-      export function renderUserProfile(): string {
-        const user = getUser();
-        if (!user) return '<div>Not logged in</div>';
-        return `<div class="profile">${user.name} (${user.email})</div>`;
-      }
-    src/utils/dateFormat.ts: |
-      export function formatDate(date: Date): string {
-        return date.toISOString().split('T')[0];
-      }
+
+      def check_health() -> bool:
+          return True
+    garbage/rollback.py: |
+      GARBAGE_BAL046_ROLLBACK_B = "rollback_marker"
+
+
+      def rollback(version: str) -> None:
+          pass
+    garbage/secrets.py: |
+      GARBAGE_BAL046_SECRETS_C = "secrets_marker"
+
+
+      def load_secrets() -> dict:
+          return {}
   changed_files:
-    src/store/userStore.ts: |
-      export interface User {
-        id: string;
-        name: string;
-        email: string;
-      }
+    deploy/package.py: |
+      import os
+      import tarfile
+      import hashlib
 
-      let currentUser: User | null = null;
+      OUTPUT_DIR = "dist"
 
-      export function setUser(user: User): void {
-        currentUser = user;
-      }
 
-      export function getUser(): User | null {
-        return currentUser;
-      }
+      def create_package(source_dir: str, version: str) -> str:
+          archive = os.path.join(OUTPUT_DIR, f"app-{version}.tar.gz")
+          with tarfile.open(archive, "w:gz") as tar:
+              tar.add(source_dir, arcname="app")
+          return archive
 
-      export function clearUser(): void {
-        currentUser = null;
-      }
 
-      export function isLoggedIn(): boolean {
-        return currentUser !== null;
-      }
-  commit_message: "feat: add clearUser and isLoggedIn to user store"
+      def checksum(archive_path: str) -> str:
+          h = hashlib.sha256()
+          with open(archive_path, "rb") as f:
+              for chunk in iter(lambda: f.read(8192), b""):
+                  h.update(chunk)
+          return h.hexdigest()
+    deploy/publish.sh: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      ARCHIVE=$(python3 deploy/package.py "$VERSION")
+      echo "Created: $ARCHIVE"
+      python3 -c "import deploy.package; print(deploy.package.checksum('$ARCHIVE'))"
+    garbage/monitor.py: |
+      GARBAGE_BAL046_MONITOR_A = "monitor_marker"
+
+
+      def check_health() -> bool:
+          return True
+    garbage/rollback.py: |
+      GARBAGE_BAL046_ROLLBACK_B = "rollback_marker"
+
+
+      def rollback(version: str) -> None:
+          pass
+    garbage/secrets.py: |
+      GARBAGE_BAL046_SECRETS_C = "secrets_marker"
+
+
+      def load_secrets() -> dict:
+          return {}
+  commit_message: "feat: add checksum function and improve publish script"
 fragments:
-- id: store_clear_user
+- id: checksum_fn
   selector:
-    path: userStore.ts
-    anchor: "clearUser"
-- id: store_is_logged_in
+    path: deploy/package.py
+    anchor: "def checksum"
+- id: create_package_fn
   selector:
-    path: userStore.ts
-    anchor: "isLoggedIn"
-- id: component_uses_store
+    path: deploy/package.py
+    anchor: "def create_package"
+- id: shell_uses_checksum
   selector:
-    path: UserProfile.ts
-    anchor: "getUser()"
-- id: no_date_format
+    path: deploy/publish.sh
+    anchor: "deploy.package.checksum"
+- id: no_garbage_a
   selector:
-    path: dateFormat.ts
-    anchor: "formatDate"
+    anchor: GARBAGE_BAL046_MONITOR_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_BAL046_ROLLBACK_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_BAL046_SECRETS_C
 oracle:
   required:
-  - store_clear_user
-  - store_is_logged_in
-  - component_uses_store
+  - checksum_fn
+  - create_package_fn
+  - shell_uses_checksum
   allowed: []
   forbidden:
-  - no_date_format
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

@@ -1,272 +1,185 @@
 name: gap2_051_julia_multifile_same_file_graph_traversal
 tags:
-- change:multi_file
-- context:same_file
-- difficulty:easy
-- distance:0hop
 - lang:julia
+- change:refactor
+- change:single_file
+- context:call_graph
+- distance:1hop
+- difficulty:hard
 repo:
   initial_files:
-    src/Graph.jl: |
-      module Graph
+    src/RouteOptimizer.jl: |
+      module RouteOptimizer
 
-      export AdjList, add_edge, neighbors, bfs
+      export Route, optimize_route, total_distance
 
-      const AdjList = Dict{Int, Vector{Int}}
+      struct Route
+          waypoints::Vector{Tuple{Float64,Float64}}
+          label::String
+      end
 
-      function add_edge(g::AdjList, u::Int, v::Int)
-          if !haskey(g, u)
-              g[u] = Int[]
+      function total_distance(route::Route)::Float64
+          total = 0.0
+          for i in 2:length(route.waypoints)
+              dx = route.waypoints[i][1] - route.waypoints[i-1][1]
+              dy = route.waypoints[i][2] - route.waypoints[i-1][2]
+              total += sqrt(dx^2 + dy^2)
           end
-          push!(g[u], v)
+          return total
       end
 
-      function neighbors(g::AdjList, node::Int)::Vector{Int}
-          return get(g, node, Int[])
-      end
-
-      function bfs(g::AdjList, start::Int)::Vector{Int}
-          visited = Set{Int}()
-          queue = [start]
-          order = Int[]
-          while !isempty(queue)
-              node = popfirst!(queue)
-              if node in visited
-                  continue
-              end
-              push!(visited, node)
-              push!(order, node)
-              for nb in neighbors(g, node)
-                  push!(queue, nb)
-              end
-          end
-          return order
+      function optimize_route(route::Route)::Route
+          return route
       end
 
       end
-    src/PathFinder.jl: |
-      module PathFinder
+    src/DeliveryPlanner.jl: |
+      module DeliveryPlanner
 
-      export shortest_path, has_path
+      include("RouteOptimizer.jl")
+      using .RouteOptimizer
 
-      function shortest_path(g::Dict{Int,Vector{Int}}, src::Int, dst::Int)::Vector{Int}
-          if src == dst
-              return [src]
-          end
-          parent = Dict{Int, Int}()
-          visited = Set{Int}([src])
-          queue = [src]
-          while !isempty(queue)
-              node = popfirst!(queue)
-              for nb in get(g, node, Int[])
-                  if !(nb in visited)
-                      parent[nb] = node
-                      push!(visited, nb)
-                      push!(queue, nb)
-                      if nb == dst
-                          return reconstruct(parent, src, dst)
-                      end
-                  end
-              end
-          end
-          return Int[]
+      function plan_deliveries(routes::Vector{Route})::Vector{Route}
+          return sort(routes, by=total_distance)
       end
 
-      function reconstruct(parent::Dict{Int,Int}, src::Int, dst::Int)::Vector{Int}
-          path = [dst]
-          current = dst
-          while current != src
-              current = parent[current]
-              pushfirst!(path, current)
-          end
-          return path
-      end
-
-      function has_path(g::Dict{Int,Vector{Int}}, src::Int, dst::Int)::Bool
-          return !isempty(shortest_path(g, src, dst))
+      function shortest_route(routes::Vector{Route})::Union{Route,Nothing}
+          isempty(routes) && return nothing
+          return first(plan_deliveries(routes))
       end
 
       end
-    src/Clustering.jl: |
-      module Clustering
+    src/ReportGenerator.jl: |
+      module ReportGenerator
 
-      GARBAGE_GAP2_051_ALGO_A = "kmeans"
-      GARBAGE_GAP2_051_K_B = 3
+      include("RouteOptimizer.jl")
+      using .RouteOptimizer
 
-      function assign_clusters(points::Vector{Vector{Float64}}, k::Int)::Vector{Int}
-          return ones(Int, length(points))
-      end
-
-      function cluster_distance(a::Vector{Float64}, b::Vector{Float64})::Float64
-          return sqrt(sum((a .- b) .^ 2))
+      function route_report(routes::Vector{Route})::Vector{String}
+          return ["$(r.label): $(round(total_distance(r), digits=2)) km" for r in routes]
       end
 
       end
-    src/Sorting.jl: |
-      module Sorting
+    src/GAP051_Auth.jl: |
+      module Auth
 
-      GARBAGE_GAP2_051_SORT_C = "quicksort"
-      GARBAGE_GAP2_051_PIVOT_D = "median"
+      GAP051_GARBAGE_A = "auth_marker"
+      GAP051_GARBAGE_B = "api_key"
 
-      function quicksort(arr::Vector{Int})::Vector{Int}
-          if length(arr) <= 1
-              return arr
-          end
-          pivot = arr[1]
-          left = filter(x -> x < pivot, arr[2:end])
-          right = filter(x -> x >= pivot, arr[2:end])
-          return vcat(quicksort(left), [pivot], quicksort(right))
+      function authenticate(token::String)::Bool
+          return length(token) > 0
+      end
+
+      end
+    src/GAP051_Notify.jl: |
+      module Notify
+
+      GAP051_GARBAGE_C = "notify_marker"
+      GAP051_GARBAGE_D = "webhook_url"
+
+      function notify(msg::String)
+          println("NOTIFY: $msg")
       end
 
       end
   changed_files:
-    src/Graph.jl: |
-      module Graph
+    src/RouteOptimizer.jl: |
+      module RouteOptimizer
 
-      export AdjList, add_edge, neighbors, bfs, dfs
+      export Route, optimize_route, total_distance, segment_distances
 
-      const AdjList = Dict{Int, Vector{Int}}
+      struct Route
+          waypoints::Vector{Tuple{Float64,Float64}}
+          label::String
+          priority::Int
+      end
 
-      function add_edge(g::AdjList, u::Int, v::Int)
-          if !haskey(g, u)
-              g[u] = Int[]
+      function total_distance(route::Route)::Float64
+          total = 0.0
+          for i in 2:length(route.waypoints)
+              dx = route.waypoints[i][1] - route.waypoints[i-1][1]
+              dy = route.waypoints[i][2] - route.waypoints[i-1][2]
+              total += sqrt(dx^2 + dy^2)
           end
-          push!(g[u], v)
+          return total
       end
 
-      function neighbors(g::AdjList, node::Int)::Vector{Int}
-          return get(g, node, Int[])
-      end
-
-      function bfs(g::AdjList, start::Int)::Vector{Int}
-          visited = Set{Int}()
-          queue = [start]
-          order = Int[]
-          while !isempty(queue)
-              node = popfirst!(queue)
-              if node in visited
-                  continue
-              end
-              push!(visited, node)
-              push!(order, node)
-              for nb in neighbors(g, node)
-                  push!(queue, nb)
-              end
+      function segment_distances(route::Route)::Vector{Float64}
+          segs = Float64[]
+          for i in 2:length(route.waypoints)
+              dx = route.waypoints[i][1] - route.waypoints[i-1][1]
+              dy = route.waypoints[i][2] - route.waypoints[i-1][2]
+              push!(segs, sqrt(dx^2 + dy^2))
           end
-          return order
+          return segs
       end
 
-      function dfs(g::AdjList, start::Int)::Vector{Int}
-          visited = Set{Int}()
-          order = Int[]
-          dfs_visit!(g, start, visited, order)
-          return order
-      end
-
-      function dfs_visit!(g::AdjList, node::Int, visited::Set{Int}, order::Vector{Int})
-          if node in visited
-              return
-          end
-          push!(visited, node)
-          push!(order, node)
-          for nb in neighbors(g, node)
-              dfs_visit!(g, nb, visited, order)
-          end
+      function optimize_route(route::Route)::Route
+          return route
       end
 
       end
-    src/PathFinder.jl: |
-      module PathFinder
+    src/GAP051_Auth.jl: |
+      module Auth
 
-      export shortest_path, has_path, path_length
+      GAP051_GARBAGE_A = "auth_marker"
+      GAP051_GARBAGE_B = "api_key"
 
-      function shortest_path(g::Dict{Int,Vector{Int}}, src::Int, dst::Int)::Vector{Int}
-          if src == dst
-              return [src]
-          end
-          parent = Dict{Int, Int}()
-          visited = Set{Int}([src])
-          queue = [src]
-          while !isempty(queue)
-              node = popfirst!(queue)
-              for nb in get(g, node, Int[])
-                  if !(nb in visited)
-                      parent[nb] = node
-                      push!(visited, nb)
-                      push!(queue, nb)
-                      if nb == dst
-                          return reconstruct(parent, src, dst)
-                      end
-                  end
-              end
-          end
-          return Int[]
-      end
-
-      function reconstruct(parent::Dict{Int,Int}, src::Int, dst::Int)::Vector{Int}
-          path = [dst]
-          current = dst
-          while current != src
-              current = parent[current]
-              pushfirst!(path, current)
-          end
-          return path
-      end
-
-      function has_path(g::Dict{Int,Vector{Int}}, src::Int, dst::Int)::Bool
-          return !isempty(shortest_path(g, src, dst))
-      end
-
-      function path_length(g::Dict{Int,Vector{Int}}, src::Int, dst::Int)::Int
-          p = shortest_path(g, src, dst)
-          return isempty(p) ? -1 : length(p) - 1
+      function authenticate(token::String)::Bool
+          return length(token) > 0
       end
 
       end
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+    src/GAP051_Notify.jl: |
+      module Notify
+
+      GAP051_GARBAGE_C = "notify_marker"
+      GAP051_GARBAGE_D = "webhook_url"
+
+      function notify(msg::String)
+          println("NOTIFY: $msg")
+      end
+
+      end
+  commit_message: "refactor: add priority field to Route, add segment_distances function"
 fragments:
-- id: graph_dfs
+- id: route_priority_field
   selector:
-    path: src/Graph.jl
-    anchor: "function dfs(g::AdjList, start::Int)::Vector{Int}"
-- id: graph_dfs_visit
+    path: src/RouteOptimizer.jl
+    anchor: "priority::Int"
+- id: segment_distances_func
   selector:
-    path: src/Graph.jl
-    anchor: "function dfs_visit!(g::AdjList, node::Int"
-- id: pathfinder_length
+    path: src/RouteOptimizer.jl
+    anchor: "function segment_distances(route::Route)"
+- id: delivery_uses_total_distance
   selector:
-    path: src/PathFinder.jl
-    anchor: "function path_length(g::Dict{Int,Vector{Int}}, src::Int, dst::Int)::Int"
-- id: no_clustering
+    path: src/DeliveryPlanner.jl
+    anchor: "sort(routes, by=total_distance)"
+- id: report_uses_total_distance
   selector:
-    path: src/Clustering.jl
-- id: no_sorting
+    path: src/ReportGenerator.jl
+    anchor: "total_distance(r)"
+- id: no_garbage_a
   selector:
-    path: src/Sorting.jl
-- id: no_global_0
+    anchor: GAP051_GARBAGE_A
+- id: no_garbage_b
   selector:
-    anchor: GARBAGE_GAP2_051_ALGO_A
-- id: no_global_1
+    anchor: GAP051_GARBAGE_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_GAP2_051_K_B
-- id: no_global_2
+    anchor: GAP051_GARBAGE_C
+- id: no_garbage_d
   selector:
-    anchor: GARBAGE_GAP2_051_SORT_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_GAP2_051_PIVOT_D
+    anchor: GAP051_GARBAGE_D
 oracle:
   required:
-  - graph_dfs
-  - graph_dfs_visit
-  - pathfinder_length
+  - route_priority_field
+  - segment_distances_func
+  - delivery_uses_total_distance
+  - report_uses_total_distance
   allowed: []
   forbidden:
-  - no_clustering
-  - no_sorting
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

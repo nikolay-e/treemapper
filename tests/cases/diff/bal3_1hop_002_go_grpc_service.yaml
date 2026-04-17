@@ -1,177 +1,161 @@
 name: bal3_1hop_002_go_grpc_service
 tags:
-- lang:go
-- change:signature
+- lang:clojure
+- change:single_file
 - context:import_chain
-- distance:1hop
-- difficulty:hard
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
-    internal/models/order.go: |
-      package models
+    src/feature/flags.clj: |
+      (ns feature.flags)
 
-      type OrderStatus int
+      (def ^:dynamic *flags* #{})
 
-      const (
-          OrderPending   OrderStatus = iota
-          OrderConfirmed
-          OrderShipped
-      )
+      (defn enabled? [flag]
+        (contains? *flags* flag))
 
-      type Order struct {
-          ID     string
-          Status OrderStatus
-          Total  float64
-      }
+      (defn enable! [flag]
+        (alter-var-root #'*flags* conj flag))
 
-      func NewOrder(id string, total float64) *Order {
-          return &Order{ID: id, Status: OrderPending, Total: total}
-      }
-    internal/service/order_service.go: |
-      package service
+      (defn disable! [flag]
+        (alter-var-root #'*flags* disj flag))
+    src/feature/guard.clj: |
+      (ns feature.guard
+        (:require [feature.flags :as flags]))
 
-      import "internal/models"
+      (defmacro when-feature [flag & body]
+        `(when (flags/enabled? ~flag)
+           ~@body))
 
-      type OrderService struct {
-          orders map[string]*models.Order
-      }
+      (defn feature-gate [flag handler]
+        (fn [request]
+          (if (flags/enabled? flag)
+            (handler request)
+            {:status 503 :body {:error "feature disabled"}})))
+    src/api/features_handler.clj: |
+      (ns api.features-handler
+        (:require [feature.guard :as guard]
+                  [feature.flags :as flags]))
 
-      func NewOrderService() *OrderService {
-          return &OrderService{orders: make(map[string]*models.Order)}
-      }
+      (defn handle-new-ui [request]
+        (guard/feature-gate :new-ui
+          (fn [_] {:status 200 :body {:page "new-ui"}})))
 
-      func (s *OrderService) PlaceOrder(id string, total float64) *models.Order {
-          o := models.NewOrder(id, total)
-          s.orders[id] = o
-          return o
-      }
+      (defn toggle-flag [flag-name enable?]
+        (if enable?
+          (flags/enable! (keyword flag-name))
+          (flags/disable! (keyword flag-name))))
+    garbage/ab.clj: |
+      (ns garbage.ab)
 
-      func (s *OrderService) GetOrder(id string) *models.Order {
-          return s.orders[id]
-      }
-    internal/service/shipping_service.go: |
-      package service
+      (def ^:const GARBAGE_BAL31HOP002_A "experiment_marker")
+      (def ^:const GARBAGE_BAL31HOP002_B "variant_marker")
 
-      import "internal/models"
+      (defn assign-variant [user-id experiment]
+        GARBAGE_BAL31HOP002_A)
+    garbage/rollout.clj: |
+      (ns garbage.rollout)
 
-      type ShippingService struct{}
+      (def ^:const GARBAGE_BAL31HOP002_C "rollout_marker")
+      (def ^:const GARBAGE_BAL31HOP002_D "percentage_marker")
 
-      func (s *ShippingService) Ship(order *models.Order) error {
-          order.Status = models.OrderShipped
-          return nil
-      }
-    internal/notify/email.go: |
-      package notify
+      (defn should-rollout? [user-id percentage]
+        GARBAGE_BAL31HOP002_C)
+    garbage/audit.clj: |
+      (ns garbage.audit)
 
-      GARBAGE_002_EMAIL_A = "email"
+      (def ^:const GARBAGE_BAL31HOP002_E "audit_marker")
 
-      type EmailSender struct {
-          SMTPAddr string
-      }
-
-      func (e *EmailSender) Send(to, subject, body string) error {
-          return nil
-      }
-    internal/analytics/tracker.go: |
-      package analytics
-
-      GARBAGE_002_TRACKER_B = "tracker"
-
-      type EventTracker struct {
-          Endpoint string
-      }
-
-      func (t *EventTracker) Track(event string) {}
-    internal/payments/stripe.go: |
-      package payments
-
-      GARBAGE_002_STRIPE_C = "stripe"
-
-      type StripeClient struct {
-          APIKey string
-      }
-
-      func (c *StripeClient) Charge(amount float64) error {
-          return nil
-      }
+      (defn record-toggle [flag enabled?]
+        GARBAGE_BAL31HOP002_E)
   changed_files:
-    internal/models/order.go: |
-      package models
+    src/feature/flags.clj: |
+      (ns feature.flags)
 
-      type OrderStatus int
+      (def ^:dynamic *flags* #{})
+      (def ^:dynamic *overrides* {})
 
-      const (
-          OrderPending   OrderStatus = iota
-          OrderConfirmed
-          OrderShipped
-          OrderCancelled
-      )
+      (defn enabled? [flag]
+        (if-let [override (get *overrides* flag)]
+          override
+          (contains? *flags* flag)))
 
-      type Order struct {
-          ID       string
-          Status   OrderStatus
-          Total    float64
-          Currency string
-      }
+      (defn enable! [flag]
+        (alter-var-root #'*flags* conj flag))
 
-      func NewOrder(id string, total float64, currency string) *Order {
-          return &Order{ID: id, Status: OrderPending, Total: total, Currency: currency}
-      }
-  commit_message: "feat: add Currency to Order and OrderCancelled status"
+      (defn disable! [flag]
+        (alter-var-root #'*flags* disj flag))
+
+      (defn with-override [flag value f]
+        (binding [*overrides* (assoc *overrides* flag value)]
+          (f)))
+    garbage/ab.clj: |
+      (ns garbage.ab)
+
+      (def ^:const GARBAGE_BAL31HOP002_A "experiment_marker")
+      (def ^:const GARBAGE_BAL31HOP002_B "variant_marker")
+
+      (defn assign-variant [user-id experiment]
+        GARBAGE_BAL31HOP002_A)
+    garbage/rollout.clj: |
+      (ns garbage.rollout)
+
+      (def ^:const GARBAGE_BAL31HOP002_C "rollout_marker")
+      (def ^:const GARBAGE_BAL31HOP002_D "percentage_marker")
+
+      (defn should-rollout? [user-id percentage]
+        GARBAGE_BAL31HOP002_C)
+    garbage/audit.clj: |
+      (ns garbage.audit)
+
+      (def ^:const GARBAGE_BAL31HOP002_E "audit_marker")
+
+      (defn record-toggle [flag enabled?]
+        GARBAGE_BAL31HOP002_E)
+  commit_message: "feat: add per-flag overrides with with-override to feature flags"
 fragments:
-- id: order_cancelled
+- id: flags_overrides_var
   selector:
-    path: internal/models/order.go
-    anchor: "OrderCancelled"
-- id: currency_field
+    path: src/feature/flags.clj
+    anchor: "(def ^:dynamic *overrides* {})"
+- id: flags_enabled_override_check
   selector:
-    path: internal/models/order.go
-    anchor: "Currency string"
-- id: new_order_currency_param
+    path: src/feature/flags.clj
+    anchor: "(if-let [override (get *overrides* flag)]"
+- id: flags_with_override
   selector:
-    path: internal/models/order.go
-    anchor: "func NewOrder(id string, total float64, currency string)"
-- id: order_service_calls_new
+    path: src/feature/flags.clj
+    anchor: "(defn with-override"
+- id: guard_uses_enabled
   selector:
-    path: internal/service/order_service.go
-    anchor: "models.NewOrder(id, total)"
-- id: shipping_uses_order
-  selector:
-    path: internal/service/shipping_service.go
-    anchor: "order *models.Order"
-- id: unrelated_email
-  selector:
-    path: internal/notify/email.go
-    anchor: "type EmailSender struct"
-- id: unrelated_tracker
-  selector:
-    path: internal/analytics/tracker.go
-    anchor: "type EventTracker struct"
-- id: unrelated_stripe
-  selector:
-    path: internal/payments/stripe.go
-    anchor: "type StripeClient struct"
+    path: src/feature/guard.clj
+    anchor: "(flags/enabled? ~flag)"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_002_EMAIL_A
+    anchor: GARBAGE_BAL31HOP002_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_002_TRACKER_B
+    anchor: GARBAGE_BAL31HOP002_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_002_STRIPE_C
+    anchor: GARBAGE_BAL31HOP002_C
+- id: no_garbage_d
+  selector:
+    anchor: GARBAGE_BAL31HOP002_D
+- id: no_garbage_e
+  selector:
+    anchor: GARBAGE_BAL31HOP002_E
 oracle:
   required:
-  - order_cancelled
-  - currency_field
-  - new_order_currency_param
-  - order_service_calls_new
-  allowed:
-  - shipping_uses_order
+  - flags_overrides_var
+  - flags_enabled_override_check
+  - flags_with_override
+  - guard_uses_enabled
+  allowed: []
   forbidden:
-  - unrelated_email
-  - unrelated_tracker
-  - unrelated_stripe
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

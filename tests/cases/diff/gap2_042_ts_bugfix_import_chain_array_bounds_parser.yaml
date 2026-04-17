@@ -1,158 +1,132 @@
 name: gap2_042_ts_bugfix_import_chain_array_bounds_parser
 tags:
-- change:bug_fix
-- change:single_file
+- lang:python
+- change:multi_file
+- change:refactor
 - context:import_chain
-- difficulty:easy
-- distance:0hop
-- lang:typescript
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
-    src/parser/token.ts: |
-      export enum TokenKind {
-        Number = "NUMBER",
-        Operator = "OPERATOR",
-        Paren = "PAREN",
-        Whitespace = "WHITESPACE",
-      }
+    src/pipeline/reader.py: |
+      def read_lines(path: str) -> list[str]:
+          with open(path) as f:
+              return f.readlines()
 
-      export interface Token {
-        kind: TokenKind;
-        value: string;
-        position: number;
-      }
-    src/parser/lexer.ts: |
-      import { Token, TokenKind } from "./token";
+      def read_csv(path: str) -> list[list[str]]:
+          lines = read_lines(path)
+          return [line.strip().split(",") for line in lines]
+    src/pipeline/transformer.py: |
+      from src.pipeline.reader import read_csv
 
-      function isDigit(ch: string): boolean {
-        return ch >= "0" && ch <= "9";
-      }
+      def transform_records(path: str) -> list[dict]:
+          rows = read_csv(path)
+          if not rows:
+              return []
+          headers = rows[0]
+          return [dict(zip(headers, row)) for row in rows[1:]]
+    src/pipeline/exporter.py: |
+      from src.pipeline.transformer import transform_records
 
-      function tokenize(input: string): Token[] {
-        const tokens: Token[] = [];
-        let pos = 0;
-        while (pos < input.length) {
-          const ch = input[pos];
-          if (isDigit(ch)) {
-            let num = "";
-            const start = pos;
-            while (pos < input.length && isDigit(input[pos])) {
-              num += input[pos];
-              pos++;
-            }
-            tokens.push({ kind: TokenKind.Number, value: num, position: start });
-          } else if ("+-*/".includes(ch)) {
-            tokens.push({ kind: TokenKind.Operator, value: ch, position: pos });
-            pos++;
-          } else {
-            pos++;
-          }
-        }
-        return tokens;
-      }
+      def export_to_json(path: str) -> list[dict]:
+          records = transform_records(path)
+          return records
 
-      function peekToken(tokens: Token[], index: number): Token {
-        return tokens[index];
-      }
-    src/parser/evaluator.ts: |
-      const TRAP_GAP2_042_EVAL_A: string = "evaluator_v2";
-      const TRAP_GAP2_042_PREC_B: number = 10;
+      def export_filtered(path: str, key: str, value: str) -> list[dict]:
+          records = transform_records(path)
+          return [r for r in records if r.get(key) == value]
+    garbage/archiver.py: |
+      GARBAGE_GAP2042_A = "archive_marker"
 
-      function evaluate(expression: string): number {
-        return 0;
-      }
+      def noop():
+          pass
+    garbage/notifier.py: |
+      GARBAGE_GAP2042_B = "notify_marker"
 
-      function precedence(op: string): number {
-        if (op === "+" || op === "-") return 1;
-        return 2;
-      }
-    src/parser/formatter.ts: |
-      const TRAP_GAP2_042_FMT_C: string = "formatter";
-      const TRAP_GAP2_042_PAD_D: number = 2;
+      def noop():
+          pass
+    garbage/scheduler.py: |
+      GARBAGE_GAP2042_C = "schedule_marker"
 
-      function formatExpression(tokens: string[]): string {
-        return tokens.join(" ");
-      }
-
-      function padOperator(op: string): string {
-        return ` ${op} `;
-      }
+      def noop():
+          pass
   changed_files:
-    src/parser/lexer.ts: |
-      import { Token, TokenKind } from "./token";
+    src/pipeline/reader.py: |
+      def read_lines(path: str) -> list[str]:
+          with open(path, encoding="utf-8") as f:
+              return f.readlines()
 
-      function isDigit(ch: string): boolean {
-        return ch >= "0" && ch <= "9";
-      }
+      def read_csv(path: str) -> list[list[str]]:
+          lines = read_lines(path)
+          return [line.strip().split(",") for line in lines if line.strip()]
+    src/pipeline/transformer.py: |
+      from src.pipeline.reader import read_csv
 
-      function tokenize(input: string): Token[] {
-        const tokens: Token[] = [];
-        let pos = 0;
-        while (pos < input.length) {
-          const ch = input[pos];
-          if (isDigit(ch)) {
-            let num = "";
-            const start = pos;
-            while (pos < input.length && isDigit(input[pos])) {
-              num += input[pos];
-              pos++;
-            }
-            tokens.push({ kind: TokenKind.Number, value: num, position: start });
-          } else if ("+-*/".includes(ch)) {
-            tokens.push({ kind: TokenKind.Operator, value: ch, position: pos });
-            pos++;
-          } else {
-            pos++;
-          }
-        }
-        return tokens;
-      }
+      def transform_records(path: str) -> list[dict]:
+          rows = read_csv(path)
+          if not rows:
+              return []
+          headers = [h.strip() for h in rows[0]]
+          return [dict(zip(headers, [c.strip() for c in row])) for row in rows[1:]]
+    src/pipeline/exporter.py: |
+      from src.pipeline.transformer import transform_records
 
-      function peekToken(tokens: Token[], index: number): Token | null {
-        if (index < 0 || index >= tokens.length) {
-          return null;
-        }
-        return tokens[index];
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      def export_to_json(path: str) -> list[dict]:
+          records = transform_records(path)
+          return records
+
+      def export_filtered(path: str, key: str, value: str) -> list[dict]:
+          records = transform_records(path)
+          return [r for r in records if r.get(key) == value]
+    garbage/archiver.py: |
+      GARBAGE_GAP2042_A = "archive_marker"
+
+      def noop():
+          pass
+    garbage/notifier.py: |
+      GARBAGE_GAP2042_B = "notify_marker"
+
+      def noop():
+          pass
+    garbage/scheduler.py: |
+      GARBAGE_GAP2042_C = "schedule_marker"
+
+      def noop():
+          pass
+  commit_message: "refactor: add utf-8 encoding, strip blank lines and whitespace in CSV pipeline"
 fragments:
-- id: lexer_bounds_check
+- id: reader_encoding
   selector:
-    path: src/parser/lexer.ts
-    anchor: "if (index < 0 || index >= tokens.length)"
-- id: lexer_return_null
+    path: src/pipeline/reader.py
+    anchor: 'encoding="utf-8"'
+- id: reader_strip_blank
   selector:
-    path: src/parser/lexer.ts
-    anchor: "Token | null"
-- id: no_evaluator
+    path: src/pipeline/reader.py
+    anchor: "if line.strip()"
+- id: transformer_strip_headers
   selector:
-    path: src/parser/evaluator.ts
-- id: no_formatter
+    path: src/pipeline/transformer.py
+    anchor: "[h.strip() for h in rows[0]]"
+- id: exporter_file
   selector:
-    path: src/parser/formatter.ts
-- id: no_global_0
+    path: src/pipeline/exporter.py
+- id: no_garbage_a
   selector:
-    anchor: TRAP_GAP2_042_EVAL_A
-- id: no_global_1
+    anchor: GARBAGE_GAP2042_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2_042_PREC_B
-- id: no_global_2
+    anchor: GARBAGE_GAP2042_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2_042_FMT_C
-- id: no_global_3
-  selector:
-    anchor: TRAP_GAP2_042_PAD_D
+    anchor: GARBAGE_GAP2042_C
 oracle:
   required:
-  - lexer_bounds_check
-  - lexer_return_null
-  allowed: []
+  - reader_encoding
+  - reader_strip_blank
+  - transformer_strip_headers
+  allowed:
+  - exporter_file
   forbidden:
-  - no_evaluator
-  - no_formatter
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

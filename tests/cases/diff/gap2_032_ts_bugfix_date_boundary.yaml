@@ -1,156 +1,198 @@
 name: gap2_032_ts_bugfix_date_boundary
 tags:
-- change:bug_fix
-- change:single_file
+- lang:clojure
+- change:multi_file
 - context:import_chain
-- difficulty:easy
 - distance:2hop
-- lang:typescript
+- difficulty:hard
 repo:
   initial_files:
-    src/scheduling/dateutil.ts: |
-      export function daysBetween(start: Date, end: Date): number {
-        const ms = end.getTime() - start.getTime();
-        return Math.floor(ms / 86400000);
-      }
+    src/payments/ledger.clj: |
+      (ns payments.ledger)
 
-      export function addDays(date: Date, days: number): Date {
-        const result = new Date(date);
-        result.setDate(result.getDate() + days);
-        return result;
-      }
-    src/scheduling/availability.ts: |
-      import { daysBetween, addDays } from "./dateutil";
+      (defprotocol Ledger
+        (debit! [this account amount])
+        (credit! [this account amount])
+        (balance [this account]))
 
-      export interface TimeSlot {
-        start: Date;
-        end: Date;
-      }
+      (defrecord InMemoryLedger [entries]
+        Ledger
+        (debit! [this account amount]
+          (swap! entries update account (fnil - 0) amount)
+          this)
+        (credit! [this account amount]
+          (swap! entries update account (fnil + 0) amount)
+          this)
+        (balance [this account]
+          (get @entries account 0)))
 
-      export function isAvailable(slots: TimeSlot[], checkDate: Date): boolean {
-        return slots.some((s) => daysBetween(s.start, checkDate) >= 0 && daysBetween(checkDate, s.end) >= 0);
-      }
-    src/scheduling/planner.ts: |
-      import { isAvailable, TimeSlot } from "./availability";
+      (defn create-ledger []
+        (->InMemoryLedger (atom {})))
+    src/payments/transfer.clj: |
+      (ns payments.transfer
+        (:require [payments.ledger :as l]))
 
-      export function findNextAvailable(slots: TimeSlot[], from: Date, maxDays: number): Date | null {
-        for (let i = 0; i < maxDays; i++) {
-          const candidate = new Date(from.getTime() + i * 86400000);
-          if (isAvailable(slots, candidate)) return candidate;
-        }
-        return null;
-      }
-    src/scheduling/recurrence.ts: |
-      const TRAP_GAP2032_PATTERN_A: string = "weekly";
-      const TRAP_GAP2032_MAX_B: number = 52;
+      (defn transfer! [ledger from to amount]
+        (when (neg? (- (l/balance ledger from) amount))
+          (throw (ex-info "Insufficient funds" {:from from :amount amount})))
+        (l/debit! ledger from amount)
+        (l/credit! ledger to amount)
+        {:from from :to to :amount amount})
+    src/api/payment_handler.clj: |
+      (ns api.payment-handler
+        (:require [payments.transfer :as tr]))
 
-      export function expandRecurrence(startDate: Date, count: number): Date[] {
-        const dates: Date[] = [];
-        for (let i = 0; i < count; i++) {
-          dates.push(new Date(startDate.getTime() + i * 7 * 86400000));
-        }
-        return dates;
-      }
-    src/scheduling/reminder.ts: |
-      const TRAP_GAP2032_LEAD_C: number = 24;
-      const TRAP_GAP2032_CHANNEL_D: string = "email";
+      (defn handle-transfer [ledger req]
+        (try
+          {:status 200 :body (tr/transfer! ledger (:from req) (:to req) (:amount req))}
+          (catch clojure.lang.ExceptionInfo e
+            {:status 400 :body {:error (ex-message e)}})))
+    garbage/notify.clj: |
+      (ns garbage.notify)
 
-      export function shouldRemind(eventDate: Date, now: Date): boolean {
-        const hoursUntil = (eventDate.getTime() - now.getTime()) / 3600000;
-        return hoursUntil <= TRAP_GAP2032_LEAD_C && hoursUntil > 0;
-      }
+      (def ^:const GARBAGE_GAP2032_A "sms_marker")
+      (def ^:const GARBAGE_GAP2032_B "email_marker")
+
+      (defn send-notification [to message]
+        GARBAGE_GAP2032_A)
+    garbage/audit.clj: |
+      (ns garbage.audit)
+
+      (def ^:const GARBAGE_GAP2032_C "audit_marker")
+      (def ^:const GARBAGE_GAP2032_D "trail_marker")
+
+      (defn record-event [event]
+        GARBAGE_GAP2032_C)
+    garbage/fraud.clj: |
+      (ns garbage.fraud)
+
+      (def ^:const GARBAGE_GAP2032_E "fraud_marker")
+
+      (defn score [transaction]
+        GARBAGE_GAP2032_E)
   changed_files:
-    src/scheduling/dateutil.ts: |
-      export function daysBetween(start: Date, end: Date): number {
-        const startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
-        const endDay = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
-        return Math.floor((endDay - startDay) / 86400000);
-      }
+    src/payments/ledger.clj: |
+      (ns payments.ledger)
 
-      export function addDays(date: Date, days: number): Date {
-        const result = new Date(date);
-        result.setDate(result.getDate() + days);
-        return result;
-      }
-    src/scheduling/availability.ts: |
-      import { daysBetween, addDays } from "./dateutil";
+      (defprotocol Ledger
+        (debit! [this account amount])
+        (credit! [this account amount])
+        (balance [this account])
+        (history [this account]))
 
-      export interface TimeSlot {
-        start: Date;
-        end: Date;
-      }
+      (defrecord InMemoryLedger [entries log]
+        Ledger
+        (debit! [this account amount]
+          (swap! entries update account (fnil - 0) amount)
+          (swap! log conj {:type :debit :account account :amount amount})
+          this)
+        (credit! [this account amount]
+          (swap! entries update account (fnil + 0) amount)
+          (swap! log conj {:type :credit :account account :amount amount})
+          this)
+        (balance [this account]
+          (get @entries account 0))
+        (history [this account]
+          (filter #(= account (:account %)) @log)))
 
-      export function isAvailable(slots: TimeSlot[], checkDate: Date): boolean {
-        return slots.some((s) => daysBetween(s.start, checkDate) >= 0 && daysBetween(checkDate, s.end) >= 0);
-      }
-    src/scheduling/planner.ts: |
-      import { isAvailable, TimeSlot } from "./availability";
+      (defn create-ledger []
+        (->InMemoryLedger (atom {}) (atom [])))
+    src/payments/transfer.clj: |
+      (ns payments.transfer
+        (:require [payments.ledger :as l]))
 
-      export function findNextAvailable(slots: TimeSlot[], from: Date, maxDays: number): Date | null {
-        for (let i = 0; i < maxDays; i++) {
-          const candidate = new Date(from.getTime() + i * 86400000);
-          if (isAvailable(slots, candidate)) return candidate;
-        }
-        return null;
-      }
-    src/scheduling/recurrence.ts: |
-      const TRAP_GAP2032_PATTERN_A: string = "weekly";
-      const TRAP_GAP2032_MAX_B: number = 52;
+      (defn transfer! [ledger from to amount]
+        (when (neg? (- (l/balance ledger from) amount))
+          (throw (ex-info "Insufficient funds" {:from from :amount amount})))
+        (l/debit! ledger from amount)
+        (l/credit! ledger to amount)
+        {:from from :to to :amount amount})
 
-      export function expandRecurrence(startDate: Date, count: number): Date[] {
-        const dates: Date[] = [];
-        for (let i = 0; i < count; i++) {
-          dates.push(new Date(startDate.getTime() + i * 7 * 86400000));
-        }
-        return dates;
-      }
-    src/scheduling/reminder.ts: |
-      const TRAP_GAP2032_LEAD_C: number = 24;
-      const TRAP_GAP2032_CHANNEL_D: string = "email";
+      (defn transfer-history [ledger account]
+        (l/history ledger account))
+    src/api/payment_handler.clj: |
+      (ns api.payment-handler
+        (:require [payments.transfer :as tr]))
 
-      export function shouldRemind(eventDate: Date, now: Date): boolean {
-        const hoursUntil = (eventDate.getTime() - now.getTime()) / 3600000;
-        return hoursUntil <= TRAP_GAP2032_LEAD_C && hoursUntil > 0;
-      }
-  commit_message: Update files
-fixtures:
-  auto_garbage: true
+      (defn handle-transfer [ledger req]
+        (try
+          {:status 200 :body (tr/transfer! ledger (:from req) (:to req) (:amount req))}
+          (catch clojure.lang.ExceptionInfo e
+            {:status 400 :body {:error (ex-message e)}})))
+
+      (defn handle-history [ledger req]
+        {:status 200 :body (tr/transfer-history ledger (:account req))})
+    garbage/notify.clj: |
+      (ns garbage.notify)
+
+      (def ^:const GARBAGE_GAP2032_A "sms_marker")
+      (def ^:const GARBAGE_GAP2032_B "email_marker")
+
+      (defn send-notification [to message]
+        GARBAGE_GAP2032_A)
+    garbage/audit.clj: |
+      (ns garbage.audit)
+
+      (def ^:const GARBAGE_GAP2032_C "audit_marker")
+      (def ^:const GARBAGE_GAP2032_D "trail_marker")
+
+      (defn record-event [event]
+        GARBAGE_GAP2032_C)
+    garbage/fraud.clj: |
+      (ns garbage.fraud)
+
+      (def ^:const GARBAGE_GAP2032_E "fraud_marker")
+
+      (defn score [transaction]
+        GARBAGE_GAP2032_E)
+  commit_message: "feat: add transaction history to Ledger protocol and transfer module"
 fragments:
-- id: days_utc_fix
+- id: ledger_history_protocol
   selector:
-    path: src/scheduling/dateutil.ts
-    anchor: "const startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())"
-- id: days_between_func
+    path: src/payments/ledger.clj
+    anchor: "(history [this account])"
+- id: ledger_log_field
   selector:
-    path: src/scheduling/dateutil.ts
-    anchor: "export function daysBetween(start: Date, end: Date): number {"
-- id: no_recurrence
+    path: src/payments/ledger.clj
+    anchor: "(defrecord InMemoryLedger [entries log]"
+- id: ledger_history_impl
   selector:
-    path: src/scheduling/recurrence.ts
-- id: no_reminder
+    path: src/payments/ledger.clj
+    anchor: "(filter #(= account (:account %)) @log)"
+- id: transfer_history_fn
   selector:
-    path: src/scheduling/reminder.ts
-- id: no_global_0
+    path: src/payments/transfer.clj
+    anchor: "(defn transfer-history"
+- id: handler_history
   selector:
-    anchor: TRAP_GAP2032_PATTERN_A
-- id: no_global_1
+    path: src/api/payment_handler.clj
+    anchor: "(defn handle-history"
+- id: no_garbage_a
   selector:
-    anchor: TRAP_GAP2032_MAX_B
-- id: no_global_2
+    anchor: GARBAGE_GAP2032_A
+- id: no_garbage_b
   selector:
-    anchor: TRAP_GAP2032_LEAD_C
-- id: no_global_3
+    anchor: GARBAGE_GAP2032_B
+- id: no_garbage_c
   selector:
-    anchor: TRAP_GAP2032_CHANNEL_D
+    anchor: GARBAGE_GAP2032_C
+- id: no_garbage_d
+  selector:
+    anchor: GARBAGE_GAP2032_D
+- id: no_garbage_e
+  selector:
+    anchor: GARBAGE_GAP2032_E
 oracle:
   required:
-  - days_utc_fix
-  - days_between_func
+  - ledger_history_protocol
+  - ledger_log_field
+  - ledger_history_impl
+  - transfer_history_fn
+  - handler_history
   allowed: []
   forbidden:
-  - no_recurrence
-  - no_reminder
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

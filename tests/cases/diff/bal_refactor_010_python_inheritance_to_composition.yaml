@@ -1,237 +1,237 @@
 name: bal_refactor_010_python_inheritance_to_composition
 tags:
-- lang:python
+- lang:scala
 - change:multi_file
-- change:refactor
+- change:new_function
 - context:cross_module
-- distance:2hop
+- distance:3hop+
 - difficulty:hard
 repo:
   initial_files:
-    core/base_handler.py: |
-      import logging
+    src/main/scala/medical/Patient.scala: |
+      package medical
 
-      class BaseHandler:
-          def __init__(self):
-              self.logger = logging.getLogger(self.__class__.__name__)
+      case class Patient(
+        id: String,
+        name: String,
+        age: Int,
+        conditions: List[String]
+      )
+    src/main/scala/medical/PatientRepository.scala: |
+      package medical
 
-          def log_request(self, method, path):
-              self.logger.info(f"{method} {path}")
+      class PatientRepository {
+        private var store: Map[String, Patient] = Map.empty
 
-          def validate_auth(self, token):
-              if not token:
-                  raise PermissionError("missing token")
-              return True
+        def save(p: Patient): Unit = {
+          store = store + (p.id -> p)
+        }
 
-          def format_response(self, data, status=200):
-              return {"status": status, "data": data}
-    handlers/user_handler.py: |
-      from core.base_handler import BaseHandler
+        def find(id: String): Option[Patient] = store.get(id)
 
-      class UserHandler(BaseHandler):
-          def __init__(self, user_repo):
-              super().__init__()
-              self.user_repo = user_repo
+        def all(): List[Patient] = store.values.toList
+      }
+    src/main/scala/medical/DiagnosisService.scala: |
+      package medical
 
-          def get_user(self, request):
-              self.log_request("GET", "/users")
-              self.validate_auth(request.get("token"))
-              user = self.user_repo.find(request["user_id"])
-              return self.format_response(user)
-    handlers/product_handler.py: |
-      from core.base_handler import BaseHandler
-
-      class ProductHandler(BaseHandler):
-          def __init__(self, product_repo):
-              super().__init__()
-              self.product_repo = product_repo
-
-          def list_products(self, request):
-              self.log_request("GET", "/products")
-              self.validate_auth(request.get("token"))
-              products = self.product_repo.all()
-              return self.format_response(products)
-    app/routes.py: |
-      from handlers.user_handler import UserHandler
-      from handlers.product_handler import ProductHandler
-
-      def setup_routes(user_repo, product_repo):
-          user_h = UserHandler(user_repo)
-          product_h = ProductHandler(product_repo)
-          return {
-              "/users": user_h.get_user,
-              "/products": product_h.list_products,
+      class DiagnosisService(repo: PatientRepository) {
+        def addCondition(id: String, condition: String): Either[String, Patient] = {
+          repo.find(id) match {
+            case None    => Left(s"Patient $id not found")
+            case Some(p) =>
+              val updated = p.copy(conditions = p.conditions :+ condition)
+              repo.save(updated)
+              Right(updated)
           }
-    garbage_i18n.py: |
-      GARBAGE_REFACTOR_010_I18N_MARKER_A = "i18n"
-      GARBAGE_REFACTOR_010_LOCALE_MARKER_B = "en"
+        }
+      }
+    src/main/scala/medical/api/PatientController.scala: |
+      package medical.api
 
-      class Translator:
-          GARBAGE_REFACTOR_010_TRANS_CLASS_C = True
+      import medical.{DiagnosisService, PatientRepository, Patient}
 
-          def translate(self, key, locale):
-              return key
-    garbage_templates.py: |
-      GARBAGE_REFACTOR_010_TMPL_MARKER_D = "templates"
-      GARBAGE_REFACTOR_010_ENGINE_MARKER_E = "jinja2"
+      class PatientController(service: DiagnosisService) {
+        def handleAddCondition(patientId: String, condition: String): String = {
+          service.addCondition(patientId, condition) match {
+            case Right(p) => s"Updated patient ${p.id}: ${p.conditions.mkString(", ")}"
+            case Left(e)  => s"ERROR: $e"
+          }
+        }
+      }
+    src/main/scala/REFACTOR010_Billing.scala: |
+      package billing
 
-      class TemplateEngine:
-          GARBAGE_REFACTOR_010_ENGINE_CLASS_F = True
+      object REFACTOR010_Billing {
+        val REFACTOR010_GARBAGE_A = "billing_marker"
+        val REFACTOR010_GARBAGE_B = "invoice_prefix"
 
-          def render(self, name, ctx):
-              return ""
+        def generateInvoice(patientId: String): String = s"INV-$patientId"
+      }
+    src/main/scala/REFACTOR010_Scheduler.scala: |
+      package scheduler
+
+      object REFACTOR010_Scheduler {
+        val REFACTOR010_GARBAGE_C = "scheduler_marker"
+        val REFACTOR010_GARBAGE_D = "cron_expr"
+
+        def schedule(task: String): Unit = {}
+      }
+    src/main/scala/REFACTOR010_Notify.scala: |
+      package notify
+
+      object REFACTOR010_Notify {
+        val REFACTOR010_GARBAGE_E = "notify_marker"
+
+        def send(msg: String): Unit = println(msg)
+      }
   changed_files:
-    core/request_logger.py: |
-      import logging
+    src/main/scala/medical/Patient.scala: |
+      package medical
 
-      class RequestLogger:
-          def __init__(self, name):
-              self.logger = logging.getLogger(name)
+      case class Patient(
+        id: String,
+        name: String,
+        age: Int,
+        conditions: List[String],
+        riskScore: Double
+      )
+    src/main/scala/medical/PatientRepository.scala: |
+      package medical
 
-          def log_request(self, method, path):
-              self.logger.info(f"{method} {path}")
-    core/auth.py: |
-      def validate_auth(token):
-          if not token:
-              raise PermissionError("missing token")
-          return True
-    core/response.py: |
-      def format_response(data, status=200):
-          return {"status": status, "data": data}
-    handlers/user_handler.py: |
-      from core.request_logger import RequestLogger
-      from core.auth import validate_auth
-      from core.response import format_response
+      class PatientRepository {
+        private var store: Map[String, Patient] = Map.empty
 
-      class UserHandler:
-          def __init__(self, user_repo):
-              self.user_repo = user_repo
-              self.logger = RequestLogger("UserHandler")
+        def save(p: Patient): Unit = {
+          store = store + (p.id -> p)
+        }
 
-          def get_user(self, request):
-              self.logger.log_request("GET", "/users")
-              validate_auth(request.get("token"))
-              user = self.user_repo.find(request["user_id"])
-              return format_response(user)
-    handlers/product_handler.py: |
-      from core.request_logger import RequestLogger
-      from core.auth import validate_auth
-      from core.response import format_response
+        def find(id: String): Option[Patient] = store.get(id)
 
-      class ProductHandler:
-          def __init__(self, product_repo):
-              self.product_repo = product_repo
-              self.logger = RequestLogger("ProductHandler")
+        def all(): List[Patient] = store.values.toList
 
-          def list_products(self, request):
-              self.logger.log_request("GET", "/products")
-              validate_auth(request.get("token"))
-              products = self.product_repo.all()
-              return format_response(products)
-    app/routes.py: |
-      from handlers.user_handler import UserHandler
-      from handlers.product_handler import ProductHandler
+        def highRisk(threshold: Double): List[Patient] =
+          store.values.filter(_.riskScore >= threshold).toList
+      }
+    src/main/scala/medical/DiagnosisService.scala: |
+      package medical
 
-      def setup_routes(user_repo, product_repo):
-          user_h = UserHandler(user_repo)
-          product_h = ProductHandler(product_repo)
-          return {
-              "/users": user_h.get_user,
-              "/products": product_h.list_products,
+      class DiagnosisService(repo: PatientRepository) {
+        def addCondition(id: String, condition: String): Either[String, Patient] = {
+          repo.find(id) match {
+            case None    => Left(s"Patient $id not found")
+            case Some(p) =>
+              val updated = p.copy(conditions = p.conditions :+ condition)
+              repo.save(updated)
+              Right(updated)
           }
-    garbage_i18n.py: |
-      GARBAGE_REFACTOR_010_I18N_MARKER_A = "i18n"
-      GARBAGE_REFACTOR_010_LOCALE_MARKER_B = "en"
+        }
 
-      class Translator:
-          GARBAGE_REFACTOR_010_TRANS_CLASS_C = True
+        def updateRiskScore(id: String, score: Double): Either[String, Patient] = {
+          repo.find(id) match {
+            case None    => Left(s"Patient $id not found")
+            case Some(p) =>
+              val updated = p.copy(riskScore = score)
+              repo.save(updated)
+              Right(updated)
+          }
+        }
 
-          def translate(self, key, locale):
-              return key
-    garbage_templates.py: |
-      GARBAGE_REFACTOR_010_TMPL_MARKER_D = "templates"
-      GARBAGE_REFACTOR_010_ENGINE_MARKER_E = "jinja2"
+        def listHighRisk(threshold: Double): List[Patient] = repo.highRisk(threshold)
+      }
+    src/main/scala/medical/api/PatientController.scala: |
+      package medical.api
 
-      class TemplateEngine:
-          GARBAGE_REFACTOR_010_ENGINE_CLASS_F = True
+      import medical.{DiagnosisService, PatientRepository, Patient}
 
-          def render(self, name, ctx):
-              return ""
-  commit_message: "refactor: replace BaseHandler inheritance with composition"
+      class PatientController(service: DiagnosisService) {
+        def handleAddCondition(patientId: String, condition: String): String = {
+          service.addCondition(patientId, condition) match {
+            case Right(p) => s"Updated patient ${p.id}: ${p.conditions.mkString(", ")}"
+            case Left(e)  => s"ERROR: $e"
+          }
+        }
+
+        def handleRiskUpdate(patientId: String, score: Double): String = {
+          service.updateRiskScore(patientId, score) match {
+            case Right(p) => s"Risk score for ${p.id} set to ${p.riskScore}"
+            case Left(e)  => s"ERROR: $e"
+          }
+        }
+      }
+    src/main/scala/REFACTOR010_Billing.scala: |
+      package billing
+
+      object REFACTOR010_Billing {
+        val REFACTOR010_GARBAGE_A = "billing_marker"
+        val REFACTOR010_GARBAGE_B = "invoice_prefix"
+
+        def generateInvoice(patientId: String): String = s"INV-$patientId"
+      }
+    src/main/scala/REFACTOR010_Scheduler.scala: |
+      package scheduler
+
+      object REFACTOR010_Scheduler {
+        val REFACTOR010_GARBAGE_C = "scheduler_marker"
+        val REFACTOR010_GARBAGE_D = "cron_expr"
+
+        def schedule(task: String): Unit = {}
+      }
+    src/main/scala/REFACTOR010_Notify.scala: |
+      package notify
+
+      object REFACTOR010_Notify {
+        val REFACTOR010_GARBAGE_E = "notify_marker"
+
+        def send(msg: String): Unit = println(msg)
+      }
+  commit_message: "feat: add riskScore to Patient, updateRiskScore and listHighRisk to DiagnosisService"
 fragments:
-- id: new_request_logger
+- id: patient_risk_score
   selector:
-    path: core/request_logger.py
-    anchor: "class RequestLogger"
-- id: new_auth_module
+    path: src/main/scala/medical/Patient.scala
+    anchor: "riskScore: Double"
+- id: repo_high_risk
   selector:
-    path: core/auth.py
-    anchor: "def validate_auth(token)"
-- id: new_response_module
+    path: src/main/scala/medical/PatientRepository.scala
+    anchor: "def highRisk(threshold: Double)"
+- id: service_update_risk
   selector:
-    path: core/response.py
-    anchor: "def format_response(data"
-- id: user_handler_imports
+    path: src/main/scala/medical/DiagnosisService.scala
+    anchor: "def updateRiskScore(id: String, score: Double)"
+- id: service_list_high_risk
   selector:
-    path: handlers/user_handler.py
-    anchor: "from core.request_logger import RequestLogger"
-- id: user_handler_composition
+    path: src/main/scala/medical/DiagnosisService.scala
+    anchor: "def listHighRisk(threshold: Double)"
+- id: controller_risk_update
   selector:
-    path: handlers/user_handler.py
-    anchor: "self.logger = RequestLogger"
-- id: product_handler_imports
+    path: src/main/scala/medical/api/PatientController.scala
+    anchor: "def handleRiskUpdate(patientId: String, score: Double)"
+- id: no_garbage_a
   selector:
-    path: handlers/product_handler.py
-    anchor: "from core.request_logger import RequestLogger"
-- id: product_handler_composition
+    anchor: REFACTOR010_GARBAGE_A
+- id: no_garbage_b
   selector:
-    path: handlers/product_handler.py
-    anchor: "self.logger = RequestLogger"
-- id: routes_wires_handlers
+    anchor: REFACTOR010_GARBAGE_B
+- id: no_garbage_c
   selector:
-    path: app/routes.py
-    anchor: "from handlers.user_handler import UserHandler"
-- id: no_garbage_i18n
+    anchor: REFACTOR010_GARBAGE_C
+- id: no_garbage_d
   selector:
-    path: garbage_i18n.py
-- id: no_garbage_templates
+    anchor: REFACTOR010_GARBAGE_D
+- id: no_garbage_e
   selector:
-    path: garbage_templates.py
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_010_I18N_MARKER_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_010_LOCALE_MARKER_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_010_TRANS_CLASS_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_010_TMPL_MARKER_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_010_ENGINE_MARKER_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_REFACTOR_010_ENGINE_CLASS_F
+    anchor: REFACTOR010_GARBAGE_E
 oracle:
   required:
-  - new_request_logger
-  - new_auth_module
-  - new_response_module
-  - user_handler_imports
-  - user_handler_composition
-  - product_handler_imports
-  - product_handler_composition
-  - routes_wires_handlers
+  - patient_risk_score
+  - repo_high_risk
+  - service_update_risk
+  - service_list_high_risk
+  - controller_risk_update
   allowed: []
   forbidden:
-  - no_garbage_i18n
-  - no_garbage_templates
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

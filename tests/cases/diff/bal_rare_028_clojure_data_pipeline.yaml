@@ -1,172 +1,194 @@
 name: bal_rare_028_clojure_data_pipeline
 tags:
-- lang:clojure
-- change:single_file
-- change:new_function
-- context:same_file
-- distance:0hop
+- lang:csharp
+- change:bug_fix
+- context:test_file
+- distance:1hop
 - difficulty:easy
 repo:
   initial_files:
-    src/pipeline/transform.clj: |
-      (ns pipeline.transform)
+    src/Strings/SlugGenerator.cs: |
+      namespace Strings;
 
-      (defn normalize-key [k]
-        (-> k name clojure.string/lower-case (clojure.string/replace #"_" "-") keyword))
+      public static class SlugGenerator
+      {
+          public static string Generate(string title)
+          {
+              var slug = title.ToLowerInvariant();
+              slug = slug.Replace(" ", "-");
+              slug = new string(slug.Where(c => char.IsLetterOrDigit(c) || c == '-').ToArray());
+              return slug;
+          }
 
-      (defn normalize-keys [m]
-        (into {} (map (fn [[k v]] [(normalize-key k) v]) m)))
+          public static bool IsValidSlug(string slug)
+          {
+              return !string.IsNullOrEmpty(slug) && slug.All(c => char.IsLetterOrDigit(c) || c == '-');
+          }
+      }
+    tests/Strings/SlugGeneratorTests.cs: |
+      using Xunit;
+      using Strings;
 
-      (defn filter-blanks [m]
-        (into {} (filter (fn [[_ v]] (and (some? v) (not= v ""))) m)))
+      public class SlugGeneratorTests
+      {
+          [Fact]
+          public void Generate_TitleWithSpaces_ReturnsHyphenated()
+          {
+              var slug = SlugGenerator.Generate("Hello World");
+              Assert.Equal("hello-world", slug);
+          }
 
-      (defn transform [record]
-        (-> record
-            normalize-keys
-            filter-blanks))
-    src/pipeline/loader.clj: |
-      (ns pipeline.loader
-        (:require [pipeline.transform :as t]))
+          [Fact]
+          public void Generate_TitleWithSpecialChars_StripsNonAlphanumeric()
+          {
+              var slug = SlugGenerator.Generate("C# is great!");
+              Assert.Equal("c-is-great", slug);
+          }
+      }
+    garbage/Encoder.cs: |
+      namespace Garbage;
 
-      (defn load-records [records]
-        (map t/transform records))
+      public static class EncoderGarbage
+      {
+          public const string GARBAGE_RARE028_A = "base64_marker";
+          public const string GARBAGE_RARE028_B = "utf8_marker";
+      }
+    garbage/Parser.cs: |
+      namespace Garbage;
 
-      (defn load-and-count [records]
-        (let [transformed (load-records records)]
-          {:count (count transformed)
-           :records transformed}))
-    garbage_notify.clj: |
-      (ns garbage-notify)
+      public static class ParserGarbage
+      {
+          public const string GARBAGE_RARE028_C = "regex_marker";
+      }
+    garbage/Formatter.cs: |
+      namespace Garbage;
 
-      (def ^:const GARBAGE_RARE_028_CHANNEL_A "email")
-      (def ^:const GARBAGE_RARE_028_RETRY_B 3)
-
-      (defn garbage-send []
-        GARBAGE_RARE_028_CHANNEL_A)
-
-      (def ^:const GARBAGE_RARE_028_BATCH_C 50)
-    garbage_metrics.clj: |
-      (ns garbage-metrics)
-
-      (def ^:const GARBAGE_RARE_028_INTERVAL_D 60)
-      (def ^:const GARBAGE_RARE_028_PREFIX_E "app")
-
-      (defn garbage-record []
-        GARBAGE_RARE_028_INTERVAL_D)
-
-      (def ^:const GARBAGE_RARE_028_FLUSH_F true)
+      public static class FormatterGarbage
+      {
+          public const string GARBAGE_RARE028_D = "format_marker";
+          public const string GARBAGE_RARE028_E = "template_marker";
+      }
   changed_files:
-    src/pipeline/transform.clj: |
-      (ns pipeline.transform)
+    src/Strings/SlugGenerator.cs: |
+      namespace Strings;
 
-      (defn normalize-key [k]
-        (-> k name clojure.string/lower-case (clojure.string/replace #"_" "-") keyword))
+      public static class SlugGenerator
+      {
+          public static string Generate(string title)
+          {
+              var slug = title.ToLowerInvariant().Trim();
+              slug = slug.Replace(" ", "-");
+              while (slug.Contains("--"))
+                  slug = slug.Replace("--", "-");
+              slug = new string(slug.Where(c => char.IsLetterOrDigit(c) || c == '-').ToArray());
+              slug = slug.Trim('-');
+              return slug;
+          }
 
-      (defn normalize-keys [m]
-        (into {} (map (fn [[k v]] [(normalize-key k) v]) m)))
+          public static bool IsValidSlug(string slug)
+          {
+              return !string.IsNullOrEmpty(slug) && slug.All(c => char.IsLetterOrDigit(c) || c == '-');
+          }
+      }
+    tests/Strings/SlugGeneratorTests.cs: |
+      using Xunit;
+      using Strings;
 
-      (defn filter-blanks [m]
-        (into {} (filter (fn [[_ v]] (and (some? v) (not= v ""))) m)))
+      public class SlugGeneratorTests
+      {
+          [Fact]
+          public void Generate_TitleWithSpaces_ReturnsHyphenated()
+          {
+              var slug = SlugGenerator.Generate("Hello World");
+              Assert.Equal("hello-world", slug);
+          }
 
-      (defn coerce-types [m schema]
-        (reduce-kv
-          (fn [acc k coercer]
-            (if-let [v (get acc k)]
-              (assoc acc k (coercer v))
-              acc))
-          m
-          schema))
+          [Fact]
+          public void Generate_TitleWithSpecialChars_StripsNonAlphanumeric()
+          {
+              var slug = SlugGenerator.Generate("C# is great!");
+              Assert.Equal("c-is-great", slug);
+          }
 
-      (defn validate-required [m required-keys]
-        (let [missing (remove #(contains? m %) required-keys)]
-          (when (seq missing)
-            (throw (ex-info "Missing required keys" {:keys missing})))
-          m))
+          [Fact]
+          public void Generate_MultipleSpaces_NoDuplicateHyphens()
+          {
+              var slug = SlugGenerator.Generate("Hello   World");
+              Assert.Equal("hello-world", slug);
+          }
 
-      (defn transform [record]
-        (-> record
-            normalize-keys
-            filter-blanks))
-    src/pipeline/loader.clj: |
-      (ns pipeline.loader
-        (:require [pipeline.transform :as t]))
+          [Fact]
+          public void Generate_LeadingTrailingSpaces_StrippedFromSlug()
+          {
+              var slug = SlugGenerator.Generate("  Hello World  ");
+              Assert.Equal("hello-world", slug);
+          }
+      }
+    garbage/Encoder.cs: |
+      namespace Garbage;
 
-      (defn load-records [records]
-        (map t/transform records))
+      public static class EncoderGarbage
+      {
+          public const string GARBAGE_RARE028_A = "base64_marker";
+          public const string GARBAGE_RARE028_B = "utf8_marker";
+      }
+    garbage/Parser.cs: |
+      namespace Garbage;
 
-      (defn load-and-count [records]
-        (let [transformed (load-records records)]
-          {:count (count transformed)
-           :records transformed}))
-    garbage_notify.clj: |
-      (ns garbage-notify)
+      public static class ParserGarbage
+      {
+          public const string GARBAGE_RARE028_C = "regex_marker";
+      }
+    garbage/Formatter.cs: |
+      namespace Garbage;
 
-      (def ^:const GARBAGE_RARE_028_CHANNEL_A "email")
-      (def ^:const GARBAGE_RARE_028_RETRY_B 3)
-
-      (defn garbage-send []
-        GARBAGE_RARE_028_CHANNEL_A)
-
-      (def ^:const GARBAGE_RARE_028_BATCH_C 50)
-    garbage_metrics.clj: |
-      (ns garbage-metrics)
-
-      (def ^:const GARBAGE_RARE_028_INTERVAL_D 60)
-      (def ^:const GARBAGE_RARE_028_PREFIX_E "app")
-
-      (defn garbage-record []
-        GARBAGE_RARE_028_INTERVAL_D)
-
-      (def ^:const GARBAGE_RARE_028_FLUSH_F true)
-  commit_message: "feat: add type coercion and required-key validation"
+      public static class FormatterGarbage
+      {
+          public const string GARBAGE_RARE028_D = "format_marker";
+          public const string GARBAGE_RARE028_E = "template_marker";
+      }
+  commit_message: "fix: trim whitespace, collapse double hyphens, strip leading/trailing hyphens"
 fragments:
-- id: coerce_types
+- id: slug_trim
   selector:
-    path: src/pipeline/transform.clj
-    anchor: "(defn coerce-types [m schema]"
-- id: validate_required
+    path: src/Strings/SlugGenerator.cs
+    anchor: ".Trim();"
+- id: slug_double_hyphen
   selector:
-    path: src/pipeline/transform.clj
-    anchor: "(defn validate-required [m required-keys]"
-- id: no_loader
+    path: src/Strings/SlugGenerator.cs
+    anchor: "slug.Contains(\"--\")"
+- id: slug_trim_hyphens
   selector:
-    path: src/pipeline/loader.clj
-- id: no_garbage_notify
+    path: src/Strings/SlugGenerator.cs
+    anchor: "slug.Trim('-')"
+- id: test_file
   selector:
-    path: garbage_notify.clj
-- id: no_garbage_metrics
+    path: tests/Strings/SlugGeneratorTests.cs
+- id: no_garbage_a
   selector:
-    path: garbage_metrics.clj
-- id: no_global_0
+    anchor: GARBAGE_RARE028_A
+- id: no_garbage_b
   selector:
-    anchor: GARBAGE_RARE_028_CHANNEL_A
-- id: no_global_1
+    anchor: GARBAGE_RARE028_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_RARE_028_RETRY_B
-- id: no_global_2
+    anchor: GARBAGE_RARE028_C
+- id: no_garbage_d
   selector:
-    anchor: GARBAGE_RARE_028_BATCH_C
-- id: no_global_3
+    anchor: GARBAGE_RARE028_D
+- id: no_garbage_e
   selector:
-    anchor: GARBAGE_RARE_028_INTERVAL_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_028_PREFIX_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_028_FLUSH_F
+    anchor: GARBAGE_RARE028_E
 oracle:
   required:
-  - coerce_types
-  - validate_required
+  - slug_trim
+  - slug_double_hyphen
+  - slug_trim_hyphens
+  - test_file
   allowed: []
   forbidden:
-  - no_loader
-  - no_garbage_notify
-  - no_garbage_metrics
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d
+  - no_garbage_e

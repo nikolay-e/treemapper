@@ -1,156 +1,141 @@
 name: bal_rare_016_nim_string_utils
 tags:
-- lang:nim
+- lang:json
+- lang:yaml
+- change:config
 - change:single_file
-- change:new_function
-- context:same_file
-- distance:0hop
-- difficulty:trivial
+- context:import_chain
+- distance:2hop
+- difficulty:medium
 repo:
   initial_files:
-    src/strutils.nim: |
-      proc capitalize*(s: string): string =
-        if s.len == 0: return ""
-        result = s[0].toUpperAscii & s[1..^1].toLowerAscii
+    config/telemetry.json: |
+      {
+        "telemetry": {
+          "exportInterval": 30,
+          "batchSize": 100,
+          "endpoint": "http://collector:4318"
+        }
+      }
+    src/telemetry/exporter.py: |
+      import json
+      from src.telemetry.batcher import MetricBatcher
 
-      proc repeat_str*(s: string, n: int): string =
-        result = ""
-        for i in 0..<n:
-          result.add(s)
+      def load_telemetry_config(path: str = "config/telemetry.json") -> dict:
+          with open(path) as f:
+              return json.load(f)
 
-      proc trim_left*(s: string): string =
-        var i = 0
-        while i < s.len and s[i] == ' ':
-          inc i
-        result = s[i..^1]
-    src/formatter.nim: |
-      import strutils
+      def create_exporter(config: dict) -> "OtlpExporter":
+          interval = config["telemetry"]["exportInterval"]
+          endpoint = config["telemetry"]["endpoint"]
+          return OtlpExporter(interval=interval, endpoint=endpoint)
+    src/telemetry/batcher.py: |
+      class MetricBatcher:
+          def __init__(self, batch_size: int, export_fn):
+              self.batch_size = batch_size
+              self.export_fn = export_fn
+              self._buffer = []
 
-      proc format_name*(first, last: string): string =
-        capitalize(first) & " " & capitalize(last)
+          def record(self, metric: dict) -> None:
+              self._buffer.append(metric)
+              if len(self._buffer) >= self.batch_size:
+                  self.flush()
 
-      proc format_list*(items: seq[string], sep: string = ", "): string =
-        result = ""
-        for i, item in items:
-          if i > 0: result.add(sep)
-          result.add(item)
-    garbage_crypto.nim: |
-      const GARBAGE_RARE_016_ALGO_A = "aes256"
-      const GARBAGE_RARE_016_KEYLEN_B = 32
-
-      proc garbage_encrypt*() =
-        discard GARBAGE_RARE_016_ALGO_A
-
-      const GARBAGE_RARE_016_IV_C = 16
-    garbage_compress.nim: |
-      const GARBAGE_RARE_016_METHOD_D = "gzip"
-      const GARBAGE_RARE_016_LEVEL_E = 6
-
-      proc garbage_compress*() =
-        discard GARBAGE_RARE_016_METHOD_D
-
-      const GARBAGE_RARE_016_WINDOW_F = 15
+          def flush(self) -> None:
+              if self._buffer:
+                  self.export_fn(self._buffer)
+                  self._buffer = []
+    garbage/HealthCheck.py: |
+      # GARBAGE_TEL_A = "health_check_marker"
+    garbage/AlertManager.py: |
+      # GARBAGE_TEL_B = "alert_manager_marker"
+    garbage/Dashboard.py: |
+      # GARBAGE_TEL_C = "dashboard_marker"
+    garbage/Retention.py: |
+      # GARBAGE_TEL_D = "retention_marker"
   changed_files:
-    src/strutils.nim: |
-      proc capitalize*(s: string): string =
-        if s.len == 0: return ""
-        result = s[0].toUpperAscii & s[1..^1].toLowerAscii
+    config/telemetry.json: |
+      {
+        "telemetry": {
+          "exportInterval": 10,
+          "batchSize": 500,
+          "endpoint": "http://collector:4318",
+          "compression": "gzip",
+          "retryAttempts": 3
+        }
+      }
+    src/telemetry/exporter.py: |
+      import json
+      from src.telemetry.batcher import MetricBatcher
 
-      proc repeat_str*(s: string, n: int): string =
-        result = ""
-        for i in 0..<n:
-          result.add(s)
+      def load_telemetry_config(path: str = "config/telemetry.json") -> dict:
+          with open(path) as f:
+              return json.load(f)
 
-      proc trim_left*(s: string): string =
-        var i = 0
-        while i < s.len and s[i] == ' ':
-          inc i
-        result = s[i..^1]
+      def create_exporter(config: dict) -> "OtlpExporter":
+          interval = config["telemetry"]["exportInterval"]
+          endpoint = config["telemetry"]["endpoint"]
+          compression = config["telemetry"].get("compression", "none")
+          retries = config["telemetry"].get("retryAttempts", 1)
+          return OtlpExporter(interval=interval, endpoint=endpoint,
+                              compression=compression, retries=retries)
+    src/telemetry/batcher.py: |
+      class MetricBatcher:
+          def __init__(self, batch_size: int, export_fn):
+              self.batch_size = batch_size
+              self.export_fn = export_fn
+              self._buffer = []
 
-      proc trim_right*(s: string): string =
-        var i = s.len - 1
-        while i >= 0 and s[i] == ' ':
-          dec i
-        result = s[0..i]
+          def record(self, metric: dict) -> None:
+              self._buffer.append(metric)
+              if len(self._buffer) >= self.batch_size:
+                  self.flush()
 
-      proc trim*(s: string): string =
-        trim_left(trim_right(s))
-    src/formatter.nim: |
-      import strutils
-
-      proc format_name*(first, last: string): string =
-        capitalize(first) & " " & capitalize(last)
-
-      proc format_list*(items: seq[string], sep: string = ", "): string =
-        result = ""
-        for i, item in items:
-          if i > 0: result.add(sep)
-          result.add(item)
-    garbage_crypto.nim: |
-      const GARBAGE_RARE_016_ALGO_A = "aes256"
-      const GARBAGE_RARE_016_KEYLEN_B = 32
-
-      proc garbage_encrypt*() =
-        discard GARBAGE_RARE_016_ALGO_A
-
-      const GARBAGE_RARE_016_IV_C = 16
-    garbage_compress.nim: |
-      const GARBAGE_RARE_016_METHOD_D = "gzip"
-      const GARBAGE_RARE_016_LEVEL_E = 6
-
-      proc garbage_compress*() =
-        discard GARBAGE_RARE_016_METHOD_D
-
-      const GARBAGE_RARE_016_WINDOW_F = 15
-  commit_message: "feat: add trim_right and trim functions"
+          def flush(self) -> None:
+              if self._buffer:
+                  self.export_fn(self._buffer)
+                  self._buffer = []
+    garbage/HealthCheck.py: |
+      # GARBAGE_TEL_A = "health_check_marker"
+    garbage/AlertManager.py: |
+      # GARBAGE_TEL_B = "alert_manager_marker"
+    garbage/Dashboard.py: |
+      # GARBAGE_TEL_C = "dashboard_marker"
+    garbage/Retention.py: |
+      # GARBAGE_TEL_D = "retention_marker"
+  commit_message: "config: tune telemetry export interval, batch size, add compression and retry"
 fragments:
-- id: trim_right
+- id: telemetry_config
   selector:
-    path: src/strutils.nim
-    anchor: "proc trim_right*(s: string)"
-- id: trim_combined
+    path: config/telemetry.json
+    anchor: "exportInterval"
+- id: create_exporter
   selector:
-    path: src/strutils.nim
-    anchor: "proc trim*(s: string)"
-- id: no_formatter
+    path: src/telemetry/exporter.py
+    anchor: "def create_exporter"
+- id: no_batcher
   selector:
-    path: src/formatter.nim
-- id: no_garbage_crypto
+    path: src/telemetry/batcher.py
+- id: no_garbage_a
   selector:
-    path: garbage_crypto.nim
-- id: no_garbage_compress
+    anchor: GARBAGE_TEL_A
+- id: no_garbage_b
   selector:
-    path: garbage_compress.nim
-- id: no_global_0
+    anchor: GARBAGE_TEL_B
+- id: no_garbage_c
   selector:
-    anchor: GARBAGE_RARE_016_ALGO_A
-- id: no_global_1
+    anchor: GARBAGE_TEL_C
+- id: no_garbage_d
   selector:
-    anchor: GARBAGE_RARE_016_KEYLEN_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_RARE_016_IV_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_RARE_016_METHOD_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_016_LEVEL_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_016_WINDOW_F
+    anchor: GARBAGE_TEL_D
 oracle:
   required:
-  - trim_right
-  - trim_combined
+  - telemetry_config
+  - create_exporter
   allowed: []
   forbidden:
-  - no_formatter
-  - no_garbage_crypto
-  - no_garbage_compress
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - no_batcher
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

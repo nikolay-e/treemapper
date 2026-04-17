@@ -1,177 +1,129 @@
 name: bal_refactor_005_python_sync_to_async
 tags:
-- lang:python
-- change:multi_file
-- change:refactor
+- lang:rust
+- change:bug_fix
+- change:single_file
 - context:import_chain
-- distance:2hop
-- difficulty:medium
+- distance:1hop
+- difficulty:easy
 repo:
   initial_files:
-    services/fetcher.py: |
-      import requests
+    src/pagination/cursor.rs: |
+      pub struct Cursor {
+          pub page: u32,
+          pub per_page: u32,
+          pub total: u64,
+      }
 
-      def fetch_user(user_id):
-          resp = requests.get(f"https://api.example.com/users/{user_id}")
-          resp.raise_for_status()
-          return resp.json()
-
-      def fetch_orders(user_id):
-          resp = requests.get(f"https://api.example.com/users/{user_id}/orders")
-          resp.raise_for_status()
-          return resp.json()
-    services/aggregator.py: |
-      from services.fetcher import fetch_user, fetch_orders
-
-      def get_user_summary(user_id):
-          user = fetch_user(user_id)
-          orders = fetch_orders(user_id)
-          return {
-              "name": user["name"],
-              "order_count": len(orders),
-              "total_spent": sum(o["amount"] for o in orders),
+      impl Cursor {
+          pub fn new(page: u32, per_page: u32, total: u64) -> Self {
+              Cursor { page, per_page, total }
           }
-    api/endpoints.py: |
-      from services.aggregator import get_user_summary
 
-      def user_summary_endpoint(request):
-          user_id = request.params["user_id"]
-          summary = get_user_summary(user_id)
-          return {"status": 200, "body": summary}
-    api/middleware.py: |
-      GARBAGE_REFACTOR_005_MW_MARKER_A = "middleware"
-      GARBAGE_REFACTOR_005_AUTH_MARKER_B = True
+          pub fn offset(&self) -> u64 {
+              // BUG: underflows when page=0 instead of being treated as page 1
+              ((self.page - 1) as u64) * (self.per_page as u64)
+          }
 
-      def auth_middleware(request, handler):
-          if "token" not in request.headers:
-              return {"status": 401}
-          return handler(request)
-    garbage_migrations.py: |
-      GARBAGE_REFACTOR_005_MIG_MARKER_C = "migrations"
-      GARBAGE_REFACTOR_005_VERSION_MARKER_D = 42
+          pub fn total_pages(&self) -> u32 {
+              ((self.total + self.per_page as u64 - 1) / self.per_page as u64) as u32
+          }
 
-      class Migration:
-          GARBAGE_REFACTOR_005_MIG_CLASS_E = True
+          pub fn has_next(&self) -> bool {
+              self.page < self.total_pages()
+          }
+      }
+    src/api/list_handler.rs: |
+      use crate::pagination::cursor::Cursor;
 
-          def up(self):
-              pass
+      pub struct ListHandler;
 
-          def down(self):
-              pass
+      impl ListHandler {
+          pub fn paginate(page: u32, per_page: u32, total: u64) -> Cursor {
+              Cursor::new(page, per_page, total)
+          }
+      }
+    garbage/filter.rs: |
+      // GARBAGE_PAGE_A = "filter_marker"
+      pub fn apply_filter(_q: &str) -> Vec<String> { vec![] }
+    garbage/sort.rs: |
+      // GARBAGE_PAGE_B = "sort_marker"
+      pub fn sort_asc(mut v: Vec<i64>) -> Vec<i64> { v.sort(); v }
+    garbage/export.rs: |
+      // GARBAGE_PAGE_C = "export_marker"
+      pub fn export_csv(_rows: &[Vec<String>]) -> String { String::new() }
   changed_files:
-    services/fetcher.py: |
-      import aiohttp
+    src/pagination/cursor.rs: |
+      pub struct Cursor {
+          pub page: u32,
+          pub per_page: u32,
+          pub total: u64,
+      }
 
-      async def fetch_user(user_id):
-          async with aiohttp.ClientSession() as session:
-              async with session.get(f"https://api.example.com/users/{user_id}") as resp:
-                  resp.raise_for_status()
-                  return await resp.json()
-
-      async def fetch_orders(user_id):
-          async with aiohttp.ClientSession() as session:
-              async with session.get(f"https://api.example.com/users/{user_id}/orders") as resp:
-                  resp.raise_for_status()
-                  return await resp.json()
-    services/aggregator.py: |
-      from services.fetcher import fetch_user, fetch_orders
-
-      async def get_user_summary(user_id):
-          user = await fetch_user(user_id)
-          orders = await fetch_orders(user_id)
-          return {
-              "name": user["name"],
-              "order_count": len(orders),
-              "total_spent": sum(o["amount"] for o in orders),
+      impl Cursor {
+          pub fn new(page: u32, per_page: u32, total: u64) -> Self {
+              let page = page.max(1);
+              Cursor { page, per_page, total }
           }
-    api/endpoints.py: |
-      from services.aggregator import get_user_summary
 
-      async def user_summary_endpoint(request):
-          user_id = request.params["user_id"]
-          summary = await get_user_summary(user_id)
-          return {"status": 200, "body": summary}
-    api/middleware.py: |
-      GARBAGE_REFACTOR_005_MW_MARKER_A = "middleware"
-      GARBAGE_REFACTOR_005_AUTH_MARKER_B = True
+          pub fn offset(&self) -> u64 {
+              ((self.page - 1) as u64) * (self.per_page as u64)
+          }
 
-      def auth_middleware(request, handler):
-          if "token" not in request.headers:
-              return {"status": 401}
-          return handler(request)
-    garbage_migrations.py: |
-      GARBAGE_REFACTOR_005_MIG_MARKER_C = "migrations"
-      GARBAGE_REFACTOR_005_VERSION_MARKER_D = 42
+          pub fn total_pages(&self) -> u32 {
+              ((self.total + self.per_page as u64 - 1) / self.per_page as u64) as u32
+          }
 
-      class Migration:
-          GARBAGE_REFACTOR_005_MIG_CLASS_E = True
+          pub fn has_next(&self) -> bool {
+              self.page < self.total_pages()
+          }
+      }
+    src/api/list_handler.rs: |
+      use crate::pagination::cursor::Cursor;
 
-          def up(self):
-              pass
+      pub struct ListHandler;
 
-          def down(self):
-              pass
-  commit_message: "refactor: convert sync HTTP calls to async with aiohttp"
+      impl ListHandler {
+          pub fn paginate(page: u32, per_page: u32, total: u64) -> Cursor {
+              Cursor::new(page, per_page, total)
+          }
+      }
+    garbage/filter.rs: |
+      // GARBAGE_PAGE_A = "filter_marker"
+      pub fn apply_filter(_q: &str) -> Vec<String> { vec![] }
+    garbage/sort.rs: |
+      // GARBAGE_PAGE_B = "sort_marker"
+      pub fn sort_asc(mut v: Vec<i64>) -> Vec<i64> { v.sort(); v }
+    garbage/export.rs: |
+      // GARBAGE_PAGE_C = "export_marker"
+      pub fn export_csv(_rows: &[Vec<String>]) -> String { String::new() }
+  commit_message: "fix: clamp page to minimum 1 in Cursor::new to prevent underflow"
 fragments:
-- id: async_fetch_user
+- id: page_clamp
   selector:
-    path: services/fetcher.py
-    anchor: "async def fetch_user(user_id)"
-- id: async_fetch_orders
+    anchor: "let page = page.max(1);"
+- id: cursor_new
   selector:
-    path: services/fetcher.py
-    anchor: "async def fetch_orders(user_id)"
-- id: async_aggregator
+    anchor: "pub fn new(page: u32, per_page: u32, total: u64) -> Self"
+- id: handler_uses_cursor
   selector:
-    path: services/aggregator.py
-    anchor: "async def get_user_summary(user_id)"
-- id: aggregator_awaits
+    anchor: "use crate::pagination::cursor::Cursor"
+- id: no_garbage_a
   selector:
-    path: services/aggregator.py
-    anchor: "user = await fetch_user(user_id)"
-- id: async_endpoint
+    anchor: GARBAGE_PAGE_A
+- id: no_garbage_b
   selector:
-    path: api/endpoints.py
-    anchor: "async def user_summary_endpoint(request)"
-- id: endpoint_awaits
+    anchor: GARBAGE_PAGE_B
+- id: no_garbage_c
   selector:
-    path: api/endpoints.py
-    anchor: "summary = await get_user_summary(user_id)"
-- id: no_middleware
-  selector:
-    path: api/middleware.py
-- id: no_garbage_migrations
-  selector:
-    path: garbage_migrations.py
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_005_MW_MARKER_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_005_AUTH_MARKER_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_005_MIG_MARKER_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_005_VERSION_MARKER_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_005_MIG_CLASS_E
+    anchor: GARBAGE_PAGE_C
 oracle:
   required:
-  - async_fetch_user
-  - async_fetch_orders
-  - async_aggregator
-  - aggregator_awaits
-  - async_endpoint
-  - endpoint_awaits
+  - page_clamp
+  - cursor_new
+  - handler_uses_cursor
   allowed: []
   forbidden:
-  - no_middleware
-  - no_garbage_migrations
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

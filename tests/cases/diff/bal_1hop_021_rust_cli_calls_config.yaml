@@ -1,118 +1,193 @@
 name: bal_1hop_021_rust_cli_calls_config
 tags:
 - lang:rust
-- change:signature
+- change:multi_file
+- change:refactor
 - context:import_chain
-- distance:1hop
-- difficulty:easy
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
-    src/config/loader.rs: |
-      use std::collections::HashMap;
-
-      pub struct Config {
-          pub values: HashMap<String, String>,
+    src/queue/message.rs: |
+      #[derive(Debug, Clone)]
+      pub struct Message {
+          pub id: String,
+          pub topic: String,
+          pub payload: Vec<u8>,
       }
 
-      impl Config {
-          pub fn from_env() -> Self {
-              Config {
-                  values: HashMap::new(),
+      impl Message {
+          pub fn new(id: &str, topic: &str, payload: Vec<u8>) -> Self {
+              Self {
+                  id: id.to_string(),
+                  topic: topic.to_string(),
+                  payload,
               }
           }
-
-          pub fn get(&self, key: &str) -> Option<&String> {
-              self.values.get(key)
-          }
-      }
-    src/cli/run.rs: |
-      use crate::config::loader::Config;
-
-      pub fn execute() {
-          let cfg = Config::from_env();
-          if let Some(port) = cfg.get("PORT") {
-              println!("Starting on port {}", port);
-          } else {
-              println!("Starting on default port 3000");
-          }
-      }
-    src/logging/setup.rs: |
-      pub enum LogLevel {
-          Debug,
-          Info,
-          Warn,
-          Error,
       }
 
-      pub fn init_logger(level: LogLevel) {
-          match level {
-              LogLevel::Debug => println!("Logger: debug"),
-              LogLevel::Info => println!("Logger: info"),
-              LogLevel::Warn => println!("Logger: warn"),
-              LogLevel::Error => println!("Logger: error"),
+      pub fn publish(topic: &str, payload: Vec<u8>) -> Message {
+          let id = format!("msg-{}", topic);
+          Message::new(&id, topic, payload)
+      }
+    src/worker/consumer.rs: |
+      use crate::queue::message::{Message, publish};
+
+      pub struct Consumer {
+          pub topic: String,
+      }
+
+      impl Consumer {
+          pub fn new(topic: &str) -> Self {
+              Self { topic: topic.to_string() }
+          }
+
+          pub fn send_ack(&self, msg: &Message) -> Message {
+              publish(&format!("{}.ack", self.topic), msg.id.as_bytes().to_vec())
           }
       }
+    src/api/ingest.rs: |
+      use crate::worker::consumer::Consumer;
+      use crate::queue::message::publish;
+
+      pub struct IngestEndpoint {
+          consumer: Consumer,
+      }
+
+      impl IngestEndpoint {
+          pub fn new(topic: &str) -> Self {
+              Self { consumer: Consumer::new(topic) }
+          }
+
+          pub fn handle(&self, raw: Vec<u8>) -> String {
+              let msg = publish(&self.consumer.topic, raw);
+              let ack = self.consumer.send_ack(&msg);
+              format!("acked: {}", ack.id)
+          }
+      }
+    garbage/metrics.rs: |
+      // GARBAGE_CLICFG_A = "prometheus_scrape_marker"
+    garbage/tracing.rs: |
+      // GARBAGE_CLICFG_B = "opentelemetry_trace_marker"
+    garbage/config.rs: |
+      // GARBAGE_CLICFG_C = "env_config_loader_marker"
   changed_files:
-    src/config/loader.rs: |
-      use std::collections::HashMap;
-      use std::path::Path;
-      use std::fs;
+    src/queue/message.rs: |
+      use uuid::Uuid;
 
-      pub struct Config {
-          pub values: HashMap<String, String>,
-          pub source: String,
+      #[derive(Debug, Clone)]
+      pub struct Message {
+          pub id: String,
+          pub topic: String,
+          pub payload: Vec<u8>,
+          pub priority: u8,
       }
 
-      impl Config {
-          pub fn from_env() -> Self {
-              Config {
-                  values: HashMap::new(),
-                  source: "env".to_string(),
+      impl Message {
+          pub fn new(id: &str, topic: &str, payload: Vec<u8>) -> Self {
+              Self {
+                  id: id.to_string(),
+                  topic: topic.to_string(),
+                  payload,
+                  priority: 0,
               }
-          }
-
-          pub fn from_file(path: &Path) -> Result<Self, String> {
-              let content = fs::read_to_string(path)
-                  .map_err(|e| format!("failed to read config: {}", e))?;
-              let mut values = HashMap::new();
-              for line in content.lines() {
-                  if let Some((key, val)) = line.split_once('=') {
-                      values.insert(key.trim().to_string(), val.trim().to_string());
-                  }
-              }
-              Ok(Config {
-                  values,
-                  source: path.display().to_string(),
-              })
-          }
-
-          pub fn get(&self, key: &str) -> Option<&String> {
-              self.values.get(key)
           }
       }
-  commit_message: "feat: add from_file config loading with source tracking"
+
+      pub trait MessageBroker: Send + Sync {
+          fn publish(&self, topic: &str, payload: Vec<u8>) -> Message;
+          fn subscribe(&self, topic: &str) -> Vec<Message>;
+      }
+
+      pub struct LocalBroker;
+
+      impl MessageBroker for LocalBroker {
+          fn publish(&self, topic: &str, payload: Vec<u8>) -> Message {
+              let id = Uuid::new_v4().to_string();
+              Message::new(&id, topic, payload)
+          }
+
+          fn subscribe(&self, _topic: &str) -> Vec<Message> {
+              Vec::new()
+          }
+      }
+    src/worker/consumer.rs: |
+      use crate::queue::message::{Message, MessageBroker};
+
+      pub struct Consumer<B: MessageBroker> {
+          pub topic: String,
+          broker: B,
+      }
+
+      impl<B: MessageBroker> Consumer<B> {
+          pub fn new(topic: &str, broker: B) -> Self {
+              Self { topic: topic.to_string(), broker }
+          }
+
+          pub fn send_ack(&self, msg: &Message) -> Message {
+              self.broker.publish(&format!("{}.ack", self.topic), msg.id.as_bytes().to_vec())
+          }
+      }
+    src/api/ingest.rs: |
+      use crate::worker::consumer::Consumer;
+      use crate::queue::message::{MessageBroker, LocalBroker};
+
+      pub struct IngestEndpoint<B: MessageBroker> {
+          consumer: Consumer<B>,
+      }
+
+      impl IngestEndpoint<LocalBroker> {
+          pub fn new(topic: &str) -> Self {
+              Self { consumer: Consumer::new(topic, LocalBroker) }
+          }
+      }
+
+      impl<B: MessageBroker> IngestEndpoint<B> {
+          pub fn handle(&self, raw: Vec<u8>) -> String {
+              let msg = self.consumer.broker.publish(&self.consumer.topic, raw);
+              let ack = self.consumer.send_ack(&msg);
+              format!("acked: {}", ack.id)
+          }
+      }
+    garbage/metrics.rs: |
+      // GARBAGE_CLICFG_A = "prometheus_scrape_marker"
+    garbage/tracing.rs: |
+      // GARBAGE_CLICFG_B = "opentelemetry_trace_marker"
+    garbage/config.rs: |
+      // GARBAGE_CLICFG_C = "env_config_loader_marker"
+  commit_message: "refactor: introduce MessageBroker trait replacing free publish fn"
 fragments:
-- id: from_file_method
+- id: message_broker_trait
   selector:
-    path: src/config/loader.rs
-    anchor: "pub fn from_file(path: &Path)"
-- id: source_field
+    anchor: "pub trait MessageBroker"
+- id: priority_field_added
   selector:
-    path: src/config/loader.rs
-    anchor: "pub source: String"
-- id: cli_calls_from_env
+    anchor: "pub priority: u8"
+- id: consumer_generic_broker
   selector:
-    path: src/cli/run.rs
-    anchor: "Config::from_env()"
-- id: unrelated_logging
+    path: src/worker/consumer.rs
+    anchor: "use crate::queue::message::{Message, MessageBroker}"
+- id: ingest_uses_broker
   selector:
-    path: src/logging/setup.rs
-    anchor: "pub fn init_logger"
+    path: src/api/ingest.rs
+    anchor: "use crate::queue::message::{MessageBroker, LocalBroker}"
+- id: no_garbage_a
+  selector:
+    anchor: GARBAGE_CLICFG_A
+- id: no_garbage_b
+  selector:
+    anchor: GARBAGE_CLICFG_B
+- id: no_garbage_c
+  selector:
+    anchor: GARBAGE_CLICFG_C
 oracle:
   required:
-  - from_file_method
-  - cli_calls_from_env
-  allowed:
-  - source_field
+  - message_broker_trait
+  - priority_field_added
+  - consumer_generic_broker
+  - ingest_uses_broker
+  allowed: []
   forbidden:
-  - unrelated_logging
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c

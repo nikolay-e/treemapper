@@ -1,224 +1,279 @@
 name: bal3_refactor_004_go_interface_extraction
 tags:
-- lang:go
+- lang:rust
+- change:bug_fix
 - change:multi_file
-- change:refactor
-- context:cross_module
-- distance:1hop
-- difficulty:medium
+- context:test_file
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
-    storage/postgres.go: |
-      package storage
+    src/session/manager.rs: |
+      use crate::session::store::SessionStore;
+      use crate::session::session::Session;
+      use std::time::{SystemTime, UNIX_EPOCH};
 
-      type PostgresRepo struct {
-          DSN string
+      pub struct SessionManager {
+          store: SessionStore,
+          ttl_secs: u64,
       }
 
-      func NewPostgresRepo(dsn string) *PostgresRepo {
-          return &PostgresRepo{DSN: dsn}
+      impl SessionManager {
+          pub fn new(store: SessionStore, ttl_secs: u64) -> Self {
+              Self { store, ttl_secs }
+          }
+
+          pub fn create(&mut self, user_id: &str) -> String {
+              let token = uuid::Uuid::new_v4().to_string();
+              let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+              let session = Session { user_id: user_id.to_string(), created_at: now, expires_at: now + self.ttl_secs };
+              self.store.insert(token.clone(), session);
+              token
+          }
+
+          pub fn get(&self, token: &str) -> Option<&Session> {
+              self.store.get(token)
+          }
+
+          pub fn invalidate(&mut self, token: &str) {
+              self.store.remove(token);
+          }
+      }
+    src/session/store.rs: |
+      use crate::session::session::Session;
+      use std::collections::HashMap;
+
+      pub struct SessionStore {
+          sessions: HashMap<String, Session>,
       }
 
-      func (r *PostgresRepo) Save(key string, value []byte) error {
-          return nil
+      impl SessionStore {
+          pub fn new() -> Self {
+              Self { sessions: HashMap::new() }
+          }
+
+          pub fn insert(&mut self, token: String, session: Session) {
+              self.sessions.insert(token, session);
+          }
+
+          pub fn get(&self, token: &str) -> Option<&Session> {
+              self.sessions.get(token)
+          }
+
+          pub fn remove(&mut self, token: &str) {
+              self.sessions.remove(token);
+          }
+      }
+    src/session/session.rs: |
+      pub struct Session {
+          pub user_id: String,
+          pub created_at: u64,
+          pub expires_at: u64,
+      }
+    tests/test_session.rs: |
+      use crate::session::manager::SessionManager;
+      use crate::session::store::SessionStore;
+
+      #[test]
+      fn test_create_returns_token() {
+          let mut manager = SessionManager::new(SessionStore::new(), 3600);
+          let token = manager.create("user42");
+          assert!(!token.is_empty());
       }
 
-      func (r *PostgresRepo) Load(key string) ([]byte, error) {
-          return nil, nil
+      #[test]
+      fn test_invalidate_removes_session() {
+          let mut manager = SessionManager::new(SessionStore::new(), 3600);
+          let token = manager.create("user42");
+          manager.invalidate(&token);
+          assert!(manager.get(&token).is_none());
       }
+    src/email/smtp_client.rs: |
+      pub const GARBAGE_BAL3R004_A: &str = "smtp_host_default";
 
-      func (r *PostgresRepo) Delete(key string) error {
-          return nil
+      pub struct SmtpClient;
+      impl SmtpClient {
+          pub fn send(&self, _to: &str, _body: &str) -> bool { true }
       }
-    services/profile.go: |
-      package services
+    src/cache/redis_client.rs: |
+      pub const GARBAGE_BAL3R004_B: &str = "redis_connection_string";
+      pub const GARBAGE_BAL3R004_C: u32 = 6379;
 
-      import "storage"
-
-      type ProfileService struct {
-          repo *storage.PostgresRepo
+      pub struct RedisClient;
+      impl RedisClient {
+          pub fn get(&self, _key: &str) -> Option<String> { None }
       }
+    src/queue/job_queue.rs: |
+      pub const GARBAGE_BAL3R004_D: &str = "job_queue_worker_count";
 
-      func NewProfileService(repo *storage.PostgresRepo) *ProfileService {
-          return &ProfileService{repo: repo}
-      }
-
-      func (s *ProfileService) SaveProfile(userID string, data []byte) error {
-          return s.repo.Save(userID, data)
-      }
-
-      func (s *ProfileService) GetProfile(userID string) ([]byte, error) {
-          return s.repo.Load(userID)
-      }
-    cmd/server/main.go: |
-      package main
-
-      import (
-          "storage"
-          "services"
-      )
-
-      func main() {
-          repo := storage.NewPostgresRepo("postgres://localhost/db")
-          svc := services.NewProfileService(repo)
-          _ = svc
-      }
-    pkg/cron/scheduler.go: |
-      package cron
-
-      GARBAGE_R004_CRON_A = "scheduler"
-
-      type Scheduler struct {
-          Interval int
-      }
-
-      func (s *Scheduler) Start() {}
-    pkg/health/checker.go: |
-      package health
-
-      GARBAGE_R004_HEALTH_B = "checker"
-
-      type Checker struct {
-          Endpoint string
-      }
-    pkg/ratelimit/limiter.go: |
-      package ratelimit
-
-      GARBAGE_R004_LIMIT_C = "limiter"
-
-      type Limiter struct {
-          MaxRPS int
+      pub struct JobQueue;
+      impl JobQueue {
+          pub fn push(&self, _job: &str) {}
       }
   changed_files:
-    storage/repository.go: |
-      package storage
+    src/session/manager.rs: |
+      use crate::session::store::SessionStore;
+      use crate::session::session::Session;
+      use std::time::{SystemTime, UNIX_EPOCH};
 
-      type Repository interface {
-          Save(key string, value []byte) error
-          Load(key string) ([]byte, error)
-          Delete(key string) error
-      }
-    storage/postgres.go: |
-      package storage
-
-      type PostgresRepo struct {
-          DSN string
+      pub struct SessionManager {
+          store: SessionStore,
+          ttl_secs: u64,
       }
 
-      func NewPostgresRepo(dsn string) *PostgresRepo {
-          return &PostgresRepo{DSN: dsn}
+      impl SessionManager {
+          pub fn new(store: SessionStore, ttl_secs: u64) -> Self {
+              Self { store, ttl_secs }
+          }
+
+          pub fn create(&mut self, user_id: &str) -> String {
+              let token = uuid::Uuid::new_v4().to_string();
+              let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+              let session = Session { user_id: user_id.to_string(), created_at: now, expires_at: now + self.ttl_secs };
+              self.store.insert(token.clone(), session);
+              token
+          }
+
+          pub fn get(&self, token: &str) -> Option<&Session> {
+              let session = self.store.get(token)?;
+              let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+              if session.expires_at < now {
+                  return None;
+              }
+              Some(session)
+          }
+
+          pub fn invalidate(&mut self, token: &str) {
+              self.store.remove(token);
+          }
+      }
+    src/session/store.rs: |
+      use crate::session::session::Session;
+      use std::collections::HashMap;
+
+      pub struct SessionStore {
+          sessions: HashMap<String, Session>,
       }
 
-      func (r *PostgresRepo) Save(key string, value []byte) error {
-          return nil
+      impl SessionStore {
+          pub fn new() -> Self {
+              Self { sessions: HashMap::new() }
+          }
+
+          pub fn insert(&mut self, token: String, session: Session) {
+              self.sessions.insert(token, session);
+          }
+
+          pub fn get(&self, token: &str) -> Option<&Session> {
+              self.sessions.get(token)
+          }
+
+          pub fn remove(&mut self, token: &str) {
+              self.sessions.remove(token);
+          }
+      }
+    src/session/session.rs: |
+      pub struct Session {
+          pub user_id: String,
+          pub created_at: u64,
+          pub expires_at: u64,
+      }
+    tests/test_session.rs: |
+      use crate::session::manager::SessionManager;
+      use crate::session::store::SessionStore;
+      use crate::session::session::Session;
+
+      #[test]
+      fn test_create_returns_token() {
+          let mut manager = SessionManager::new(SessionStore::new(), 3600);
+          let token = manager.create("user42");
+          assert!(!token.is_empty());
       }
 
-      func (r *PostgresRepo) Load(key string) ([]byte, error) {
-          return nil, nil
+      #[test]
+      fn test_invalidate_removes_session() {
+          let mut manager = SessionManager::new(SessionStore::new(), 3600);
+          let token = manager.create("user42");
+          manager.invalidate(&token);
+          assert!(manager.get(&token).is_none());
       }
 
-      func (r *PostgresRepo) Delete(key string) error {
-          return nil
+      #[test]
+      fn test_expired_session_returns_none() {
+          let store = SessionStore::new();
+          let mut manager = SessionManager::new(store, 0);
+          let token = manager.create("user99");
+          std::thread::sleep(std::time::Duration::from_secs(1));
+          assert!(manager.get(&token).is_none(), "Expired session should return None");
       }
-    services/profile.go: |
-      package services
+    src/email/smtp_client.rs: |
+      pub const GARBAGE_BAL3R004_A: &str = "smtp_host_default";
 
-      import "storage"
-
-      type ProfileService struct {
-          repo storage.Repository
+      pub struct SmtpClient;
+      impl SmtpClient {
+          pub fn send(&self, _to: &str, _body: &str) -> bool { true }
       }
+    src/cache/redis_client.rs: |
+      pub const GARBAGE_BAL3R004_B: &str = "redis_connection_string";
+      pub const GARBAGE_BAL3R004_C: u32 = 6379;
 
-      func NewProfileService(repo storage.Repository) *ProfileService {
-          return &ProfileService{repo: repo}
+      pub struct RedisClient;
+      impl RedisClient {
+          pub fn get(&self, _key: &str) -> Option<String> { None }
       }
+    src/queue/job_queue.rs: |
+      pub const GARBAGE_BAL3R004_D: &str = "job_queue_worker_count";
 
-      func (s *ProfileService) SaveProfile(userID string, data []byte) error {
-          return s.repo.Save(userID, data)
+      pub struct JobQueue;
+      impl JobQueue {
+          pub fn push(&self, _job: &str) {}
       }
-
-      func (s *ProfileService) GetProfile(userID string) ([]byte, error) {
-          return s.repo.Load(userID)
-      }
-    cmd/server/main.go: |
-      package main
-
-      import (
-          "storage"
-          "services"
-      )
-
-      func main() {
-          repo := storage.NewPostgresRepo("postgres://localhost/db")
-          svc := services.NewProfileService(repo)
-          _ = svc
-      }
-    pkg/cron/scheduler.go: |
-      package cron
-
-      GARBAGE_R004_CRON_A = "scheduler"
-
-      type Scheduler struct {
-          Interval int
-      }
-
-      func (s *Scheduler) Start() {}
-    pkg/health/checker.go: |
-      package health
-
-      GARBAGE_R004_HEALTH_B = "checker"
-
-      type Checker struct {
-          Endpoint string
-      }
-    pkg/ratelimit/limiter.go: |
-      package ratelimit
-
-      GARBAGE_R004_LIMIT_C = "limiter"
-
-      type Limiter struct {
-          MaxRPS int
-      }
-  commit_message: "refactor: extract Repository interface from PostgresRepo"
+  commit_message: "fix: check session expiry in SessionManager::get"
 fragments:
-- id: repository_interface
+- id: session_manager_get_expiry
   selector:
-    path: storage/repository.go
-    anchor: "type Repository interface"
-- id: service_uses_interface
+    path: src/session/manager.rs
+    anchor: "if session.expires_at < now"
+- id: session_struct
   selector:
-    path: services/profile.go
-    anchor: "repo storage.Repository"
-- id: constructor_uses_interface
+    path: src/session/session.rs
+    anchor: "pub struct Session"
+- id: test_expired_session
   selector:
-    path: services/profile.go
-    anchor: "func NewProfileService(repo storage.Repository)"
-- id: postgres_implements
+    path: tests/test_session.rs
+    anchor: "fn test_expired_session_returns_none"
+- id: no_smtp
   selector:
-    path: storage/postgres.go
-    anchor: "type PostgresRepo struct"
-- id: main_wires
+    path: src/email/smtp_client.rs
+- id: no_redis
   selector:
-    path: cmd/server/main.go
-    anchor: "services.NewProfileService(repo)"
-- id: no_garbage_a
+    path: src/cache/redis_client.rs
+- id: no_job_queue
   selector:
-    anchor: GARBAGE_R004_CRON_A
-- id: no_garbage_b
+    path: src/queue/job_queue.rs
+- id: no_global_0
   selector:
-    anchor: GARBAGE_R004_HEALTH_B
-- id: no_garbage_c
+    anchor: GARBAGE_BAL3R004_A
+- id: no_global_1
   selector:
-    anchor: GARBAGE_R004_LIMIT_C
+    anchor: GARBAGE_BAL3R004_B
+- id: no_global_2
+  selector:
+    anchor: GARBAGE_BAL3R004_C
+- id: no_global_3
+  selector:
+    anchor: GARBAGE_BAL3R004_D
 oracle:
   required:
-  - repository_interface
-  - service_uses_interface
-  - constructor_uses_interface
-  - postgres_implements
-  allowed:
-  - main_wires
+  - session_manager_get_expiry
+  - session_struct
+  - test_expired_session
+  allowed: []
   forbidden:
-  - no_garbage_a
-  - no_garbage_b
-  - no_garbage_c
+  - no_smtp
+  - no_redis
+  - no_job_queue
+  - no_global_0
+  - no_global_1
+  - no_global_2
+  - no_global_3

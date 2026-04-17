@@ -1,210 +1,312 @@
 name: bal_refactor_015_typescript_consolidate_api_clients
 tags:
-- lang:typescript
+- lang:rust
+- change:bug_fix
 - change:multi_file
-- change:refactor
-- context:cross_module
-- distance:1hop
-- difficulty:medium
+- context:test_file
+- distance:2hop
+- difficulty:hard
 repo:
   initial_files:
-    src/api/usersApi.ts: |
-      const BASE_URL = 'https://api.example.com';
+    src/net/connection.rs: |
+      use std::io::{self, Read, Write};
+      use std::net::TcpStream;
+      use std::time::Duration;
 
-      function buildHeaders(token: string): Record<string, string> {
-          return {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-          };
+      pub struct Connection {
+          stream: TcpStream,
+          timeout_ms: u64,
       }
 
-      export async function fetchUsers(token: string) {
-          const resp = await fetch(`${BASE_URL}/users`, { headers: buildHeaders(token) });
-          return resp.json();
-      }
-
-      export async function fetchUser(token: string, id: string) {
-          const resp = await fetch(`${BASE_URL}/users/${id}`, { headers: buildHeaders(token) });
-          return resp.json();
-      }
-    src/api/ordersApi.ts: |
-      const BASE_URL = 'https://api.example.com';
-
-      function buildHeaders(token: string): Record<string, string> {
-          return {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-          };
-      }
-
-      export async function fetchOrders(token: string) {
-          const resp = await fetch(`${BASE_URL}/orders`, { headers: buildHeaders(token) });
-          return resp.json();
-      }
-
-      export async function createOrder(token: string, data: Record<string, unknown>) {
-          const resp = await fetch(`${BASE_URL}/orders`, {
-              method: 'POST',
-              headers: buildHeaders(token),
-              body: JSON.stringify(data),
-          });
-          return resp.json();
-      }
-    src/pages/dashboard.ts: |
-      import { fetchUsers } from '../api/usersApi';
-      import { fetchOrders } from '../api/ordersApi';
-
-      export async function loadDashboard(token: string) {
-          const users = await fetchUsers(token);
-          const orders = await fetchOrders(token);
-          return { users, orders };
-      }
-    src/utils/constants.ts: |
-      const GARBAGE_REFACTOR_015_CONST_A = 'constants';
-      const GARBAGE_REFACTOR_015_VERSION_B = '2.0';
-
-      export const APP_NAME = 'MyApp';
-    garbage_i18n.ts: |
-      const GARBAGE_REFACTOR_015_I18N_C = 'i18n';
-      const GARBAGE_REFACTOR_015_LANG_D = 'en';
-
-      export class I18n {
-          static GARBAGE_REFACTOR_015_I18N_CLASS_E = true;
-
-          t(key: string): string {
-              return key;
+      impl Connection {
+          pub fn connect(addr: &str, timeout_ms: u64) -> io::Result<Self> {
+              let stream = TcpStream::connect(addr)?;
+              stream.set_read_timeout(Some(Duration::from_millis(timeout_ms)))?;
+              Ok(Connection { stream, timeout_ms })
           }
+
+          pub fn send(&mut self, data: &[u8]) -> io::Result<usize> {
+              self.stream.write(data)
+          }
+
+          pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+              self.stream.read(buf)
+          }
+      }
+    src/net/pool.rs: |
+      use crate::net::connection::Connection;
+      use std::collections::VecDeque;
+      use std::io;
+      use std::sync::{Arc, Mutex};
+
+      pub struct ConnectionPool {
+          addr: String,
+          timeout_ms: u64,
+          idle: Arc<Mutex<VecDeque<Connection>>>,
+          max_size: usize,
+      }
+
+      impl ConnectionPool {
+          pub fn new(addr: &str, timeout_ms: u64, max_size: usize) -> Self {
+              ConnectionPool {
+                  addr: addr.to_string(),
+                  timeout_ms,
+                  idle: Arc::new(Mutex::new(VecDeque::new())),
+                  max_size,
+              }
+          }
+
+          pub fn acquire(&self) -> io::Result<Connection> {
+              let mut idle = self.idle.lock().unwrap();
+              if let Some(conn) = idle.pop_front() {
+                  return Ok(conn);
+              }
+              Connection::connect(&self.addr, self.timeout_ms)
+          }
+
+          pub fn release(&self, conn: Connection) {
+              let mut idle = self.idle.lock().unwrap();
+              if idle.len() < self.max_size {
+                  idle.push_back(conn);
+              }
+          }
+      }
+    src/client/http.rs: |
+      use crate::net::pool::ConnectionPool;
+      use std::io;
+
+      pub struct HttpClient {
+          pool: ConnectionPool,
+      }
+
+      impl HttpClient {
+          pub fn new(addr: &str) -> Self {
+              HttpClient {
+                  pool: ConnectionPool::new(addr, 5000, 10),
+              }
+          }
+
+          pub fn get(&self, path: &str) -> io::Result<Vec<u8>> {
+              let mut conn = self.pool.acquire()?;
+              let request = format!("GET {} HTTP/1.0\r\n\r\n", path);
+              conn.send(request.as_bytes())?;
+              let mut buf = vec![0u8; 4096];
+              let n = conn.recv(&mut buf)?;
+              self.pool.release(conn);
+              Ok(buf[..n].to_vec())
+          }
+      }
+    tests/net_integration.rs: |
+      use crate::net::connection::Connection;
+      use crate::net::pool::ConnectionPool;
+
+      #[test]
+      fn pool_returns_cached_connection() {
+          let pool = ConnectionPool::new("127.0.0.1:9999", 100, 5);
+          assert_eq!(pool.max_size, 5);
+      }
+
+      #[test]
+      fn pool_max_size_limits_idle() {
+          let pool = ConnectionPool::new("127.0.0.1:9999", 100, 2);
+          assert_eq!(pool.max_size, 2);
+      }
+    src/logging/structured.rs: |
+      // GARBAGE_RF15_A = "structured_logging_unrelated"
+      pub fn log_event(level: &str, message: &str) {
+          eprintln!("[{}] {}", level, message);
+      }
+    src/config/env.rs: |
+      // GARBAGE_RF15_B = "env_config_unrelated"
+      pub fn get_env(key: &str) -> Option<String> {
+          std::env::var(key).ok()
+      }
+    src/crypto/hmac.rs: |
+      // GARBAGE_RF15_C = "hmac_crypto_unrelated"
+      pub fn compute_hmac(key: &[u8], data: &[u8]) -> Vec<u8> {
+          vec![0u8; 32]
+      }
+    src/storage/file.rs: |
+      // GARBAGE_RF15_D = "file_storage_unrelated"
+      pub fn write_file(path: &str, data: &[u8]) -> std::io::Result<()> {
+          std::fs::write(path, data)
       }
   changed_files:
-    src/api/httpClient.ts: |
-      const BASE_URL = 'https://api.example.com';
+    src/net/connection.rs: |
+      use std::io::{self, Read, Write};
+      use std::net::TcpStream;
+      use std::time::Duration;
 
-      function buildHeaders(token: string): Record<string, string> {
-          return {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-          };
+      pub struct Connection {
+          stream: TcpStream,
+          timeout_ms: u64,
       }
 
-      export async function get(token: string, path: string) {
-          const resp = await fetch(`${BASE_URL}${path}`, { headers: buildHeaders(token) });
-          return resp.json();
-      }
+      impl Connection {
+          pub fn connect(addr: &str, timeout_ms: u64) -> io::Result<Self> {
+              let stream = TcpStream::connect(addr)?;
+              stream.set_read_timeout(Some(Duration::from_millis(timeout_ms)))?;
+              stream.set_write_timeout(Some(Duration::from_millis(timeout_ms)))?;
+              Ok(Connection { stream, timeout_ms })
+          }
 
-      export async function post(token: string, path: string, data: Record<string, unknown>) {
-          const resp = await fetch(`${BASE_URL}${path}`, {
-              method: 'POST',
-              headers: buildHeaders(token),
-              body: JSON.stringify(data),
-          });
-          return resp.json();
-      }
-    src/api/usersApi.ts: |
-      import { get } from './httpClient';
+          pub fn send(&mut self, data: &[u8]) -> io::Result<usize> {
+              self.stream.write_all(data)?;
+              Ok(data.len())
+          }
 
-      export async function fetchUsers(token: string) {
-          return get(token, '/users');
-      }
+          pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+              self.stream.read(buf)
+          }
 
-      export async function fetchUser(token: string, id: string) {
-          return get(token, `/users/${id}`);
-      }
-    src/api/ordersApi.ts: |
-      import { get, post } from './httpClient';
-
-      export async function fetchOrders(token: string) {
-          return get(token, '/orders');
-      }
-
-      export async function createOrder(token: string, data: Record<string, unknown>) {
-          return post(token, '/orders', data);
-      }
-    src/pages/dashboard.ts: |
-      import { fetchUsers } from '../api/usersApi';
-      import { fetchOrders } from '../api/ordersApi';
-
-      export async function loadDashboard(token: string) {
-          const users = await fetchUsers(token);
-          const orders = await fetchOrders(token);
-          return { users, orders };
-      }
-    src/utils/constants.ts: |
-      const GARBAGE_REFACTOR_015_CONST_A = 'constants';
-      const GARBAGE_REFACTOR_015_VERSION_B = '2.0';
-
-      export const APP_NAME = 'MyApp';
-    garbage_i18n.ts: |
-      const GARBAGE_REFACTOR_015_I18N_C = 'i18n';
-      const GARBAGE_REFACTOR_015_LANG_D = 'en';
-
-      export class I18n {
-          static GARBAGE_REFACTOR_015_I18N_CLASS_E = true;
-
-          t(key: string): string {
-              return key;
+          pub fn timeout_ms(&self) -> u64 {
+              self.timeout_ms
           }
       }
-  commit_message: "refactor: consolidate duplicate HTTP client logic into shared module"
+    src/net/pool.rs: |
+      use crate::net::connection::Connection;
+      use std::collections::VecDeque;
+      use std::io;
+      use std::sync::{Arc, Mutex};
+
+      pub struct ConnectionPool {
+          addr: String,
+          timeout_ms: u64,
+          idle: Arc<Mutex<VecDeque<Connection>>>,
+          max_size: usize,
+      }
+
+      impl ConnectionPool {
+          pub fn new(addr: &str, timeout_ms: u64, max_size: usize) -> Self {
+              ConnectionPool {
+                  addr: addr.to_string(),
+                  timeout_ms,
+                  idle: Arc::new(Mutex::new(VecDeque::new())),
+                  max_size,
+              }
+          }
+
+          pub fn acquire(&self) -> io::Result<Connection> {
+              let mut idle = self.idle.lock().unwrap();
+              if let Some(conn) = idle.pop_front() {
+                  return Ok(conn);
+              }
+              Connection::connect(&self.addr, self.timeout_ms)
+          }
+
+          pub fn release(&self, conn: Connection) {
+              let mut idle = self.idle.lock().unwrap();
+              if idle.len() < self.max_size {
+                  idle.push_back(conn);
+              }
+          }
+      }
+    src/client/http.rs: |
+      use crate::net::pool::ConnectionPool;
+      use std::io;
+
+      pub struct HttpClient {
+          pool: ConnectionPool,
+      }
+
+      impl HttpClient {
+          pub fn new(addr: &str) -> Self {
+              HttpClient {
+                  pool: ConnectionPool::new(addr, 5000, 10),
+              }
+          }
+
+          pub fn get(&self, path: &str) -> io::Result<Vec<u8>> {
+              let mut conn = self.pool.acquire()?;
+              let request = format!("GET {} HTTP/1.0\r\n\r\n", path);
+              conn.send(request.as_bytes())?;
+              let mut buf = vec![0u8; 4096];
+              let n = conn.recv(&mut buf)?;
+              self.pool.release(conn);
+              Ok(buf[..n].to_vec())
+          }
+      }
+    tests/net_integration.rs: |
+      use crate::net::connection::Connection;
+      use crate::net::pool::ConnectionPool;
+
+      #[test]
+      fn pool_returns_cached_connection() {
+          let pool = ConnectionPool::new("127.0.0.1:9999", 100, 5);
+          assert_eq!(pool.max_size, 5);
+      }
+
+      #[test]
+      fn pool_max_size_limits_idle() {
+          let pool = ConnectionPool::new("127.0.0.1:9999", 100, 2);
+          assert_eq!(pool.max_size, 2);
+      }
+
+      #[test]
+      fn connection_write_timeout_set() {
+          // verifies write_timeout is now configured alongside read_timeout
+          let pool = ConnectionPool::new("127.0.0.1:9999", 50, 1);
+          assert_eq!(pool.timeout_ms, 50);
+      }
+    src/logging/structured.rs: |
+      // GARBAGE_RF15_A = "structured_logging_unrelated"
+      pub fn log_event(level: &str, message: &str) {
+          eprintln!("[{}] {}", level, message);
+      }
+    src/config/env.rs: |
+      // GARBAGE_RF15_B = "env_config_unrelated"
+      pub fn get_env(key: &str) -> Option<String> {
+          std::env::var(key).ok()
+      }
+    src/crypto/hmac.rs: |
+      // GARBAGE_RF15_C = "hmac_crypto_unrelated"
+      pub fn compute_hmac(key: &[u8], data: &[u8]) -> Vec<u8> {
+          vec![0u8; 32]
+      }
+    src/storage/file.rs: |
+      // GARBAGE_RF15_D = "file_storage_unrelated"
+      pub fn write_file(path: &str, data: &[u8]) -> std::io::Result<()> {
+          std::fs::write(path, data)
+      }
+  commit_message: "fix: use write_all and set write_timeout in Connection::connect and send"
 fragments:
-- id: new_http_client_get
+- id: connection_send
   selector:
-    path: src/api/httpClient.ts
-    anchor: "export async function get(token"
-- id: new_http_client_post
+    path: src/net/connection.rs
+    anchor: "pub fn send"
+- id: connection_connect_write_timeout
   selector:
-    path: src/api/httpClient.ts
-    anchor: "export async function post(token"
-- id: users_imports_client
+    path: src/net/connection.rs
+    anchor: "set_write_timeout"
+- id: test_write_timeout
   selector:
-    path: src/api/usersApi.ts
-    anchor: "from './httpClient'"
-- id: users_uses_get
+    path: tests/net_integration.rs
+    anchor: "connection_write_timeout_set"
+- id: test_pool_max_size
   selector:
-    path: src/api/usersApi.ts
-    anchor: "return get(token, '/users')"
-- id: orders_imports_client
+    path: tests/net_integration.rs
+    anchor: "pool_max_size_limits_idle"
+- id: no_garbage_a
   selector:
-    path: src/api/ordersApi.ts
-    anchor: "from './httpClient'"
-- id: dashboard_uses_apis
+    anchor: GARBAGE_RF15_A
+- id: no_garbage_b
   selector:
-    path: src/pages/dashboard.ts
-    anchor: "from '../api/usersApi'"
-- id: no_constants
+    anchor: GARBAGE_RF15_B
+- id: no_garbage_c
   selector:
-    path: src/utils/constants.ts
-- id: no_garbage_i18n
+    anchor: GARBAGE_RF15_C
+- id: no_garbage_d
   selector:
-    path: garbage_i18n.ts
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_REFACTOR_015_CONST_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_REFACTOR_015_VERSION_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_REFACTOR_015_I18N_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_REFACTOR_015_LANG_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_REFACTOR_015_I18N_CLASS_E
+    anchor: GARBAGE_RF15_D
 oracle:
   required:
-  - new_http_client_get
-  - new_http_client_post
-  - users_imports_client
-  - users_uses_get
-  - orders_imports_client
-  - dashboard_uses_apis
-  allowed: []
+  - connection_send
+  - connection_connect_write_timeout
+  - test_write_timeout
+  allowed:
+  - test_pool_max_size
   forbidden:
-  - no_constants
-  - no_garbage_i18n
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
+  - no_garbage_d

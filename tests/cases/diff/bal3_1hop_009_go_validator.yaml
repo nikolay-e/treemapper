@@ -1,230 +1,150 @@
 name: bal3_1hop_009_go_validator
 tags:
-- lang:go
+- lang:rust
 - change:bug_fix
+- change:single_file
 - context:import_chain
 - distance:1hop
-- difficulty:hard
+- difficulty:easy
 repo:
   initial_files:
-    pkg/validation/rules.go: |
-      package validation
+    src/pool/connection_pool.rs: |
+      use std::collections::VecDeque;
 
-      import "regexp"
-
-      type Rule struct {
-          Field   string
-          Pattern string
+      pub struct ConnectionPool {
+          available: VecDeque<String>,
+          max_size: usize,
       }
 
-      func (r Rule) Validate(value string) bool {
-          matched, _ := regexp.MatchString(r.Pattern, value)
-          return matched
-      }
-
-      func EmailRule() Rule {
-          return Rule{Field: "email", Pattern: `^[^@]+@[^@]+$`}
-      }
-
-      func PhoneRule() Rule {
-          return Rule{Field: "phone", Pattern: `^\+?[0-9]{10,15}$`}
-      }
-    internal/handlers/register.go: |
-      package handlers
-
-      import "pkg/validation"
-
-      type RegisterRequest struct {
-          Email string
-          Phone string
-      }
-
-      func ValidateRegister(req RegisterRequest) []string {
-          var errs []string
-          if !validation.EmailRule().Validate(req.Email) {
-              errs = append(errs, "invalid email")
+      impl ConnectionPool {
+          pub fn new(max_size: usize) -> Self {
+              ConnectionPool { available: VecDeque::new(), max_size }
           }
-          if !validation.PhoneRule().Validate(req.Phone) {
-              errs = append(errs, "invalid phone")
+
+          pub fn acquire(&mut self) -> Option<String> {
+              self.available.pop_front()
           }
-          return errs
-      }
-    internal/handlers/update_profile.go: |
-      package handlers
 
-      import "pkg/validation"
-
-      type UpdateProfileRequest struct {
-          Email string
-          Phone string
-      }
-
-      func ValidateUpdateProfile(req UpdateProfileRequest) []string {
-          var errs []string
-          if req.Email != "" && !validation.EmailRule().Validate(req.Email) {
-              errs = append(errs, "invalid email")
+          pub fn release(&mut self, conn: String) {
+              // BUG: no cap check; pool grows unbounded beyond max_size
+              self.available.push_back(conn);
           }
-          if req.Phone != "" && !validation.PhoneRule().Validate(req.Phone) {
-              errs = append(errs, "invalid phone")
+
+          pub fn size(&self) -> usize {
+              self.available.len()
           }
-          return errs
       }
-    internal/handlers/contact.go: |
-      package handlers
+    src/db/repository.rs: |
+      use crate::pool::connection_pool::ConnectionPool;
 
-      import "pkg/validation"
-
-      type ContactRequest struct {
-          Email   string
-          Message string
+      pub struct Repository {
+          pool: ConnectionPool,
       }
 
-      func ValidateContact(req ContactRequest) []string {
-          var errs []string
-          if !validation.EmailRule().Validate(req.Email) {
-              errs = append(errs, "invalid email")
+      impl Repository {
+          pub fn new(pool_size: usize) -> Self {
+              Repository { pool: ConnectionPool::new(pool_size) }
           }
-          return errs
+
+          pub fn execute(&mut self, query: &str) -> Result<String, String> {
+              let conn = self.pool.acquire().ok_or("no connection available")?;
+              let result = format!("result of: {} on {}", query, conn);
+              self.pool.release(conn);
+              Ok(result)
+          }
       }
-    pkg/i18n/translator.go: |
-      package i18n
-
-      GARBAGE_009_TRANSLATOR_A = "translator"
-
-      type Translator struct {
-          Locale string
-      }
-
-      func (t *Translator) Translate(key string) string {
-          return key
-      }
-    pkg/upload/handler.go: |
-      package upload
-
-      GARBAGE_009_UPLOAD_B = "upload"
-
-      type Handler struct {
-          MaxSize int64
-      }
-
-      func (h *Handler) Accept(filename string) bool {
-          return true
-      }
-    pkg/export/csv.go: |
-      package export
-
-      GARBAGE_009_EXPORT_C = "export"
-
-      type CSVExporter struct {
-          Delimiter string
-      }
-
-      func (e *CSVExporter) Export(rows [][]string) string {
-          return ""
-      }
+    garbage/logger.rs: |
+      // GARBAGE_POOL_A = "logger_marker"
+      pub fn log(_msg: &str) {}
+    garbage/metrics.rs: |
+      // GARBAGE_POOL_B = "metrics_marker"
+      pub fn count(_name: &str) {}
+    garbage/config.rs: |
+      // GARBAGE_POOL_C = "config_marker"
+      pub struct DbConfig { pub url: String }
   changed_files:
-    pkg/validation/rules.go: |
-      package validation
+    src/pool/connection_pool.rs: |
+      use std::collections::VecDeque;
 
-      import (
-          "fmt"
-          "regexp"
-      )
-
-      type ValidationError struct {
-          Field   string
-          Message string
+      pub struct ConnectionPool {
+          available: VecDeque<String>,
+          max_size: usize,
       }
 
-      func (e ValidationError) Error() string {
-          return fmt.Sprintf("%s: %s", e.Field, e.Message)
-      }
-
-      type Rule struct {
-          Field   string
-          Pattern string
-      }
-
-      func (r Rule) Validate(value string) *ValidationError {
-          matched, _ := regexp.MatchString(r.Pattern, value)
-          if !matched {
-              return &ValidationError{Field: r.Field, Message: "does not match pattern"}
+      impl ConnectionPool {
+          pub fn new(max_size: usize) -> Self {
+              ConnectionPool { available: VecDeque::new(), max_size }
           }
-          return nil
+
+          pub fn acquire(&mut self) -> Option<String> {
+              self.available.pop_front()
+          }
+
+          pub fn release(&mut self, conn: String) {
+              if self.available.len() < self.max_size {
+                  self.available.push_back(conn);
+              }
+          }
+
+          pub fn size(&self) -> usize {
+              self.available.len()
+          }
+      }
+    src/db/repository.rs: |
+      use crate::pool::connection_pool::ConnectionPool;
+
+      pub struct Repository {
+          pool: ConnectionPool,
       }
 
-      func EmailRule() Rule {
-          return Rule{Field: "email", Pattern: `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`}
-      }
+      impl Repository {
+          pub fn new(pool_size: usize) -> Self {
+              Repository { pool: ConnectionPool::new(pool_size) }
+          }
 
-      func PhoneRule() Rule {
-          return Rule{Field: "phone", Pattern: `^\+?[0-9]{10,15}$`}
+          pub fn execute(&mut self, query: &str) -> Result<String, String> {
+              let conn = self.pool.acquire().ok_or("no connection available")?;
+              let result = format!("result of: {} on {}", query, conn);
+              self.pool.release(conn);
+              Ok(result)
+          }
       }
-  commit_message: "fix: return ValidationError from Rule.Validate and stricter email regex"
+    garbage/logger.rs: |
+      // GARBAGE_POOL_A = "logger_marker"
+      pub fn log(_msg: &str) {}
+    garbage/metrics.rs: |
+      // GARBAGE_POOL_B = "metrics_marker"
+      pub fn count(_name: &str) {}
+    garbage/config.rs: |
+      // GARBAGE_POOL_C = "config_marker"
+      pub struct DbConfig { pub url: String }
+  commit_message: "fix: cap released connections at max_size in ConnectionPool::release"
 fragments:
-- id: validation_error_type
+- id: release_cap_check
   selector:
-    path: pkg/validation/rules.go
-    anchor: "type ValidationError struct"
-- id: validate_returns_error
+    anchor: "if self.available.len() < self.max_size"
+- id: release_func
   selector:
-    path: pkg/validation/rules.go
-    anchor: "func (r Rule) Validate(value string) *ValidationError"
-- id: stricter_email
+    anchor: "pub fn release(&mut self, conn: String)"
+- id: repo_uses_pool
   selector:
-    path: pkg/validation/rules.go
-    anchor: "a-zA-Z0-9._%+-"
-- id: error_method
-  selector:
-    path: pkg/validation/rules.go
-    anchor: "func (e ValidationError) Error()"
-- id: register_calls_validate
-  selector:
-    path: internal/handlers/register.go
-    anchor: "validation.EmailRule().Validate(req.Email)"
-- id: update_calls_validate
-  selector:
-    path: internal/handlers/update_profile.go
-    anchor: "validation.EmailRule().Validate(req.Email)"
-- id: contact_calls_validate
-  selector:
-    path: internal/handlers/contact.go
-    anchor: "validation.EmailRule().Validate(req.Email)"
-- id: unrelated_translator
-  selector:
-    path: pkg/i18n/translator.go
-    anchor: "type Translator struct"
-- id: unrelated_upload
-  selector:
-    path: pkg/upload/handler.go
-    anchor: "type Handler struct"
-- id: unrelated_export
-  selector:
-    path: pkg/export/csv.go
-    anchor: "type CSVExporter struct"
+    anchor: "use crate::pool::connection_pool::ConnectionPool"
 - id: no_garbage_a
   selector:
-    anchor: GARBAGE_009_TRANSLATOR_A
+    anchor: GARBAGE_POOL_A
 - id: no_garbage_b
   selector:
-    anchor: GARBAGE_009_UPLOAD_B
+    anchor: GARBAGE_POOL_B
 - id: no_garbage_c
   selector:
-    anchor: GARBAGE_009_EXPORT_C
+    anchor: GARBAGE_POOL_C
 oracle:
   required:
-  - validation_error_type
-  - validate_returns_error
-  - stricter_email
-  - register_calls_validate
-  allowed:
-  - error_method
-  - update_calls_validate
-  - contact_calls_validate
+  - release_cap_check
+  - release_func
+  - repo_uses_pool
+  allowed: []
   forbidden:
-  - unrelated_translator
-  - unrelated_upload
-  - unrelated_export
   - no_garbage_a
   - no_garbage_b
   - no_garbage_c

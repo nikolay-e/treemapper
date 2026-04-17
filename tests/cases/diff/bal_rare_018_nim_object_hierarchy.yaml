@@ -1,235 +1,230 @@
 name: bal_rare_018_nim_object_hierarchy
 tags:
-- lang:nim
+- lang:go
 - change:multi_file
-- change:signature
-- context:cross_module
-- distance:2hop
-- difficulty:hard
+- change:new_function
+- context:same_file
+- distance:0hop
+- difficulty:easy
 repo:
   initial_files:
-    src/animal.nim: |
-      type
-        Animal* = ref object of RootObj
-          name*: string
-          age*: int
+    internal/iot/sensor.go: |
+      package iot
 
-        Dog* = ref object of Animal
-          breed*: string
+      import "time"
 
-        Cat* = ref object of Animal
-          indoor*: bool
+      type Reading struct {
+          SensorID  string
+          Value     float64
+          Unit      string
+          Timestamp time.Time
+      }
 
-      method speak*(a: Animal): string {.base.} =
-        "..."
+      type Sensor struct {
+          ID       string
+          Name     string
+          Location string
+          readings []Reading
+      }
 
-      method speak*(d: Dog): string =
-        "Woof!"
+      func NewSensor(id, name, location string) *Sensor {
+          return &Sensor{ID: id, Name: name, Location: location}
+      }
 
-      method speak*(c: Cat): string =
-        "Meow!"
+      func (s *Sensor) Record(value float64, unit string) {
+          s.readings = append(s.readings, Reading{
+              SensorID:  s.ID,
+              Value:     value,
+              Unit:      unit,
+              Timestamp: time.Now(),
+          })
+      }
 
-      proc newDog*(name: string, age: int, breed: string): Dog =
-        Dog(name: name, age: age, breed: breed)
+      func (s *Sensor) Latest() *Reading {
+          if len(s.readings) == 0 {
+              return nil
+          }
+          return &s.readings[len(s.readings)-1]
+      }
+    internal/iot/hub.go: |
+      package iot
 
-      proc newCat*(name: string, age: int, indoor: bool): Cat =
-        Cat(name: name, age: age, indoor: indoor)
-    src/shelter.nim: |
-      import animal
+      type Hub struct {
+          sensors map[string]*Sensor
+      }
 
-      type
-        Shelter* = object
-          animals: seq[Animal]
+      func NewHub() *Hub {
+          return &Hub{sensors: make(map[string]*Sensor)}
+      }
 
-      proc newShelter*(): Shelter =
-        Shelter(animals: @[])
+      func (h *Hub) Register(s *Sensor) {
+          h.sensors[s.ID] = s
+      }
 
-      proc adopt*(s: var Shelter, a: Animal) =
-        s.animals.add(a)
+      func (h *Hub) Get(id string) *Sensor {
+          return h.sensors[id]
+      }
+    internal/cloud/uploader.go: |
+      package cloud
 
-      proc listAll*(s: Shelter): seq[string] =
-        result = @[]
-        for a in s.animals:
-          result.add(a.name & " says " & a.speak())
-    src/main.nim: |
-      import animal, shelter
+      import "fmt"
 
-      proc main() =
-        var s = newShelter()
-        s.adopt(newDog("Rex", 3, "Labrador"))
-        s.adopt(newCat("Whiskers", 2, true))
-        for desc in s.listAll():
-          echo desc
+      type Uploader struct {
+          endpoint string
+      }
 
-      main()
-    garbage_weather.nim: |
-      const GARBAGE_RARE_018_API_A = "openweather"
-      const GARBAGE_RARE_018_UNITS_B = "metric"
+      func NewUploader(endpoint string) *Uploader {
+          return &Uploader{endpoint: endpoint}
+      }
 
-      proc garbage_forecast*() =
-        discard GARBAGE_RARE_018_API_A
-
-      const GARBAGE_RARE_018_DAYS_C = 7
-    garbage_logger.nim: |
-      const GARBAGE_RARE_018_LEVEL_D = "info"
-      const GARBAGE_RARE_018_FILE_E = "app.log"
-
-      proc garbage_log*() =
-        discard GARBAGE_RARE_018_LEVEL_D
-
-      const GARBAGE_RARE_018_ROTATE_F = true
+      func (u *Uploader) Upload(data []byte) error {
+          fmt.Printf("uploading %d bytes to %s\n", len(data), u.endpoint)
+          return nil
+      }
+    garbage/firmware.go: |
+      // GARBAGE_RARE018_FIRM_A = "firmware_marker"
+    garbage/provisioning.go: |
+      // GARBAGE_RARE018_PROV_B = "provisioning_marker"
+    garbage/ota.go: |
+      // GARBAGE_RARE018_OTA_C = "ota_marker"
   changed_files:
-    src/animal.nim: |
-      type
-        Animal* = ref object of RootObj
-          name*: string
-          age*: int
+    internal/iot/sensor.go: |
+      package iot
 
-        Dog* = ref object of Animal
-          breed*: string
+      import "time"
 
-        Cat* = ref object of Animal
-          indoor*: bool
+      type Reading struct {
+          SensorID  string
+          Value     float64
+          Unit      string
+          Timestamp time.Time
+      }
 
-        Bird* = ref object of Animal
-          canFly*: bool
+      type Sensor struct {
+          ID       string
+          Name     string
+          Location string
+          readings []Reading
+      }
 
-      method speak*(a: Animal): string {.base.} =
-        "..."
+      func NewSensor(id, name, location string) *Sensor {
+          return &Sensor{ID: id, Name: name, Location: location}
+      }
 
-      method speak*(d: Dog): string =
-        "Woof!"
+      func (s *Sensor) Record(value float64, unit string) {
+          s.readings = append(s.readings, Reading{
+              SensorID:  s.ID,
+              Value:     value,
+              Unit:      unit,
+              Timestamp: time.Now(),
+          })
+      }
 
-      method speak*(c: Cat): string =
-        "Meow!"
+      func (s *Sensor) Latest() *Reading {
+          if len(s.readings) == 0 {
+              return nil
+          }
+          return &s.readings[len(s.readings)-1]
+      }
 
-      method speak*(b: Bird): string =
-        if b.canFly: "Tweet!" else: "Squawk!"
+      func (s *Sensor) Average() float64 {
+          if len(s.readings) == 0 {
+              return 0
+          }
+          sum := 0.0
+          for _, r := range s.readings {
+              sum += r.Value
+          }
+          return sum / float64(len(s.readings))
+      }
 
-      method describe*(a: Animal): string {.base.} =
-        a.name & " (age " & $a.age & ")"
+      func (s *Sensor) ReadingCount() int {
+          return len(s.readings)
+      }
+    internal/iot/hub.go: |
+      package iot
 
-      method describe*(d: Dog): string =
-        procCall describe(Animal(d)) & " [" & d.breed & "]"
+      type Hub struct {
+          sensors map[string]*Sensor
+      }
 
-      proc newDog*(name: string, age: int, breed: string): Dog =
-        Dog(name: name, age: age, breed: breed)
+      func NewHub() *Hub {
+          return &Hub{sensors: make(map[string]*Sensor)}
+      }
 
-      proc newCat*(name: string, age: int, indoor: bool): Cat =
-        Cat(name: name, age: age, indoor: indoor)
+      func (h *Hub) Register(s *Sensor) {
+          h.sensors[s.ID] = s
+      }
 
-      proc newBird*(name: string, age: int, canFly: bool): Bird =
-        Bird(name: name, age: age, canFly: canFly)
-    src/shelter.nim: |
-      import animal
+      func (h *Hub) Get(id string) *Sensor {
+          return h.sensors[id]
+      }
 
-      type
-        Shelter* = object
-          animals: seq[Animal]
+      func (h *Hub) AllSensors() []*Sensor {
+          sensors := make([]*Sensor, 0, len(h.sensors))
+          for _, s := range h.sensors {
+              sensors = append(sensors, s)
+          }
+          return sensors
+      }
+    internal/cloud/uploader.go: |
+      package cloud
 
-      proc newShelter*(): Shelter =
-        Shelter(animals: @[])
+      import "fmt"
 
-      proc adopt*(s: var Shelter, a: Animal) =
-        s.animals.add(a)
+      type Uploader struct {
+          endpoint string
+      }
 
-      proc listAll*(s: Shelter): seq[string] =
-        result = @[]
-        for a in s.animals:
-          result.add(a.describe() & " says " & a.speak())
-    src/main.nim: |
-      import animal, shelter
+      func NewUploader(endpoint string) *Uploader {
+          return &Uploader{endpoint: endpoint}
+      }
 
-      proc main() =
-        var s = newShelter()
-        s.adopt(newDog("Rex", 3, "Labrador"))
-        s.adopt(newCat("Whiskers", 2, true))
-        s.adopt(newBird("Tweety", 1, true))
-        for desc in s.listAll():
-          echo desc
-
-      main()
-    garbage_weather.nim: |
-      const GARBAGE_RARE_018_API_A = "openweather"
-      const GARBAGE_RARE_018_UNITS_B = "metric"
-
-      proc garbage_forecast*() =
-        discard GARBAGE_RARE_018_API_A
-
-      const GARBAGE_RARE_018_DAYS_C = 7
-    garbage_logger.nim: |
-      const GARBAGE_RARE_018_LEVEL_D = "info"
-      const GARBAGE_RARE_018_FILE_E = "app.log"
-
-      proc garbage_log*() =
-        discard GARBAGE_RARE_018_LEVEL_D
-
-      const GARBAGE_RARE_018_ROTATE_F = true
-  commit_message: "feat: add Bird type and describe method hierarchy"
+      func (u *Uploader) Upload(data []byte) error {
+          fmt.Printf("uploading %d bytes to %s\n", len(data), u.endpoint)
+          return nil
+      }
+    garbage/firmware.go: |
+      // GARBAGE_RARE018_FIRM_A = "firmware_marker"
+    garbage/provisioning.go: |
+      // GARBAGE_RARE018_PROV_B = "provisioning_marker"
+    garbage/ota.go: |
+      // GARBAGE_RARE018_OTA_C = "ota_marker"
+  commit_message: "feat: add Sensor.Average/ReadingCount and Hub.AllSensors"
 fragments:
-- id: bird_type
+- id: sensor_average
   selector:
-    path: src/animal.nim
-    anchor: "Bird* = ref object of Animal"
-- id: bird_speak
+    path: internal/iot/sensor.go
+    anchor: "func (s *Sensor) Average() float64 {"
+- id: sensor_reading_count
   selector:
-    path: src/animal.nim
-    anchor: "method speak*(b: Bird)"
-- id: describe_base
+    path: internal/iot/sensor.go
+    anchor: "func (s *Sensor) ReadingCount() int {"
+- id: hub_all_sensors
   selector:
-    path: src/animal.nim
-    anchor: "method describe*(a: Animal)"
-- id: new_bird
+    path: internal/iot/hub.go
+    anchor: "func (h *Hub) AllSensors() []*Sensor {"
+- id: unrelated_uploader
   selector:
-    path: src/animal.nim
-    anchor: "proc newBird*"
-- id: shelter_uses_describe
+    path: internal/cloud/uploader.go
+    anchor: "func (u *Uploader) Upload"
+- id: no_garbage_a
   selector:
-    path: src/shelter.nim
-    anchor: "a.describe()"
-- id: main_adopts_bird
+    anchor: GARBAGE_RARE018_FIRM_A
+- id: no_garbage_b
   selector:
-    path: src/main.nim
-    anchor: 'newBird("Tweety"'
-- id: no_garbage_weather
+    anchor: GARBAGE_RARE018_PROV_B
+- id: no_garbage_c
   selector:
-    path: garbage_weather.nim
-- id: no_garbage_logger
-  selector:
-    path: garbage_logger.nim
-- id: no_global_0
-  selector:
-    anchor: GARBAGE_RARE_018_API_A
-- id: no_global_1
-  selector:
-    anchor: GARBAGE_RARE_018_UNITS_B
-- id: no_global_2
-  selector:
-    anchor: GARBAGE_RARE_018_DAYS_C
-- id: no_global_3
-  selector:
-    anchor: GARBAGE_RARE_018_LEVEL_D
-- id: no_global_4
-  selector:
-    anchor: GARBAGE_RARE_018_FILE_E
-- id: no_global_5
-  selector:
-    anchor: GARBAGE_RARE_018_ROTATE_F
+    anchor: GARBAGE_RARE018_OTA_C
 oracle:
   required:
-  - bird_type
-  - bird_speak
-  - describe_base
-  - new_bird
-  - shelter_uses_describe
-  - main_adopts_bird
+  - sensor_average
+  - sensor_reading_count
+  - hub_all_sensors
   allowed: []
   forbidden:
-  - no_garbage_weather
-  - no_garbage_logger
-  - no_global_0
-  - no_global_1
-  - no_global_2
-  - no_global_3
-  - no_global_4
-  - no_global_5
+  - unrelated_uploader
+  - no_garbage_a
+  - no_garbage_b
+  - no_garbage_c
