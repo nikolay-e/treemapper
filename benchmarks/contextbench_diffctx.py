@@ -216,6 +216,32 @@ def line_overlap(
     }
 
 
+def _collect_instance_diagnostics(
+    frag_count: int,
+    lo_all: dict,
+    file_recall: float,
+    gf: set,
+    sel_files: set,
+    nontrivial_recall: float,
+    output: dict,
+) -> list[str]:
+    diagnostics: list[str] = []
+    if frag_count == 0:
+        diagnostics.append("WARN: diffctx returned 0 fragments")
+    if lo_all["line_recall"] < 1e-9 and frag_count > 0:
+        diagnostics.append("DIAG: line_recall=0 with fragments>0 — possible line parse bug or no file overlap")
+    if file_recall < 1e-9 and frag_count > 0:
+        diagnostics.append("DIAG: file_recall=0 with fragments>0 — selected files don't overlap gold at all")
+        diagnostics.append(f"  gold_files: {sorted(gf)[:5]}")
+        diagnostics.append(f"  selected:   {sorted(sel_files)[:5]}")
+    if nontrivial_recall < 1e-9 and frag_count > 5:
+        diagnostics.append("DIAG: nontrivial_recall=0 — diffctx may only be selecting patch-adjacent files")
+    unparsed = sum(1 for f in output.get("fragments", []) if parse_lines_field(f.get("lines", "")) is None)
+    if unparsed:
+        diagnostics.append(f"DIAG: {unparsed}/{frag_count} fragments have unparseable 'lines' field")
+    return diagnostics
+
+
 def evaluate_instance(
     inst: dict,
     budget: int = 8000,
@@ -301,26 +327,7 @@ def evaluate_instance(
         },
     }
 
-    diagnostics = []
-
-    if frag_count == 0:
-        diagnostics.append("WARN: diffctx returned 0 fragments")
-
-    if lo_all["line_recall"] < 1e-9 and frag_count > 0:
-        diagnostics.append("DIAG: line_recall=0 with fragments>0 — possible line parse bug or no file overlap")
-
-    if file_recall < 1e-9 and frag_count > 0:
-        diagnostics.append("DIAG: file_recall=0 with fragments>0 — selected files don't overlap gold at all")
-        diagnostics.append(f"  gold_files: {sorted(gf)[:5]}")
-        diagnostics.append(f"  selected:   {sorted(sel_files)[:5]}")
-
-    if nontrivial_recall < 1e-9 and frag_count > 5:
-        diagnostics.append("DIAG: nontrivial_recall=0 — diffctx may only be selecting patch-adjacent files")
-
-    unparsed = sum(1 for f in output.get("fragments", []) if parse_lines_field(f.get("lines", "")) is None)
-    if unparsed:
-        diagnostics.append(f"DIAG: {unparsed}/{frag_count} fragments have unparseable 'lines' field")
-
+    diagnostics = _collect_instance_diagnostics(frag_count, lo_all, file_recall, gf, sel_files, nontrivial_recall, output)
     result["diagnostics"] = diagnostics
 
     print(f"Fragments: {frag_count} | Time: {elapsed:.1f}s")
@@ -331,6 +338,28 @@ def evaluate_instance(
         print(f"  {d}")
 
     return result
+
+
+def _print_per_language_breakdown(ok: list[dict], by_lang: dict) -> None:
+    if len(by_lang) <= 1:
+        return
+    print("\nPer-language breakdown:")
+    for lang in sorted(by_lang):
+        lr = by_lang[lang]
+        avg_fr = sum(r["file_recall"] for r in lr) / len(lr)
+        avg_ntr = sum(r["nontrivial_file_recall"] for r in lr) / len(lr)
+        avg_lr = sum(r["line_recall"] for r in lr) / len(lr)
+        print(f"  {lang:12s} (n={len(lr):3d}): file_recall={avg_fr:.3f}  nontrivial={avg_ntr:.3f}  line_recall={avg_lr:.3f}")
+
+
+def _print_per_repo_breakdown(ok: list[dict], by_repo: dict) -> None:
+    if len(by_repo) <= 1:
+        return
+    print("\nPer-repo breakdown:")
+    for repo in sorted(by_repo, key=lambda r: -len(by_repo[r])):
+        rr = by_repo[repo]
+        avg_ntr = sum(r["nontrivial_file_recall"] for r in rr) / len(rr)
+        print(f"  {repo:30s} (n={len(rr):3d}): nontrivial_recall={avg_ntr:.3f}")
 
 
 def aggregate(results: list[dict]) -> None:
@@ -360,26 +389,12 @@ def aggregate(results: list[dict]) -> None:
     by_lang: dict[str, list[dict]] = defaultdict(list)
     for r in ok:
         by_lang[r["language"]].append(r)
-
-    if len(by_lang) > 1:
-        print("\nPer-language breakdown:")
-        for lang in sorted(by_lang):
-            lr = by_lang[lang]
-            avg_fr = sum(r["file_recall"] for r in lr) / len(lr)
-            avg_ntr = sum(r["nontrivial_file_recall"] for r in lr) / len(lr)
-            avg_lr = sum(r["line_recall"] for r in lr) / len(lr)
-            print(f"  {lang:12s} (n={len(lr):3d}): file_recall={avg_fr:.3f}  nontrivial={avg_ntr:.3f}  line_recall={avg_lr:.3f}")
+    _print_per_language_breakdown(ok, by_lang)
 
     by_repo: dict[str, list[dict]] = defaultdict(list)
     for r in ok:
         by_repo[r["repo"]].append(r)
-
-    if len(by_repo) > 1:
-        print("\nPer-repo breakdown:")
-        for repo in sorted(by_repo, key=lambda r: -len(by_repo[r])):
-            rr = by_repo[repo]
-            avg_ntr = sum(r["nontrivial_file_recall"] for r in rr) / len(rr)
-            print(f"  {repo:30s} (n={len(rr):3d}): nontrivial_recall={avg_ntr:.3f}")
+    _print_per_repo_breakdown(ok, by_repo)
 
     zero_frag = sum(1 for r in ok if r["fragments"] == 0)
     zero_line = sum(1 for r in ok if r["line_recall"] < 1e-9 and r["fragments"] > 0)

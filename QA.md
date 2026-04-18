@@ -5,8 +5,6 @@
 - CI matrix: Linux/macOS/Windows × Python 3.10-3.14
   (15 test matrices + 3 lint/arch jobs)
 - Windows jobs slowest — typically 7-10min vs 2-4min for Linux/macOS
-- Windows runners occasionally hang indefinitely (>1hr) —
-  cancel and rerun with `gh run rerun <id> --failed`
 - All jobs must pass; no flaky CI tolerance
 
 ## SonarCloud
@@ -20,18 +18,23 @@
   merge with `or` when bodies identical
 - Test YAML fixture "Password" triggers false positive VULNERABILITY
   (yaml:S2068) — expected
-- `dataclasses.replace()` return type: mypy may flag as OK or error
-  depending on version — check before adding `# type: ignore`
-- Lambda capturing loop variable in immediate-use context (e.g. `max()`)
-  — SonarCloud flags it; suppress with `# noqa: B023` if mypy rejects
-  the default-arg workaround
+- `dataclasses.replace()` return type: mypy (modern) infers correctly —
+  do NOT add `cast(T, replace(...))`, mypy will flag as redundant-cast;
+  remove cast and let type inference work
+- Lambda capturing loop variable (S1515): use `dict.__getitem__` instead
+  of `lambda k: d[k]` — simpler and avoids the flag
+- S3776 cognitive complexity: SonarCloud counts boolean operators (`and`,
+  `or`) as separate increments — extracting complex conditions into named
+  helpers reduces complexity even without deep nesting changes
+- `cast` import removal: after removing casts, remove the `typing.cast`
+  import too or ruff/mypy will flag unused imports
 
 ## Test Suite
 
 - Run `python -m pytest --tb=no -q` for quick status
 - test_graph.py separate from test_yaml_diff.py — check both
-- 87 xfails currently — all strict=False, bidirectional discovery
-  precision tradeoff
+- Many xfails (strict=False) for bidirectional discovery precision tradeoff —
+  check count trends, not absolute numbers
 
 ## Code Review
 
