@@ -350,7 +350,7 @@ class JavaScriptEdgeBuilder(EdgeBuilder):
             discovered.update(newly_found)
             frontier = [f for f in newly_found if _is_js_file(f)]
 
-        return list(discovered)
+        return sorted(discovered)
 
     def _discover_one_hop(
         self,

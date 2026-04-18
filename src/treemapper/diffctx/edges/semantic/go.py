@@ -190,7 +190,7 @@ class GoEdgeBuilder(EdgeBuilder):
             candidate_index = self._build_candidate_import_index(candidates, file_cache)
             self._discover_cross_package(go_changed, changed_set, candidates, candidate_index, discovered, repo_root, file_cache)
 
-        return list(discovered)
+        return sorted(discovered)
 
     def _build_candidate_import_index(
         self,

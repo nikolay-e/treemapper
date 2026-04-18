@@ -303,7 +303,7 @@ class PythonEdgeBuilder(EdgeBuilder):
             if not frontier:
                 break
 
-        return list(discovered)
+        return sorted(discovered)
 
     @staticmethod
     def _expand_frontier(

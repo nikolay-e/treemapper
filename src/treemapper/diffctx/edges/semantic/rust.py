@@ -309,7 +309,7 @@ class RustEdgeBuilder(EdgeBuilder):
             if not frontier:
                 break
 
-        return list(discovered)
+        return sorted(discovered)
 
     @staticmethod
     @staticmethod
