@@ -312,7 +312,6 @@ class RustEdgeBuilder(EdgeBuilder):
         return sorted(discovered)
 
     @staticmethod
-    @staticmethod
     def _collect_forward_targets(
         frontier: set[Path], file_uses: dict[Path, set[str]], file_mods: dict[Path, set[str]]
     ) -> set[str]:
@@ -355,9 +354,9 @@ class RustEdgeBuilder(EdgeBuilder):
         for candidate in candidates:
             if candidate in skip or candidate in found:
                 continue
-            if file_mods.get(candidate, set()) & frontier_mod_names:
-                found.add(candidate)
-            elif RustEdgeBuilder._extract_use_parts(file_uses, candidate) & frontier_mod_names:
+            if (file_mods.get(candidate, set()) & frontier_mod_names) or (
+                RustEdgeBuilder._extract_use_parts(file_uses, candidate) & frontier_mod_names
+            ):
                 found.add(candidate)
 
         return found

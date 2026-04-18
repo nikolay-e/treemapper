@@ -562,13 +562,12 @@ class UtilityState:
     file_importance: dict[Path, float] = field(default_factory=dict)
 
     def copy(self) -> UtilityState:
-        result: UtilityState = replace(
+        return replace(
             self,
             max_rel=dict(self.max_rel),
             priorities=dict(self.priorities),
             file_importance=dict(self.file_importance),
         )
-        return result
 
 
 def _phi(x: float) -> float:

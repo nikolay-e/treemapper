@@ -26,7 +26,7 @@ REPOS_DIR = repos_dir("LOO_REPOS_DIR")
 def strip_file_from_patch(patch_text: str, file_to_hide: str) -> str:
     import re
 
-    pattern = re.compile(r"^diff --git\s.*?(?=^diff --git\s|\Z)", re.MULTILINE | re.DOTALL)
+    pattern = re.compile(r"^diff --git\s.+?(?=(?:^diff --git\s)|\Z)", re.MULTILINE | re.DOTALL)
     hidden_markers = {f"a/{file_to_hide}", f"b/{file_to_hide}"}
     kept = []
     for m in pattern.finditer(patch_text):

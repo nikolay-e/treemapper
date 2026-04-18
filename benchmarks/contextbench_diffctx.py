@@ -26,6 +26,8 @@ from common import (
 )
 from stats import bootstrap_ci
 
+_DEFAULT_DIFF_RANGE = "HEAD~1..HEAD"
+
 REPOS_DIR = repos_dir("CB_REPOS_DIR", suffix_var="CONTEXTBENCH_REPOS_SUFFIX")
 
 
@@ -52,7 +54,7 @@ def run_diffctx(repo_dir: Path, budget: int = 8000, scoring_mode: str = "hybrid"
     from treemapper.diffctx.pipeline import build_diff_context
 
     try:
-        return build_diff_context(repo_dir, "HEAD~1..HEAD", budget_tokens=budget, scoring_mode=scoring_mode)
+        return build_diff_context(repo_dir, _DEFAULT_DIFF_RANGE, budget_tokens=budget, scoring_mode=scoring_mode)
     except Exception as e:
         print(f"  DIFFCTX FAIL: {type(e).__name__}: {e}")
         return None
@@ -97,7 +99,7 @@ def _pack_files_to_fragments(repo_dir: Path, ranked_files: list[str], budget: in
 
 def run_baseline_patch_files(repo_dir: Path, budget: int = 8000) -> dict | None:
     r = subprocess.run(
-        ["git", "-C", str(repo_dir), "diff", "HEAD~1..HEAD", "--name-only"],
+        ["git", "-C", str(repo_dir), "diff", _DEFAULT_DIFF_RANGE, "--name-only"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -125,7 +127,7 @@ def run_baseline_bm25(repo_dir: Path, budget: int = 8000) -> dict | None:
         return _pack_files_to_fragments(repo_dir, [], budget)
 
     diff_result = subprocess.run(
-        ["git", "-C", str(repo_dir), "diff", "HEAD~1..HEAD"],
+        ["git", "-C", str(repo_dir), "diff", _DEFAULT_DIFF_RANGE],
         capture_output=True,
         text=True,
         timeout=30,
