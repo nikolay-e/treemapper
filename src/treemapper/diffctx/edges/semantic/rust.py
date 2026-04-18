@@ -397,6 +397,23 @@ class RustEdgeBuilder(EdgeBuilder):
         return name_to_frags, mod_to_frags, type_defs, fn_defs, trait_impls
 
     @staticmethod
+    @staticmethod
+    def _register_pub_use(
+        leaf_lower: str,
+        frag_id: FragmentId,
+        name_to_frags: dict[str, list[FragmentId]],
+        type_defs: dict[str, list[FragmentId]],
+        fn_defs: dict[str, list[FragmentId]],
+    ) -> None:
+        if leaf_lower in name_to_frags:
+            return
+        for target_fid_list in (type_defs.get(leaf_lower, []), fn_defs.get(leaf_lower, [])):
+            for target_fid in target_fid_list:
+                if target_fid != frag_id:
+                    name_to_frags[leaf_lower].append(frag_id)
+                    return
+
+    @staticmethod
     def _index_fragment(
         f: Fragment,
         name_to_frags: dict[str, list[FragmentId]],
@@ -426,14 +443,8 @@ class RustEdgeBuilder(EdgeBuilder):
             trait_impls[f.id].append((trait_name, type_name))
 
         for pub_use_path in _extract_pub_uses(f.content):
-            parts = pub_use_path.split("::")
-            leaf_lower = parts[-1].lower()
-            if leaf_lower not in name_to_frags:
-                for target_fid_list in [type_defs.get(leaf_lower, []), fn_defs.get(leaf_lower, [])]:
-                    for target_fid in target_fid_list:
-                        if target_fid != f.id:
-                            name_to_frags[leaf_lower].append(f.id)
-                            break
+            leaf_lower = pub_use_path.split("::")[-1].lower()
+            RustEdgeBuilder._register_pub_use(leaf_lower, f.id, name_to_frags, type_defs, fn_defs)
 
     def _link_fragment(
         self,
