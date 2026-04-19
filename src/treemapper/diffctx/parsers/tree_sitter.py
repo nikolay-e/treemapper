@@ -258,6 +258,7 @@ class TreeSitterStrategy:
         if added_ends is None:
             added_ends = set()
         if depth > _MAX_RECURSION_DEPTH:
+            logger.debug("tree-sitter recursion depth limit reached for %s", path)
             return
 
         if node.type in definition_types:
@@ -338,6 +339,32 @@ class TreeSitterStrategy:
         return True
 
     @staticmethod
+    def _create_and_append_fragment(
+        path: Path,
+        lines: list[str],
+        start: int,
+        end: int,
+        kind: str,
+        sym_name: str | None,
+        fragments: list[Fragment],
+        covered: set[tuple[int, int]],
+    ) -> bool:
+        snippet = create_snippet(lines, start, end)
+        if snippet is None:
+            return False
+        fragments.append(
+            Fragment(
+                id=FragmentId(path=path, start_line=start, end_line=end),
+                kind=kind,
+                content=snippet,
+                identifiers=extract_identifiers(snippet, profile="code"),
+                symbol_name=sym_name,
+            )
+        )
+        covered.add((start, end))
+        return True
+
+    @staticmethod
     def _add_leaf_definition(
         path: Path,
         lines: list[str],
@@ -351,20 +378,8 @@ class TreeSitterStrategy:
     ) -> None:
         if end - start + 1 < MIN_FRAGMENT_LINES:
             return
-        snippet = create_snippet(lines, start, end)
-        if snippet is None:
-            return
-        fragments.append(
-            Fragment(
-                id=FragmentId(path=path, start_line=start, end_line=end),
-                kind=kind,
-                content=snippet,
-                identifiers=extract_identifiers(snippet, profile="code"),
-                symbol_name=sym_name,
-            )
-        )
-        covered.add((start, end))
-        added_ends.add((kind, end))
+        if TreeSitterStrategy._create_and_append_fragment(path, lines, start, end, kind, sym_name, fragments, covered):
+            added_ends.add((kind, end))
 
     @staticmethod
     def _find_body_node(node: Node) -> Node | None:
@@ -387,20 +402,10 @@ class TreeSitterStrategy:
         fragments: list[Fragment],
         covered: set[tuple[int, int]],
     ) -> None:
-        if end < start:
+        if end < start or end - start + 1 < MIN_FRAGMENT_LINES:
             return
-        snippet = create_snippet(lines, start, end)
-        if snippet and end - start + 1 >= MIN_FRAGMENT_LINES:
-            fragments.append(
-                Fragment(
-                    id=FragmentId(path=path, start_line=start, end_line=end),
-                    kind="chunk",
-                    content=snippet,
-                    identifiers=extract_identifiers(snippet, profile="code"),
-                    symbol_name=f"{parent_symbol}[{start}]" if parent_symbol else None,
-                )
-            )
-            covered.add((start, end))
+        sym_name = f"{parent_symbol}[{start}]" if parent_symbol else None
+        TreeSitterStrategy._create_and_append_fragment(path, lines, start, end, "chunk", sym_name, fragments, covered)
 
     @staticmethod
     def _create_sub_fragments(
@@ -413,6 +418,7 @@ class TreeSitterStrategy:
         _depth: int = 0,
     ) -> None:
         if _depth > _MAX_SUB_DEPTH:
+            logger.debug("sub-fragment depth limit reached for node in %s", path)
             return
         body = TreeSitterStrategy._find_body_node(node)
         if body is None:

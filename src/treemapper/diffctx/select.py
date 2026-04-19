@@ -342,6 +342,7 @@ def lazy_greedy_select(
     core_ids = selected_core_id_set
 
     if should_return_early:
+        logger.debug("core selection exhausted budget, skipping greedy phase")
         used = budget_tokens - state.remaining_budget
         return _log_and_return(
             SelectionResult(

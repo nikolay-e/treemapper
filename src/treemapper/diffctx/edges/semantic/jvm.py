@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -7,6 +8,8 @@ from pathlib import Path
 from ...config.weights import EDGE_WEIGHTS
 from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict
+
+logger = logging.getLogger(__name__)
 
 _DISCOVERY_MAX_DEPTH = 2
 
@@ -281,7 +284,7 @@ class JVMEdgeBuilder(EdgeBuilder):
                         if len(parts) == 2:
                             import_packages.add(parts[0])
             except (OSError, UnicodeDecodeError):
-                pass
+                logger.debug("skipping unreadable file: %s", f)
         return type_refs, import_packages
 
     @staticmethod
@@ -303,7 +306,7 @@ class JVMEdgeBuilder(EdgeBuilder):
                 content = f.read_text(encoding="utf-8")
                 frontier_classes.update(_extract_classes(content, f))
             except (OSError, UnicodeDecodeError):
-                pass
+                logger.debug("skipping unreadable file: %s", f)
         return frontier_classes
 
     @staticmethod
@@ -322,6 +325,7 @@ class JVMEdgeBuilder(EdgeBuilder):
                 return True
             return any(imp.rsplit(".", 1)[-1] in frontier_classes for imp in _extract_imports(content, candidate))
         except (OSError, UnicodeDecodeError):
+            logger.debug("skipping unreadable file: %s", candidate)
             return False
 
     def _discover_single_hop(
