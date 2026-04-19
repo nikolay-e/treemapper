@@ -1,19 +1,15 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
-_RUST_USE_STMT_RE = re.compile(r"^\s*use\s+(.+?)\s*;", re.DOTALL | re.MULTILINE)
-_RUST_MOD_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+([a-z_][a-z0-9_]*)\s*[;{]", re.MULTILINE)
+import tree_sitter_rust
+from tree_sitter import Language, Node, Parser, Tree
 
-_RUST_FN_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([a-z_][a-z0-9_]*)", re.MULTILINE)
-_RUST_STRUCT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+([A-Z]\w*)", re.MULTILINE)
-_RUST_ENUM_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?enum\s+([A-Z]\w*)", re.MULTILINE)
-_RUST_TRAIT_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?trait\s+([A-Z]\w*)", re.MULTILINE)
-_RUST_IMPL_RE = re.compile(r"^\s*impl(?:<[^>\n]*>)?\s+(?:\w+\s+for\s+)?([A-Z]\w*)", re.MULTILINE)
-_RUST_TRAIT_IMPL_RE = re.compile(r"^\s*impl(?:<[^>\n]*>)?\s+(\w+)\s+for\s+(\w+)", re.MULTILINE)
-_RUST_PUB_USE_RE = re.compile(r"^\s*pub\s+use\s+(?:crate::)?([a-z_]\w*(?:::\w+)*)", re.MULTILINE)
-_RUST_TYPE_ALIAS_RE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?type\s+([A-Z]\w*)", re.MULTILINE)
+logger = logging.getLogger(__name__)
+
+_LANG = Language(tree_sitter_rust.language())
 
 _RUST_TYPE_REF_RE = re.compile(r"(?<![a-z_])([A-Z]\w*)\b")
 _RUST_FN_CALL_RE = re.compile(r"(?<!\w)([a-z_][a-z0-9_]*)\s?!?\s?\(")
@@ -115,109 +111,181 @@ _RUST_KEYWORDS = frozenset(
     }
 )
 
+_STRIP_PREFIX = {"crate", "self", "super"}
+
+
+def _get_parser() -> Parser:
+    return Parser(_LANG)
+
+
+def _parse_tree(content: str) -> Tree | None:
+    try:
+        return _get_parser().parse(content.encode("utf-8"))
+    except Exception:
+        logger.debug("tree-sitter failed to parse Rust content")
+        return None
+
 
 def is_rust_file(path: Path) -> bool:
     return path.suffix.lower() == ".rs"
 
 
-_MAX_USE_TREE_DEPTH = 10
+_PATH_IDENT_TYPES = frozenset({"identifier", "crate", "self", "super"})
+_USE_LIST_PUNCTUATION = frozenset({"{", "}", ","})
 
 
-def _find_matching_brace(inner: str) -> int:
-    depth = 1
-    for i, ch in enumerate(inner):
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return i
-    return 0
+def _extract_scoped_identifier_path(node: Node) -> str:
+    parts = [c.text.decode() for c in node.children if c.type in _PATH_IDENT_TYPES]
+    return "::".join(parts)
 
 
-def _split_brace_items(items_str: str) -> tuple[list[str], bool]:
-    items: list[str] = []
-    current: list[str] = []
-    depth = 0
-    has_self = False
-    for ch in items_str:
-        if ch == "{":
-            depth += 1
-            current.append(ch)
-        elif ch == "}":
-            depth -= 1
-            current.append(ch)
-        elif ch == "," and depth == 0:
-            item = "".join(current).strip()
-            if item == "self":
-                has_self = True
-            elif item:
-                items.append(item)
-            current = []
-        else:
-            current.append(ch)
-    item = "".join(current).strip()
-    if item == "self":
-        has_self = True
-    elif item:
-        items.append(item)
-    return items, has_self
+def _collect_scoped_use_list(node: Node) -> list[str]:
+    scope_parts: list[str] = []
+    use_list = None
+    for child in node.children:
+        if child.type == "use_list":
+            use_list = child
+        elif child.type in _PATH_IDENT_TYPES:
+            scope_parts.append(child.text.decode())
+        elif child.type == "scoped_identifier":
+            scope_parts = [c.text.decode() for c in child.children if c.type in _PATH_IDENT_TYPES]
+    scope = "::".join(scope_parts)
+    if use_list:
+        results = []
+        for child in use_list.children:
+            if child.type in _USE_LIST_PUNCTUATION:
+                continue
+            for p in _collect_use_paths(child):
+                results.append(f"{scope}::{p}" if scope else p)
+        return results
+    return [scope] if scope else []
 
 
-def _parse_use_tree(text: str, _depth: int = 0) -> list[str]:
-    if _depth > _MAX_USE_TREE_DEPTH:
+def _collect_use_paths(node: Node, prefix: str = "") -> list[str]:
+    ntype = node.type
+    if ntype in _PATH_IDENT_TYPES:
+        name = node.text.decode()
+        return [f"{prefix}::{name}" if prefix else name]
+    if ntype == "scoped_identifier":
+        return [_extract_scoped_identifier_path(node)]
+    if ntype == "scoped_use_list":
+        return _collect_scoped_use_list(node)
+    if ntype == "use_list":
+        return [p for c in node.children if c.type not in _USE_LIST_PUNCTUATION for p in _collect_use_paths(c, prefix)]
+    if ntype == "use_as_clause":
+        for child in node.children:
+            if child.type in ("identifier", "scoped_identifier"):
+                return _collect_use_paths(child, prefix)
         return []
-    text = re.sub(r"^(?:crate|self|super)::", "", text.strip())
-    if "{" not in text:
-        return [text] if text else []
-    brace_pos = text.index("{")
-    prefix = text[:brace_pos].rstrip(":")
-    inner = text[brace_pos + 1 :]
-    end = _find_matching_brace(inner)
-    items, has_self = _split_brace_items(inner[:end])
-    results: list[str] = []
-    if has_self and prefix:
-        results.append(prefix)
-    for item in items:
-        results.extend(_parse_use_tree(f"{prefix}::{item}" if prefix else item, _depth + 1))
-    return results
+    if ntype == "use_wildcard":
+        return [f"{prefix}::*" if prefix else "*"]
+    return []
+
+
+def _strip_crate_prefix(path: str) -> str:
+    parts = path.split("::")
+    while parts and parts[0] in _STRIP_PREFIX:
+        parts = parts[1:]
+    return "::".join(parts)
 
 
 def extract_uses(content: str) -> set[str]:
+    tree = _parse_tree(content)
+    if tree is None:
+        return set()
     uses: set[str] = set()
-    for match in _RUST_USE_STMT_RE.finditer(content):
-        for path in _parse_use_tree(match.group(1)):
-            uses.add(path)
-            parts = path.split("::")
-            if len(parts) > 1:
-                uses.add(parts[0])
+    for node in tree.root_node.children:
+        if node.type != "use_declaration":
+            continue
+        for child in node.children:
+            if child.type in ("use", ";", "visibility_modifier"):
+                continue
+            for raw_path in _collect_use_paths(child):
+                path = _strip_crate_prefix(raw_path)
+                if path:
+                    uses.add(path)
+                    parts = path.split("::")
+                    if len(parts) > 1:
+                        uses.add(parts[0])
     return uses
 
 
 def extract_mods(content: str) -> set[str]:
-    return {m.group(1) for m in _RUST_MOD_RE.finditer(content)}
+    tree = _parse_tree(content)
+    if tree is None:
+        return set()
+    mods: set[str] = set()
+    for node in tree.root_node.children:
+        if node.type != "mod_item":
+            continue
+        for child in node.children:
+            if child.type == "identifier":
+                mods.add(child.text.decode())
+                break
+    return mods
 
 
 def extract_trait_impls(content: str) -> list[tuple[str, str]]:
-    return [(m.group(1), m.group(2)) for m in _RUST_TRAIT_IMPL_RE.finditer(content)]
+    tree = _parse_tree(content)
+    if tree is None:
+        return []
+    result: list[tuple[str, str]] = []
+    for node in tree.root_node.children:
+        if node.type != "impl_item":
+            continue
+        has_for = any(c.type == "for" for c in node.children)
+        if not has_for:
+            continue
+        type_ids = [c for c in node.children if c.type == "type_identifier"]
+        if len(type_ids) >= 2:
+            result.append((type_ids[0].text.decode(), type_ids[1].text.decode()))
+    return result
 
 
 def extract_pub_uses(content: str) -> list[str]:
-    return [m.group(1) for m in _RUST_PUB_USE_RE.finditer(content)]
+    tree = _parse_tree(content)
+    if tree is None:
+        return []
+    result: list[str] = []
+    for node in tree.root_node.children:
+        if node.type != "use_declaration":
+            continue
+        is_pub = any(c.type == "visibility_modifier" for c in node.children)
+        if not is_pub:
+            continue
+        for child in node.children:
+            if child.type in ("use", ";", "visibility_modifier"):
+                continue
+            for raw_path in _collect_use_paths(child):
+                path = _strip_crate_prefix(raw_path)
+                if path:
+                    result.append(path)
+    return result
 
 
 def extract_definitions(content: str) -> tuple[set[str], set[str]]:
-    funcs = {m.group(1) for m in _RUST_FN_RE.finditer(content)}
+    tree = _parse_tree(content)
+    if tree is None:
+        return set(), set()
+    funcs: set[str] = set()
     types: set[str] = set()
-    types.update(m.group(1) for m in _RUST_STRUCT_RE.finditer(content))
-    types.update(m.group(1) for m in _RUST_ENUM_RE.finditer(content))
-    types.update(m.group(1) for m in _RUST_TRAIT_RE.finditer(content))
-    types.update(m.group(1) for m in _RUST_TYPE_ALIAS_RE.finditer(content))
-
-    for m in _RUST_IMPL_RE.finditer(content):
-        if m.group(1):
-            types.add(m.group(1))
-
+    for node in tree.root_node.children:
+        ntype = node.type
+        if ntype == "function_item":
+            for child in node.children:
+                if child.type == "identifier":
+                    funcs.add(child.text.decode())
+                    break
+        elif ntype in ("struct_item", "enum_item", "trait_item", "type_item"):
+            for child in node.children:
+                if child.type == "type_identifier":
+                    types.add(child.text.decode())
+                    break
+        elif ntype == "impl_item":
+            for child in node.children:
+                if child.type == "type_identifier":
+                    types.add(child.text.decode())
+                    break
     return funcs, types
 
 
