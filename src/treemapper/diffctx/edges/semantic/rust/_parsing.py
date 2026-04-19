@@ -236,9 +236,20 @@ def extract_trait_impls(content: str) -> list[tuple[str, str]]:
         has_for = any(c.type == "for" for c in node.children)
         if not has_for:
             continue
-        type_ids = [c for c in node.children if c.type == "type_identifier"]
-        if len(type_ids) >= 2:
-            result.append((type_ids[0].text.decode(), type_ids[1].text.decode()))
+        trait_name = None
+        impl_type = None
+        before_for = True
+        for child in node.children:
+            if child.type == "for":
+                before_for = False
+            elif child.type in ("type_identifier", "generic_type"):
+                name = _type_name_from_node(child)
+                if name and before_for:
+                    trait_name = name
+                elif name:
+                    impl_type = name
+        if trait_name and impl_type:
+            result.append((trait_name, impl_type))
     return result
 
 
@@ -263,6 +274,32 @@ def extract_pub_uses(content: str) -> list[str]:
     return result
 
 
+def _type_name_from_node(node: Node) -> str | None:
+    if node.type == "type_identifier":
+        return str(node.text.decode())
+    if node.type == "generic_type":
+        for child in node.children:
+            if child.type == "type_identifier":
+                return str(child.text.decode())
+    return None
+
+
+def _extract_impl_target_type(impl_node: Node) -> str | None:
+    has_for = any(c.type == "for" for c in impl_node.children)
+    if has_for:
+        after_for = False
+        for child in impl_node.children:
+            if child.type == "for":
+                after_for = True
+            elif after_for and child.type in ("type_identifier", "generic_type"):
+                return _type_name_from_node(child)
+    else:
+        for child in impl_node.children:
+            if child.type in ("type_identifier", "generic_type"):
+                return _type_name_from_node(child)
+    return None
+
+
 def extract_definitions(content: str) -> tuple[set[str], set[str]]:
     tree = _parse_tree(content)
     if tree is None:
@@ -282,10 +319,9 @@ def extract_definitions(content: str) -> tuple[set[str], set[str]]:
                     types.add(child.text.decode())
                     break
         elif ntype == "impl_item":
-            for child in node.children:
-                if child.type == "type_identifier":
-                    types.add(child.text.decode())
-                    break
+            impl_type = _extract_impl_target_type(node)
+            if impl_type:
+                types.add(impl_type)
     return funcs, types
 
 
