@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,8 @@ from tree_sitter import Language, Node, Parser
 from ..languages import TREE_SITTER_LANGUAGES
 from ..types import Fragment, FragmentId, extract_identifiers
 from .base import MIN_FRAGMENT_LINES, create_code_gap_fragments, create_snippet
+
+logger = logging.getLogger(__name__)
 
 _SUB_FRAGMENT_THRESHOLD_LINES = 30
 _SUB_FRAGMENT_TARGET_LINES = 20
@@ -116,6 +119,29 @@ _CONTAINER_KINDS = frozenset({"class", "interface", "struct", "impl"})
 
 _MAX_RECURSION_DEPTH = 500
 
+_CONTAINER_SEARCH_MAX_DEPTH = 3
+
+
+def _node_start_line(node: Node) -> int:
+    return int(node.start_point[0]) + 1
+
+
+def _node_end_line(node: Node) -> int:
+    return int(node.end_point[0]) + 1
+
+
+def _adjust_start_for_ancestor(node: Node, start: int) -> int:
+    ancestor = node.parent
+    if ancestor is not None and ancestor.type not in ("export_statement", "decorated_definition"):
+        if ancestor.parent is not None and ancestor.parent.type in ("export_statement", "decorated_definition"):
+            ancestor = ancestor.parent
+    if ancestor is not None and ancestor.type in ("export_statement", "decorated_definition"):
+        ancestor_start = _node_start_line(ancestor)
+        if ancestor_start < start:
+            return ancestor_start
+    return start
+
+
 _LANG_MODULES = {
     "python": "tree_sitter_python",
     "javascript": "tree_sitter_javascript",
@@ -149,6 +175,7 @@ def _import_lang_module(lang: str) -> Any | None:
     try:
         return importlib.import_module(module_name)
     except ImportError:
+        logger.debug("tree-sitter grammar module not available for %s", lang)
         return None
 
 
@@ -250,8 +277,8 @@ class TreeSitterStrategy:
         added_ends: set[tuple[str, int]],
         depth: int,
     ) -> None:
-        start = node.start_point[0] + 1
-        end = node.end_point[0] + 1
+        start = _node_start_line(node)
+        end = _node_end_line(node)
         kind = self._node_type_to_kind(node.type, node)
 
         if (kind, end) in added_ends:
@@ -260,14 +287,7 @@ class TreeSitterStrategy:
 
         sym_name = self._extract_symbol_name(node)
 
-        ancestor = node.parent
-        if ancestor is not None and ancestor.type not in ("export_statement", "decorated_definition"):
-            if ancestor.parent is not None and ancestor.parent.type in ("export_statement", "decorated_definition"):
-                ancestor = ancestor.parent
-        if ancestor is not None and ancestor.type in ("export_statement", "decorated_definition"):
-            ancestor_start = ancestor.start_point[0] + 1
-            if ancestor_start < start:
-                start = ancestor_start
+        start = _adjust_start_for_ancestor(node, start)
 
         if kind in _CONTAINER_KINDS and self._try_container_split(
             node, code_bytes, path, lines, definition_types, fragments, covered, added_ends, depth, start, end, kind, sym_name
@@ -401,12 +421,12 @@ class TreeSitterStrategy:
         if len(children) < 2:
             return
 
-        chunk_start_line = children[0].start_point[0] + 1
-        chunk_end_line = children[0].end_point[0] + 1
+        chunk_start_line = _node_start_line(children[0])
+        chunk_end_line = _node_end_line(children[0])
 
         for child in children[1:]:
-            child_start = child.start_point[0] + 1
-            child_end = child.end_point[0] + 1
+            child_start = _node_start_line(child)
+            child_end = _node_end_line(child)
             if child_end - chunk_start_line + 1 > _SUB_FRAGMENT_TARGET_LINES:
                 TreeSitterStrategy._emit_chunk(path, lines, chunk_start_line, chunk_end_line, parent_symbol, fragments, covered)
                 chunk_start_line = child_start
@@ -432,11 +452,11 @@ class TreeSitterStrategy:
             self._extract_definitions(child, code_bytes, path, lines, definition_types, fragments, covered, added_ends, depth + 1)
 
     def _first_child_def_line(self, node: Node, definition_types: set[str], depth: int = 0) -> int | None:
-        if depth > 3:
+        if depth > _CONTAINER_SEARCH_MAX_DEPTH:
             return None
         for child in node.children:
             if child.type in definition_types:
-                return int(child.start_point[0]) + 1
+                return _node_start_line(child)
             result = self._first_child_def_line(child, definition_types, depth + 1)
             if result is not None:
                 return result

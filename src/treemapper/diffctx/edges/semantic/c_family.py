@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -7,6 +8,8 @@ from pathlib import Path
 from ...config.weights import EDGE_WEIGHTS
 from ...types import Fragment, FragmentId
 from ..base import EdgeBuilder, EdgeDict
+
+logger = logging.getLogger(__name__)
 
 _C_EXTENSIONS = {".c", ".h"}
 _CPP_EXTENSIONS = {".cpp", ".hpp", ".cc", ".cxx", ".hxx", ".c++", ".h++", ".hh", ".ipp", ".tpp"}
@@ -44,6 +47,10 @@ _INHERITANCE_RE = re.compile(
 _FORWARD_DECL_RE = re.compile(r"^\s*(?:class|struct)\s+(\w+)\s*;", re.MULTILINE)
 
 _FRIEND_DECL_RE = re.compile(r"\bfriend\s+(?:class|struct)\s+(\w+)", re.MULTILINE)
+
+_HEADER_EXTENSIONS = frozenset({".h", ".hpp", ".hh", ".hxx", ".h++"})
+_IMPL_EXTENSIONS = frozenset({".c", ".cpp", ".cc", ".cxx", ".c++", ".m", ".mm"})
+_MIN_IDENTIFIER_LENGTH = 2
 
 _DISCOVERY_MAX_DEPTH = 2
 
@@ -190,14 +197,14 @@ def _extract_references(content: str, own_defs: set[str]) -> tuple[set[str], set
         name = match.group(1)
         if name in _C_KEYWORDS:
             continue
-        if name not in own_defs and not name.startswith("_") and len(name) > 2:
+        if name not in own_defs and not name.startswith("_") and len(name) > _MIN_IDENTIFIER_LENGTH:
             calls.add(name)
 
     for match in _TYPE_REF_RE.finditer(content):
         name = match.group(1)
         if name in _C_COMMON_MACROS:
             continue
-        if name not in own_defs and len(name) > 2:
+        if name not in own_defs and len(name) > _MIN_IDENTIFIER_LENGTH:
             type_refs.add(name)
 
     return calls, type_refs
@@ -273,6 +280,7 @@ class CFamilyEdgeBuilder(EdgeBuilder):
                     if "/" in inc:
                         included.add(inc.split("/")[-1])
             except (OSError, UnicodeDecodeError):
+                logger.debug("skipping unreadable file: %s", f)
                 continue
         return included
 
@@ -314,6 +322,7 @@ class CFamilyEdgeBuilder(EdgeBuilder):
                     return True
             return False
         except (OSError, UnicodeDecodeError):
+            logger.debug("skipping unreadable file: %s", candidate)
             return False
 
     def build(self, fragments: list[Fragment], repo_root: Path | None = None) -> EdgeDict:
@@ -435,8 +444,8 @@ class CFamilyEdgeBuilder(EdgeBuilder):
             if len(group) < 2:
                 continue
 
-            headers = [f for f in group if f.path.suffix.lower() in {".h", ".hpp", ".hh", ".hxx", ".h++"}]
-            impls = [f for f in group if f.path.suffix.lower() in {".c", ".cpp", ".cc", ".cxx", ".c++", ".m", ".mm"}]
+            headers = [f for f in group if f.path.suffix.lower() in _HEADER_EXTENSIONS]
+            impls = [f for f in group if f.path.suffix.lower() in _IMPL_EXTENSIONS]
 
             for h in headers:
                 for impl in impls:

@@ -32,6 +32,29 @@ from ._builtins import (
 if TYPE_CHECKING:
     from ..graph import Graph
 
+_MIN_SYMBOL_LENGTH = 3
+_BACKGROUND_MIN_IDENT_LENGTH = 5
+
+_DEFINES_SCOPE_MATCH = 1.0
+_DEFINES_NO_SCOPE = 0.5
+_DEFINES_OTHER_SCOPE = 0.3
+_IMPACT_SCOPE_MATCH = 0.15
+_IMPACT_MENTIONS = 0.8
+_SIGNATURE_DEFINES = 0.7
+_TEST_MENTIONS = 0.6
+_MENTIONS_FALLBACK = 0.3
+
+_DEFINITION_PRIORITY = 0.9
+_CALL_DEFINITION_PRIORITY = 1.0
+_SIGNATURE_PRIORITY = 0.7
+_IMPACT_PRIORITY = 0.8
+_INVARIANT_PRIORITY = 0.85
+_TEST_PRIORITY = 0.6
+_CLOSURE_PRIORITY = 0.5
+_BACKGROUND_PRIORITY = 0.2
+_CONCEPT_BACKGROUND_PRIORITY = 0.3
+_FALLBACK_PRIORITY = 0.5
+
 
 @dataclass(frozen=True)
 class InformationNeed:
@@ -70,8 +93,8 @@ def _is_local_import(source: str) -> bool:
 
 def _add_needs_for_syms(syms: set[str], needs: dict[tuple[str, str], InformationNeed]) -> None:
     for sym in syms:
-        if len(sym) >= 3 and sym not in CODE_STOPWORDS:
-            needs.setdefault(("definition", sym), InformationNeed("definition", sym, None, 0.9))
+        if len(sym) >= _MIN_SYMBOL_LENGTH and sym not in CODE_STOPWORDS:
+            needs.setdefault(("definition", sym), InformationNeed("definition", sym, None, _DEFINITION_PRIORITY))
 
 
 def _collect_js_import_needs(line: str, needs: dict[tuple[str, str], InformationNeed]) -> None:
@@ -111,8 +134,8 @@ def _is_comment_line(line: str) -> bool:
 
 def _defines_strength(scope_match: bool, has_scope: bool) -> float:
     if scope_match:
-        return 1.0
-    return 0.5 if not has_scope else 0.3
+        return _DEFINES_SCOPE_MATCH
+    return _DEFINES_NO_SCOPE if not has_scope else _DEFINES_OTHER_SCOPE
 
 
 def _is_test_fragment(frag: Fragment) -> bool:
@@ -130,16 +153,16 @@ def _match_strength_typed(frag: Fragment, need: InformationNeed) -> float:
     nt = need.need_type
 
     if nt == "impact" and scope_match:
-        return 0.15
+        return _IMPACT_SCOPE_MATCH
     if defines and "_signature" not in frag.kind:
         return _defines_strength(scope_match, need.scope is not None)
     if nt == "impact" and mentions and not defines:
-        return 0.8
+        return _IMPACT_MENTIONS
     if defines and ("_signature" in frag.kind or nt == "signature"):
-        return 0.7
+        return _SIGNATURE_DEFINES
     if nt == "test" and mentions and _is_test_fragment(frag):
-        return 0.6
-    return 0.3 if mentions else 0.0
+        return _TEST_MENTIONS
+    return _MENTIONS_FALLBACK if mentions else 0.0
 
 
 def _extract_changed_lines(diff_text: str) -> list[str]:
@@ -167,7 +190,7 @@ def concepts_from_diff_text(
         profile=profile,
         skip_stopwords=True,
         extra_stopwords=_EXPANSION_STOPWORDS | _LANGUAGE_BUILTINS,
-        min_length=3,
+        min_length=_MIN_SYMBOL_LENGTH,
     )
 
 
@@ -231,7 +254,7 @@ def _infer_core_symbol(frag: Fragment) -> str | None:
         return frag.symbol_name.lower()
     if frag.path.suffix.lower() in _ONE_CLASS_PER_FILE_SUFFIXES:
         stem = frag.path.stem
-        if len(stem) >= 3:
+        if len(stem) >= _MIN_SYMBOL_LENGTH:
             return stem.lower()
     return None
 
@@ -256,7 +279,7 @@ def _collect_core_needs(
         core_symbol_names.add(sym)
         key = ("impact", sym)
         if key not in needs:
-            needs[key] = InformationNeed("impact", sym, frag.path, 0.8)
+            needs[key] = InformationNeed("impact", sym, frag.path, _IMPACT_PRIORITY)
     return core_symbol_names
 
 
@@ -268,17 +291,17 @@ def _process_line_for_needs(
     for m in _CALL_RE.finditer(line):
         name = m.group(1)
         low = name.lower()
-        if len(name) < 3 or low in CODE_STOPWORDS or low in _LANGUAGE_BUILTINS:
+        if len(name) < _MIN_SYMBOL_LENGTH or low in CODE_STOPWORDS or low in _LANGUAGE_BUILTINS:
             continue
         if low in external_syms:
             continue
-        needs.setdefault(("definition", low), InformationNeed("definition", low, None, 1.0))
+        needs.setdefault(("definition", low), InformationNeed("definition", low, None, _CALL_DEFINITION_PRIORITY))
     for m in _TYPE_REF_RE.finditer(line):
         sym = m.group(1).lower()
-        needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, 0.7))
+        needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, _SIGNATURE_PRIORITY))
     for m in _GENERIC_TYPE_RE.finditer(line):
         sym = m.group(1).lower()
-        needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, 0.7))
+        needs.setdefault(("signature", sym), InformationNeed("signature", sym, None, _SIGNATURE_PRIORITY))
 
 
 def _collect_diff_line_needs(
@@ -306,7 +329,7 @@ def _collect_test_needs(
         if tested and (tested in core_symbol_names or ("definition", tested) in needs):
             key = ("test", tested)
             if key not in needs:
-                needs[key] = InformationNeed("test", tested, None, 0.6)
+                needs[key] = InformationNeed("test", tested, None, _TEST_PRIORITY)
 
 
 def _collect_invariant_needs(
@@ -319,8 +342,8 @@ def _collect_invariant_needs(
     for line in changed_lines:
         for m in _INVARIANT_RE.finditer(line):
             sym = m.group(1).lower()
-            if len(sym) >= 3 and sym not in CODE_STOPWORDS:
-                needs.setdefault(("invariant", sym), InformationNeed("invariant", sym, None, 0.85))
+            if len(sym) >= _MIN_SYMBOL_LENGTH and sym not in CODE_STOPWORDS:
+                needs.setdefault(("invariant", sym), InformationNeed("invariant", sym, None, _INVARIANT_PRIORITY))
 
 
 def _is_terraform_diff(all_fragments: list[Fragment], core_ids: set[FragmentId]) -> bool:
@@ -342,10 +365,10 @@ def _collect_config_context_needs(
         if frag.id not in core_ids:
             continue
         for ident in frag.identifiers:
-            if len(ident) >= 5 and ident not in covered:
+            if len(ident) >= _BACKGROUND_MIN_IDENT_LENGTH and ident not in covered:
                 key = ("background", ident)
                 if key not in needs:
-                    needs[key] = InformationNeed("background", ident, None, 0.2)
+                    needs[key] = InformationNeed("background", ident, None, _BACKGROUND_PRIORITY)
 
 
 def _collect_terraform_needs(
@@ -358,14 +381,14 @@ def _collect_terraform_needs(
     for line in changed_lines:
         for m in _TF_VAR_NEED_RE.finditer(line):
             sym = m.group(1).lower()
-            if len(sym) >= 3 and sym not in CODE_STOPWORDS:
-                needs.setdefault(("definition", sym), InformationNeed("definition", sym, None, 1.0))
+            if len(sym) >= _MIN_SYMBOL_LENGTH and sym not in CODE_STOPWORDS:
+                needs.setdefault(("definition", sym), InformationNeed("definition", sym, None, _CALL_DEFINITION_PRIORITY))
         for m in _TF_RES_REF_NEED_RE.finditer(line):
             ref_type, ref_name = m.group(1).lower(), m.group(2).lower()
             if ref_type in _TF_SKIP_REF_TYPES:
                 continue
             full_ref = f"{ref_type}.{ref_name}"
-            needs.setdefault(("definition", full_ref), InformationNeed("definition", full_ref, None, 0.9))
+            needs.setdefault(("definition", full_ref), InformationNeed("definition", full_ref, None, _DEFINITION_PRIORITY))
 
 
 def needs_from_diff(
@@ -393,17 +416,17 @@ def needs_from_diff(
     for sym in closure - base_symbols:
         key = ("definition", sym)
         if key not in needs:
-            needs[key] = InformationNeed("definition", sym, None, 0.5)
+            needs[key] = InformationNeed("definition", sym, None, _CLOSURE_PRIORITY)
 
     if not needs:
         fallback = concepts_from_diff_text(diff_text, changed_lines=changed_lines)
-        return tuple(InformationNeed("definition", c, None, 0.5) for c in fallback)
+        return tuple(InformationNeed("definition", c, None, _FALLBACK_PRIORITY) for c in fallback)
 
     covered_symbols = {n.symbol for n in needs.values()}
     for c in concepts_from_diff_text(diff_text, changed_lines=changed_lines):
         if c not in covered_symbols:
             key = ("background", c)
             if key not in needs:
-                needs[key] = InformationNeed("background", c, None, 0.3)
+                needs[key] = InformationNeed("background", c, None, _CONCEPT_BACKGROUND_PRIORITY)
 
     return tuple(needs.values())
