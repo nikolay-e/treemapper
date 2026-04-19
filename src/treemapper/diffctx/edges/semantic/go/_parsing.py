@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
-_GO_IMPORT_SINGLE_RE = re.compile(r'^\s*import\s+(?:[\w.]+\s+)?"([^"]+)"', re.MULTILINE)
-_GO_IMPORT_BLOCK_RE = re.compile(r"import\s*\((.*?)\)", re.DOTALL)
-_GO_IMPORT_LINE_RE = re.compile(r'^\s*(?:(?:\w+|\.)\s+)?"([^"]+)"', re.MULTILINE)
+import tree_sitter_go
+from tree_sitter import Language, Node, Parser, Tree
 
-_GO_FUNC_RE = re.compile(r"^func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(", re.MULTILINE)
-_GO_TYPE_RE = re.compile(r"^type\s+(\w+)\s+", re.MULTILINE)
+logger = logging.getLogger(__name__)
+
+_LANG = Language(tree_sitter_go.language())
 
 _GO_FUNC_CALL_RE = re.compile(r"\b([a-zA-Z_]\w*)\s*\(")
 _GO_KEYWORDS = frozenset(
@@ -65,29 +66,75 @@ _GO_COMMON_TYPES = frozenset(
 )
 _GO_PKG_CALL_RE = re.compile(r"\b(\w+)\.([A-Z]\w*)")
 _GO_EMBED_RE = re.compile(r"//go:embed\s+(\S+)", re.MULTILINE)
-_GO_PKG_DECL_RE = re.compile(r"^package\s+(\w+)", re.MULTILINE)
-_GO_STRUCT_BODY_RE = re.compile(r"type\s+(\w+)\s+struct\s*\{([^}]*)\}", re.DOTALL)
-_GO_EMBED_LINE_RE = re.compile(r"^\s*\*?([A-Z]\w*)\s*$", re.MULTILINE)
-_GO_INIT_FUNC_RE = re.compile(r"^func\s+init\s*\(\s*\)", re.MULTILINE)
+
+
+def _get_parser() -> Parser:
+    return Parser(_LANG)
+
+
+def _parse_tree(content: str) -> Tree | None:
+    try:
+        return _get_parser().parse(content.encode("utf-8"))
+    except Exception:
+        logger.debug("tree-sitter failed to parse Go content")
+        return None
 
 
 def _extract_imports(content: str) -> set[str]:
+    tree = _parse_tree(content)
+    if tree is None:
+        return set()
     imports: set[str] = set()
-
-    for match in _GO_IMPORT_SINGLE_RE.finditer(content):
-        imports.add(match.group(1))
-
-    for block_match in _GO_IMPORT_BLOCK_RE.finditer(content):
-        block = block_match.group(1)
-        for line_match in _GO_IMPORT_LINE_RE.finditer(block):
-            imports.add(line_match.group(1))
-
+    for node in tree.root_node.children:
+        if node.type != "import_declaration":
+            continue
+        _collect_import_paths(node, imports)
     return imports
 
 
+def _collect_import_paths(node: Node, imports: set[str]) -> None:
+    for child in node.children:
+        if child.type == "import_spec_list":
+            for spec in child.children:
+                if spec.type == "import_spec":
+                    _add_import_from_spec(spec, imports)
+        elif child.type == "import_spec":
+            _add_import_from_spec(child, imports)
+        elif child.type == "interpreted_string_literal":
+            imports.add(child.text.decode().strip('"'))
+
+
+def _add_import_from_spec(spec: Node, imports: set[str]) -> None:
+    for child in spec.children:
+        if child.type == "interpreted_string_literal":
+            imports.add(child.text.decode().strip('"'))
+            return
+
+
 def _extract_definitions(content: str) -> tuple[set[str], set[str]]:
-    funcs = {m.group(1) for m in _GO_FUNC_RE.finditer(content)}
-    types = {m.group(1) for m in _GO_TYPE_RE.finditer(content)}
+    tree = _parse_tree(content)
+    if tree is None:
+        return set(), set()
+    funcs: set[str] = set()
+    types: set[str] = set()
+    for node in tree.root_node.children:
+        if node.type == "function_declaration":
+            for child in node.children:
+                if child.type == "identifier":
+                    funcs.add(child.text.decode())
+                    break
+        elif node.type == "method_declaration":
+            for child in node.children:
+                if child.type == "field_identifier":
+                    funcs.add(child.text.decode())
+                    break
+        elif node.type == "type_declaration":
+            for spec in node.children:
+                if spec.type == "type_spec":
+                    for child in spec.children:
+                        if child.type == "type_identifier":
+                            types.add(child.text.decode())
+                            break
     return funcs, types
 
 
@@ -101,18 +148,62 @@ def _extract_references(content: str) -> tuple[set[str], set[str], set[tuple[str
 
 
 def _extract_embedded_types(content: str) -> dict[str, set[str]]:
+    tree = _parse_tree(content)
+    if tree is None:
+        return {}
     result: dict[str, set[str]] = {}
-    for match in _GO_STRUCT_BODY_RE.finditer(content):
-        struct_name = match.group(1)
-        body = match.group(2)
-        embeds = {m.group(1) for m in _GO_EMBED_LINE_RE.finditer(body)}
-        if embeds:
-            result[struct_name] = embeds
+    for node in tree.root_node.children:
+        if node.type != "type_declaration":
+            continue
+        for spec in node.children:
+            if spec.type != "type_spec":
+                continue
+            name_node = _find_child_by_type(spec, "type_identifier")
+            struct_node = _find_child_by_type(spec, "struct_type")
+            if name_node is None or struct_node is None:
+                continue
+            embeds = _collect_struct_embeds(struct_node)
+            if embeds:
+                result[name_node.text.decode()] = embeds
     return result
 
 
+def _find_child_by_type(node: Node, child_type: str) -> Node | None:
+    for child in node.children:
+        if child.type == child_type:
+            return child
+    return None
+
+
+def _collect_struct_embeds(struct_node: Node) -> set[str]:
+    embeds: set[str] = set()
+    field_list = struct_node.child_by_field_name("field_list") or struct_node
+    for field in field_list.children:
+        if field.type != "field_declaration":
+            continue
+        has_field_name = any(c.type == "field_identifier" for c in field.children)
+        if has_field_name:
+            continue
+        for child in field.children:
+            if child.type == "type_identifier" and child.text.decode()[0].isupper():
+                embeds.add(child.text.decode())
+            elif child.type == "pointer_type":
+                inner = _find_child_by_type(child, "type_identifier")
+                if inner and inner.text.decode()[0].isupper():
+                    embeds.add(inner.text.decode())
+    return embeds
+
+
 def _has_init_func(content: str) -> bool:
-    return _GO_INIT_FUNC_RE.search(content) is not None
+    tree = _parse_tree(content)
+    if tree is None:
+        return False
+    for node in tree.root_node.children:
+        if node.type == "function_declaration":
+            for child in node.children:
+                if child.type == "identifier" and child.text.decode() == "init":
+                    return True
+    return False
 
 
 def _is_go_file(path: Path) -> bool:
@@ -120,9 +211,13 @@ def _is_go_file(path: Path) -> bool:
 
 
 def _get_package_name_from_content(content: str, path: Path) -> str:
-    match = _GO_PKG_DECL_RE.search(content)
-    if match:
-        return match.group(1)
+    tree = _parse_tree(content)
+    if tree is not None:
+        for node in tree.root_node.children:
+            if node.type == "package_clause":
+                for child in node.children:
+                    if child.type == "package_identifier":
+                        return str(child.text.decode())
     return path.parent.name
 
 
