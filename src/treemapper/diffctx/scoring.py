@@ -281,6 +281,10 @@ class PPRScoring(ScoringStrategy):
                 )
 
 
+_EGO_IDENT_OVERLAP_EPSILON = 0.1
+_EGO_IDENT_OVERLAP_CAP = 10
+
+
 class EgoGraphScoring(ScoringStrategy):
     def __init__(self, max_depth: int = 2) -> None:
         self.max_depth = max_depth
@@ -300,6 +304,16 @@ class EgoGraphScoring(ScoringStrategy):
 
         graph = build_graph(all_fragments, repo_root=repo_root)
         rel_scores = graph.ego_graph(core_ids, radius=self.max_depth)
+
+        diff_idents = frozenset().union(*(f.identifiers for f in all_fragments if f.id in core_ids))
+        if diff_idents:
+            for frag in all_fragments:
+                if frag.id in core_ids or frag.id not in rel_scores:
+                    continue
+                overlap = len(frag.identifiers & diff_idents)
+                if overlap > 0:
+                    bonus = _EGO_IDENT_OVERLAP_EPSILON * min(overlap, _EGO_IDENT_OVERLAP_CAP) / _EGO_IDENT_OVERLAP_CAP
+                    rel_scores[frag.id] += bonus
 
         filtered = _filter_unrelated_fragments(all_fragments, core_ids, graph)
         filtered = [f for f in filtered if f.id in core_ids or rel_scores.get(f.id, 0.0) > 0]
