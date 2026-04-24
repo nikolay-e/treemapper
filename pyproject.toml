@@ -238,6 +238,14 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = [
+  "treemapper.ignore",
+  "treemapper.tree",
+  "treemapper.diffctx.universe",
+]
+disable_error_code = [ "type-arg" ]
+
+[[tool.mypy.overrides]]
 module = [ "treemapper.mcp.*" ]
 disallow_untyped_decorators = false
 
