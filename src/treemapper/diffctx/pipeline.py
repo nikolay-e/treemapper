@@ -3,8 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from _diffctx import build_diff_context as _rust_build
-
 
 class DiffContextTimeoutError(Exception):
     pass
@@ -27,6 +25,8 @@ def build_diff_context(
     scoring_mode: str = "hybrid",
     timeout: int = _PIPELINE_TIMEOUT,
 ) -> dict[str, Any]:
+    from _diffctx import build_diff_context as _rust_build  # type: ignore[import-not-found]
+
     return _rust_build(  # type: ignore[no-any-return]
         str(root_dir),
         diff_range,
