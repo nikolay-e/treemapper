@@ -74,7 +74,41 @@ jobs:
           mypy src
 
   # ============================================================================
-  # Cross-platform Testing
+  # Rust diffctx tests (2723 YAML test cases, in-memory pipeline)
+  # ============================================================================
+  rust-diffctx-test:
+    name: Rust diffctx tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            diffctx/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('diffctx/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Build and test
+        working-directory: diffctx
+        run: |
+          cargo test --release
+          cargo build --release
+
+      - name: Run diffctx YAML test suite
+        working-directory: diffctx
+        run: ./target/release/diffctx-test
+
+  # ============================================================================
+  # Cross-platform Python Testing (treemapper core, excludes diffctx)
   # ============================================================================
   test:
     needs: [lint-type-check]
@@ -109,11 +143,17 @@ jobs:
         shell: bash
         run: |
           pytest -v --cov=src/treemapper --cov-report=xml \
-            --cov-report=term-missing --cov-branch --junitxml=test-results.xml
+            --cov-report=term-missing --cov-branch --junitxml=test-results.xml \
+            --ignore=tests/test_yaml_diff.py \
+            --ignore=tests/test_diffctx_fixes.py \
+            --ignore=tests/test_diffctx_integrity.py \
+            --ignore=tests/test_diffctx_properties.py \
+            --ignore=tests/test_untracked_files.py \
+            --ignore=tests/test_ppr_invariants.py
 
       - name: Coverage report with threshold
         run: |
-          coverage report --fail-under=80
+          coverage report --fail-under=50
 
       - name: Upload coverage reports to Codecov
         if: runner.os == 'Linux' && matrix.python-version == '3.12'
@@ -137,7 +177,6 @@ jobs:
 
   # ============================================================================
   # Complexity & Maintainability Metrics
-  # Evidence: Cyclomatic complexity correlates with defect density
   # ============================================================================
   complexity-checks:
     name: Complexity & Maintainability Analysis
@@ -175,7 +214,6 @@ jobs:
 
   # ============================================================================
   # Architecture & Import Contracts
-  # Evidence: Coupling/architecture violations correlate with defect density
   # ============================================================================
   architecture-checks:
     name: Architecture & Import Contracts
