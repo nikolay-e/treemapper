@@ -13,7 +13,11 @@ fn is_allowed_file(path: &Path) -> bool {
     get_language_for_file(&path.to_string_lossy()).is_some()
 }
 
-fn is_candidate_file(file_path: &Path, _root_dir: &Path, included_set: &FxHashSet<PathBuf>) -> bool {
+fn is_candidate_file(
+    file_path: &Path,
+    _root_dir: &Path,
+    included_set: &FxHashSet<PathBuf>,
+) -> bool {
     if !file_path.is_file() {
         return false;
     }
@@ -31,15 +35,9 @@ fn is_candidate_file(file_path: &Path, _root_dir: &Path, included_set: &FxHashSe
     true
 }
 
-pub fn collect_candidate_files(
-    root_dir: &Path,
-    included_set: &FxHashSet<PathBuf>,
-) -> Vec<PathBuf> {
+pub fn collect_candidate_files(root_dir: &Path, included_set: &FxHashSet<PathBuf>) -> Vec<PathBuf> {
     if let Ok(parts) = git::run_git_z(root_dir, &["ls-files", "-z"]) {
-        let all_paths: Vec<PathBuf> = parts
-            .into_iter()
-            .map(|f| root_dir.join(f))
-            .collect();
+        let all_paths: Vec<PathBuf> = parts.into_iter().map(|f| root_dir.join(f)).collect();
         let files: Vec<PathBuf> = all_paths
             .into_par_iter()
             .filter(|f| is_candidate_file(f, root_dir, included_set))

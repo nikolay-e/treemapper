@@ -15,6 +15,11 @@ from ..base import EdgeBuilder, EdgeDict
 
 logger = logging.getLogger(__name__)
 
+
+def _node_text(node: Node) -> str:
+    return node.text.decode() if node.text else ""
+
+
 _C_LANG = Language(tree_sitter_c.language())
 _CPP_LANG = Language(tree_sitter_cpp.language())
 
@@ -140,9 +145,9 @@ def _find_child_by_type(node: Node, child_type: str) -> Node | None:
 def _extract_func_name_from_declarator(declarator: Node) -> tuple[str | None, str | None]:
     for child in declarator.children:
         if child.type == "identifier":
-            return child.text.decode(), None
+            return _node_text(child), None
         if child.type == "qualified_identifier":
-            parts = [c.text.decode() for c in child.children if c.type in ("identifier", "type_identifier")]
+            parts = [_node_text(c) for c in child.children if c.type in ("identifier", "type_identifier")]
             if len(parts) >= 2:
                 return parts[-1], parts[-2]
             if parts:
@@ -170,7 +175,7 @@ _TYPE_DEFINITION_NODES = frozenset(
 def _add_type_name(child: Node, types: set[str]) -> None:
     name_node = _find_child_by_type(child, "type_identifier")
     if name_node:
-        types.add(name_node.text.decode())
+        types.add(_node_text(name_node))
 
 
 def _add_func_definition(child: Node, functions: set[str], types: set[str]) -> None:
@@ -193,7 +198,7 @@ def _walk_definitions(node: Node, functions: set[str], types: set[str], namespac
         elif ntype == "namespace_definition":
             name_node = _find_child_by_type(child, "identifier")
             if name_node:
-                namespaces.add(name_node.text.decode())
+                namespaces.add(_node_text(name_node))
             body = child.child_by_field_name("body")
             if body:
                 _walk_definitions(body, functions, types, namespaces)
@@ -229,9 +234,9 @@ def _walk_inheritance(node: Node, results: list[tuple[str, set[str]]]) -> None:
             name_node = _find_child_by_type(child, "type_identifier")
             base_clause = _find_child_by_type(child, "base_class_clause")
             if name_node and base_clause:
-                bases = {c.text.decode() for c in base_clause.children if c.type == "type_identifier"}
+                bases = {_node_text(c) for c in base_clause.children if c.type == "type_identifier"}
                 if bases:
-                    results.append((name_node.text.decode(), bases))
+                    results.append((_node_text(name_node), bases))
         elif child.type == "namespace_definition":
             body = child.child_by_field_name("body")
             if body:
@@ -258,12 +263,12 @@ def _walk_forward_decls(node: Node, result: set[str]) -> None:
                     if inner.type in ("class_specifier", "struct_specifier"):
                         name_node = _find_child_by_type(inner, "type_identifier")
                         if name_node:
-                            result.add(name_node.text.decode())
+                            result.add(_node_text(name_node))
         elif child.type in ("class_specifier", "struct_specifier"):
             if not _find_child_by_type(child, "field_declaration_list"):
                 name_node = _find_child_by_type(child, "type_identifier")
                 if name_node:
-                    result.add(name_node.text.decode())
+                    result.add(_node_text(name_node))
         elif child.type == "namespace_definition":
             body = child.child_by_field_name("body")
             if body:
@@ -286,7 +291,7 @@ def _walk_friend_decls(node: Node, result: set[str]) -> None:
         if child.type == "friend_declaration":
             name_node = _find_child_by_type(child, "type_identifier")
             if name_node:
-                result.add(name_node.text.decode())
+                result.add(_node_text(name_node))
         elif hasattr(child, "children"):
             body = child.child_by_field_name("body") or child.child_by_field_name("field_declaration_list")
             if body:

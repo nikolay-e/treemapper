@@ -3,9 +3,9 @@ use std::sync::Arc;
 use rustc_hash::FxHashSet;
 use tree_sitter::{Language, Node, Parser};
 
-use crate::types::{extract_identifiers, Fragment, FragmentId, FragmentKind};
+use crate::types::{Fragment, FragmentId, FragmentKind, extract_identifiers};
 
-use super::{create_code_gap_fragments, create_snippet, FragmentationStrategy, MIN_FRAGMENT_LINES};
+use super::{FragmentationStrategy, MIN_FRAGMENT_LINES, create_code_gap_fragments, create_snippet};
 
 const SUB_FRAGMENT_THRESHOLD_LINES: u32 = 30;
 const SUB_FRAGMENT_TARGET_LINES: u32 = 20;
@@ -14,7 +14,12 @@ const MAX_RECURSION_DEPTH: u32 = 500;
 const CONTAINER_SEARCH_MAX_DEPTH: u32 = 3;
 
 const BODY_FIELD_NAMES: &[&str] = &["body", "block", "consequence"];
-const BODY_NODE_TYPES: &[&str] = &["block", "statement_block", "compound_statement", "function_body"];
+const BODY_NODE_TYPES: &[&str] = &[
+    "block",
+    "statement_block",
+    "compound_statement",
+    "function_body",
+];
 
 struct LangConfig {
     extension: &'static str,
@@ -26,17 +31,29 @@ const LANG_CONFIGS: &[LangConfig] = &[
     LangConfig {
         extension: ".py",
         ts_name: "python",
-        definition_types: &["function_definition", "class_definition", "decorated_definition"],
+        definition_types: &[
+            "function_definition",
+            "class_definition",
+            "decorated_definition",
+        ],
     },
     LangConfig {
         extension: ".pyw",
         ts_name: "python",
-        definition_types: &["function_definition", "class_definition", "decorated_definition"],
+        definition_types: &[
+            "function_definition",
+            "class_definition",
+            "decorated_definition",
+        ],
     },
     LangConfig {
         extension: ".pyi",
         ts_name: "python",
-        definition_types: &["function_definition", "class_definition", "decorated_definition"],
+        definition_types: &[
+            "function_definition",
+            "class_definition",
+            "decorated_definition",
+        ],
     },
     LangConfig {
         extension: ".js",
@@ -381,28 +398,59 @@ const LANG_CONFIGS: &[LangConfig] = &[
     LangConfig {
         extension: ".css",
         ts_name: "css",
-        definition_types: &["rule_set", "media_statement", "keyframes_statement", "import_statement"],
+        definition_types: &[
+            "rule_set",
+            "media_statement",
+            "keyframes_statement",
+            "import_statement",
+        ],
     },
     LangConfig {
         extension: ".scss",
         ts_name: "css",
-        definition_types: &["rule_set", "media_statement", "keyframes_statement", "import_statement"],
+        definition_types: &[
+            "rule_set",
+            "media_statement",
+            "keyframes_statement",
+            "import_statement",
+        ],
     },
     LangConfig {
         extension: ".less",
         ts_name: "css",
-        definition_types: &["rule_set", "media_statement", "keyframes_statement", "import_statement"],
+        definition_types: &[
+            "rule_set",
+            "media_statement",
+            "keyframes_statement",
+            "import_statement",
+        ],
     },
     // --- Haskell ---
     LangConfig {
         extension: ".hs",
         ts_name: "haskell",
-        definition_types: &["function", "type_alias", "newtype", "adt", "class", "instance", "signature"],
+        definition_types: &[
+            "function",
+            "type_alias",
+            "newtype",
+            "adt",
+            "class",
+            "instance",
+            "signature",
+        ],
     },
     LangConfig {
         extension: ".lhs",
         ts_name: "haskell",
-        definition_types: &["function", "type_alias", "newtype", "adt", "class", "instance", "signature"],
+        definition_types: &[
+            "function",
+            "type_alias",
+            "newtype",
+            "adt",
+            "class",
+            "instance",
+            "signature",
+        ],
     },
     // --- Elixir ---
     LangConfig {
@@ -419,7 +467,11 @@ const LANG_CONFIGS: &[LangConfig] = &[
     LangConfig {
         extension: ".lua",
         ts_name: "lua",
-        definition_types: &["function_declaration", "local_function", "function_definition_statement"],
+        definition_types: &[
+            "function_declaration",
+            "local_function",
+            "function_definition_statement",
+        ],
     },
     // --- R ---
     LangConfig {
@@ -431,12 +483,24 @@ const LANG_CONFIGS: &[LangConfig] = &[
     LangConfig {
         extension: ".ml",
         ts_name: "ocaml",
-        definition_types: &["let_binding", "type_definition", "module_definition", "module_type_definition", "value_definition"],
+        definition_types: &[
+            "let_binding",
+            "type_definition",
+            "module_definition",
+            "module_type_definition",
+            "value_definition",
+        ],
     },
     LangConfig {
         extension: ".mli",
         ts_name: "ocaml",
-        definition_types: &["let_binding", "type_definition", "module_definition", "module_type_definition", "value_definition"],
+        definition_types: &[
+            "let_binding",
+            "type_definition",
+            "module_definition",
+            "module_type_definition",
+            "value_definition",
+        ],
     },
     // --- Erlang ---
     LangConfig {
@@ -573,7 +637,13 @@ const LANG_CONFIGS: &[LangConfig] = &[
     LangConfig {
         extension: ".prisma",
         ts_name: "prisma",
-        definition_types: &["model_declaration", "enum_declaration", "type_declaration", "generator_declaration", "datasource_declaration"],
+        definition_types: &[
+            "model_declaration",
+            "enum_declaration",
+            "type_declaration",
+            "generator_declaration",
+            "datasource_declaration",
+        ],
     },
     // --- Svelte ---
     LangConfig {
@@ -771,32 +841,122 @@ const LANG_CONFIGS: &[LangConfig] = &[
 ];
 
 const NODE_TYPE_KEYWORDS: &[(&[&str], &str)] = &[
-    (&["function", "method", "subroutine", "FnDecl", "short_function"], "function"),
-    (&["class", "object_definition", "class_interface", "class_implementation", "category_interface", "category_implementation"], "class"),
+    (
+        &[
+            "function",
+            "method",
+            "subroutine",
+            "FnDecl",
+            "short_function",
+        ],
+        "function",
+    ),
+    (
+        &[
+            "class",
+            "object_definition",
+            "class_interface",
+            "class_implementation",
+            "category_interface",
+            "category_implementation",
+        ],
+        "class",
+    ),
     (&["struct", "struct_definition", "ContainerDecl"], "struct"),
     (&["impl"], "impl"),
-    (&["trait", "interface", "protocol", "protocol_declaration", "mixin"], "interface"),
+    (
+        &[
+            "trait",
+            "interface",
+            "protocol",
+            "protocol_declaration",
+            "mixin",
+        ],
+        "interface",
+    ),
     (&["enum", "adt", "newtype"], "enum"),
-    (&["module", "module_definition", "abstract_definition", "package"], "module"),
-    (&["type_alias", "alias_declaration", "type_definition", "type_declaration"], "type"),
-    (&["variable_declarator", "VarDecl", "let_binding", "binding", "left_assignment"], "variable"),
-    (&["record", "model_declaration", "datasource_declaration", "generator_declaration"], "record"),
+    (
+        &[
+            "module",
+            "module_definition",
+            "abstract_definition",
+            "package",
+        ],
+        "module",
+    ),
+    (
+        &[
+            "type_alias",
+            "alias_declaration",
+            "type_definition",
+            "type_declaration",
+        ],
+        "type",
+    ),
+    (
+        &[
+            "variable_declarator",
+            "VarDecl",
+            "let_binding",
+            "binding",
+            "left_assignment",
+        ],
+        "variable",
+    ),
+    (
+        &[
+            "record",
+            "model_declaration",
+            "datasource_declaration",
+            "generator_declaration",
+        ],
+        "record",
+    ),
     (&["property", "property_declaration"], "property"),
-    (&["declaration", "using_declaration", "attribute", "type_spec", "signature", "instance"], "declaration"),
+    (
+        &[
+            "declaration",
+            "using_declaration",
+            "attribute",
+            "type_spec",
+            "signature",
+            "instance",
+        ],
+        "declaration",
+    ),
     (&["rule_set", "rule"], "definition"),
     (&["block"], "definition"),
     (&["section", "subsection"], "definition"),
     (&["environment", "new_command_definition"], "definition"),
-    (&["element", "script_element", "style_element"], "definition"),
+    (
+        &["element", "script_element", "style_element"],
+        "definition",
+    ),
     (&["pair", "block_mapping_pair"], "definition"),
     (&["TestDecl"], "definition"),
     (&["closure"], "function"),
     (&["call", "list_lit"], "definition"),
     (&["extension_declaration"], "definition"),
-    (&["macro_definition", "macro_def", "function_def"], "function"),
+    (
+        &["macro_definition", "macro_def", "function_def"],
+        "function",
+    ),
     (&["if_condition", "foreach_loop"], "definition"),
-    (&["media_statement", "keyframes_statement", "import_statement"], "definition"),
-    (&["object_type_definition", "interface_type_definition", "enum_type_definition", "input_object_type_definition", "union_type_definition", "scalar_type_definition"], "type"),
+    (
+        &["media_statement", "keyframes_statement", "import_statement"],
+        "definition",
+    ),
+    (
+        &[
+            "object_type_definition",
+            "interface_type_definition",
+            "enum_type_definition",
+            "input_object_type_definition",
+            "union_type_definition",
+            "scalar_type_definition",
+        ],
+        "type",
+    ),
     (&["singleton_method"], "function"),
     (&["inherit"], "declaration"),
 ];
@@ -1116,11 +1276,7 @@ fn create_sub_fragments(
     );
 }
 
-fn first_child_def_line(
-    node: &Node,
-    definition_types: &[&str],
-    depth: u32,
-) -> Option<u32> {
+fn first_child_def_line(node: &Node, definition_types: &[&str], depth: u32) -> Option<u32> {
     if depth > CONTAINER_SEARCH_MAX_DEPTH {
         return None;
     }
@@ -1256,7 +1412,15 @@ fn handle_definition_node(
     }
 
     if end - start + 1 > SUB_FRAGMENT_THRESHOLD_LINES {
-        create_sub_fragments(node, path, lines, sym_name.as_deref(), fragments, covered, 0);
+        create_sub_fragments(
+            node,
+            path,
+            lines,
+            sym_name.as_deref(),
+            fragments,
+            covered,
+            0,
+        );
     }
 
     if node.kind() == "variable_declarator" && has_function_child(node) {

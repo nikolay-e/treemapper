@@ -6,16 +6,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::Fragment;
 
-use super::super::base::{self, EdgeBuilder, FragmentIndex, link_by_name};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, FragmentIndex, link_by_name};
 
 const FILE_REF_WEIGHT: f64 = 0.60;
 const REVERSE_FACTOR: f64 = 0.35;
 
 static MAKE_INCLUDE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^(?:-)?include\s+(.+)$").unwrap());
-static MAKE_RECIPE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\t(.+)$").unwrap());
+static MAKE_RECIPE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\t(.+)$").unwrap());
 
 static CMAKE_INCLUDE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"include\s*\(\s*([^)]+)\)").unwrap());
@@ -43,8 +42,7 @@ fn is_cmake(path: &Path) -> bool {
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    name == "CMakeLists.txt"
-        || name.to_lowercase().ends_with(".cmake")
+    name == "CMakeLists.txt" || name.to_lowercase().ends_with(".cmake")
 }
 
 fn is_build_file(path: &Path) -> bool {

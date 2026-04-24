@@ -111,10 +111,7 @@ impl FragmentIndex {
                         .push(f.id.clone());
                     let posix = rel_str.replace('\\', "/");
                     if posix != rel_str {
-                        by_path
-                            .entry(posix)
-                            .or_default()
-                            .push(f.id.clone());
+                        by_path.entry(posix).or_default().push(f.id.clone());
                     }
                 }
             }
@@ -144,7 +141,12 @@ pub fn add_edge(
     }
 }
 
-pub fn add_edge_unidirectional(edges: &mut EdgeDict, src: &FragmentId, dst: &FragmentId, weight: f64) {
+pub fn add_edge_unidirectional(
+    edges: &mut EdgeDict,
+    src: &FragmentId,
+    dst: &FragmentId,
+    weight: f64,
+) {
     let key = (src.clone(), dst.clone());
     let existing = edges.get(&key).copied().unwrap_or(0.0);
     if weight > existing {

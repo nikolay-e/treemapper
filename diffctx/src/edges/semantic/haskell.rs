@@ -7,8 +7,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, FragmentIndex, add_edge, discover_files_by_refs, link_by_name};
 use super::super::EdgeDict;
+use super::super::base::{
+    self, EdgeBuilder, FragmentIndex, add_edge, discover_files_by_refs, link_by_name,
+};
 
 static HASKELL_EXTENSIONS: Lazy<FxHashSet<&str>> =
     Lazy::new(|| [".hs", ".lhs"].iter().copied().collect());
@@ -28,23 +30,73 @@ static CLASS_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*class\s+(?:.*?=>\s*)?([A-Z]\w+)").unwrap());
 static INSTANCE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*instance\s+.*?\b([A-Z]\w+)\s+([A-Z]\w+)").unwrap());
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w+)\b").unwrap());
-static FUNC_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^([a-z_]\w*)\s*::").unwrap());
-static CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([a-z_]\w+)\b").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w+)\b").unwrap());
+static FUNC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^([a-z_]\w*)\s*::").unwrap());
+static CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([a-z_]\w+)\b").unwrap());
 
 static HASKELL_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "module", "where", "import", "qualified", "as", "hiding", "data", "newtype",
-        "type", "class", "instance", "deriving", "if", "then", "else", "case", "of",
-        "let", "in", "do", "return", "where", "forall", "foreign", "default",
-        "infixl", "infixr", "infix", "otherwise", "undefined", "error", "show",
-        "read", "map", "filter", "foldl", "foldr", "head", "tail", "null", "length",
-        "print", "putStrLn", "getLine", "main", "IO", "Maybe", "Just", "Nothing",
-        "Either", "Left", "Right", "True", "False", "Bool", "Int", "Integer",
-        "Float", "Double", "Char", "String",
+        "module",
+        "where",
+        "import",
+        "qualified",
+        "as",
+        "hiding",
+        "data",
+        "newtype",
+        "type",
+        "class",
+        "instance",
+        "deriving",
+        "if",
+        "then",
+        "else",
+        "case",
+        "of",
+        "let",
+        "in",
+        "do",
+        "return",
+        "where",
+        "forall",
+        "foreign",
+        "default",
+        "infixl",
+        "infixr",
+        "infix",
+        "otherwise",
+        "undefined",
+        "error",
+        "show",
+        "read",
+        "map",
+        "filter",
+        "foldl",
+        "foldr",
+        "head",
+        "tail",
+        "null",
+        "length",
+        "print",
+        "putStrLn",
+        "getLine",
+        "main",
+        "IO",
+        "Maybe",
+        "Just",
+        "Nothing",
+        "Either",
+        "Left",
+        "Right",
+        "True",
+        "False",
+        "Bool",
+        "Int",
+        "Integer",
+        "Float",
+        "Double",
+        "Char",
+        "String",
     ]
     .iter()
     .copied()
@@ -129,13 +181,19 @@ impl EdgeBuilder for HaskellEdgeBuilder {
         for f in &hs_frags {
             let defs = extract_defines(&f.content);
             for name in &defs {
-                name_to_defs.entry(name.clone()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
             frag_defines.insert(f.id.clone(), defs);
 
             let modules = extract_modules(&f.content);
             for m in &modules {
-                module_to_frags.entry(m.clone()).or_default().push(f.id.clone());
+                module_to_frags
+                    .entry(m.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
         }
 
@@ -162,7 +220,13 @@ impl EdgeBuilder for HaskellEdgeBuilder {
                     if let Some(dst_ids) = name_to_defs.get(name) {
                         for dst_id in dst_ids {
                             if dst_id != &f.id {
-                                add_edge(&mut edges, &f.id, dst_id, instance_weight, reverse_factor);
+                                add_edge(
+                                    &mut edges,
+                                    &f.id,
+                                    dst_id,
+                                    instance_weight,
+                                    reverse_factor,
+                                );
                             }
                         }
                     }

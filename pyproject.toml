@@ -232,6 +232,8 @@ module = [
   "mcp.server",
   "mcp.server.fastmcp",
   "anyio",
+  "_diffctx",
+  "pathspec",
 ]
 ignore_missing_imports = true
 

@@ -11,7 +11,7 @@ use crate::core::{compute_seed_weights, identify_core_fragments};
 use crate::edges;
 use crate::mode::{PipelineConfig, ScoringKind, ScoringMode};
 use crate::parsers::fragment_file;
-use crate::render::{build_diff_context_output, DiffContextOutput};
+use crate::render::{DiffContextOutput, build_diff_context_output};
 use crate::scoring::{EgoGraphScoring, PPRScoring, ScoringStrategy};
 use crate::signatures::generate_signature_variants;
 use crate::tokenizer::count_tokens;
@@ -41,7 +41,8 @@ pub fn build_diff_context_in_memory(
     let diff_text = compute_memory_diff_text(&repo.initial_files, &repo.changed_files);
     let all_files = merge_file_contents(&repo.initial_files, &repo.changed_files);
 
-    let changed_paths: FxHashSet<String> = hunks.iter().map(|h| h.path.as_ref().to_string()).collect();
+    let changed_paths: FxHashSet<String> =
+        hunks.iter().map(|h| h.path.as_ref().to_string()).collect();
 
     let changed_file_paths: Vec<PathBuf> = changed_paths.iter().map(PathBuf::from).collect();
     let all_file_paths: Vec<PathBuf> = all_files.keys().map(PathBuf::from).collect();
@@ -106,7 +107,10 @@ pub fn build_diff_context_in_memory(
 
     let strategy: Box<dyn ScoringStrategy> = match config.scoring {
         ScoringKind::Ego => Box::new(EgoGraphScoring::new(config.ego_depth)),
-        ScoringKind::Ppr => Box::new(PPRScoring::new(config.ppr_alpha, config.low_relevance_filter)),
+        ScoringKind::Ppr => Box::new(PPRScoring::new(
+            config.ppr_alpha,
+            config.low_relevance_filter,
+        )),
     };
 
     let scoring_result = strategy.score_and_filter(

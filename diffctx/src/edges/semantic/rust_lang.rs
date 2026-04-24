@@ -8,8 +8,8 @@ use crate::config::extensions::RUST_EXTENSIONS;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids};
 
 fn is_rust_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
@@ -27,28 +27,76 @@ static TYPE_DEF_RE: Lazy<Regex> = Lazy::new(|| {
 static FN_DEF_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([a-z_]\w*)").unwrap()
 });
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
-static FN_CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([a-z_]\w+)\s*[(<]").unwrap());
-static PATH_CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b(\w+)::(\w+)").unwrap());
-static IMPL_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^\s*impl(?:<[^>]*>)?\s+(\w+)\s+for\s+(\w+)").unwrap()
-});
-static PUB_USE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^\s*pub\s+use\s+([\w:]+)").unwrap()
-});
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
+static FN_CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([a-z_]\w+)\s*[(<]").unwrap());
+static PATH_CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b(\w+)::(\w+)").unwrap());
+static IMPL_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*impl(?:<[^>]*>)?\s+(\w+)\s+for\s+(\w+)").unwrap());
+static PUB_USE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*pub\s+use\s+([\w:]+)").unwrap());
 
 static RUST_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "if", "else", "for", "while", "loop", "match", "return", "break", "continue", "let",
-        "mut", "ref", "fn", "pub", "mod", "use", "struct", "enum", "trait", "impl", "type",
-        "where", "as", "in", "self", "super", "crate", "extern", "async", "await", "move",
-        "unsafe", "const", "static", "dyn", "box", "true", "false", "Some", "None", "Ok", "Err",
-        "vec", "println", "eprintln", "format", "write", "writeln", "panic", "assert",
-        "assert_eq", "assert_ne", "debug_assert", "todo", "unimplemented", "unreachable",
-        "cfg", "derive", "allow", "deny", "warn",
+        "if",
+        "else",
+        "for",
+        "while",
+        "loop",
+        "match",
+        "return",
+        "break",
+        "continue",
+        "let",
+        "mut",
+        "ref",
+        "fn",
+        "pub",
+        "mod",
+        "use",
+        "struct",
+        "enum",
+        "trait",
+        "impl",
+        "type",
+        "where",
+        "as",
+        "in",
+        "self",
+        "super",
+        "crate",
+        "extern",
+        "async",
+        "await",
+        "move",
+        "unsafe",
+        "const",
+        "static",
+        "dyn",
+        "box",
+        "true",
+        "false",
+        "Some",
+        "None",
+        "Ok",
+        "Err",
+        "vec",
+        "println",
+        "eprintln",
+        "format",
+        "write",
+        "writeln",
+        "panic",
+        "assert",
+        "assert_eq",
+        "assert_ne",
+        "debug_assert",
+        "todo",
+        "unimplemented",
+        "unreachable",
+        "cfg",
+        "derive",
+        "allow",
+        "deny",
+        "warn",
     ]
     .iter()
     .copied()
@@ -95,7 +143,13 @@ fn extract_pub_uses(content: &str) -> Vec<String> {
         .collect()
 }
 
-fn extract_references(content: &str) -> (FxHashSet<String>, FxHashSet<String>, FxHashSet<(String, String)>) {
+fn extract_references(
+    content: &str,
+) -> (
+    FxHashSet<String>,
+    FxHashSet<String>,
+    FxHashSet<(String, String)>,
+) {
     let type_refs: FxHashSet<String> = TYPE_REF_RE
         .captures_iter(content)
         .map(|c| c[1].to_string())
@@ -157,12 +211,21 @@ impl EdgeBuilder for RustEdgeBuilder {
 
         for f in &rust_frags {
             let path = Path::new(f.path());
-            let stem = path.file_stem().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
-            name_to_frags.entry(stem.clone()).or_default().push(f.id.clone());
+            let stem = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+            name_to_frags
+                .entry(stem.clone())
+                .or_default()
+                .push(f.id.clone());
 
             if stem == "mod" || stem == "lib" {
                 if let Some(parent_name) = path.parent().and_then(|p| p.file_name()) {
-                    mod_to_frags.entry(parent_name.to_string_lossy().to_lowercase()).or_default().push(f.id.clone());
+                    mod_to_frags
+                        .entry(parent_name.to_string_lossy().to_lowercase())
+                        .or_default()
+                        .push(f.id.clone());
                 }
             } else {
                 mod_to_frags.entry(stem).or_default().push(f.id.clone());
@@ -170,14 +233,23 @@ impl EdgeBuilder for RustEdgeBuilder {
 
             let (funcs, types) = extract_definitions(&f.content);
             for t in types {
-                type_defs.entry(t.to_lowercase()).or_default().push(f.id.clone());
+                type_defs
+                    .entry(t.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
             }
             for func in funcs {
-                fn_defs.entry(func.to_lowercase()).or_default().push(f.id.clone());
+                fn_defs
+                    .entry(func.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
             }
 
             for mod_name in extract_mods(&f.content) {
-                mod_to_frags.entry(mod_name.to_lowercase()).or_default().push(f.id.clone());
+                mod_to_frags
+                    .entry(mod_name.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
             }
 
             let impls = extract_trait_impls(&f.content);
@@ -188,10 +260,17 @@ impl EdgeBuilder for RustEdgeBuilder {
             for pub_use_path in extract_pub_uses(&f.content) {
                 let leaf_lower = pub_use_path.split("::").last().unwrap_or("").to_lowercase();
                 if !leaf_lower.is_empty() && !name_to_frags.contains_key(&leaf_lower) {
-                    let has_target = type_defs.get(&leaf_lower).map_or(false, |v| v.iter().any(|fid| fid != &f.id))
-                        || fn_defs.get(&leaf_lower).map_or(false, |v| v.iter().any(|fid| fid != &f.id));
+                    let has_target = type_defs
+                        .get(&leaf_lower)
+                        .map_or(false, |v| v.iter().any(|fid| fid != &f.id))
+                        || fn_defs
+                            .get(&leaf_lower)
+                            .map_or(false, |v| v.iter().any(|fid| fid != &f.id));
                     if has_target {
-                        name_to_frags.entry(leaf_lower).or_default().push(f.id.clone());
+                        name_to_frags
+                            .entry(leaf_lower)
+                            .or_default()
+                            .push(f.id.clone());
                     }
                 }
             }
@@ -212,7 +291,10 @@ impl EdgeBuilder for RustEdgeBuilder {
         for f in &rust_frags {
             for pub_use_path in extract_pub_uses(&f.content) {
                 let leaf_lower = pub_use_path.split("::").last().unwrap_or("").to_lowercase();
-                for target_list in [type_defs.get(&leaf_lower), fn_defs.get(&leaf_lower)].iter().flatten() {
+                for target_list in [type_defs.get(&leaf_lower), fn_defs.get(&leaf_lower)]
+                    .iter()
+                    .flatten()
+                {
                     for target_fid in *target_list {
                         if target_fid != &f.id {
                             add_edge(&mut edges, &f.id, target_fid, use_weight, reverse_factor);
@@ -228,13 +310,28 @@ impl EdgeBuilder for RustEdgeBuilder {
             for use_path in extract_uses(&rf.content) {
                 for part in use_path.split("::") {
                     let part_lower = part.to_lowercase();
-                    add_edges_from_ids(&mut edges, &rf.id, mod_to_frags.get(&part_lower).unwrap_or(&vec![]), use_weight, reverse_factor);
-                    add_edges_from_ids(&mut edges, &rf.id, name_to_frags.get(&part_lower).unwrap_or(&vec![]), use_weight, reverse_factor);
+                    add_edges_from_ids(
+                        &mut edges,
+                        &rf.id,
+                        mod_to_frags.get(&part_lower).unwrap_or(&vec![]),
+                        use_weight,
+                        reverse_factor,
+                    );
+                    add_edges_from_ids(
+                        &mut edges,
+                        &rf.id,
+                        name_to_frags.get(&part_lower).unwrap_or(&vec![]),
+                        use_weight,
+                        reverse_factor,
+                    );
                 }
             }
 
             for mod_name in extract_mods(&rf.content) {
-                for fid in name_to_frags.get(&mod_name.to_lowercase()).unwrap_or(&vec![]) {
+                for fid in name_to_frags
+                    .get(&mod_name.to_lowercase())
+                    .unwrap_or(&vec![])
+                {
                     if fid != &rf.id {
                         add_edge(&mut edges, &rf.id, fid, mod_weight, reverse_factor);
                     }
@@ -258,20 +355,32 @@ impl EdgeBuilder for RustEdgeBuilder {
             }
 
             for (mod_name, _symbol) in &path_calls {
-                for fid in mod_to_frags.get(&mod_name.to_lowercase()).unwrap_or(&vec![]) {
+                for fid in mod_to_frags
+                    .get(&mod_name.to_lowercase())
+                    .unwrap_or(&vec![])
+                {
                     if fid != &rf.id {
                         add_edge(&mut edges, &rf.id, fid, use_weight, reverse_factor);
                     }
                 }
             }
 
-            let stem = Path::new(rf.path()).file_stem().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
+            let stem = Path::new(rf.path())
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
             if stem == "lib" || stem == "mod" {
                 let parent_dir = Path::new(rf.path()).parent();
                 for other in &rust_frags {
                     if let Some(pd) = parent_dir {
                         if Path::new(other.path()).parent() == Some(pd) && other.id != rf.id {
-                            add_edge(&mut edges, &rf.id, &other.id, same_crate_weight, reverse_factor);
+                            add_edge(
+                                &mut edges,
+                                &rf.id,
+                                &other.id,
+                                same_crate_weight,
+                                reverse_factor,
+                            );
                         }
                     }
                 }

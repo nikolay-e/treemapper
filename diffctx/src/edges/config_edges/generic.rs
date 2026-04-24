@@ -8,8 +8,8 @@ use crate::config::extensions::{CODE_EXTENSIONS, CONFIG_EXTENSIONS};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{self, add_edge, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge};
 
 static CONFIG_EXTENSIONS_WITH_ENV: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
     let mut s = CONFIG_EXTENSIONS.clone();
@@ -89,8 +89,7 @@ static JSON_KEY_RE: Lazy<Regex> =
 static TOML_INI_KEY_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*=").unwrap());
 
-static ENV_KEY_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^([A-Za-z_]\w*)\s*=").unwrap());
+static ENV_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^([A-Za-z_]\w*)\s*=").unwrap());
 
 static PROPERTIES_KEY_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*([a-zA-Z_][a-zA-Z0-9_./-]*)\s*[=:]").unwrap());
@@ -243,10 +242,7 @@ impl EdgeBuilder for ConfigToCodeEdgeBuilder {
         _repo_root: Option<&Path>,
         file_cache: Option<&FxHashMap<PathBuf, String>>,
     ) -> Vec<PathBuf> {
-        let config_changed: Vec<&PathBuf> = changed
-            .iter()
-            .filter(|f| is_config_file(f))
-            .collect();
+        let config_changed: Vec<&PathBuf> = changed.iter().filter(|f| is_config_file(f)).collect();
 
         if config_changed.is_empty() {
             return vec![];

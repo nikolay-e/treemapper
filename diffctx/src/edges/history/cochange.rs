@@ -7,8 +7,8 @@ use crate::config::limits::COCHANGE;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{add_edge, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{EdgeBuilder, add_edge};
 
 pub struct CochangeEdgeBuilder;
 

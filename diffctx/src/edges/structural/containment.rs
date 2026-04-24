@@ -5,8 +5,8 @@ use rustc_hash::FxHashMap;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{add_edge, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{EdgeBuilder, add_edge};
 
 pub struct ContainmentEdgeBuilder;
 

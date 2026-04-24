@@ -8,8 +8,10 @@ use crate::config::extensions::DOTNET_EXTENSIONS;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, FragmentIndex, add_edge, discover_files_by_refs, link_by_name};
 use super::super::EdgeDict;
+use super::super::base::{
+    self, EdgeBuilder, FragmentIndex, add_edge, discover_files_by_refs, link_by_name,
+};
 
 static EXTENDED_DOTNET_EXTENSIONS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     DOTNET_EXTENSIONS
@@ -35,8 +37,7 @@ fn is_fs_file(path: &Path) -> bool {
 
 static CS_USING_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*(?:global\s+)?using\s+(?:static\s+)?([A-Z][\w.]+)").unwrap());
-static FS_OPEN_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*open\s+([A-Z][\w.]+)").unwrap());
+static FS_OPEN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*open\s+([A-Z][\w.]+)").unwrap());
 static NAMESPACE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*namespace\s+([A-Z][\w.]+)").unwrap());
 static TYPE_DEF_RE: Lazy<Regex> = Lazy::new(|| {
@@ -48,25 +49,82 @@ static TYPE_DEF_RE: Lazy<Regex> = Lazy::new(|| {
 static INHERITANCE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?:class|struct|interface|record)\s+\w+\s*(?:<[^>]*>)?\s*:\s*(.+)").unwrap()
 });
-static ATTRIBUTE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\[(\w+)(?:\(|])").unwrap());
+static ATTRIBUTE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[(\w+)(?:\(|])").unwrap());
 static PARTIAL_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)^\s*(?:public|internal|private|protected)?\s*partial\s+(?:class|struct|interface|record)\s+(\w+)").unwrap()
 });
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w+)\b").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w+)\b").unwrap());
 
 static DOTNET_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "String", "Int32", "Boolean", "Object", "Void", "Task", "Action", "Func",
-        "List", "Dictionary", "IEnumerable", "IList", "ICollection", "Exception",
-        "Console", "Math", "Convert", "Type", "Attribute", "Nullable",
-        "if", "else", "for", "while", "do", "switch", "case", "break", "continue",
-        "return", "new", "this", "base", "null", "true", "false", "var", "dynamic",
-        "async", "await", "try", "catch", "finally", "throw", "using", "namespace",
-        "class", "struct", "interface", "enum", "record", "delegate", "event",
-        "public", "private", "protected", "internal", "static", "abstract", "sealed",
-        "virtual", "override", "partial", "readonly", "const", "ref", "out", "in",
+        "String",
+        "Int32",
+        "Boolean",
+        "Object",
+        "Void",
+        "Task",
+        "Action",
+        "Func",
+        "List",
+        "Dictionary",
+        "IEnumerable",
+        "IList",
+        "ICollection",
+        "Exception",
+        "Console",
+        "Math",
+        "Convert",
+        "Type",
+        "Attribute",
+        "Nullable",
+        "if",
+        "else",
+        "for",
+        "while",
+        "do",
+        "switch",
+        "case",
+        "break",
+        "continue",
+        "return",
+        "new",
+        "this",
+        "base",
+        "null",
+        "true",
+        "false",
+        "var",
+        "dynamic",
+        "async",
+        "await",
+        "try",
+        "catch",
+        "finally",
+        "throw",
+        "using",
+        "namespace",
+        "class",
+        "struct",
+        "interface",
+        "enum",
+        "record",
+        "delegate",
+        "event",
+        "public",
+        "private",
+        "protected",
+        "internal",
+        "static",
+        "abstract",
+        "sealed",
+        "virtual",
+        "override",
+        "partial",
+        "readonly",
+        "const",
+        "ref",
+        "out",
+        "in",
     ]
     .iter()
     .copied()
@@ -170,19 +228,28 @@ impl EdgeBuilder for DotNetEdgeBuilder {
         for f in &dn_frags {
             let defs = extract_defines(&f.content);
             for name in &defs {
-                name_to_defs.entry(name.clone()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
             frag_defines.insert(f.id.clone(), defs);
 
             let namespaces = extract_namespaces(&f.content);
             for ns in &namespaces {
-                ns_to_frags.entry(ns.clone()).or_default().push(f.id.clone());
+                ns_to_frags
+                    .entry(ns.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
             frag_namespaces.insert(f.id.clone(), namespaces);
 
             let partials = extract_partials(&f.content);
             for p in &partials {
-                partial_to_frags.entry(p.clone()).or_default().push(f.id.clone());
+                partial_to_frags
+                    .entry(p.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
         }
 
@@ -209,7 +276,13 @@ impl EdgeBuilder for DotNetEdgeBuilder {
                 if let Some(dst_ids) = name_to_defs.get(bt) {
                     for dst_id in dst_ids {
                         if dst_id != &f.id {
-                            add_edge(&mut edges, &f.id, dst_id, inheritance_weight, reverse_factor);
+                            add_edge(
+                                &mut edges,
+                                &f.id,
+                                dst_id,
+                                inheritance_weight,
+                                reverse_factor,
+                            );
                         }
                     }
                 }
@@ -257,8 +330,20 @@ impl EdgeBuilder for DotNetEdgeBuilder {
             }
             for i in 0..frag_ids.len() {
                 for j in (i + 1)..frag_ids.len() {
-                    add_edge(&mut edges, &frag_ids[i], &frag_ids[j], partial_weight, reverse_factor);
-                    add_edge(&mut edges, &frag_ids[j], &frag_ids[i], partial_weight, reverse_factor);
+                    add_edge(
+                        &mut edges,
+                        &frag_ids[i],
+                        &frag_ids[j],
+                        partial_weight,
+                        reverse_factor,
+                    );
+                    add_edge(
+                        &mut edges,
+                        &frag_ids[j],
+                        &frag_ids[i],
+                        partial_weight,
+                        reverse_factor,
+                    );
                 }
             }
         }

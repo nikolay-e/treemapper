@@ -31,7 +31,9 @@ fn fragment_hunk_gap(frag_start: u32, frag_end: u32, hunk_start: u32, hunk_end: 
 fn proximity_score(frag: &Fragment, file_hunks: &[(u32, u32)]) -> f64 {
     let min_gap = file_hunks
         .iter()
-        .map(|&(h_start, h_end)| fragment_hunk_gap(frag.start_line(), frag.end_line(), h_start, h_end))
+        .map(|&(h_start, h_end)| {
+            fragment_hunk_gap(frag.start_line(), frag.end_line(), h_start, h_end)
+        })
         .min()
         .unwrap_or(u32::MAX);
     let half_decay = if frag.kind == FragmentKind::Definition {
@@ -43,7 +45,9 @@ fn proximity_score(frag: &Fragment, file_hunks: &[(u32, u32)]) -> f64 {
 }
 
 fn effective_relevance_threshold(token_count: u32) -> f64 {
-    let size_factor = (token_count as f64 / SIZE_PENALTY_BASE_TOKENS).max(1.0).powf(SIZE_PENALTY_EXPONENT);
+    let size_factor = (token_count as f64 / SIZE_PENALTY_BASE_TOKENS)
+        .max(1.0)
+        .powf(SIZE_PENALTY_EXPONENT);
     LOW_RELEVANCE_THRESHOLD * size_factor
 }
 
@@ -97,11 +101,7 @@ fn classify_semantic_edges(
             continue;
         }
 
-        let (changed_frag, other_frag) = if src_changed {
-            (src, dst)
-        } else {
-            (dst, src)
-        };
+        let (changed_frag, other_frag) = if src_changed { (src, dst) } else { (dst, src) };
 
         let fwd_w = graph
             .neighbors(&changed_frag)
@@ -125,10 +125,7 @@ fn classify_semantic_edges(
     (reverse_deps, direct_edge_paths)
 }
 
-fn find_hub_noise_paths(
-    graph: &Graph,
-    changed_paths: &FxHashSet<Arc<str>>,
-) -> FxHashSet<Arc<str>> {
+fn find_hub_noise_paths(graph: &Graph, changed_paths: &FxHashSet<Arc<str>>) -> FxHashSet<Arc<str>> {
     let (reverse_deps, direct_edge_paths) = classify_semantic_edges(graph, changed_paths);
 
     let changed_dirs: FxHashSet<String> = changed_paths
@@ -190,17 +187,11 @@ fn find_config_generic_code_files(
         if !(src_changed ^ dst_changed) {
             continue;
         }
-        let other_path = if src_changed {
-            &dst.path
-        } else {
-            &src.path
-        };
+        let other_path = if src_changed { &dst.path } else { &src.path };
         match category {
             EdgeCategory::ConfigGeneric => {
                 has_generic_config.insert(other_path.clone());
-                *generic_edge_count
-                    .entry(other_path.clone())
-                    .or_insert(0) += 1;
+                *generic_edge_count.entry(other_path.clone()).or_insert(0) += 1;
             }
             EdgeCategory::Semantic | EdgeCategory::Config => {
                 has_real_edge.insert(other_path.clone());

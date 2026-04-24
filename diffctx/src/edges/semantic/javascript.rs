@@ -8,8 +8,8 @@ use crate::config::extensions::{JS_TS_EXTENSIONS, TYPESCRIPT_EXTENSIONS};
 use crate::config::weights::LANG_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder};
 
 fn is_js_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
@@ -22,14 +22,16 @@ fn is_ts_file(path: &Path) -> bool {
 }
 
 static IMPORT_SOURCE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?m)(?:import\s+.*?\s+from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))"#).unwrap()
+    Regex::new(
+        r#"(?m)(?:import\s+.*?\s+from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\))"#,
+    )
+    .unwrap()
 });
 static EXPORT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)^\s*export\s+(?:default\s+)?(?:function|class|const|let|var|interface|type|enum|abstract\s+class)\s+([A-Za-z_$]\w*)").unwrap()
 });
-static NAMED_IMPORT_NAMES_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)import\s*\{([^}]+)\}\s*from").unwrap()
-});
+static NAMED_IMPORT_NAMES_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)import\s*\{([^}]+)\}\s*from").unwrap());
 static CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Za-z_$]\w*)\s*\(").unwrap());
 static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
 static DEF_RE: Lazy<Regex> = Lazy::new(|| {
@@ -38,13 +40,63 @@ static DEF_RE: Lazy<Regex> = Lazy::new(|| {
 
 static JS_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "if", "for", "while", "return", "function", "class", "const", "let", "var", "new",
-        "delete", "typeof", "instanceof", "void", "switch", "case", "break", "continue",
-        "throw", "try", "catch", "finally", "yield", "async", "await", "import", "export",
-        "default", "from", "require", "super", "this", "true", "false", "null", "undefined",
-        "console", "Math", "Object", "Array", "String", "Number", "Boolean", "Error",
-        "Promise", "Map", "Set", "Date", "JSON", "RegExp", "Symbol", "parseInt", "parseFloat",
-        "setTimeout", "setInterval", "clearTimeout", "clearInterval",
+        "if",
+        "for",
+        "while",
+        "return",
+        "function",
+        "class",
+        "const",
+        "let",
+        "var",
+        "new",
+        "delete",
+        "typeof",
+        "instanceof",
+        "void",
+        "switch",
+        "case",
+        "break",
+        "continue",
+        "throw",
+        "try",
+        "catch",
+        "finally",
+        "yield",
+        "async",
+        "await",
+        "import",
+        "export",
+        "default",
+        "from",
+        "require",
+        "super",
+        "this",
+        "true",
+        "false",
+        "null",
+        "undefined",
+        "console",
+        "Math",
+        "Object",
+        "Array",
+        "String",
+        "Number",
+        "Boolean",
+        "Error",
+        "Promise",
+        "Map",
+        "Set",
+        "Date",
+        "JSON",
+        "RegExp",
+        "Symbol",
+        "parseInt",
+        "parseFloat",
+        "setTimeout",
+        "setInterval",
+        "clearTimeout",
+        "clearInterval",
     ]
     .iter()
     .copied()
@@ -166,10 +218,7 @@ impl EdgeBuilder for JavaScriptEdgeBuilder {
             let calls = extract_calls(&f.content);
             let type_refs = extract_type_refs(&f.content);
 
-            for (ref_set, base_weight) in [
-                (&calls, w.call),
-                (&type_refs, w.type_ref),
-            ] {
+            for (ref_set, base_weight) in [(&calls, w.call), (&type_refs, w.type_ref)] {
                 for name in ref_set {
                     if self_defs.contains(name) {
                         continue;
@@ -252,7 +301,10 @@ impl EdgeBuilder for JavaScriptEdgeBuilder {
 
             let mut changed_names: FxHashSet<String> = FxHashSet::default();
             for f in &frontier {
-                let stem = f.file_stem().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
+                let stem = f
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
                 changed_names.insert(stem.clone());
                 if stem == "index" {
                     if let Some(parent) = f.parent() {
@@ -270,14 +322,21 @@ impl EdgeBuilder for JavaScriptEdgeBuilder {
             }
 
             for candidate in candidates {
-                if changed_set.contains(candidate) || discovered.contains(candidate) || !is_js_file(candidate) {
+                if changed_set.contains(candidate)
+                    || discovered.contains(candidate)
+                    || !is_js_file(candidate)
+                {
                     continue;
                 }
                 if let Ok(content) = std::fs::read_to_string(candidate) {
                     let imports = extract_import_sources(&content);
                     for imp in &imports {
                         let imp_lower = imp.to_lowercase();
-                        if changed_names.iter().any(|n| n.len() >= 3 && (imp_lower.contains(n.as_str()) || imp_lower.ends_with(n.as_str()))) {
+                        if changed_names.iter().any(|n| {
+                            n.len() >= 3
+                                && (imp_lower.contains(n.as_str())
+                                    || imp_lower.ends_with(n.as_str()))
+                        }) {
                             newly_found.insert(candidate.clone());
                             break;
                         }
@@ -293,7 +352,11 @@ impl EdgeBuilder for JavaScriptEdgeBuilder {
 
             if !exported_names.is_empty() {
                 for candidate in candidates {
-                    if changed_set.contains(candidate) || discovered.contains(candidate) || newly_found.contains(candidate) || !is_js_file(candidate) {
+                    if changed_set.contains(candidate)
+                        || discovered.contains(candidate)
+                        || newly_found.contains(candidate)
+                        || !is_js_file(candidate)
+                    {
                         continue;
                     }
                     if let Ok(content) = std::fs::read_to_string(candidate) {
@@ -301,8 +364,13 @@ impl EdgeBuilder for JavaScriptEdgeBuilder {
                             let names: FxHashSet<String> = cap[1]
                                 .split(',')
                                 .filter_map(|n| {
-                                    let trimmed = n.trim().split(" as ").next()?.trim().to_lowercase();
-                                    if trimmed.is_empty() { None } else { Some(trimmed) }
+                                    let trimmed =
+                                        n.trim().split(" as ").next()?.trim().to_lowercase();
+                                    if trimmed.is_empty() {
+                                        None
+                                    } else {
+                                        Some(trimmed)
+                                    }
                                 })
                                 .collect();
                             if !names.is_disjoint(&exported_names) {
@@ -320,8 +388,12 @@ impl EdgeBuilder for JavaScriptEdgeBuilder {
                     let sources = extract_import_sources(&content);
                     for source in sources {
                         if source.starts_with('.') {
-                            if let Some(resolved) = resolve_relative_import(f, &source, &candidate_set) {
-                                if !changed_set.contains(&resolved) && !discovered.contains(&resolved) {
+                            if let Some(resolved) =
+                                resolve_relative_import(f, &source, &candidate_set)
+                            {
+                                if !changed_set.contains(&resolved)
+                                    && !discovered.contains(&resolved)
+                                {
                                     newly_found.insert(resolved);
                                 }
                             }

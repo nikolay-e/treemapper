@@ -6,8 +6,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, add_edge, add_edges_from_ids, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids};
 
 const WEIGHT: f64 = 0.60;
 const REVERSE_FACTOR: f64 = 0.40;
@@ -21,24 +21,19 @@ fn is_terraform_file(path: &Path) -> bool {
     TF_EXTENSIONS.contains(ext.as_str())
 }
 
-static VARIABLE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?m)^variable\s+"([^"]+)""#).unwrap());
+static VARIABLE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(?m)^variable\s+"([^"]+)""#).unwrap());
 static RESOURCE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?m)^resource\s+"([^"]+)"\s+"([^"]+)""#).unwrap());
 static DATA_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?m)^data\s+"([^"]+)"\s+"([^"]+)""#).unwrap());
-static MODULE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?m)^module\s+"([^"]+)""#).unwrap());
-static LOCALS_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^locals\s*\{").unwrap());
-static LOCAL_KEY_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s+(\w+)\s*=").unwrap());
+static MODULE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(?m)^module\s+"([^"]+)""#).unwrap());
+static LOCALS_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^locals\s*\{").unwrap());
+static LOCAL_KEY_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s+(\w+)\s*=").unwrap());
 
 static VAR_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"var\.(\w+)").unwrap());
 static LOCAL_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"local\.(\w+)").unwrap());
 static DATA_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"data\.(\w+)\.(\w+)").unwrap());
-static RESOURCE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)(\w+)\.(\w+)\.(\w+)").unwrap());
+static RESOURCE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)(\w+)\.(\w+)\.(\w+)").unwrap());
 static MODULE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"module\.(\w+)").unwrap());
 
 static SOURCE_RE: Lazy<Regex> =
@@ -73,7 +68,15 @@ static GENERIC_NAMES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
 
 static RESOURCE_SKIP_TYPES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "var", "local", "data", "module", "path", "terraform", "each", "self", "count",
+        "var",
+        "local",
+        "data",
+        "module",
+        "path",
+        "terraform",
+        "each",
+        "self",
+        "count",
     ]
     .iter()
     .copied()
@@ -88,8 +91,7 @@ fn extract_locals(content: &str) -> FxHashSet<String> {
     for line in content.lines() {
         if LOCALS_RE.is_match(line) {
             in_locals = true;
-            brace_count =
-                line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            brace_count = line.matches('{').count() as i32 - line.matches('}').count() as i32;
             if brace_count <= 0 {
                 in_locals = false;
             }
@@ -97,8 +99,7 @@ fn extract_locals(content: &str) -> FxHashSet<String> {
         }
 
         if in_locals {
-            brace_count +=
-                line.matches('{').count() as i32 - line.matches('}').count() as i32;
+            brace_count += line.matches('{').count() as i32 - line.matches('}').count() as i32;
             if brace_count <= 0 {
                 in_locals = false;
                 continue;
@@ -289,14 +290,8 @@ fn index_definitions(f: &Fragment, idx: &mut TFIndex) {
     for cap in DATA_RE.captures_iter(&f.content) {
         let full = format!("{}.{}", &cap[1], &cap[2]);
         let name = cap[2].to_string();
-        idx.data_defs
-            .entry(full)
-            .or_default()
-            .push(f.id.clone());
-        idx.data_defs
-            .entry(name)
-            .or_default()
-            .push(f.id.clone());
+        idx.data_defs.entry(full).or_default().push(f.id.clone());
+        idx.data_defs.entry(name).or_default().push(f.id.clone());
     }
 
     for local_key in extract_locals(&f.content) {
@@ -394,9 +389,7 @@ fn build_path_to_frags(
         map.entry(path.clone()).or_default().push(f.id.clone());
         if let Some(root) = repo_root {
             if let Ok(rel) = path.strip_prefix(root) {
-                map.entry(rel.to_path_buf())
-                    .or_default()
-                    .push(f.id.clone());
+                map.entry(rel.to_path_buf()).or_default().push(f.id.clone());
             }
         }
     }
@@ -424,9 +417,7 @@ fn build_module_source_edges(
                     let candidate = if p.is_absolute() {
                         p.clone()
                     } else if let Some(root) = repo_root {
-                        root.join(p)
-                            .canonicalize()
-                            .unwrap_or_else(|_| root.join(p))
+                        root.join(p).canonicalize().unwrap_or_else(|_| root.join(p))
                     } else {
                         p.clone()
                     };

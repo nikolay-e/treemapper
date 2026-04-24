@@ -6,11 +6,7 @@ fn kind_priority(kind: FragmentKind) -> u8 {
     if kind.is_semantic() { 0 } else { 1 }
 }
 
-fn find_core_for_hunk(
-    frags: &[&Fragment],
-    h_start: u32,
-    h_end: u32,
-) -> FxHashSet<FragmentId> {
+fn find_core_for_hunk(frags: &[&Fragment], h_start: u32, h_end: u32) -> FxHashSet<FragmentId> {
     let mut core = FxHashSet::default();
 
     let covering: Vec<&Fragment> = frags
@@ -24,8 +20,7 @@ fn find_core_for_hunk(
             .min_by(|a, b| {
                 let ka = kind_priority(a.kind);
                 let kb = kind_priority(b.kind);
-                ka.cmp(&kb)
-                    .then(a.line_count().cmp(&b.line_count()))
+                ka.cmp(&kb).then(a.line_count().cmp(&b.line_count()))
             })
             .unwrap();
         core.insert(best.id.clone());
@@ -100,10 +95,7 @@ pub fn identify_core_fragments(
 ) -> FxHashSet<FragmentId> {
     let mut frags_by_path: FxHashMap<&str, Vec<&Fragment>> = FxHashMap::default();
     for frag in all_fragments {
-        frags_by_path
-            .entry(frag.path())
-            .or_default()
-            .push(frag);
+        frags_by_path.entry(frag.path()).or_default().push(frag);
     }
 
     let mut core_ids = FxHashSet::default();

@@ -8,8 +8,8 @@ use crate::config::extensions::GO_EXTENSIONS;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids};
 
 fn is_go_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
@@ -18,20 +18,14 @@ fn is_go_file(path: &Path) -> bool {
 
 static IMPORT_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?m)^\s*(?:import\s+)?"([^"]+)""#).unwrap());
-static PACKAGE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*package\s+(\w+)").unwrap());
-static TYPE_DEF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*type\s+([A-Z]\w*)").unwrap());
+static PACKAGE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*package\s+(\w+)").unwrap());
+static TYPE_DEF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*type\s+([A-Z]\w*)").unwrap());
 static FUNC_DEF_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*func\s+(?:\([^)]*\)\s+)?([A-Z]\w*)\s*\(").unwrap());
-static FUNC_CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\s*\(").unwrap());
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
-static PKG_CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([a-z]\w+)\.([A-Z]\w*)").unwrap());
-static INIT_FUNC_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*func\s+init\s*\(").unwrap());
+static FUNC_CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\s*\(").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
+static PKG_CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([a-z]\w+)\.([A-Z]\w*)").unwrap());
+static INIT_FUNC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*func\s+init\s*\(").unwrap());
 
 fn extract_imports(content: &str) -> FxHashSet<String> {
     IMPORT_RE
@@ -59,7 +53,13 @@ fn extract_definitions(content: &str) -> (FxHashSet<String>, FxHashSet<String>) 
     (funcs, types)
 }
 
-fn extract_references(content: &str) -> (FxHashSet<String>, FxHashSet<String>, FxHashSet<(String, String)>) {
+fn extract_references(
+    content: &str,
+) -> (
+    FxHashSet<String>,
+    FxHashSet<String>,
+    FxHashSet<(String, String)>,
+) {
     let func_calls: FxHashSet<String> = FUNC_CALL_RE
         .captures_iter(content)
         .map(|c| c[1].to_string())
@@ -163,7 +163,13 @@ impl EdgeBuilder for GoEdgeBuilder {
                 let imp_pkg = imp.split('/').next_back().unwrap_or(imp).to_lowercase();
                 for (pkg, frag_ids) in &pkg_to_frags {
                     if *pkg == imp_pkg {
-                        add_edges_from_ids(&mut edges, &gf.id, frag_ids, import_weight, reverse_factor);
+                        add_edges_from_ids(
+                            &mut edges,
+                            &gf.id,
+                            frag_ids,
+                            import_weight,
+                            reverse_factor,
+                        );
                     }
                 }
                 for (path_str, frag_ids) in &path_to_frags {
@@ -171,7 +177,13 @@ impl EdgeBuilder for GoEdgeBuilder {
                         || imp.ends_with(&format!("/{}", path_str))
                         || imp.contains(&format!("/{}/", path_str))
                     {
-                        add_edges_from_ids(&mut edges, &gf.id, frag_ids, import_weight, reverse_factor);
+                        add_edges_from_ids(
+                            &mut edges,
+                            &gf.id,
+                            frag_ids,
+                            import_weight,
+                            reverse_factor,
+                        );
                     }
                 }
             }
@@ -193,7 +205,10 @@ impl EdgeBuilder for GoEdgeBuilder {
             }
 
             for (pkg_name, _symbol) in &pkg_calls {
-                for fid in pkg_to_frags.get(&pkg_name.to_lowercase()).unwrap_or(&vec![]) {
+                for fid in pkg_to_frags
+                    .get(&pkg_name.to_lowercase())
+                    .unwrap_or(&vec![])
+                {
                     if fid != &gf.id {
                         add_edge(&mut edges, &gf.id, fid, func_weight, reverse_factor);
                     }

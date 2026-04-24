@@ -8,8 +8,8 @@ use crate::config::extensions::SHELL_EXTENSIONS;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{self, EdgeBuilder, FragmentIndex, discover_files_by_refs, link_by_name};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, FragmentIndex, discover_files_by_refs, link_by_name};
 
 fn is_shell_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
@@ -20,8 +20,7 @@ static SOURCE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?m)^\s*(?:source|\.)\s+["']?([^"'\s;]+)"#).unwrap());
 static SCRIPT_CALL_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?:bash|sh|python|python3|node|ruby|perl)\s+(\S+)").unwrap());
-static EXEC_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\./(\S+)").unwrap());
+static EXEC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\./(\S+)").unwrap());
 
 fn extract_refs(content: &str) -> FxHashSet<String> {
     let mut refs = FxHashSet::default();
@@ -63,17 +62,38 @@ impl EdgeBuilder for ShellEdgeBuilder {
 
             for cap in SOURCE_RE.captures_iter(content) {
                 let ref_path = &cap[1];
-                link_by_name(&f.id, ref_path, &idx, &mut edges, source_weight, source_reverse);
+                link_by_name(
+                    &f.id,
+                    ref_path,
+                    &idx,
+                    &mut edges,
+                    source_weight,
+                    source_reverse,
+                );
             }
 
             for cap in SCRIPT_CALL_RE.captures_iter(content) {
                 let ref_path = &cap[1];
-                link_by_name(&f.id, ref_path, &idx, &mut edges, script_weight, script_reverse);
+                link_by_name(
+                    &f.id,
+                    ref_path,
+                    &idx,
+                    &mut edges,
+                    script_weight,
+                    script_reverse,
+                );
             }
 
             for cap in EXEC_RE.captures_iter(content) {
                 let ref_path = &cap[1];
-                link_by_name(&f.id, ref_path, &idx, &mut edges, script_weight, script_reverse);
+                link_by_name(
+                    &f.id,
+                    ref_path,
+                    &idx,
+                    &mut edges,
+                    script_weight,
+                    script_reverse,
+                );
             }
         }
 

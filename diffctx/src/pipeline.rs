@@ -130,9 +130,10 @@ pub fn build_diff_context(
     let mode = scoring_mode;
     let config = PipelineConfig::from_mode(mode, all_candidate_files.len());
 
-    let mut expansion_concepts: FxHashSet<String> = crate::types::extract_identifiers(&diff_text, 3)
-        .into_iter()
-        .collect();
+    let mut expansion_concepts: FxHashSet<String> =
+        crate::types::extract_identifiers(&diff_text, 3)
+            .into_iter()
+            .collect();
 
     if let Some(ref h) = head_rev {
         if std::env::var("DIFFCTX_NO_COMMIT_SIGNAL").as_deref() != Ok("1") {
@@ -208,11 +209,7 @@ pub fn build_diff_context(
             Some(&discovered_path_set),
         );
 
-        let needs = crate::utility::needs::needs_from_diff(
-            &all_fragments,
-            &core_ids,
-            &diff_text,
-        );
+        let needs = crate::utility::needs::needs_from_diff(&all_fragments, &core_ids, &diff_text);
 
         let selection_result = crate::select::lazy_greedy_select(
             scoring_result.filtered_fragments.clone(),
@@ -268,11 +265,7 @@ pub fn build_diff_context(
         t4.duration_since(t3).as_secs_f64(),
     );
 
-    let mut output = render::build_diff_context_output(
-        &root_dir,
-        &selected,
-        no_content,
-    );
+    let mut output = render::build_diff_context_output(&root_dir, &selected, no_content);
     output.latency = Some(render::LatencyBreakdown {
         fragmentation_ms: t1.duration_since(t0).as_secs_f64() * 1000.0,
         discovery_ms: t2.duration_since(t1).as_secs_f64() * 1000.0,
@@ -370,6 +363,10 @@ fn select_full_mode(all_fragments: &[Fragment], changed_files: &[PathBuf]) -> Ve
         .filter(|f| changed_paths.contains(f.path()))
         .cloned()
         .collect();
-    selected.sort_by(|a, b| a.path().cmp(b.path()).then(a.start_line().cmp(&b.start_line())));
+    selected.sort_by(|a, b| {
+        a.path()
+            .cmp(b.path())
+            .then(a.start_line().cmp(&b.start_line()))
+    });
     selected
 }

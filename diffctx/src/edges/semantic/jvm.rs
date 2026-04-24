@@ -4,12 +4,14 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::config::extensions::{JAVA_EXTENSIONS, JVM_EXTENSIONS, KOTLIN_EXTENSIONS, SCALA_EXTENSIONS};
+use crate::config::extensions::{
+    JAVA_EXTENSIONS, JVM_EXTENSIONS, KOTLIN_EXTENSIONS, SCALA_EXTENSIONS,
+};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, add_edge};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge};
 
 fn is_jvm_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
@@ -41,43 +43,94 @@ static KOTLIN_CLASS_RE: Lazy<Regex> = Lazy::new(|| {
 static JAVA_IMPORT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)^\s*import\s+(?:static\s+)?([a-z][a-z0-9_.]*(?:\.\*)?)\s*;").unwrap()
 });
-static JAVA_PACKAGE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^\s*package\s+([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)").unwrap()
-});
+static JAVA_PACKAGE_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*package\s+([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)").unwrap());
 static JAVA_CLASS_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)^\s*(?:\w+\s+)*(?:class|interface|enum|@interface)\s+([A-Z]\w*)").unwrap()
 });
 static SCALA_IMPORT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)^\s*import\s+([a-z][a-z0-9_.]+(?:\.[A-Z]\w*|\._|\.\{[^}]+\})?)").unwrap()
 });
-static SCALA_CLASS_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^\s*(?:\w+\s+)*(?:class|trait|object)\s+([A-Z]\w*)").unwrap()
-});
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
-static ANNOTATION_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"@([A-Z]\w*)").unwrap());
+static SCALA_CLASS_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*(?:\w+\s+)*(?:class|trait|object)\s+([A-Z]\w*)").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
+static ANNOTATION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"@([A-Z]\w*)").unwrap());
 static KOTLIN_EXTENDS_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?:class|interface|object)\s+\w+(?:<[^>]*>)?(?:\([^)]*\))?\s*:\s*([^{]+)").unwrap()
 });
 static JAVA_EXTENDS_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)\b(?:extends|implements)\s+([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)").unwrap()
 });
-static SCALA_EXTENDS_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)\b(?:extends|with)\s+([A-Z]\w*)").unwrap()
-});
+static SCALA_EXTENDS_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)\b(?:extends|with)\s+([A-Z]\w*)").unwrap());
 
 static JVM_STDLIB_TYPES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "String", "Integer", "Long", "Double", "Float", "Boolean", "Byte", "Short", "Character",
-        "Object", "Class", "System", "Math", "Collections", "Arrays", "Optional", "HashMap",
-        "ArrayList", "LinkedList", "Iterator", "Iterable", "Comparable", "Runnable", "Thread",
-        "Exception", "RuntimeException", "IllegalArgumentException", "IllegalStateException",
-        "NullPointerException", "IndexOutOfBoundsException", "IOException", "InputStream",
-        "OutputStream", "StringBuilder", "StringBuffer", "Number", "Enum", "Void", "Override",
-        "Unit", "Any", "AnyVal", "AnyRef", "Nothing", "Option", "Some", "Either", "Left",
-        "Right", "Try", "Success", "Failure", "Future", "Promise", "Seq", "Vector", "Map",
-        "Set", "Tuple", "Function", "Product", "Serializable", "Pair", "Triple", "Sequence",
+        "String",
+        "Integer",
+        "Long",
+        "Double",
+        "Float",
+        "Boolean",
+        "Byte",
+        "Short",
+        "Character",
+        "Object",
+        "Class",
+        "System",
+        "Math",
+        "Collections",
+        "Arrays",
+        "Optional",
+        "HashMap",
+        "ArrayList",
+        "LinkedList",
+        "Iterator",
+        "Iterable",
+        "Comparable",
+        "Runnable",
+        "Thread",
+        "Exception",
+        "RuntimeException",
+        "IllegalArgumentException",
+        "IllegalStateException",
+        "NullPointerException",
+        "IndexOutOfBoundsException",
+        "IOException",
+        "InputStream",
+        "OutputStream",
+        "StringBuilder",
+        "StringBuffer",
+        "Number",
+        "Enum",
+        "Void",
+        "Override",
+        "Unit",
+        "Any",
+        "AnyVal",
+        "AnyRef",
+        "Nothing",
+        "Option",
+        "Some",
+        "Either",
+        "Left",
+        "Right",
+        "Try",
+        "Success",
+        "Failure",
+        "Future",
+        "Promise",
+        "Seq",
+        "Vector",
+        "Map",
+        "Set",
+        "Tuple",
+        "Function",
+        "Product",
+        "Serializable",
+        "Pair",
+        "Triple",
+        "Sequence",
     ]
     .iter()
     .copied()
@@ -86,11 +139,20 @@ static JVM_STDLIB_TYPES: Lazy<FxHashSet<&str>> = Lazy::new(|| {
 
 fn extract_imports(content: &str, path: &Path) -> FxHashSet<String> {
     if is_java(path) {
-        JAVA_IMPORT_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+        JAVA_IMPORT_RE
+            .captures_iter(content)
+            .map(|c| c[1].to_string())
+            .collect()
     } else if is_kotlin(path) {
-        KOTLIN_IMPORT_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+        KOTLIN_IMPORT_RE
+            .captures_iter(content)
+            .map(|c| c[1].to_string())
+            .collect()
     } else if is_scala(path) {
-        SCALA_IMPORT_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+        SCALA_IMPORT_RE
+            .captures_iter(content)
+            .map(|c| c[1].to_string())
+            .collect()
     } else {
         FxHashSet::default()
     }
@@ -98,11 +160,20 @@ fn extract_imports(content: &str, path: &Path) -> FxHashSet<String> {
 
 fn extract_classes(content: &str, path: &Path) -> FxHashSet<String> {
     if is_java(path) {
-        JAVA_CLASS_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+        JAVA_CLASS_RE
+            .captures_iter(content)
+            .map(|c| c[1].to_string())
+            .collect()
     } else if is_kotlin(path) {
-        KOTLIN_CLASS_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+        KOTLIN_CLASS_RE
+            .captures_iter(content)
+            .map(|c| c[1].to_string())
+            .collect()
     } else if is_scala(path) {
-        SCALA_CLASS_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+        SCALA_CLASS_RE
+            .captures_iter(content)
+            .map(|c| c[1].to_string())
+            .collect()
     } else {
         FxHashSet::default()
     }
@@ -177,12 +248,21 @@ impl EdgeBuilder for JVMEdgeBuilder {
             let path = Path::new(f.path());
             let pkg = extract_package(&f.content);
             if let Some(ref pkg) = pkg {
-                package_to_frags.entry(pkg.clone()).or_default().push(f.id.clone());
+                package_to_frags
+                    .entry(pkg.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
             for cls in extract_classes(&f.content, path) {
-                class_to_frags.entry(cls.to_lowercase()).or_default().push(f.id.clone());
+                class_to_frags
+                    .entry(cls.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
                 if let Some(ref pkg) = pkg {
-                    fqn_to_frags.entry(format!("{}.{}", pkg, cls).to_lowercase()).or_default().push(f.id.clone());
+                    fqn_to_frags
+                        .entry(format!("{}.{}", pkg, cls).to_lowercase())
+                        .or_default()
+                        .push(f.id.clone());
                 }
             }
         }
@@ -217,7 +297,10 @@ impl EdgeBuilder for JVMEdgeBuilder {
             }
 
             for inh_ref in extract_inheritance(&jf.content, path) {
-                for fid in class_to_frags.get(&inh_ref.to_lowercase()).unwrap_or(&vec![]) {
+                for fid in class_to_frags
+                    .get(&inh_ref.to_lowercase())
+                    .unwrap_or(&vec![])
+                {
                     if fid != &jf.id {
                         add_edge(&mut edges, &jf.id, fid, inheritance_weight, reverse_factor);
                     }
@@ -226,7 +309,10 @@ impl EdgeBuilder for JVMEdgeBuilder {
 
             for type_ref in extract_type_refs(&jf.content) {
                 if !JVM_STDLIB_TYPES.contains(type_ref.as_str()) {
-                    for fid in class_to_frags.get(&type_ref.to_lowercase()).unwrap_or(&vec![]) {
+                    for fid in class_to_frags
+                        .get(&type_ref.to_lowercase())
+                        .unwrap_or(&vec![])
+                    {
                         if fid != &jf.id {
                             add_edge(&mut edges, &jf.id, fid, type_weight, reverse_factor);
                         }
@@ -235,7 +321,10 @@ impl EdgeBuilder for JVMEdgeBuilder {
             }
 
             for ann_ref in extract_annotations(&jf.content) {
-                for fid in class_to_frags.get(&ann_ref.to_lowercase()).unwrap_or(&vec![]) {
+                for fid in class_to_frags
+                    .get(&ann_ref.to_lowercase())
+                    .unwrap_or(&vec![])
+                {
                     if fid != &jf.id {
                         add_edge(&mut edges, &jf.id, fid, annotation_weight, reverse_factor);
                     }

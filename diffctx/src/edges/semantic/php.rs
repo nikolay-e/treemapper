@@ -8,38 +8,46 @@ use crate::config::extensions::PHP_EXTENSIONS;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids, discover_files_by_refs};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids, discover_files_by_refs};
 
 fn is_php_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
     PHP_EXTENSIONS.contains(ext.as_str())
 }
 
-static USE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*use\s+([\w\\]+)").unwrap());
+static USE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*use\s+([\w\\]+)").unwrap());
 static NAMESPACE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*namespace\s+([\w\\]+)").unwrap());
-static REQUIRE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?m)^\s*(?:require_once|require|include_once|include)\s+['"]([^'"]+)['"]"#).unwrap());
-static DEF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*(?:abstract\s+)?(?:class|interface|trait|enum)\s+([A-Z]\w*)").unwrap());
-static FUNC_DEF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*(?:public|protected|private|static)?\s*function\s+([a-zA-Z_]\w*)").unwrap());
+static REQUIRE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r#"(?m)^\s*(?:require_once|require|include_once|include)\s+['"]([^'"]+)['"]"#)
+        .unwrap()
+});
+static DEF_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?m)^\s*(?:abstract\s+)?(?:class|interface|trait|enum)\s+([A-Z]\w*)").unwrap()
+});
+static FUNC_DEF_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?m)^\s*(?:public|protected|private|static)?\s*function\s+([a-zA-Z_]\w*)").unwrap()
+});
 static EXTENDS_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?:extends|implements)\s+([\w\\,\s]+)").unwrap());
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
 
 fn extract_uses(content: &str) -> FxHashSet<String> {
-    USE_RE.captures_iter(content).map(|c| {
-        let full = &c[1];
-        full.split('\\').last().unwrap_or(full).to_string()
-    }).collect()
+    USE_RE
+        .captures_iter(content)
+        .map(|c| {
+            let full = &c[1];
+            full.split('\\').last().unwrap_or(full).to_string()
+        })
+        .collect()
 }
 
 fn extract_requires(content: &str) -> FxHashSet<String> {
-    REQUIRE_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+    REQUIRE_RE
+        .captures_iter(content)
+        .map(|c| c[1].to_string())
+        .collect()
 }
 
 fn extract_namespace(content: &str) -> Option<String> {
@@ -47,7 +55,10 @@ fn extract_namespace(content: &str) -> Option<String> {
 }
 
 fn extract_defs(content: &str) -> FxHashSet<String> {
-    let mut defs: FxHashSet<String> = DEF_RE.captures_iter(content).map(|c| c[1].to_string()).collect();
+    let mut defs: FxHashSet<String> = DEF_RE
+        .captures_iter(content)
+        .map(|c| c[1].to_string())
+        .collect();
     defs.extend(FUNC_DEF_RE.captures_iter(content).map(|c| c[1].to_string()));
     defs
 }
@@ -57,7 +68,9 @@ fn extract_inheritance(content: &str) -> FxHashSet<String> {
     for cap in EXTENDS_RE.captures_iter(content) {
         for part in cap[1].split(',') {
             let name = part.trim().split('\\').last().unwrap_or("").trim();
-            if !name.is_empty() { refs.insert(name.to_string()); }
+            if !name.is_empty() {
+                refs.insert(name.to_string());
+            }
         }
     }
     refs
@@ -67,8 +80,13 @@ pub struct PhpEdgeBuilder;
 
 impl EdgeBuilder for PhpEdgeBuilder {
     fn build(&self, fragments: &[Fragment], repo_root: Option<&Path>) -> EdgeDict {
-        let frags: Vec<&Fragment> = fragments.iter().filter(|f| is_php_file(Path::new(f.path()))).collect();
-        if frags.is_empty() { return FxHashMap::default(); }
+        let frags: Vec<&Fragment> = fragments
+            .iter()
+            .filter(|f| is_php_file(Path::new(f.path())))
+            .collect();
+        if frags.is_empty() {
+            return FxHashMap::default();
+        }
 
         let use_w = EDGE_WEIGHTS["php_use"].forward;
         let require_w = EDGE_WEIGHTS["php_require"].forward;
@@ -81,7 +99,10 @@ impl EdgeBuilder for PhpEdgeBuilder {
         let mut ns_to_frags: FxHashMap<String, Vec<_>> = FxHashMap::default();
         for f in &frags {
             for name in extract_defs(&f.content) {
-                name_to_defs.entry(name.to_lowercase()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
             }
             if let Some(ns) = extract_namespace(&f.content) {
                 ns_to_frags.entry(ns).or_default().push(f.id.clone());
@@ -107,9 +128,15 @@ impl EdgeBuilder for PhpEdgeBuilder {
             }
             for tr in TYPE_REF_RE.captures_iter(&f.content) {
                 let name = &tr[1];
-                if self_defs.contains(name) { continue; }
+                if self_defs.contains(name) {
+                    continue;
+                }
                 if let Some(targets) = name_to_defs.get(&name.to_lowercase()) {
-                    for t in targets { if t != &f.id { add_edge(&mut edges, &f.id, t, type_w, reverse_factor); } }
+                    for t in targets {
+                        if t != &f.id {
+                            add_edge(&mut edges, &f.id, t, type_w, reverse_factor);
+                        }
+                    }
                 }
             }
         }
@@ -117,11 +144,16 @@ impl EdgeBuilder for PhpEdgeBuilder {
     }
 
     fn discover_related_files(
-        &self, changed: &[PathBuf], candidates: &[PathBuf],
-        repo_root: Option<&Path>, file_cache: Option<&FxHashMap<PathBuf, String>>,
+        &self,
+        changed: &[PathBuf],
+        candidates: &[PathBuf],
+        repo_root: Option<&Path>,
+        file_cache: Option<&FxHashMap<PathBuf, String>>,
     ) -> Vec<PathBuf> {
         let php_changed: Vec<&PathBuf> = changed.iter().filter(|f| is_php_file(f)).collect();
-        if php_changed.is_empty() { return vec![]; }
+        if php_changed.is_empty() {
+            return vec![];
+        }
         let mut refs = FxHashSet::default();
         for f in &php_changed {
             if let Some(content) = base::read_file_cached(f, file_cache) {

@@ -8,42 +8,76 @@ use crate::config::extensions::C_FAMILY_EXTENSIONS;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, add_edge};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge};
 
 fn is_c_family(path: &Path) -> bool {
     let ext = base::file_ext(path);
     C_FAMILY_EXTENSIONS.contains(ext.as_str())
 }
 
-static HEADER_EXTENSIONS: Lazy<FxHashSet<&str>> =
-    Lazy::new(|| [".h", ".hpp", ".hh", ".hxx", ".h++"].iter().copied().collect());
+static HEADER_EXTENSIONS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
+    [".h", ".hpp", ".hh", ".hxx", ".h++"]
+        .iter()
+        .copied()
+        .collect()
+});
 
-static IMPL_EXTENSIONS: Lazy<FxHashSet<&str>> =
-    Lazy::new(|| [".c", ".cpp", ".cc", ".cxx", ".c++", ".m", ".mm"].iter().copied().collect());
+static IMPL_EXTENSIONS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
+    [".c", ".cpp", ".cc", ".cxx", ".c++", ".m", ".mm"]
+        .iter()
+        .copied()
+        .collect()
+});
 
 static INCLUDE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?m)^\s*#\s*(?:include|import)\s*[<"]([^>"]+)[>"]"#).unwrap());
-static FUNC_CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b(\w+)\s*\(").unwrap());
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
-static FUNC_DEF_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^\s*(?:[\w*&]+\s+)+(\w+)\s*\(").unwrap()
-});
-static TYPE_DEF_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^\s*(?:class|struct|enum|union|typedef)\s+([A-Z]\w*)").unwrap()
-});
+static FUNC_CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b(\w+)\s*\(").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
+static FUNC_DEF_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*(?:[\w*&]+\s+)+(\w+)\s*\(").unwrap());
+static TYPE_DEF_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\s*(?:class|struct|enum|union|typedef)\s+([A-Z]\w*)").unwrap());
 static INHERITANCE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?:class|struct)\s+(\w+)\s*:\s*(?:public|protected|private)?\s*(\w+)").unwrap()
 });
 
 static C_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "if", "for", "while", "switch", "case", "return", "sizeof", "typeof", "alignof",
-        "static_assert", "do", "else", "goto", "break", "continue", "default", "register",
-        "volatile", "extern", "typedef", "auto", "inline", "restrict", "noexcept", "decltype",
-        "nullptr", "throw", "try", "catch", "delete", "new", "template", "namespace", "using",
+        "if",
+        "for",
+        "while",
+        "switch",
+        "case",
+        "return",
+        "sizeof",
+        "typeof",
+        "alignof",
+        "static_assert",
+        "do",
+        "else",
+        "goto",
+        "break",
+        "continue",
+        "default",
+        "register",
+        "volatile",
+        "extern",
+        "typedef",
+        "auto",
+        "inline",
+        "restrict",
+        "noexcept",
+        "decltype",
+        "nullptr",
+        "throw",
+        "try",
+        "catch",
+        "delete",
+        "new",
+        "template",
+        "namespace",
+        "using",
         "operator",
     ]
     .iter()
@@ -53,9 +87,9 @@ static C_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
 
 static C_COMMON_MACROS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "NULL", "TRUE", "FALSE", "BOOL", "DWORD", "HANDLE", "VOID", "HRESULT", "LPCTSTR",
-        "LPCSTR", "LPWSTR", "INT", "UINT", "LONG", "ULONG", "WORD", "BYTE", "CHAR", "SHORT",
-        "EOF", "SIZE_MAX", "INT_MAX", "INT_MIN",
+        "NULL", "TRUE", "FALSE", "BOOL", "DWORD", "HANDLE", "VOID", "HRESULT", "LPCTSTR", "LPCSTR",
+        "LPWSTR", "INT", "UINT", "LONG", "ULONG", "WORD", "BYTE", "CHAR", "SHORT", "EOF",
+        "SIZE_MAX", "INT_MAX", "INT_MIN",
     ]
     .iter()
     .copied()
@@ -90,7 +124,10 @@ fn extract_definitions(content: &str) -> (FxHashSet<String>, FxHashSet<String>) 
     (functions, types)
 }
 
-fn extract_references(content: &str, own_defs: &FxHashSet<String>) -> (FxHashSet<String>, FxHashSet<String>) {
+fn extract_references(
+    content: &str,
+    own_defs: &FxHashSet<String>,
+) -> (FxHashSet<String>, FxHashSet<String>) {
     let calls: FxHashSet<String> = FUNC_CALL_RE
         .captures_iter(content)
         .map(|c| c[1].to_string())
@@ -139,23 +176,41 @@ impl EdgeBuilder for CFamilyEdgeBuilder {
 
         for f in &c_frags {
             let path = Path::new(f.path());
-            let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-            let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let stem = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
 
             header_to_frags.entry(name).or_default().push(f.id.clone());
             if !stem.is_empty() {
-                header_to_frags.entry(format!("{}.h", stem)).or_default().push(f.id.clone());
-                header_to_frags.entry(format!("{}.hpp", stem)).or_default().push(f.id.clone());
+                header_to_frags
+                    .entry(format!("{}.h", stem))
+                    .or_default()
+                    .push(f.id.clone());
+                header_to_frags
+                    .entry(format!("{}.hpp", stem))
+                    .or_default()
+                    .push(f.id.clone());
             }
 
             let (functions, types) = extract_definitions(&f.content);
             let mut own_defs = FxHashSet::default();
             for func in &functions {
-                func_defs_map.entry(func.clone()).or_default().push(f.id.clone());
+                func_defs_map
+                    .entry(func.clone())
+                    .or_default()
+                    .push(f.id.clone());
                 own_defs.insert(func.clone());
             }
             for t in &types {
-                type_defs_map.entry(t.clone()).or_default().push(f.id.clone());
+                type_defs_map
+                    .entry(t.clone())
+                    .or_default()
+                    .push(f.id.clone());
                 own_defs.insert(t.clone());
             }
             frag_own_defs.insert(f.id.clone(), own_defs);
@@ -200,7 +255,13 @@ impl EdgeBuilder for CFamilyEdgeBuilder {
                 let base = cap[2].to_string();
                 for def_id in type_defs_map.get(&base).unwrap_or(&vec![]) {
                     if def_id != &f.id {
-                        add_edge(&mut edges, &f.id, def_id, inheritance_weight, reverse_factor);
+                        add_edge(
+                            &mut edges,
+                            &f.id,
+                            def_id,
+                            inheritance_weight,
+                            reverse_factor,
+                        );
                     }
                 }
             }
@@ -221,7 +282,9 @@ impl EdgeBuilder for CFamilyEdgeBuilder {
             }
             let headers: Vec<&&Fragment> = group
                 .iter()
-                .filter(|f| HEADER_EXTENSIONS.contains(base::file_ext(Path::new(f.path())).as_str()))
+                .filter(|f| {
+                    HEADER_EXTENSIONS.contains(base::file_ext(Path::new(f.path())).as_str())
+                })
                 .collect();
             let impls: Vec<&&Fragment> = group
                 .iter()
@@ -276,10 +339,16 @@ impl EdgeBuilder for CFamilyEdgeBuilder {
             }
 
             for candidate in candidates {
-                if changed_set.contains(candidate) || discovered.contains(candidate) || !is_c_family(candidate) {
+                if changed_set.contains(candidate)
+                    || discovered.contains(candidate)
+                    || !is_c_family(candidate)
+                {
                     continue;
                 }
-                let cand_name = candidate.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                let cand_name = candidate
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 if included_headers.contains(&cand_name) {
                     hop_found.push(candidate.clone());
                     continue;

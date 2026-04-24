@@ -6,15 +6,16 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::Fragment;
 
-use super::super::base::{self, add_edge, EdgeBuilder, FragmentIndex, link_by_name};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, FragmentIndex, add_edge, link_by_name};
 
 const WEIGHT: f64 = 0.55;
 const SCRIPT_WEIGHT: f64 = 0.60;
 const REVERSE_FACTOR: f64 = 0.35;
 
-static GHA_RUN_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s{0,20}-?\s{0,5}run:\s{0,5}[|>]?\s{0,5}([^\n]{1,500})").unwrap());
+static GHA_RUN_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?m)^\s{0,20}-?\s{0,5}run:\s{0,5}[|>]?\s{0,5}([^\n]{1,500})").unwrap()
+});
 static GHA_RUN_BLOCK_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)run:\s*[|>]-?\s*\n((?:\s{2,}[^\n]*\n?)+)").unwrap());
 
@@ -42,8 +43,10 @@ static SCRIPT_CALL_RE: Lazy<Regex> = Lazy::new(|| {
 });
 
 static FILE_REF_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?:\./|scripts/|bin/|tools/|src/|tests/)([a-zA-Z0-9_.-]+(?:\.(?:sh|py|js|ts|rb))?)")
-        .unwrap()
+    Regex::new(
+        r"(?:\./|scripts/|bin/|tools/|src/|tests/)([a-zA-Z0-9_.-]+(?:\.(?:sh|py|js|ts|rb))?)",
+    )
+    .unwrap()
 });
 
 static PKG_MANAGER_SUBCOMMANDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
@@ -242,7 +245,10 @@ pub struct CICDEdgeBuilder;
 
 impl EdgeBuilder for CICDEdgeBuilder {
     fn build(&self, fragments: &[Fragment], repo_root: Option<&Path>) -> EdgeDict {
-        let ci_frags: Vec<&Fragment> = fragments.iter().filter(|f| is_ci_file(Path::new(f.path()))).collect();
+        let ci_frags: Vec<&Fragment> = fragments
+            .iter()
+            .filter(|f| is_ci_file(Path::new(f.path())))
+            .collect();
         if ci_frags.is_empty() {
             return EdgeDict::default();
         }
@@ -257,7 +263,11 @@ impl EdgeBuilder for CICDEdgeBuilder {
             }
 
             let lower = ci.content.to_lowercase();
-            if lower.contains("npm") || lower.contains("yarn") || lower.contains("pnpm") || lower.contains("npx") {
+            if lower.contains("npm")
+                || lower.contains("yarn")
+                || lower.contains("pnpm")
+                || lower.contains("npx")
+            {
                 for f in fragments {
                     let fname = Path::new(f.path())
                         .file_name()

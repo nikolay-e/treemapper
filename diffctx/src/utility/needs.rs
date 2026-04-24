@@ -33,14 +33,13 @@ static CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\w+)\s*\(").unwrap());
 static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?::|->)\s*([A-Z]\w+)").unwrap());
 static GENERIC_TYPE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[\[<,]\s*([A-Z]\w*)").unwrap());
 static INVARIANT_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(?:assert|require|ensure|precondition|postcondition|invariant)\s*\(\s*(\w+)").unwrap()
+    Regex::new(r"(?i)\b(?:assert|require|ensure|precondition|postcondition|invariant)\s*\(\s*(\w+)")
+        .unwrap()
 });
-static JS_IMPORT_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]"#).unwrap()
-});
-static PY_IMPORT_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"from\s+(\S+)\s+import\s+(.+)").unwrap()
-});
+static JS_IMPORT_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]"#).unwrap());
+static PY_IMPORT_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"from\s+(\S+)\s+import\s+(.+)").unwrap());
 static JS_LOCAL_IMPORT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r#"import\s+(?:\{([^}]+)\}|([A-Z]\w+))\s+from\s+['"]([^'"]+)['"]"#).unwrap()
 });
@@ -51,30 +50,132 @@ static TF_RES_REF_NEED_RE: Lazy<Regex> = Lazy::new(|| {
 
 static LANGUAGE_BUILTINS: Lazy<FxHashSet<String>> = Lazy::new(|| {
     [
-        "range", "enumerate", "zip", "sorted", "reversed", "isinstance", "issubclass",
-        "hasattr", "getattr", "setattr", "delattr", "callable", "iter", "next", "any", "all",
-        "abs", "round", "pow", "divmod", "repr", "dir", "vars", "globals", "locals",
-        "breakpoint", "property", "classmethod", "staticmethod", "dataclass", "object",
-        "exception", "baseexception", "valueerror", "typeerror", "keyerror", "indexerror",
-        "attributeerror", "importerror", "runtimeerror", "stopiteration", "generatorexit",
-        "oserror", "ioerror", "filenotfounderror", "permissionerror", "notimplementederror",
-        "zerodivisionerror", "overflowerror", "memoryerror", "recursionerror", "unicodeerror",
-        "assertionerror", "lookuperror", "arithmeticerror",
-        "array.from", "object.keys", "object.values", "object.entries", "array.isarray",
-        "number.isnan", "number.isfinite", "parseint", "parsefloat", "isnan", "isfinite",
-        "settimeout", "setinterval", "clearinterval", "cleartimeout", "requestanimationframe",
-        "cancelanimationframe", "typeof", "void",
-        "make", "append", "panic", "recover", "cap", "println", "printf", "sprintf", "fprintf",
+        "range",
+        "enumerate",
+        "zip",
+        "sorted",
+        "reversed",
+        "isinstance",
+        "issubclass",
+        "hasattr",
+        "getattr",
+        "setattr",
+        "delattr",
+        "callable",
+        "iter",
+        "next",
+        "any",
+        "all",
+        "abs",
+        "round",
+        "pow",
+        "divmod",
+        "repr",
+        "dir",
+        "vars",
+        "globals",
+        "locals",
+        "breakpoint",
+        "property",
+        "classmethod",
+        "staticmethod",
+        "dataclass",
+        "object",
+        "exception",
+        "baseexception",
+        "valueerror",
+        "typeerror",
+        "keyerror",
+        "indexerror",
+        "attributeerror",
+        "importerror",
+        "runtimeerror",
+        "stopiteration",
+        "generatorexit",
+        "oserror",
+        "ioerror",
+        "filenotfounderror",
+        "permissionerror",
+        "notimplementederror",
+        "zerodivisionerror",
+        "overflowerror",
+        "memoryerror",
+        "recursionerror",
+        "unicodeerror",
+        "assertionerror",
+        "lookuperror",
+        "arithmeticerror",
+        "array.from",
+        "object.keys",
+        "object.values",
+        "object.entries",
+        "array.isarray",
+        "number.isnan",
+        "number.isfinite",
+        "parseint",
+        "parsefloat",
+        "isnan",
+        "isfinite",
+        "settimeout",
+        "setinterval",
+        "clearinterval",
+        "cleartimeout",
+        "requestanimationframe",
+        "cancelanimationframe",
+        "typeof",
+        "void",
+        "make",
+        "append",
+        "panic",
+        "recover",
+        "cap",
+        "println",
+        "printf",
+        "sprintf",
+        "fprintf",
         "errorf",
-        "vec", "arc", "unwrap",
-        "usestate", "useeffect", "usecontext", "usereducer", "usecallback", "usememo", "useref",
-        "uselayouteffect", "useimperativehandle", "usedebugvalue", "useid", "usetransition",
-        "usedeferredvalue", "createcontext", "forwardref", "createref", "suspense", "strictmode",
+        "vec",
+        "arc",
+        "unwrap",
+        "usestate",
+        "useeffect",
+        "usecontext",
+        "usereducer",
+        "usecallback",
+        "usememo",
+        "useref",
+        "uselayouteffect",
+        "useimperativehandle",
+        "usedebugvalue",
+        "useid",
+        "usetransition",
+        "usedeferredvalue",
+        "createcontext",
+        "forwardref",
+        "createref",
+        "suspense",
+        "strictmode",
         "profiler",
-        "usenavigate", "useparams", "uselocation", "usesearchparams", "useloaderdata",
-        "useactiondata", "usefetcher", "useoutletcontext", "usedispatch", "useselector",
-        "usestore", "usequery", "usemutation", "usesubscription",
-        "describe", "beforeeach", "aftereach", "beforeall", "afterall", "assert",
+        "usenavigate",
+        "useparams",
+        "uselocation",
+        "usesearchparams",
+        "useloaderdata",
+        "useactiondata",
+        "usefetcher",
+        "useoutletcontext",
+        "usedispatch",
+        "useselector",
+        "usestore",
+        "usequery",
+        "usemutation",
+        "usesubscription",
+        "describe",
+        "beforeeach",
+        "aftereach",
+        "beforeall",
+        "afterall",
+        "assert",
     ]
     .iter()
     .map(|s| s.to_string())
@@ -86,7 +187,15 @@ static ONE_CLASS_PER_FILE_SUFFIXES: &[&str] = &[".swift", ".java", ".kt"];
 static TF_EXTENSIONS: &[&str] = &[".tf", ".tfvars", ".hcl"];
 static CONFIG_EXTENSIONS_FOR_DIFF: &[&str] = &[".yaml", ".yml", ".json", ".toml", ".ini"];
 static TF_SKIP_REF_TYPES: &[&str] = &[
-    "var", "local", "data", "module", "path", "terraform", "count", "each", "self",
+    "var",
+    "local",
+    "data",
+    "module",
+    "path",
+    "terraform",
+    "count",
+    "each",
+    "self",
 ];
 
 #[derive(Debug, Clone)]
@@ -150,10 +259,7 @@ fn add_needs_for_syms(
     }
 }
 
-fn collect_js_import_needs(
-    line: &str,
-    needs: &mut FxHashMap<(String, String), InformationNeed>,
-) {
+fn collect_js_import_needs(line: &str, needs: &mut FxHashMap<(String, String), InformationNeed>) {
     for m in JS_LOCAL_IMPORT_RE.captures_iter(line) {
         let named = m.get(1).map(|x| x.as_str());
         let default = m.get(2).map(|x| x.as_str());
@@ -171,10 +277,7 @@ fn collect_js_import_needs(
     }
 }
 
-fn collect_py_import_needs(
-    line: &str,
-    needs: &mut FxHashMap<(String, String), InformationNeed>,
-) {
+fn collect_py_import_needs(line: &str, needs: &mut FxHashMap<(String, String), InformationNeed>) {
     for m in PY_IMPORT_RE.captures_iter(line) {
         let module = &m[1];
         let names = &m[2];
@@ -258,8 +361,8 @@ pub fn match_strength_typed(frag: &Fragment, need: &InformationNeed) -> f64 {
         .unwrap_or_default();
     let defines = !frag_sym.is_empty() && frag_sym == *sym;
     let mentions = frag.identifiers.contains(sym);
-    let scope_match = need.scope.is_some()
-        && need.scope.as_ref().map(|s| s.as_ref()) == Some(frag.path());
+    let scope_match =
+        need.scope.is_some() && need.scope.as_ref().map(|s| s.as_ref()) == Some(frag.path());
     let nt = need.need_type.as_str();
 
     if nt == "impact" && scope_match {
@@ -358,7 +461,10 @@ fn process_line_for_needs(
     for m in CALL_RE.captures_iter(line) {
         let name = &m[1];
         let low = name.to_lowercase();
-        if name.len() < MIN_SYMBOL_LENGTH || CODE_STOPWORDS.contains(&low) || LANGUAGE_BUILTINS.contains(&low) {
+        if name.len() < MIN_SYMBOL_LENGTH
+            || CODE_STOPWORDS.contains(&low)
+            || LANGUAGE_BUILTINS.contains(&low)
+        {
             continue;
         }
         if external_syms.contains(&low) {
@@ -416,13 +522,10 @@ fn collect_test_needs(
         if !is_test_fragment(frag) {
             continue;
         }
-        let tested = frag
-            .symbol_name
-            .as_ref()
-            .map(|s| {
-                let lower = s.to_lowercase();
-                lower.strip_prefix("test_").unwrap_or(&lower).to_string()
-            });
+        let tested = frag.symbol_name.as_ref().map(|s| {
+            let lower = s.to_lowercase();
+            lower.strip_prefix("test_").unwrap_or(&lower).to_string()
+        });
         if let Some(ref tested) = tested {
             if core_symbol_names.contains(tested)
                 || needs.contains_key(&("definition".to_string(), tested.clone()))
@@ -535,7 +638,10 @@ fn collect_terraform_needs(
     }
 }
 
-pub fn concepts_from_diff_text(diff_text: &str, changed_lines: Option<&[String]>) -> FxHashSet<String> {
+pub fn concepts_from_diff_text(
+    diff_text: &str,
+    changed_lines: Option<&[String]>,
+) -> FxHashSet<String> {
     let owned;
     let lines = match changed_lines {
         Some(l) => l,

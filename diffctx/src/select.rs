@@ -63,9 +63,7 @@ impl IntervalIndex {
         self.ids.insert(frag_id.clone());
         let intervals = self.by_path.entry(frag_id.path.clone()).or_default();
         let item = (frag_id.start_line, frag_id.end_line);
-        let pos = intervals
-            .binary_search(&item)
-            .unwrap_or_else(|e| e);
+        let pos = intervals.binary_search(&item).unwrap_or_else(|e| e);
         intervals.insert(pos, item);
     }
 
@@ -78,8 +76,7 @@ impl IntervalIndex {
             Some(v) => v,
             None => return false,
         };
-        let upper = intervals
-            .partition_point(|&(s, _)| s <= frag.end_line());
+        let upper = intervals.partition_point(|&(s, _)| s <= frag.end_line());
         for i in 0..upper {
             let (start, end) = intervals[i];
             if start == frag.start_line() && end == frag.end_line() {
@@ -97,8 +94,7 @@ impl IntervalIndex {
             Some(v) => v,
             None => return false,
         };
-        let upper = intervals
-            .partition_point(|&(s, _)| s <= frag.start_line());
+        let upper = intervals.partition_point(|&(s, _)| s <= frag.start_line());
         for i in 0..upper {
             let (start, end) = intervals[i];
             if start == frag.start_line() && end == frag.end_line() {
@@ -120,8 +116,7 @@ struct HeapEntry {
 
 impl PartialEq for HeapEntry {
     fn eq(&self, other: &Self) -> bool {
-        self.neg_density.to_bits() == other.neg_density.to_bits()
-            && self.frag_id == other.frag_id
+        self.neg_density.to_bits() == other.neg_density.to_bits() && self.frag_id == other.frag_id
     }
 }
 
@@ -160,24 +155,27 @@ fn drop_redundant_signatures(candidates: &[Fragment], budget: u32) -> Vec<Fragme
                 return true;
             }
             let key = (f.id.path.clone(), f.start_line());
-            full_token_by_loc.get(&key).copied().unwrap_or(SENTINEL_TOKEN_COUNT) > budget
+            full_token_by_loc
+                .get(&key)
+                .copied()
+                .unwrap_or(SENTINEL_TOKEN_COUNT)
+                > budget
         })
         .cloned()
         .collect()
 }
 
 fn adaptive_baseline_k(n_candidates: usize) -> usize {
-    BASELINE_K_MAX.min(
-        (BASELINE_SAMPLE_FRACTION * n_candidates as f64).ceil() as usize,
-    )
+    BASELINE_K_MAX.min((BASELINE_SAMPLE_FRACTION * n_candidates as f64).ceil() as usize)
 }
 
-fn compute_r_cap(rel: &FxHashMap<FragmentId, f64>, core_ids: Option<&FxHashSet<FragmentId>>) -> f64 {
+fn compute_r_cap(
+    rel: &FxHashMap<FragmentId, f64>,
+    core_ids: Option<&FxHashSet<FragmentId>>,
+) -> f64 {
     let values: Vec<f64> = rel
         .iter()
-        .filter(|(fid, v)| {
-            **v > 0.0 && core_ids.map_or(true, |c| !c.contains(*fid))
-        })
+        .filter(|(fid, v)| **v > 0.0 && core_ids.map_or(true, |c| !c.contains(*fid)))
         .map(|(_, v)| *v)
         .collect();
 
@@ -199,7 +197,8 @@ fn compute_r_cap(rel: &FxHashMap<FragmentId, f64>, core_ids: Option<&FxHashSet<F
     };
 
     let mean: f64 = values.iter().sum::<f64>() / values.len() as f64;
-    let variance: f64 = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
+    let variance: f64 =
+        values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     let std = variance.sqrt();
 
     (med + UTILITY.r_cap_sigma * std).max(1e-9)
@@ -282,7 +281,12 @@ fn build_initial_heap(
     let mut heap = BinaryHeap::new();
     for frag in candidates {
         if frag.token_count > 0 {
-            let density = compute_density(frag, rel.get(&frag.id).copied().unwrap_or(0.0), needs, state);
+            let density = compute_density(
+                frag,
+                rel.get(&frag.id).copied().unwrap_or(0.0),
+                needs,
+                state,
+            );
             heap.push(HeapEntry {
                 neg_density: -density,
                 frag_id: frag.id.clone(),
@@ -469,8 +473,16 @@ fn setup_and_select_core(
         .cloned()
         .collect();
     core_fragments.sort_by(|a, b| {
-        let ta = if a.token_count > 0 { a.token_count } else { SENTINEL_TOKEN_COUNT };
-        let tb = if b.token_count > 0 { b.token_count } else { SENTINEL_TOKEN_COUNT };
+        let ta = if a.token_count > 0 {
+            a.token_count
+        } else {
+            SENTINEL_TOKEN_COUNT
+        };
+        let tb = if b.token_count > 0 {
+            b.token_count
+        } else {
+            SENTINEL_TOKEN_COUNT
+        };
         ta.cmp(&tb)
             .then(a.line_count().cmp(&b.line_count()))
             .then(a.start_line().cmp(&b.start_line()))
@@ -484,9 +496,17 @@ fn setup_and_select_core(
 
     let sig_lookup = build_signature_lookup(fragments, &core_fragments);
     let mut state = init_selection_state(core_ids, rel, budget_tokens, file_importance);
-    select_core_fragments(&core_fragments, rel, needs, &mut state, budget_tokens, &sig_lookup);
+    select_core_fragments(
+        &core_fragments,
+        rel,
+        needs,
+        &mut state,
+        budget_tokens,
+        &sig_lookup,
+    );
 
-    let selected_core_ids: FxHashSet<FragmentId> = state.selected.iter().map(|f| f.id.clone()).collect();
+    let selected_core_ids: FxHashSet<FragmentId> =
+        state.selected.iter().map(|f| f.id.clone()).collect();
     let skipped_core: Vec<FragmentId> = core_ids
         .iter()
         .filter(|id| !selected_core_ids.contains(*id))
@@ -505,7 +525,12 @@ fn setup_and_select_core(
 
     let should_return_early = state.remaining_budget == 0;
     let selected_copy = state.selected.clone();
-    (state, non_core_with_skipped, selected_copy, should_return_early)
+    (
+        state,
+        non_core_with_skipped,
+        selected_copy,
+        should_return_early,
+    )
 }
 
 pub fn lazy_greedy_select(
@@ -527,8 +552,14 @@ pub fn lazy_greedy_select(
     }
 
     let (mut state, non_core_fragments, _selected_core, should_return_early) =
-        setup_and_select_core(&fragments, core_ids, rel, needs, budget_tokens, file_importance);
-
+        setup_and_select_core(
+            &fragments,
+            core_ids,
+            rel,
+            needs,
+            budget_tokens,
+            file_importance,
+        );
 
     if should_return_early {
         let used = budget_tokens - state.remaining_budget;
@@ -553,10 +584,23 @@ pub fn lazy_greedy_select(
 
     let baseline_k = adaptive_baseline_k(candidates.len());
     let mut id_to_frag: FxHashMap<FragmentId, Fragment> = FxHashMap::default();
-    let mut heap = build_initial_heap(&candidates, rel, needs, &state.utility_state, &mut id_to_frag);
+    let mut heap = build_initial_heap(
+        &candidates,
+        rel,
+        needs,
+        &state.utility_state,
+        &mut id_to_frag,
+    );
 
-    let (selections_for_baseline, threshold) =
-        run_greedy_loop_heap(&mut heap, &id_to_frag, &mut state, rel, needs, tau, baseline_k);
+    let (selections_for_baseline, threshold) = run_greedy_loop_heap(
+        &mut heap,
+        &id_to_frag,
+        &mut state,
+        rel,
+        needs,
+        tau,
+        baseline_k,
+    );
 
     let greedy_utility = utility_value(&state.utility_state);
 

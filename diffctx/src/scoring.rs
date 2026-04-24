@@ -56,17 +56,14 @@ impl ScoringStrategy for PPRScoring {
         _discovered_paths: Option<&FxHashSet<Arc<str>>>,
     ) -> ScoringResult {
         let skip_expensive = all_fragments.len() > LIMITS.skip_expensive_threshold;
-        let (edges, categories) = edges::collect_all_edges(all_fragments, repo_root, skip_expensive);
+        let (edges, categories) =
+            edges::collect_all_edges(all_fragments, repo_root, skip_expensive);
         let mut g = graph::build_graph(all_fragments, edges, categories);
         let mut rel_scores =
             personalized_pagerank(&mut g, core_ids, self.alpha, 1e-4, 0.4, seed_weights);
         filtering::apply_hunk_proximity_bonus(&mut rel_scores, core_ids, all_fragments, hunks);
 
-        let filtered = filtering::filter_unrelated_fragments(
-            all_fragments.to_vec(),
-            core_ids,
-            &g,
-        );
+        let filtered = filtering::filter_unrelated_fragments(all_fragments.to_vec(), core_ids, &g);
         let filtered = if self.low_relevance_filter {
             filtering::filter_low_relevance(filtered, core_ids, &rel_scores)
         } else {
@@ -103,7 +100,8 @@ impl ScoringStrategy for EgoGraphScoring {
         _discovered_paths: Option<&FxHashSet<Arc<str>>>,
     ) -> ScoringResult {
         let skip_expensive = all_fragments.len() > LIMITS.skip_expensive_threshold;
-        let (edges, categories) = edges::collect_all_edges(all_fragments, repo_root, skip_expensive);
+        let (edges, categories) =
+            edges::collect_all_edges(all_fragments, repo_root, skip_expensive);
         let g = graph::build_graph(all_fragments, edges, categories);
         let mut rel_scores = g.ego_graph(core_ids, self.max_depth);
 
@@ -128,11 +126,7 @@ impl ScoringStrategy for EgoGraphScoring {
             }
         }
 
-        let filtered = filtering::filter_unrelated_fragments(
-            all_fragments.to_vec(),
-            core_ids,
-            &g,
-        );
+        let filtered = filtering::filter_unrelated_fragments(all_fragments.to_vec(), core_ids, &g);
         let filtered = filtering::filter_positive_relevance(filtered, core_ids, &rel_scores);
         let filtered = filtering::cap_context_fragments(filtered, core_ids, &rel_scores);
 

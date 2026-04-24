@@ -7,12 +7,11 @@ use rustc_hash::FxHashMap;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId, FragmentKind};
 
-use super::base::{add_edge, EdgeBuilder};
 use super::EdgeDict;
+use super::base::{EdgeBuilder, add_edge};
 
 static HEADING_PREFIX_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^#+\s*").unwrap());
-static MD_INTERNAL_LINK_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\[.*?\]\(#([^)]+)\)").unwrap());
+static MD_INTERNAL_LINK_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[.*?\]\(#([^)]+)\)").unwrap());
 static CITATION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\[@([^\]]+)\]").unwrap());
 
 fn slugify(text: &str) -> String {
@@ -62,7 +61,10 @@ impl EdgeBuilder for DocumentStructureEdgeBuilder {
 pub struct AnchorLinkEdgeBuilder;
 
 impl AnchorLinkEdgeBuilder {
-    fn build_anchor_index<'a>(&self, fragments: &'a [Fragment]) -> FxHashMap<String, &'a FragmentId> {
+    fn build_anchor_index<'a>(
+        &self,
+        fragments: &'a [Fragment],
+    ) -> FxHashMap<String, &'a FragmentId> {
         let mut index: FxHashMap<String, &FragmentId> = FxHashMap::default();
         for f in fragments {
             if f.kind == FragmentKind::Section {

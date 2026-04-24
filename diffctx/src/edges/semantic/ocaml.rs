@@ -7,28 +7,22 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids, discover_files_by_refs};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids, discover_files_by_refs};
 
 fn is_ocaml_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
     ext == ".ml" || ext == ".mli"
 }
 
-static OPEN_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*open\s+([A-Z]\w*)").unwrap());
-static INCLUDE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*include\s+([A-Z]\w*)").unwrap());
+static OPEN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*open\s+([A-Z]\w*)").unwrap());
+static INCLUDE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*include\s+([A-Z]\w*)").unwrap());
 static MODULE_DEF_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*module\s+([A-Z]\w*)").unwrap());
-static LET_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*let\s+(\w+)").unwrap());
-static VAL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*val\s+(\w+)").unwrap());
-static TYPE_DEF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*type\s+(\w+)").unwrap());
-static MODULE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\.\w+").unwrap());
+static LET_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*let\s+(\w+)").unwrap());
+static VAL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*val\s+(\w+)").unwrap());
+static TYPE_DEF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*type\s+(\w+)").unwrap());
+static MODULE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\.\w+").unwrap());
 
 fn extract_opens(content: &str) -> FxHashSet<String> {
     let mut refs = FxHashSet::default();
@@ -39,7 +33,11 @@ fn extract_opens(content: &str) -> FxHashSet<String> {
 
 fn extract_defs(content: &str) -> FxHashSet<String> {
     let mut defs = FxHashSet::default();
-    defs.extend(MODULE_DEF_RE.captures_iter(content).map(|c| c[1].to_string()));
+    defs.extend(
+        MODULE_DEF_RE
+            .captures_iter(content)
+            .map(|c| c[1].to_string()),
+    );
     defs.extend(LET_RE.captures_iter(content).map(|c| c[1].to_string()));
     defs.extend(VAL_RE.captures_iter(content).map(|c| c[1].to_string()));
     defs.extend(TYPE_DEF_RE.captures_iter(content).map(|c| c[1].to_string()));
@@ -47,15 +45,23 @@ fn extract_defs(content: &str) -> FxHashSet<String> {
 }
 
 fn extract_module_refs(content: &str) -> FxHashSet<String> {
-    MODULE_REF_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+    MODULE_REF_RE
+        .captures_iter(content)
+        .map(|c| c[1].to_string())
+        .collect()
 }
 
 pub struct OCamlEdgeBuilder;
 
 impl EdgeBuilder for OCamlEdgeBuilder {
     fn build(&self, fragments: &[Fragment], repo_root: Option<&Path>) -> EdgeDict {
-        let frags: Vec<&Fragment> = fragments.iter().filter(|f| is_ocaml_file(Path::new(f.path()))).collect();
-        if frags.is_empty() { return FxHashMap::default(); }
+        let frags: Vec<&Fragment> = fragments
+            .iter()
+            .filter(|f| is_ocaml_file(Path::new(f.path())))
+            .collect();
+        if frags.is_empty() {
+            return FxHashMap::default();
+        }
 
         let open_w = EDGE_WEIGHTS["ocaml_open"].forward;
         let _type_w = EDGE_WEIGHTS["ocaml_type"].forward;
@@ -67,7 +73,10 @@ impl EdgeBuilder for OCamlEdgeBuilder {
         let mut name_to_defs: FxHashMap<String, Vec<_>> = FxHashMap::default();
         for f in &frags {
             for name in extract_defs(&f.content) {
-                name_to_defs.entry(name.to_lowercase()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
             }
         }
 
@@ -82,15 +91,27 @@ impl EdgeBuilder for OCamlEdgeBuilder {
                 }
             }
             for mref in extract_module_refs(&f.content) {
-                if self_defs.contains(&mref) { continue; }
+                if self_defs.contains(&mref) {
+                    continue;
+                }
                 if let Some(targets) = name_to_defs.get(&mref.to_lowercase()) {
-                    for t in targets { if t != &f.id { add_edge(&mut edges, &f.id, t, mod_w, reverse_factor); } }
+                    for t in targets {
+                        if t != &f.id {
+                            add_edge(&mut edges, &f.id, t, mod_w, reverse_factor);
+                        }
+                    }
                 }
             }
             for id in &f.identifiers {
-                if self_defs.contains(id) { continue; }
+                if self_defs.contains(id) {
+                    continue;
+                }
                 if let Some(targets) = name_to_defs.get(&id.to_lowercase()) {
-                    for t in targets { if t != &f.id { add_edge(&mut edges, &f.id, t, fn_w, reverse_factor); } }
+                    for t in targets {
+                        if t != &f.id {
+                            add_edge(&mut edges, &f.id, t, fn_w, reverse_factor);
+                        }
+                    }
                 }
             }
         }
@@ -98,11 +119,16 @@ impl EdgeBuilder for OCamlEdgeBuilder {
     }
 
     fn discover_related_files(
-        &self, changed: &[PathBuf], candidates: &[PathBuf],
-        repo_root: Option<&Path>, file_cache: Option<&FxHashMap<PathBuf, String>>,
+        &self,
+        changed: &[PathBuf],
+        candidates: &[PathBuf],
+        repo_root: Option<&Path>,
+        file_cache: Option<&FxHashMap<PathBuf, String>>,
     ) -> Vec<PathBuf> {
         let ml_changed: Vec<&PathBuf> = changed.iter().filter(|f| is_ocaml_file(f)).collect();
-        if ml_changed.is_empty() { return vec![]; }
+        if ml_changed.is_empty() {
+            return vec![];
+        }
         let mut refs = FxHashSet::default();
         for f in &ml_changed {
             if let Some(content) = base::read_file_cached(f, file_cache) {

@@ -32,10 +32,7 @@ impl EdgeCategory {
     }
 
     fn is_suppression_exempt(self) -> bool {
-        matches!(
-            self,
-            Self::Semantic | Self::Structural | Self::TestEdge
-        )
+        matches!(self, Self::Semantic | Self::Structural | Self::TestEdge)
     }
 }
 
@@ -132,10 +129,8 @@ impl Graph {
             return FxHashMap::default();
         }
 
-        let valid_seeds: Vec<&FragmentId> = seeds
-            .iter()
-            .filter(|s| self.nodes.contains(*s))
-            .collect();
+        let valid_seeds: Vec<&FragmentId> =
+            seeds.iter().filter(|s| self.nodes.contains(*s)).collect();
 
         let per_seed: Vec<FxHashMap<FragmentId, f64>> = valid_seeds
             .par_iter()
@@ -167,11 +162,7 @@ impl Graph {
         scores
     }
 
-    fn bfs_from_seed(
-        &self,
-        seed: &FragmentId,
-        radius: usize,
-    ) -> FxHashMap<FragmentId, usize> {
+    fn bfs_from_seed(&self, seed: &FragmentId, radius: usize) -> FxHashMap<FragmentId, usize> {
         let mut visited: FxHashMap<FragmentId, usize> = FxHashMap::default();
         visited.insert(seed.clone(), 0);
         let mut frontier: FxHashMap<FragmentId, usize> = FxHashMap::default();
@@ -265,10 +256,8 @@ fn apply_hub_suppression(
         return;
     }
 
-    let edge_list: Vec<((FragmentId, FragmentId), f64)> = edges
-        .iter()
-        .map(|(k, &v)| (k.clone(), v))
-        .collect();
+    let edge_list: Vec<((FragmentId, FragmentId), f64)> =
+        edges.iter().map(|(k, &v)| (k.clone(), v)).collect();
 
     let mut node_set: FxHashMap<FragmentId, u32> = FxHashMap::default();
     for ((src, dst), _) in &edge_list {

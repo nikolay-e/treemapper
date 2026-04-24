@@ -64,16 +64,28 @@ fn build_covered_set(covered: &[(u32, u32)]) -> rustc_hash::FxHashSet<u32> {
 }
 
 fn trim_blank_lines(lines: &[&str], mut start: u32, mut end: u32) -> (u32, u32) {
-    while start <= end && lines.get((start - 1) as usize).map_or(true, |l| l.trim().is_empty()) {
+    while start <= end
+        && lines
+            .get((start - 1) as usize)
+            .map_or(true, |l| l.trim().is_empty())
+    {
         start += 1;
     }
-    while end >= start && lines.get((end - 1) as usize).map_or(true, |l| l.trim().is_empty()) {
+    while end >= start
+        && lines
+            .get((end - 1) as usize)
+            .map_or(true, |l| l.trim().is_empty())
+    {
         end -= 1;
     }
     (start, end)
 }
 
-fn create_code_gap_fragments(path: Arc<str>, lines: &[&str], covered: &[(u32, u32)]) -> Vec<Fragment> {
+fn create_code_gap_fragments(
+    path: Arc<str>,
+    lines: &[&str],
+    covered: &[(u32, u32)],
+) -> Vec<Fragment> {
     if lines.is_empty() {
         return Vec::new();
     }

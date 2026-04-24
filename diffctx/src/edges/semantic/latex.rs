@@ -7,16 +7,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{self, EdgeBuilder, discover_files_by_refs};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, discover_files_by_refs};
 
 fn is_latex_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
     matches!(ext.as_str(), ".tex" | ".sty" | ".cls" | ".bib")
 }
 
-static INPUT_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\\(?:input|include)\{([^}]+)\}").unwrap());
+static INPUT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\(?:input|include)\{([^}]+)\}").unwrap());
 static USEPACKAGE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\\usepackage(?:\[.*?\])?\{([^}]+)\}").unwrap());
 static BIB_RE: Lazy<Regex> =
@@ -32,13 +31,17 @@ fn extract_refs(content: &str) -> FxHashSet<String> {
     for cap in USEPACKAGE_RE.captures_iter(content) {
         for pkg in cap[1].split(',') {
             let name = pkg.trim();
-            if !name.is_empty() { refs.insert(name.to_string()); }
+            if !name.is_empty() {
+                refs.insert(name.to_string());
+            }
         }
     }
     for cap in BIB_RE.captures_iter(content) {
         for bib in cap[1].split(',') {
             let name = bib.trim();
-            if !name.is_empty() { refs.insert(name.to_string()); }
+            if !name.is_empty() {
+                refs.insert(name.to_string());
+            }
         }
     }
     refs
@@ -48,8 +51,13 @@ pub struct LatexEdgeBuilder;
 
 impl EdgeBuilder for LatexEdgeBuilder {
     fn build(&self, fragments: &[Fragment], repo_root: Option<&Path>) -> EdgeDict {
-        let frags: Vec<&Fragment> = fragments.iter().filter(|f| is_latex_file(Path::new(f.path()))).collect();
-        if frags.is_empty() { return FxHashMap::default(); }
+        let frags: Vec<&Fragment> = fragments
+            .iter()
+            .filter(|f| is_latex_file(Path::new(f.path())))
+            .collect();
+        if frags.is_empty() {
+            return FxHashMap::default();
+        }
 
         let input_w = EDGE_WEIGHTS["latex_input"].forward;
         let pkg_w = EDGE_WEIGHTS["latex_package"].forward;
@@ -87,11 +95,16 @@ impl EdgeBuilder for LatexEdgeBuilder {
     }
 
     fn discover_related_files(
-        &self, changed: &[PathBuf], candidates: &[PathBuf],
-        repo_root: Option<&Path>, file_cache: Option<&FxHashMap<PathBuf, String>>,
+        &self,
+        changed: &[PathBuf],
+        candidates: &[PathBuf],
+        repo_root: Option<&Path>,
+        file_cache: Option<&FxHashMap<PathBuf, String>>,
     ) -> Vec<PathBuf> {
         let tex_changed: Vec<&PathBuf> = changed.iter().filter(|f| is_latex_file(f)).collect();
-        if tex_changed.is_empty() { return vec![]; }
+        if tex_changed.is_empty() {
+            return vec![];
+        }
         let mut refs = FxHashSet::default();
         for f in &tex_changed {
             if let Some(content) = base::read_file_cached(f, file_cache) {

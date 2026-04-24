@@ -6,8 +6,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, add_edge, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge};
 
 const WEIGHT: f64 = 0.65;
 const CONFIGMAP_SECRET_WEIGHT: f64 = 0.70;
@@ -20,25 +20,28 @@ static YAML_EXTS: Lazy<FxHashSet<&str>> = Lazy::new(|| [".yaml", ".yml"].iter().
 
 static K8S_API_VERSION_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^apiVersion:\s?([^\s#]{1,100})").unwrap());
-static K8S_KIND_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^kind:\s?(\w{1,100})").unwrap());
-static K8S_METADATA_NAME_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r##"(?m)^metadata:\s*\n\s{2,4}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
+static K8S_KIND_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^kind:\s?(\w{1,100})").unwrap());
+static K8S_METADATA_NAME_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r##"(?m)^metadata:\s*\n\s{2,4}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap()
+});
 static K8S_NAME_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r##"(?m)^\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
-static CONFIGMAP_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r##"(?m)configMapKeyRef:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
+static CONFIGMAP_REF_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r##"(?m)configMapKeyRef:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap()
+});
 static CONFIGMAP_NAME_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r##"(?m)configMapName:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
-static SECRET_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r##"(?m)secretKeyRef:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
+static SECRET_REF_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r##"(?m)secretKeyRef:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap()
+});
 static SECRET_NAME_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r##"(?m)secretName:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
 
 static SERVICE_NAME_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r##"(?m)serviceName:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
-static BACKEND_SERVICE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r##"(?m)service:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
+static BACKEND_SERVICE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r##"(?m)service:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap()
+});
 
 static IMAGE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r##"(?m)^\s{1,20}image:\s?['"]?([^'"#\n]{1,300})"##).unwrap());
@@ -52,18 +55,22 @@ static LABELS_RE: Lazy<Regex> = Lazy::new(|| {
         .unwrap()
 });
 static LABEL_PAIR_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r##"(?m)^\s{0,20}([a-zA-Z0-9_./-]{1,100}):\s?['"]?([a-zA-Z0-9_./-]{1,100})['"]?\s{0,10}$"##)
-        .unwrap()
+    Regex::new(
+        r##"(?m)^\s{0,20}([a-zA-Z0-9_./-]{1,100}):\s?['"]?([a-zA-Z0-9_./-]{1,100})['"]?\s{0,10}$"##,
+    )
+    .unwrap()
 });
 static SIMPLE_SELECTOR_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)selector:\s?\n((?:\s{1,20}[a-zA-Z0-9_./-]{1,100}:\s?[^\n:]{1,200}\n){1,50})")
         .unwrap()
 });
 
-static VOLUME_CONFIGMAP_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r##"(?m)configMap:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
-static VOLUME_SECRET_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r##"(?m)secret:\s?\n\s{1,20}secretName:\s?['"]?([^'"#\n]{1,200})"##).unwrap());
+static VOLUME_CONFIGMAP_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r##"(?m)configMap:\s?\n\s{1,20}name:\s?['"]?([^'"#\n]{1,200})"##).unwrap()
+});
+static VOLUME_SECRET_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r##"(?m)secret:\s?\n\s{1,20}secretName:\s?['"]?([^'"#\n]{1,200})"##).unwrap()
+});
 static VOLUME_PVC_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r##"(?m)persistentVolumeClaim:\s?\n\s{1,20}claimName:\s?['"]?([^'"#\n]{1,200})"##)
         .unwrap()
@@ -182,8 +189,10 @@ fn labels_match(selector: &FxHashMap<String, String>, labels: &FxHashMap<String,
 
 fn collect_k8s_dirs(k8s_files: &[&PathBuf]) -> FxHashSet<PathBuf> {
     let mut dirs = FxHashSet::default();
-    let special_dirs: FxHashSet<&str> =
-        ["base", "overlays", "templates", "manifests"].iter().copied().collect();
+    let special_dirs: FxHashSet<&str> = ["base", "overlays", "templates", "manifests"]
+        .iter()
+        .copied()
+        .collect();
 
     for f in k8s_files {
         if let Some(parent) = f.parent() {

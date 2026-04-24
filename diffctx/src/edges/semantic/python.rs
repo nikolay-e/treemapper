@@ -8,22 +8,19 @@ use crate::config::extensions::PYTHON_EXTENSIONS;
 use crate::config::weights::LANG_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, path_to_module};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, path_to_module};
 
 fn is_python_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
     PYTHON_EXTENSIONS.contains(ext.as_str())
 }
 
-static IMPORT_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*import\s+([\w.]+)").unwrap());
+static IMPORT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*import\s+([\w.]+)").unwrap());
 static FROM_IMPORT_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*from\s+([\w.]+)\s+import\s+(.+)").unwrap());
-static CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Za-z_]\w*)\s*\(").unwrap());
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
+static CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Za-z_]\w*)\s*\(").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
 static DEF_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*(?:def|class|async\s+def)\s+([A-Za-z_]\w*)").unwrap());
 
@@ -76,12 +73,61 @@ fn extract_type_refs(content: &str) -> FxHashSet<String> {
 
 static PY_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "if", "for", "while", "return", "def", "class", "import", "from", "as", "with", "try",
-        "except", "finally", "raise", "pass", "break", "continue", "yield", "lambda", "assert",
-        "del", "elif", "else", "global", "nonlocal", "and", "or", "not", "is", "in", "async",
-        "await", "True", "False", "None", "print", "len", "range", "type", "list", "dict", "set",
-        "tuple", "str", "int", "float", "bool", "super", "isinstance", "hasattr", "getattr",
-        "setattr", "property", "staticmethod", "classmethod",
+        "if",
+        "for",
+        "while",
+        "return",
+        "def",
+        "class",
+        "import",
+        "from",
+        "as",
+        "with",
+        "try",
+        "except",
+        "finally",
+        "raise",
+        "pass",
+        "break",
+        "continue",
+        "yield",
+        "lambda",
+        "assert",
+        "del",
+        "elif",
+        "else",
+        "global",
+        "nonlocal",
+        "and",
+        "or",
+        "not",
+        "is",
+        "in",
+        "async",
+        "await",
+        "True",
+        "False",
+        "None",
+        "print",
+        "len",
+        "range",
+        "type",
+        "list",
+        "dict",
+        "set",
+        "tuple",
+        "str",
+        "int",
+        "float",
+        "bool",
+        "super",
+        "isinstance",
+        "hasattr",
+        "getattr",
+        "setattr",
+        "property",
+        "staticmethod",
+        "classmethod",
     ]
     .iter()
     .copied()
@@ -97,7 +143,10 @@ pub struct PythonEdgeBuilder;
 
 impl EdgeBuilder for PythonEdgeBuilder {
     fn build(&self, fragments: &[Fragment], repo_root: Option<&Path>) -> EdgeDict {
-        let py_frags: Vec<&Fragment> = fragments.iter().filter(|f| is_python_file(Path::new(f.path()))).collect();
+        let py_frags: Vec<&Fragment> = fragments
+            .iter()
+            .filter(|f| is_python_file(Path::new(f.path())))
+            .collect();
         if py_frags.is_empty() {
             return FxHashMap::default();
         }
@@ -114,13 +163,19 @@ impl EdgeBuilder for PythonEdgeBuilder {
         for f in &py_frags {
             let defines = extract_defines(&f.content);
             for name in &defines {
-                name_to_defs.entry(name.clone()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
             frag_defines.insert(f.id.clone(), defines);
 
             let module = path_to_module(Path::new(f.path()), repo_root);
             if !module.is_empty() {
-                module_to_frags.entry(module).or_default().push(f.id.clone());
+                module_to_frags
+                    .entry(module)
+                    .or_default()
+                    .push(f.id.clone());
             }
         }
 
@@ -136,7 +191,11 @@ impl EdgeBuilder for PythonEdgeBuilder {
             .iter()
             .filter_map(|f| {
                 let m = path_to_module(Path::new(f.path()), repo_root);
-                if m.is_empty() { None } else { Some((f.id.clone(), m)) }
+                if m.is_empty() {
+                    None
+                } else {
+                    Some((f.id.clone(), m))
+                }
             })
             .collect();
 
@@ -148,7 +207,9 @@ impl EdgeBuilder for PythonEdgeBuilder {
 
             let calls = extract_calls(&f.content);
             let type_refs = extract_type_refs(&f.content);
-            let refs: FxHashSet<String> = f.identifiers.iter()
+            let refs: FxHashSet<String> = f
+                .identifiers
+                .iter()
                 .filter(|id| !self_defs.contains(*id))
                 .cloned()
                 .collect();
@@ -167,9 +228,15 @@ impl EdgeBuilder for PythonEdgeBuilder {
                             if dst_id == &f.id {
                                 continue;
                             }
-                            let dst_module = frag_to_module.get(dst_id).map(|s| s.as_str()).unwrap_or("");
-                            let confirmed = !dst_module.is_empty() && src_imports.contains(dst_module);
-                            let factor = if confirmed { IMPORT_CONFIRMED_BOOST } else { IMPORT_UNCONFIRMED_PENALTY };
+                            let dst_module =
+                                frag_to_module.get(dst_id).map(|s| s.as_str()).unwrap_or("");
+                            let confirmed =
+                                !dst_module.is_empty() && src_imports.contains(dst_module);
+                            let factor = if confirmed {
+                                IMPORT_CONFIRMED_BOOST
+                            } else {
+                                IMPORT_UNCONFIRMED_PENALTY
+                            };
                             let w = base_weight * factor;
                             let key_fwd = (f.id.clone(), dst_id.clone());
                             let existing = edges.get(&key_fwd).copied().unwrap_or(0.0);
@@ -229,7 +296,10 @@ impl EdgeBuilder for PythonEdgeBuilder {
             let module = path_to_module(f, repo_root);
             if !module.is_empty() {
                 file_to_module.insert(f.clone(), module.clone());
-                module_to_files.entry(module.clone()).or_default().push(f.clone());
+                module_to_files
+                    .entry(module.clone())
+                    .or_default()
+                    .push(f.clone());
                 let parts: Vec<&str> = module.split('.').collect();
                 for i in 1..parts.len() {
                     module_to_files

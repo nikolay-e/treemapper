@@ -6,8 +6,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, add_edge, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge};
 
 const WEIGHT: f64 = 0.70;
 const REVERSE_FACTOR: f64 = 0.45;
@@ -215,13 +215,12 @@ fn add_chart_file_edges(
     edges: &mut EdgeDict,
 ) {
     for cf in chart_files {
-        let cf_root = get_chart_root_from_fragment(Path::new(cf.path()))
-            .unwrap_or_else(|| {
-                Path::new(cf.path())
-                    .parent()
-                    .unwrap_or(Path::new(""))
-                    .to_path_buf()
-            });
+        let cf_root = get_chart_root_from_fragment(Path::new(cf.path())).unwrap_or_else(|| {
+            Path::new(cf.path())
+                .parent()
+                .unwrap_or(Path::new(""))
+                .to_path_buf()
+        });
         if cf_root == chart_root {
             add_edge(edges, &tmpl.id, &cf.id, WEIGHT * 0.5, REVERSE_FACTOR);
         }
@@ -311,7 +310,9 @@ impl EdgeBuilder for HelmEdgeBuilder {
             if changed_set.contains(candidate) {
                 continue;
             }
-            if !is_helm_template(candidate) && !is_helm_values(candidate) && !is_chart_yaml(candidate)
+            if !is_helm_template(candidate)
+                && !is_helm_values(candidate)
+                && !is_chart_yaml(candidate)
             {
                 continue;
             }

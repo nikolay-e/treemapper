@@ -9,7 +9,7 @@ use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
-use _diffctx::memory_pipeline::{build_diff_context_in_memory, MemoryRepo};
+use _diffctx::memory_pipeline::{MemoryRepo, build_diff_context_in_memory};
 use _diffctx::mode::ScoringMode;
 use _diffctx::render::FragmentEntry;
 use _diffctx::tokenizer::count_tokens;
@@ -195,7 +195,11 @@ fn matches_selector(frag: &FragmentEntry, sel: &Selector, accept: &Accept) -> bo
         }
     }
     if let Some(ref anchor) = sel.anchor {
-        let in_content = frag.content.as_deref().unwrap_or("").contains(anchor.as_str());
+        let in_content = frag
+            .content
+            .as_deref()
+            .unwrap_or("")
+            .contains(anchor.as_str());
         let in_path = frag.path.contains(anchor.as_str());
         if !in_content && !in_path {
             return false;
@@ -204,8 +208,14 @@ fn matches_selector(frag: &FragmentEntry, sel: &Selector, accept: &Accept) -> bo
     true
 }
 
-fn fragment_matched(output_frags: &[FragmentEntry], decl: &DeclaredFragment, accept: &Accept) -> bool {
-    output_frags.iter().any(|f| matches_selector(f, &decl.selector, accept))
+fn fragment_matched(
+    output_frags: &[FragmentEntry],
+    decl: &DeclaredFragment,
+    accept: &Accept,
+) -> bool {
+    output_frags
+        .iter()
+        .any(|f| matches_selector(f, &decl.selector, accept))
 }
 
 fn calculate_budget(case: &TestCase) -> u32 {
@@ -254,11 +264,8 @@ fn build_memory_repo(case: &TestCase) -> MemoryRepo {
 }
 
 fn evaluate_oracle(case: &TestCase, output_frags: &[FragmentEntry]) -> TestResult {
-    let decl_by_id: FxHashMap<&str, &DeclaredFragment> = case
-        .fragments
-        .iter()
-        .map(|d| (d.id.as_str(), d))
-        .collect();
+    let decl_by_id: FxHashMap<&str, &DeclaredFragment> =
+        case.fragments.iter().map(|d| (d.id.as_str(), d)).collect();
 
     let mut required_hits = 0usize;
     let mut missing_required = Vec::new();
@@ -321,14 +328,8 @@ fn run_single_test(case: &TestCase) -> TestResult {
     let repo = build_memory_repo(case);
     let budget = calculate_budget(case);
 
-    let output = build_diff_context_in_memory(
-        &repo,
-        Some(budget),
-        0.60,
-        0.05,
-        false,
-        ScoringMode::Hybrid,
-    );
+    let output =
+        build_diff_context_in_memory(&repo, Some(budget), 0.60, 0.05, false, ScoringMode::Hybrid);
 
     let mut result = evaluate_oracle(case, &output.fragments);
     result.elapsed_secs = t0.elapsed().as_secs_f64();
@@ -350,10 +351,16 @@ fn load_all_cases(dir: &Path) -> Vec<(PathBuf, TestCase)> {
             Err(_) => continue,
         };
 
-        if path.file_name().map_or(false, |n| n.to_string_lossy().starts_with('.')) {
+        if path
+            .file_name()
+            .map_or(false, |n| n.to_string_lossy().starts_with('.'))
+        {
             continue;
         }
-        if path.file_name().map_or(false, |n| n.to_string_lossy() == "SCHEMA.md") {
+        if path
+            .file_name()
+            .map_or(false, |n| n.to_string_lossy() == "SCHEMA.md")
+        {
             continue;
         }
 
@@ -449,10 +456,16 @@ fn main() {
                     result.elapsed_secs, icon, result.name, result.score
                 );
                 if !result.missing_required.is_empty() {
-                    line.push_str(&format!(" [missing: {}]", result.missing_required.join(", ")));
+                    line.push_str(&format!(
+                        " [missing: {}]",
+                        result.missing_required.join(", ")
+                    ));
                 }
                 if !result.hit_forbidden.is_empty() {
-                    line.push_str(&format!(" [forbidden: {}]", result.hit_forbidden.join(", ")));
+                    line.push_str(&format!(
+                        " [forbidden: {}]",
+                        result.hit_forbidden.join(", ")
+                    ));
                 }
                 if result.xfail {
                     if let Some(ref cat) = result.xfail_category {
@@ -480,10 +493,22 @@ fn main() {
         .filter(|r| r.passed && r.xfail_category.is_some())
         .count();
 
-    let score_100 = results.iter().filter(|r| r.score >= 100.0 - f64::EPSILON).count();
-    let score_90 = results.iter().filter(|r| r.score >= 90.0 && r.score < 100.0 - f64::EPSILON).count();
-    let score_70 = results.iter().filter(|r| r.score >= 70.0 && r.score < 90.0).count();
-    let score_50 = results.iter().filter(|r| r.score >= 50.0 && r.score < 70.0).count();
+    let score_100 = results
+        .iter()
+        .filter(|r| r.score >= 100.0 - f64::EPSILON)
+        .count();
+    let score_90 = results
+        .iter()
+        .filter(|r| r.score >= 90.0 && r.score < 100.0 - f64::EPSILON)
+        .count();
+    let score_70 = results
+        .iter()
+        .filter(|r| r.score >= 70.0 && r.score < 90.0)
+        .count();
+    let score_50 = results
+        .iter()
+        .filter(|r| r.score >= 50.0 && r.score < 70.0)
+        .count();
     let score_below = results.iter().filter(|r| r.score < 50.0).count();
 
     eprintln!();

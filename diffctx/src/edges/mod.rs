@@ -89,10 +89,7 @@ pub fn collect_all_edges(
                 let cat_label = builder.category_label().unwrap_or(cat_name);
                 let category = EdgeCategory::from_str(cat_label);
                 let edges = builder.build(fragments, repo_root);
-                let cats: Vec<_> = edges
-                    .keys()
-                    .map(|k| (k.clone(), category))
-                    .collect();
+                let cats: Vec<_> = edges.keys().map(|k| (k.clone(), category)).collect();
                 (edges, cats)
             })
             .collect();
@@ -121,7 +118,8 @@ pub fn discover_all_related_files(
 ) -> Vec<PathBuf> {
     let mut discovered: FxHashMap<PathBuf, ()> = FxHashMap::default();
     for builder in get_all_builders() {
-        for f in builder.discover_related_files(changed_files, all_candidates, repo_root, file_cache)
+        for f in
+            builder.discover_related_files(changed_files, all_candidates, repo_root, file_cache)
         {
             discovered.entry(f).or_insert(());
         }

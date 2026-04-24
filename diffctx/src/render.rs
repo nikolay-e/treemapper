@@ -49,7 +49,8 @@ struct SymbolPatterns {
     section: Vec<Regex>,
 }
 
-static SYMBOL_PATTERNS: Lazy<SymbolPatterns> = Lazy::new(|| SymbolPatterns {
+static SYMBOL_PATTERNS: Lazy<SymbolPatterns> = Lazy::new(|| {
+    SymbolPatterns {
     function: vec![
         Regex::new(r"(?m)^\s*(?:async\s+)?def\s+(\w+)\s*\(").unwrap(),
         Regex::new(r"(?m)^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[\(<]").unwrap(),
@@ -89,6 +90,7 @@ static SYMBOL_PATTERNS: Lazy<SymbolPatterns> = Lazy::new(|| SymbolPatterns {
     section: vec![
         Regex::new(r"(?m)^#{1,6}\s+(\S[^\n]*)$").unwrap(),
     ],
+}
 });
 
 fn extract_symbol(frag: &Fragment) -> Option<String> {
@@ -133,10 +135,7 @@ fn get_relative_path(frag: &Fragment, repo_root: &Path) -> String {
 }
 
 fn create_fragment_entry(frag: &Fragment, path_str: &str) -> FragmentEntry {
-    let symbol = frag
-        .symbol_name
-        .clone()
-        .or_else(|| extract_symbol(frag));
+    let symbol = frag.symbol_name.clone().or_else(|| extract_symbol(frag));
     let content = if frag.content.is_empty() {
         None
     } else {

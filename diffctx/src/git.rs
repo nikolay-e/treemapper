@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
@@ -25,8 +25,7 @@ const SAFE_DIFF_FLAGS: &[&str] = &["--no-textconv", "--no-ext-diff"];
 static HUNK_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@").unwrap());
 
-static RANGE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\S+?)(\.\.\.?)(\S*?)\s*$").unwrap());
+static RANGE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\s*(\S+?)(\.\.\.?)(\S*?)\s*$").unwrap());
 
 static SAFE_RANGE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_.^~/@{}\-]+(\.\.\.?[a-zA-Z0-9_.^~/@{}\-]*)?$").unwrap());
@@ -150,22 +149,50 @@ fn unquote_c_style(quoted: &str) -> String {
         if bytes[i] == b'\\' && i + 1 < bytes.len() {
             let nxt = bytes[i + 1];
             match nxt {
-                b't' => { result.push(b'\t'); i += 2; }
-                b'n' => { result.push(b'\n'); i += 2; }
-                b'r' => { result.push(b'\r'); i += 2; }
-                b'b' => { result.push(0x08); i += 2; }
-                b'f' => { result.push(0x0C); i += 2; }
-                b'v' => { result.push(0x0B); i += 2; }
-                b'a' => { result.push(0x07); i += 2; }
-                b'\\' => { result.push(b'\\'); i += 2; }
-                b'"' => { result.push(b'"'); i += 2; }
-                b'0'..=b'7' if i + 3 < bytes.len()
-                    && bytes[i + 2].is_ascii_digit() && bytes[i + 2] <= b'7'
-                    && bytes[i + 3].is_ascii_digit() && bytes[i + 3] <= b'7' =>
+                b't' => {
+                    result.push(b'\t');
+                    i += 2;
+                }
+                b'n' => {
+                    result.push(b'\n');
+                    i += 2;
+                }
+                b'r' => {
+                    result.push(b'\r');
+                    i += 2;
+                }
+                b'b' => {
+                    result.push(0x08);
+                    i += 2;
+                }
+                b'f' => {
+                    result.push(0x0C);
+                    i += 2;
+                }
+                b'v' => {
+                    result.push(0x0B);
+                    i += 2;
+                }
+                b'a' => {
+                    result.push(0x07);
+                    i += 2;
+                }
+                b'\\' => {
+                    result.push(b'\\');
+                    i += 2;
+                }
+                b'"' => {
+                    result.push(b'"');
+                    i += 2;
+                }
+                b'0'..=b'7'
+                    if i + 3 < bytes.len()
+                        && bytes[i + 2].is_ascii_digit()
+                        && bytes[i + 2] <= b'7'
+                        && bytes[i + 3].is_ascii_digit()
+                        && bytes[i + 3] <= b'7' =>
                 {
-                    let val = (nxt - b'0') * 64
-                        + (bytes[i + 2] - b'0') * 8
-                        + (bytes[i + 3] - b'0');
+                    let val = (nxt - b'0') * 64 + (bytes[i + 2] - b'0') * 8 + (bytes[i + 3] - b'0');
                     result.push(val);
                     i += 4;
                 }
@@ -322,10 +349,7 @@ pub fn get_changed_files(repo_root: &Path, diff_range: Option<&str>) -> Result<V
     Ok(parts.iter().map(|p| repo_root.join(p)).collect())
 }
 
-pub fn get_deleted_files(
-    repo_root: &Path,
-    diff_range: Option<&str>,
-) -> Result<HashSet<PathBuf>> {
+pub fn get_deleted_files(repo_root: &Path, diff_range: Option<&str>) -> Result<HashSet<PathBuf>> {
     let mut args: Vec<&str> = vec!["diff"];
     args.extend_from_slice(SAFE_DIFF_FLAGS);
     args.extend_from_slice(&["--diff-filter=D", "--name-only", "-M", "-z"]);
@@ -397,8 +421,14 @@ pub fn split_diff_range(range: &str) -> (Option<String>, Option<String>) {
     match RANGE_RE.captures(range) {
         None => (None, None),
         Some(caps) => {
-            let base = caps.get(1).map(|m| m.as_str().trim().to_string()).filter(|s| !s.is_empty());
-            let head = caps.get(3).map(|m| m.as_str().trim().to_string()).filter(|s| !s.is_empty());
+            let base = caps
+                .get(1)
+                .map(|m| m.as_str().trim().to_string())
+                .filter(|s| !s.is_empty());
+            let head = caps
+                .get(3)
+                .map(|m| m.as_str().trim().to_string())
+                .filter(|s| !s.is_empty());
             (base, head)
         }
     }

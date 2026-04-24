@@ -7,11 +7,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder, FragmentIndex, add_edge, discover_files_by_refs, link_by_name};
 use super::super::EdgeDict;
+use super::super::base::{
+    self, EdgeBuilder, FragmentIndex, add_edge, discover_files_by_refs, link_by_name,
+};
 
-static DART_EXTENSIONS: Lazy<FxHashSet<&str>> =
-    Lazy::new(|| [".dart"].iter().copied().collect());
+static DART_EXTENSIONS: Lazy<FxHashSet<&str>> = Lazy::new(|| [".dart"].iter().copied().collect());
 
 fn is_dart_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
@@ -28,27 +29,76 @@ static PART_OF_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?m)^\s*part\s+of\s+['"]([^'"]+)['"]"#).unwrap());
 static CLASS_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*(?:abstract\s+)?class\s+(\w+)").unwrap());
-static MIXIN_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*mixin\s+(\w+)").unwrap());
-static EXTENSION_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*extension\s+(\w+)").unwrap());
-static FUNC_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*(?:\w+\s+)*(\w+)\s*[<(]").unwrap());
-static TYPE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([A-Z]\w+)\b").unwrap());
-static CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b([a-z_]\w+)\s*\(").unwrap());
+static MIXIN_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*mixin\s+(\w+)").unwrap());
+static EXTENSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*extension\s+(\w+)").unwrap());
+static FUNC_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*(?:\w+\s+)*(\w+)\s*[<(]").unwrap());
+static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w+)\b").unwrap());
+static CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([a-z_]\w+)\s*\(").unwrap());
 
 static DART_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [
-        "if", "else", "for", "while", "do", "switch", "case", "break", "continue",
-        "return", "var", "final", "const", "void", "null", "true", "false", "new",
-        "this", "super", "class", "extends", "implements", "with", "abstract",
-        "import", "export", "library", "part", "typedef", "enum", "mixin",
-        "extension", "async", "await", "yield", "try", "catch", "finally",
-        "throw", "rethrow", "assert", "in", "is", "as", "dynamic", "Function",
-        "String", "int", "double", "bool", "List", "Map", "Set", "Future",
-        "Stream", "Iterable", "Object", "Null", "Never", "Type", "print",
+        "if",
+        "else",
+        "for",
+        "while",
+        "do",
+        "switch",
+        "case",
+        "break",
+        "continue",
+        "return",
+        "var",
+        "final",
+        "const",
+        "void",
+        "null",
+        "true",
+        "false",
+        "new",
+        "this",
+        "super",
+        "class",
+        "extends",
+        "implements",
+        "with",
+        "abstract",
+        "import",
+        "export",
+        "library",
+        "part",
+        "typedef",
+        "enum",
+        "mixin",
+        "extension",
+        "async",
+        "await",
+        "yield",
+        "try",
+        "catch",
+        "finally",
+        "throw",
+        "rethrow",
+        "assert",
+        "in",
+        "is",
+        "as",
+        "dynamic",
+        "Function",
+        "String",
+        "int",
+        "double",
+        "bool",
+        "List",
+        "Map",
+        "Set",
+        "Future",
+        "Stream",
+        "Iterable",
+        "Object",
+        "Null",
+        "Never",
+        "Type",
+        "print",
     ]
     .iter()
     .copied()
@@ -134,7 +184,10 @@ impl EdgeBuilder for DartEdgeBuilder {
         for f in &dart_frags {
             let defs = extract_defines(&f.content);
             for name in &defs {
-                name_to_defs.entry(name.clone()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.clone())
+                    .or_default()
+                    .push(f.id.clone());
             }
             frag_defines.insert(f.id.clone(), defs);
         }
@@ -184,7 +237,13 @@ impl EdgeBuilder for DartEdgeBuilder {
                 if let Some(dst_ids) = name_to_defs.get(ident) {
                     for dst_id in dst_ids {
                         if dst_id != &f.id {
-                            add_edge(&mut edges, &f.id, dst_id, inheritance_weight, reverse_factor);
+                            add_edge(
+                                &mut edges,
+                                &f.id,
+                                dst_id,
+                                inheritance_weight,
+                                reverse_factor,
+                            );
                         }
                     }
                 }

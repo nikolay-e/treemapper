@@ -7,8 +7,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{self, EdgeBuilder, add_edge_unidirectional, path_to_module};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge_unidirectional, path_to_module};
 
 static IMPORT_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?:from\s+([\w.]+)\s+import|import\s+([\w.]+))").unwrap());
@@ -90,7 +90,10 @@ fn extract_target_name_from_test(test_name: &str) -> Option<String> {
     if lower.contains(".spec") {
         return Some(lower.split(".spec").next()?.to_string());
     }
-    if test_name.starts_with("Test") && test_name.len() > 4 && test_name.as_bytes()[4].is_ascii_uppercase() {
+    if test_name.starts_with("Test")
+        && test_name.len() > 4
+        && test_name.as_bytes()[4].is_ascii_uppercase()
+    {
         return Some(test_name[4..].to_lowercase());
     }
     if test_name.ends_with("Tests") && test_name.len() > 5 {
@@ -173,7 +176,12 @@ impl EdgeBuilder for TestEdgeBuilder {
                 };
 
                 add_edge_unidirectional(&mut edges, &test_frag.id, &src_frag.id, weight);
-                add_edge_unidirectional(&mut edges, &src_frag.id, &test_frag.id, test_reverse_weight);
+                add_edge_unidirectional(
+                    &mut edges,
+                    &src_frag.id,
+                    &test_frag.id,
+                    test_reverse_weight,
+                );
             }
         }
 
@@ -218,7 +226,10 @@ impl EdgeBuilder for TestEdgeBuilder {
                 }
             } else {
                 let stem_lower = stem.to_lowercase();
-                for test_stem in [format!("test_{}", stem_lower), format!("{}_test", stem_lower)] {
+                for test_stem in [
+                    format!("test_{}", stem_lower),
+                    format!("{}_test", stem_lower),
+                ] {
                     for c in candidate_by_stem.get(&test_stem).unwrap_or(&vec![]) {
                         if base::file_ext(c) == ext && is_test_file(c) {
                             discovered.push(c.clone());

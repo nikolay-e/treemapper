@@ -68,7 +68,10 @@ fn find_dangling_semantic_names(
                 let cat = graph
                     .edge_categories
                     .get(&(frag.id.clone(), nbr_id.clone()));
-                if cat.map(|c| *c != crate::graph::EdgeCategory::Semantic).unwrap_or(true) {
+                if cat
+                    .map(|c| *c != crate::graph::EdgeCategory::Semantic)
+                    .unwrap_or(true)
+                {
                     continue;
                 }
                 if let Some(nbr_frag) = frag_by_id.get(nbr_id) {
@@ -93,7 +96,10 @@ fn pick_best_fragment<'a>(
         .iter()
         .filter(|f| !f.kind.is_signature())
         .collect();
-    let sig: Vec<&&Fragment> = candidates.iter().filter(|f| f.kind.is_signature()).collect();
+    let sig: Vec<&&Fragment> = candidates
+        .iter()
+        .filter(|f| f.kind.is_signature())
+        .collect();
     full.first().or(sig.first()).map(|f| **f)
 }
 
@@ -269,7 +275,10 @@ pub fn ensure_changed_files_represented(
     let mut frags_by_path: HashMap<String, Vec<Fragment>> = HashMap::new();
     for f in all_fragments {
         let path_str = f.id.path.as_ref().to_string();
-        if missing_paths.iter().any(|p| p.to_string_lossy().as_ref() == path_str) {
+        if missing_paths
+            .iter()
+            .any(|p| p.to_string_lossy().as_ref() == path_str)
+        {
             frags_by_path.entry(path_str).or_default().push(f.clone());
         }
     }

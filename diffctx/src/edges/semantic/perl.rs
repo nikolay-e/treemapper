@@ -7,26 +7,26 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::Fragment;
 
-use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids, discover_files_by_refs};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder, add_edge, add_edges_from_ids, discover_files_by_refs};
 
 fn is_perl_file(path: &Path) -> bool {
     let ext = base::file_ext(path);
     ext == ".pl" || ext == ".pm"
 }
 
-static USE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*use\s+([\w:]+)").unwrap());
+static USE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*use\s+([\w:]+)").unwrap());
 static REQUIRE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r##"(?m)^\s*require\s+(?:['"]([^'"]+)['"]|([\w:]+))"##).unwrap());
-static PACKAGE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*package\s+([\w:]+)").unwrap());
-static SUB_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*sub\s+(\w+)").unwrap());
-static ISA_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r##"(?m)(?:use\s+(?:parent|base)\s+.*?['"]([\w:]+)['"]|@ISA\s*=.*?['"]([\w:]+)['"])"##).unwrap());
-static METHOD_CALL_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\b(\w+)->(\w+)").unwrap());
+static PACKAGE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*package\s+([\w:]+)").unwrap());
+static SUB_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\s*sub\s+(\w+)").unwrap());
+static ISA_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r##"(?m)(?:use\s+(?:parent|base)\s+.*?['"]([\w:]+)['"]|@ISA\s*=.*?['"]([\w:]+)['"])"##,
+    )
+    .unwrap()
+});
+static METHOD_CALL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b(\w+)->(\w+)").unwrap());
 
 fn extract_uses(content: &str) -> FxHashSet<String> {
     let mut refs = FxHashSet::default();
@@ -37,34 +37,73 @@ fn extract_uses(content: &str) -> FxHashSet<String> {
         }
     }
     for cap in REQUIRE_RE.captures_iter(content) {
-        if let Some(m) = cap.get(1) { refs.insert(m.as_str().to_string()); }
-        if let Some(m) = cap.get(2) { refs.insert(m.as_str().to_string()); }
+        if let Some(m) = cap.get(1) {
+            refs.insert(m.as_str().to_string());
+        }
+        if let Some(m) = cap.get(2) {
+            refs.insert(m.as_str().to_string());
+        }
     }
     refs
 }
 
 static PERL_PRAGMAS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
-    ["strict", "warnings", "utf8", "lib", "constant", "vars", "feature",
-     "Exporter", "Carp", "Data::Dumper", "File::Basename"]
-        .iter().copied().collect()
+    [
+        "strict",
+        "warnings",
+        "utf8",
+        "lib",
+        "constant",
+        "vars",
+        "feature",
+        "Exporter",
+        "Carp",
+        "Data::Dumper",
+        "File::Basename",
+    ]
+    .iter()
+    .copied()
+    .collect()
 });
 
 fn extract_packages(content: &str) -> FxHashSet<String> {
-    PACKAGE_RE.captures_iter(content).map(|c| {
-        let full = &c[1];
-        full.split("::").last().unwrap_or(full).to_string()
-    }).collect()
+    PACKAGE_RE
+        .captures_iter(content)
+        .map(|c| {
+            let full = &c[1];
+            full.split("::").last().unwrap_or(full).to_string()
+        })
+        .collect()
 }
 
 fn extract_subs(content: &str) -> FxHashSet<String> {
-    SUB_RE.captures_iter(content).map(|c| c[1].to_string()).collect()
+    SUB_RE
+        .captures_iter(content)
+        .map(|c| c[1].to_string())
+        .collect()
 }
 
 fn extract_parents(content: &str) -> FxHashSet<String> {
     let mut parents = FxHashSet::default();
     for cap in ISA_RE.captures_iter(content) {
-        if let Some(m) = cap.get(1) { parents.insert(m.as_str().split("::").last().unwrap_or(m.as_str()).to_string()); }
-        if let Some(m) = cap.get(2) { parents.insert(m.as_str().split("::").last().unwrap_or(m.as_str()).to_string()); }
+        if let Some(m) = cap.get(1) {
+            parents.insert(
+                m.as_str()
+                    .split("::")
+                    .last()
+                    .unwrap_or(m.as_str())
+                    .to_string(),
+            );
+        }
+        if let Some(m) = cap.get(2) {
+            parents.insert(
+                m.as_str()
+                    .split("::")
+                    .last()
+                    .unwrap_or(m.as_str())
+                    .to_string(),
+            );
+        }
     }
     parents
 }
@@ -73,8 +112,13 @@ pub struct PerlEdgeBuilder;
 
 impl EdgeBuilder for PerlEdgeBuilder {
     fn build(&self, fragments: &[Fragment], repo_root: Option<&Path>) -> EdgeDict {
-        let frags: Vec<&Fragment> = fragments.iter().filter(|f| is_perl_file(Path::new(f.path()))).collect();
-        if frags.is_empty() { return FxHashMap::default(); }
+        let frags: Vec<&Fragment> = fragments
+            .iter()
+            .filter(|f| is_perl_file(Path::new(f.path())))
+            .collect();
+        if frags.is_empty() {
+            return FxHashMap::default();
+        }
 
         let use_w = EDGE_WEIGHTS["perl_use"].forward;
         let fn_w = EDGE_WEIGHTS["perl_fn"].forward;
@@ -86,10 +130,16 @@ impl EdgeBuilder for PerlEdgeBuilder {
         let mut name_to_defs: FxHashMap<String, Vec<_>> = FxHashMap::default();
         for f in &frags {
             for name in extract_packages(&f.content) {
-                name_to_defs.entry(name.to_lowercase()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
             }
             for name in extract_subs(&f.content) {
-                name_to_defs.entry(name.to_lowercase()).or_default().push(f.id.clone());
+                name_to_defs
+                    .entry(name.to_lowercase())
+                    .or_default()
+                    .push(f.id.clone());
             }
         }
 
@@ -108,15 +158,27 @@ impl EdgeBuilder for PerlEdgeBuilder {
             }
             for cap in METHOD_CALL_RE.captures_iter(&f.content) {
                 let method = &cap[2];
-                if self_defs.contains(method) { continue; }
+                if self_defs.contains(method) {
+                    continue;
+                }
                 if let Some(targets) = name_to_defs.get(&method.to_lowercase()) {
-                    for t in targets { if t != &f.id { add_edge(&mut edges, &f.id, t, method_w, reverse_factor); } }
+                    for t in targets {
+                        if t != &f.id {
+                            add_edge(&mut edges, &f.id, t, method_w, reverse_factor);
+                        }
+                    }
                 }
             }
             for id in &f.identifiers {
-                if self_defs.contains(id) { continue; }
+                if self_defs.contains(id) {
+                    continue;
+                }
                 if let Some(targets) = name_to_defs.get(&id.to_lowercase()) {
-                    for t in targets { if t != &f.id { add_edge(&mut edges, &f.id, t, fn_w, reverse_factor); } }
+                    for t in targets {
+                        if t != &f.id {
+                            add_edge(&mut edges, &f.id, t, fn_w, reverse_factor);
+                        }
+                    }
                 }
             }
         }
@@ -124,11 +186,16 @@ impl EdgeBuilder for PerlEdgeBuilder {
     }
 
     fn discover_related_files(
-        &self, changed: &[PathBuf], candidates: &[PathBuf],
-        repo_root: Option<&Path>, file_cache: Option<&FxHashMap<PathBuf, String>>,
+        &self,
+        changed: &[PathBuf],
+        candidates: &[PathBuf],
+        repo_root: Option<&Path>,
+        file_cache: Option<&FxHashMap<PathBuf, String>>,
     ) -> Vec<PathBuf> {
         let pl_changed: Vec<&PathBuf> = changed.iter().filter(|f| is_perl_file(f)).collect();
-        if pl_changed.is_empty() { return vec![]; }
+        if pl_changed.is_empty() {
+            return vec![];
+        }
         let mut refs = FxHashSet::default();
         for f in &pl_changed {
             if let Some(content) = base::read_file_cached(f, file_cache) {

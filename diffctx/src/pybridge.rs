@@ -201,9 +201,19 @@ fn build_diff_context_native(
     let mode = ScoringMode::from_str(scoring_mode);
     let path = Path::new(root_dir);
 
-    pipeline::build_diff_context(path, diff_range, budget_tokens, alpha, tau, no_content, full, mode, timeout)
-        .map(DiffContextResult::from)
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+    pipeline::build_diff_context(
+        path,
+        diff_range,
+        budget_tokens,
+        alpha,
+        tau,
+        no_content,
+        full,
+        mode,
+        timeout,
+    )
+    .map(DiffContextResult::from)
+    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
 
 #[pyfunction]
@@ -248,11 +258,23 @@ fn build_diff_context<'py>(
 
     let mode = ScoringMode::from_str(scoring_mode);
     let path = Path::new(root_dir);
-    let range = if diff_range.is_empty() { None } else { Some(diff_range) };
+    let range = if diff_range.is_empty() {
+        None
+    } else {
+        Some(diff_range)
+    };
 
     let start = std::time::Instant::now();
     let output = pipeline::build_diff_context(
-        path, range, budget_tokens, alpha, tau, no_content, full, mode, timeout,
+        path,
+        range,
+        budget_tokens,
+        alpha,
+        tau,
+        no_content,
+        full,
+        mode,
+        timeout,
     )
     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
     let total_ms = start.elapsed().as_secs_f64() * 1000.0;
@@ -280,10 +302,19 @@ fn build_diff_context<'py>(
 
     let latency = PyDict::new(py);
     if let Some(ref lb) = output.latency {
-        latency.set_item("fragmentation_ms", (lb.fragmentation_ms * 10.0).round() / 10.0)?;
+        latency.set_item(
+            "fragmentation_ms",
+            (lb.fragmentation_ms * 10.0).round() / 10.0,
+        )?;
         latency.set_item("discovery_ms", (lb.discovery_ms * 10.0).round() / 10.0)?;
-        latency.set_item("tokenization_ms", (lb.tokenization_ms * 10.0).round() / 10.0)?;
-        latency.set_item("scoring_selection_ms", (lb.scoring_selection_ms * 10.0).round() / 10.0)?;
+        latency.set_item(
+            "tokenization_ms",
+            (lb.tokenization_ms * 10.0).round() / 10.0,
+        )?;
+        latency.set_item(
+            "scoring_selection_ms",
+            (lb.scoring_selection_ms * 10.0).round() / 10.0,
+        )?;
         latency.set_item("total_ms", (lb.total_ms * 10.0).round() / 10.0)?;
     } else {
         latency.set_item("total_ms", (total_ms * 10.0).round() / 10.0)?;

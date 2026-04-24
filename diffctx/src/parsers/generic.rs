@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::types::{extract_identifiers, Fragment, FragmentId, FragmentKind};
+use crate::types::{Fragment, FragmentId, FragmentKind, extract_identifiers};
 
 use super::FragmentationStrategy;
 

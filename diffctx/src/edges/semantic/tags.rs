@@ -4,8 +4,8 @@ use rustc_hash::FxHashMap;
 
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{self, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{self, EdgeBuilder};
 
 const WEIGHT: f64 = 0.30;
 const REVERSE_FACTOR: f64 = 0.70;

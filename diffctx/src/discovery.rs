@@ -54,7 +54,10 @@ impl DiscoveryStrategy for DefaultDiscovery {
     }
 }
 
-fn expand_by_rare_identifiers(ctx: &DiscoveryContext, changed_set: &FxHashSet<&Path>) -> Vec<PathBuf> {
+fn expand_by_rare_identifiers(
+    ctx: &DiscoveryContext,
+    changed_set: &FxHashSet<&Path>,
+) -> Vec<PathBuf> {
     let rare_threshold = crate::config::limits::LIMITS.rare_identifier_threshold;
 
     let mut ident_to_files: FxHashMap<String, Vec<PathBuf>> = FxHashMap::default();
@@ -66,7 +69,10 @@ fn expand_by_rare_identifiers(ctx: &DiscoveryContext, changed_set: &FxHashSet<&P
             let idents: FxHashSet<String> = crate::types::extract_identifiers(&content, 3);
             for ident in &ctx.expansion_concepts {
                 if idents.contains(ident) {
-                    ident_to_files.entry(ident.clone()).or_default().push(f.clone());
+                    ident_to_files
+                        .entry(ident.clone())
+                        .or_default()
+                        .push(f.clone());
                 }
             }
         }
@@ -220,7 +226,11 @@ impl DiscoveryStrategy for BM25Discovery {
             .collect();
 
         let mut ranked: Vec<usize> = (0..scores.len()).collect();
-        ranked.sort_by(|&a, &b| scores[b].partial_cmp(&scores[a]).unwrap_or(std::cmp::Ordering::Equal));
+        ranked.sort_by(|&a, &b| {
+            scores[b]
+                .partial_cmp(&scores[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         ranked
             .into_iter()

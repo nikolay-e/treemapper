@@ -6,8 +6,8 @@ use crate::config::limits::SIBLING;
 use crate::config::weights::EDGE_WEIGHTS;
 use crate::types::{Fragment, FragmentId};
 
-use super::super::base::{add_edge, EdgeBuilder};
 use super::super::EdgeDict;
+use super::super::base::{EdgeBuilder, add_edge};
 
 pub struct SiblingEdgeBuilder;
 
@@ -29,7 +29,10 @@ impl SiblingEdgeBuilder {
         by_dir
     }
 
-    fn build_file_representative_map(&self, fragments: &[Fragment]) -> FxHashMap<String, FragmentId> {
+    fn build_file_representative_map(
+        &self,
+        fragments: &[Fragment],
+    ) -> FxHashMap<String, FragmentId> {
         let mut file_to_rep: FxHashMap<String, FragmentId> = FxHashMap::default();
         let mut file_to_token_count: FxHashMap<String, u32> = FxHashMap::default();
 
@@ -68,10 +71,9 @@ impl EdgeBuilder for SiblingEdgeBuilder {
 
             for i in 0..file_list.len() {
                 for j in (i + 1)..file_list.len() {
-                    if let (Some(f1_id), Some(f2_id)) = (
-                        file_to_rep.get(file_list[i]),
-                        file_to_rep.get(file_list[j]),
-                    ) {
+                    if let (Some(f1_id), Some(f2_id)) =
+                        (file_to_rep.get(file_list[i]), file_to_rep.get(file_list[j]))
+                    {
                         add_edge(&mut edges, f1_id, f2_id, weight, reverse_factor);
                     }
                 }

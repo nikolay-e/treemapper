@@ -157,7 +157,11 @@ fn compute_gain_core(
         let old_max = state.max_rel.get(&nkey).copied().unwrap_or(0.0);
         let new_max = old_max.max(a_fz);
         let priority = if use_state_priorities {
-            state.priorities.get(&nkey).copied().unwrap_or(need.priority)
+            state
+                .priorities
+                .get(&nkey)
+                .copied()
+                .unwrap_or(need.priority)
         } else {
             need.priority
         };

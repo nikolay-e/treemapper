@@ -10,7 +10,7 @@ use crate::config::limits::LIMITS;
 use crate::git::{self, CatFileBatch};
 use crate::parsers::fragment_file;
 use crate::tokenizer::count_tokens;
-use crate::types::{extract_identifiers, Fragment, FragmentId, FragmentKind};
+use crate::types::{Fragment, FragmentId, FragmentKind, extract_identifiers};
 
 static BINARY_CTRL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[\x00-\x08\x0e-\x1f]").unwrap());
 
@@ -65,8 +65,8 @@ static KNOWN_BINARY_EXTENSIONS: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
         ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp", ".mp3", ".mp4", ".wav",
         ".ogg", ".flac", ".avi", ".mkv", ".mov", ".zip", ".gz", ".tar", ".bz2", ".xz", ".7z",
         ".rar", ".jar", ".war", ".ear", ".class", ".pyc", ".pyo", ".o", ".a", ".so", ".dylib",
-        ".dll", ".exe", ".bin", ".dat", ".db", ".sqlite", ".pdf", ".doc", ".docx", ".xls",
-        ".xlsx", ".ppt", ".pptx", ".woff", ".woff2", ".ttf", ".otf", ".eot",
+        ".dll", ".exe", ".bin", ".dat", ".db", ".sqlite", ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+        ".ppt", ".pptx", ".woff", ".woff2", ".ttf", ".otf", ".eot",
     ]
     .into_iter()
     .collect()
@@ -126,7 +126,9 @@ fn is_generated_file(path: &Path, content: &str) -> bool {
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    has_generated_filename(&name) || has_generated_path_segment(path) || has_generated_content_marker(content)
+    has_generated_filename(&name)
+        || has_generated_path_segment(path)
+        || has_generated_content_marker(content)
 }
 
 fn truncate_generated_fragments(file_frags: Vec<Fragment>) -> Vec<Fragment> {
@@ -140,8 +142,11 @@ fn truncate_generated_fragments(file_frags: Vec<Fragment>) -> Vec<Fragment> {
             let lines: Vec<&str> = frag.content.lines().collect();
             let remaining = lines.len() - max_lines as usize;
             let truncated_lines = &lines[..max_lines as usize];
-            let truncated_content =
-                format!("{}\n# ... [{} more lines]", truncated_lines.join("\n"), remaining);
+            let truncated_content = format!(
+                "{}\n# ... [{} more lines]",
+                truncated_lines.join("\n"),
+                remaining
+            );
             let new_end = frag.start_line() + max_lines - 1;
             Fragment {
                 id: FragmentId::new(frag.id.path.clone(), frag.start_line(), new_end),
@@ -171,9 +176,7 @@ fn normalize_path(path: &Path, root_dir: &Path) -> PathBuf {
         path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
     } else {
         let joined = root_dir.join(path);
-        joined
-            .canonicalize()
-            .unwrap_or_else(|_| joined)
+        joined.canonicalize().unwrap_or_else(|_| joined)
     }
 }
 
@@ -235,7 +238,12 @@ pub fn process_files_for_fragments(
     let file_contents: Vec<(PathBuf, String)> = files
         .iter()
         .filter_map(|file_path| {
-            let content = read_file_content(file_path, root_dir, preferred_revs, batch_reader.as_deref_mut())?;
+            let content = read_file_content(
+                file_path,
+                root_dir,
+                preferred_revs,
+                batch_reader.as_deref_mut(),
+            )?;
             Some((file_path.clone(), content))
         })
         .collect();

@@ -9,8 +9,8 @@ use crate::languages::EXTENSION_TO_LANGUAGE;
 use crate::stopwords::{filter_idents, profile_from_path};
 use crate::types::{Fragment, FragmentId, extract_identifier_list};
 
-use super::super::base::EdgeBuilder;
 use super::super::EdgeDict;
+use super::super::base::EdgeBuilder;
 
 static LANG_ALIAS: &[(&str, &str)] = &[
     ("bash", "shell"),
@@ -42,7 +42,10 @@ fn clamp_lexical_weight(raw_sim: f64, src_path: Option<&Path>, dst_path: Option<
         (Some(sp), Some(dp)) => {
             let sw = get_lang_weights(sp);
             let dw = get_lang_weights(dp);
-            (sw.lexical_max.max(dw.lexical_max), sw.lexical_min.max(dw.lexical_min))
+            (
+                sw.lexical_max.max(dw.lexical_max),
+                sw.lexical_min.max(dw.lexical_min),
+            )
         }
         _ => (LEXICAL.weight_max, LEXICAL.weight_min),
     };
@@ -77,7 +80,11 @@ impl LexicalEdgeBuilder {
         doc_freq
     }
 
-    fn compute_idf(&self, doc_freq: &FxHashMap<String, usize>, n_docs: usize) -> FxHashMap<String, f64> {
+    fn compute_idf(
+        &self,
+        doc_freq: &FxHashMap<String, usize>,
+        n_docs: usize,
+    ) -> FxHashMap<String, f64> {
         doc_freq
             .iter()
             .map(|(term, &df)| {
@@ -175,10 +182,8 @@ impl EdgeBuilder for LexicalEdgeBuilder {
             }
         }
 
-        let id_to_path: FxHashMap<FragmentId, &str> = fragments
-            .iter()
-            .map(|f| (f.id.clone(), f.path()))
-            .collect();
+        let id_to_path: FxHashMap<FragmentId, &str> =
+            fragments.iter().map(|f| (f.id.clone(), f.path())).collect();
 
         let mut neighbors_by_node: FxHashMap<FragmentId, Vec<(f64, FragmentId)>> =
             FxHashMap::default();
