@@ -47,6 +47,44 @@ def _validate_inputs(root_dir: Path, alpha: float, tau: float, budget_tokens: in
         raise ValueError(f"budget_tokens must be > 0, got {budget_tokens}")
 
 
+def _try_rust_backend(
+    root_dir: Path,
+    diff_range: str,
+    budget_tokens: int | None,
+    alpha: float,
+    tau: float,
+    no_content: bool,
+    ignore_file: Path | None,
+    no_default_ignores: bool,
+    full: bool,
+    whitelist_file: Path | None,
+    scoring_mode: str,
+    timeout: int,
+) -> dict[str, Any] | None:
+    try:
+        from _diffctx import build_diff_context as _rust_build
+    except ImportError:
+        return None
+    try:
+        return _rust_build(  # type: ignore[no-any-return]
+            str(root_dir),
+            diff_range,
+            budget_tokens=budget_tokens,
+            alpha=alpha,
+            tau=tau,
+            no_content=no_content,
+            ignore_file=str(ignore_file) if ignore_file else None,
+            no_default_ignores=no_default_ignores,
+            full=full,
+            whitelist_file=str(whitelist_file) if whitelist_file else None,
+            scoring_mode=scoring_mode,
+            timeout=timeout,
+        )
+    except Exception:
+        logger.debug("Rust backend failed, falling back to Python", exc_info=True)
+        return None
+
+
 def build_diff_context(
     root_dir: Path,
     diff_range: str,
@@ -63,6 +101,24 @@ def build_diff_context(
 ) -> dict[str, Any]:
     _validate_inputs(root_dir, alpha, tau, budget_tokens)
     root_dir = root_dir.resolve()
+
+    if os.environ.get("DIFFCTX_NO_RUST") != "1":
+        result = _try_rust_backend(
+            root_dir,
+            diff_range,
+            budget_tokens,
+            alpha,
+            tau,
+            no_content,
+            ignore_file,
+            no_default_ignores,
+            full,
+            whitelist_file,
+            scoring_mode,
+            timeout,
+        )
+        if result is not None:
+            return result
 
     import threading
 

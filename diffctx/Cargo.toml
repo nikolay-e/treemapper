@@ -1,0 +1,148 @@
+[package]
+name = "diffctx"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "_diffctx"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "diffctx"
+path = "src/main.rs"
+
+[[bin]]
+name = "diffctx-test"
+path = "src/test_harness.rs"
+
+[features]
+default = []
+python = ["pyo3"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+gix = { version = "0.72", default-features = false, features = ["blocking-network-client"] }
+tree-sitter = "0.25"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-java = "0.23"
+tree-sitter-c = "0.23"
+tree-sitter-cpp = "0.23"
+tree-sitter-c-sharp = "0.23"
+tree-sitter-ruby = "0.23"
+tree-sitter-php = "0.24"
+tree-sitter-scala = "0.23"
+tree-sitter-swift = "0.6"
+tree-sitter-html = "0.23"
+tiktoken-rs = "0.6"
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+regex = "1"
+once_cell = "1"
+rustc-hash = "2"
+similar = "2"
+glob = "0.3"
+smallvec = "1"
+pyo3 = { version = "0.24", features = ["extension-module"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+redundant_closure_for_method_calls = "allow"
+too_many_lines = "allow"
+too_many_arguments = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+cast_lossless = "allow"
+items_after_statements = "allow"
+similar_names = "allow"
+needless_pass_by_value = "allow"
+wildcard_imports = "allow"
+struct_excessive_bools = "allow"
+non_std_lazy_statics = "allow"
+implicit_hasher = "allow"
+uninlined_format_args = "allow"
+manual_let_else = "allow"
+missing_const_for_fn = "allow"
+collapsible_if = "allow"
+option_if_let_else = "allow"
+unnested_or_patterns = "allow"
+unused_self = "allow"
+redundant_else = "allow"
+bool_to_int_with_if = "allow"
+needless_raw_string_hashes = "allow"
+trivial_regex = "allow"
+cargo_common_metadata = "allow"
+double_ended_iterator_last = "allow"
+match_same_arms = "allow"
+manual_midpoint = "allow"
+map_unwrap_or = "allow"
+suboptimal_flops = "allow"
+iter_on_empty_collections = "allow"
+needless_lifetimes = "allow"
+str_split_at_newline = "allow"
+for_kv_map = "allow"
+type_complexity = "allow"
+should_implement_trait = "allow"
+ref_as_ptr = "allow"
+needless_range_loop = "allow"
+manual_is_multiple_of = "allow"
+match_single_binding = "allow"
+manual_contains = "allow"
+unnecessary_wraps = "allow"
+multiple_crate_versions = "allow"
+manual_strip = "allow"
+or_fun_call = "allow"
+unnecessary_to_owned = "allow"
+return_self_not_must_use = "allow"
+field_reassign_with_default = "allow"
+match_like_matches_macro = "allow"
+derive_partial_eq_without_eq = "allow"
+match_ref_pats = "allow"
+single_match_else = "allow"
+branches_sharing_code = "allow"
+default_trait_access = "allow"
+cloned_instead_of_copied = "allow"
+if_not_else = "allow"
+needless_collect = "allow"
+manual_saturating_arithmetic = "allow"
+stable_sort_primitive = "allow"
+used_underscore_binding = "allow"
+elidable_lifetime_names = "allow"
+ignored_unit_patterns = "allow"
+needless_borrow = "allow"
+needless_continue = "allow"
+unnecessary_lazy_evaluations = "allow"
+unnecessary_map_or = "allow"
+unnecessary_sort_by = "allow"
+while_let_loop = "allow"
+zero_sized_map_values = "allow"
+implicit_saturating_sub = "allow"
+new_without_default = "allow"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
