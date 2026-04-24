@@ -234,6 +234,9 @@ module = [
   "anyio",
   "_diffctx",
   "pathspec",
+  "treemapper.diffctx.edges",
+  "treemapper.diffctx.edges.*",
+  "treemapper.diffctx.embeddings",
 ]
 ignore_missing_imports = true
 

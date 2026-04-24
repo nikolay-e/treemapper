@@ -196,9 +196,9 @@ def _populate_graph(graph: Graph, all_edges: dict[tuple[FragmentId, FragmentId],
 
 
 def build_graph(fragments: list[Fragment], repo_root: Path | None = None) -> Graph:
-    from .edges import collect_all_edges  # type: ignore[import-not-found]
-    from .edges.similarity.lexical import clamp_lexical_weight  # type: ignore[import-not-found]
-    from .embeddings import _build_embedding_edges  # type: ignore[import-not-found]
+    from .edges import collect_all_edges
+    from .edges.similarity.lexical import clamp_lexical_weight
+    from .embeddings import _build_embedding_edges
 
     graph = Graph()
     for frag in fragments:
