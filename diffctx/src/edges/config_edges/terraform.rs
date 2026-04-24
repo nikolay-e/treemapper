@@ -38,7 +38,7 @@ static VAR_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"var\.(\w+)").unwrap()
 static LOCAL_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"local\.(\w+)").unwrap());
 static DATA_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"data\.(\w+)\.(\w+)").unwrap());
 static RESOURCE_REF_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?<![.\w"])(\w+)\.(\w+)\.(\w+)"#).unwrap());
+    Lazy::new(|| Regex::new(r"(?m)(\w+)\.(\w+)\.(\w+)").unwrap());
 static MODULE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"module\.(\w+)").unwrap());
 
 static SOURCE_RE: Lazy<Regex> =

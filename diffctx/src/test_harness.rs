@@ -210,15 +210,15 @@ fn fragment_matched(output_frags: &[FragmentEntry], decl: &DeclaredFragment, acc
 
 fn calculate_budget(case: &TestCase) -> u32 {
     let overhead: u32 = 20;
-    let mut all_files: FxHashMap<String, String> = case.repo.initial_files.clone();
+    let mut test_files: FxHashMap<String, String> = case.repo.initial_files.clone();
     for (k, v) in &case.repo.changed_files {
-        all_files.insert(k.clone(), v.clone());
+        test_files.insert(k.clone(), v.clone());
     }
     for (k, v) in &case.fixtures.distractors {
-        all_files.insert(k.clone(), v.clone());
+        test_files.insert(k.clone(), v.clone());
     }
-    let content_tokens: u32 = all_files.values().map(|c| count_tokens(c)).sum();
-    let estimated_fragments = (all_files.len().max(2)) as u32;
+    let content_tokens: u32 = test_files.values().map(|c| count_tokens(c)).sum();
+    let estimated_fragments = (test_files.len().max(2)) as u32;
     let budget = (content_tokens + estimated_fragments * overhead) * 5 / 2;
     budget.max(500)
 }
@@ -329,15 +329,6 @@ fn run_single_test(case: &TestCase) -> TestResult {
         false,
         ScoringMode::Hybrid,
     );
-
-    if case.name == "gap_001_python_rate_limiter_overflow_fix" {
-        eprintln!("DEBUG [{}] budget={} fragments={}", case.name, budget, output.fragment_count);
-        eprintln!("DEBUG initial_files: {:?}", repo.initial_files.keys().collect::<Vec<_>>());
-        eprintln!("DEBUG changed_files: {:?}", repo.changed_files.keys().collect::<Vec<_>>());
-        for f in &output.fragments {
-            eprintln!("DEBUG FRAG: {} | {} | {} | sym={}", f.path, f.lines, f.kind, f.symbol.as_deref().unwrap_or("-"));
-        }
-    }
 
     let mut result = evaluate_oracle(case, &output.fragments);
     result.elapsed_secs = t0.elapsed().as_secs_f64();

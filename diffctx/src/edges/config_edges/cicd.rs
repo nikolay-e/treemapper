@@ -19,7 +19,7 @@ static GHA_RUN_BLOCK_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)run:\s*[|>]-?\s*\n((?:\s{2,}[^\n]*\n?)+)").unwrap());
 
 static GITLAB_SCRIPT_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?m)^\s{0,20}(?:script|before_script|after_script):\s?\n((?:\s{1,20}-\s{0,5}[^\n]{1,500}\n){1,100})")
+    Regex::new(r"(?m)^\s{0,20}(?:script|before_script|after_script):\s?\n((?:\s+-[^\n]*\n)+)")
         .unwrap()
 });
 static GITLAB_INCLUDE_RE: Lazy<Regex> = Lazy::new(|| {

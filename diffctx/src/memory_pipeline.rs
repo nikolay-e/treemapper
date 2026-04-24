@@ -1,5 +1,5 @@
 use std::fmt::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rayon::prelude::*;
@@ -8,6 +8,7 @@ use similar::{ChangeTag, TextDiff};
 
 use crate::config::limits::LIMITS;
 use crate::core::{compute_seed_weights, identify_core_fragments};
+use crate::edges;
 use crate::mode::{PipelineConfig, ScoringKind, ScoringMode};
 use crate::parsers::fragment_file;
 use crate::render::{build_diff_context_output, DiffContextOutput};
@@ -40,9 +41,38 @@ pub fn build_diff_context_in_memory(
     let diff_text = compute_memory_diff_text(&repo.initial_files, &repo.changed_files);
     let all_files = merge_file_contents(&repo.initial_files, &repo.changed_files);
 
+    let changed_paths: FxHashSet<String> = hunks.iter().map(|h| h.path.as_ref().to_string()).collect();
+
+    let changed_file_paths: Vec<PathBuf> = changed_paths.iter().map(PathBuf::from).collect();
+    let all_file_paths: Vec<PathBuf> = all_files.keys().map(PathBuf::from).collect();
+    let file_cache: FxHashMap<PathBuf, String> = all_files
+        .iter()
+        .map(|(k, v)| (PathBuf::from(k), v.clone()))
+        .collect();
+
+    let discovered = edges::discover_all_related_files(
+        &changed_file_paths,
+        &all_file_paths,
+        None,
+        Some(&file_cache),
+    );
+    let discovered_paths: FxHashSet<String> = discovered
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect();
+
+    let allowed_paths: FxHashSet<&str> = changed_paths
+        .iter()
+        .chain(discovered_paths.iter())
+        .map(|s| s.as_str())
+        .collect();
+
     let mut all_fragments: Vec<Fragment> = Vec::new();
     let mut seen: FxHashSet<FragmentId> = FxHashSet::default();
     for (path, content) in &all_files {
+        if !allowed_paths.contains(path.as_str()) {
+            continue;
+        }
         let path_arc: Arc<str> = Arc::from(path.as_str());
         let frags = fragment_file(path_arc, content);
         for f in frags {
@@ -56,19 +86,7 @@ pub fn build_diff_context_in_memory(
         f.token_count = count_tokens(&f.content) + LIMITS.overhead_per_fragment;
     });
 
-    if std::env::var("DIFFCTX_DEBUG").as_deref() == Ok("1") {
-        eprintln!("DEBUG hunks:");
-        for h in &hunks {
-            eprintln!("  {} new={}+{} old={}+{}", h.path, h.new_start, h.new_len, h.old_start, h.old_len);
-        }
-    }
     let core_ids = identify_core_fragments(&hunks, &all_fragments);
-    if std::env::var("DIFFCTX_DEBUG").as_deref() == Ok("1") {
-        eprintln!("DEBUG core_ids ({}):", core_ids.len());
-        for cid in &core_ids {
-            eprintln!("  {}:{}-{}", cid.path, cid.start_line, cid.end_line);
-        }
-    }
 
     let mut sig_frags = generate_signature_variants(&all_fragments);
     sig_frags.par_iter_mut().for_each(|f| {
@@ -77,8 +95,14 @@ pub fn build_diff_context_in_memory(
     all_fragments.extend(sig_frags);
 
     let effective_budget = budget_tokens.unwrap_or(UNLIMITED_BUDGET);
-    let config = PipelineConfig::from_mode(scoring_mode, all_files.len());
+    let n_context = allowed_paths.len();
+    let config = PipelineConfig::from_mode(scoring_mode, n_context);
     let seed_weights = compute_seed_weights(&hunks, &core_ids, &all_fragments);
+
+    let discovered_arc: FxHashSet<Arc<str>> = discovered_paths
+        .iter()
+        .map(|s| Arc::from(s.as_str()))
+        .collect();
 
     let strategy: Box<dyn ScoringStrategy> = match config.scoring {
         ScoringKind::Ego => Box::new(EgoGraphScoring::new(config.ego_depth)),
@@ -91,19 +115,8 @@ pub fn build_diff_context_in_memory(
         &hunks,
         None,
         Some(&seed_weights),
-        None,
+        Some(&discovered_arc),
     );
-
-    if std::env::var("DIFFCTX_DEBUG").as_deref() == Ok("1") {
-        eprintln!("DEBUG scoring={:?} n_fragments={} n_core={} n_filtered={}",
-            config.scoring, all_fragments.len(), core_ids.len(), scoring_result.filtered_fragments.len());
-        let mut scores: Vec<_> = scoring_result.rel_scores.iter().collect();
-        scores.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-        for (fid, score) in scores.iter().take(30) {
-            let is_core = if core_ids.contains(fid) { " [CORE]" } else { "" };
-            eprintln!("DEBUG  score={:.6} {}:{}-{}{}", score, fid.path, fid.start_line, fid.end_line, is_core);
-        }
-    }
 
     let needs = crate::utility::needs::needs_from_diff(&all_fragments, &core_ids, &diff_text);
 

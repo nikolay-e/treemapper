@@ -13,17 +13,17 @@ use super::super::EdgeDict;
 static WORKSPACE_MEMBERS_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?s)\[workspace\][^\[]*?members\s*=\s*\[(.*?)\]").unwrap());
 static PATH_DEP_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?m)^\s*(\w[\w-]{0,100})\s*=\s*\{[^}]*?path\s*=\s*["']([^"']{1,300})["']"#).unwrap());
+    Lazy::new(|| Regex::new(r##"(?m)^\s*(\w[\w-]{0,100})\s*=\s*\{[^}]*?path\s*=\s*["']([^"']{1,300})["']"##).unwrap());
 static FEATURES_SECTION_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\[features\]\s*\n((?:(?!\[)[^\n]*\n)*)").unwrap());
+    Lazy::new(|| Regex::new(r"(?ms)^\[features\]\s*\n(.+?)(?:\n\[|\z)").unwrap());
 static FEATURE_DEP_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"["'](\w[\w-]{0,100})(?:/[^"']*)?["']"#).unwrap());
+    Lazy::new(|| Regex::new(r##"["'](\w[\w-]{0,100})(?:/[^"']*)?["']"##).unwrap());
 static STRING_ITEM_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"["']([^"']{1,300})["']"#).unwrap());
+    Lazy::new(|| Regex::new(r##"["']([^"']{1,300})["']"##).unwrap());
 static BIN_SECTION_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?s)\[\[bin\]\][^\[]*?path\s*=\s*["']([^"']{1,300})["']"#).unwrap());
+    Lazy::new(|| Regex::new(r##"(?s)\[\[bin\]\][^\[]*?path\s*=\s*["']([^"']{1,300})["']"##).unwrap());
 static LIB_SECTION_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?s)\[lib\][^\[]*?path\s*=\s*["']([^"']{1,300})["']"#).unwrap());
+    Lazy::new(|| Regex::new(r##"(?s)\[lib\][^\[]*?path\s*=\s*["']([^"']{1,300})["']"##).unwrap());
 
 fn is_cargo_toml(path: &Path) -> bool {
     path.file_name()
