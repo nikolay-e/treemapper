@@ -77,7 +77,7 @@ jobs:
   # Cross-platform Testing
   # ============================================================================
   test:
-    needs: [pre-commit, lint-type-check]
+    needs: [lint-type-check]
     strategy:
       fail-fast: false
       matrix:
