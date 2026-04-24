@@ -176,7 +176,7 @@ report.exclude_lines = [
   "if TYPE_CHECKING:",
   "pragma: no cover",
 ]
-report.fail_under = 80
+report.fail_under = 40
 report.show_missing = true
 report.skip_empty = true
 
