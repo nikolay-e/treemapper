@@ -7,6 +7,11 @@ from pathlib import Path
 import tree_sitter_rust
 from tree_sitter import Language, Node, Parser, Tree
 
+
+def _node_text(node: Node) -> str:
+    return _node_text(node) if node.text else ""
+
+
 logger = logging.getLogger(__name__)
 
 _LANG = Language(tree_sitter_rust.language())
@@ -135,7 +140,7 @@ _USE_LIST_PUNCTUATION = frozenset({"{", "}", ","})
 
 
 def _extract_scoped_identifier_path(node: Node) -> str:
-    parts = [c.text.decode() for c in node.children if c.type in _PATH_IDENT_TYPES]
+    parts = [_node_text(c) for c in node.children if c.type in _PATH_IDENT_TYPES]
     return "::".join(parts)
 
 
@@ -146,9 +151,9 @@ def _collect_scoped_use_list(node: Node) -> list[str]:
         if child.type == "use_list":
             use_list = child
         elif child.type in _PATH_IDENT_TYPES:
-            scope_parts.append(child.text.decode())
+            scope_parts.append(_node_text(child))
         elif child.type == "scoped_identifier":
-            scope_parts = [c.text.decode() for c in child.children if c.type in _PATH_IDENT_TYPES]
+            scope_parts = [_node_text(c) for c in child.children if c.type in _PATH_IDENT_TYPES]
     scope = "::".join(scope_parts)
     if use_list:
         results = []
@@ -164,7 +169,7 @@ def _collect_scoped_use_list(node: Node) -> list[str]:
 def _collect_use_paths(node: Node, prefix: str = "") -> list[str]:
     ntype = node.type
     if ntype in _PATH_IDENT_TYPES:
-        name = node.text.decode()
+        name = _node_text(node)
         return [f"{prefix}::{name}" if prefix else name]
     if ntype == "scoped_identifier":
         return [_extract_scoped_identifier_path(node)]
@@ -220,7 +225,7 @@ def extract_mods(content: str) -> set[str]:
             continue
         for child in node.children:
             if child.type == "identifier":
-                mods.add(child.text.decode())
+                mods.add(_node_text(child))
                 break
     return mods
 
@@ -276,11 +281,11 @@ def extract_pub_uses(content: str) -> list[str]:
 
 def _type_name_from_node(node: Node) -> str | None:
     if node.type == "type_identifier":
-        return str(node.text.decode())
+        return str(_node_text(node))
     if node.type == "generic_type":
         for child in node.children:
             if child.type == "type_identifier":
-                return str(child.text.decode())
+                return str(_node_text(child))
     return None
 
 
@@ -311,12 +316,12 @@ def extract_definitions(content: str) -> tuple[set[str], set[str]]:
         if ntype == "function_item":
             for child in node.children:
                 if child.type == "identifier":
-                    funcs.add(child.text.decode())
+                    funcs.add(_node_text(child))
                     break
         elif ntype in ("struct_item", "enum_item", "trait_item", "type_item"):
             for child in node.children:
                 if child.type == "type_identifier":
-                    types.add(child.text.decode())
+                    types.add(_node_text(child))
                     break
         elif ntype == "impl_item":
             impl_type = _extract_impl_target_type(node)

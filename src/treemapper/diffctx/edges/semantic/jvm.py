@@ -155,7 +155,7 @@ def _collect_nodes(root: Node, target_types: set[str]) -> list[Node]:
 
 
 def _node_text(node: Node) -> str:
-    return node.text.decode()  # type: ignore[no-any-return]
+    return node.text.decode() if node.text else ""
 
 
 def _extract_java_imports(root: Node) -> set[str]:

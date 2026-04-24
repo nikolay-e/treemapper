@@ -7,6 +7,11 @@ from pathlib import Path
 import tree_sitter_go
 from tree_sitter import Language, Node, Parser, Tree
 
+
+def _node_text(node: Node) -> str:
+    return _node_text(node) if node.text else ""
+
+
 logger = logging.getLogger(__name__)
 
 _LANG = Language(tree_sitter_go.language())
@@ -101,13 +106,13 @@ def _collect_import_paths(node: Node, imports: set[str]) -> None:
         elif child.type == "import_spec":
             _add_import_from_spec(child, imports)
         elif child.type == "interpreted_string_literal":
-            imports.add(child.text.decode().strip('"'))
+            imports.add(_node_text(child).strip('"'))
 
 
 def _add_import_from_spec(spec: Node, imports: set[str]) -> None:
     for child in spec.children:
         if child.type == "interpreted_string_literal":
-            imports.add(child.text.decode().strip('"'))
+            imports.add(_node_text(child).strip('"'))
             return
 
 
@@ -121,19 +126,19 @@ def _extract_definitions(content: str) -> tuple[set[str], set[str]]:
         if node.type == "function_declaration":
             for child in node.children:
                 if child.type == "identifier":
-                    funcs.add(child.text.decode())
+                    funcs.add(_node_text(child))
                     break
         elif node.type == "method_declaration":
             for child in node.children:
                 if child.type == "field_identifier":
-                    funcs.add(child.text.decode())
+                    funcs.add(_node_text(child))
                     break
         elif node.type == "type_declaration":
             for spec in node.children:
                 if spec.type == "type_spec":
                     for child in spec.children:
                         if child.type == "type_identifier":
-                            types.add(child.text.decode())
+                            types.add(_node_text(child))
                             break
     return funcs, types
 
@@ -164,7 +169,7 @@ def _extract_embedded_types(content: str) -> dict[str, set[str]]:
                 continue
             embeds = _collect_struct_embeds(struct_node)
             if embeds:
-                result[name_node.text.decode()] = embeds
+                result[_node_text(name_node)] = embeds
     return result
 
 
@@ -185,12 +190,12 @@ def _collect_struct_embeds(struct_node: Node) -> set[str]:
         if has_field_name:
             continue
         for child in field.children:
-            if child.type == "type_identifier" and child.text.decode()[0].isupper():
-                embeds.add(child.text.decode())
+            if child.type == "type_identifier" and _node_text(child)[0].isupper():
+                embeds.add(_node_text(child))
             elif child.type == "pointer_type":
                 inner = _find_child_by_type(child, "type_identifier")
-                if inner and inner.text.decode()[0].isupper():
-                    embeds.add(inner.text.decode())
+                if inner and _node_text(inner)[0].isupper():
+                    embeds.add(_node_text(inner))
     return embeds
 
 
@@ -201,7 +206,7 @@ def _has_init_func(content: str) -> bool:
     for node in tree.root_node.children:
         if node.type == "function_declaration":
             for child in node.children:
-                if child.type == "identifier" and child.text.decode() == "init":
+                if child.type == "identifier" and _node_text(child) == "init":
                     return True
     return False
 
@@ -217,7 +222,7 @@ def _get_package_name_from_content(content: str, path: Path) -> str:
             if node.type == "package_clause":
                 for child in node.children:
                     if child.type == "package_identifier":
-                        return str(child.text.decode())
+                        return str(_node_text(child))
     return path.parent.name
 
 
