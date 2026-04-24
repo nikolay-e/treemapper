@@ -40,8 +40,6 @@ def cap_diff_context_budget(monkeypatch):
     yield
 
 
-
-
 def _verify_no_garbage_in_context(context: dict) -> None:
     all_content = []
     for frag in context.get("fragments", []):
@@ -228,5 +226,3 @@ def git_repo(tmp_path):
     repo_path = tmp_path / "git_test_repo"
     Pygit2Repo(repo_path)
     return repo_path
-
-
