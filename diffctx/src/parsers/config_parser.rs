@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::types::{extract_identifiers, Fragment, FragmentId, FragmentKind};
@@ -7,6 +8,12 @@ use crate::types::{extract_identifiers, Fragment, FragmentId, FragmentKind};
 use super::FragmentationStrategy;
 
 const CONFIG_EXTENSIONS: &[&str] = &[".yaml", ".yml", ".toml", ".json"];
+
+static YAML_TOP_LEVEL_KEY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^[A-Za-z_][A-Za-z0-9_.-]*\s*:").unwrap());
+static TOML_SECTION_HEADER: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\[").unwrap());
+static JSON_TOP_LEVEL_KEY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"^\s{0,4}"[^"]+"\s*:"#).unwrap());
 
 fn file_extension_lower(path: &str) -> String {
     if let Some(dot_pos) = path.rfind('.') {
@@ -33,20 +40,14 @@ impl FragmentationStrategy for ConfigStrategy {
             _ => Vec::new(),
         }
     }
-
-    fn priority(&self) -> i32 {
-        50
-    }
 }
 
 fn fragment_yaml(path: Arc<str>, content: &str) -> Vec<Fragment> {
-    let top_level_key = Regex::new(r"^[A-Za-z_][A-Za-z0-9_.-]*\s*:").unwrap();
-    split_at_top_level_pattern(path, content, &top_level_key)
+    split_at_top_level_pattern(path, content, &YAML_TOP_LEVEL_KEY)
 }
 
 fn fragment_toml(path: Arc<str>, content: &str) -> Vec<Fragment> {
-    let section_header = Regex::new(r"^\[").unwrap();
-    split_at_top_level_pattern(path, content, &section_header)
+    split_at_top_level_pattern(path, content, &TOML_SECTION_HEADER)
 }
 
 fn fragment_json(path: Arc<str>, content: &str) -> Vec<Fragment> {
@@ -55,11 +56,10 @@ fn fragment_json(path: Arc<str>, content: &str) -> Vec<Fragment> {
         return Vec::new();
     }
 
-    let top_level_key = Regex::new(r#"^\s{0,4}"[^"]+"\s*:"#).unwrap();
     let mut boundaries: Vec<usize> = Vec::new();
 
     for (i, line) in lines.iter().enumerate() {
-        if top_level_key.is_match(line) {
+        if JSON_TOP_LEVEL_KEY.is_match(line) {
             boundaries.push(i);
         }
     }

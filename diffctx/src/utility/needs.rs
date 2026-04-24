@@ -419,7 +419,10 @@ fn collect_test_needs(
         let tested = frag
             .symbol_name
             .as_ref()
-            .map(|s| s.to_lowercase().strip_prefix("test_").unwrap_or(&s.to_lowercase()).to_string());
+            .map(|s| {
+                let lower = s.to_lowercase();
+                lower.strip_prefix("test_").unwrap_or(&lower).to_string()
+            });
         if let Some(ref tested) = tested {
             if core_symbol_names.contains(tested)
                 || needs.contains_key(&("definition".to_string(), tested.clone()))

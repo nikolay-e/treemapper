@@ -48,8 +48,4 @@ impl FragmentationStrategy for GenericStrategy {
 
         fragments
     }
-
-    fn priority(&self) -> i32 {
-        0
-    }
 }

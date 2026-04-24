@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::types::{extract_identifiers, Fragment, FragmentId, FragmentKind};
@@ -7,6 +8,8 @@ use crate::types::{extract_identifiers, Fragment, FragmentId, FragmentKind};
 use super::FragmentationStrategy;
 
 const MARKDOWN_EXTENSIONS: &[&str] = &[".md", ".markdown", ".mdx"];
+
+static HEADING_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(#{1,6})(?:\s(.+))?$").unwrap());
 
 fn file_extension_lower(path: &str) -> String {
     if let Some(dot_pos) = path.rfind('.') {
@@ -30,11 +33,10 @@ impl FragmentationStrategy for MarkdownStrategy {
             return Vec::new();
         }
 
-        let heading_re = Regex::new(r"^(#{1,6})(?:\s(.+))?$").unwrap();
         let mut headings: Vec<(u32, u32, String)> = Vec::new();
 
         for (i, line) in lines.iter().enumerate() {
-            if let Some(caps) = heading_re.captures(line) {
+            if let Some(caps) = HEADING_RE.captures(line) {
                 let level = caps.get(1).unwrap().as_str().len() as u32;
                 let title = caps
                     .get(2)
@@ -82,10 +84,6 @@ impl FragmentationStrategy for MarkdownStrategy {
         }
 
         fragments
-    }
-
-    fn priority(&self) -> i32 {
-        85
     }
 }
 

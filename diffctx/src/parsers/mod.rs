@@ -10,7 +10,6 @@ use crate::types::Fragment;
 pub trait FragmentationStrategy: Send + Sync {
     fn can_handle(&self, path: &str, content: &str) -> bool;
     fn fragment(&self, path: Arc<str>, content: &str) -> Vec<Fragment>;
-    fn priority(&self) -> i32;
 }
 
 pub fn fragment_file(path: Arc<str>, content: &str) -> Vec<Fragment> {

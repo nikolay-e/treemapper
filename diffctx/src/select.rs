@@ -526,11 +526,9 @@ pub fn lazy_greedy_select(
         };
     }
 
-    let (mut state, non_core_fragments, selected_core, should_return_early) =
+    let (mut state, non_core_fragments, _selected_core, should_return_early) =
         setup_and_select_core(&fragments, core_ids, rel, needs, budget_tokens, file_importance);
 
-    let _selected_core_id_set: FxHashSet<FragmentId> =
-        selected_core.iter().map(|f| f.id.clone()).collect();
 
     if should_return_early {
         let used = budget_tokens - state.remaining_budget;

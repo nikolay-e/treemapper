@@ -57,8 +57,6 @@ pub static EDGE_WEIGHTS: Lazy<FxHashMap<&'static str, EdgeWeightConfig>> = Lazy:
         ("c_call", EdgeWeightConfig::new(0.55, 0.40)),
         ("c_type", EdgeWeightConfig::new(0.50, 0.40)),
         ("c_inheritance", EdgeWeightConfig::new(0.70, 0.40)),
-        ("c_forward_decl", EdgeWeightConfig::new(0.35, 0.40)),
-        ("c_friend", EdgeWeightConfig::new(0.50, 0.40)),
         ("dotnet_using", EdgeWeightConfig::new(0.65, 0.40)),
         ("dotnet_inheritance", EdgeWeightConfig::new(0.75, 0.40)),
         ("dotnet_type", EdgeWeightConfig::new(0.60, 0.40)),

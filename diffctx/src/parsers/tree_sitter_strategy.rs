@@ -948,8 +948,4 @@ impl FragmentationStrategy for TreeSitterStrategy {
 
         fragments
     }
-
-    fn priority(&self) -> i32 {
-        100
-    }
 }

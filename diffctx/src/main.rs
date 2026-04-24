@@ -36,6 +36,9 @@ struct Cli {
 
     #[arg(long, default_value = "hybrid")]
     scoring: String,
+
+    #[arg(long, default_value = "300")]
+    timeout: u64,
 }
 
 fn main() -> Result<()> {
@@ -55,6 +58,7 @@ fn main() -> Result<()> {
         cli.no_content,
         cli.full,
         scoring_mode,
+        cli.timeout,
     )?;
 
     match cli.format.as_str() {

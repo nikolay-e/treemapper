@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -10,7 +11,15 @@ use regex::Regex;
 
 use crate::types::DiffHunk;
 
-const GIT_TIMEOUT_SECS: u64 = 60;
+static GIT_TIMEOUT_SECS: AtomicU64 = AtomicU64::new(60);
+
+pub fn set_git_timeout(secs: u64) {
+    GIT_TIMEOUT_SECS.store(secs, Ordering::Relaxed);
+}
+
+fn git_timeout() -> u64 {
+    GIT_TIMEOUT_SECS.load(Ordering::Relaxed)
+}
 const SAFE_DIFF_FLAGS: &[&str] = &["--no-textconv", "--no-ext-diff"];
 
 static HUNK_RE: Lazy<Regex> =
@@ -61,7 +70,7 @@ pub fn run_git(repo_root: &Path, args: &[&str]) -> Result<String> {
         }
     })?;
 
-    let output = wait_with_timeout(child, Duration::from_secs(GIT_TIMEOUT_SECS), args)?;
+    let output = wait_with_timeout(child, Duration::from_secs(git_timeout()), args)?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -292,7 +301,7 @@ pub fn parse_diff(repo_root: &Path, diff_range: Option<&str>) -> Result<Vec<Diff
     Ok(hunks)
 }
 
-fn run_git_z(repo_root: &Path, args: &[&str]) -> Result<Vec<String>> {
+pub fn run_git_z(repo_root: &Path, args: &[&str]) -> Result<Vec<String>> {
     let output = run_git(repo_root, args)?;
     Ok(output
         .split('\0')

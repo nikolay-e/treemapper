@@ -16,8 +16,6 @@ const REVERSE_FACTOR: f64 = 0.40;
 
 static DOCKERFILE_COPY_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?mi)^(?:COPY|ADD)\s+(?:--[^\s]+\s+)*(.+)").unwrap());
-static DOCKERFILE_FROM_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?mi)^FROM\s+(\S+)").unwrap());
 static DOCKERFILE_ENV_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?mi)^ENV\s+(\w+)").unwrap());
 static DOCKERFILE_ARG_RE: Lazy<Regex> =

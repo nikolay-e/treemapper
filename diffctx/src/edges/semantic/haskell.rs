@@ -25,7 +25,7 @@ static MODULE_RE: Lazy<Regex> =
 static DATA_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*(?:data|newtype|type)\s+([A-Z]\w+)").unwrap());
 static CLASS_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?m)^\s*class\s+.*?\b([A-Z]\w+)").unwrap());
+    Lazy::new(|| Regex::new(r"(?m)^\s*class\s+(?:.*?=>\s*)?([A-Z]\w+)").unwrap());
 static INSTANCE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*instance\s+.*?\b([A-Z]\w+)\s+([A-Z]\w+)").unwrap());
 static TYPE_REF_RE: Lazy<Regex> =

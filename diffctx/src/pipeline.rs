@@ -34,8 +34,13 @@ pub fn build_diff_context(
     no_content: bool,
     full: bool,
     scoring_mode: ScoringMode,
+    timeout: u64,
 ) -> Result<DiffContextOutput> {
-    let root_dir = root_dir.canonicalize().unwrap_or_else(|_| root_dir.to_path_buf());
+    git::set_git_timeout(timeout);
+    let root_dir = root_dir.canonicalize().unwrap_or_else(|e| {
+        tracing::debug!("canonicalize failed for '{}': {}", root_dir.display(), e);
+        root_dir.to_path_buf()
+    });
 
     if !git::is_git_repo(&root_dir) {
         anyhow::bail!("'{}' is not a git repository", root_dir.display());
@@ -322,7 +327,7 @@ fn create_discovery(config: &PipelineConfig) -> Box<dyn DiscoveryStrategy> {
 const MAX_CACHE_BYTES: usize = 200 * 1024 * 1024;
 
 fn build_file_cache(candidate_files: &[PathBuf]) -> FxHashMap<PathBuf, String> {
-    let entries: Vec<(PathBuf, String)> = candidate_files
+    let mut entries: Vec<(PathBuf, String)> = candidate_files
         .par_iter()
         .filter_map(|f| {
             let meta = f.metadata().ok()?;
@@ -333,6 +338,7 @@ fn build_file_cache(candidate_files: &[PathBuf]) -> FxHashMap<PathBuf, String> {
             Some((f.clone(), content))
         })
         .collect();
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut cache: FxHashMap<PathBuf, String> = FxHashMap::default();
     let mut cache_bytes = 0usize;
@@ -348,7 +354,9 @@ fn build_file_cache(candidate_files: &[PathBuf]) -> FxHashMap<PathBuf, String> {
 
 fn assign_token_counts(fragments: &mut [Fragment]) {
     fragments.par_iter_mut().for_each(|frag| {
-        frag.token_count = count_tokens(&frag.content) + OVERHEAD_PER_FRAGMENT;
+        if frag.token_count == 0 {
+            frag.token_count = count_tokens(&frag.content) + OVERHEAD_PER_FRAGMENT;
+        }
     });
 }
 

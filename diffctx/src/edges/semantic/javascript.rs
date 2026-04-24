@@ -35,10 +35,6 @@ static TYPE_REF_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unw
 static DEF_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?m)^\s*(?:export\s+)?(?:default\s+)?(?:function|class|const|let|var|interface|type|enum)\s+([A-Za-z_$]\w*)").unwrap()
 });
-#[allow(dead_code)]
-static REEXPORT_SOURCE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?m)export\s+.*?\s+from\s+['"]([^'"]+)['"]"#).unwrap()
-});
 
 static JS_KEYWORDS: Lazy<FxHashSet<&str>> = Lazy::new(|| {
     [

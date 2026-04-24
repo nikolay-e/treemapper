@@ -209,7 +209,7 @@ fn fragment_matched(output_frags: &[FragmentEntry], decl: &DeclaredFragment, acc
 }
 
 fn calculate_budget(case: &TestCase) -> u32 {
-    let overhead: u32 = 20;
+    let overhead: u32 = _diffctx::config::limits::LIMITS.overhead_per_fragment;
     let mut test_files: FxHashMap<String, String> = case.repo.initial_files.clone();
     for (k, v) in &case.repo.changed_files {
         test_files.insert(k.clone(), v.clone());

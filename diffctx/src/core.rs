@@ -7,7 +7,7 @@ fn kind_priority(kind: FragmentKind) -> u8 {
 }
 
 fn find_core_for_hunk(
-    frags: &[Fragment],
+    frags: &[&Fragment],
     h_start: u32,
     h_end: u32,
 ) -> FxHashSet<FragmentId> {
@@ -15,6 +15,7 @@ fn find_core_for_hunk(
 
     let covering: Vec<&Fragment> = frags
         .iter()
+        .copied()
         .filter(|f| f.start_line() <= h_start && h_end <= f.end_line())
         .collect();
     if !covering.is_empty() {
@@ -33,6 +34,7 @@ fn find_core_for_hunk(
 
     let overlapping: Vec<&Fragment> = frags
         .iter()
+        .copied()
         .filter(|f| f.start_line() <= h_end && f.end_line() >= h_start)
         .collect();
     if !overlapping.is_empty() {
@@ -44,10 +46,12 @@ fn find_core_for_hunk(
 
     let before: Vec<&Fragment> = frags
         .iter()
+        .copied()
         .filter(|f| f.end_line() < h_start)
         .collect();
     let after: Vec<&Fragment> = frags
         .iter()
+        .copied()
         .filter(|f| f.start_line() > h_end)
         .collect();
     if let Some(nearest_before) = before.iter().max_by_key(|f| f.end_line()) {
@@ -106,8 +110,7 @@ pub fn identify_core_fragments(
     for h in hunks {
         if let Some(frags) = frags_by_path.get(h.path.as_ref()) {
             let (h_start, h_end) = h.core_selection_range();
-            let owned: Vec<Fragment> = frags.iter().map(|f| (*f).clone()).collect();
-            core_ids.extend(find_core_for_hunk(&owned, h_start, h_end));
+            core_ids.extend(find_core_for_hunk(frags, h_start, h_end));
         }
     }
 

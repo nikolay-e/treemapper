@@ -84,7 +84,10 @@ fn extract_defines(content: &str) -> FxHashSet<String> {
         defs.insert(cap[1].to_string());
     }
     for cap in FUNC_RE.captures_iter(content) {
-        defs.insert(cap[1].to_string());
+        let name = &cap[1];
+        if !DART_KEYWORDS.contains(name) {
+            defs.insert(name.to_string());
+        }
     }
     defs
 }
@@ -118,7 +121,6 @@ impl EdgeBuilder for DartEdgeBuilder {
         }
 
         let import_weight = EDGE_WEIGHTS["dart_import"].forward;
-        let export_weight = EDGE_WEIGHTS["dart_export"].forward;
         let type_weight = EDGE_WEIGHTS["dart_type"].forward;
         let fn_weight = EDGE_WEIGHTS["dart_fn"].forward;
         let inheritance_weight = EDGE_WEIGHTS["dart_inheritance"].forward;
@@ -144,8 +146,7 @@ impl EdgeBuilder for DartEdgeBuilder {
 
             let file_refs = extract_refs(&f.content);
             for r in &file_refs {
-                let w = if EXPORT_RE.is_match(r) { export_weight } else { import_weight };
-                link_by_name(&f.id, r, &idx, &mut edges, w, reverse_factor);
+                link_by_name(&f.id, r, &idx, &mut edges, import_weight, reverse_factor);
             }
 
             let type_refs = extract_type_refs(&f.content);

@@ -185,6 +185,7 @@ impl FragmentIterator {
     no_content = false,
     full = false,
     scoring_mode = "hybrid",
+    timeout = 300,
 ))]
 fn build_diff_context_native(
     root_dir: &str,
@@ -195,11 +196,12 @@ fn build_diff_context_native(
     no_content: bool,
     full: bool,
     scoring_mode: &str,
+    timeout: u64,
 ) -> PyResult<DiffContextResult> {
     let mode = ScoringMode::from_str(scoring_mode);
     let path = Path::new(root_dir);
 
-    pipeline::build_diff_context(path, diff_range, budget_tokens, alpha, tau, no_content, full, mode)
+    pipeline::build_diff_context(path, diff_range, budget_tokens, alpha, tau, no_content, full, mode, timeout)
         .map(DiffContextResult::from)
         .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
@@ -234,7 +236,15 @@ fn build_diff_context<'py>(
     scoring_mode: &str,
     timeout: u64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let _ = (ignore_file, no_default_ignores, whitelist_file, timeout);
+    if ignore_file.is_some() {
+        tracing::warn!("ignore_file is not yet implemented in Rust backend, ignored");
+    }
+    if no_default_ignores {
+        tracing::warn!("no_default_ignores is not yet implemented in Rust backend, ignored");
+    }
+    if whitelist_file.is_some() {
+        tracing::warn!("whitelist_file is not yet implemented in Rust backend, ignored");
+    }
 
     let mode = ScoringMode::from_str(scoring_mode);
     let path = Path::new(root_dir);
@@ -242,7 +252,7 @@ fn build_diff_context<'py>(
 
     let start = std::time::Instant::now();
     let output = pipeline::build_diff_context(
-        path, range, budget_tokens, alpha, tau, no_content, full, mode,
+        path, range, budget_tokens, alpha, tau, no_content, full, mode, timeout,
     )
     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
     let total_ms = start.elapsed().as_secs_f64() * 1000.0;

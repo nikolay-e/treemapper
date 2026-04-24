@@ -30,9 +30,6 @@ static TYPE_REF_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\b([A-Z]\w*)\b").unwrap());
 static PKG_CALL_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\b([a-z]\w+)\.([A-Z]\w*)").unwrap());
-#[allow(dead_code)]
-static EMBED_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"//go:embed\s+(.+)"#).unwrap());
 static INIT_FUNC_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^\s*func\s+init\s*\(").unwrap());
 

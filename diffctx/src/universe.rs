@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use rayon::prelude::*;
 use rustc_hash::FxHashSet;
 
 use crate::config::limits::LIMITS;
+use crate::git;
 use crate::languages::get_language_for_file;
 
 const FALLBACK_MAX_FILES: usize = 10_000;
@@ -35,25 +35,16 @@ pub fn collect_candidate_files(
     root_dir: &Path,
     included_set: &FxHashSet<PathBuf>,
 ) -> Vec<PathBuf> {
-    if let Ok(output) = Command::new("git")
-        .arg("-C")
-        .arg(root_dir)
-        .args(["ls-files", "-z"])
-        .output()
-    {
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let all_paths: Vec<PathBuf> = stdout
-                .split('\0')
-                .filter(|s| !s.is_empty())
-                .map(|f| root_dir.join(f))
-                .collect();
-            let files: Vec<PathBuf> = all_paths
-                .into_par_iter()
-                .filter(|f| is_candidate_file(f, root_dir, included_set))
-                .collect();
-            return files;
-        }
+    if let Ok(parts) = git::run_git_z(root_dir, &["ls-files", "-z"]) {
+        let all_paths: Vec<PathBuf> = parts
+            .into_iter()
+            .map(|f| root_dir.join(f))
+            .collect();
+        let files: Vec<PathBuf> = all_paths
+            .into_par_iter()
+            .filter(|f| is_candidate_file(f, root_dir, included_set))
+            .collect();
+        return files;
     }
 
     let mut fallback: Vec<PathBuf> = Vec::new();
