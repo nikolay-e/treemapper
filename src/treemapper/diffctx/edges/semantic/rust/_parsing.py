@@ -9,7 +9,7 @@ from tree_sitter import Language, Node, Parser, Tree
 
 
 def _node_text(node: Node) -> str:
-    return _node_text(node) if node.text else ""
+    return node.text.decode() if node.text else ""
 
 
 logger = logging.getLogger(__name__)
