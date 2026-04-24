@@ -515,7 +515,11 @@ def main():
         else:
             tag = f"cb_{args.scoring}_n{args.limit}_b{args.budget}_s{seed}"
         if args.baseline != "treemapper":
-            tag = f"cb_baseline_{args.baseline}" if len(seeds) == 1 else f"cb_baseline_{args.baseline}_s{seed}"
+            tag = (
+                f"cb_{args.baseline}_n{args.limit}_b{args.budget}"
+                if len(seeds) == 1
+                else f"cb_{args.baseline}_n{args.limit}_b{args.budget}_s{seed}"
+            )
         save_results(results, tag, seed=seed, budget=args.budget, scoring=args.scoring, baseline=args.baseline)
 
         all_seed_results[seed] = results
