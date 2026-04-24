@@ -251,7 +251,7 @@ repos:
         files: \.(md|markdown)$
 
   # ============================================================================
-  # RUST QUALITY (cargo fmt, clippy, test)
+  # RUST QUALITY (fmt, clippy, test, audit)
   # ============================================================================
   - repo: local
     hooks:
@@ -277,6 +277,14 @@ repos:
         entry: bash -c 'cd diffctx && cargo test --release'
         pass_filenames: false
         files: ^diffctx/.*\.rs$
+        types: [file]
+
+      - id: cargo-audit
+        name: cargo audit (dependency vulnerabilities)
+        language: system
+        entry: bash -c 'command -v cargo-audit >/dev/null 2>&1 && cd diffctx && cargo audit || true'
+        pass_filenames: false
+        files: ^diffctx/Cargo\.(toml|lock)$
         types: [file]
 
   # ============================================================================
