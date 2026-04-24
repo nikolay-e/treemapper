@@ -564,27 +564,11 @@ const LANG_CONFIGS: &[LangConfig] = &[
             "scalar_type_definition",
         ],
     },
-    // --- LaTeX ---
-    LangConfig {
-        extension: ".tex",
-        ts_name: "latex",
-        definition_types: &["section", "subsection", "environment", "new_command_definition"],
-    },
-    LangConfig {
-        extension: ".latex",
-        ts_name: "latex",
-        definition_types: &["section", "subsection", "environment", "new_command_definition"],
-    },
-    LangConfig {
-        extension: ".sty",
-        ts_name: "latex",
-        definition_types: &["section", "subsection", "environment", "new_command_definition"],
-    },
-    LangConfig {
-        extension: ".cls",
-        ts_name: "latex",
-        definition_types: &["section", "subsection", "environment", "new_command_definition"],
-    },
+    // LaTeX: tree-sitter-latex crate is broken, using generic parser instead
+    // LangConfig { extension: ".tex", ts_name: "latex", ... },
+    // LangConfig { extension: ".latex", ts_name: "latex", ... },
+    // LangConfig { extension: ".sty", ts_name: "latex", ... },
+    // LangConfig { extension: ".cls", ts_name: "latex", ... }
     // --- Prisma ---
     LangConfig {
         extension: ".prisma",
@@ -868,7 +852,7 @@ fn get_tree_sitter_language(ts_name: &str) -> Option<Language> {
         "make" => Language::new(tree_sitter_make::LANGUAGE),
         "hcl" => Language::new(tree_sitter_hcl::LANGUAGE),
         "graphql" => Language::new(tree_sitter_graphql::LANGUAGE),
-        "latex" => Language::new(tree_sitter_latex::LANGUAGE),
+        // "latex" => tree-sitter-latex crate is broken (missing external scanner)
         "dart" => Language::new(tree_sitter_dart::LANGUAGE),
         "prisma" => Language::new(tree_sitter_prisma_io::LANGUAGE),
         "svelte" => Language::new(tree_sitter_svelte_ng::LANGUAGE),
