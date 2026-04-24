@@ -350,21 +350,471 @@ const LANG_CONFIGS: &[LangConfig] = &[
             "protocol_function_declaration",
         ],
     },
+    // --- Ruby extra extensions ---
+    LangConfig {
+        extension: ".gemspec",
+        ts_name: "ruby",
+        definition_types: &["method", "class", "module", "singleton_method"],
+    },
+    // --- Bash/Shell ---
+    LangConfig {
+        extension: ".sh",
+        ts_name: "bash",
+        definition_types: &["function_definition"],
+    },
+    LangConfig {
+        extension: ".bash",
+        ts_name: "bash",
+        definition_types: &["function_definition"],
+    },
+    LangConfig {
+        extension: ".zsh",
+        ts_name: "bash",
+        definition_types: &["function_definition"],
+    },
+    LangConfig {
+        extension: ".ksh",
+        ts_name: "bash",
+        definition_types: &["function_definition"],
+    },
+    // --- CSS ---
+    LangConfig {
+        extension: ".css",
+        ts_name: "css",
+        definition_types: &["rule_set", "media_statement", "keyframes_statement", "import_statement"],
+    },
+    LangConfig {
+        extension: ".scss",
+        ts_name: "css",
+        definition_types: &["rule_set", "media_statement", "keyframes_statement", "import_statement"],
+    },
+    LangConfig {
+        extension: ".less",
+        ts_name: "css",
+        definition_types: &["rule_set", "media_statement", "keyframes_statement", "import_statement"],
+    },
+    // --- Haskell ---
+    LangConfig {
+        extension: ".hs",
+        ts_name: "haskell",
+        definition_types: &["function", "type_alias", "newtype", "adt", "class", "instance", "signature"],
+    },
+    LangConfig {
+        extension: ".lhs",
+        ts_name: "haskell",
+        definition_types: &["function", "type_alias", "newtype", "adt", "class", "instance", "signature"],
+    },
+    // --- Elixir ---
+    LangConfig {
+        extension: ".ex",
+        ts_name: "elixir",
+        definition_types: &["call"],
+    },
+    LangConfig {
+        extension: ".exs",
+        ts_name: "elixir",
+        definition_types: &["call"],
+    },
+    // --- Lua ---
+    LangConfig {
+        extension: ".lua",
+        ts_name: "lua",
+        definition_types: &["function_declaration", "local_function", "function_definition_statement"],
+    },
+    // --- R ---
+    LangConfig {
+        extension: ".r",
+        ts_name: "r",
+        definition_types: &["function_definition", "left_assignment"],
+    },
+    // --- OCaml ---
+    LangConfig {
+        extension: ".ml",
+        ts_name: "ocaml",
+        definition_types: &["let_binding", "type_definition", "module_definition", "module_type_definition", "value_definition"],
+    },
+    LangConfig {
+        extension: ".mli",
+        ts_name: "ocaml",
+        definition_types: &["let_binding", "type_definition", "module_definition", "module_type_definition", "value_definition"],
+    },
+    // --- Erlang ---
+    LangConfig {
+        extension: ".erl",
+        ts_name: "erlang",
+        definition_types: &["function_clause", "type_spec", "attribute"],
+    },
+    LangConfig {
+        extension: ".hrl",
+        ts_name: "erlang",
+        definition_types: &["function_clause", "type_spec", "attribute"],
+    },
+    // --- Julia ---
+    LangConfig {
+        extension: ".jl",
+        ts_name: "julia",
+        definition_types: &[
+            "function_definition",
+            "short_function_definition",
+            "macro_definition",
+            "struct_definition",
+            "abstract_definition",
+            "module_definition",
+        ],
+    },
+    // --- Zig ---
+    LangConfig {
+        extension: ".zig",
+        ts_name: "zig",
+        definition_types: &["FnDecl", "ContainerDecl", "TestDecl", "VarDecl"],
+    },
+    // --- Clojure ---
+    LangConfig {
+        extension: ".clj",
+        ts_name: "clojure",
+        definition_types: &["list_lit"],
+    },
+    LangConfig {
+        extension: ".cljs",
+        ts_name: "clojure",
+        definition_types: &["list_lit"],
+    },
+    LangConfig {
+        extension: ".cljc",
+        ts_name: "clojure",
+        definition_types: &["list_lit"],
+    },
+    // --- Nix ---
+    LangConfig {
+        extension: ".nix",
+        ts_name: "nix",
+        definition_types: &["binding", "inherit"],
+    },
+    // --- Groovy ---
+    LangConfig {
+        extension: ".groovy",
+        ts_name: "groovy",
+        definition_types: &["method_declaration", "class_declaration", "closure"],
+    },
+    LangConfig {
+        extension: ".gradle",
+        ts_name: "groovy",
+        definition_types: &["method_declaration", "class_declaration", "closure"],
+    },
+    // --- Objective-C ---
+    LangConfig {
+        extension: ".m",
+        ts_name: "objc",
+        definition_types: &[
+            "class_interface",
+            "class_implementation",
+            "method_declaration",
+            "protocol_declaration",
+            "category_interface",
+            "category_implementation",
+        ],
+    },
+    LangConfig {
+        extension: ".mm",
+        ts_name: "objc",
+        definition_types: &[
+            "class_interface",
+            "class_implementation",
+            "method_declaration",
+            "protocol_declaration",
+            "category_interface",
+            "category_implementation",
+        ],
+    },
+    // --- Dart ---
+    LangConfig {
+        extension: ".dart",
+        ts_name: "dart",
+        definition_types: &[
+            "class_definition",
+            "function_signature",
+            "method_signature",
+            "enum_declaration",
+            "extension_declaration",
+            "mixin_declaration",
+        ],
+    },
+    // --- GraphQL ---
+    LangConfig {
+        extension: ".graphql",
+        ts_name: "graphql",
+        definition_types: &[
+            "object_type_definition",
+            "interface_type_definition",
+            "enum_type_definition",
+            "input_object_type_definition",
+            "union_type_definition",
+            "scalar_type_definition",
+        ],
+    },
+    LangConfig {
+        extension: ".gql",
+        ts_name: "graphql",
+        definition_types: &[
+            "object_type_definition",
+            "interface_type_definition",
+            "enum_type_definition",
+            "input_object_type_definition",
+            "union_type_definition",
+            "scalar_type_definition",
+        ],
+    },
+    // --- LaTeX ---
+    LangConfig {
+        extension: ".tex",
+        ts_name: "latex",
+        definition_types: &["section", "subsection", "environment", "new_command_definition"],
+    },
+    LangConfig {
+        extension: ".latex",
+        ts_name: "latex",
+        definition_types: &["section", "subsection", "environment", "new_command_definition"],
+    },
+    LangConfig {
+        extension: ".sty",
+        ts_name: "latex",
+        definition_types: &["section", "subsection", "environment", "new_command_definition"],
+    },
+    LangConfig {
+        extension: ".cls",
+        ts_name: "latex",
+        definition_types: &["section", "subsection", "environment", "new_command_definition"],
+    },
+    // --- Prisma ---
+    LangConfig {
+        extension: ".prisma",
+        ts_name: "prisma",
+        definition_types: &["model_declaration", "enum_declaration", "type_declaration", "generator_declaration", "datasource_declaration"],
+    },
+    // --- Svelte ---
+    LangConfig {
+        extension: ".svelte",
+        ts_name: "svelte",
+        definition_types: &["script_element", "style_element", "element"],
+    },
+    // --- HCL / Terraform ---
+    LangConfig {
+        extension: ".tf",
+        ts_name: "hcl",
+        definition_types: &["block"],
+    },
+    LangConfig {
+        extension: ".hcl",
+        ts_name: "hcl",
+        definition_types: &["block"],
+    },
+    // --- HTML ---
+    LangConfig {
+        extension: ".html",
+        ts_name: "html",
+        definition_types: &["element", "script_element", "style_element"],
+    },
+    LangConfig {
+        extension: ".htm",
+        ts_name: "html",
+        definition_types: &["element", "script_element", "style_element"],
+    },
+    // --- JSON ---
+    LangConfig {
+        extension: ".json",
+        ts_name: "json",
+        definition_types: &["pair"],
+    },
+    // --- YAML ---
+    LangConfig {
+        extension: ".yaml",
+        ts_name: "yaml",
+        definition_types: &["block_mapping_pair"],
+    },
+    LangConfig {
+        extension: ".yml",
+        ts_name: "yaml",
+        definition_types: &["block_mapping_pair"],
+    },
+    // --- CMake ---
+    LangConfig {
+        extension: ".cmake",
+        ts_name: "cmake",
+        definition_types: &["function_def", "macro_def", "if_condition", "foreach_loop"],
+    },
+    // --- PHP extra extensions ---
+    LangConfig {
+        extension: ".phtml",
+        ts_name: "php",
+        definition_types: &[
+            "function_definition",
+            "method_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "trait_declaration",
+            "enum_declaration",
+        ],
+    },
+    // --- Kotlin (parsed as Java - close enough for fragmentation) ---
+    LangConfig {
+        extension: ".kt",
+        ts_name: "java",
+        definition_types: &[
+            "method_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "enum_declaration",
+            "constructor_declaration",
+        ],
+    },
+    LangConfig {
+        extension: ".kts",
+        ts_name: "java",
+        definition_types: &[
+            "method_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "enum_declaration",
+            "constructor_declaration",
+        ],
+    },
+    // --- C++ extra extensions ---
+    LangConfig {
+        extension: ".c++",
+        ts_name: "cpp",
+        definition_types: &[
+            "function_definition",
+            "class_specifier",
+            "struct_specifier",
+            "enum_specifier",
+            "declaration",
+            "type_definition",
+            "using_declaration",
+            "alias_declaration",
+        ],
+    },
+    LangConfig {
+        extension: ".h++",
+        ts_name: "cpp",
+        definition_types: &[
+            "function_definition",
+            "class_specifier",
+            "struct_specifier",
+            "enum_specifier",
+            "declaration",
+            "type_definition",
+            "using_declaration",
+            "alias_declaration",
+        ],
+    },
+    LangConfig {
+        extension: ".ipp",
+        ts_name: "cpp",
+        definition_types: &[
+            "function_definition",
+            "class_specifier",
+            "struct_specifier",
+            "enum_specifier",
+            "declaration",
+            "type_definition",
+            "using_declaration",
+            "alias_declaration",
+        ],
+    },
+    LangConfig {
+        extension: ".tpp",
+        ts_name: "cpp",
+        definition_types: &[
+            "function_definition",
+            "class_specifier",
+            "struct_specifier",
+            "enum_specifier",
+            "declaration",
+            "type_definition",
+            "using_declaration",
+            "alias_declaration",
+        ],
+    },
+    // --- F# (parsed as C# - closest available grammar) ---
+    LangConfig {
+        extension: ".fs",
+        ts_name: "c_sharp",
+        definition_types: &[
+            "method_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "struct_declaration",
+            "enum_declaration",
+            "record_declaration",
+            "property_declaration",
+            "constructor_declaration",
+        ],
+    },
+    LangConfig {
+        extension: ".fsi",
+        ts_name: "c_sharp",
+        definition_types: &[
+            "method_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "struct_declaration",
+            "enum_declaration",
+            "record_declaration",
+            "property_declaration",
+            "constructor_declaration",
+        ],
+    },
+    LangConfig {
+        extension: ".fsx",
+        ts_name: "c_sharp",
+        definition_types: &[
+            "method_declaration",
+            "class_declaration",
+            "interface_declaration",
+            "struct_declaration",
+            "enum_declaration",
+            "record_declaration",
+            "property_declaration",
+            "constructor_declaration",
+        ],
+    },
+    // --- Makefile ---
+    LangConfig {
+        extension: ".mk",
+        ts_name: "make",
+        definition_types: &["rule"],
+    },
 ];
 
 const NODE_TYPE_KEYWORDS: &[(&[&str], &str)] = &[
-    (&["function", "method"], "function"),
-    (&["class", "object_definition"], "class"),
-    (&["struct"], "struct"),
+    (&["function", "method", "subroutine", "FnDecl", "short_function"], "function"),
+    (&["class", "object_definition", "class_interface", "class_implementation", "category_interface", "category_implementation"], "class"),
+    (&["struct", "struct_definition", "ContainerDecl"], "struct"),
     (&["impl"], "impl"),
-    (&["trait", "interface", "protocol"], "interface"),
-    (&["enum"], "enum"),
-    (&["module"], "module"),
-    (&["type_alias", "alias_declaration", "type_definition"], "type"),
-    (&["variable_declarator"], "variable"),
-    (&["record"], "record"),
-    (&["property"], "property"),
-    (&["declaration", "using_declaration"], "declaration"),
+    (&["trait", "interface", "protocol", "protocol_declaration", "mixin"], "interface"),
+    (&["enum", "adt", "newtype"], "enum"),
+    (&["module", "module_definition", "abstract_definition", "package"], "module"),
+    (&["type_alias", "alias_declaration", "type_definition", "type_declaration"], "type"),
+    (&["variable_declarator", "VarDecl", "let_binding", "binding", "left_assignment"], "variable"),
+    (&["record", "model_declaration", "datasource_declaration", "generator_declaration"], "record"),
+    (&["property", "property_declaration"], "property"),
+    (&["declaration", "using_declaration", "attribute", "type_spec", "signature", "instance"], "declaration"),
+    (&["rule_set", "rule"], "definition"),
+    (&["block"], "definition"),
+    (&["section", "subsection"], "definition"),
+    (&["environment", "new_command_definition"], "definition"),
+    (&["element", "script_element", "style_element"], "definition"),
+    (&["pair", "block_mapping_pair"], "definition"),
+    (&["TestDecl"], "definition"),
+    (&["closure"], "function"),
+    (&["call", "list_lit"], "definition"),
+    (&["extension_declaration"], "definition"),
+    (&["macro_definition", "macro_def", "function_def"], "function"),
+    (&["if_condition", "foreach_loop"], "definition"),
+    (&["media_statement", "keyframes_statement", "import_statement"], "definition"),
+    (&["object_type_definition", "interface_type_definition", "enum_type_definition", "input_object_type_definition", "union_type_definition", "scalar_type_definition"], "type"),
+    (&["singleton_method"], "function"),
+    (&["inherit"], "declaration"),
 ];
 
 const CONTAINER_KINDS: &[&str] = &["class", "interface", "struct", "impl"];
@@ -399,6 +849,31 @@ fn get_tree_sitter_language(ts_name: &str) -> Option<Language> {
         "php" => Language::new(tree_sitter_php::LANGUAGE_PHP),
         "scala" => Language::new(tree_sitter_scala::LANGUAGE),
         "swift" => Language::new(tree_sitter_swift::LANGUAGE),
+        "html" => Language::new(tree_sitter_html::LANGUAGE),
+        "bash" => Language::new(tree_sitter_bash::LANGUAGE),
+        "css" => Language::new(tree_sitter_css::LANGUAGE),
+        "haskell" => Language::new(tree_sitter_haskell::LANGUAGE),
+        "elixir" => Language::new(tree_sitter_elixir::LANGUAGE),
+        "lua" => Language::new(tree_sitter_lua::LANGUAGE),
+        "r" => Language::new(tree_sitter_r::LANGUAGE),
+        "ocaml" => Language::new(tree_sitter_ocaml::LANGUAGE_OCAML),
+        "erlang" => Language::new(tree_sitter_erlang::LANGUAGE),
+        "julia" => Language::new(tree_sitter_julia::LANGUAGE),
+        "zig" => Language::new(tree_sitter_zig::LANGUAGE),
+        "clojure" => Language::new(tree_sitter_clojure::LANGUAGE),
+        "nix" => Language::new(tree_sitter_nix::LANGUAGE),
+        "groovy" => Language::new(tree_sitter_groovy::LANGUAGE),
+        "objc" => Language::new(tree_sitter_objc::LANGUAGE),
+        "cmake" => Language::new(tree_sitter_cmake::LANGUAGE),
+        "make" => Language::new(tree_sitter_make::LANGUAGE),
+        "hcl" => Language::new(tree_sitter_hcl::LANGUAGE),
+        "graphql" => Language::new(tree_sitter_graphql::LANGUAGE),
+        "latex" => Language::new(tree_sitter_latex::LANGUAGE),
+        "dart" => Language::new(tree_sitter_dart::LANGUAGE),
+        "prisma" => Language::new(tree_sitter_prisma_io::LANGUAGE),
+        "svelte" => Language::new(tree_sitter_svelte_ng::LANGUAGE),
+        "json" => Language::new(tree_sitter_json::LANGUAGE),
+        "yaml" => Language::new(tree_sitter_yaml::LANGUAGE),
         _ => return None,
     };
     Some(lang)
