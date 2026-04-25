@@ -37,3 +37,28 @@
   — Python silently allows stacking
 - After merging duplicate branches (S1871 fix), verify the `or`
   logic preserves both conditions
+
+## SonarCloud (extras)
+
+- `whitelist_vulture.py` bare names (`Graph.add_node`) trigger S905
+  "no side effects" BUG — wrap in `_ = expr` to silence (vulture
+  still recognizes the reference)
+- `numpy_array /= divisor` (in-place mutation) is misread by SonarCloud as
+  unused local — use explicit `np.divide(arr, divisor, out=arr)` instead
+- Pinning `dtolnay/rust-toolchain@<sha>` requires explicit
+  `with: toolchain: stable` — pinning loses the default-input behavior
+- API to mark hotspot Safe:
+  `POST /api/hotspots/change_status hotspot=KEY status=REVIEWED resolution=SAFE`
+- API to mark issue false-positive:
+  `POST /api/issues/do_transition issue=KEY transition=falsepositive`
+- GraphML XML namespace `http://graphml.graphdrawing.org/graphml` triggers
+  S5332 (insecure http) but is the literal spec identifier — mark Safe
+
+## Cognitive Complexity Tactics
+
+- run_parallel-style "parallel-or-serial dispatcher" with extend/append:
+  extract `_collect_result(results, r, collect)` helper to dedupe both
+  branches and reduce S3776 score significantly
+- evaluate_one-style "header → run → report → return" functions:
+  extract `_print_*_header` and `_print_*_dump` helpers — the heavy
+  formatting blocks dominate the complexity score
