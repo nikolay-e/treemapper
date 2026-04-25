@@ -338,7 +338,7 @@ def evaluate_instance(
     return result
 
 
-def _print_per_language_breakdown(ok: list[dict], by_lang: dict) -> None:
+def _print_per_language_breakdown(by_lang: dict) -> None:
     if len(by_lang) <= 1:
         return
     print("\nPer-language breakdown:")
@@ -350,7 +350,7 @@ def _print_per_language_breakdown(ok: list[dict], by_lang: dict) -> None:
         print(f"  {lang:12s} (n={len(lr):3d}): file_recall={avg_fr:.3f}  nontrivial={avg_ntr:.3f}  line_recall={avg_lr:.3f}")
 
 
-def _print_per_repo_breakdown(ok: list[dict], by_repo: dict) -> None:
+def _print_per_repo_breakdown(by_repo: dict) -> None:
     if len(by_repo) <= 1:
         return
     print("\nPer-repo breakdown:")
@@ -405,12 +405,12 @@ def aggregate(results: list[dict]) -> None:
     by_lang: dict[str, list[dict]] = defaultdict(list)
     for r in ok:
         by_lang[r["language"]].append(r)
-    _print_per_language_breakdown(ok, by_lang)
+    _print_per_language_breakdown(by_lang)
 
     by_repo: dict[str, list[dict]] = defaultdict(list)
     for r in ok:
         by_repo[r["repo"]].append(r)
-    _print_per_repo_breakdown(ok, by_repo)
+    _print_per_repo_breakdown(by_repo)
 
     zero_frag = sum(1 for r in ok if r["fragments"] == 0)
     zero_line = sum(1 for r in ok if r["line_recall"] < 1e-9 and r["fragments"] > 0)

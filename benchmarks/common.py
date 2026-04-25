@@ -298,29 +298,35 @@ def worker_dir(base: Path) -> Path:
     return d
 
 
-def run_parallel(worker_fn, run_args: list, workers: int, collect: str = "append") -> list:
-    results: list = []
-    if workers > 1:
-        from concurrent.futures import ProcessPoolExecutor, as_completed
+def _collect_result(results: list, r, collect: str) -> None:
+    if collect == "extend":
+        results.extend(r)
+    elif r:
+        results.append(r)
 
-        with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool:
-            futures = {pool.submit(worker_fn, a): a[0] for a in run_args}
-            for future in as_completed(futures):
-                try:
-                    r = future.result()
-                except Exception as e:
-                    idx = futures[future]
-                    print(f"  WORKER CRASH [{idx}]: {type(e).__name__}: {e}", flush=True)
-                    continue
-                if collect == "extend":
-                    results.extend(r)
-                elif r:
-                    results.append(r)
-    else:
-        for a in run_args:
-            r = worker_fn(a)
-            if collect == "extend":
-                results.extend(r)
-            elif r:
-                results.append(r)
+
+def _run_serial(worker_fn, run_args: list, collect: str) -> list:
+    results: list = []
+    for a in run_args:
+        _collect_result(results, worker_fn(a), collect)
     return results
+
+
+def _run_pool(worker_fn, run_args: list, workers: int, collect: str) -> list:
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    results: list = []
+    with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool:
+        futures = {pool.submit(worker_fn, a): a[0] for a in run_args}
+        for future in as_completed(futures):
+            try:
+                _collect_result(results, future.result(), collect)
+            except Exception as e:
+                print(f"  WORKER CRASH [{futures[future]}]: {type(e).__name__}: {e}", flush=True)
+    return results
+
+
+def run_parallel(worker_fn, run_args: list, workers: int, collect: str = "append") -> list:
+    if workers > 1:
+        return _run_pool(worker_fn, run_args, workers, collect)
+    return _run_serial(worker_fn, run_args, collect)
