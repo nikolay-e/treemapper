@@ -10,7 +10,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from common import (
+from benchmarks.common import (
     apply_as_commit,
     ensure_repo,
     normalize_gold_path,
@@ -380,11 +380,13 @@ def main():
     ap.add_argument("--limit", type=int, default=5)
     ap.add_argument("--budget", type=int, default=8000)
     ap.add_argument("--nontrivial-only", action="store_true", default=True)
+    ap.add_argument("--dataset", type=str, default="full", choices=["verified", "full"])
     args = ap.parse_args()
 
     from datasets import load_dataset
 
-    ds = load_dataset("Contextbench/ContextBench", "contextbench_verified", split="train")
+    config = "contextbench_verified" if args.dataset == "verified" else "default"
+    ds = load_dataset("Contextbench/ContextBench", config, split="train")
     insts = list(ds)
     if args.nontrivial_only:
         insts = _filter_nontrivial_instances(insts)

@@ -19,8 +19,10 @@ pub struct DiffContextOutput {
 }
 
 pub struct LatencyBreakdown {
-    pub fragmentation_ms: f64,
+    pub parse_changed_ms: f64,
+    pub universe_walk_ms: f64,
     pub discovery_ms: f64,
+    pub parse_discovered_ms: f64,
     pub tokenization_ms: f64,
     pub scoring_selection_ms: f64,
     pub total_ms: f64,

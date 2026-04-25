@@ -23,11 +23,6 @@
   remove cast and let type inference work
 - Lambda capturing loop variable (S1515): use `dict.__getitem__` instead
   of `lambda k: d[k]` — simpler and avoids the flag
-- S3776 cognitive complexity: SonarCloud counts boolean operators (`and`,
-  `or`) as separate increments — extracting complex conditions into named
-  helpers reduces complexity even without deep nesting changes
-- `cast` import removal: after removing casts, remove the `typing.cast`
-  import too or ruff/mypy will flag unused imports
 
 ## Test Suite
 

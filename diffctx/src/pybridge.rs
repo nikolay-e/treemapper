@@ -302,20 +302,14 @@ fn build_diff_context<'py>(
 
     let latency = PyDict::new(py);
     if let Some(ref lb) = output.latency {
-        latency.set_item(
-            "fragmentation_ms",
-            (lb.fragmentation_ms * 10.0).round() / 10.0,
-        )?;
-        latency.set_item("discovery_ms", (lb.discovery_ms * 10.0).round() / 10.0)?;
-        latency.set_item(
-            "tokenization_ms",
-            (lb.tokenization_ms * 10.0).round() / 10.0,
-        )?;
-        latency.set_item(
-            "scoring_selection_ms",
-            (lb.scoring_selection_ms * 10.0).round() / 10.0,
-        )?;
-        latency.set_item("total_ms", (lb.total_ms * 10.0).round() / 10.0)?;
+        let r = |v: f64| (v * 10.0).round() / 10.0;
+        latency.set_item("parse_changed_ms", r(lb.parse_changed_ms))?;
+        latency.set_item("universe_walk_ms", r(lb.universe_walk_ms))?;
+        latency.set_item("discovery_ms", r(lb.discovery_ms))?;
+        latency.set_item("parse_discovered_ms", r(lb.parse_discovered_ms))?;
+        latency.set_item("tokenization_ms", r(lb.tokenization_ms))?;
+        latency.set_item("scoring_selection_ms", r(lb.scoring_selection_ms))?;
+        latency.set_item("total_ms", r(lb.total_ms))?;
     } else {
         latency.set_item("total_ms", (total_ms * 10.0).round() / 10.0)?;
     }

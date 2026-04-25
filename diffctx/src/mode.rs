@@ -3,6 +3,7 @@ pub enum ScoringMode {
     Hybrid,
     Ppr,
     Ego,
+    Bm25,
 }
 
 impl ScoringMode {
@@ -10,6 +11,7 @@ impl ScoringMode {
         match s.to_lowercase().as_str() {
             "ppr" => Self::Ppr,
             "ego" => Self::Ego,
+            "bm25" => Self::Bm25,
             _ => Self::Hybrid,
         }
     }
@@ -25,6 +27,7 @@ pub enum DiscoveryKind {
 pub enum ScoringKind {
     Ppr,
     Ego,
+    Bm25,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +57,14 @@ impl PipelineConfig {
                 low_relevance_filter: false,
                 bm25_top_k: 1,
                 ego_depth: 2,
+                ppr_alpha: 0.60,
+            },
+            ScoringMode::Bm25 => Self {
+                discovery: DiscoveryKind::Ensemble,
+                scoring: ScoringKind::Bm25,
+                low_relevance_filter: false,
+                bm25_top_k: 0,
+                ego_depth: 1,
                 ppr_alpha: 0.60,
             },
             ScoringMode::Hybrid => {

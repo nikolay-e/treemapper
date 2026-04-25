@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
 import re
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 
 WORKERS = 11
@@ -12,6 +15,8 @@ RESULTS_DIR = Path("results")
 
 LINES_RE = re.compile(r"^(\d+)-(\d+)$")
 _WORKSPACE_PREFIX_RE = re.compile(r"^/workspace/[^/]+/")
+
+_LOCK_FILES = ("index.lock", "HEAD.lock", "refs/heads.lock")
 
 
 def normalize_gold_path(path: str) -> str:
@@ -83,6 +88,8 @@ def _clone_one_repo(args: tuple[str, str]) -> None:
     r = run_cmd(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], check=False, timeout=600)
     if r.returncode != 0:
         print(f"  CLONE FAIL {repo}: {r.stderr[:200]}")
+        return
+    run_cmd(["git", "-C", str(cache_dir), "config", "gc.auto", "0"], check=False, timeout=10)
 
 
 def _fetch_one_commit(args: tuple[str, str]) -> None:
@@ -118,6 +125,51 @@ def warm_cache(instances: list[dict]) -> None:
     print(f"  Cache warm: {len(repos_to_clone)} repos", flush=True)
 
 
+def _ensure_bare_cache(repo_url: str, repo_name: str) -> Path | None:
+    safe_name = repo_name.replace("/", "__")
+    cache_dir = _SHARED_CACHE / safe_name
+    if cache_dir.exists():
+        return cache_dir
+    url = repo_url or f"https://github.com/{repo_name}.git"
+    r = run_cmd(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], check=False, timeout=600)
+    if r.returncode != 0:
+        print(f"  CLONE FAIL: {r.stderr[:200]}")
+        return None
+    run_cmd(["git", "-C", str(cache_dir), "config", "gc.auto", "0"], check=False, timeout=10)
+    return cache_dir
+
+
+def _remove_stale_locks(git_dir: Path) -> None:
+    for lock_name in _LOCK_FILES:
+        lock = git_dir / lock_name
+        if lock.exists():
+            try:
+                lock.unlink()
+            except OSError:
+                pass
+
+
+def _git_dir_for_repo(repo_dir: Path) -> Path:
+    git_path = repo_dir / ".git"
+    if git_path.is_file():
+        content = git_path.read_text().strip()
+        if content.startswith("gitdir: "):
+            return Path(content[8:])
+    return git_path
+
+
+@contextlib.contextmanager
+def _bare_repo_lock(cache_dir: Path):
+    lock_path = cache_dir / ".bench-worktree.lock"
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
 def ensure_repo(
     repo_url: str,
     repo_name: str,
@@ -125,28 +177,27 @@ def ensure_repo(
     target_dir: Path,
     checkout_timeout: int = 120,
 ) -> Path | None:
-    safe_name = repo_name.replace("/", "__")
-    cache_dir = _SHARED_CACHE / safe_name
-    if not cache_dir.exists():
-        url = repo_url or f"https://github.com/{repo_name}.git"
-        r = run_cmd(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], check=False, timeout=600)
-        if r.returncode != 0:
-            print(f"  CLONE FAIL: {r.stderr[:200]}")
-            return None
+    cache_dir = _ensure_bare_cache(repo_url, repo_name)
+    if not cache_dir:
+        return None
     repo_dir = target_dir / repo_name.replace("/", "__")
-    if not repo_dir.exists():
+    if repo_dir.exists():
+        _remove_stale_locks(_git_dir_for_repo(repo_dir))
+        run_cmd(["git", "-C", str(repo_dir), "clean", "-fd"], check=False, timeout=30)
         r = run_cmd(
-            ["git", "clone", "--quiet", "--local", str(cache_dir), str(repo_dir)],
+            ["git", "-C", str(repo_dir), "checkout", "--force", base_commit],
             check=False,
-            timeout=120,
+            timeout=checkout_timeout,
         )
-        if r.returncode != 0:
-            print(f"  LOCAL CLONE FAIL: {r.stderr[:200]}")
-            return None
-    run_cmd(["git", "-C", str(repo_dir), "clean", "-fd"], check=False, timeout=30)
-    r = run_cmd(["git", "-C", str(repo_dir), "checkout", "--force", base_commit], check=False, timeout=checkout_timeout)
+    else:
+        with _bare_repo_lock(cache_dir):
+            r = run_cmd(
+                ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
+                check=False,
+                timeout=checkout_timeout,
+            )
     if r.returncode != 0:
-        print(f"  CHECKOUT FAIL {base_commit[:12]}: {r.stderr[:200]}")
+        print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: {r.stderr[:200]}")
         return None
     return repo_dir
 
@@ -229,28 +280,22 @@ def save_results(results: list, tag: str, output_dir: Path = RESULTS_DIR, **meta
     return path
 
 
-_worker_index_counter = 0
-_worker_index_lock = __import__("threading").Lock()
-_pid_to_worker_index: dict[int, int] = {}
+_worker_id: str = ""
 
 
-def worker_dir(base: Path) -> Path:
-    global _worker_index_counter
-    pid = os.getpid()
-    with _worker_index_lock:
-        if pid not in _pid_to_worker_index:
-            _pid_to_worker_index[pid] = _worker_index_counter
-            _worker_index_counter += 1
-    idx = _pid_to_worker_index[pid]
-    d = base / f"w{idx}"
-    d.mkdir(exist_ok=True)
-    return d
-
-
-def _suppress_spawn_warnings() -> None:
+def _init_worker() -> None:
+    global _worker_id
     import warnings
 
     warnings.filterwarnings("ignore", category=SyntaxWarning)
+    _worker_id = uuid.uuid4().hex[:12]
+
+
+def worker_dir(base: Path) -> Path:
+    wid = _worker_id or uuid.uuid4().hex[:12]
+    d = base / f"w{wid}"
+    d.mkdir(exist_ok=True)
+    return d
 
 
 def run_parallel(worker_fn, run_args: list, workers: int, collect: str = "append") -> list:
@@ -258,10 +303,15 @@ def run_parallel(worker_fn, run_args: list, workers: int, collect: str = "append
     if workers > 1:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
-        with ProcessPoolExecutor(max_workers=workers, initializer=_suppress_spawn_warnings) as pool:
+        with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool:
             futures = {pool.submit(worker_fn, a): a[0] for a in run_args}
             for future in as_completed(futures):
-                r = future.result()
+                try:
+                    r = future.result()
+                except Exception as e:
+                    idx = futures[future]
+                    print(f"  WORKER CRASH [{idx}]: {type(e).__name__}: {e}", flush=True)
+                    continue
                 if collect == "extend":
                     results.extend(r)
                 elif r:
