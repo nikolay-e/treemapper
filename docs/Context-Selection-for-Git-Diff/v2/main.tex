@@ -285,7 +285,7 @@ The Boltzmann reformulation reduces the matroid+knapsack problem to a family of 
 \end{equation}
 where features $\phi$ include diff token cost, fragment count, candidate-set size, graph density, and core-edit cost share. The predictor $f_\theta$ would be trained to minimize $|\mathrm{cost}(C^*(\beta)) - B|$ on a validation corpus, with auxiliary recall floor against golden sets.
 
-In the present work we describe the mechanism but do not learn $f_\theta$. The framework operates in the explicit-knapsack regime (Section~\ref{sec:greedy}); $\beta$ may be selected per-instance via binary search over a logarithmic grid satisfying $|\mathrm{cost}(C^*(\beta)) - B| < \varepsilon$, which is deterministic and requires no training data. Replacement of binary search with a learned regression model is left to follow-up evaluation. Temperature calibration is presented here as the theoretical mechanism through which the matroid-only $(1-1/e)$ guarantee is recovered; the calibration mechanism affects budget targeting accuracy, not optimization theory.
+In the present work we describe the mechanism and implement deterministic calibration; we do not learn $f_\theta$. The implementation selects $\beta$ per-instance via binary search over a logarithmic grid satisfying $|\mathrm{cost}(C^*(\beta)) - B| < \varepsilon$, which requires no training data. Replacement of binary search with a learned regression model is left to follow-up evaluation. Temperature calibration is the mechanism through which the matroid-only $(1-1/e)$ guarantee is recovered; the calibration mechanism affects budget targeting accuracy, not optimization theory.
 
 \subsection{Submodular Extension via Concept Coverage}
 \label{sec:utility}
@@ -337,7 +337,7 @@ We employ a density-based greedy algorithm with lazy evaluation~\cite{minoux1978
 
 \textbf{Regime B (explicit knapsack, current implementation):} density-greedy on $\mathcal{U}$ with $\mathrm{cost}(C) \leq B$, with the modified-greedy variant (Option B below) providing $\frac{1}{2}(1-1/e)$~\cite{khuller1999budgeted, sviridenko2004note}. Used when $\mathcal{U}$ is genuinely submodular (Section~\ref{sec:utility}) and Boltzmann reweighting is inapplicable.
 
-The current implementation operates in Regime B; Regime A is presented as the formal framework that motivates the temperature parameter $\beta$ (Section~\ref{sec:beta-calibration}). Comparison between the two regimes is reported in Section~\ref{sec:eval}.
+Both regimes are implemented: Regime B is the default path operating on the submodular concept-coverage objective of Section~\ref{sec:utility}; Regime A is opt-in via a configuration flag, applying Boltzmann reweighting with binary-search $\beta$ calibration over the modular weighted-relevance objective. Comparison between the two regimes is reported in Section~\ref{sec:eval}.
 
 \paragraph{Approximation guarantees.} For monotone submodular maximization, the classical greedy algorithm achieves a $(1-1/e) \approx 0.632$ approximation under \textbf{cardinality constraints} ($|C| \leq k$)~\cite{nemhauser1978analysis}. Our problem uses a \textbf{knapsack constraint} ($\mathrm{cost}(C) \leq B$ with heterogeneous fragment costs), for which density-greedy does not admit the same guarantee. We therefore present two options:
 
