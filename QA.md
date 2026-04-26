@@ -62,3 +62,40 @@
 - evaluate_one-style "header → run → report → return" functions:
   extract `_print_*_header` and `_print_*_dump` helpers — the heavy
   formatting blocks dominate the complexity score
+
+## Shell Scripts
+
+- `shelldre:S7688` — convert every `[ ... ]` to `[[ ... ]]` across the
+  whole file in one pass; SonarCloud reported lines drift after pre-commit
+  reformatting, so don't trust line numbers literally
+- `shelldre:S7682` — one-line tee/printf functions like `log() { ... }`
+  also need an explicit `return 0`; SonarCloud reports the line BEFORE
+  the function definition
+- `bash -n script.sh` after edits — quick syntactic sanity check
+
+## Pre-existing Test Failures (do not regress, do not retry-fix)
+
+- `tests/test_graph.py`, `test_graph_cli.py`, `test_graph_export.py` —
+  ALL three fail with `ModuleNotFoundError: treemapper.diffctx.edges`.
+  Python `edges` module was deleted in commit `e77d5494` (Rust-only
+  pipeline); CI excludes them via three `--ignore=...` flags in
+  `.github/workflows/ci.yml`. Reproduce locally with the same flags
+  before claiming "tests pass". Do NOT delete these files until
+  ProjectGraph is ported to Rust — they document the contract.
+
+## SonarCloud API
+
+- Public `api/issues/search?projectKeys=nikolay-e_TreeMapper&statuses=OPEN`
+  works without auth for OPEN issues. Token only needed for hotspot
+  state changes / false-positive transitions.
+
+## Memory Profiling for diffctx
+
+- `/usr/bin/time -l` on macOS reports `peak memory footprint` and
+  `maximum resident set size`. Run 3× and take median — single run
+  varies by ~500MB on small diffs (rayon thread allocator cache noise)
+- Peak on small diffs over treemapper itself is ~1.6–2.0 GB; dominated
+  by `build_file_cache` (200MB cap, but reads ALL <100KB files into
+  `Vec<(PathBuf, String)>` BEFORE applying the cap) and tree-sitter
+  parse trees, NOT lexical similarity. Lexical fixes only show up on
+  repos with many fragments + dense term overlap.
