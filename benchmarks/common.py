@@ -10,7 +10,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-WORKERS = 11
+WORKERS = int(os.environ.get("BENCH_WORKERS", "11"))
 RESULTS_DIR = Path("results")
 
 LINES_RE = re.compile(r"^(\d+)-(\d+)$")
@@ -240,8 +240,10 @@ def parse_lines_field(lines_str: str) -> tuple[int, int] | None:
 def load_results(path: Path) -> list[dict]:
     data = json.loads(path.read_text())
     if isinstance(data, dict) and "results" in data:
-        return data["results"]
-    return data
+        return list(data["results"])
+    if isinstance(data, list):
+        return data
+    raise ValueError(f"unexpected results shape in {path}: {type(data).__name__}")
 
 
 def _git_commit_sha() -> str:
@@ -314,15 +316,24 @@ def _run_serial(worker_fn, run_args: list, collect: str) -> list:
 
 def _run_pool(worker_fn, run_args: list, workers: int, collect: str) -> list:
     from concurrent.futures import ProcessPoolExecutor, as_completed
+    from concurrent.futures.process import BrokenProcessPool
 
+    batch_size = int(os.environ.get("BENCH_BATCH_SIZE", str(max(workers * 4, 20))))
     results: list = []
-    with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool:
-        futures = {pool.submit(worker_fn, a): a[0] for a in run_args}
-        for future in as_completed(futures):
-            try:
-                _collect_result(results, future.result(), collect)
-            except Exception as e:
-                print(f"  WORKER CRASH [{futures[future]}]: {type(e).__name__}: {e}", flush=True)
+    for batch_start in range(0, len(run_args), batch_size):
+        batch = run_args[batch_start : batch_start + batch_size]
+        try:
+            with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker) as pool:
+                futures = {pool.submit(worker_fn, a): a[0] for a in batch}
+                for future in as_completed(futures):
+                    try:
+                        _collect_result(results, future.result(), collect)
+                    except BrokenProcessPool as e:
+                        print(f"  WORKER CRASH [{futures[future]}]: {type(e).__name__}", flush=True)
+                    except Exception as e:
+                        print(f"  WORKER CRASH [{futures[future]}]: {type(e).__name__}: {e}", flush=True)
+        except BrokenProcessPool as e:
+            print(f"  POOL CRASH batch {batch_start}-{batch_start+len(batch)}: {e}", flush=True)
     return results
 
 

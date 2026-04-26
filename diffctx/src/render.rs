@@ -141,7 +141,7 @@ fn create_fragment_entry(frag: &Fragment, path_str: &str) -> FragmentEntry {
     let content = if frag.content.is_empty() {
         None
     } else {
-        Some(frag.content.clone())
+        Some(frag.content.to_string())
     };
 
     FragmentEntry {
