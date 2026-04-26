@@ -7,6 +7,7 @@ use crate::types::{Fragment, FragmentId};
 pub enum EdgeCategory {
     Semantic,
     Structural,
+    Sibling,
     Config,
     ConfigGeneric,
     Document,
@@ -21,6 +22,7 @@ impl EdgeCategory {
         match s {
             "semantic" => Self::Semantic,
             "structural" => Self::Structural,
+            "sibling" => Self::Sibling,
             "config" => Self::Config,
             "config_generic" => Self::ConfigGeneric,
             "document" => Self::Document,
