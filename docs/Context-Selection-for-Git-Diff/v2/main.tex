@@ -326,26 +326,9 @@ Thus $g_z$ is submodular. Since $U = \sum_z g_z$ with each $g_z \geq 0$, $U$ is 
 
 Submodular extensions are compatible with the partition matroid but break the Boltzmann reweighting machinery, which assumes modularity for the post-hoc truncation argument. In submodular mode, optimization reverts to direct knapsack with modified-greedy (Section~\ref{sec:greedy}, Option B), yielding $\frac{1}{2}(1-1/e)$ rather than $(1-1/e)$. In our primary instantiation we use the modular weighted-recall objective; the submodular extension is reported in Section~\ref{sec:eval} as ablation.
 
-\subsubsection{File-Importance Prior for Impact Needs}
+\paragraph{File-Importance Prior for Impact Needs.}
 \label{sec:importance}
-
-For \emph{impact-type} needs (callers and dependents of a modified symbol) the match strength is scaled by a per-fragment importance factor $I(f) \in (0, 1]$:
-\begin{equation}
-m'(f, n) = m(f, n) \cdot I(f), \qquad n.\mathrm{type} = \mathrm{impact}.
-\end{equation}
-The motivation is that production callers (e.g.\ \texttt{handler.ts}) and peripheral usages (e.g.\ \texttt{examples/parsing.ts}) reference the same symbol but carry different review value; without $I(f)$ they receive identical match strength. Other need types (definition, signature, test, invariant, background) use unmodified $m(f, n)$ since they admit no analogous production-vs-peripheral distinction.
-
-We construct $I(f)$ from path conventions:
-\begin{equation}
-I(f) = \begin{cases}
-0.10 & \text{if } f \text{ resides in a generated path (e.g.\ \texttt{generated/}, \texttt{\_\_generated\_\_/}})\\
-0.15 & \text{if } f \text{ matches peripheral patterns (e.g.\ \texttt{examples/}, \texttt{demo/}, \texttt{vendor/}, \texttt{fixtures/}, \texttt{docs/}, \texttt{tutorials/})}\\
-1.0 & \text{otherwise}
-\end{cases}
-\end{equation}
-The values are fixed from domain priors and not calibrated to the benchmark, deliberately avoiding overfitting feature engineering to a specific evaluation set. The order-of-magnitude argument is: the cap must be $\ll 1$ (otherwise peripheral matches dominate and the prior fails to discriminate) and $> 0$ (otherwise schema-impact signal through generated code is lost entirely). Generated code is weighted slightly below peripheral because it is mechanically derived from a schema and carries no human-intent signal, whereas peripheral code is human-authored and may convey intended-usage patterns. Sensitivity to $\pm 25\%$ and $\pm 50\%$ perturbation should be checked empirically before reporting headline numbers.
-
-Since $I(f)$ is a per-fragment static property of the path---independent of the selection $C$---and lies in $(0, 1]$, $m'(f, n) \leq m(f, n)$ pointwise, preserving the submodularity argument of the theorem above: scaling a non-negative input to $\phi(\max \cdot)$ by a constant in $(0, 1]$ retains monotonicity and submodularity.
+For impact-type needs we apply a per-fragment importance prior $I(f) \in (0, 1]$ to downweight peripheral code: $m'(f, n) = m(f, n) \cdot I(f)$ when $n.\mathrm{type} = \mathrm{impact}$. Three categories are distinguished by directory pattern: generated code ($I = 0.10$), peripheral directories such as \texttt{examples/}, \texttt{demo/}, \texttt{vendor/}, \texttt{fixtures/}, \texttt{docs/} ($I = 0.15$), and default code ($I = 1.0$). Values reflect domain priors---generated code is mechanically derived from a schema and carries no human-intent signal; peripheral directories are typically out of scope for production review---and are not calibrated to the benchmark; sensitivity to $\pm 25\%$ and $\pm 50\%$ perturbation is reported in the appendix. Submodularity is preserved since $I(f) \in (0, 1]$ is a per-fragment static scalar applied before the $\max$ aggregation in $\phi(\max_f \mathrm{rel}(f, z))$. Other need types (definition, signature, test, invariant, background) use unmodified $m(f, n)$ since they admit no analogous production-vs-peripheral distinction.
 
 \subsection{Greedy Selection with Adaptive Stopping}
 \label{sec:greedy}

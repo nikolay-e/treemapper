@@ -72,3 +72,71 @@ pub fn compute_file_importance(fragments: &[Fragment]) -> FxHashMap<Arc<str>, f6
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn classify(path_str: &str) -> f64 {
+        let path = Path::new(path_str);
+        if is_generated(path) {
+            GENERATED_CAP
+        } else if is_peripheral(path) {
+            PERIPHERAL_CAP
+        } else {
+            DEFAULT_IMPORTANCE
+        }
+    }
+
+    #[test]
+    fn default_for_production_paths() {
+        assert_eq!(classify("src/handler.ts"), DEFAULT_IMPORTANCE);
+        assert_eq!(classify("lib/auth/login.rs"), DEFAULT_IMPORTANCE);
+        assert_eq!(classify("server/main.go"), DEFAULT_IMPORTANCE);
+    }
+
+    #[test]
+    fn peripheral_for_examples_and_demo() {
+        assert_eq!(classify("examples/parsing.ts"), PERIPHERAL_CAP);
+        assert_eq!(classify("demo/usage.py"), PERIPHERAL_CAP);
+        assert_eq!(classify("vendor/lib/foo.go"), PERIPHERAL_CAP);
+        assert_eq!(classify("fixtures/sample.json"), PERIPHERAL_CAP);
+        assert_eq!(classify("docs/guide.md"), PERIPHERAL_CAP);
+    }
+
+    #[test]
+    fn peripheral_for_stem_patterns() {
+        assert_eq!(classify("tests/example_usage.py"), PERIPHERAL_CAP);
+        assert_eq!(classify("src/module_demo.rs"), PERIPHERAL_CAP);
+        assert_eq!(classify("scripts/sample_run.sh"), PERIPHERAL_CAP);
+    }
+
+    #[test]
+    fn generated_takes_precedence() {
+        assert_eq!(classify("generated/protobuf.rs"), GENERATED_CAP);
+        assert_eq!(classify("src/__generated__/api.ts"), GENERATED_CAP);
+        // generated/ in any component triggers, even nested under examples
+        assert_eq!(classify("examples/__generated__/foo.py"), GENERATED_CAP);
+    }
+
+    #[test]
+    fn case_insensitive_directory_matching() {
+        assert_eq!(classify("Examples/foo.py"), PERIPHERAL_CAP);
+        assert_eq!(classify("VENDOR/lib.go"), PERIPHERAL_CAP);
+        assert_eq!(classify("Generated/api.ts"), GENERATED_CAP);
+    }
+
+    #[test]
+    fn ordering_is_stable_under_priors() {
+        // Production caller is at least 6.6x more important than peripheral.
+        assert!(DEFAULT_IMPORTANCE / PERIPHERAL_CAP >= 6.0);
+        // Peripheral is at least 1.4x more important than generated.
+        assert!(PERIPHERAL_CAP / GENERATED_CAP >= 1.4);
+        // Both caps are well below 1 (the cap must bite).
+        assert!(GENERATED_CAP < 0.25);
+        assert!(PERIPHERAL_CAP < 0.25);
+        // Both caps are above 0 (schema-impact signal retained).
+        assert!(GENERATED_CAP > 0.0);
+        assert!(PERIPHERAL_CAP > 0.0);
+    }
+}

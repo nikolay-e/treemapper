@@ -25,8 +25,10 @@
 //! Order-of-magnitude bounds: the cap must be ≪ 1 (otherwise peripheral
 //! matches dominate) and > 0 (otherwise schema-impact signal is lost).
 //! Any value in [0.05, 0.25] satisfies this; we pick round numbers.
-//! Sensitivity to ±50% perturbation should be checked empirically before
-//! reporting any benchmark numbers.
+//! Sensitivity to ±25%/±50% perturbation should be checked empirically
+//! before reporting any benchmark numbers.
+//!
+//! Not calibrated to any benchmark; sensitivity analysis in paper Appendix.
 
 pub const GENERATED_CAP: f64 = 0.10;
 pub const PERIPHERAL_CAP: f64 = 0.15;
