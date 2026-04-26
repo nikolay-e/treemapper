@@ -10,7 +10,8 @@ mkdir -p "$LOG_DIR"
 
 CACHE_HOST="$HOME/.cache/contextbench_repos"
 HF_HOME_HOST="$HOME/.cache/huggingface"
-IMAGE="treemapper-bench:latest"
+IMAGE="${IMAGE:-treemapper-bench:latest}"
+USE_BAKED_CACHE="${USE_BAKED_CACHE:-1}"
 
 MIN_OK_THRESHOLD=550
 LIMIT=9999
@@ -41,6 +42,7 @@ declare -a CONFIGS=(
 
 log() {
   printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$SWEEP_LOG"
+  return 0
 }
 
 run_one_config() {
@@ -53,6 +55,10 @@ run_one_config() {
   local t0
   t0=$(date -u +%s)
   log "RUN start mode=$mode budget=$budget workers=$workers batch=$batch"
+  local cache_mount=()
+  if [[ "$USE_BAKED_CACHE" != "1" ]]; then
+    cache_mount=(-v "$CACHE_HOST:/cache/contextbench_repos")
+  fi
   docker run --rm \
     --cpus="$CPUS" \
     --memory="$MEM" \
@@ -62,7 +68,7 @@ run_one_config() {
     -e PYTHONUNBUFFERED=1 \
     -e HF_HOME=/cache/huggingface \
     -e HF_DATASETS_CACHE=/cache/huggingface/datasets \
-    -v "$CACHE_HOST:/cache/contextbench_repos" \
+    "${cache_mount[@]}" \
     -v "$HF_HOME_HOST:/cache/huggingface" \
     -v "$REPO_ROOT/results:/app/results" \
     -v "$REPO_ROOT/benchmarks:/app/benchmarks:ro" \
@@ -81,9 +87,9 @@ count_ok() {
   local mode="$1"
   local budget="$2"
   local f="$REPO_ROOT/results/cb_${mode}_n${LIMIT}_b${budget}.json"
-  if [ ! -f "$f" ]; then
+  if [[ ! -f "$f" ]]; then
     echo 0
-    return
+    return 0
   fi
   python3 -c "
 import json,sys
@@ -106,7 +112,7 @@ for cfg in "${CONFIGS[@]}"; do
   mode=$(echo "$cfg" | awk '{print $1}')
   budget=$(echo "$cfg" | awk '{print $2}')
   existing_ok=$(count_ok "$mode" "$budget")
-  if [ "$existing_ok" -ge "$MIN_OK_THRESHOLD" ]; then
+  if [[ "$existing_ok" -ge "$MIN_OK_THRESHOLD" ]]; then
     log "CFG $mode b=$budget SKIP (existing ok=$existing_ok >= $MIN_OK_THRESHOLD)"
     continue
   fi
@@ -120,13 +126,13 @@ for cfg in "${CONFIGS[@]}"; do
     run_one_config "$mode" "$budget" "$workers" "$batch"
     ok_count=$(count_ok "$mode" "$budget")
     log "CFG $mode b=$budget attempt=$attempt RESULT ok=$ok_count threshold=$MIN_OK_THRESHOLD"
-    if [ "$ok_count" -ge "$MIN_OK_THRESHOLD" ]; then
+    if [[ "$ok_count" -ge "$MIN_OK_THRESHOLD" ]]; then
       log "CFG $mode b=$budget OK (ok=$ok_count, attempt=$attempt)"
       break
     fi
     log "CFG $mode b=$budget BELOW THRESHOLD (ok=$ok_count) — escalating to next tier"
   done
-  if [ "$ok_count" -lt "$MIN_OK_THRESHOLD" ]; then
+  if [[ "$ok_count" -lt "$MIN_OK_THRESHOLD" ]]; then
     FAILED+=("$mode b=$budget ok=$ok_count")
     log "CFG $mode b=$budget FAILED ALL TIERS (ok=$ok_count)"
   fi
