@@ -173,7 +173,7 @@ Generic fallback    & \texttt{Section}, \texttt{Chunk} \\
 \label{tab:fragment-types}
 \end{table}
 
-\paragraph{Edge Categories.} The set $T$ comprises ten categories (Table~\ref{tab:edge-categories}): three core static-dependency categories (\texttt{Semantic}, \texttt{Structural}, \texttt{Similarity}); a \texttt{Sibling} category for file co-location (same-directory coupling); four extension categories that go beyond pure source-code dependencies (\texttt{Config}, \texttt{ConfigGeneric}, \texttt{Document}, \texttt{TestEdge}); the empirical \texttt{History} category mining co-change patterns from the git log~\cite{hassan2004predicting}; and a \texttt{Generic} bucket for heuristic infrastructure-config edges (CI/CD, Dockerfile, Kubernetes, build-system) that are intentionally treated as weak signals to avoid pulling broad-capture configs (e.g.\ a Dockerfile with \texttt{COPY .\ .}) into context. \texttt{Semantic} subsumes call/import/type/symbol-reference edges, which are individually distinguished at extraction time but share a single learned weight. \texttt{TestEdge} carries direct ground-truth signal for relevance (failing tests after $\Delta$ point to impacted code). Three categories---\texttt{Semantic}, \texttt{Structural}, and \texttt{TestEdge}---are exempt from hub-suppression on the basis that their edges encode load-bearing structural and behavioral relationships that should not be dampened by node degree.
+\paragraph{Edge Categories.} The set $T$ comprises ten categories (Table~\ref{tab:edge-categories}): three core static-dependency categories (\texttt{Semantic}, \texttt{Structural}, \texttt{Similarity}); a \texttt{Sibling} category for file co-location (same-directory coupling); four extension categories that go beyond pure source-code dependencies (\texttt{Config}, \texttt{ConfigGeneric}, \texttt{Document}, \texttt{TestEdge}); the empirical \texttt{History} category mining co-change patterns from the git log~\cite{hassan2004predicting}; and a \texttt{Generic} fallback for unclassified relations. \texttt{Config} subsumes domain-specific infrastructure cross-references (Helm charts, Kubernetes manifests, Dockerfile/Compose dependencies, CI/CD pipeline links, build-system configs); these share the same learned weight per the per-category parameterization (Section~\ref{sec:weight-calibration}). \texttt{Semantic} subsumes call/import/type/symbol-reference edges, which are individually distinguished at extraction time but share a single learned weight. \texttt{TestEdge} carries direct ground-truth signal for relevance (failing tests after $\Delta$ point to impacted code). Three categories---\texttt{Semantic}, \texttt{Structural}, and \texttt{TestEdge}---are exempt from hub-suppression on the basis that their edges encode load-bearing structural and behavioral relationships that should not be dampened by node degree.
 
 \begin{table}[h]
 \centering
@@ -186,12 +186,12 @@ Generic fallback    & \texttt{Section}, \texttt{Chunk} \\
 \texttt{Structural}    & AST containment (parent--child scope nesting). \\
 \texttt{Sibling}       & Files in the same directory (weak co-location coupling). \\
 \texttt{Similarity}    & Lexical/token overlap (TF-IDF on identifier tokens). \\
-\texttt{Config}        & Cross-references in Helm charts and generic config-file relationships. \\
+\texttt{Config}        & Domain-specific infrastructure cross-references: Helm charts, Kubernetes manifests, Dockerfile/Compose dependencies, CI/CD pipelines, build-system configs (Bazel, CMake, etc.). \\
 \texttt{ConfigGeneric} & Generic YAML/JSON cross-references not covered by domain-specific extractors. \\
 \texttt{Document}      & Cross-references in documentation (markdown links, reference-style citations). \\
 \texttt{History}       & Co-change patterns mined from git history. \\
 \texttt{TestEdge}      & Test-to-code relationships. \\
-\texttt{Generic}       & Heuristic infrastructure-config edges (CI/CD pipelines, Dockerfile, Kubernetes manifests, build-system configs); deliberately treated as weak signals. \\
+\texttt{Generic}       & Fallback for unclassified edges. \\
 \bottomrule
 \end{tabular}
 \caption{Edge categories in the typed dependency graph. Per-category weights $w_\tau$ are learned (Section~\ref{sec:weight-calibration}); cold-start prior orders structural over lexical.}
