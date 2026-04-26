@@ -165,6 +165,8 @@ pub fn build_diff_context(
         .map(|p| universe::normalize_path(&p, &root_dir))
         .collect();
 
+    drop(discovery_ctx);
+
     let t_discovery = Instant::now();
 
     all_fragments.extend(process_files_for_fragments(

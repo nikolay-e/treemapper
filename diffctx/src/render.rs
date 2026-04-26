@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -28,7 +29,7 @@ pub struct LatencyBreakdown {
     pub total_ms: f64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct FragmentEntry {
     pub path: String,
     pub lines: String,
@@ -36,7 +37,7 @@ pub struct FragmentEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    pub content: Option<Arc<str>>,
 }
 
 struct SymbolPatterns {
@@ -141,7 +142,7 @@ fn create_fragment_entry(frag: &Fragment, path_str: &str) -> FragmentEntry {
     let content = if frag.content.is_empty() {
         None
     } else {
-        Some(frag.content.to_string())
+        Some(Arc::clone(&frag.content))
     };
 
     FragmentEntry {

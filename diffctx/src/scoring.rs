@@ -67,7 +67,7 @@ impl ScoringStrategy for PPRScoring {
             personalized_pagerank(&mut g, core_ids, self.alpha, 1e-4, 0.4, seed_weights);
         filtering::apply_hunk_proximity_bonus(&mut rel_scores, core_ids, all_fragments, hunks);
 
-        let filtered = filtering::filter_unrelated_fragments(all_fragments.to_vec(), core_ids, &g);
+        let filtered = filtering::filter_unrelated_fragments(all_fragments, core_ids, &g);
         let filtered = if self.low_relevance_filter {
             filtering::filter_low_relevance(filtered, core_ids, &rel_scores)
         } else {
@@ -130,7 +130,7 @@ impl ScoringStrategy for EgoGraphScoring {
             }
         }
 
-        let filtered = filtering::filter_unrelated_fragments(all_fragments.to_vec(), core_ids, &g);
+        let filtered = filtering::filter_unrelated_fragments(all_fragments, core_ids, &g);
         let filtered = filtering::filter_positive_relevance(filtered, core_ids, &rel_scores);
         let filtered = filtering::cap_context_fragments(filtered, core_ids, &rel_scores);
 
@@ -221,8 +221,13 @@ impl ScoringStrategy for BM25Scoring {
             }
         }
 
-        let filtered =
-            filtering::filter_positive_relevance(all_fragments.to_vec(), core_ids, &rel_scores);
+        let filtered: Vec<Fragment> = all_fragments
+            .iter()
+            .filter(|f| {
+                core_ids.contains(&f.id) || rel_scores.get(&f.id).copied().unwrap_or(0.0) > 0.0
+            })
+            .cloned()
+            .collect();
         let filtered = filtering::cap_context_fragments(filtered, core_ids, &rel_scores);
 
         let g = Graph::new();
