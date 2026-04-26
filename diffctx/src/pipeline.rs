@@ -133,7 +133,10 @@ pub fn build_diff_context(
 
     let file_cache = build_file_cache(&all_candidate_files);
     let mode = scoring_mode;
-    let config = PipelineConfig::from_mode(mode, all_candidate_files.len());
+    let mut config = PipelineConfig::from_mode(mode, all_candidate_files.len());
+    if let Ok(s) = std::env::var("DIFFCTX_OBJECTIVE") {
+        config.objective = crate::mode::ObjectiveMode::from_str(&s);
+    }
 
     let mut expansion_concepts: FxHashSet<String> =
         crate::types::extract_identifiers(&diff_text, 3)
@@ -229,15 +232,34 @@ pub fn build_diff_context(
 
         let needs = crate::utility::needs::needs_from_diff(&all_fragments, &core_ids, &diff_text);
 
-        let selection_result = crate::select::lazy_greedy_select(
-            scoring_result.filtered_fragments.clone(),
-            &core_ids,
-            &scoring_result.rel_scores,
-            &needs,
-            effective_budget,
-            tau,
-            None,
-        );
+        let selection_result = match config.objective {
+            crate::mode::ObjectiveMode::BoltzmannModular => {
+                let beta = crate::utility::calibrate_beta(
+                    &scoring_result.filtered_fragments,
+                    &core_ids,
+                    &scoring_result.rel_scores,
+                    effective_budget,
+                    0.05,
+                );
+                tracing::debug!("diffctx: boltzmann beta calibrated to {:.6e}", beta);
+                crate::utility::boltzmann_select(
+                    &scoring_result.filtered_fragments,
+                    &core_ids,
+                    &scoring_result.rel_scores,
+                    effective_budget,
+                    beta,
+                )
+            }
+            crate::mode::ObjectiveMode::Submodular => crate::select::lazy_greedy_select(
+                scoring_result.filtered_fragments.clone(),
+                &core_ids,
+                &scoring_result.rel_scores,
+                &needs,
+                effective_budget,
+                tau,
+                None,
+            ),
+        };
 
         let mut selected = selection_result.selected;
 
