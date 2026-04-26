@@ -250,15 +250,19 @@ pub fn build_diff_context(
                     beta,
                 )
             }
-            crate::mode::ObjectiveMode::Submodular => crate::select::lazy_greedy_select(
-                scoring_result.filtered_fragments.clone(),
-                &core_ids,
-                &scoring_result.rel_scores,
-                &needs,
-                effective_budget,
-                tau,
-                None,
-            ),
+            crate::mode::ObjectiveMode::Submodular => {
+                let file_importance =
+                    crate::utility::compute_file_importance(&scoring_result.filtered_fragments);
+                crate::select::lazy_greedy_select(
+                    scoring_result.filtered_fragments.clone(),
+                    &core_ids,
+                    &scoring_result.rel_scores,
+                    &needs,
+                    effective_budget,
+                    tau,
+                    Some(&file_importance),
+                )
+            }
         };
 
         let mut selected = selection_result.selected;
