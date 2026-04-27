@@ -160,8 +160,11 @@ jobs:
           pip install "maturin>=1,<2"
 
       - name: Build and install diffctx Rust extension
-        working-directory: diffctx
-        run: maturin develop --release
+        shell: bash
+        run: |
+          cd diffctx
+          maturin build --release --out wheelhouse
+          pip install --force-reinstall --no-deps wheelhouse/*.whl
 
       - name: Run Tests with Coverage
         shell: bash
