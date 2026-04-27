@@ -162,9 +162,7 @@ def _format_hotspots(pg: Any) -> str:
     hot = hotspots(pg, top=10, edge_types=set(_ARCHITECTURAL_EDGE_TYPES))
     lines = [f"Top {len(hot)} hotspots:"]
     for rank, (name, score, details) in enumerate(hot, 1):
-        lines.append(
-            f"  {rank}. {name}  score={score:.4f}  out_degree={details['out_degree']}  churn={details['churn']}"
-        )
+        lines.append(f"  {rank}. {name}  score={score:.4f}  out_degree={details['out_degree']}  churn={details['churn']}")
     return "\n".join(lines)
 
 
