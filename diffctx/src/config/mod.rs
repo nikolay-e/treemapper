@@ -1,3 +1,4 @@
+pub mod category_weights;
 pub mod extensions;
 pub mod importance;
 pub mod limits;
