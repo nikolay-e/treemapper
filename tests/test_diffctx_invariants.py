@@ -110,3 +110,22 @@ def test_fraction_param_rejects_negative_falls_back_to_default(tmp_path, env_var
     assert baseline_out == negative_out, (
         f"{env_var}=-1.0 should be rejected and fall back to default, " f"but stdout differs (clamp/reject path inconsistent)."
     )
+
+
+def test_tiktoken_o200k_base_encoding_is_pinned():
+    import tiktoken
+
+    enc = tiktoken.get_encoding("o200k_base")
+    fixture = "def add(a, b):\n    return a + b\n\ndef sub(a, b):\n    return a - b\n"
+    tokens = enc.encode(fixture)
+    assert len(tokens) == 24, (
+        f"tiktoken o200k_base BPE drift: fixture now produces {len(tokens)} tokens, expected 24. "
+        f"This breaks paper reproducibility — investigate before bumping tiktoken."
+    )
+    assert tokens[:5] == [
+        1314,
+        1147,
+        6271,
+        11,
+        287,
+    ], f"tiktoken o200k_base BPE drift: first 5 tokens changed to {tokens[:5]}, expected [1314, 1147, 6271, 11, 287]."
