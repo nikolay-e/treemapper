@@ -75,6 +75,27 @@ def test_diffctx_output_is_byte_identical_across_runs(tmp_path):
     )
 
 
+@pytest.mark.parametrize("threads", ["1", "2", "4", "14"])
+def test_diffctx_output_is_invariant_under_rayon_thread_count(tmp_path, threads):
+    repo, diff_range = _make_diff_repo(tmp_path)
+    args = [".", "--diff", diff_range, "--budget", "1024", "-f", "txt"]
+    baseline_out, _ = _run(repo.path, args, {"RAYON_NUM_THREADS": "1"})
+    actual_out, _ = _run(repo.path, args, {"RAYON_NUM_THREADS": threads})
+    assert baseline_out == actual_out, (
+        f"Non-determinism under RAYON_NUM_THREADS={threads}: "
+        f"output differs from RAYON_NUM_THREADS=1. "
+        f"This indicates a parallel reduce or concurrent state mutation race."
+    )
+
+
+@pytest.mark.parametrize("objective", ["submodular", "boltzmann"])
+def test_diffctx_objective_modes_are_deterministic(tmp_path, objective):
+    repo, diff_range = _make_diff_repo(tmp_path)
+    args = [".", "--diff", diff_range, "--budget", "1024", "-f", "txt"]
+    runs = [_run(repo.path, args, {"DIFFCTX_OBJECTIVE": objective})[0] for _ in range(3)]
+    assert len(set(runs)) == 1, f"Non-determinism in DIFFCTX_OBJECTIVE={objective} mode across 3 runs."
+
+
 def test_extreme_core_budget_fraction_is_clamped(tmp_path):
     repo, diff_range = _make_diff_repo(tmp_path)
     budget = 1024
