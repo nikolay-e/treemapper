@@ -254,4 +254,71 @@ mod tests {
         let result = personalized_pagerank(&mut g, &seeds, 0.6, 1e-6, 0.4, Some(&sw));
         assert!(result[&a] > result[&b]);
     }
+
+    fn build_star_graph() -> (Graph, FragmentId) {
+        let mut g = Graph::new();
+        let center = fid("center.rs", 1, 10);
+        g.add_node(center.clone());
+        for i in 0..5 {
+            let leaf = fid(&format!("leaf_{i}.rs"), 1, 10);
+            g.add_node(leaf.clone());
+            g.add_edge(center.clone(), leaf.clone(), 1.0);
+            g.add_edge(leaf.clone(), center.clone(), 1.0);
+        }
+        (g, center)
+    }
+
+    #[test]
+    fn ppr_is_deterministic_across_calls() {
+        let (mut g1, center) = build_star_graph();
+        let (mut g2, _) = build_star_graph();
+        let seeds: FxHashSet<FragmentId> = std::iter::once(center).collect();
+
+        let r1 = personalized_pagerank(&mut g1, &seeds, 0.6, 1e-6, 0.4, None);
+        let r2 = personalized_pagerank(&mut g2, &seeds, 0.6, 1e-6, 0.4, None);
+
+        assert_eq!(r1.len(), r2.len());
+        for (id, v1) in &r1 {
+            let v2 = r2.get(id).copied().unwrap_or(f64::NAN);
+            assert!((v1 - v2).abs() < 1e-12, "PPR drift at {id}: {v1} vs {v2}");
+        }
+    }
+
+    #[test]
+    fn ppr_converges_under_tighter_tolerance() {
+        let (mut g_loose, center) = build_star_graph();
+        let (mut g_tight, _) = build_star_graph();
+        let seeds: FxHashSet<FragmentId> = std::iter::once(center).collect();
+
+        let loose = personalized_pagerank(&mut g_loose, &seeds, 0.6, 1e-2, 0.4, None);
+        let tight = personalized_pagerank(&mut g_tight, &seeds, 0.6, 1e-6, 0.4, None);
+
+        let max_diff = loose
+            .iter()
+            .map(|(id, v)| (v - tight.get(id).copied().unwrap_or(0.0)).abs())
+            .fold(0.0f64, f64::max);
+        assert!(
+            max_diff < 1e-2,
+            "PPR did not converge: max diff between tol=1e-2 and tol=1e-6 is {max_diff}"
+        );
+    }
+
+    #[test]
+    fn ppr_symmetric_star_assigns_equal_mass_to_leaves() {
+        let (mut g, center) = build_star_graph();
+        let seeds: FxHashSet<FragmentId> = std::iter::once(center.clone()).collect();
+        let result = personalized_pagerank(&mut g, &seeds, 0.6, 1e-8, 0.5, None);
+
+        let leaf_scores: Vec<f64> = (0..5)
+            .map(|i| result[&fid(&format!("leaf_{i}.rs"), 1, 10)])
+            .collect();
+        let max_leaf = leaf_scores.iter().cloned().fold(0.0f64, f64::max);
+        let min_leaf = leaf_scores.iter().cloned().fold(f64::INFINITY, f64::min);
+        assert!(
+            (max_leaf - min_leaf) < 1e-6,
+            "Symmetric star should give equal leaf mass; got spread {} (leaves: {leaf_scores:?})",
+            max_leaf - min_leaf
+        );
+        assert!(result[&center] > max_leaf, "Center must dominate leaves");
+    }
 }
