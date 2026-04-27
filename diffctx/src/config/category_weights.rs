@@ -25,6 +25,7 @@
 
 use once_cell::sync::Lazy;
 
+use crate::config::env_overrides::read_env_f64;
 use crate::graph::EdgeCategory;
 
 #[derive(Debug, Clone, Copy)]
@@ -76,30 +77,17 @@ impl CategoryWeights {
     }
 }
 
-/// Parse a string into a non-negative finite float, falling back to default
-/// if the value is missing, unparseable, or out of range. Pure function so
-/// tests do not need to mutate process-global env state.
-fn parse_or_default(raw: Option<String>, default: f64) -> f64 {
-    raw.and_then(|s| s.parse::<f64>().ok())
-        .filter(|v| v.is_finite() && *v >= 0.0)
-        .unwrap_or(default)
-}
-
-fn read_env(name: &str, default: f64) -> f64 {
-    parse_or_default(std::env::var(name).ok(), default)
-}
-
 pub static CATEGORY_WEIGHTS: Lazy<CategoryWeights> = Lazy::new(|| CategoryWeights {
-    semantic: read_env("DIFFCTX_CATWEIGHT_SEMANTIC", 1.0),
-    structural: read_env("DIFFCTX_CATWEIGHT_STRUCTURAL", 1.0),
-    sibling: read_env("DIFFCTX_CATWEIGHT_SIBLING", 1.0),
-    config: read_env("DIFFCTX_CATWEIGHT_CONFIG", 1.0),
-    config_generic: read_env("DIFFCTX_CATWEIGHT_CONFIGGENERIC", 1.0),
-    document: read_env("DIFFCTX_CATWEIGHT_DOCUMENT", 1.0),
-    similarity: read_env("DIFFCTX_CATWEIGHT_SIMILARITY", 1.0),
-    history: read_env("DIFFCTX_CATWEIGHT_HISTORY", 1.0),
-    test_edge: read_env("DIFFCTX_CATWEIGHT_TESTEDGE", 1.0),
-    generic: read_env("DIFFCTX_CATWEIGHT_GENERIC", 1.0),
+    semantic: read_env_f64("DIFFCTX_CATWEIGHT_SEMANTIC", 1.0),
+    structural: read_env_f64("DIFFCTX_CATWEIGHT_STRUCTURAL", 1.0),
+    sibling: read_env_f64("DIFFCTX_CATWEIGHT_SIBLING", 1.0),
+    config: read_env_f64("DIFFCTX_CATWEIGHT_CONFIG", 1.0),
+    config_generic: read_env_f64("DIFFCTX_CATWEIGHT_CONFIGGENERIC", 1.0),
+    document: read_env_f64("DIFFCTX_CATWEIGHT_DOCUMENT", 1.0),
+    similarity: read_env_f64("DIFFCTX_CATWEIGHT_SIMILARITY", 1.0),
+    history: read_env_f64("DIFFCTX_CATWEIGHT_HISTORY", 1.0),
+    test_edge: read_env_f64("DIFFCTX_CATWEIGHT_TESTEDGE", 1.0),
+    generic: read_env_f64("DIFFCTX_CATWEIGHT_GENERIC", 1.0),
 });
 
 #[cfg(test)]
@@ -123,27 +111,6 @@ mod tests {
         ] {
             assert_eq!(w.multiplier(cat), 1.0);
         }
-    }
-
-    #[test]
-    fn parse_accepts_finite_nonneg() {
-        assert_eq!(parse_or_default(Some("0.42".into()), 1.0), 0.42);
-        assert_eq!(parse_or_default(Some("0".into()), 1.0), 0.0);
-        assert_eq!(parse_or_default(Some("17.5".into()), 1.0), 17.5);
-    }
-
-    #[test]
-    fn parse_rejects_negative_and_nonfinite() {
-        assert_eq!(parse_or_default(Some("-0.5".into()), 1.0), 1.0);
-        assert_eq!(parse_or_default(Some("nan".into()), 1.0), 1.0);
-        assert_eq!(parse_or_default(Some("inf".into()), 1.0), 1.0);
-    }
-
-    #[test]
-    fn parse_falls_back_on_missing_or_unparseable() {
-        assert_eq!(parse_or_default(None, 0.7), 0.7);
-        assert_eq!(parse_or_default(Some("hello".into()), 0.7), 0.7);
-        assert_eq!(parse_or_default(Some("".into()), 0.7), 0.7);
     }
 
     #[test]

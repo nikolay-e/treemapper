@@ -1,5 +1,7 @@
 use once_cell::sync::Lazy;
 
+use crate::config::env_overrides::read_env_usize;
+
 pub struct ModeConfig {
     pub bm25_top_k_primary: usize,
     pub bm25_top_k_off: usize,
@@ -20,4 +22,10 @@ impl Default for ModeConfig {
     }
 }
 
-pub static MODE: Lazy<ModeConfig> = Lazy::new(ModeConfig::default);
+pub static MODE: Lazy<ModeConfig> = Lazy::new(|| ModeConfig {
+    hybrid_large_candidate_threshold: read_env_usize(
+        "DIFFCTX_OP_MODE_HYBRID_LARGE_CANDIDATE_THRESHOLD",
+        50,
+    ),
+    ..ModeConfig::default()
+});

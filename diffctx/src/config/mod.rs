@@ -3,6 +3,7 @@ pub mod bm25;
 pub mod budget;
 pub mod category_weights;
 pub mod edge_weights;
+pub mod env_overrides;
 pub mod extensions;
 pub mod filtering;
 pub mod fragmentation;

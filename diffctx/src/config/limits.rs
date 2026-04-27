@@ -1,5 +1,7 @@
 use once_cell::sync::Lazy;
 
+use crate::config::env_overrides::read_env_f64;
+
 pub struct AlgorithmLimits {
     pub max_file_size: usize,
     pub max_fragments: usize,
@@ -134,8 +136,17 @@ impl Default for UtilityConfig {
 }
 
 pub static LIMITS: Lazy<AlgorithmLimits> = Lazy::new(AlgorithmLimits::default);
-pub static PPR: Lazy<PPRConfig> = Lazy::new(PPRConfig::default);
+pub static PPR: Lazy<PPRConfig> = Lazy::new(|| PPRConfig {
+    alpha: read_env_f64("DIFFCTX_OP_PPR_ALPHA", DEFAULT_PPR_ALPHA),
+    forward_blend: read_env_f64("DIFFCTX_OP_PPR_FORWARD_BLEND", 0.4),
+    ..PPRConfig::default()
+});
 pub static LEXICAL: Lazy<LexicalConfig> = Lazy::new(LexicalConfig::default);
 pub static COCHANGE: Lazy<CochangeConfig> = Lazy::new(CochangeConfig::default);
 pub static SIBLING: Lazy<SiblingConfig> = Lazy::new(SiblingConfig::default);
-pub static UTILITY: Lazy<UtilityConfig> = Lazy::new(UtilityConfig::default);
+pub static UTILITY: Lazy<UtilityConfig> = Lazy::new(|| UtilityConfig {
+    eta: read_env_f64("DIFFCTX_OP_UTILITY_ETA", 0.20),
+    structural_bonus_weight: read_env_f64("DIFFCTX_OP_UTILITY_STRUCTURAL_BONUS_WEIGHT", 0.10),
+    r_cap_sigma: read_env_f64("DIFFCTX_OP_UTILITY_R_CAP_SIGMA", 2.0),
+    proximity_decay: read_env_f64("DIFFCTX_OP_UTILITY_PROXIMITY_DECAY", 0.30),
+});
