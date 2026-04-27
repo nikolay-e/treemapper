@@ -3,11 +3,10 @@ use std::path::{Path, PathBuf};
 use rayon::prelude::*;
 use rustc_hash::FxHashSet;
 
+use crate::config::graph_filtering::GRAPH_FILTERING;
 use crate::config::limits::LIMITS;
 use crate::git;
 use crate::languages::get_language_for_file;
-
-const FALLBACK_MAX_FILES: usize = 10_000;
 
 fn is_allowed_file(path: &Path) -> bool {
     get_language_for_file(&path.to_string_lossy()).is_some()
@@ -48,7 +47,7 @@ pub fn collect_candidate_files(root_dir: &Path, included_set: &FxHashSet<PathBuf
     let mut fallback: Vec<PathBuf> = Vec::new();
     if let Ok(entries) = walkdir(root_dir) {
         for f in entries {
-            if fallback.len() >= FALLBACK_MAX_FILES {
+            if fallback.len() >= GRAPH_FILTERING.fallback_max_files {
                 break;
             }
             if is_candidate_file(&f, root_dir, included_set) {

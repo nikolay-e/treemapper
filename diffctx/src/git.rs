@@ -9,9 +9,10 @@ use std::time::Duration;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use crate::config::git::{self, GIT};
 use crate::types::DiffHunk;
 
-static GIT_TIMEOUT_SECS: AtomicU64 = AtomicU64::new(60);
+static GIT_TIMEOUT_SECS: AtomicU64 = AtomicU64::new(git::DEFAULT_TIMEOUT_SECONDS);
 
 pub fn set_git_timeout(secs: u64) {
     GIT_TIMEOUT_SECS.store(secs, Ordering::Relaxed);
@@ -114,7 +115,7 @@ fn wait_with_timeout(
                     let _ = child.wait();
                     return Err(GitError::Timeout(timeout.as_secs()));
                 }
-                std::thread::sleep(Duration::from_millis(10));
+                std::thread::sleep(Duration::from_millis(GIT.poll_interval_ms));
             }
             Err(e) => return Err(GitError::Io(e)),
         }
@@ -574,7 +575,7 @@ impl CatFileBatch {
         self.reader.take();
         if let Some(mut child) = self.child.take() {
             drop(child.stdin.take());
-            match child.wait_timeout(Duration::from_secs(5)) {
+            match child.wait_timeout(Duration::from_secs(GIT.catfile_termination_timeout_seconds)) {
                 Ok(_) => {}
                 Err(_) => {
                     let _ = child.kill();
@@ -605,7 +606,7 @@ impl WaitTimeout for Child {
                     if start.elapsed() >= dur {
                         return Err(());
                     }
-                    std::thread::sleep(Duration::from_millis(10));
+                    std::thread::sleep(Duration::from_millis(GIT.poll_interval_ms));
                 }
                 Err(_) => return Err(()),
             }

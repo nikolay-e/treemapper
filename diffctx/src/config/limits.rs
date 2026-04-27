@@ -28,13 +28,30 @@ impl Default for AlgorithmLimits {
     }
 }
 
+pub const DEFAULT_PPR_ALPHA: f64 = 0.60;
+pub const DEFAULT_STOPPING_THRESHOLD: f64 = 0.08;
+pub const DEFAULT_PIPELINE_TIMEOUT_SECONDS: u64 = 300;
+pub const DEFAULT_BUDGET_TOKENS: u32 = 4096;
+
 pub struct PPRConfig {
     pub alpha: f64,
+    pub default_seed_epsilon: f64,
+    pub push_scale_factor: usize,
+    pub max_pushes_cap: usize,
+    pub convergence_tolerance: f64,
+    pub forward_blend: f64,
 }
 
 impl Default for PPRConfig {
     fn default() -> Self {
-        Self { alpha: 0.60 }
+        Self {
+            alpha: DEFAULT_PPR_ALPHA,
+            default_seed_epsilon: 0.1,
+            push_scale_factor: 100,
+            max_pushes_cap: 2_000_000,
+            convergence_tolerance: 1e-4,
+            forward_blend: 0.4,
+        }
     }
 }
 
@@ -70,6 +87,7 @@ pub struct CochangeConfig {
     pub max_files_per_commit: usize,
     pub commits_limit: usize,
     pub timeout_seconds: u64,
+    pub log_scale_factor: f64,
 }
 
 impl Default for CochangeConfig {
@@ -80,6 +98,7 @@ impl Default for CochangeConfig {
             max_files_per_commit: 30,
             commits_limit: 500,
             timeout_seconds: 10,
+            log_scale_factor: 0.1,
         }
     }
 }
@@ -98,7 +117,7 @@ impl Default for SiblingConfig {
 
 pub struct UtilityConfig {
     pub eta: f64,
-    pub gamma: f64,
+    pub structural_bonus_weight: f64,
     pub r_cap_sigma: f64,
     pub proximity_decay: f64,
 }
@@ -107,7 +126,7 @@ impl Default for UtilityConfig {
     fn default() -> Self {
         Self {
             eta: 0.20,
-            gamma: 0.10,
+            structural_bonus_weight: 0.10,
             r_cap_sigma: 2.0,
             proximity_decay: 0.30,
         }

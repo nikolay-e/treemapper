@@ -4,13 +4,11 @@ use std::sync::Arc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::config::selection::RESCUE;
 use crate::fragmentation::create_whole_file_fragment;
 use crate::git::CatFileBatch;
 use crate::graph::Graph;
 use crate::types::{Fragment, FragmentId};
-
-const RESCUE_BUDGET_FRACTION: f64 = 0.05;
-const RESCUE_MIN_SCORE_PERCENTILE: f64 = 0.80;
 
 struct IntervalIndex {
     by_path: HashMap<Arc<str>, Vec<(u32, u32)>>,
@@ -184,7 +182,7 @@ fn compute_rescue_threshold(
         return f64::INFINITY;
     }
     context_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-    let idx = (context_scores.len() as f64 * (1.0 - RESCUE_MIN_SCORE_PERCENTILE)) as usize;
+    let idx = (context_scores.len() as f64 * (1.0 - RESCUE.min_score_percentile)) as usize;
     context_scores[idx.min(context_scores.len() - 1)]
 }
 
@@ -197,7 +195,7 @@ pub fn rescue_nontrivial_context(
 ) {
     let used: u32 = selected.iter().map(|f| f.token_count).sum();
     let remaining = budget.saturating_sub(used);
-    let rescue_budget = remaining.min((budget as f64 * RESCUE_BUDGET_FRACTION) as u32);
+    let rescue_budget = remaining.min((budget as f64 * RESCUE.budget_fraction) as u32);
     if rescue_budget == 0 {
         return;
     }

@@ -3,15 +3,11 @@ use std::sync::Arc;
 use rustc_hash::FxHashSet;
 use tree_sitter::{Language, Node, Parser};
 
+use crate::config::parsers::PARSERS;
+use crate::config::tokenization::TOKENIZATION;
 use crate::types::{Fragment, FragmentId, FragmentKind, extract_identifiers};
 
-use super::{FragmentationStrategy, MIN_FRAGMENT_LINES, create_code_gap_fragments, create_snippet};
-
-const SUB_FRAGMENT_THRESHOLD_LINES: u32 = 30;
-const SUB_FRAGMENT_TARGET_LINES: u32 = 20;
-const MAX_SUB_DEPTH: u32 = 3;
-const MAX_RECURSION_DEPTH: u32 = 500;
-const CONTAINER_SEARCH_MAX_DEPTH: u32 = 3;
+use super::{FragmentationStrategy, create_code_gap_fragments, create_snippet};
 
 const BODY_FIELD_NAMES: &[&str] = &["body", "block", "consequence"];
 const BODY_NODE_TYPES: &[&str] = &[
@@ -1178,7 +1174,7 @@ fn create_and_append_fragment(
         Some(s) => s,
         None => return false,
     };
-    let identifiers = extract_identifiers(&snippet, 2);
+    let identifiers = extract_identifiers(&snippet, TOKENIZATION.fragment_min_identifier_length);
     fragments.push(Fragment {
         id: FragmentId::new(Arc::clone(path), start, end),
         kind: FragmentKind::from_str(kind),
@@ -1200,7 +1196,7 @@ fn emit_chunk(
     fragments: &mut Vec<Fragment>,
     covered: &mut Vec<(u32, u32)>,
 ) {
-    if end < start || end - start + 1 < MIN_FRAGMENT_LINES {
+    if end < start || end - start + 1 < PARSERS.min_fragment_lines {
         return;
     }
     let sym_name = parent_symbol.map(|ps| format!("{ps}[{start}]"));
@@ -1225,7 +1221,7 @@ fn create_sub_fragments(
     covered: &mut Vec<(u32, u32)>,
     depth: u32,
 ) {
-    if depth > MAX_SUB_DEPTH {
+    if depth > PARSERS.max_sub_depth {
         return;
     }
     let body = match find_body_node(node) {
@@ -1249,7 +1245,7 @@ fn create_sub_fragments(
     for child in &children[1..] {
         let child_start = node_start_line(child);
         let child_end = node_end_line(child);
-        if child_end - chunk_start_line + 1 > SUB_FRAGMENT_TARGET_LINES {
+        if child_end - chunk_start_line + 1 > PARSERS.sub_fragment_target_lines {
             emit_chunk(
                 path,
                 lines,
@@ -1278,7 +1274,7 @@ fn create_sub_fragments(
 }
 
 fn first_child_def_line(node: &Node, definition_types: &[&str], depth: u32) -> Option<u32> {
-    if depth > CONTAINER_SEARCH_MAX_DEPTH {
+    if depth > PARSERS.container_search_max_depth {
         return None;
     }
     let child_count = node.child_count();
@@ -1319,7 +1315,8 @@ fn try_container_split(
     }
     let header_end = first_child_start - 1;
     if let Some(snippet) = create_snippet(lines, start, header_end) {
-        let identifiers = extract_identifiers(&snippet, 2);
+        let identifiers =
+            extract_identifiers(&snippet, TOKENIZATION.fragment_min_identifier_length);
         fragments.push(Fragment {
             id: FragmentId::new(Arc::clone(path), start, header_end),
             kind: FragmentKind::from_str(kind),
@@ -1398,7 +1395,7 @@ fn handle_definition_node(
         return;
     }
 
-    if end - start + 1 >= MIN_FRAGMENT_LINES {
+    if end - start + 1 >= PARSERS.min_fragment_lines {
         if create_and_append_fragment(
             path,
             lines,
@@ -1413,7 +1410,7 @@ fn handle_definition_node(
         }
     }
 
-    if end - start + 1 > SUB_FRAGMENT_THRESHOLD_LINES {
+    if end - start + 1 > PARSERS.sub_fragment_threshold_lines {
         create_sub_fragments(
             node,
             path,
@@ -1453,7 +1450,7 @@ fn extract_definitions(
     added_ends: &mut FxHashSet<(String, u32)>,
     depth: u32,
 ) {
-    if depth > MAX_RECURSION_DEPTH {
+    if depth > PARSERS.max_recursion_depth {
         return;
     }
 

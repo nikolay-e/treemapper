@@ -4,6 +4,9 @@ use std::sync::Arc;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
+use crate::config::limits::{
+    DEFAULT_PIPELINE_TIMEOUT_SECONDS, DEFAULT_PPR_ALPHA, DEFAULT_STOPPING_THRESHOLD,
+};
 use crate::mode::ScoringMode;
 use crate::pipeline;
 use crate::render::{DiffContextOutput, FragmentEntry};
@@ -185,12 +188,12 @@ impl FragmentIterator {
     root_dir,
     diff_range = None,
     budget_tokens = None,
-    alpha = 0.60,
-    tau = 0.08,
+    alpha = DEFAULT_PPR_ALPHA,
+    tau = DEFAULT_STOPPING_THRESHOLD,
     no_content = false,
     full = false,
     scoring_mode = "hybrid",
-    timeout = 300,
+    timeout = DEFAULT_PIPELINE_TIMEOUT_SECONDS,
 ))]
 fn build_diff_context_native(
     root_dir: &str,
@@ -226,15 +229,15 @@ fn build_diff_context_native(
     root_dir,
     diff_range,
     budget_tokens = None,
-    alpha = 0.60,
-    tau = 0.08,
+    alpha = DEFAULT_PPR_ALPHA,
+    tau = DEFAULT_STOPPING_THRESHOLD,
     no_content = false,
     ignore_file = None,
     no_default_ignores = false,
     full = false,
     whitelist_file = None,
     scoring_mode = "hybrid",
-    timeout = 300,
+    timeout = DEFAULT_PIPELINE_TIMEOUT_SECONDS,
 ))]
 fn build_diff_context<'py>(
     py: Python<'py>,
