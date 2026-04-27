@@ -12,6 +12,10 @@ pub fn parse_f64_or_default(raw: Option<String>, default: f64) -> f64 {
         .unwrap_or(default)
 }
 
+pub fn parse_fraction_or_default(raw: Option<String>, default: f64) -> f64 {
+    parse_f64_or_default(raw, default).clamp(0.0, 1.0)
+}
+
 pub fn parse_usize_or_default(raw: Option<String>, default: usize) -> usize {
     raw.and_then(|s| s.parse::<usize>().ok()).unwrap_or(default)
 }
@@ -22,6 +26,10 @@ pub fn parse_u32_or_default(raw: Option<String>, default: u32) -> u32 {
 
 pub fn read_env_f64(name: &str, default: f64) -> f64 {
     parse_f64_or_default(std::env::var(name).ok(), default)
+}
+
+pub fn read_env_fraction(name: &str, default: f64) -> f64 {
+    parse_fraction_or_default(std::env::var(name).ok(), default)
 }
 
 pub fn read_env_usize(name: &str, default: usize) -> usize {
@@ -47,6 +55,16 @@ mod tests {
         assert_eq!(parse_f64_or_default(Some("-0.5".into()), 1.0), 1.0);
         assert_eq!(parse_f64_or_default(Some("nan".into()), 1.0), 1.0);
         assert_eq!(parse_f64_or_default(Some("inf".into()), 1.0), 1.0);
+    }
+
+    #[test]
+    fn fraction_clamps_into_unit_interval() {
+        assert_eq!(parse_fraction_or_default(Some("0.5".into()), 0.7), 0.5);
+        assert_eq!(parse_fraction_or_default(Some("1.05".into()), 0.7), 1.0);
+        assert_eq!(parse_fraction_or_default(Some("42".into()), 0.7), 1.0);
+        assert_eq!(parse_fraction_or_default(Some("-0.5".into()), 0.7), 0.7);
+        assert_eq!(parse_fraction_or_default(Some("nan".into()), 0.7), 0.7);
+        assert_eq!(parse_fraction_or_default(None, 0.7), 0.7);
     }
 
     #[test]

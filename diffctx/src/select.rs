@@ -247,7 +247,7 @@ fn select_core_fragments(
                 {
                     state.selected.push(sig.clone());
                     state.selected_ids.add(&sig.id);
-                    state.remaining_budget -= sig.token_count;
+                    state.remaining_budget = state.remaining_budget.saturating_sub(sig.token_count);
                     core_used += sig.token_count;
                     let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
                     apply_fragment(sig, rel_score, needs, &mut state.utility_state);
@@ -258,7 +258,7 @@ fn select_core_fragments(
 
         state.selected.push(frag.clone());
         state.selected_ids.add(&frag.id);
-        state.remaining_budget -= frag.token_count;
+        state.remaining_budget = state.remaining_budget.saturating_sub(frag.token_count);
         core_used += frag.token_count;
         let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
         apply_fragment(frag, rel_score, needs, &mut state.utility_state);
@@ -431,7 +431,7 @@ fn run_greedy_loop_heap(
 
         state.selected.push(best_frag.clone());
         state.selected_ids.add(&best_frag.id);
-        state.remaining_budget -= best_frag.token_count;
+        state.remaining_budget = state.remaining_budget.saturating_sub(best_frag.token_count);
         let rel_score = rel.get(&best_frag.id).copied().unwrap_or(0.0);
         apply_fragment(&best_frag, rel_score, needs, &mut state.utility_state);
     }

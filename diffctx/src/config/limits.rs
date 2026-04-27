@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 
-use crate::config::env_overrides::read_env_f64;
+use crate::config::env_overrides::{read_env_f64, read_env_fraction};
 
 pub struct AlgorithmLimits {
     pub max_file_size: usize,
@@ -137,8 +137,8 @@ impl Default for UtilityConfig {
 
 pub static LIMITS: Lazy<AlgorithmLimits> = Lazy::new(AlgorithmLimits::default);
 pub static PPR: Lazy<PPRConfig> = Lazy::new(|| PPRConfig {
-    alpha: read_env_f64("DIFFCTX_OP_PPR_ALPHA", DEFAULT_PPR_ALPHA),
-    forward_blend: read_env_f64("DIFFCTX_OP_PPR_FORWARD_BLEND", 0.4),
+    alpha: read_env_fraction("DIFFCTX_OP_PPR_ALPHA", DEFAULT_PPR_ALPHA),
+    forward_blend: read_env_fraction("DIFFCTX_OP_PPR_FORWARD_BLEND", 0.4),
     ..PPRConfig::default()
 });
 pub static LEXICAL: Lazy<LexicalConfig> = Lazy::new(LexicalConfig::default);
