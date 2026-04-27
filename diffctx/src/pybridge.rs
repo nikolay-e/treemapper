@@ -323,10 +323,22 @@ fn build_diff_context<'py>(
     Ok(dict)
 }
 
+#[pyfunction]
+fn get_language_for_file(path: &str) -> Option<String> {
+    crate::languages::get_language_for_file(path).map(|s| s.to_string())
+}
+
+#[pyfunction]
+fn count_tokens(text: &str) -> u32 {
+    crate::tokenizer::count_tokens(text)
+}
+
 #[pymodule]
 pub fn _diffctx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_diff_context, m)?)?;
     m.add_function(wrap_pyfunction!(build_diff_context_native, m)?)?;
+    m.add_function(wrap_pyfunction!(get_language_for_file, m)?)?;
+    m.add_function(wrap_pyfunction!(count_tokens, m)?)?;
     m.add_class::<DiffContextResult>()?;
     m.add_class::<PyFragment>()?;
     Ok(())

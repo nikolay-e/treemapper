@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .cli import GraphArgs, ParsedArgs
+    from .cli import ParsedArgs
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ def _configure_windows_utf8() -> None:
 
 
 def _build_diff_tree(args: ParsedArgs) -> dict[str, Any]:
-    from .diffctx import GitError, build_diff_context
+    from .diffctx import build_diff_context
 
     if not args.diff_range:
         raise RuntimeError("diff_range is required in diff mode")
@@ -35,7 +35,7 @@ def _build_diff_tree(args: ParsedArgs) -> dict[str, Any]:
             whitelist_file=args.whitelist_file,
             scoring_mode=getattr(args, "scoring", "hybrid"),
         )
-    except GitError as e:
+    except RuntimeError as e:
         logger.error("%s", e)
         sys.exit(1)
 
@@ -138,90 +138,15 @@ def _is_graph_mode(args: ParsedArgs) -> bool:
     return args.command == "graph"
 
 
-_ARCHITECTURAL_EDGE_TYPES: frozenset[str] = frozenset(
-    {"semantic", "structural", "config_generic", "document", "sibling", "test_edge", "history"}
+_GRAPH_MODE_PORT_PENDING = (
+    "treemapper graph mode is being ported from Python to Rust; the Python "
+    "implementation has been removed. Re-enable by exposing analytics / "
+    "graph_export / project_graph from the diffctx Rust crate via PyO3."
 )
 
 
-def _format_cycles(g: GraphArgs, pg: Any) -> str:
-    from .diffctx.graph_analytics import detect_cycles
-
-    cycles = detect_cycles(pg, level=g.level, edge_types={"semantic"})
-    if not cycles:
-        return "No dependency cycles detected."
-    lines = [f"{len(cycles)} dependency cycle(s) detected:\n"]
-    for i, cycle in enumerate(cycles, 1):
-        chain = " \u2192 ".join(cycle) + " \u2192 " + cycle[0]
-        lines.append(f"  Cycle {i} ({len(cycle)} nodes): {chain}")
-    return "\n".join(lines)
-
-
-def _format_hotspots(_g: GraphArgs, pg: Any) -> str:
-    from .diffctx.graph_analytics import hotspots
-
-    hot = hotspots(pg, top=10, edge_types=set(_ARCHITECTURAL_EDGE_TYPES))
-    lines = [f"Top {len(hot)} hotspots:"]
-    for rank, (name, score, details) in enumerate(hot, 1):
-        lines.append(f"  {rank}. {name}  score={score}  out_degree={details['out_degree']}  churn={details['churn']}")
-    return "\n".join(lines)
-
-
-def _format_metrics(g: GraphArgs, pg: Any) -> str:
-    from .diffctx.graph_analytics import coupling_metrics
-
-    metrics = coupling_metrics(pg, level=g.level, edge_types=set(_ARCHITECTURAL_EDGE_TYPES))
-    lines = [f"Module metrics ({g.level} level):"]
-    for m in metrics:
-        flags = ""
-        if m.coupling > 0.7:
-            flags = "  \u26a0 high coupling"
-        elif m.cohesion > 0.8:
-            flags = "  \u2713 high cohesion"
-        lines.append(
-            f"  {m.name}  cohesion={m.cohesion}  coupling={m.coupling}  "
-            f"instability={m.instability}  fan_in={m.fan_in}  fan_out={m.fan_out}{flags}"
-        )
-    return "\n".join(lines)
-
-
-def _graph_to_string(pg: Any, fmt: str, level: str = "directory") -> str:
-    from .diffctx.graph_analytics import quotient_graph, to_mermaid
-    from .diffctx.graph_export import graph_to_graphml_string, graph_to_json_string
-
-    if fmt == "graphml":
-        return graph_to_graphml_string(pg)
-    if fmt == "mermaid":
-        qg = quotient_graph(pg, level=level)
-        return to_mermaid(qg)
-    return graph_to_json_string(pg)
-
-
 def _handle_graph_mode(args: ParsedArgs) -> str:
-    from .diffctx.graph_export import graph_summary
-    from .diffctx.project_graph import build_project_graph
-
-    assert args.graph is not None
-    g = args.graph
-
-    pg = build_project_graph(
-        args.root_dir,
-        ignore_file=args.ignore_file,
-        no_default_ignores=args.no_default_ignores,
-        whitelist_file=args.whitelist_file,
-    )
-
-    parts: list[str] = []
-
-    if g.summary:
-        parts.append(graph_summary(pg))
-        parts.append(_format_cycles(g, pg))
-        parts.append(_format_hotspots(g, pg))
-        parts.append(_format_metrics(g, pg))
-
-    if not g.summary:
-        parts.append(_graph_to_string(pg, g.format, level=g.level))
-
-    return "\n".join(parts) + "\n" if parts else ""
+    raise NotImplementedError(_GRAPH_MODE_PORT_PENDING)
 
 
 def _run() -> None:
