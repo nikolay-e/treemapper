@@ -5,6 +5,8 @@ mod tree_sitter_strategy;
 
 use std::sync::Arc;
 
+use once_cell::sync::Lazy;
+
 use crate::config::parsers::PARSERS;
 use crate::config::tokenization::TOKENIZATION;
 use crate::types::Fragment;
@@ -14,15 +16,17 @@ pub trait FragmentationStrategy: Send + Sync {
     fn fragment(&self, path: Arc<str>, content: &str) -> Vec<Fragment>;
 }
 
-pub fn fragment_file(path: Arc<str>, content: &str) -> Vec<Fragment> {
-    let strategies: Vec<Box<dyn FragmentationStrategy>> = vec![
+static STRATEGIES: Lazy<Vec<Box<dyn FragmentationStrategy>>> = Lazy::new(|| {
+    vec![
         Box::new(tree_sitter_strategy::TreeSitterStrategy::new()),
         Box::new(markdown::MarkdownStrategy),
         Box::new(config_parser::ConfigStrategy),
         Box::new(generic::GenericStrategy),
-    ];
+    ]
+});
 
-    for strategy in &strategies {
+pub fn fragment_file(path: Arc<str>, content: &str) -> Vec<Fragment> {
+    for strategy in STRATEGIES.iter() {
         if strategy.can_handle(&path, content) {
             let fragments = strategy.fragment(Arc::clone(&path), content);
             if !fragments.is_empty() {

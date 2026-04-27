@@ -1,7 +1,9 @@
+use std::cell::RefCell;
 use std::sync::Arc;
 
-use rustc_hash::FxHashSet;
-use tree_sitter::{Language, Node, Parser};
+use once_cell::sync::Lazy;
+use rustc_hash::{FxHashMap, FxHashSet};
+use tree_sitter::{Language, Node, Parser, Tree};
 
 use crate::config::parsers::PARSERS;
 use crate::config::tokenization::TOKENIZATION;
@@ -973,50 +975,82 @@ fn find_lang_config(path: &str) -> Option<&'static LangConfig> {
     LANG_CONFIGS.iter().find(|c| c.extension == ext)
 }
 
+static LANGUAGE_CACHE: Lazy<FxHashMap<&'static str, Language>> = Lazy::new(|| {
+    let mut m: FxHashMap<&'static str, Language> = FxHashMap::default();
+    m.insert("python", Language::new(tree_sitter_python::LANGUAGE));
+    let js = Language::new(tree_sitter_javascript::LANGUAGE);
+    m.insert("javascript", js.clone());
+    m.insert("jsx", js);
+    m.insert(
+        "typescript",
+        Language::new(tree_sitter_typescript::LANGUAGE_TYPESCRIPT),
+    );
+    m.insert("tsx", Language::new(tree_sitter_typescript::LANGUAGE_TSX));
+    m.insert("go", Language::new(tree_sitter_go::LANGUAGE));
+    m.insert("rust", Language::new(tree_sitter_rust::LANGUAGE));
+    m.insert("java", Language::new(tree_sitter_java::LANGUAGE));
+    m.insert("c", Language::new(tree_sitter_c::LANGUAGE));
+    m.insert("cpp", Language::new(tree_sitter_cpp::LANGUAGE));
+    m.insert("ruby", Language::new(tree_sitter_ruby::LANGUAGE));
+    m.insert("c_sharp", Language::new(tree_sitter_c_sharp::LANGUAGE));
+    m.insert("php", Language::new(tree_sitter_php::LANGUAGE_PHP));
+    m.insert("scala", Language::new(tree_sitter_scala::LANGUAGE));
+    m.insert("swift", Language::new(tree_sitter_swift::LANGUAGE));
+    m.insert("html", Language::new(tree_sitter_html::LANGUAGE));
+    m.insert("bash", Language::new(tree_sitter_bash::LANGUAGE));
+    m.insert("css", Language::new(tree_sitter_css::LANGUAGE));
+    m.insert("haskell", Language::new(tree_sitter_haskell::LANGUAGE));
+    m.insert("elixir", Language::new(tree_sitter_elixir::LANGUAGE));
+    m.insert("lua", Language::new(tree_sitter_lua::LANGUAGE));
+    m.insert("r", Language::new(tree_sitter_r::LANGUAGE));
+    m.insert("ocaml", Language::new(tree_sitter_ocaml::LANGUAGE_OCAML));
+    m.insert("erlang", Language::new(tree_sitter_erlang::LANGUAGE));
+    m.insert("julia", Language::new(tree_sitter_julia::LANGUAGE));
+    m.insert("zig", Language::new(tree_sitter_zig::LANGUAGE));
+    m.insert("clojure", Language::new(tree_sitter_clojure::LANGUAGE));
+    m.insert("nix", Language::new(tree_sitter_nix::LANGUAGE));
+    m.insert("groovy", Language::new(tree_sitter_groovy::LANGUAGE));
+    m.insert("objc", Language::new(tree_sitter_objc::LANGUAGE));
+    m.insert("cmake", Language::new(tree_sitter_cmake::LANGUAGE));
+    m.insert("make", Language::new(tree_sitter_make::LANGUAGE));
+    m.insert("hcl", Language::new(tree_sitter_hcl::LANGUAGE));
+    m.insert("graphql", Language::new(tree_sitter_graphql::LANGUAGE));
+    m.insert("dart", Language::new(tree_sitter_dart::LANGUAGE));
+    m.insert("prisma", Language::new(tree_sitter_prisma_io::LANGUAGE));
+    m.insert("svelte", Language::new(tree_sitter_svelte_ng::LANGUAGE));
+    m.insert("json", Language::new(tree_sitter_json::LANGUAGE));
+    m.insert("yaml", Language::new(tree_sitter_yaml::LANGUAGE));
+    m
+});
+
 fn get_tree_sitter_language(ts_name: &str) -> Option<Language> {
-    let lang = match ts_name {
-        "python" => Language::new(tree_sitter_python::LANGUAGE),
-        "javascript" | "jsx" => Language::new(tree_sitter_javascript::LANGUAGE),
-        "typescript" => Language::new(tree_sitter_typescript::LANGUAGE_TYPESCRIPT),
-        "tsx" => Language::new(tree_sitter_typescript::LANGUAGE_TSX),
-        "go" => Language::new(tree_sitter_go::LANGUAGE),
-        "rust" => Language::new(tree_sitter_rust::LANGUAGE),
-        "java" => Language::new(tree_sitter_java::LANGUAGE),
-        "c" => Language::new(tree_sitter_c::LANGUAGE),
-        "cpp" => Language::new(tree_sitter_cpp::LANGUAGE),
-        "ruby" => Language::new(tree_sitter_ruby::LANGUAGE),
-        "c_sharp" => Language::new(tree_sitter_c_sharp::LANGUAGE),
-        "php" => Language::new(tree_sitter_php::LANGUAGE_PHP),
-        "scala" => Language::new(tree_sitter_scala::LANGUAGE),
-        "swift" => Language::new(tree_sitter_swift::LANGUAGE),
-        "html" => Language::new(tree_sitter_html::LANGUAGE),
-        "bash" => Language::new(tree_sitter_bash::LANGUAGE),
-        "css" => Language::new(tree_sitter_css::LANGUAGE),
-        "haskell" => Language::new(tree_sitter_haskell::LANGUAGE),
-        "elixir" => Language::new(tree_sitter_elixir::LANGUAGE),
-        "lua" => Language::new(tree_sitter_lua::LANGUAGE),
-        "r" => Language::new(tree_sitter_r::LANGUAGE),
-        "ocaml" => Language::new(tree_sitter_ocaml::LANGUAGE_OCAML),
-        "erlang" => Language::new(tree_sitter_erlang::LANGUAGE),
-        "julia" => Language::new(tree_sitter_julia::LANGUAGE),
-        "zig" => Language::new(tree_sitter_zig::LANGUAGE),
-        "clojure" => Language::new(tree_sitter_clojure::LANGUAGE),
-        "nix" => Language::new(tree_sitter_nix::LANGUAGE),
-        "groovy" => Language::new(tree_sitter_groovy::LANGUAGE),
-        "objc" => Language::new(tree_sitter_objc::LANGUAGE),
-        "cmake" => Language::new(tree_sitter_cmake::LANGUAGE),
-        "make" => Language::new(tree_sitter_make::LANGUAGE),
-        "hcl" => Language::new(tree_sitter_hcl::LANGUAGE),
-        "graphql" => Language::new(tree_sitter_graphql::LANGUAGE),
-        // "latex" => tree-sitter-latex crate is broken (missing external scanner)
-        "dart" => Language::new(tree_sitter_dart::LANGUAGE),
-        "prisma" => Language::new(tree_sitter_prisma_io::LANGUAGE),
-        "svelte" => Language::new(tree_sitter_svelte_ng::LANGUAGE),
-        "json" => Language::new(tree_sitter_json::LANGUAGE),
-        "yaml" => Language::new(tree_sitter_yaml::LANGUAGE),
-        _ => return None,
-    };
-    Some(lang)
+    LANGUAGE_CACHE.get(ts_name).cloned()
+}
+
+thread_local! {
+    static PARSER_CACHE: RefCell<FxHashMap<&'static str, Parser>> = RefCell::new(FxHashMap::default());
+}
+
+fn parse_with_cached_parser(
+    ts_name: &'static str,
+    language: &Language,
+    content: &str,
+) -> Option<Tree> {
+    PARSER_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        let parser = match cache.get_mut(ts_name) {
+            Some(p) => p,
+            None => {
+                let mut p = Parser::new();
+                if p.set_language(language).is_err() {
+                    return None;
+                }
+                cache.insert(ts_name, p);
+                cache.get_mut(ts_name).expect("just inserted")
+            }
+        };
+        parser.parse(content, None)
+    })
 }
 
 fn node_start_line(node: &Node) -> u32 {
@@ -1536,12 +1570,7 @@ impl FragmentationStrategy for TreeSitterStrategy {
             None => return Vec::new(),
         };
 
-        let mut parser = Parser::new();
-        if parser.set_language(&language).is_err() {
-            return Vec::new();
-        }
-
-        let tree = match parser.parse(content, None) {
+        let tree = match parse_with_cached_parser(config.ts_name, &language, content) {
             Some(t) => t,
             None => return Vec::new(),
         };

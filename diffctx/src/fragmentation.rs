@@ -208,21 +208,31 @@ fn read_file_content(
         .unwrap_or_else(|_| root_dir.to_path_buf());
     let rel = abs_path.strip_prefix(&resolved_root).ok()?;
 
+    let max_size = LIMITS.max_file_size;
     for rev in preferred_revs {
         if let Some(reader) = batch_reader.as_deref_mut() {
             match reader.get(rev, rel) {
-                Ok(content) if !looks_binary(&content) => return Some(content),
+                Ok(content) if content.len() <= max_size && !looks_binary(&content) => {
+                    return Some(content);
+                }
                 _ => continue,
             }
         } else {
             match git::show_file_at_revision(root_dir, rev, rel) {
-                Ok(content) if !looks_binary(&content) => return Some(content),
+                Ok(content) if content.len() <= max_size && !looks_binary(&content) => {
+                    return Some(content);
+                }
                 _ => continue,
             }
         }
     }
 
     if abs_path.exists() && abs_path.is_file() {
+        if let Ok(meta) = std::fs::metadata(&abs_path) {
+            if meta.len() as usize > LIMITS.max_file_size {
+                return None;
+            }
+        }
         if let Ok(content) = std::fs::read_to_string(&abs_path) {
             if !looks_binary(&content) {
                 return Some(content);
