@@ -3,8 +3,6 @@ use std::sync::Arc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use std::collections::HashMap;
-
 use crate::config::bm25::BM25;
 use crate::config::limits::{LIMITS, PPR};
 use crate::config::scoring::EGO;
@@ -181,7 +179,7 @@ impl ScoringStrategy for BM25Scoring {
         let n_docs = docs.len().max(1);
         let avgdl = docs.iter().map(|(_, d)| d.len()).sum::<usize>() as f64 / n_docs as f64;
 
-        let mut df: HashMap<String, usize> = HashMap::new();
+        let mut df: FxHashMap<String, usize> = FxHashMap::default();
         for (_, doc) in &docs {
             let unique: FxHashSet<&str> = doc.iter().map(|s| s.as_str()).collect();
             for term in unique {
@@ -207,7 +205,7 @@ impl ScoringStrategy for BM25Scoring {
         }
         for (fid, doc) in &docs {
             let dl = doc.len() as f64;
-            let mut tf: HashMap<&str, u32> = HashMap::new();
+            let mut tf: FxHashMap<&str, u32> = FxHashMap::default();
             for t in doc {
                 *tf.entry(t.as_str()).or_insert(0) += 1;
             }

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -11,14 +10,14 @@ use crate::graph::Graph;
 use crate::types::{Fragment, FragmentId};
 
 struct IntervalIndex {
-    by_path: HashMap<Arc<str>, Vec<(u32, u32)>>,
+    by_path: FxHashMap<Arc<str>, Vec<(u32, u32)>>,
     ids: FxHashSet<FragmentId>,
 }
 
 impl IntervalIndex {
     fn new() -> Self {
         Self {
-            by_path: HashMap::new(),
+            by_path: FxHashMap::default(),
             ids: FxHashSet::default(),
         }
     }
@@ -131,7 +130,7 @@ pub fn coherence_post_pass(
     let used: u32 = selected.iter().map(|f| f.token_count).sum();
     let mut remaining = budget.saturating_sub(used);
 
-    let mut name_to_frags: HashMap<String, Vec<&Fragment>> = HashMap::new();
+    let mut name_to_frags: FxHashMap<String, Vec<&Fragment>> = FxHashMap::default();
     for f in all_fragments {
         if let Some(ref name) = f.symbol_name {
             name_to_frags
@@ -268,7 +267,7 @@ pub fn ensure_changed_files_represented(
         return;
     }
 
-    let mut frags_by_path: HashMap<String, Vec<Fragment>> = HashMap::new();
+    let mut frags_by_path: FxHashMap<String, Vec<Fragment>> = FxHashMap::default();
     for f in all_fragments {
         let path_str = f.id.path.as_ref().to_string();
         if missing_paths

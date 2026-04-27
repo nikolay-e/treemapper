@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -49,7 +48,7 @@ pub fn apply_hunk_proximity_bonus(
     fragments: &[Fragment],
     hunks: &[DiffHunk],
 ) {
-    let mut hunks_by_path: HashMap<&str, Vec<(u32, u32)>> = HashMap::new();
+    let mut hunks_by_path: FxHashMap<&str, Vec<(u32, u32)>> = FxHashMap::default();
     for h in hunks {
         let (h_start, h_end) = h.core_selection_range();
         hunks_by_path
@@ -79,8 +78,11 @@ pub fn apply_hunk_proximity_bonus(
 fn classify_semantic_edges(
     graph: &Graph,
     changed_paths: &FxHashSet<Arc<str>>,
-) -> (HashMap<Arc<str>, FxHashSet<Arc<str>>>, FxHashSet<Arc<str>>) {
-    let mut reverse_deps: HashMap<Arc<str>, FxHashSet<Arc<str>>> = HashMap::new();
+) -> (
+    FxHashMap<Arc<str>, FxHashSet<Arc<str>>>,
+    FxHashSet<Arc<str>>,
+) {
+    let mut reverse_deps: FxHashMap<Arc<str>, FxHashSet<Arc<str>>> = FxHashMap::default();
     let mut direct_edge_paths: FxHashSet<Arc<str>> = FxHashSet::default();
 
     for ((src, dst), category) in &graph.edge_categories {
@@ -127,7 +129,7 @@ fn find_hub_noise_paths(graph: &Graph, changed_paths: &FxHashSet<Arc<str>>) -> F
         })
         .collect();
 
-    let mut noise_counts: HashMap<Arc<str>, usize> = HashMap::new();
+    let mut noise_counts: FxHashMap<Arc<str>, usize> = FxHashMap::default();
     for (hub_path, deps) in &reverse_deps {
         if changed_paths.contains(hub_path) {
             continue;
@@ -161,7 +163,7 @@ fn find_config_generic_code_files(
 ) -> FxHashSet<Arc<str>> {
     let mut has_real_edge: FxHashSet<Arc<str>> = FxHashSet::default();
     let mut has_generic_config: FxHashSet<Arc<str>> = FxHashSet::default();
-    let mut generic_edge_count: HashMap<Arc<str>, usize> = HashMap::new();
+    let mut generic_edge_count: FxHashMap<Arc<str>, usize> = FxHashMap::default();
     let config_stems: FxHashSet<String> = changed_paths
         .iter()
         .filter_map(|p| {
@@ -270,7 +272,7 @@ pub fn cap_context_fragments(
 ) -> Vec<Fragment> {
     let changed_paths: FxHashSet<Arc<str>> = core_ids.iter().map(|fid| fid.path.clone()).collect();
 
-    let mut ctx_by_path: HashMap<Arc<str>, Vec<Fragment>> = HashMap::new();
+    let mut ctx_by_path: FxHashMap<Arc<str>, Vec<Fragment>> = FxHashMap::default();
     let mut result: Vec<Fragment> = Vec::new();
 
     for f in fragments {

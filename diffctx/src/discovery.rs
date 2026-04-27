@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
@@ -161,7 +160,7 @@ impl BM25Discovery {
         avgdl: f64,
     ) -> f64 {
         let dl = doc.len() as f64;
-        let mut tf: HashMap<&str, u32> = HashMap::new();
+        let mut tf: FxHashMap<&str, u32> = FxHashMap::default();
         for t in doc {
             *tf.entry(t.as_str()).or_insert(0) += 1;
         }
@@ -212,7 +211,7 @@ impl DiscoveryStrategy for BM25Discovery {
         let n_docs = corpus.len();
         let avgdl = corpus.iter().map(|d| d.len()).sum::<usize>() as f64 / n_docs as f64;
 
-        let mut df: HashMap<String, usize> = HashMap::new();
+        let mut df: FxHashMap<String, usize> = FxHashMap::default();
         for doc in &corpus {
             let unique: FxHashSet<&str> = doc.iter().map(|s| s.as_str()).collect();
             for term in unique {

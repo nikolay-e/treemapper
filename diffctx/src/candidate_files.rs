@@ -65,9 +65,11 @@ fn walkdir(root: &Path) -> std::io::Result<Vec<PathBuf>> {
 }
 
 fn walk_recursive(dir: &Path, result: &mut Vec<PathBuf>) -> std::io::Result<()> {
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect();
+    entries.sort();
+    for path in entries {
         if path.is_dir() {
             let name = path
                 .file_name()

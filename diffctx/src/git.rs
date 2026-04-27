@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
@@ -8,6 +7,7 @@ use std::time::Duration;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustc_hash::FxHashSet;
 
 use crate::config::git::{self, GIT};
 use crate::types::DiffHunk;
@@ -365,7 +365,7 @@ pub fn get_changed_files(repo_root: &Path, diff_range: Option<&str>) -> Result<V
     Ok(parts.iter().map(|p| repo_root.join(p)).collect())
 }
 
-pub fn get_deleted_files(repo_root: &Path, diff_range: Option<&str>) -> Result<HashSet<PathBuf>> {
+pub fn get_deleted_files(repo_root: &Path, diff_range: Option<&str>) -> Result<FxHashSet<PathBuf>> {
     let mut args: Vec<&str> = vec!["diff"];
     args.extend_from_slice(SAFE_DIFF_FLAGS);
     args.extend_from_slice(&["--diff-filter=D", "--name-only", "-M", "-z"]);
@@ -389,7 +389,7 @@ pub fn get_renamed_paths(
     repo_root: &Path,
     diff_range: Option<&str>,
     min_similarity: u32,
-) -> Result<(HashSet<PathBuf>, HashSet<PathBuf>)> {
+) -> Result<(FxHashSet<PathBuf>, FxHashSet<PathBuf>)> {
     let mut args: Vec<&str> = vec!["diff"];
     args.extend_from_slice(SAFE_DIFF_FLAGS);
     args.extend_from_slice(&["--diff-filter=R", "--name-status", "-M", "-z"]);
@@ -400,8 +400,8 @@ pub fn get_renamed_paths(
     let output = run_git(repo_root, &args)?;
     let parts: Vec<&str> = output.split('\0').collect();
 
-    let mut old_paths = HashSet::new();
-    let mut pure_new_paths = HashSet::new();
+    let mut old_paths = FxHashSet::default();
+    let mut pure_new_paths = FxHashSet::default();
     let mut i = 0;
 
     while i < parts.len() {
