@@ -133,6 +133,17 @@ def test_fraction_param_rejects_negative_falls_back_to_default(tmp_path, env_var
     )
 
 
+def test_ppr_alpha_one_does_not_degenerate(tmp_path):
+    repo, diff_range = _make_diff_repo(tmp_path)
+    args = [".", "--diff", diff_range, "--budget", "1024", "-f", "txt"]
+    out, err = _run(repo.path, args, {"DIFFCTX_OP_PPR_ALPHA": "1.0", "DIFFCTX_SCORING": "ppr"})
+    tokens = _extract_tokens(out + err)
+    assert tokens > 0, (
+        f"DIFFCTX_OP_PPR_ALPHA=1.0 produced empty output; PPR restart=0 must be clamped "
+        f"to avoid all-zero rankings. tokens={tokens}"
+    )
+
+
 def test_release_profile_aborts_on_panic():
     cargo_toml = (PROJECT_ROOT / "diffctx" / "Cargo.toml").read_text()
     assert 'panic = "abort"' in cargo_toml, (
