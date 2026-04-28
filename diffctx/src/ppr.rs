@@ -321,4 +321,52 @@ mod tests {
         );
         assert!(result[&center] > max_leaf, "Center must dominate leaves");
     }
+
+    /// Claim 6B (paper §4.4): personalized PageRank converges to the closed-form
+    /// stationary distribution π = (1-α)(I - αM)^(-1) p, normalized to sum to 1.
+    ///
+    /// For a symmetric star with center c and N leaves, all bidirectional weight 1:
+    ///     π_center = 1 / (1 + α)
+    ///     π_leaf   = α / (N · (1 + α))
+    /// Derivation:
+    ///     π_c = (1-α) + α · Σ_leaf π_leaf,   π_leaf = α · (1/N) · π_c
+    ///     ⇒ π_c · (1 + α) = 1 after normalization (Σ π = 1).
+    #[test]
+    fn ppr_matches_closed_form_on_symmetric_star() {
+        for &(alpha, n_leaves) in &[(0.6, 5usize), (0.5, 4usize), (0.85, 7usize)] {
+            let mut g = Graph::new();
+            let center = fid("center.rs", 1, 10);
+            g.add_node(center.clone());
+            for i in 0..n_leaves {
+                let leaf = fid(&format!("leaf_{i}.rs"), 1, 10);
+                g.add_node(leaf.clone());
+                g.add_edge(center.clone(), leaf.clone(), 1.0);
+                g.add_edge(leaf.clone(), center.clone(), 1.0);
+            }
+            let seeds: FxHashSet<FragmentId> = std::iter::once(center.clone()).collect();
+            let result = personalized_pagerank(&mut g, &seeds, alpha, 1e-10, 0.5, None);
+
+            let expected_center = 1.0 / (1.0 + alpha);
+            let expected_leaf = alpha / (n_leaves as f64 * (1.0 + alpha));
+
+            let actual_center = result[&center];
+            let center_err = (actual_center - expected_center).abs();
+            assert!(
+                center_err < 1e-3,
+                "α={alpha}, N={n_leaves}: center mass drift |actual - closed-form| = {center_err}; \
+                 expected={expected_center}, got={actual_center}"
+            );
+
+            for i in 0..n_leaves {
+                let leaf_id = fid(&format!("leaf_{i}.rs"), 1, 10);
+                let actual_leaf = result[&leaf_id];
+                let leaf_err = (actual_leaf - expected_leaf).abs();
+                assert!(
+                    leaf_err < 1e-3,
+                    "α={alpha}, N={n_leaves}, leaf_{i}: drift |actual - closed-form| = {leaf_err}; \
+                     expected={expected_leaf}, got={actual_leaf}"
+                );
+            }
+        }
+    }
 }

@@ -112,3 +112,62 @@ pub fn calibrate_beta(
     }
     (lo * hi).sqrt()
 }
+
+#[cfg(test)]
+mod paper_claim_tests {
+    //! Empirical validation of Boltzmann-related paper claims.
+    //!
+    //!  - Claim 8 (paper §4.5): selected cost is monotonically non-increasing in β
+    //!    (β₁ < β₂ ⇒ E[c(C*(β₂))] ≤ E[c(C*(β₁))]).
+    //!    Without monotonicity the bisection in `calibrate_beta` does not converge.
+
+    use super::*;
+    use crate::types::{FragmentId, FragmentKind};
+    use std::sync::Arc;
+
+    fn frag(name: &str, tokens: u32) -> Fragment {
+        Fragment {
+            id: FragmentId::new(Arc::from(format!("syn/{name}.rs")), 1, 10),
+            kind: FragmentKind::Function,
+            content: Arc::from(""),
+            identifiers: FxHashSet::default(),
+            token_count: tokens,
+            symbol_name: Some(name.to_lowercase()),
+        }
+    }
+
+    #[test]
+    fn claim_8_boltzmann_cost_is_monotone_in_beta() {
+        let fragments: Vec<Fragment> = (0..12)
+            .map(|i| frag(&format!("f_{i}"), 50 + i * 60))
+            .collect();
+        let mut rels: FxHashMap<FragmentId, f64> = FxHashMap::default();
+        for (i, f) in fragments.iter().enumerate() {
+            rels.insert(f.id.clone(), 0.2 + 0.05 * i as f64);
+        }
+        let core_ids = FxHashSet::default();
+        let budget: u32 = 4096;
+
+        let betas = [1e-6, 1e-4, 1e-2, 1.0, 100.0];
+        let costs: Vec<u32> = betas
+            .iter()
+            .map(|&b| boltzmann_select(&fragments, &core_ids, &rels, budget, b).used_tokens)
+            .collect();
+
+        for i in 0..costs.len() - 1 {
+            assert!(
+                costs[i] >= costs[i + 1],
+                "Boltzmann cost not monotone in β: at β={}→{} cost {}→{} (sequence: {costs:?})",
+                betas[i],
+                betas[i + 1],
+                costs[i],
+                costs[i + 1]
+            );
+        }
+
+        assert!(
+            costs[0] > costs[costs.len() - 1],
+            "β sweep produced no cost variation; sweep range may be too narrow (costs: {costs:?})"
+        );
+    }
+}
