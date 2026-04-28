@@ -16,7 +16,8 @@ impl Default for AlgorithmLimits {
     fn default() -> Self {
         let max_fragments = std::env::var("TREEMAPPER_MAX_FRAGMENTS")
             .ok()
-            .and_then(|v| v.parse().ok())
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|&v| v >= 1)
             .unwrap_or(200);
         Self {
             max_file_size: 100_000,
