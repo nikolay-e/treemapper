@@ -1,0 +1,318 @@
+# Benchmarks
+
+Catalog of every evaluation, diagnostic, and orchestration script under
+`benchmarks/` and `scripts/`. This file is a reference — for the *why*
+of each benchmark, see the project paper and `CLAUDE.md`.
+
+## TL;DR — when to use what
+
+| You want to … | Use |
+|---|---|
+| Single ContextBench run | `python -m benchmarks cb --limit 50 --budget 8000` |
+| Diagnose why diffctx missed a file on a specific instance | `python -m benchmarks cb --forensic --limit 5` |
+| Test robustness via leave-one-out | `python -m benchmarks loo --limit 50` |
+| Sweep budget across modes | `python -m benchmarks curve --limit 50` |
+| Combine N seed runs into mean ± std | `python -m benchmarks aggregate results/*.json` |
+| Compare two result sets (A/B) | `python benchmarks/compare_runs.py after.json before.json` |
+| Probe one-at-a-time parameter sensitivity | `python scripts/sensitivity_check.py` |
+| Run the full 12-config sweep (4 modes × 3 budgets) | `bash scripts/sweep_orchestrator.sh` |
+| Generate the markdown summary report | `python scripts/aggregate_sweep_report.py` |
+
+## Datasets
+
+### ContextBench (primary)
+
+Loaded via HuggingFace Hub: `Contextbench/ContextBench`.
+
+| Config | Flag | Approx. size | Use for |
+|---|---|---|---|
+| `default` | `--dataset full` | ~672 nontrivial | Sweeps, calibration |
+| `contextbench_verified` | `--dataset verified` | curated subset | Final paper numbers |
+
+Each instance has: `instance_id`, `repo`, `repo_url`, `base_commit`,
+`patch`, `gold_context` (list of `{path, lines}`), `language`.
+
+Repo cache is persisted at `~/.cache/contextbench_repos` (override via
+`CONTEXTBENCH_REPOS_DIR`).
+
+### SWE-bench-derived LOO
+
+`benchmarks/loo_swebench.py` reuses ContextBench instances but treats
+them as a robustness probe: hide one patch file, ask diffctx to recover
+it from the remaining context.
+
+## Scripts
+
+### `benchmarks/__main__.py` — CLI dispatcher
+
+```bash
+python -m benchmarks <subcommand> [args]
+```
+
+| Subcommand | Routes to |
+|---|---|
+| `cb` | `contextbench_diffctx.py` (or `forensic_contextbench.py` if `--forensic`) |
+| `loo` | `loo_swebench.py` |
+| `compare` | `compare_runs.py` |
+| `curve` | `budget_curve.py` |
+| `aggregate` | `aggregate_seeds.py` |
+
+### `contextbench_diffctx.py` — main evaluation
+
+**Purpose**: end-to-end recall/precision on ContextBench, parallel
+across instances, multi-seed.
+
+**Args**:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--limit` | 3 | Number of instances |
+| `--budget` | 16000 | Token budget passed to diffctx |
+| `--lang` | none | Filter by `language` field |
+| `--nontrivial-only` | true | Skip instances where gold ⊆ patch files |
+| `--seeds` | `42` | Comma-separated seeds for shuffle |
+| `--no-shuffle` | false | Use dataset order |
+| `--scoring` | `hybrid` | `hybrid` / `ppr` / `ego` / `bm25` |
+| `--baseline` | `treemapper` | `treemapper` / `patch_files` / `bm25` |
+| `--dataset` | `full` | `full` / `verified` |
+| `--tau` | 0.08 | Selection stopping threshold |
+
+**Metrics**: `file_recall`, `file_precision`, `nontrivial_file_recall`,
+`line_recall`, `line_recall_nontrivial`, `elapsed_s`, `fragment_count`.
+Bootstrap 95% CI on each. Per-language and per-repo breakdowns.
+
+**Output**: `results/cb_{scoring}_n{limit}_b{budget}[_s{seed}].json`
+plus stdout tables. One file per seed when `--seeds` lists multiple.
+
+### `forensic_contextbench.py` — diagnostic mode
+
+**Purpose**: trace through pipeline stages on individual instances,
+classify why each nontrivial gold file was missed (universe →
+fragmented → candidate → selected).
+
+**Invocation**: `python -m benchmarks cb --forensic --limit 5`
+
+**Output**:
+
+- Stdout: per-instance trace + stage-wise breakdown table + alerts on
+  `patch_coverage < 0.95`.
+- `/tmp/diffctx_dump/`: `universe.txt`, `fragmented.txt`, `selected.txt`,
+  `candidates.txt`, `diffctx_scores.jsonl` (set via env vars
+  `DIFFCTX_DUMP_DIR`, `DIFFCTX_DUMP_SCORES`).
+
+**When to use**: a recall regression appears in the main eval; pick a
+failing instance ID and run forensic to see at which pipeline stage
+the gold file disappeared.
+
+### `loo_swebench.py` — leave-one-out robustness
+
+**Purpose**: hide one file from the ground truth, run diffctx, check
+whether it appears in the selected set. Plus a distractor check (random
+file with same suffix) for false-positive rate.
+
+**Args**:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--limit` | 50 | Instances |
+| `--budget` | 16000 | Token budget |
+| `--seed` / `--seeds` | 42 | RNG |
+| `--dataset` | `Contextbench/ContextBench` | HF path |
+| `--split` | `contextbench_verified` | HF config |
+| `--scoring` | `ego` | Mode |
+| `--timeout` | 300s | Per-instance timeout |
+
+**Filtering**: only multi-file patches; mechanical / vendor /
+generated paths excluded.
+
+**Metrics per trial**: `found` (hidden file recovered), `found_distractor`
+(false positive), `n_patch_files`, `n_remaining`, `n_selected`.
+
+**Output**: `results/loo_{scoring}_n{limit}_b{budget}[_s{seed}].json` +
+stdout: per-repo / per-language % found.
+
+### `budget_curve.py` — budget × mode sweep
+
+**Purpose**: how does recall scale with token budget?
+
+**Args**: `--limit` (default 50).
+
+**Sweep**:
+
+- Budgets: `[8000, 16000, 32000, 64000, 999999]`
+- Modes: `[hybrid, ppr, ego]`
+
+**Workflow**: spawns one `python -m benchmarks cb` subprocess per
+(budget, mode) pair, skips configs whose result file already exists,
+then aggregates into one curve.
+
+**Output**: `results/curve.json` with per-mode list of
+`{budget, n, nontrivial_file_recall, file_recall, line_recall}`.
+
+### `aggregate_seeds.py` — multi-seed mean ± std
+
+**Purpose**: combine per-seed JSON files into cross-seed statistics.
+
+**Invocation**: `python -m benchmarks aggregate file1.json file2.json …`
+
+**Metrics aggregated**: `file_recall`, `file_precision`,
+`nontrivial_file_recall`, `line_recall`, `line_recall_nontrivial`.
+
+**Output**: stdout — per-seed line + cross-seed `mean ± stdev` row.
+
+### `compare_runs.py` — paired A/B test
+
+**Purpose**: statistical test between two result sets (e.g. before/after
+a tuning change).
+
+**Invocation**: `python benchmarks/compare_runs.py <after.json> <before.json>`
+
+**Statistics**:
+
+- Bootstrap 95% CI per metric per group (n_iter=10000).
+- Paired bootstrap delta with p-value.
+- Wilcoxon signed-rank test (`scipy.stats.wilcoxon`).
+
+**Output**: stdout table —
+`metric | before CI | after CI | delta CI | p_boot | p_wilc`.
+
+### `stats.py` — statistics helpers
+
+Library, not a script. Used by `compare_runs.py` and others.
+
+| Function | Returns |
+|---|---|
+| `bootstrap_ci(values, n_iter=10000, alpha=0.05, seed=42)` | `(mean, lo, hi)` |
+| `paired_bootstrap_delta(before, after, n_iter=10000, seed=42)` | `{delta_mean, ci_lo, ci_hi, p_value}` |
+| `wilcoxon_paired(before, after)` | `{statistic, p_value}` |
+
+### `common.py` — shared utilities
+
+Library used by every script.
+
+Highlights:
+
+- `repos_dir(...)`: cache directory resolver.
+- `ensure_repo(url, name, commit, target_dir)`: git worktree + checkout.
+- `apply_as_commit(...) / reset_to_parent(...)`: patch ↔ commit cycle.
+- `run_parallel(fn, args, WORKERS)`: thread-pool executor.
+- `save_results(results, tag, seed, budget, scoring, baseline)`:
+  uniform JSON writer to `results/`.
+- `warm_cache(instances)`: pre-clone + fetch all repos before parallel.
+- `WORKERS`: env var `BENCH_WORKERS` (default 11).
+
+## Orchestration scripts (`scripts/`)
+
+### `scripts/sweep_orchestrator.sh` — full sweep
+
+Runs the 12-config matrix (4 modes × 3 budgets) inside Docker with
+adaptive resource scaling. Skips configs whose result file already has
+≥550 ok runs. Tries two resource tiers if the first fails:
+`(workers=7, batch=20)` → `(workers=4, batch=12)`.
+
+**Env**: `BENCH_WORKERS`, `BENCH_BATCH_SIZE`.
+
+**Output**:
+
+- `results/cb_{mode}_n9999_b{budget}.json` — one per config.
+- `results/logs/sweep_orchestrator.log` — orchestration log.
+
+After all configs complete, calls `aggregate_sweep_report.py`.
+
+### `scripts/aggregate_sweep_report.py` — markdown summary
+
+Reads the 12 sweep result files; produces `results/SWEEP_REPORT.md`
+with sections:
+
+- Per-config summary (ok count, failure breakdown, metrics).
+- Head-to-head by budget (mode × budget recall matrix).
+- Budget impact per mode.
+- Per-language `nontrivial_file_recall` at `b=16000`.
+- Raw files index.
+
+### `scripts/sensitivity_check.py` — parameter sensitivity
+
+One-at-a-time perturbation of the 15 Group-C operational parameters.
+Pertubation factors `[0.50, 0.75, 1.25, 1.50]` → 61 runs total
+(1 baseline + 15 × 4).
+
+**Args**:
+
+| Flag | Default |
+|---|---|
+| `--diff` | `HEAD~5..HEAD` |
+| `--budget` | 4096 |
+| `--repo` | `.` |
+| `--params` | all 15 |
+
+**Output**: stdout table — `param | factor | value | tokens | Δ% | Jaccard`.
+
+**Limitation**: runs on a single diff (the local repo's HEAD~5..HEAD
+by default). Use as smoke test, not as ground truth for parameter
+optimization. For real calibration use ContextBench.
+
+## Output directory layout
+
+```text
+results/
+├── cb_{scoring}_n{limit}_b{budget}.json      # contextbench_diffctx
+├── cb_{scoring}_n{limit}_b{budget}_s{seed}.json   # multi-seed runs
+├── loo_{scoring}_n{limit}_b{budget}.json     # leave-one-out
+├── curve.json                                 # budget_curve aggregate
+├── SWEEP_REPORT.md                            # aggregated sweep report
+└── logs/
+    └── sweep_orchestrator.log
+```
+
+JSON record schema (per instance, abbreviated):
+
+```json
+{
+  "id": "<repo>__<sha>",
+  "status": "ok | clone_fail | timeout | error",
+  "language": "python",
+  "repo": "owner/name",
+  "elapsed_s": 12.3,
+  "fragment_count": 87,
+  "file_recall": 0.91,
+  "file_precision": 0.42,
+  "nontrivial_file_recall": 0.83,
+  "line_recall": 0.76,
+  "line_recall_nontrivial": 0.71
+}
+```
+
+## Reproducibility
+
+- **Seeds**: every script that shuffles takes `--seed` / `--seeds`. Default
+  42. Multi-seed runs append `_s{seed}` to the JSON filename.
+- **tiktoken**: pinned to `==0.12.0` in `pyproject.toml` and to `=0.6.0`
+  for `tiktoken-rs` in `diffctx/Cargo.toml`. Drift snapshot in
+  `tests/test_diffctx_invariants.py::test_tiktoken_o200k_base_encoding_is_pinned`.
+- **Determinism**: `tests/test_diffctx_invariants.py` locks byte-identical
+  output across runs and rayon thread counts.
+- **Worker counts**: `BENCH_WORKERS` (Python pool, default 11),
+  `RAYON_NUM_THREADS` (Rust pool — common.py sets to 1 by default to
+  avoid oversubscription with the Python pool).
+
+## Calibration vs evaluation split
+
+To prevent contamination between hyperparameter calibration (e.g.
+sweeping `tau`) and final paper numbers, **never share instances
+between the two phases**. Recommended split:
+
+| Phase | Dataset | Use |
+|---|---|---|
+| Calibration | `default` minus `verified` | parameter tuning |
+| Evaluation | `contextbench_verified` | paper figures |
+
+Concrete instance manifests live under `benchmarks/manifests/` (when
+present); both files are committed to git so the split is reproducible
+across runs and reviewers. The `verified` config is the
+ContextBench-team-curated holdout — using it as eval keeps the split
+under external authority rather than our own choice.
+
+For the 1D `tau` calibration specifically: 30–50 stratified instances
+from the calibration pool are sufficient (BO converges fast on a 1D
+continuous space). Verify on the full calibration set after best `tau`
+is found, then evaluate ONCE on the held-out `verified` set.
