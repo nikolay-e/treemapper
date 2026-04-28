@@ -295,6 +295,43 @@ JSON record schema (per instance, abbreviated):
   `RAYON_NUM_THREADS` (Rust pool — common.py sets to 1 by default to
   avoid oversubscription with the Python pool).
 
+## Multi-benchmark adapter layer
+
+`benchmarks/adapters/` normalizes heterogeneous benchmark sources behind a
+single `BenchmarkAdapter` interface, so calibration and evaluation can mix
+SWE-bench Lite, SWE-bench Verified, ContextBench, and (future) PolyBench /
+Multi-SWE-bench instances without per-source branching in the runner.
+
+| Module | Purpose |
+|---|---|
+| `adapters/base.py` | `GoldenFragment`, `BenchmarkInstance`, `EvalResult`, `BenchmarkAdapter` ABC |
+| `adapters/swebench.py` | `SWEBenchLiteAdapter`, `SWEBenchVerifiedAdapter` (princeton-nlp) |
+| `adapters/contextbench.py` | `ContextBenchAdapter(config="default" \| "contextbench_verified")` with fragment-level annotations |
+| `adapters/contamination.py` | `ContaminationDetector` — cross-benchmark dedup by `(repo, base_commit)` |
+
+**Why contamination matters**: ContextBench is built from SWE-bench Verified
+∪ PolyBench ∪ Multi-SWE-bench. Calibrating on ContextBench while testing on
+SWE-bench Verified is direct leakage. The detector indexes every adapter's
+instances by `(repo, base_commit)`, then `filter_calibration_pool(...)` drops
+any candidate that shares state with a held-out test instance.
+
+**Adapter contract**:
+
+```python
+class BenchmarkAdapter(ABC):
+    name: str
+    @abstractmethod
+    def dataset_revision(self) -> str: ...    # pinned for reproducibility
+    @abstractmethod
+    def _load_raw(self) -> Iterator[dict]: ...  # network I/O lives here
+    @abstractmethod
+    def _normalize(self, row) -> BenchmarkInstance | None: ...  # pure
+    def load(self) -> Iterator[BenchmarkInstance]: ...  # final
+```
+
+`load()` is pure normalization; tests stub `_load_raw()` with synthetic rows
+to verify field mapping without HF fetches (`tests/test_benchmark_adapters.py`).
+
 ## Calibration vs evaluation split
 
 To prevent contamination between hyperparameter calibration (e.g.
