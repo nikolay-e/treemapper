@@ -136,6 +136,66 @@ mod paper_claim_tests {
         }
     }
 
+    /// Tilde-utility under Boltzmann reweighting (paper §3, before greedy):
+    /// $\tilde{U}(C) = \sum_{f \in C} w(f) \cdot e^{-\beta |f|}$.
+    /// This must be modular — pure sum decomposition with no cross-term.
+    fn tilde_utility(set: &[usize], fragments: &[Fragment], rels: &[f64], beta: f64) -> f64 {
+        set.iter()
+            .map(|&i| rels[i] * (-beta * fragments[i].token_count as f64).exp())
+            .sum()
+    }
+
+    fn xorshift(state: &mut u64) -> u64 {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        *state
+    }
+
+    fn random_subset(n: usize, fraction: f64, rng: &mut u64) -> Vec<usize> {
+        (0..n)
+            .filter(|_| (xorshift(rng) % 1000) as f64 / 1000.0 < fraction)
+            .collect()
+    }
+
+    #[test]
+    fn claim_3a_boltzmann_reweighted_utility_is_modular() {
+        let fragments: Vec<Fragment> = (0..10)
+            .map(|i| frag(&format!("f_{i}"), 80 + i * 40))
+            .collect();
+        let rels: Vec<f64> = (0..10).map(|i| 0.2 + 0.07 * i as f64).collect();
+
+        let mut rng = 0xBADCAFE_u64;
+        for &beta in &[1e-4_f64, 1e-2, 0.1, 1.0, 10.0] {
+            for _ in 0..1000 {
+                let a = random_subset(10, 0.5, &mut rng);
+                let b = random_subset(10, 0.5, &mut rng);
+                let union: Vec<usize> = {
+                    let s: FxHashSet<usize> = a.iter().chain(b.iter()).copied().collect();
+                    let mut v: Vec<usize> = s.into_iter().collect();
+                    v.sort();
+                    v
+                };
+                let intersection: Vec<usize> = {
+                    let sa: FxHashSet<usize> = a.iter().copied().collect();
+                    let mut v: Vec<usize> = b.iter().copied().filter(|i| sa.contains(i)).collect();
+                    v.sort();
+                    v
+                };
+                let lhs = tilde_utility(&union, &fragments, &rels, beta);
+                let rhs = tilde_utility(&a, &fragments, &rels, beta)
+                    + tilde_utility(&b, &fragments, &rels, beta)
+                    - tilde_utility(&intersection, &fragments, &rels, beta);
+                assert!(
+                    (lhs - rhs).abs() < 1e-9,
+                    "Boltzmann tilde-utility not modular at β={beta}: \
+                     lhs={lhs}, rhs={rhs}, |Δ|={}",
+                    (lhs - rhs).abs()
+                );
+            }
+        }
+    }
+
     #[test]
     fn claim_8_boltzmann_cost_is_monotone_in_beta() {
         let fragments: Vec<Fragment> = (0..12)

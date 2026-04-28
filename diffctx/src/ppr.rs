@@ -322,6 +322,197 @@ mod tests {
         assert!(result[&center] > max_leaf, "Center must dominate leaves");
     }
 
+    /// Claim 7 (paper §4.4): hub suppression $w'_{uv} = w_{uv} / \ln(1 + \text{in\_deg}(v))$
+    /// reduces PPR mass concentration on hub nodes without removing them.
+    ///
+    /// Two graphs are compared:
+    ///   - Naive: a leaf-to-hub graph built directly via `Graph::add_edge`, no suppression.
+    ///   - Suppressed: same topology built via `build_graph` with non-exempt category,
+    ///     which triggers `apply_hub_suppression` for in-degree above the median.
+    ///
+    /// Expected: hub mass is materially reduced; non-hub mass is largely preserved.
+    #[test]
+    fn claim_7_hub_suppression_reduces_hub_mass_without_removal() {
+        use crate::graph::{EdgeCategory, build_graph};
+        use crate::types::{Fragment, FragmentKind};
+
+        let n_leaves = 20usize;
+        let hub = fid("hub.rs", 1, 10);
+        let leaves: Vec<FragmentId> = (0..n_leaves)
+            .map(|i| fid(&format!("leaf_{i}.rs"), 1, 10))
+            .collect();
+
+        let mut naive = Graph::new();
+        naive.add_node(hub.clone());
+        for leaf in &leaves {
+            naive.add_node(leaf.clone());
+            naive.add_edge(leaf.clone(), hub.clone(), 1.0);
+        }
+        for i in 0..n_leaves - 1 {
+            naive.add_edge(leaves[i].clone(), leaves[i + 1].clone(), 1.0);
+        }
+
+        let fragments: Vec<Fragment> = std::iter::once(hub.clone())
+            .chain(leaves.iter().cloned())
+            .map(|id| Fragment {
+                id,
+                kind: FragmentKind::Function,
+                content: Arc::from(""),
+                identifiers: FxHashSet::default(),
+                token_count: 100,
+                symbol_name: None,
+            })
+            .collect();
+        let mut edges: FxHashMap<(FragmentId, FragmentId), f64> = FxHashMap::default();
+        let mut categories: FxHashMap<(FragmentId, FragmentId), EdgeCategory> =
+            FxHashMap::default();
+        for leaf in &leaves {
+            edges.insert((leaf.clone(), hub.clone()), 1.0);
+            categories.insert((leaf.clone(), hub.clone()), EdgeCategory::Generic);
+        }
+        for i in 0..n_leaves - 1 {
+            edges.insert((leaves[i].clone(), leaves[i + 1].clone()), 1.0);
+            categories.insert(
+                (leaves[i].clone(), leaves[i + 1].clone()),
+                EdgeCategory::Generic,
+            );
+        }
+        let mut suppressed = build_graph(&fragments, edges, categories);
+
+        let seeds: FxHashSet<FragmentId> = leaves.iter().take(3).cloned().collect();
+        let alpha = 0.6;
+        let tol = 1e-8;
+        let blend = 1.0;
+
+        let r_naive = personalized_pagerank(&mut naive, &seeds, alpha, tol, blend, None);
+        let r_suppressed = personalized_pagerank(&mut suppressed, &seeds, alpha, tol, blend, None);
+
+        let hub_naive = r_naive.get(&hub).copied().unwrap_or(0.0);
+        let hub_suppressed = r_suppressed.get(&hub).copied().unwrap_or(0.0);
+
+        assert!(
+            hub_suppressed < hub_naive,
+            "Hub suppression did not reduce hub mass: naive={hub_naive}, suppressed={hub_suppressed}"
+        );
+        let reduction_ratio = hub_naive / hub_suppressed.max(1e-12);
+        assert!(
+            reduction_ratio >= 1.5,
+            "Hub suppression effect too small: only {reduction_ratio:.2}× reduction (want ≥1.5×)"
+        );
+
+        assert!(
+            hub_suppressed > 0.0,
+            "Hub mass should be reduced, not removed; got {hub_suppressed}"
+        );
+
+        let mut leaves_present_after = 0;
+        for leaf in &leaves {
+            if r_suppressed.get(leaf).copied().unwrap_or(0.0) > 0.0 {
+                leaves_present_after += 1;
+            }
+        }
+        assert!(
+            leaves_present_after >= leaves.len() / 2,
+            "Suppression should preserve most leaves in the result, only {leaves_present_after}/{} survived",
+            leaves.len()
+        );
+    }
+
+    /// Claim 10 (paper §4.4 hypothesis): PPR with $\alpha \in [0.5, 0.65]$ ranks nodes
+    /// similarly to ego-graph BFS scoring (hop-decay 1/(1+d)). Spearman rank correlation
+    /// of the two score vectors should be high on a connected graph.
+    #[test]
+    fn claim_10_ppr_and_ego_rankings_correlate_on_synthetic_graph() {
+        let mut g = Graph::new();
+        let nodes: Vec<FragmentId> = (0..30).map(|i| fid(&format!("n_{i}.rs"), 1, 10)).collect();
+        for n in &nodes {
+            g.add_node(n.clone());
+        }
+        let mut rng = 0xC0FFEE_u64;
+        let xorshift = |state: &mut u64| -> u64 {
+            *state ^= *state << 13;
+            *state ^= *state >> 7;
+            *state ^= *state << 17;
+            *state
+        };
+        for i in 0..nodes.len() {
+            for _ in 0..3 {
+                let j = (xorshift(&mut rng) as usize) % nodes.len();
+                if i != j {
+                    g.add_edge(nodes[i].clone(), nodes[j].clone(), 1.0);
+                }
+            }
+        }
+        for i in 0..nodes.len() {
+            let next = (i + 1) % nodes.len();
+            g.add_edge(nodes[i].clone(), nodes[next].clone(), 1.0);
+        }
+
+        let seeds: FxHashSet<FragmentId> = nodes.iter().take(2).cloned().collect();
+        let ppr_scores = personalized_pagerank(&mut g, &seeds, 0.6, 1e-8, 0.5, None);
+        let ego_scores = g.ego_graph(&seeds, 3);
+
+        let common: Vec<FragmentId> = nodes
+            .iter()
+            .filter(|n| ppr_scores.contains_key(n) && ego_scores.contains_key(n))
+            .cloned()
+            .collect();
+        assert!(
+            common.len() >= 10,
+            "Need ≥10 common ranked nodes, got {}",
+            common.len()
+        );
+
+        let ppr_v: Vec<f64> = common.iter().map(|n| ppr_scores[n]).collect();
+        let ego_v: Vec<f64> = common.iter().map(|n| ego_scores[n]).collect();
+
+        let rho = spearman_correlation(&ppr_v, &ego_v);
+        assert!(
+            rho > 0.3,
+            "PPR/EGO Spearman correlation too low: ρ={rho:.3} (paper hypothesizes high correlation, want > 0.3)"
+        );
+    }
+
+    fn rank(values: &[f64]) -> Vec<f64> {
+        let n = values.len();
+        let mut indexed: Vec<(usize, f64)> = values.iter().copied().enumerate().collect();
+        indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut ranks = vec![0.0_f64; n];
+        let mut i = 0;
+        while i < n {
+            let mut j = i;
+            while j + 1 < n && indexed[j + 1].1 == indexed[i].1 {
+                j += 1;
+            }
+            let avg_rank = ((i + j) as f64) / 2.0 + 1.0;
+            for k in i..=j {
+                ranks[indexed[k].0] = avg_rank;
+            }
+            i = j + 1;
+        }
+        ranks
+    }
+
+    fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
+        assert_eq!(x.len(), y.len());
+        let rx = rank(x);
+        let ry = rank(y);
+        let n = x.len() as f64;
+        let mean_x: f64 = rx.iter().sum::<f64>() / n;
+        let mean_y: f64 = ry.iter().sum::<f64>() / n;
+        let mut cov = 0.0;
+        let mut var_x = 0.0;
+        let mut var_y = 0.0;
+        for i in 0..rx.len() {
+            let dx = rx[i] - mean_x;
+            let dy = ry[i] - mean_y;
+            cov += dx * dy;
+            var_x += dx * dx;
+            var_y += dy * dy;
+        }
+        cov / (var_x.sqrt() * var_y.sqrt()).max(1e-12)
+    }
+
     /// Claim 6B (paper §4.4): personalized PageRank converges to the closed-form
     /// stationary distribution π = (1-α)(I - αM)^(-1) p, normalized to sum to 1.
     ///
