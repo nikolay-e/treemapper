@@ -133,6 +133,14 @@ def test_fraction_param_rejects_negative_falls_back_to_default(tmp_path, env_var
     )
 
 
+def test_release_profile_aborts_on_panic():
+    cargo_toml = (PROJECT_ROOT / "diffctx" / "Cargo.toml").read_text()
+    assert 'panic = "abort"' in cargo_toml, (
+        'diffctx/Cargo.toml release profile must set panic = "abort". '
+        "Removing it reintroduces UB on panic propagation across the PyO3 FFI boundary."
+    )
+
+
 def test_tiktoken_o200k_base_encoding_is_pinned():
     import tiktoken
 
