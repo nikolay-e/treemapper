@@ -133,6 +133,32 @@ def test_fraction_param_rejects_negative_falls_back_to_default(tmp_path, env_var
     )
 
 
+def test_unreachable_revision_raises_clear_error(tmp_path):
+    repo, _ = _make_diff_repo(tmp_path)
+    args = [".", "--diff", "1111111111111111111111111111111111111111..HEAD", "--budget", "1024"]
+    cmd = [sys.executable, "-m", "treemapper", *args]
+    env = {**dict(__import__("os").environ), "PYTHONPATH": str(SRC_DIR)}
+    result = subprocess.run(cmd, cwd=repo.path, env=env, capture_output=True, text=True, check=False)
+    assert result.returncode != 0, (
+        f"Unreachable revision must raise a non-zero exit, not silently empty. "
+        f"stdout={result.stdout[:200]} stderr={result.stderr[:200]}"
+    )
+
+
+def test_zero_commit_repo_raises_clear_error(tmp_path):
+    empty_repo = tmp_path / "empty_repo"
+    empty_repo.mkdir()
+    Pygit2Repo(empty_repo)
+    args = [".", "--diff", "HEAD~1..HEAD", "--budget", "1024"]
+    cmd = [sys.executable, "-m", "treemapper", *args]
+    env = {**dict(__import__("os").environ), "PYTHONPATH": str(SRC_DIR)}
+    result = subprocess.run(cmd, cwd=empty_repo, env=env, capture_output=True, text=True, check=False)
+    assert result.returncode != 0, (
+        f"Zero-commit repo must raise a non-zero exit, not silently empty. "
+        f"stdout={result.stdout[:200]} stderr={result.stderr[:200]}"
+    )
+
+
 def test_max_fragments_zero_falls_back_to_default(tmp_path):
     repo, diff_range = _make_diff_repo(tmp_path)
     args = [".", "--diff", diff_range, "--budget", "1024", "-f", "txt"]
