@@ -106,3 +106,24 @@ class TestGetDiffContext:
                 "get_diff_context",
                 {"repo_path": str(mcp_repo.path), "diff_range": "nonexistent_ref..HEAD"},
             )
+
+
+class TestPathTraversalContainment:
+    @pytest.mark.asyncio
+    async def test_get_file_context_glob_traversal_returns_only_contained_paths(self, server, mcp_repo):
+        outside_secret = mcp_repo.path.parent / "secret.txt"
+        outside_secret.write_text("SHOULD_NOT_LEAK\n")
+        result = await server.call_tool(
+            "get_file_context",
+            {"repo_path": str(mcp_repo.path), "patterns": ["../secret.txt"]},
+        )
+        text = _get_text(result)
+        assert "SHOULD_NOT_LEAK" not in text, "glob traversal escaped repo_path; M2 regression"
+
+    @pytest.mark.asyncio
+    async def test_get_tree_map_subdirectory_traversal_rejected(self, server, mcp_repo):
+        with pytest.raises((ToolError, ValueError), match=r"escapes|outside|not.*directory"):
+            await server.call_tool(
+                "get_tree_map",
+                {"repo_path": str(mcp_repo.path), "subdirectory": "../"},
+            )
