@@ -306,8 +306,11 @@ Multi-SWE-bench instances without per-source branching in the runner.
 |---|---|
 | `adapters/base.py` | `GoldenFragment`, `BenchmarkInstance`, `EvalResult`, `BenchmarkAdapter` ABC |
 | `adapters/swebench.py` | `SWEBenchLiteAdapter`, `SWEBenchVerifiedAdapter` (princeton-nlp) |
+| `adapters/polybench.py` | `PolyBenchAdapter`, `PolyBench500Adapter`, `PolyBenchVerifiedAdapter` (amazon-science, CST node-level annotations) |
+| `adapters/multi_swebench.py` | `MultiSWEBenchAdapter`, `MultiSWEBenchMiniAdapter`, `MultiSWEBenchFlashAdapter` (ByteDance, Java/TS/JS/Go/Rust/C/C++; language inferred from file extension when missing) |
 | `adapters/contextbench.py` | `ContextBenchAdapter(config="default" \| "contextbench_verified")` with fragment-level annotations |
 | `adapters/contamination.py` | `ContaminationDetector` — cross-benchmark dedup by `(repo, base_commit)` |
+| `adapters/evaluator.py` | `UniversalEvaluator`, `SelectionOutput` — file/fragment/line metrics, per-benchmark aggregation |
 
 **Why contamination matters**: ContextBench is built from SWE-bench Verified
 ∪ PolyBench ∪ Multi-SWE-bench. Calibrating on ContextBench while testing on
@@ -331,6 +334,43 @@ class BenchmarkAdapter(ABC):
 
 `load()` is pure normalization; tests stub `_load_raw()` with synthetic rows
 to verify field mapping without HF fetches (`tests/test_benchmark_adapters.py`).
+
+**Universal evaluator**:
+
+```python
+from benchmarks.adapters import UniversalEvaluator, SelectionOutput
+
+ev = UniversalEvaluator()
+result = ev.evaluate(
+    instance,
+    SelectionOutput(
+        selected_files=frozenset(selected_paths),
+        selected_fragments=tuple_of_GoldenFragment,  # optional
+        used_tokens=N,
+        elapsed_seconds=t,
+    ),
+    budget=8000,
+)
+# result.file_recall, result.file_precision   — always
+# result.fragment_recall, .fragment_precision — when gold_fragments present
+# result.line_f1                              — line-set F1 averaged over files
+```
+
+`ev.aggregate_per_benchmark(results)` groups by `source_benchmark`. The
+calibration objective is `min(per_benchmark_recall)` — generalization-friendly,
+prevents one large benchmark from dominating the global mean.
+
+**Pinned revisions** (override per adapter via `revision=` kwarg before any
+calibration run; current default is `"main"` which is NOT bit-for-bit
+reproducible across upstream pushes):
+
+| Adapter | HF path |
+|---|---|
+| `SWEBenchLiteAdapter` | `princeton-nlp/SWE-bench_Lite` |
+| `SWEBenchVerifiedAdapter` | `princeton-nlp/SWE-bench_Verified` |
+| `PolyBench{,500,Verified}Adapter` | `AmazonScience/SWE-PolyBench` (configs: `default`, `polybench500`, `verified`) |
+| `MultiSWEBench{,Mini,Flash}Adapter` | `bytedance-research/Multi-SWE-bench` (configs: `default`, `mini`, `flash`) |
+| `ContextBenchAdapter` | `Contextbench/ContextBench` (configs: `default`, `contextbench_verified`) |
 
 ## Calibration vs evaluation split
 

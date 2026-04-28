@@ -10,8 +10,12 @@ from benchmarks.adapters import (
     ContaminationDetector,
     ContextBenchAdapter,
     GoldenFragment,
+    MultiSWEBenchMiniAdapter,
+    PolyBenchVerifiedAdapter,
+    SelectionOutput,
     SWEBenchLiteAdapter,
     SWEBenchVerifiedAdapter,
+    UniversalEvaluator,
 )
 
 _SAMPLE_PATCH = """\
@@ -197,6 +201,187 @@ def test_eval_result_dataclass_carries_optional_fragment_metrics():
     assert r.fragment_recall is None
     assert r.line_f1 is None
     assert r.elapsed_seconds == 0.0
+
+
+class _StubPolyBenchAdapter(PolyBenchVerifiedAdapter):
+    def __init__(self, rows: list[dict]) -> None:
+        self._rows = rows
+
+    def _load_raw(self):
+        yield from self._rows
+
+
+class _StubMultiAdapter(MultiSWEBenchMiniAdapter):
+    def __init__(self, rows: list[dict]) -> None:
+        self._rows = rows
+
+    def _load_raw(self):
+        yield from self._rows
+
+
+def test_polybench_extracts_cst_node_fragments():
+    row = {
+        "instance_id": "pb-001",
+        "repo": "owner/javasrv",
+        "base_commit": "1" * 40,
+        "patch": _SAMPLE_PATCH,
+        "language": "Java",
+        "gold_nodes": [
+            {"file": "src/auth.py", "start_line": 10, "end_line": 20, "node_type": "method"},
+            {"file": "src/Helper.java", "start_line": 5, "end_line": 50, "node_type": "class"},
+        ],
+    }
+    adapter = _StubPolyBenchAdapter([row])
+    inst = next(iter(adapter.load()))
+    assert inst.source_benchmark == "polybench_verified"
+    assert inst.language == "java"
+    assert inst.gold_fragments is not None
+    assert len(inst.gold_fragments) == 2
+    assert inst.gold_fragments[1].kind == "class"
+    assert "src/Helper.java" in inst.gold_files
+
+
+def test_polybench_tolerates_json_string_or_missing_cst():
+    row = {
+        "instance_id": "pb-002",
+        "repo": "owner/x",
+        "base_commit": "2" * 40,
+        "patch": _SAMPLE_PATCH,
+        "language": "python",
+    }
+    adapter = _StubPolyBenchAdapter([row])
+    inst = next(iter(adapter.load()))
+    assert inst.gold_fragments is None
+
+
+def test_multi_swebench_infers_language_from_file_extensions():
+    rust_patch = (
+        "diff --git a/src/lib.rs b/src/lib.rs\n"
+        "--- a/src/lib.rs\n"
+        "+++ b/src/lib.rs\n"
+        "@@ -1,1 +1,2 @@\n pub fn x() {}\n+pub fn y() {}\n"
+    )
+    row = {
+        "instance_id": "msb-rust-1",
+        "repo": "owner/rustcrate",
+        "base_commit": "3" * 40,
+        "patch": rust_patch,
+    }
+    adapter = _StubMultiAdapter([row])
+    inst = next(iter(adapter.load()))
+    assert inst.language == "rust"
+
+
+def test_multi_swebench_explicit_language_wins_over_inference():
+    row = {
+        "instance_id": "msb-go-1",
+        "repo": "owner/x",
+        "base_commit": "4" * 40,
+        "patch": _SAMPLE_PATCH,  # python files
+        "language": "Go",
+    }
+    adapter = _StubMultiAdapter([row])
+    inst = next(iter(adapter.load()))
+    assert inst.language == "go"
+
+
+def test_evaluator_file_metrics_only_when_no_gold_fragments():
+    inst = BenchmarkInstance(
+        instance_id="x::1",
+        source_benchmark="x",
+        repo="o/r",
+        base_commit="abc",
+        gold_patch="",
+        gold_files=frozenset({"a.py", "b.py"}),
+        language="python",
+    )
+    output = SelectionOutput(selected_files=frozenset({"a.py", "c.py"}))
+    result = UniversalEvaluator().evaluate(inst, output, budget=8000)
+    assert result.file_recall == 0.5
+    assert result.file_precision == 0.5
+    assert result.fragment_recall is None
+    assert result.line_f1 is None
+
+
+def test_evaluator_fragment_recall_counts_overlapping_lines():
+    gold = (
+        GoldenFragment(path="src/auth.py", start_line=10, end_line=20),
+        GoldenFragment(path="src/auth.py", start_line=30, end_line=40),
+        GoldenFragment(path="src/utils.py", start_line=1, end_line=5),
+    )
+    selected = (
+        GoldenFragment(path="src/auth.py", start_line=15, end_line=25),  # hits gold[0]
+        GoldenFragment(path="src/auth.py", start_line=100, end_line=110),  # no overlap
+        GoldenFragment(path="src/utils.py", start_line=1, end_line=10),  # hits gold[2]
+    )
+    inst = BenchmarkInstance(
+        instance_id="x::1",
+        source_benchmark="x",
+        repo="o/r",
+        base_commit="abc",
+        gold_patch="",
+        gold_files=frozenset({"src/auth.py", "src/utils.py"}),
+        language="python",
+        gold_fragments=gold,
+    )
+    output = SelectionOutput(
+        selected_files=frozenset({"src/auth.py", "src/utils.py"}),
+        selected_fragments=selected,
+    )
+    result = UniversalEvaluator().evaluate(inst, output, budget=8000)
+    assert result.fragment_recall == pytest.approx(2 / 3)  # 2 of 3 gold fragments hit
+    assert result.fragment_precision == pytest.approx(2 / 3)  # 2 of 3 selected hit gold
+    assert result.line_f1 is not None
+    assert 0 < result.line_f1 < 1
+
+
+def test_evaluator_whole_file_gold_satisfied_by_any_selection_on_path():
+    gold = (GoldenFragment(path="README.md", start_line=None, end_line=None, kind="file"),)
+    selected = (GoldenFragment(path="README.md", start_line=1, end_line=10),)
+    inst = BenchmarkInstance(
+        instance_id="x::1",
+        source_benchmark="x",
+        repo="o/r",
+        base_commit="abc",
+        gold_patch="",
+        gold_files=frozenset({"README.md"}),
+        language="markdown",
+        gold_fragments=gold,
+    )
+    output = SelectionOutput(selected_files=frozenset({"README.md"}), selected_fragments=selected)
+    result = UniversalEvaluator().evaluate(inst, output, budget=8000)
+    assert result.fragment_recall == 1.0
+
+
+def test_evaluator_aggregate_per_benchmark_separates_by_source():
+    inst_a = BenchmarkInstance(
+        instance_id="a::1",
+        source_benchmark="a",
+        repo="o/r",
+        base_commit="x",
+        gold_patch="",
+        gold_files=frozenset({"f.py"}),
+        language="python",
+    )
+    inst_b = BenchmarkInstance(
+        instance_id="b::1",
+        source_benchmark="b",
+        repo="o/r",
+        base_commit="x",
+        gold_patch="",
+        gold_files=frozenset({"f.py"}),
+        language="python",
+    )
+    output_hit = SelectionOutput(selected_files=frozenset({"f.py"}))
+    output_miss = SelectionOutput(selected_files=frozenset({"other.py"}))
+    ev = UniversalEvaluator()
+    results = [
+        ev.evaluate(inst_a, output_hit, 8000),
+        ev.evaluate(inst_b, output_miss, 8000),
+    ]
+    agg = ev.aggregate_per_benchmark(results)
+    assert agg["a"]["file_recall"] == 1.0
+    assert agg["b"]["file_recall"] == 0.0
 
 
 def test_benchmark_instance_is_immutable():
