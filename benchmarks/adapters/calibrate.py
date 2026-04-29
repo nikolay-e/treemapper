@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from benchmarks.adapters.base import BenchmarkInstance, EvalResult
 from benchmarks.adapters.evaluator import UniversalEvaluator
@@ -64,17 +65,32 @@ def evaluate_grid(
     eval_fn: EvalFn,
     workers: int = 1,
     on_trial: TrialCallback | None = None,
+    timeout_per_instance: float = 300.0,
+    checkpoint_dir: Path | None = None,
 ) -> list[TrialResult]:
     """Run every grid point, return per-trial aggregates.
 
     `on_trial(idx, total, trial)` fires after each completed trial — the CLI
     uses it for progress logging without coupling the pure logic to stdout.
+
+    `checkpoint_dir`, when set, gets one JSONL per trial named after
+    `params.label()`; restarting the sweep skips instances already recorded
+    inside each trial's checkpoint.
     """
     evaluator = UniversalEvaluator()
     points = list(spec.points())
     out: list[TrialResult] = []
     for i, params in enumerate(points):
-        results = run_eval_set(instances, eval_fn, params, workers=workers)
+        ckpt = (checkpoint_dir / f"{params.label()}.jsonl") if checkpoint_dir is not None else None
+        results = run_eval_set(
+            instances,
+            eval_fn,
+            params,
+            workers=workers,
+            timeout_per_instance=timeout_per_instance,
+            resume_from=ckpt,
+            checkpoint_path=ckpt,
+        )
         agg = evaluator.aggregate_per_benchmark(results)
         trial = TrialResult(params=params, per_benchmark=agg, raw_results=tuple(results))
         out.append(trial)

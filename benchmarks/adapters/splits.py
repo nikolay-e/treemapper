@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import random
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -141,6 +142,12 @@ def render_split_report(config: SplitConfig, result: SplitResult, today: str = "
         lines.append(f"Generated: {today}")
     lines.append(f"Random seed: {config.seed}")
     lines.append(f"Validation fraction: {config.validation_fraction}")
+    lines.append(f"Platform: {platform.machine()} ({platform.system()} {platform.release()})")
+    lines.append(
+        "Note: arm64 is the canonical platform for diffctx benchmarks on this "
+        "project — Rosetta'd amd64 on Apple Silicon is ~25% slower for a "
+        "sub-precision float-determinism win the paper does not require."
+    )
     lines.append("")
     lines.append("## Totals")
     lines.append("")

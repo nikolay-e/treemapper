@@ -231,6 +231,89 @@ def test_aggregate_by_language_groups_using_extra_field():
     assert agg["java"]["n"] == 1.0
 
 
+def test_run_eval_set_resume_from_skips_already_recorded(tmp_path: Path):
+    instances = [_inst("a", i) for i in range(5)]
+    params = RunParams()
+    ckpt = tmp_path / "ckpt.jsonl"
+    # Pre-populate checkpoint with two completed IDs.
+    pre = run_eval_set(instances[:2], _stub_eval_fn, params, workers=1, checkpoint_path=ckpt)
+    assert len(pre) == 2
+    # Resume — only the last 3 should run.
+    rest = run_eval_set(instances, _stub_eval_fn, params, workers=1, resume_from=ckpt, checkpoint_path=ckpt)
+    assert len(rest) == 3
+    assert {r.instance_id for r in rest} == {"a::2", "a::3", "a::4"}
+
+
+def test_run_eval_set_records_timeout_when_eval_fn_hangs(tmp_path: Path):
+    import time as _time
+
+    def _slow_eval(instance, params):
+        _time.sleep(2)
+        return EvalResult(
+            instance_id=instance.instance_id,
+            source_benchmark=instance.source_benchmark,
+            file_recall=1.0,
+            file_precision=1.0,
+        )
+
+    instances = [_inst("a", i) for i in range(2)]
+    params = RunParams()
+    results = run_eval_set(instances, _slow_eval, params, workers=2, timeout_per_instance=0.05)
+    statuses = {r.extra.get("status") for r in results}
+    assert statuses == {"timeout"}, f"expected only timeouts, got {statuses}"
+
+
+def test_run_eval_set_serial_records_exception_as_error(tmp_path: Path):
+    def _broken(instance, params):
+        raise RuntimeError("synthetic failure")
+
+    results = run_eval_set([_inst("a", 1)], _broken, RunParams(), workers=1)
+    assert len(results) == 1
+    assert results[0].extra["status"] == "error"
+    assert "synthetic failure" in results[0].extra["error"]
+
+
+def test_runtime_probe_warns_on_low_disk(tmp_path: Path):
+    from benchmarks.adapters.runtime_probe import probe_resources
+
+    msgs = probe_resources(min_memory_gb=0.001, repos_dir=tmp_path, min_disk_gb=10**9)
+    severities = [m.severity for m in msgs]
+    assert "warn" in severities, f"expected a warn-level message, got {[(m.severity, m.message) for m in msgs]}"
+
+
+def test_runtime_probe_skips_memory_check_off_linux(monkeypatch):
+    from benchmarks.adapters import runtime_probe
+
+    # Force the path to a definitely-missing file.
+    monkeypatch.setattr(runtime_probe, "Path", lambda p: __import__("pathlib").Path("/nonexistent/proc/meminfo"))
+    msgs = runtime_probe.probe_resources(min_memory_gb=999.0)
+    assert any(m.severity == "info" and "skipping" in m.message for m in msgs)
+
+
+def test_render_split_report_includes_platform():
+    from benchmarks.adapters.splits import SplitConfig, build_splits, render_split_report
+
+    class _Empty(BenchmarkAdapter):
+        name = "empty"
+
+        def dataset_revision(self):
+            return "stub://empty"
+
+        def _load_raw(self):
+            return iter(())
+
+        def _normalize(self, row):
+            return None
+
+        def load(self):
+            yield from ()
+
+    cfg = SplitConfig(test_only_adapters=(_Empty(),), calibration_pool_adapters=(), validation_fraction=0.1)
+    report = render_split_report(cfg, build_splits(cfg), today="2026-04-29")
+    assert "Platform:" in report
+    assert "arm64" in report.lower() or "x86" in report.lower() or "platform:" in report.lower()
+
+
 def test_render_language_table_orders_by_count_desc():
     agg = {
         "python": {"n": 100.0, "file_recall": 0.7, "file_precision": 0.5},

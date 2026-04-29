@@ -25,6 +25,7 @@ from benchmarks.adapters.final_eval import (
     render_paper_table,
 )
 from benchmarks.adapters.runner import RunParams, filter_instances_by_manifest, read_manifest, run_eval_set
+from benchmarks.adapters.runtime_probe import probe_resources, report_and_maybe_exit
 from benchmarks.build_splits import default_calibration_pool_adapters, default_test_adapters
 from benchmarks.common import repos_dir as default_repos_dir
 from benchmarks.diffctx_eval_fn import make_diffctx_eval_fn
@@ -48,7 +49,13 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--repos-dir", type=Path, default=None)
+    p.add_argument("--timeout-per-instance", type=float, default=300.0)
+    p.add_argument("--min-memory-gb", type=float, default=16.0)
+    p.add_argument("--min-disk-gb", type=float, default=50.0)
     args = p.parse_args()
+
+    repo_root = args.repos_dir or default_repos_dir()
+    report_and_maybe_exit(probe_resources(min_memory_gb=args.min_memory_gb, repos_dir=repo_root, min_disk_gb=args.min_disk_gb))
 
     params = _load_winner(args.winner)
     print(f"Final params: τ={params.tau} cbf={params.core_budget_fraction} budget={params.budget}")
@@ -59,7 +66,6 @@ def main() -> int:
         return 1
 
     adapters = default_test_adapters() + default_calibration_pool_adapters()
-    repo_root = args.repos_dir or default_repos_dir()
     eval_fn = make_diffctx_eval_fn(repo_root)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -70,7 +76,16 @@ def main() -> int:
         ids = read_manifest(manifest_path)
         instances = [i for i in filter_instances_by_manifest(adapters, ids) if i.source_benchmark == name]
         print(f"\n[{name}] {len(instances)} instances")
-        results = run_eval_set(instances, eval_fn, params, workers=args.workers)
+        ckpt = args.out / f"{name}.checkpoint.jsonl"
+        results = run_eval_set(
+            instances,
+            eval_fn,
+            params,
+            workers=args.workers,
+            timeout_per_instance=args.timeout_per_instance,
+            resume_from=ckpt,
+            checkpoint_path=ckpt,
+        )
         for r in results:
             r.extra.setdefault("benchmark_manifest", name)
         all_results.extend(results)

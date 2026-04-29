@@ -18,6 +18,7 @@ from pathlib import Path
 
 from benchmarks.adapters import BenchmarkAdapter
 from benchmarks.adapters.runner import RunParams, filter_instances_by_manifest, read_manifest, run_eval_set
+from benchmarks.adapters.runtime_probe import probe_resources, report_and_maybe_exit
 from benchmarks.build_splits import default_calibration_pool_adapters, default_test_adapters
 from benchmarks.common import repos_dir as default_repos_dir
 from benchmarks.diffctx_eval_fn import make_diffctx_eval_fn
@@ -42,7 +43,15 @@ def main() -> int:
         default=None,
         help="Where to cache cloned repositories (default: $CB_REPOS_DIR or ~/.cache/contextbench_repos)",
     )
+    p.add_argument("--timeout-per-instance", type=float, default=300.0)
+    p.add_argument("--resume-from", type=Path, default=None, help="Skip instance_ids in this JSONL checkpoint.")
+    p.add_argument("--checkpoint", type=Path, default=None, help="Append each result to this JSONL as it completes.")
+    p.add_argument("--min-memory-gb", type=float, default=16.0, help="Pre-flight memory probe threshold.")
+    p.add_argument("--min-disk-gb", type=float, default=50.0, help="Pre-flight disk probe threshold for repos cache.")
     args = p.parse_args()
+
+    repo_root = args.repos_dir or default_repos_dir()
+    report_and_maybe_exit(probe_resources(min_memory_gb=args.min_memory_gb, repos_dir=repo_root, min_disk_gb=args.min_disk_gb))
 
     manifest_ids = read_manifest(args.manifest)
     print(f"Manifest: {args.manifest} → {len(manifest_ids)} instance_ids")
@@ -62,9 +71,16 @@ def main() -> int:
     )
     print(f"Params: {params.label()}")
 
-    repo_root = args.repos_dir or default_repos_dir()
     eval_fn = make_diffctx_eval_fn(repo_root)
-    results = run_eval_set(instances, eval_fn, params, workers=args.workers)
+    results = run_eval_set(
+        instances,
+        eval_fn,
+        params,
+        workers=args.workers,
+        timeout_per_instance=args.timeout_per_instance,
+        resume_from=args.resume_from,
+        checkpoint_path=args.checkpoint,
+    )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     payload = {

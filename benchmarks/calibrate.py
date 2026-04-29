@@ -20,6 +20,7 @@ from pathlib import Path
 
 from benchmarks.adapters.calibrate import GridSpec, evaluate_grid, render_grid_report, top_k_trials
 from benchmarks.adapters.runner import filter_instances_by_manifest, read_manifest
+from benchmarks.adapters.runtime_probe import probe_resources, report_and_maybe_exit
 from benchmarks.build_splits import default_calibration_pool_adapters, default_test_adapters
 from benchmarks.common import repos_dir as default_repos_dir
 from benchmarks.diffctx_eval_fn import make_diffctx_eval_fn
@@ -44,7 +45,13 @@ def main() -> int:
     p.add_argument("--top-k", type=int, default=3)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--repos-dir", type=Path, default=None)
+    p.add_argument("--timeout-per-instance", type=float, default=300.0)
+    p.add_argument("--min-memory-gb", type=float, default=16.0)
+    p.add_argument("--min-disk-gb", type=float, default=50.0)
     args = p.parse_args()
+
+    repo_root = args.repos_dir or default_repos_dir()
+    report_and_maybe_exit(probe_resources(min_memory_gb=args.min_memory_gb, repos_dir=repo_root, min_disk_gb=args.min_disk_gb))
 
     spec = GridSpec(
         tau_values=_parse_floats(args.tau),
@@ -59,8 +66,9 @@ def main() -> int:
     instances = list(filter_instances_by_manifest(adapters, manifest_ids))
     print(f"Resolved {len(instances)} / {len(manifest_ids)} instances")
 
-    repo_root = args.repos_dir or default_repos_dir()
     eval_fn = make_diffctx_eval_fn(repo_root)
+    args.out.mkdir(parents=True, exist_ok=True)
+    checkpoint_dir = args.out / "checkpoints"
 
     def _on_trial(idx: int, total: int, trial) -> None:
         print(
@@ -69,9 +77,16 @@ def main() -> int:
             f"min(per_benchmark file_recall) = {trial.score:.4f}"
         )
 
-    trials = evaluate_grid(spec, instances, eval_fn, workers=args.workers, on_trial=_on_trial)
+    trials = evaluate_grid(
+        spec,
+        instances,
+        eval_fn,
+        workers=args.workers,
+        on_trial=_on_trial,
+        timeout_per_instance=args.timeout_per_instance,
+        checkpoint_dir=checkpoint_dir,
+    )
 
-    args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "grid_report.md").write_text(render_grid_report(trials))
     payload = {
         "manifest": str(args.manifest),

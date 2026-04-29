@@ -295,6 +295,50 @@ JSON record schema (per instance, abbreviated):
   `RAYON_NUM_THREADS` (Rust pool — common.py sets to 1 by default to
   avoid oversubscription with the Python pool).
 
+## Pre-flight & resilience
+
+Every CLI runner (`run_eval`, `calibrate`, `select_final`, `run_final_eval`)
+performs a pre-flight check before submitting any work:
+
+- **Memory probe**: reads `/proc/meminfo` (Linux only — silent on macOS).
+  Exits with code 2 if visible memory is below `--min-memory-gb` (default
+  16 GB). Closes the macOS Docker Desktop "VM defaults to 8 GB" footgun.
+- **Disk probe**: warns (does not exit) when the repos volume has less
+  than `--min-disk-gb` (default 50 GB). SWE-bench `transformers` alone is
+  ~4 GB; calibration touches 10-20 distinct repos.
+
+`runner.run_eval_set` exposes three resilience knobs threaded through every
+sweep CLI:
+
+| Flag | Behaviour |
+|---|---|
+| `--timeout-per-instance N` | Records `status="timeout"` for any future that does not return within N seconds. Hung worker threads are abandoned at pool shutdown (Python cannot kill threads safely). |
+| `--resume-from FILE.jsonl` | Skips instance_ids already present in the JSONL checkpoint — restart after a crash continues where it left off. |
+| `--checkpoint FILE.jsonl` | Appends each completed result to the JSONL as it arrives, so a crash mid-sweep loses at most one in-flight result. |
+
+`calibrate` uses one checkpoint per grid cell at `<out>/checkpoints/<label>.jsonl`;
+`run_final_eval` uses one per test set at `<out>/<benchmark>.checkpoint.jsonl`.
+
+## Canonical platform
+
+**arm64** is canonical for both development and the paper artifact on this
+project. Float-determinism deltas across arm64 / amd64 are below paper-reported
+precision (3 sig figs); Rosetta'd amd64 on Apple Silicon is ~25% slower for
+no scientifically defensible win. `SPLIT_REPORT.md` records `platform.machine()`
+on the build host so any reviewer can verify the platform of the pinned
+manifests.
+
+## Reproducibility stack
+
+| Layer | What pins it |
+|---|---|
+| Rust toolchain | `rust-toolchain.toml` (`channel = "1.92.0"`) |
+| Cargo deps | `diffctx/Cargo.lock` (committed) |
+| Python deps | `requirements-bench.lock` from `uv pip compile`; install with `pip install --require-hashes -r requirements-bench.lock` (committed) |
+| HuggingFace datasets | `benchmarks/dataset_revisions.json` from `python -m benchmarks.pin_revisions` (committed) |
+| tiktoken BPE | `tiktoken==0.12.0` + `tiktoken-rs=0.6.0` exact-pinned; drift snapshot test `test_tiktoken_o200k_base_encoding_is_pinned` |
+| Build determinism | NOT bit-for-bit — Rust release builds carry HashMap ordering non-determinism per `cargo#16693`. Documented limitation; reviewers don't ask for byte-identical `.so`. |
+
 ## Multi-benchmark adapter layer
 
 `benchmarks/adapters/` normalizes heterogeneous benchmark sources behind a

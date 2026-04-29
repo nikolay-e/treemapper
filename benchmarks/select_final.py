@@ -20,6 +20,7 @@ from pathlib import Path
 from benchmarks.adapters.calibrate import TrialResult, top_k_trials
 from benchmarks.adapters.evaluator import UniversalEvaluator
 from benchmarks.adapters.runner import RunParams, filter_instances_by_manifest, read_manifest, run_eval_set
+from benchmarks.adapters.runtime_probe import probe_resources, report_and_maybe_exit
 from benchmarks.build_splits import default_calibration_pool_adapters, default_test_adapters
 from benchmarks.common import repos_dir as default_repos_dir
 from benchmarks.diffctx_eval_fn import make_diffctx_eval_fn
@@ -47,7 +48,14 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--repos-dir", type=Path, default=None)
+    p.add_argument("--timeout-per-instance", type=float, default=300.0)
+    p.add_argument("--min-memory-gb", type=float, default=16.0)
+    p.add_argument("--min-disk-gb", type=float, default=50.0)
+    p.add_argument("--checkpoint-dir", type=Path, default=None)
     args = p.parse_args()
+
+    repo_root = args.repos_dir or default_repos_dir()
+    report_and_maybe_exit(probe_resources(min_memory_gb=args.min_memory_gb, repos_dir=repo_root, min_disk_gb=args.min_disk_gb))
 
     candidates = _load_candidates(args.candidates)
     print(f"Re-evaluating {len(candidates)} candidates on {args.manifest}")
@@ -57,13 +65,21 @@ def main() -> int:
     instances = list(filter_instances_by_manifest(adapters, manifest_ids))
     print(f"Validation set: {len(instances)} instances")
 
-    repo_root = args.repos_dir or default_repos_dir()
     eval_fn = make_diffctx_eval_fn(repo_root)
     evaluator = UniversalEvaluator()
 
     trials: list[TrialResult] = []
     for params in candidates:
-        results = run_eval_set(instances, eval_fn, params, workers=args.workers)
+        ckpt = (args.checkpoint_dir / f"{params.label()}.jsonl") if args.checkpoint_dir else None
+        results = run_eval_set(
+            instances,
+            eval_fn,
+            params,
+            workers=args.workers,
+            timeout_per_instance=args.timeout_per_instance,
+            resume_from=ckpt,
+            checkpoint_path=ckpt,
+        )
         agg = evaluator.aggregate_per_benchmark(results)
         trial = TrialResult(params=params, per_benchmark=agg, raw_results=tuple(results))
         print(f"τ={params.tau} cbf={params.core_budget_fraction} → score={trial.score:.4f}")
