@@ -360,9 +360,23 @@ result = ev.evaluate(
 calibration objective is `min(per_benchmark_recall)` — generalization-friendly,
 prevents one large benchmark from dominating the global mean.
 
-**Pinned revisions** (override per adapter via `revision=` kwarg before any
-calibration run; current default is `"main"` which is NOT bit-for-bit
-reproducible across upstream pushes):
+**Pinning workflow** (mandatory before any calibration sweep):
+
+```bash
+python -m benchmarks.pin_revisions   # writes benchmarks/dataset_revisions.json
+git add benchmarks/dataset_revisions.json
+git commit -m "chore(benchmarks): pin dataset revisions for v1"
+```
+
+Resolution order in `adapters/dataset_pins.py::resolve_revision`:
+
+1. `BENCH_REVISION_<HF_PATH_UPPER_SAFE>` env var (one-off override)
+2. `benchmarks/dataset_revisions.json` (committed pin file)
+3. `default="main"` (development only, NOT reproducible)
+
+Each adapter takes an optional `revision="..."` kwarg that wins over both.
+
+**Pinned revisions** (canonical HF paths registered with `dataset_pins`):
 
 | Adapter | HF path |
 |---|---|

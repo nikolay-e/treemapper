@@ -68,6 +68,11 @@ def main() -> int:
     )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--validation-fraction", type=float, default=0.10)
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Compute split + print SPLIT_REPORT.md to stdout, do NOT write manifests.",
+    )
     args = p.parse_args()
 
     config = SplitConfig(
@@ -82,17 +87,24 @@ def main() -> int:
     print()
 
     result = build_splits(config)
-    written = write_manifests(result, args.out)
     today = dt.date.today().isoformat()
     report = render_split_report(config, result, today=today)
-    report_path = args.out / "SPLIT_REPORT.md"
-    report_path.write_text(report)
 
     print(f"Test     : {result.stats.test_total:>5d}")
     print(f"Validation: {result.stats.validation_total:>5d}")
     print(f"Calibration: {result.stats.calibration_total:>5d}")
     print(f"Dropped (contamination): {result.stats.pool_dropped_by_contamination:>5d}")
     print()
+
+    if args.dry_run:
+        print("=== SPLIT_REPORT.md (dry-run, NOT written) ===\n")
+        print(report)
+        print("\n--dry-run: no manifests written. Re-run without the flag to freeze.")
+        return 0
+
+    written = write_manifests(result, args.out)
+    report_path = args.out / "SPLIT_REPORT.md"
+    report_path.write_text(report)
     print(f"Manifests: {args.out}")
     for name, path in sorted(written.items()):
         print(f"  {name}: {path}")

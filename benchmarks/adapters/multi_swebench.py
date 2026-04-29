@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from benchmarks.adapters.base import BenchmarkAdapter, BenchmarkInstance, extract_patch_files
+from benchmarks.adapters.dataset_pins import resolve_revision
 
 # Best-effort language inference for Multi-SWE-bench rows that do not carry
 # an explicit `language` field. Map repo namespace → language; the upstream
@@ -57,7 +58,13 @@ class _MultiSWEBenchAdapterBase(BenchmarkAdapter):
 
     hf_path = "bytedance-research/Multi-SWE-bench"
     config: str
-    revision: str = "main"
+
+    def __init__(self, revision: str | None = None) -> None:
+        self._revision_override = revision
+
+    @property
+    def revision(self) -> str:
+        return self._revision_override or resolve_revision(self.hf_path)
 
     def dataset_revision(self) -> str:
         return f"{self.hf_path}[{self.config}]@{self.revision}"

@@ -9,6 +9,7 @@ from benchmarks.adapters.base import (
     GoldenFragment,
     extract_patch_files,
 )
+from benchmarks.adapters.dataset_pins import resolve_revision
 
 
 def _parse_gold_context(raw: str) -> list[dict]:
@@ -37,10 +38,16 @@ class ContextBenchAdapter(BenchmarkAdapter):
     - "contextbench_verified" — curated subset for paper-grade evaluation
     """
 
-    def __init__(self, config: str = "default", revision: str = "main") -> None:
+    hf_path = "Contextbench/ContextBench"
+
+    def __init__(self, config: str = "default", revision: str | None = None) -> None:
         self.config = config
-        self.revision = revision
+        self._revision_override = revision
         self.name = "contextbench_verified" if config == "contextbench_verified" else "contextbench"
+
+    @property
+    def revision(self) -> str:
+        return self._revision_override or resolve_revision(self.hf_path)
 
     def dataset_revision(self) -> str:
         return f"Contextbench/ContextBench[{self.config}]@{self.revision}"

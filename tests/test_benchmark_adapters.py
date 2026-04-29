@@ -384,6 +384,53 @@ def test_evaluator_aggregate_per_benchmark_separates_by_source():
     assert agg["b"]["file_recall"] == 0.0
 
 
+def test_dataset_pin_resolver_prefers_env_override(monkeypatch, tmp_path):
+    from benchmarks.adapters import dataset_pins
+
+    monkeypatch.setattr(dataset_pins, "PIN_FILE", tmp_path / "missing.json")
+    monkeypatch.setenv("BENCH_REVISION_PRINCETON_NLP_SWE_BENCH_LITE", "abc123")
+    assert dataset_pins.resolve_revision("princeton-nlp/SWE-bench_Lite") == "abc123"
+
+
+def test_dataset_pin_resolver_reads_json(tmp_path, monkeypatch):
+    import json
+
+    from benchmarks.adapters import dataset_pins
+
+    pin_path = tmp_path / "pins.json"
+    pin_path.write_text(json.dumps({"princeton-nlp/SWE-bench_Lite": {"revision": "deadbeef", "fetched_at": "2026-01-01"}}))
+    monkeypatch.setattr(dataset_pins, "PIN_FILE", pin_path)
+    monkeypatch.delenv("BENCH_REVISION_PRINCETON_NLP_SWE_BENCH_LITE", raising=False)
+    assert dataset_pins.resolve_revision("princeton-nlp/SWE-bench_Lite") == "deadbeef"
+
+
+def test_dataset_pin_resolver_falls_back_to_default(tmp_path, monkeypatch):
+    from benchmarks.adapters import dataset_pins
+
+    monkeypatch.setattr(dataset_pins, "PIN_FILE", tmp_path / "missing.json")
+    monkeypatch.delenv("BENCH_REVISION_FOO_BAR", raising=False)
+    assert dataset_pins.resolve_revision("foo/bar", default="trunk") == "trunk"
+
+
+def test_swebench_adapter_picks_up_env_override(monkeypatch, tmp_path):
+    from benchmarks.adapters import dataset_pins
+
+    monkeypatch.setattr(dataset_pins, "PIN_FILE", tmp_path / "absent.json")
+    monkeypatch.setenv("BENCH_REVISION_PRINCETON_NLP_SWE_BENCH_LITE", "ENV_SHA")
+    adapter = SWEBenchLiteAdapter()
+    assert "ENV_SHA" in adapter.dataset_revision()
+
+
+def test_swebench_adapter_explicit_revision_wins_over_pin_and_env(monkeypatch, tmp_path):
+    from benchmarks.adapters import dataset_pins
+
+    monkeypatch.setattr(dataset_pins, "PIN_FILE", tmp_path / "absent.json")
+    monkeypatch.setenv("BENCH_REVISION_PRINCETON_NLP_SWE_BENCH_LITE", "ENV_SHA")
+    adapter = SWEBenchLiteAdapter(revision="EXPLICIT_SHA")
+    assert "EXPLICIT_SHA" in adapter.dataset_revision()
+    assert "ENV_SHA" not in adapter.dataset_revision()
+
+
 def test_benchmark_instance_is_immutable():
     inst = BenchmarkInstance(
         instance_id="x::1",

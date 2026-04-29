@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from benchmarks.adapters.base import BenchmarkAdapter, BenchmarkInstance, extract_patch_files
+from benchmarks.adapters.dataset_pins import resolve_revision
 
 
 class _SWEBenchAdapterBase(BenchmarkAdapter):
@@ -15,7 +16,13 @@ class _SWEBenchAdapterBase(BenchmarkAdapter):
 
     hf_path: str
     hf_split: str = "test"
-    revision: str = "main"
+
+    def __init__(self, revision: str | None = None) -> None:
+        self._revision_override = revision
+
+    @property
+    def revision(self) -> str:
+        return self._revision_override or resolve_revision(self.hf_path)
 
     def dataset_revision(self) -> str:
         return f"{self.hf_path}@{self.revision}"
@@ -54,10 +61,8 @@ class _SWEBenchAdapterBase(BenchmarkAdapter):
 class SWEBenchLiteAdapter(_SWEBenchAdapterBase):
     name = "swebench_lite"
     hf_path = "princeton-nlp/SWE-bench_Lite"
-    revision = "main"
 
 
 class SWEBenchVerifiedAdapter(_SWEBenchAdapterBase):
     name = "swebench_verified"
     hf_path = "princeton-nlp/SWE-bench_Verified"
-    revision = "main"

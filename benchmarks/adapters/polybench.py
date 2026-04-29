@@ -8,6 +8,7 @@ from benchmarks.adapters.base import (
     GoldenFragment,
     extract_patch_files,
 )
+from benchmarks.adapters.dataset_pins import resolve_revision
 
 
 class _PolyBenchAdapterBase(BenchmarkAdapter):
@@ -26,7 +27,13 @@ class _PolyBenchAdapterBase(BenchmarkAdapter):
 
     hf_path = "AmazonScience/SWE-PolyBench"
     config: str
-    revision: str = "main"
+
+    def __init__(self, revision: str | None = None) -> None:
+        self._revision_override = revision
+
+    @property
+    def revision(self) -> str:
+        return self._revision_override or resolve_revision(self.hf_path)
 
     def dataset_revision(self) -> str:
         return f"{self.hf_path}[{self.config}]@{self.revision}"
