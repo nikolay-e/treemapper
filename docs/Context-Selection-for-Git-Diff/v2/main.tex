@@ -33,7 +33,7 @@
 \maketitle
 
 \begin{abstract}
-Retrieving optimal context for Large Language Models to understand code changes is a critical challenge in automated software engineering. Current approaches rely on naive windowing or purely lexical retrieval, missing complex structural dependencies. We formulate diff-aware code context selection as \textbf{budgeted utility maximization} over multi-resolution fragments on a typed dependency graph. The deployed system uses a modular relevance objective with lazy-greedy budgeted selection and engineering heuristics; we additionally describe a submodular concept-coverage extension and identify clean analyzable variants whose approximation guarantees are known. Two structural components ground the framework: (i) a partition matroid over multi-resolution fragments enforcing structural non-redundancy, and (ii) a pluggable relevance signal $\hat{w}(f, \Delta)$ instantiated via three families---Personalized PageRank, bounded ego-network expansion, and BM25 lexical retrieval---together with a hybrid combiner. The framework is evaluated by file-level recall against annotated golden contexts at a fixed token budget across multi-language software-engineering benchmarks; interim results on 845 of $\sim$1500 instances yield pooled file recall $0.855$ at an $8000$-token budget, with baseline comparisons (BM25, Aider repo-map) and a four-mode scoring ablation queued.
+Retrieving optimal context for Large Language Models to understand code changes is a critical challenge in automated software engineering. Current approaches rely on naive windowing or purely lexical retrieval, missing complex structural dependencies. We formulate diff-aware code context selection as \textbf{budgeted utility maximization} over multi-resolution fragments on a typed dependency graph. The deployed system uses a modular relevance objective with lazy-greedy budgeted selection and engineering heuristics; we additionally describe a submodular concept-coverage extension and identify clean analyzable variants whose approximation guarantees are known. Two structural components ground the framework: (i) a partition matroid over multi-resolution fragments enforcing structural non-redundancy, and (ii) a pluggable relevance signal $\hat{w}(f, \Delta)$ instantiated via three families---Personalized PageRank, bounded ego-network expansion, and BM25 lexical retrieval---together with a hybrid combiner. The framework is evaluated by file-level recall against annotated golden contexts at a fixed token budget across three multi-language software-engineering benchmarks (1500 instances total). At an $8000$-token budget under hybrid scoring, diffctx achieves pooled file recall $0.875$ [95\% CI $0.861, 0.889$], with per-benchmark recall $0.911$ on SWE-bench Verified, $0.922$ on PolyBench-500, and $0.793$ on ContextBench Verified. Baseline comparisons (BM25 over patch identifiers, Aider repo-map in fair-input and oracle-mentioned modes) and a four-mode scoring ablation are queued.
 \end{abstract}
 
 \newpage
@@ -472,7 +472,7 @@ Sourcegraph Cody~\cite{hartman2024recsys} is cited as related work but cannot be
 \section{Empirical Evaluation}
 \label{sec:prelim-results}
 
-This section instantiates the protocol of Section~\ref{sec:eval} and reports the v1 evaluation run. At the time of writing the run is partially complete; numbers are reported over the completed portion and the in-flight items are listed at the end of the section. The setup, calibration, and reproducibility statements (frozen manifests, pinned dataset revisions, fixed hardware) are unconditional on completion.
+This section instantiates the protocol of Section~\ref{sec:eval} and reports the v1 evaluation run. The diffctx-hybrid run on the full 1500-instance test set has completed; baseline runs (BM25, Aider) and the scoring-mode ablation are scheduled and tracked at the end of the section.
 
 \subsection{Setup}
 
@@ -510,18 +510,18 @@ Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precisi
 \begin{table}[h]
 \centering
 \small
-\caption{Per-benchmark file-level metrics, scoring=hybrid, $B{=}8000$ tokens, with 95\% percentile bootstrap CIs ($B{=}10{,}000$ resamples, seed=42). Status \texttt{ok} excludes \texttt{clone\_fail} (4 Java instances on ContextBench Verified) and pending instances. SWE-bench Verified row is a placeholder pending completion of the in-flight run; the full table will be re-emitted when $n=1500$.}
+\caption{Per-benchmark file-level metrics, scoring=hybrid, $B{=}8000$ tokens, with 95\% percentile bootstrap CIs ($B{=}10{,}000$ resamples, seed=42). Status \texttt{ok} excludes \texttt{clone\_fail} (4 Java instances on ContextBench Verified). Macro and micro averages coincide because each test set has $n{=}500$.}
 \label{tab:prelim-bench}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lrllr}
 \toprule
 \textbf{Test set} & \textbf{n} & \textbf{File recall} & \textbf{File precision} & \textbf{ok\%} \\
 \midrule
-ContextBench Verified            & 500          & 0.793 [0.767, 0.818] & 0.121 [0.110, 0.133] & 99.2\% \\
-PolyBench-500 (in progress)      & 345          & 0.946 [0.926, 0.964] & 0.124 [0.113, 0.137] & 100.0\% \\
-SWE-bench Verified \emph{(TBD)}  & \emph{500}   & \emph{TBD}           & \emph{TBD}           & \emph{TBD} \\
+ContextBench Verified            & 500  & 0.793 [0.767, 0.818] & 0.121 [0.110, 0.133] & 99.2\% \\
+PolyBench-500                    & 500  & 0.922 [0.901, 0.941] & 0.126 [0.116, 0.138] & 100.0\% \\
+SWE-bench Verified               & 500  & 0.911 [0.886, 0.934] & 0.067 [0.059, 0.075] & 100.0\% \\
 \midrule
-Pooled (interim)                 & 845          & 0.855 [0.837, 0.873] & 0.122 [0.114, 0.131] & 99.5\% \\
+Pooled                           & 1500 & 0.875 [0.861, 0.889] & 0.105 [0.099, 0.111] & 99.7\% \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -529,16 +529,16 @@ Pooled (interim)                 & 845          & 0.855 [0.837, 0.873] & 0.122 [
 \begin{table}[h]
 \centering
 \small
-\caption{Per-language interim metrics with 95\% percentile bootstrap CIs ($B{=}10{,}000$). Pooled across the two completed test sets, status=ok only.}
+\caption{Per-language metrics with 95\% percentile bootstrap CIs ($B{=}10{,}000$). Pooled across the three test sets, status=ok only.}
 \label{tab:prelim-lang}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lrll}
 \toprule
 \textbf{Language} & \textbf{n} & \textbf{File recall} & \textbf{File precision} \\
 \midrule
-Python      & 266 & 0.780 [0.743, 0.816] & 0.103 [0.089, 0.118] \\
+Python      & 891 & 0.862 [0.843, 0.881] & 0.085 [0.078, 0.093] \\
+TypeScript  & 191 & 0.950 [0.929, 0.969] & 0.150 [0.132, 0.170] \\
 JavaScript  & 185 & 0.886 [0.852, 0.918] & 0.124 [0.109, 0.139] \\
-TypeScript  & 161 & 0.945 [0.919, 0.968] & 0.145 [0.126, 0.165] \\
 Java        & 136 & 0.887 [0.841, 0.929] & 0.116 [0.098, 0.136] \\
 Go          &  40 & 0.931 [0.890, 0.967] & 0.094 [0.056, 0.140] \\
 C           &  23 & 0.703 [0.580, 0.816] & 0.166 [0.106, 0.236] \\
@@ -550,9 +550,9 @@ C++         &  10 & 0.702 [0.583, 0.835] & 0.257 [0.115, 0.447] \\
 
 \subsection{Observations}
 
-\paragraph{Recall is high at a tight 8k-token budget.} Pooled mean file recall is $0.855$ across 845 completed instances at $B{=}8000$. Direct head-to-head against published baselines is deferred to the completed run; a BM25 baseline running the same protocol at the same budget on the same manifests is implemented (\texttt{benchmarks/baselines/bm25\_baseline.py}) and queued, and an Aider repo-map baseline (\texttt{benchmarks/baselines/aider\_baseline.py}) is scheduled to follow.
+\paragraph{Recall is high at a tight 8k-token budget.} Pooled mean file recall is $0.875$ [95\% CI $0.861, 0.889$] across all 1500 instances at $B{=}8000$. Per-benchmark recall is highest on PolyBench-500 ($0.922$) and SWE-bench Verified ($0.911$), and lowest on ContextBench Verified ($0.793$); the per-set spread (about 13 percentage points) is much larger than each set's CI half-width and therefore is benchmark-driven, not noise. Direct head-to-head against published baselines is forthcoming: a BM25 baseline running the same protocol at the same budget on the same manifests is implemented (\texttt{benchmarks/baselines/bm25\_baseline.py}) and currently running, and an Aider repo-map baseline (\texttt{benchmarks/baselines/aider\_baseline.py}, in fair-input and oracle-mentioned modes) is scheduled to follow.
 
-\paragraph{Per-language pattern.} TypeScript ($0.944$) and Go ($0.931$) lead; Python ($0.780$), C ($0.703$), and C++ ($0.702$) trail. The C/C++ samples are too small ($n{=}23$ and $n{=}10$) to draw firm conclusions; the Python gap is consistent with the hypothesis that dynamic dispatch and metaprogramming weaken the symbol-reference heuristic (limitations discussed in Section~\ref{sec:scoring}). The TypeScript advantage tracks the language's static type information enriching the dependency graph.
+\paragraph{Per-language pattern.} TypeScript ($n{=}191$, recall $0.950$) and Go ($n{=}40$, $0.931$) lead; Python ($n{=}891$, $0.862$), Java ($n{=}136$, $0.887$), and JavaScript ($n{=}185$, $0.886$) cluster in the upper-eighties; C ($n{=}23$, $0.703$) and C++ ($n{=}10$, $0.702$) trail with sample sizes too small to draw firm conclusions. The TypeScript advantage tracks the language's static type information enriching the dependency graph; the relatively narrow gap between Python and the upper-eighties cluster (roughly 9 percentage points despite Python carrying $\sim$60\% of the pooled instances and being the language most affected by dynamic dispatch and metaprogramming) is the more interesting signal --- the symbol-reference heuristic, while imperfect for dynamic dispatch (Section~\ref{sec:scoring}), nonetheless covers most cases in modern Python codebases.
 
 \paragraph{Precision is uniformly low ($\approx 0.12$).} Mean file precision is approximately $|G|/k$ where $|G|$ is the gold-file count per instance ($\sim 1$--$3$) and $k$ is the number of files that fit the budget. Low file precision indicates that the selector retrieves many non-gold files under the fixed budget; downstream LLM context quality depends on both recall and noise, so file recall is a necessary but insufficient proxy. ContextBench Verified provides block-level (line-range) annotations beyond the file level; we plan to report block-level recall on that subset to characterize how concentrated the selected context is around the gold regions, and to bound the true noise floor implied by the file-precision number.
 
@@ -577,24 +577,24 @@ Two external file-level baselines were implemented to run the same protocol (sam
 \midrule
 \multicolumn{6}{l}{\emph{vs.\ BM25 over patch identifiers}} \\
 \midrule
-ContextBench Verified            & \emph{500}   & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-PolyBench-500                    & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-SWE-bench Verified               & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-\textbf{Pooled}                  & \emph{1500}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+ContextBench Verified            & 500    & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+PolyBench-500                    & 500    & 0.922 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+SWE-bench Verified               & 500    & 0.911 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\textbf{Pooled}                  & 1500   & \textbf{0.875} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
 \midrule
 \multicolumn{6}{l}{\emph{vs.\ Aider repo-map (fair-input mode)}} \\
 \midrule
-ContextBench Verified            & \emph{500}   & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-PolyBench-500                    & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-SWE-bench Verified               & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-\textbf{Pooled}                  & \emph{1500}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+ContextBench Verified            & 500    & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+PolyBench-500                    & 500    & 0.922 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+SWE-bench Verified               & 500    & 0.911 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\textbf{Pooled}                  & 1500   & \textbf{0.875} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
 \midrule
 \multicolumn{6}{l}{\emph{vs.\ Aider repo-map (oracle-mentioned, upper-bound stress test --- not a baseline)}} \\
 \midrule
-ContextBench Verified            & \emph{500}   & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-PolyBench-500                    & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-SWE-bench Verified               & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
-\textbf{Pooled}                  & \emph{1500}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+ContextBench Verified            & 500    & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+PolyBench-500                    & 500    & 0.922 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+SWE-bench Verified               & 500    & 0.911 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\textbf{Pooled}                  & 1500   & \textbf{0.875} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -639,7 +639,7 @@ To support claims about budget efficiency, the same protocol is repeated at $B \
 \toprule
 \textbf{Budget $B$} & \textbf{n} & \textbf{Mean recall [95\% CI]} & \textbf{Mean used tokens} & \textbf{Recall / used token (k)} \\
 \midrule
-$8{,}000$   & 845 (interim) & 0.855 [0.837, 0.873] & \emph{TBD$^{\dagger}$} & \emph{TBD$^{\dagger}$} \\
+$8{,}000$   & 1500          & 0.875 [0.861, 0.889] & \emph{TBD$^{\dagger}$} & \emph{TBD$^{\dagger}$} \\
 $16{,}000$  & \emph{TBD}    & \emph{TBD}           & \emph{TBD}             & \emph{TBD} \\
 $32{,}000$  & \emph{TBD}    & \emph{TBD}           & \emph{TBD}             & \emph{TBD} \\
 \bottomrule
@@ -653,7 +653,7 @@ $^{\dagger}$ Mean used tokens is presently zero in v1 result rows due to a key-m
 The numbers in this section reflect a partial v1 run. The following items are scheduled work, not deferred future work, and will be incorporated into the next version of this section before submission:
 
 \begin{itemize}
-    \item \textbf{SWE-bench Verified completion.} The third test manifest is in queue; final pooled $n$ will be $\sim 1500$.
+    \item \textbf{SWE-bench Verified completion.} \emph{Done.} All three test manifests have completed for the diffctx-hybrid run ($n{=}1500$ total).
     \item \textbf{Baseline comparisons.} BM25 over patch identifiers (\texttt{benchmarks/baselines/bm25\_baseline.py}) is queued to run after the diffctx run completes. Aider repo-map (\texttt{benchmarks/baselines/aider\_baseline.py}) is scheduled to follow. The comparison table will report paired-bootstrap CI on per-instance recall deltas and Wilcoxon signed-rank $p$-values via \texttt{render\_comparison\_table}.
     \item \textbf{Scoring-mode ablation across the four modes.} Section~\ref{sec:ego} predicts that PPR at high restart probability $\alpha$ approximates bounded-radius EGO. This requires running each of $\mathrm{scoring} \in \{\mathrm{hybrid}, \mathrm{ppr}, \mathrm{ego}, \mathrm{bm25}_{\text{internal}}\}$ on the same manifests. Only $\mathrm{hybrid}$ has been evaluated to date; the remaining three modes are queued. To control compute, the ablation is planned on a stratified subset rather than the full 1500 instances per mode; $(\tau, \beta_{\mathrm{core}})$ are held at the hybrid-optimal values, with per-mode re-tuning recorded as a sensitivity question.
     \item \textbf{Budget curve.} v1 fixes $B{=}8000$. A budget sweep across $\{8000, 16000, 32000\}$ is required to support any claim about budget efficiency. The sweep will be paired with the \texttt{used\_tokens} fix below so the curve plots recall against actual measured token usage rather than nominal budget.
@@ -687,7 +687,7 @@ While we provide operational ranges for parameters ($\alpha$, $\tau$, edge weigh
 
 We have presented diffctx, a framework for diff-aware code context selection that formulates the problem as budgeted utility maximization over multi-resolution fragments on a typed dependency graph. The deployed system uses a modular relevance objective with lazy-greedy budgeted selection and engineering heuristics, including an adaptive stopping rule based on marginal utility. A pluggable scoring abstraction (PPR, EGO, BM25, Hybrid) allows the same selection algorithm to be instantiated with different relevance signals without changing the optimization machinery. We do not claim a new approximation algorithm; we use known optimization structure to make context selection explicit, analyzable, and extensible.
 
-Key contributions: (1) an explicit ``algorithm $\times$ constraint $\times$ guarantee'' map (Table~\ref{tab:algo-constraint-guarantee}) that separates the deployed heuristic from analyzable variants of the framework, with the submodular concept-coverage extension (Section~\ref{sec:utility}) treated as a generalization, not as the deployed default; (2) a typed-edge dependency graph with per-category treatment (hub-suppression exemption for semantic, structural, and test edges); (3) interim empirical results (Section~\ref{sec:prelim-results}) showing pooled file recall $0.855$ at $B{=}8000$ on 845 multi-language instances under the hybrid scoring mode, with the rest of the protocol --- baseline comparisons (BM25, Aider in fair and oracle-mentioned modes), scoring-mode ablation, and budget curve --- scheduled and tracked.
+Key contributions: (1) an explicit ``algorithm $\times$ constraint $\times$ guarantee'' map (Table~\ref{tab:algo-constraint-guarantee}) that separates the deployed heuristic from analyzable variants of the framework, with the submodular concept-coverage extension (Section~\ref{sec:utility}) treated as a generalization, not as the deployed default; (2) a typed-edge dependency graph with per-category treatment (hub-suppression exemption for semantic, structural, and test edges); (3) empirical results (Section~\ref{sec:prelim-results}) showing pooled file recall $0.875$ [95\% CI $0.861, 0.889$] at $B{=}8000$ on 1500 multi-language instances under the hybrid scoring mode (per-benchmark recall: SWE-bench Verified $0.911$, PolyBench-500 $0.922$, ContextBench Verified $0.793$), with the rest of the protocol --- baseline comparisons (BM25, Aider in fair and oracle-mentioned modes), scoring-mode ablation, and budget curve --- scheduled and tracked.
 
 \subsection{Future Work}
 \label{sec:future-work}
