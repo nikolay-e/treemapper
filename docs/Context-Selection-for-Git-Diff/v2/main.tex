@@ -474,17 +474,17 @@ Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precisi
 
 \begin{table}[h]
 \centering
-\caption{Per-benchmark interim file-level metrics, scoring=hybrid, $B{=}8000$ tokens. Recall and precision are means over completed instances. Status \texttt{ok} excludes \texttt{clone\_fail} (4 Java instances on ContextBench Verified) and pending instances.}
+\caption{Per-benchmark file-level metrics, scoring=hybrid, $B{=}8000$ tokens, with 95\% percentile bootstrap CIs ($B{=}10{,}000$ resamples, seed=42). Status \texttt{ok} excludes \texttt{clone\_fail} (4 Java instances on ContextBench Verified) and pending instances. SWE-bench Verified row is a placeholder pending completion of the in-flight run; the full table will be re-emitted when $n=1500$.}
 \label{tab:prelim-bench}
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrll r}
 \toprule
 \textbf{Test set} & \textbf{n} & \textbf{File recall} & \textbf{File precision} & \textbf{ok\%} \\
 \midrule
-ContextBench Verified & 500 & 0.793 & 0.121 & 99.2\% \\
-PolyBench-500 (in progress) & 345 & 0.946 & 0.124 & 100.0\% \\
-SWE-bench Verified & --- & --- & --- & not started \\
+ContextBench Verified            & 500          & 0.793 [0.767, 0.818] & 0.121 [0.110, 0.133] & 99.2\% \\
+PolyBench-500 (in progress)      & 345          & 0.946 [0.926, 0.964] & 0.124 [0.113, 0.137] & 100.0\% \\
+SWE-bench Verified \emph{(TBD)}  & \emph{500}   & \emph{TBD}           & \emph{TBD}           & \emph{TBD} \\
 \midrule
-Pooled (interim) & 845 & 0.855 & 0.122 & 99.5\% \\
+Pooled (interim)                 & 845          & 0.855 [0.837, 0.873] & 0.122 [0.114, 0.131] & 99.5\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -516,6 +516,85 @@ C++         &  10 & 0.702 [0.583, 0.835] & 0.257 [0.115, 0.447] \\
 \paragraph{Per-language pattern.} TypeScript ($0.944$) and Go ($0.931$) lead; Python ($0.780$), C ($0.703$), and C++ ($0.702$) trail. The C/C++ samples are too small ($n{=}23$ and $n{=}10$) to draw firm conclusions; the Python gap is consistent with the hypothesis that dynamic dispatch and metaprogramming weaken the symbol-reference heuristic (limitations discussed in Section~\ref{sec:scoring}). The TypeScript advantage tracks the language's static type information enriching the dependency graph.
 
 \paragraph{Precision is uniformly low ($\approx 0.12$).} The current selector packs files until the budget is exhausted; on small gold sets ($\sim 1$--$3$ files per instance) this produces many true-negative selections that depress precision. This is a methodological artifact, not a flaw: at fixed budget, recall is the load-bearing metric and precision is constrained by $|G|/k$. We report precision for completeness but do not optimize against it.
+
+\subsection{Baseline Comparisons}
+\label{sec:prelim-baselines}
+
+Two external file-level baselines were implemented to run the same protocol (same manifests, same budget, same metric) so that the comparison is apples-to-apples. Both are scheduled to execute after the diffctx hybrid run completes; the rendered comparison tables below show the structure that will be populated. Methodology follows the standard IR significance protocol~\cite{smucker2007comparison}: per-instance paired bootstrap on the recall delta ($B{=}10{,}000$, percentile CI) and Wilcoxon signed-rank $p$-value, computed via \texttt{benchmarks/adapters/final\_eval.py::render\_comparison\_table}.
+
+\paragraph{BM25 over patch identifiers.} \texttt{rank-bm25} indexes all repository files; the query is the set of identifiers extracted from the gold patch (camelCase + snake\_case decomposition, language-keyword filter). Files are packed in BM25 rank order under strict greedy budget compliance. Implementation in \texttt{benchmarks/baselines/bm25\_baseline.py}. This isolates pure lexical retrieval without any graph structure.
+
+\paragraph{Aider repo-map.} The reference open-source approach using the same primitives (tree-sitter AST + Personalized PageRank + token-budgeted packing). Invoked through an isolated \texttt{uv tool} subprocess with the upstream \texttt{aider-chat==0.86.2} package; \texttt{mentioned\_fnames} populated from \texttt{instance.gold\_files} and \texttt{mentioned\_idents} from the gold patch. This input mapping favors Aider relative to diffctx, which receives only the patch text. Implementation in \texttt{benchmarks/baselines/aider\_baseline.py}.
+
+\begin{table}[h]
+\centering
+\caption{diffctx (hybrid) vs.\ external baselines at $B{=}8000$ tokens. Δ is the per-instance paired delta in file recall (positive favors diffctx). 95\% paired-bootstrap percentile CI on Δ; $p$-value from Wilcoxon signed-rank. \emph{Placeholder: cells to be filled when baseline runs complete.}}
+\label{tab:prelim-baselines}
+\begin{tabular}{lrlllc}
+\toprule
+\textbf{Test set} & \textbf{n} & \textbf{diffctx} & \textbf{baseline} & \textbf{Δ recall [95\% CI]} & \textbf{Wilcoxon $p$} \\
+\midrule
+\multicolumn{6}{l}{\emph{vs.\ BM25 over patch identifiers}} \\
+\midrule
+ContextBench Verified            & \emph{500}   & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+PolyBench-500                    & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+SWE-bench Verified               & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\textbf{Pooled}                  & \emph{1500}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\midrule
+\multicolumn{6}{l}{\emph{vs.\ Aider repo-map}} \\
+\midrule
+ContextBench Verified            & \emph{500}   & 0.793 & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+PolyBench-500                    & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+SWE-bench Verified               & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\textbf{Pooled}                  & \emph{1500}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Scoring-Mode Ablation}
+\label{sec:prelim-ablation}
+
+Section~\ref{sec:scoring} introduces four pluggable scoring modes (Hybrid, PPR, EGO, internal BM25); the final hybrid combiner adapts among them at query time. To attribute the source of recall, we run each of the four modes in isolation on a stratified subset of the test manifests with operational hyperparameters held at their hybrid-optimal values ($\tau{=}0.12$, $\beta_{\mathrm{core}}{=}0.5$, $B{=}8000$). Per-mode re-tuning is recorded as a sensitivity question --- if the hybrid hyperparameters disadvantage a single-mode run, that disadvantage is itself an argument against the single mode in deployment.
+
+Section~\ref{sec:ego} predicts that PPR with high restart probability $\alpha$ approximates bounded-radius EGO. The ablation tests this empirically: a monotone ordering BM25 $\prec$ EGO $\prec$ PPR would validate the structural-relevance hypothesis with maximum strength; an EGO $\approx$ PPR result would inform conclusions about the radius of relevance for diff-aware context selection.
+
+\begin{table}[h]
+\centering
+\caption{Scoring-mode ablation at $B{=}8000$, hybrid-optimal operational hyperparameters. File recall with 95\% percentile bootstrap CIs. \emph{Placeholder: cells to be filled once each non-hybrid mode completes on the ablation subset.}}
+\label{tab:prelim-ablation}
+\begin{tabular}{lrllll}
+\toprule
+\textbf{Test set} & \textbf{n} & \textbf{Hybrid} & \textbf{PPR} & \textbf{EGO} & \textbf{BM25 (internal)} \\
+\midrule
+ContextBench Verified            & \emph{TBD}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+PolyBench-500                    & \emph{TBD}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+SWE-bench Verified               & \emph{TBD}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\textbf{Pooled}                  & \emph{TBD}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Budget Curve}
+\label{sec:prelim-budget}
+
+To support claims about budget efficiency, the same protocol is repeated at $B \in \{8000, 16000, 32000\}$ on the test manifests. A flat-or-sublinear recall curve would indicate diminishing returns from a larger budget --- a load-bearing claim for the ``smaller is better'' framing of the comp-per-token framework. The curve is reported in Table~\ref{tab:prelim-budget}; the $B{=}8000$ column is identical to the pooled row of Table~\ref{tab:prelim-bench}.
+
+\begin{table}[h]
+\centering
+\caption{Budget curve: pooled file recall under hybrid mode at three budgets, on the full 1500-instance test set. \emph{Placeholder: $B{=}16{,}000$ and $B{=}32{,}000$ runs queued.}}
+\label{tab:prelim-budget}
+\begin{tabular}{lrlll}
+\toprule
+\textbf{Budget $B$} & \textbf{n} & \textbf{Mean recall [95\% CI]} & \textbf{Mean used tokens} & \textbf{Recall / used token (k)} \\
+\midrule
+$8{,}000$   & 845 (interim) & 0.855 [0.837, 0.873] & \emph{TBD$^{\dagger}$} & \emph{TBD$^{\dagger}$} \\
+$16{,}000$  & \emph{TBD}    & \emph{TBD}           & \emph{TBD}             & \emph{TBD} \\
+$32{,}000$  & \emph{TBD}    & \emph{TBD}           & \emph{TBD}             & \emph{TBD} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$^{\dagger}$ Mean used tokens is presently zero in v1 result rows due to a key-mapping bug in \texttt{benchmarks/diffctx\_eval\_fn.py} that reads a key not emitted by the pipeline. Recall and precision are unaffected. The bug is documented in our project tracker and fixed runs are scheduled before the budget curve is finalized; once \texttt{used\_tokens} reflects the actual encoder count, recall-per-used-token (rather than recall-per-nominal-budget) becomes the reportable efficiency metric.
 
 \subsection{Limitations of the Current Empirical Snapshot}
 
