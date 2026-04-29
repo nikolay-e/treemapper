@@ -11,6 +11,13 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage[margin=1in]{geometry}
+% Allow TeX to stretch interword space in emergencies to avoid overfull hboxes
+% caused by long unbreakable \texttt{} or compound identifiers.
+\setlength{\emergencystretch}{5em}
+% Permit \texttt{} and \url to break at common code separators (./_\-).
+\hyphenpenalty=200
+\exhyphenpenalty=200
+\sloppy
 
 \title{diffctx: Budgeted Typed-Graph Retrieval for Diff-Aware Code Context Selection}
 
@@ -121,17 +128,18 @@ The deployed system is a heuristic and we do not invoke any of the above guarant
 \small
 \caption{Algorithm $\times$ constraint $\times$ guarantee map. The deployed default is a heuristic; analyzable variants of the framework admit the listed guarantees on their respective surrogate problems, and a submodular concept-coverage extension is described in Section~\ref{sec:utility} but is not the deployed default.}
 \label{tab:algo-constraint-guarantee}
-\begin{tabular}{p{3.4cm}p{3.0cm}p{2.6cm}p{2.4cm}p{2.6cm}}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{p{3.6cm}p{3.0cm}p{2.6cm}p{2.6cm}p{3.6cm}}
 \toprule
 \textbf{Variant} & \textbf{Objective} & \textbf{Constraint} & \textbf{Algorithm} & \textbf{Claim} \\
 \midrule
-Deployed default (this paper) & modular relevance + adaptive stopping + rescue phase & budget $\cap$ partition matroid & lazy density-greedy with heuristics & empirical only \\
-Modular cost-blind variant & modular & partition matroid only & best representative per class & exact (Edmonds) \\
-Modular + knapsack with $\arg\max$-singleton modification & modular & knapsack & modified density-greedy & $\frac{1}{2}(1-1/e)$ (degenerates from~\cite{khuller1999budgeted}) \\
-Submodular extension (concept coverage, Section~\ref{sec:utility}) & monotone submodular & knapsack & modified density-greedy & $\frac{1}{2}(1-1/e)$~\cite{khuller1999budgeted,sviridenko2004note} \\
-Submodular extension under matroid only & monotone submodular & partition matroid & greedy / continuous greedy & $1/2$ greedy; $(1-1/e)$ continuous~\cite{nemhauser1978analysis,calinescu2011maximizing} \\
+Deployed default (this paper) & modular relevance + adaptive stopping + rescue & budget $\cap$ partition matroid & lazy density-greedy with heuristics & empirical only \\
+Modular cost-blind variant & modular & partition matroid & best representative per class & exact (Edmonds) \\
+Modular + knapsack, $\arg\max$-singleton modification & modular & knapsack & modified density-greedy & $\frac{1}{2}(1-1/e)$ (from~\cite{khuller1999budgeted}) \\
+Submodular extension (Section~\ref{sec:utility}) & monotone submodular & knapsack & modified density-greedy & $\frac{1}{2}(1-1/e)$~\cite{khuller1999budgeted,sviridenko2004note} \\
+Submodular extension, matroid only & monotone submodular & partition matroid & greedy; continuous greedy & $1/2$ greedy; $(1-1/e)$ continuous~\cite{nemhauser1978analysis,calinescu2011maximizing} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \paragraph{Objective.} The objective takes the same algebraic form in both modes but with different sources for the per-fragment weight $w(f, \Delta) \geq 0$:
@@ -501,9 +509,11 @@ Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precisi
 
 \begin{table}[h]
 \centering
+\small
 \caption{Per-benchmark file-level metrics, scoring=hybrid, $B{=}8000$ tokens, with 95\% percentile bootstrap CIs ($B{=}10{,}000$ resamples, seed=42). Status \texttt{ok} excludes \texttt{clone\_fail} (4 Java instances on ContextBench Verified) and pending instances. SWE-bench Verified row is a placeholder pending completion of the in-flight run; the full table will be re-emitted when $n=1500$.}
 \label{tab:prelim-bench}
-\begin{tabular}{lrll r}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrllr}
 \toprule
 \textbf{Test set} & \textbf{n} & \textbf{File recall} & \textbf{File precision} & \textbf{ok\%} \\
 \midrule
@@ -513,13 +523,15 @@ SWE-bench Verified \emph{(TBD)}  & \emph{500}   & \emph{TBD}           & \emph{T
 \midrule
 Pooled (interim)                 & 845          & 0.855 [0.837, 0.873] & 0.122 [0.114, 0.131] & 99.5\% \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \begin{table}[h]
 \centering
+\small
 \caption{Per-language interim metrics with 95\% percentile bootstrap CIs ($B{=}10{,}000$). Pooled across the two completed test sets, status=ok only.}
 \label{tab:prelim-lang}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lrll}
 \toprule
 \textbf{Language} & \textbf{n} & \textbf{File recall} & \textbf{File precision} \\
@@ -533,7 +545,7 @@ C           &  23 & 0.703 [0.580, 0.816] & 0.166 [0.106, 0.236] \\
 Rust        &  20 & 0.899 [0.831, 0.959] & 0.201 [0.140, 0.270] \\
 C++         &  10 & 0.702 [0.583, 0.835] & 0.257 [0.115, 0.447] \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \subsection{Observations}
@@ -555,8 +567,10 @@ Two external file-level baselines were implemented to run the same protocol (sam
 
 \begin{table}[h]
 \centering
+\small
 \caption{diffctx (hybrid) vs.\ external baselines at $B{=}8000$ tokens. Δ is the per-instance paired delta in file recall (positive favors diffctx). 95\% paired-bootstrap percentile CI on Δ; $p$-value from Wilcoxon signed-rank. The \emph{Aider (oracle)} row is an upper-bound stress test, not a comparison baseline. \emph{Placeholder: cells to be filled when baseline runs complete.}}
 \label{tab:prelim-baselines}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lrlllc}
 \toprule
 \textbf{Test set} & \textbf{n} & \textbf{diffctx} & \textbf{baseline} & \textbf{Δ recall [95\% CI]} & \textbf{Wilcoxon $p$} \\
@@ -582,7 +596,7 @@ PolyBench-500                    & \emph{500}   & \emph{TBD} & \emph{TBD} & \emp
 SWE-bench Verified               & \emph{500}   & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
 \textbf{Pooled}                  & \emph{1500}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \subsection{Scoring-Mode Ablation}
@@ -594,8 +608,10 @@ Section~\ref{sec:ego} predicts that PPR with high restart probability $\alpha$ a
 
 \begin{table}[h]
 \centering
+\small
 \caption{Scoring-mode ablation at $B{=}8000$, hybrid-optimal operational hyperparameters. File recall with 95\% percentile bootstrap CIs. \emph{Placeholder: cells to be filled once each non-hybrid mode completes on the ablation subset.}}
 \label{tab:prelim-ablation}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lrllll}
 \toprule
 \textbf{Test set} & \textbf{n} & \textbf{Hybrid} & \textbf{PPR} & \textbf{EGO} & \textbf{BM25 (internal)} \\
@@ -605,7 +621,7 @@ PolyBench-500                    & \emph{TBD}  & \emph{TBD} & \emph{TBD} & \emph
 SWE-bench Verified               & \emph{TBD}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
 \textbf{Pooled}                  & \emph{TBD}  & \emph{TBD} & \emph{TBD} & \emph{TBD} & \emph{TBD} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \subsection{Budget Curve}
@@ -615,8 +631,10 @@ To support claims about budget efficiency, the same protocol is repeated at $B \
 
 \begin{table}[h]
 \centering
+\small
 \caption{Budget curve: pooled file recall under hybrid mode at three budgets, on the full 1500-instance test set. \emph{Placeholder: $B{=}16{,}000$ and $B{=}32{,}000$ runs queued.}}
 \label{tab:prelim-budget}
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lrlll}
 \toprule
 \textbf{Budget $B$} & \textbf{n} & \textbf{Mean recall [95\% CI]} & \textbf{Mean used tokens} & \textbf{Recall / used token (k)} \\
@@ -625,7 +643,7 @@ $8{,}000$   & 845 (interim) & 0.855 [0.837, 0.873] & \emph{TBD$^{\dagger}$} & \e
 $16{,}000$  & \emph{TBD}    & \emph{TBD}           & \emph{TBD}             & \emph{TBD} \\
 $32{,}000$  & \emph{TBD}    & \emph{TBD}           & \emph{TBD}             & \emph{TBD} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 $^{\dagger}$ Mean used tokens is presently zero in v1 result rows due to a key-mapping bug in \texttt{benchmarks/diffctx\_eval\_fn.py} that reads a key not emitted by the pipeline. Recall and precision are unaffected. The bug is documented in our project tracker and fixed runs are scheduled before the budget curve is finalized; once \texttt{used\_tokens} reflects the actual encoder count, recall-per-used-token (rather than recall-per-nominal-budget) becomes the reportable efficiency metric.
@@ -782,8 +800,9 @@ This appendix records the correspondence between symbols in the body of the pape
 
 \begin{table}[h]
 \centering
-\small
-\begin{tabular}{llp{4.5cm}l}
+\scriptsize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llp{5cm}l}
 \toprule
 \textbf{Paper symbol} & \textbf{Meaning} & \textbf{Code identifier} & \textbf{Source} \\
 \midrule
@@ -811,7 +830,7 @@ Filtering           & Relevance/proximity filters    & \texttt{filtering::*}    
 Selection           & Lazy greedy / Boltzmann        & \texttt{select::lazy\_greedy\_select}          & \texttt{select.rs} \\
 Coherence post-pass & Rescue dangling references     & \texttt{postpass::coherence\_post\_pass}       & \texttt{postpass.rs} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \caption{Symbol-to-code map. Paper symbols on the left correspond to the named code identifiers on the right, located in the listed source file under \texttt{diffctx/src/}. Implementation-only parameters are documented inline in Appendix~A and are not duplicated here.}
 \label{tab:symbol-map}
 \end{table}
