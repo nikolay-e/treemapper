@@ -19,10 +19,9 @@ from collections.abc import Iterable
 
 from benchmarks.adapters import (
     ContextBenchAdapter,
-    MultiSWEBenchFlashAdapter,
-    MultiSWEBenchMiniAdapter,
+    MultiSWEBenchAdapter,
     PolyBench500Adapter,
-    PolyBenchVerifiedAdapter,
+    PolyBenchAdapter,
     SWEBenchLiteAdapter,
     SWEBenchVerifiedAdapter,
 )
@@ -35,10 +34,9 @@ def _hf_paths_to_pin() -> Iterable[str]:
     for adapter in (
         SWEBenchLiteAdapter(),
         SWEBenchVerifiedAdapter(),
-        PolyBenchVerifiedAdapter(),
+        PolyBenchAdapter(),
         PolyBench500Adapter(),
-        MultiSWEBenchMiniAdapter(),
-        MultiSWEBenchFlashAdapter(),
+        MultiSWEBenchAdapter(),
         ContextBenchAdapter(config="default"),
         ContextBenchAdapter(config="contextbench_verified"),
     ):

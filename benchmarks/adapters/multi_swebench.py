@@ -43,12 +43,12 @@ def _infer_language(row: dict, gold_files: frozenset[str]) -> str:
 
 
 class _MultiSWEBenchAdapterBase(BenchmarkAdapter):
-    """Adapter for ByteDance Multi-SWE-bench family.
+    """Adapter for ByteDance Multi-SWE-bench.
 
-    Three configs:
-    - full (n≈1632)  — `MultiSWEBenchAdapter`
-    - mini (n=400)   — `MultiSWEBenchMiniAdapter`
-    - flash (n=300)  — `MultiSWEBenchFlashAdapter`
+    Verified 2026-04-29 against the live HF API: only `default` config and
+    a single `train` split exist. The `mini` / `flash` variants advertised
+    upstream are not published as HF datasets; the full set is the only
+    accessible source.
 
     Languages: Java, TS, JS, Go, Rust, C, C++ (and minor others). Schema is
     SWE-bench-shaped (instance_id, repo, base_commit, patch, problem_statement)
@@ -57,7 +57,6 @@ class _MultiSWEBenchAdapterBase(BenchmarkAdapter):
     """
 
     hf_path = "bytedance-research/Multi-SWE-bench"
-    config: str
 
     def __init__(self, revision: str | None = None) -> None:
         self._revision_override = revision
@@ -67,51 +66,82 @@ class _MultiSWEBenchAdapterBase(BenchmarkAdapter):
         return self._revision_override or resolve_revision(self.hf_path)
 
     def dataset_revision(self) -> str:
-        return f"{self.hf_path}[{self.config}]@{self.revision}"
+        return f"{self.hf_path}@{self.revision}"
 
     def _load_raw(self) -> Iterator[dict]:
-        from datasets import load_dataset
+        # Streaming bypasses Arrow column-type casting: as of 2026-04-29 the
+        # bytedance-research/Multi-SWE-bench dataset has shards with
+        # inconsistent null-vs-string typing that breaks the bulk loader.
+        # The streaming iterator can still raise on a malformed shard part-
+        # way through; we treat that as end-of-stream and warn so we keep
+        # whatever rows came through cleanly.
+        import sys
 
-        ds = load_dataset(self.hf_path, self.config, split="test", revision=self.revision)
-        for row in ds:
+        from datasets import load_dataset
+        from datasets.exceptions import DatasetGenerationError
+
+        ds = load_dataset(self.hf_path, split="train", revision=self.revision, streaming=True)
+        it = iter(ds)
+        n = 0
+        while True:
+            try:
+                row = next(it)
+            except StopIteration:
+                break
+            except (DatasetGenerationError, TypeError, ValueError) as e:
+                print(
+                    f"[WARN] {self.name}: stream stopped early at row {n} " f"({type(e).__name__}: {str(e)[:200]})",
+                    file=sys.stderr,
+                )
+                break
+            n += 1
             yield dict(row)
 
     def _normalize(self, row: dict) -> BenchmarkInstance | None:
-        patch = row.get("patch") or ""
+        # Multi-SWE-bench schema differs from SWE-bench: `fix_patch` instead
+        # of `patch`, `base.sha` instead of `base_commit`, `org`/`repo` split.
+        patch = row.get("fix_patch") or row.get("patch") or ""
         if not patch.strip():
             return None
         gold_files = extract_patch_files(patch)
         if not gold_files:
             return None
+        base = row.get("base") or {}
+        if isinstance(base, dict):
+            base_commit = base.get("sha") or base.get("commit") or ""
+        else:
+            base_commit = str(base) if base else ""
+        if not base_commit:
+            return None
+        org = row.get("org") or ""
+        repo_short = row.get("repo") or ""
+        repo = f"{org}/{repo_short}" if org and "/" not in repo_short else (repo_short or org)
+        if not repo:
+            return None
         return BenchmarkInstance(
             instance_id=f"{self.name}::{row['instance_id']}",
             source_benchmark=self.name,
-            repo=row["repo"],
-            base_commit=row["base_commit"],
+            repo=repo,
+            base_commit=base_commit,
             gold_patch=patch,
             gold_files=gold_files,
             language=_infer_language(row, gold_files),
-            problem_statement=row.get("problem_statement"),
-            gold_fragments=None,  # Multi-SWE-bench is patch-only
+            problem_statement=row.get("body") or row.get("title") or row.get("problem_statement"),
+            gold_fragments=None,
             difficulty=row.get("difficulty"),
             edit_scope=len(gold_files),
             extra={
                 "test_patch": row.get("test_patch"),
-                "hints_text": row.get("hints_text"),
+                "hints_text": row.get("hints"),
             },
         )
 
 
 class MultiSWEBenchAdapter(_MultiSWEBenchAdapterBase):
     name = "multi_swebench"
-    config = "default"
 
 
-class MultiSWEBenchMiniAdapter(_MultiSWEBenchAdapterBase):
-    name = "multi_swebench_mini"
-    config = "mini"
-
-
-class MultiSWEBenchFlashAdapter(_MultiSWEBenchAdapterBase):
-    name = "multi_swebench_flash"
-    config = "flash"
+# `MultiSWEBenchMiniAdapter` and `MultiSWEBenchFlashAdapter` removed: the
+# upstream dataset only publishes a single `default` config. Use
+# `MultiSWEBenchAdapter` and slice via the manifest layer if a smaller
+# subset is needed.

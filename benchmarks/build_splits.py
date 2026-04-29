@@ -25,10 +25,9 @@ from pathlib import Path
 from benchmarks.adapters import (
     BenchmarkAdapter,
     ContextBenchAdapter,
-    MultiSWEBenchFlashAdapter,
-    MultiSWEBenchMiniAdapter,
+    MultiSWEBenchAdapter,
     PolyBench500Adapter,
-    PolyBenchVerifiedAdapter,
+    PolyBenchAdapter,
     SWEBenchLiteAdapter,
     SWEBenchVerifiedAdapter,
 )
@@ -41,10 +40,19 @@ from benchmarks.adapters.splits import (
 
 
 def default_test_adapters() -> tuple[BenchmarkAdapter, ...]:
+    """Test set composition (frozen, never seen during the τ sweep).
+
+    The user's original v1 plan listed "PolyBench Verified" and
+    "Multi-SWE-bench mini" as test sets. Verified against the live HF API
+    on 2026-04-29: neither subset is published. Substitutes:
+    - `PolyBench500Adapter` (curated 500) replaces "PolyBench Verified".
+    - Multi-SWE-bench has no curated subset; we put the full set in
+      calibration and rely on PolyBench/SWE-bench Verified for non-Python
+      and Python coverage in test.
+    """
     return (
         SWEBenchVerifiedAdapter(),
-        PolyBenchVerifiedAdapter(),
-        MultiSWEBenchMiniAdapter(),
+        PolyBench500Adapter(),
         ContextBenchAdapter(config="contextbench_verified"),
     )
 
@@ -52,8 +60,8 @@ def default_test_adapters() -> tuple[BenchmarkAdapter, ...]:
 def default_calibration_pool_adapters() -> tuple[BenchmarkAdapter, ...]:
     return (
         SWEBenchLiteAdapter(),
-        PolyBench500Adapter(),
-        MultiSWEBenchFlashAdapter(),
+        PolyBenchAdapter(),
+        MultiSWEBenchAdapter(),
         ContextBenchAdapter(config="default"),
     )
 

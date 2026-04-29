@@ -10,8 +10,8 @@ from benchmarks.adapters import (
     ContaminationDetector,
     ContextBenchAdapter,
     GoldenFragment,
-    MultiSWEBenchMiniAdapter,
-    PolyBenchVerifiedAdapter,
+    MultiSWEBenchAdapter,
+    PolyBenchAdapter,
     SelectionOutput,
     SWEBenchLiteAdapter,
     SWEBenchVerifiedAdapter,
@@ -203,7 +203,7 @@ def test_eval_result_dataclass_carries_optional_fragment_metrics():
     assert r.elapsed_seconds == 0.0
 
 
-class _StubPolyBenchAdapter(PolyBenchVerifiedAdapter):
+class _StubPolyBenchAdapter(PolyBenchAdapter):
     def __init__(self, rows: list[dict]) -> None:
         self._rows = rows
 
@@ -211,7 +211,7 @@ class _StubPolyBenchAdapter(PolyBenchVerifiedAdapter):
         yield from self._rows
 
 
-class _StubMultiAdapter(MultiSWEBenchMiniAdapter):
+class _StubMultiAdapter(MultiSWEBenchAdapter):
     def __init__(self, rows: list[dict]) -> None:
         self._rows = rows
 
@@ -233,7 +233,7 @@ def test_polybench_extracts_cst_node_fragments():
     }
     adapter = _StubPolyBenchAdapter([row])
     inst = next(iter(adapter.load()))
-    assert inst.source_benchmark == "polybench_verified"
+    assert inst.source_benchmark == "polybench"
     assert inst.language == "java"
     assert inst.gold_fragments is not None
     assert len(inst.gold_fragments) == 2
@@ -263,9 +263,10 @@ def test_multi_swebench_infers_language_from_file_extensions():
     )
     row = {
         "instance_id": "msb-rust-1",
-        "repo": "owner/rustcrate",
-        "base_commit": "3" * 40,
-        "patch": rust_patch,
+        "org": "owner",
+        "repo": "rustcrate",
+        "base": {"sha": "3" * 40},
+        "fix_patch": rust_patch,
     }
     adapter = _StubMultiAdapter([row])
     inst = next(iter(adapter.load()))
@@ -275,9 +276,10 @@ def test_multi_swebench_infers_language_from_file_extensions():
 def test_multi_swebench_explicit_language_wins_over_inference():
     row = {
         "instance_id": "msb-go-1",
-        "repo": "owner/x",
-        "base_commit": "4" * 40,
-        "patch": _SAMPLE_PATCH,  # python files
+        "org": "owner",
+        "repo": "x",
+        "base": {"sha": "4" * 40},
+        "fix_patch": _SAMPLE_PATCH,  # python files
         "language": "Go",
     }
     adapter = _StubMultiAdapter([row])

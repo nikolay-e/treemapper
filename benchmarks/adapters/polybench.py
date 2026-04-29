@@ -12,21 +12,20 @@ from benchmarks.adapters.dataset_pins import resolve_revision
 
 
 class _PolyBenchAdapterBase(BenchmarkAdapter):
-    """Adapter for amazon-science SWE-PolyBench (Java / JS / TS / Python).
+    """Adapter for amazon-science SWE-PolyBench family (Java / JS / TS / Python).
 
     PolyBench ships CST node-level annotations alongside the gold patch when
     available. The annotations live in `gold_nodes` (or `cst_nodes`) and are
     optional; instances without them still expose file-level recall via the
     patch.
 
-    Three configs exist upstream:
-    - full (n≈2110)         — `--config default`, uses subclass `PolyBenchAdapter`
-    - polybench500 (n=500)  — `PolyBench500Adapter`
-    - verified (n=382)      — `PolyBenchVerifiedAdapter`
+    The upstream layout (verified 2026-04-29 against the live HF API):
+    - `AmazonScience/SWE-PolyBench`     — full ~2110, `PolyBenchAdapter`
+    - `AmazonScience/SWE-PolyBench_500` — curated 500, `PolyBench500Adapter`
+    Both have a single `default` config and a `test` split.
     """
 
-    hf_path = "AmazonScience/SWE-PolyBench"
-    config: str
+    hf_path: str
 
     def __init__(self, revision: str | None = None) -> None:
         self._revision_override = revision
@@ -36,12 +35,12 @@ class _PolyBenchAdapterBase(BenchmarkAdapter):
         return self._revision_override or resolve_revision(self.hf_path)
 
     def dataset_revision(self) -> str:
-        return f"{self.hf_path}[{self.config}]@{self.revision}"
+        return f"{self.hf_path}@{self.revision}"
 
     def _load_raw(self) -> Iterator[dict]:
         from datasets import load_dataset
 
-        ds = load_dataset(self.hf_path, self.config, split="test", revision=self.revision)
+        ds = load_dataset(self.hf_path, split="test", revision=self.revision)
         for row in ds:
             yield dict(row)
 
@@ -114,14 +113,14 @@ class _PolyBenchAdapterBase(BenchmarkAdapter):
 
 class PolyBenchAdapter(_PolyBenchAdapterBase):
     name = "polybench"
-    config = "default"
+    hf_path = "AmazonScience/SWE-PolyBench"
 
 
 class PolyBench500Adapter(_PolyBenchAdapterBase):
     name = "polybench500"
-    config = "polybench500"
+    hf_path = "AmazonScience/SWE-PolyBench_500"
 
 
-class PolyBenchVerifiedAdapter(_PolyBenchAdapterBase):
-    name = "polybench_verified"
-    config = "verified"
+# `PolyBenchVerifiedAdapter` removed: there is no publicly available
+# "verified" sub-dataset under AmazonScience as of 2026-04-29. Use
+# `PolyBench500Adapter` for the curated subset instead.
