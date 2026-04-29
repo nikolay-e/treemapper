@@ -418,6 +418,82 @@ Given diff and context $(\Delta, C)$, an evaluator (LLM or human) ranks suspicio
 We propose evaluation on 500+ bug-fix commits from established benchmarks (Defects4J, BugsInPy), stratified by diff size, change type, and programming language. Baselines include: diff-only with fixed padding, whole modified files, fixed-depth graph expansion, BM25-only retrieval, and \textbf{dense embedding retrieval} (CodeBERT or text-embedding-3-small with cosine similarity). Ablations will measure the contribution of each edge type (call graph, symbol reference, lexical) and the effect of the stopping criterion.
 
 \newpage
+\section{Preliminary Empirical Results}
+\label{sec:prelim-results}
+
+We report interim numbers from an ongoing v1 evaluation run. The protocol implements Section~\ref{sec:eval}; this section reports what has completed at time of writing and explicitly flags what is missing. All numbers in this section should be read as preliminary and subject to change once the run completes and baselines are added.
+
+\subsection{Setup}
+
+\paragraph{Test sets.} We evaluate on three frozen manifests stratified per \texttt{(source\_benchmark, language)}: \emph{SWE-bench Verified} (500 instances, Python), \emph{PolyBench-500} (500 instances, multi-language curated subset), and \emph{ContextBench Verified} (500 instances, fragment-annotated). Cross-benchmark contamination is filtered by \texttt{(repo, base\_commit)} key. HuggingFace dataset revisions are pinned by SHA in \texttt{benchmarks/dataset\_revisions.json} for reproducibility.
+
+\paragraph{Hyperparameters.} A 3$\times$3 calibration grid over $\tau \in \{0.04, 0.08, 0.12\}$ and core-budget-fraction $\in \{0.5, 0.7, 0.9\}$ on a held-out 235-instance validation manifest selected $\tau{=}0.12$, $\mathrm{cbf}{=}0.5$, $B{=}8000$ tokens, $\mathrm{scoring}{=}\mathrm{hybrid}$. The remaining operational parameters (Section~\ref{sec:greedy} and the appendix) are held fixed at the values listed there.
+
+\paragraph{Hardware and reproducibility.} Apple M4 Pro, 48\,GB unified memory, macOS arm64. Python 3.12.12 with dependencies pinned in \texttt{requirements-bench.lock} (compiled via \texttt{uv pip compile}). Rust toolchain pinned to 1.92.0 via \texttt{rust-toolchain.toml}. Per-instance timeout 180\,s; checkpoint/resume supported.
+
+\subsection{Interim Results: Hybrid Mode}
+
+Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precision over the completed portion of the run (ContextBench Verified: 500/500; PolyBench-500: 344/500 at the cutoff for this draft; SWE-bench Verified: not started). Table~\ref{tab:prelim-lang} breaks the same data down by source language with non-parametric percentile bootstrap 95\% confidence intervals ($B{=}10{,}000$ resamples, seed=42).
+
+\begin{table}[h]
+\centering
+\caption{Per-benchmark interim file-level metrics, scoring=hybrid, $B{=}8000$ tokens. Recall and precision are means over completed instances. Status \texttt{ok} excludes \texttt{clone\_fail} (4 Java instances on ContextBench Verified) and pending instances.}
+\label{tab:prelim-bench}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Test set} & \textbf{n} & \textbf{File recall} & \textbf{File precision} & \textbf{ok\%} \\
+\midrule
+ContextBench Verified & 500 & 0.793 & 0.121 & 99.2\% \\
+PolyBench-500 (in progress) & 344 & 0.946 & 0.124 & 100.0\% \\
+SWE-bench Verified & --- & --- & --- & not started \\
+\midrule
+Pooled (interim) & 844 & 0.855 & 0.122 & 99.5\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Per-language interim metrics with 95\% percentile bootstrap CIs ($B{=}10{,}000$). Pooled across the two completed test sets, status=ok only.}
+\label{tab:prelim-lang}
+\begin{tabular}{lrll}
+\toprule
+\textbf{Language} & \textbf{n} & \textbf{File recall} & \textbf{File precision} \\
+\midrule
+Python      & 266 & 0.780 [0.743, 0.816] & 0.103 [0.089, 0.118] \\
+JavaScript  & 185 & 0.886 [0.852, 0.918] & 0.124 [0.109, 0.139] \\
+TypeScript  & 160 & 0.944 [0.918, 0.967] & 0.144 [0.125, 0.164] \\
+Java        & 136 & 0.887 [0.841, 0.929] & 0.116 [0.098, 0.136] \\
+Go          &  40 & 0.931 [0.890, 0.967] & 0.094 [0.056, 0.140] \\
+C           &  23 & 0.703 [0.580, 0.816] & 0.166 [0.106, 0.236] \\
+Rust        &  20 & 0.899 [0.831, 0.959] & 0.201 [0.140, 0.270] \\
+C++         &  10 & 0.702 [0.583, 0.835] & 0.257 [0.115, 0.447] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Observations}
+
+\paragraph{Recall is high at a tight 8k-token budget.} Pooled mean file recall is $0.855$ across 844 completed instances at $B{=}8000$. As a reference point, the published BM25 file-recall on SWE-bench at $B{=}13{,}000$ is $0.296$~\cite{jimenez2024swebench}, although the test sets are not identical---SWE-bench Verified, the directly comparable slice, has not yet completed in this run. We defer head-to-head numbers to the completed evaluation.
+
+\paragraph{Per-language pattern.} TypeScript ($0.944$) and Go ($0.931$) lead; Python ($0.780$), C ($0.703$), and C++ ($0.702$) trail. The C/C++ samples are too small ($n{=}23$ and $n{=}10$) to draw firm conclusions; the Python gap is consistent with the hypothesis that dynamic dispatch and metaprogramming weaken the symbol-reference heuristic (limitations discussed in Section~\ref{sec:scoring}). The TypeScript advantage tracks the language's static type information enriching the dependency graph.
+
+\paragraph{Precision is uniformly low ($\approx 0.12$).} The current selector packs files until the budget is exhausted; on small gold sets ($\sim 1$--$3$ files per instance) this produces many true-negative selections that depress precision. This is a methodological artifact, not a flaw: at fixed budget, recall is the load-bearing metric and precision is constrained by $|G|/k$. We report precision for completeness but do not optimize against it.
+
+\subsection{What is Missing}
+
+The following items are paper-blocking and tracked in our project TODO; they will be present in the final version of this section:
+
+\begin{itemize}
+    \item \textbf{SWE-bench Verified completion.} The third test manifest is still in queue; final pooled $n$ will be $\sim 1500$.
+    \item \textbf{Baseline comparisons.} BM25 (rank-bm25 over patch identifiers, file-level) and Aider repo-map are implemented (\texttt{benchmarks/baselines/}); BM25 is queued to run after the diffctx run completes, Aider scheduled for the following day. Paired-bootstrap CI on the diffctx-vs-baseline delta and Wilcoxon $p$-values are wired through \texttt{render\_comparison\_table}.
+    \item \textbf{Scoring-mode ablation.} Section~\ref{sec:ego} predicts that PPR with high $\alpha$ approximates EGO; this hypothesis requires running the same manifest at $\mathrm{scoring}{=}\mathrm{ppr}$, $\mathrm{ego}$, and the internal $\mathrm{bm25}$ mode. Only $\mathrm{hybrid}$ has been evaluated to date.
+    \item \textbf{Token-efficiency claims.} The current \texttt{used\_tokens} field is zero in v1 results due to a key-mapping bug in the eval-side wrapper; recall and precision are unaffected, but ``recall per actual token'' cannot be computed until the wrapper is fixed and the relevant rows are re-emitted.
+    \item \textbf{Budget curve.} v1 fixed $B{=}8000$. A budget sweep across $\{8\mathrm{k}, 16\mathrm{k}, 32\mathrm{k}\}$ is required to support any ``smaller budget suffices'' claim.
+    \item \textbf{Per-future timeout.} The runner's per-future timeout does not enforce in single-worker mode (bulk \texttt{as\_completed} timeout); $\sim$2\% of instances exceed the configured 180\,s, increasing wall-clock but not corrupting results.
+\end{itemize}
+
+\newpage
 \section{Discussion and Limitations}
 
 \paragraph{Language Coverage.}
