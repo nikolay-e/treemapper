@@ -12,7 +12,7 @@
 \usepackage{algpseudocode}
 \usepackage[margin=1in]{geometry}
 
-\title{Context-Selection for Git Diff: Budgeted Submodular Maximization on Code Dependency Graphs}
+\title{diffctx: A Submodular Framework for Diff-Aware Code Context Selection}
 
 \author{
   Nikolay Eremeev \\
@@ -26,7 +26,7 @@
 \maketitle
 
 \begin{abstract}
-Retrieving optimal context for Large Language Models to understand code changes is a critical challenge in automated software engineering. Current approaches rely on naive windowing or purely lexical retrieval, missing complex structural dependencies. We formalize diff-aware code context selection as \textbf{budgeted submodular maximization on a typed dependency graph}, providing constant-factor approximation guarantees through modified-greedy on submodular knapsack ($\frac{1}{2}(1-1/e)$); a Boltzmann-reweighted matroid reformulation recovers the classical $(1-1/e)$ bound when applicable. Two formal components ground the framework: (i) a partition matroid over multi-resolution fragments enforcing structural non-redundancy, and (ii) a pluggable relevance signal $\hat{w}(f, \Delta)$ instantiated via three families---Personalized PageRank, bounded ego-network expansion, and BM25 lexical retrieval---together with a hybrid combiner. We propose an evaluation methodology using dependency coverage recall and fault localization accuracy as behavioral proxies for the latent notion of ``understanding.''
+Retrieving optimal context for Large Language Models to understand code changes is a critical challenge in automated software engineering. Current approaches rely on naive windowing or purely lexical retrieval, missing complex structural dependencies. We formalize diff-aware code context selection as \textbf{budgeted submodular maximization on a typed dependency graph}, providing constant-factor approximation guarantees through modified-greedy on submodular knapsack ($\frac{1}{2}(1-1/e)$); a Boltzmann-reweighted matroid reformulation recovers the classical $(1-1/e)$ bound when applicable. Two formal components ground the framework: (i) a partition matroid over multi-resolution fragments enforcing structural non-redundancy, and (ii) a pluggable relevance signal $\hat{w}(f, \Delta)$ instantiated via three families---Personalized PageRank, bounded ego-network expansion, and BM25 lexical retrieval---together with a hybrid combiner. The framework is evaluated by file-level recall against annotated golden contexts at a fixed token budget across multi-language software-engineering benchmarks; interim results on 845 of $\sim$1500 instances yield pooled file recall $0.855$ at an $8000$-token budget, with baseline comparisons (BM25, Aider repo-map) and a four-mode scoring ablation queued.
 \end{abstract}
 
 \newpage
@@ -42,7 +42,7 @@ We address this gap by formalizing diff context selection as \textbf{budgeted su
 \begin{enumerate}
     \item A formal problem statement casting context selection as budgeted submodular maximization with constant-factor approximation guarantees: $\frac{1}{2}(1-1/e)$ via modified-greedy on submodular knapsack, and $(1-1/e)$ on a Boltzmann-reweighted matroid reformulation that folds the budget into the objective
     \item A typed-edge dependency-graph framework with per-category extraction and treatment (e.g., hub-suppression exemption), generalizing flat code-graph approaches
-    \item A pluggable relevance-scoring abstraction $\hat{w}(f, \Delta)$ where multiple algorithms (Personalized PageRank, bounded ego-network expansion, BM25) instantiate the abstract signal under a single submodular framework
+    \item A pluggable relevance-scoring abstraction $\hat{w}(f, \Delta)$ where multiple algorithms (Personalized PageRank, bounded ego-network expansion, BM25) instantiate the abstract signal under a single submodular framework, with a hybrid combiner adapting among them at query time
     \item An evaluation methodology using behavioral proxies (dependency coverage, fault localization) when ground truth is unavailable
     \item A reference implementation supporting 42 programming languages and configuration formats (Appendix~\ref{sec:impl-inventory})
 \end{enumerate}
@@ -274,16 +274,23 @@ The four scoring instantiations answer different questions in ablation:
 \end{itemize}
 A monotone ordering BM25 < EGO < PPR would validate the structural-relevance hypothesis with maximum strength; non-monotone results (e.g., EGO $\approx$ PPR) inform task-structure conclusions about the radius of relevance in code change. Section~\ref{sec:eval} reports the comparison.
 
-\subsection{Edge-Type Weight Calibration}
+\subsection{Edge-Type Weight Priors and Operational Calibration}
 \label{sec:weight-calibration}
 
-This is hyperparameter optimization over $|T|$ scalar parameters (ten in our instantiation, one per edge category), not learned per-edge weighting; richer parameterizations are deferred to future work. We parameterize edge weights by type: $w(e) = w_{\tau(e)}$ with $w_\tau \in \mathbb{R}_{\geq 0}^{|T|}$. Given a labeled corpus $\{(\Delta_i, G_i)\}_{i=1}^N$ of diffs paired with golden contexts, weights are calibrated by maximizing expected weighted recall on a held-out validation split:
-\begin{equation}
-w_\tau^* = \arg\max_{w_\tau \geq 0} \; \frac{1}{N} \sum_{i=1}^N \sum_{f \in C_i^*(w_\tau)} \mathbbm{1}[f \in G_i] \cdot \omega_f
-\end{equation}
-where $C_i^*(w_\tau)$ is the greedy solution under the active scoring algorithm $\hat{w} \in \{\mathrm{PPR}, \mathrm{EGO}, \mathrm{BM25}, \mathrm{Hybrid}\}$ with edge weights $w_\tau$. Calibration is performed independently for each scoring mode---PPR-tuned weights are not assumed optimal for EGO. Optimization uses grid search over a coarse simplex ($\sim 10^3$ evaluations for $|T| = 10$), or black-box methods (Bayesian optimization, CMA-ES) when more dimensions are added. In the absence of labeled data, structural priors $w_{\mathrm{semantic}} > w_{\mathrm{structural}} > w_{\mathrm{config}} > w_{\mathrm{similarity}} > w_{\mathrm{generic}}$ provide a reasonable cold-start ordering motivated by code-navigation studies~\cite{ko2006exploratory, robillard2004effective}.
+We separate \emph{structural} edge-type weights from \emph{operational} hyperparameters of the selection algorithm.
 
-Richer parameterizations---learned per-edge weights $w(e) = \mathrm{MLP}(\mathrm{features}(e))$ over edge-context features---are deferred to future work, as they require labeled corpora larger than the $|T|$-scalar regime.
+\paragraph{Edge-type weights as fixed priors.} Edge-type weights $w_\tau \in \mathbb{R}_{\geq 0}^{|T|}$ (one per edge category) are derived from code-navigation literature priors~\cite{ko2006exploratory, robillard2004effective} and held fixed across modes and benchmarks. The ordering $w_{\mathrm{semantic}} > w_{\mathrm{structural}} > w_{\mathrm{config}} > w_{\mathrm{similarity}} > w_{\mathrm{generic}}$ reflects the empirical finding that structural relationships dominate over lexical ones during developer code-search behavior. Full data-driven calibration over the $|T|$-dimensional weight simplex,
+\begin{equation}
+w_\tau^* = \arg\max_{w_\tau \geq 0} \; \frac{1}{N} \sum_{i=1}^N \sum_{f \in C_i^*(w_\tau)} \mathbbm{1}[f \in G_i] \cdot \omega_f,
+\end{equation}
+is left to future work: the labeled corpora required to disambiguate ten weights without overfitting exceed the size used in the present evaluation. The above formulation is recorded here as the natural calibration target once such corpora become available; richer parameterizations such as learned per-edge weights $w(e) = \mathrm{MLP}(\mathrm{features}(e))$ over edge-context features remain a further direction.
+
+\paragraph{Operational hyperparameters that are calibrated.} The two scalar operational parameters of the selection algorithm are calibrated empirically:
+\begin{itemize}
+    \item $\tau$: the marginal-utility stopping threshold of the lazy-greedy loop (Section~\ref{sec:greedy}),
+    \item $\beta_{\mathrm{core}}$ (a.k.a.\ \texttt{core\_budget\_fraction}): the fraction of the budget reserved for fragments adjacent to the core edit set $E_0$ before peripheral expansion.
+\end{itemize}
+These two parameters govern algorithm behavior at query time and admit a small grid search on a held-out manifest; calibration details are reported in Section~\ref{sec:prelim-results}. In the present work each scoring mode uses the same $(\tau, \beta_{\mathrm{core}})$ values selected on the hybrid-mode calibration; per-mode re-tuning is recorded as a sensitivity question in the limitations.
 
 \subsection{Temperature Calibration}
 \label{sec:beta-calibration}
@@ -392,48 +399,78 @@ This standard modification provides a constant-factor approximation guarantee un
 The algorithm runs in $O(|\mathcal{V}| \log |\mathcal{V}| + k \cdot T_{\text{eval}})$ where $k = |C|$ (typically 15--50 fragments) and $T_{\text{eval}} = O(|Z|)$. Lazy evaluation significantly reduces recomputations versus standard greedy on sparse code graphs.
 
 \newpage
-\section{Proposed Evaluation Methodology}
+\section{Evaluation Methodology}
 \label{sec:eval}
 
-Since ``understanding'' is latent and task-dependent, we propose operationalizing it via behavioral proxies with measurable outcomes. Empirical validation following this protocol is planned as future work.
+Since ``understanding'' is latent and task-dependent, we operationalize it via a behavioral proxy with directly measurable outcomes: \emph{file-level recall against an annotated golden context} on multi-language software-engineering benchmarks. Section~\ref{sec:prelim-results} reports results under this protocol; additional proxies (dependency coverage, co-change recall, fault-localization accuracy) are described as natural extensions in Section~\ref{sec:future-work}.
 
-\subsection{Dependency Coverage Recall}
+\subsection{Primary Metric: File Recall at Fixed Token Budget}
 
+For a diff $\Delta$ with golden file set $G \subseteq F$ and selector output $C \subseteq F$ subject to $\mathrm{cost}(C) \leq B$, define
 \begin{equation}
-    \text{Coverage}(C, \Delta) = \frac{|\{d \in \text{deps}(\Delta) : \exists f \in C, d \text{ resolves in } f\}|}{|\text{deps}(\Delta)|}
+\mathrm{Recall}(C, G) = \frac{|C \cap G|}{|G|}, \qquad \mathrm{Precision}(C, G) = \frac{|C \cap G|}{|C|}.
 \end{equation}
+At a fixed token budget $B$, recall is the load-bearing metric: precision is constrained by $|G|/k$ where $k$ is the number of files that fit, and is reported only for completeness. The metric is independent of which scoring instantiation $\hat{w}$ is active and is computed identically across all four modes (PPR, EGO, BM25, Hybrid) and across baselines.
 
-where $\text{deps}(\Delta)$ includes definitions of modified symbols, call targets, callers, types in signatures, and covering tests. Prior work shows developers locate bugs significantly faster with complete dependency context~\cite{parnin2011automated}, motivating coverage as a structural proxy for understanding. However, we note that dependency coverage is a \emph{secondary diagnostic}; behavioral tasks (fault localization, explanation quality) provide primary validation.
+\subsection{Test Sets and Benchmarks}
 
-\subsection{Co-Change Recall}
+Evaluation uses three frozen manifests aggregating instances from publicly released benchmarks: SWE-bench Verified~\cite{jimenez2024swebench}, a curated 500-instance subset of SWE-PolyBench, and the fragment-annotated ContextBench Verified configuration. Stratification is performed per \texttt{(source\_benchmark, language)}; cross-benchmark contamination is filtered by \texttt{(repo, base\_commit)} key. Manifests are committed to git before any calibration trial executes. HuggingFace dataset revisions are pinned by SHA so that subsequent reruns operate on the same data.
 
-For commits where files $A$ and $B$ changed together, we input only change $A$ and measure whether retrieved context $C$ includes file $B$. Co-change is an established empirical proxy for coupling and impact in software repositories~\cite{hassan2004predicting}. Note that co-change has 30--40\% false positive rate due to incidental coupling (formatting, mass refactoring); we filter to semantic modifications ($\geq$5 substantive lines changed).
+\subsection{Calibration Protocol}
 
-\subsection{Fault Localization Accuracy}
+Two operational parameters are calibrated on a separate calibration manifest disjoint from the test manifests: $\tau$ (stopping threshold) and $\beta_{\mathrm{core}}$ (core budget fraction), as defined in Section~\ref{sec:weight-calibration}. The calibration objective is the minimum file-recall across the four calibration source benchmarks,
+\begin{equation}
+\mathrm{score}(\tau, \beta_{\mathrm{core}}) \;=\; \min_{b \in \mathcal{B}_{\mathrm{cal}}} \; \mathrm{recall}_b(\tau, \beta_{\mathrm{core}}),
+\end{equation}
+chosen to avoid bias toward the largest-population calibration benchmark. A grid search of $3{\times}3$ values over $(\tau, \beta_{\mathrm{core}})$ is then validated on a held-out 235-instance validation manifest before fixing parameters and running the test set exactly once.
 
-Given diff and context $(\Delta, C)$, an evaluator (LLM or human) ranks suspicious lines for root cause identification. Metrics include Mean Reciprocal Rank and Precision@$k$. Prior work suggests fault localization accuracy correlates with debugging efficiency~\cite{parnin2011automated}.
+\subsection{Baselines}
 
-\subsection{Experimental Design}
-
-We propose evaluation on 500+ bug-fix commits from established benchmarks (Defects4J, BugsInPy), stratified by diff size, change type, and programming language. Baselines include: diff-only with fixed padding, whole modified files, fixed-depth graph expansion, BM25-only retrieval, and \textbf{dense embedding retrieval} (CodeBERT or text-embedding-3-small with cosine similarity). Ablations will measure the contribution of each edge type (call graph, symbol reference, lexical) and the effect of the stopping criterion.
+Two external baselines are implemented at the same fixed token budget $B$ on identical manifests:
+\begin{itemize}
+    \item \textbf{BM25 over patch identifiers} (\texttt{benchmarks/baselines/bm25\_baseline.py}): rank-bm25 over all repo files, query = identifiers extracted from the gold patch, file-pack to budget. This isolates pure lexical retrieval without graph structure and corresponds to the SWE-bench paper's reference protocol~\cite{jimenez2024swebench} adapted to a tight budget.
+    \item \textbf{Aider repo-map}~\cite{aider2023repomap} (\texttt{benchmarks/baselines/aider\_baseline.py}): the closest publicly available approach using the same primitives (tree-sitter AST extraction + PageRank + token-budgeted selection). Aider is invoked with \texttt{mentioned\_fnames} populated from the gold patch and \texttt{map\_tokens}=$B$, an asymmetry favoring Aider; diffctx receives only the patch text.
+\end{itemize}
+Sourcegraph Cody~\cite{hartman2024recsys} is cited as related work but cannot be directly compared: its evaluation suite is internal and requires the Sourcegraph backend.
 
 \newpage
-\section{Preliminary Empirical Results}
+\section{Empirical Evaluation}
 \label{sec:prelim-results}
 
-We report interim numbers from an ongoing v1 evaluation run. The protocol implements Section~\ref{sec:eval}; this section reports what has completed at time of writing and explicitly flags what is missing. All numbers in this section should be read as preliminary and subject to change once the run completes and baselines are added.
+This section instantiates the protocol of Section~\ref{sec:eval} and reports the v1 evaluation run. At the time of writing the run is partially complete; numbers are reported over the completed portion and the in-flight items are listed at the end of the section. The setup, calibration, and reproducibility statements (frozen manifests, pinned dataset revisions, fixed hardware) are unconditional on completion.
 
 \subsection{Setup}
 
-\paragraph{Test sets.} We evaluate on three frozen manifests stratified per \texttt{(source\_benchmark, language)}: \emph{SWE-bench Verified} (500 instances, Python), \emph{PolyBench-500} (500 instances, multi-language curated subset), and \emph{ContextBench Verified} (500 instances, fragment-annotated). Cross-benchmark contamination is filtered by \texttt{(repo, base\_commit)} key. HuggingFace dataset revisions are pinned by SHA in \texttt{benchmarks/dataset\_revisions.json} for reproducibility.
+\paragraph{Test sets.} Evaluation uses three frozen manifests, 500 instances each (1500 total), stratified per \texttt{(source\_benchmark, language)}:
+\begin{itemize}
+    \item \emph{SWE-bench Verified}~\cite{jimenez2024swebench} --- 500 Python instances drawn from 12 unique repositories.
+    \item \emph{PolyBench-500} --- a 500-instance multi-language curated subset of SWE-PolyBench, spanning 21 unique repositories across Java (125), JavaScript (125), TypeScript (95), and additional languages.
+    \item \emph{ContextBench Verified} --- 500 instances spanning 58 unique repositories with fragment-level golden annotations across 8 languages (Python 266, TypeScript 66, JavaScript 60, Go 40, C 23, Rust 20, Java 11, C++ 10, plus 4 unclassified).
+\end{itemize}
+Cross-benchmark contamination is filtered by \texttt{(repo, base\_commit)} key (1449 instances dropped from the calibration pool). HuggingFace dataset revisions are pinned by SHA in \texttt{benchmarks/dataset\_revisions.json}.
 
-\paragraph{Hyperparameters.} A 3$\times$3 calibration grid over $\tau \in \{0.04, 0.08, 0.12\}$ and core-budget-fraction $\in \{0.5, 0.7, 0.9\}$ on a held-out 235-instance validation manifest selected $\tau{=}0.12$, $\mathrm{cbf}{=}0.5$, $B{=}8000$ tokens, $\mathrm{scoring}{=}\mathrm{hybrid}$. The remaining operational parameters (Section~\ref{sec:greedy} and the appendix) are held fixed at the values listed there.
+\paragraph{Calibration.} A 3$\times$3 grid over $\tau \in \{0.04, 0.08, 0.12\}$ and $\beta_{\mathrm{core}} \in \{0.5, 0.7, 0.9\}$ was run on the calibration manifest. The selection objective was the minimum file-recall across the four calibration source benchmarks (Section~\ref{sec:eval}). The full grid is reported in Table~\ref{tab:calibration-grid}. The selected cell is $\tau{=}0.12$, $\beta_{\mathrm{core}}{=}0.5$, with $B{=}8000$ tokens, $\mathrm{scoring}{=}\mathrm{hybrid}$. Two observations are worth recording: first, the winning $\tau$ row ($\tau{=}0.12$) clusters tightly across $\beta_{\mathrm{core}}$ values (0.7287--0.7298, a span of 0.001), indicating that $\beta_{\mathrm{core}}$ is essentially insensitive in this regime; second, the calibration objective varies by only $\sim$0.02 across the full grid. The remaining operational parameters (Section~\ref{sec:greedy} and the appendix) are held fixed at the values listed there.
 
-\paragraph{Hardware and reproducibility.} Apple M4 Pro, 48\,GB unified memory, macOS arm64. Python 3.12.12 with dependencies pinned in \texttt{requirements-bench.lock} (compiled via \texttt{uv pip compile}). Rust toolchain pinned to 1.92.0 via \texttt{rust-toolchain.toml}. Per-instance timeout 180\,s; checkpoint/resume supported.
+\begin{table}[h]
+\centering
+\caption{Calibration grid scores: minimum per-source-benchmark file recall on the calibration manifest. The selected cell is highlighted; $\tau{=}0.12$ dominates across $\beta_{\mathrm{core}}$. The grid is reported in full to make the parameter-sensitivity argument concrete.}
+\label{tab:calibration-grid}
+\begin{tabular}{lccc}
+\toprule
+$\tau \; \backslash \; \beta_{\mathrm{core}}$ & $0.5$ & $0.7$ & $0.9$ \\
+\midrule
+$0.04$ & $0.7196$ & $0.7196$ & $0.7196$ \\
+$0.08$ & $0.7113$ & $0.7113$ & $0.7113$ \\
+$0.12$ & $\mathbf{0.7287^\ast}$ & $0.7287$ & $0.7298$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reproducibility.} Test, validation, and calibration manifests were frozen and committed to git (commit \texttt{5852d3bb}, \emph{``feat(benchmarks): freeze v1 splits''}, 2026-04-29) before any calibration trial executed. Calibration trials checkpoint to disk; final test runs are conducted exactly once on the frozen splits. Stratification seed is 42 with validation fraction 10\%; details in \texttt{benchmarks/manifests/v1/SPLIT\_REPORT.md}. Hardware: Apple M4 Pro, 48\,GB unified memory, macOS arm64; Python 3.12.12 with dependencies pinned in \texttt{requirements-bench.lock} (\texttt{uv pip compile}); Rust toolchain pinned to 1.92.0 via \texttt{rust-toolchain.toml}; per-instance timeout 180\,s; checkpoint/resume supported.
 
 \subsection{Interim Results: Hybrid Mode}
 
-Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precision over the completed portion of the run (ContextBench Verified: 500/500; PolyBench-500: 344/500 at the cutoff for this draft; SWE-bench Verified: not started). Table~\ref{tab:prelim-lang} breaks the same data down by source language with non-parametric percentile bootstrap 95\% confidence intervals ($B{=}10{,}000$ resamples, seed=42).
+Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precision over the completed portion of the run (ContextBench Verified: 500/500; PolyBench-500: 345/500 at the cutoff for this draft; SWE-bench Verified: not started). Table~\ref{tab:prelim-lang} breaks the same data down by source language with non-parametric percentile bootstrap 95\% confidence intervals ($B{=}10{,}000$ resamples, seed=42).
 
 \begin{table}[h]
 \centering
@@ -444,10 +481,10 @@ Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precisi
 \textbf{Test set} & \textbf{n} & \textbf{File recall} & \textbf{File precision} & \textbf{ok\%} \\
 \midrule
 ContextBench Verified & 500 & 0.793 & 0.121 & 99.2\% \\
-PolyBench-500 (in progress) & 344 & 0.946 & 0.124 & 100.0\% \\
+PolyBench-500 (in progress) & 345 & 0.946 & 0.124 & 100.0\% \\
 SWE-bench Verified & --- & --- & --- & not started \\
 \midrule
-Pooled (interim) & 844 & 0.855 & 0.122 & 99.5\% \\
+Pooled (interim) & 845 & 0.855 & 0.122 & 99.5\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -462,7 +499,7 @@ Pooled (interim) & 844 & 0.855 & 0.122 & 99.5\% \\
 \midrule
 Python      & 266 & 0.780 [0.743, 0.816] & 0.103 [0.089, 0.118] \\
 JavaScript  & 185 & 0.886 [0.852, 0.918] & 0.124 [0.109, 0.139] \\
-TypeScript  & 160 & 0.944 [0.918, 0.967] & 0.144 [0.125, 0.164] \\
+TypeScript  & 161 & 0.945 [0.919, 0.968] & 0.145 [0.126, 0.165] \\
 Java        & 136 & 0.887 [0.841, 0.929] & 0.116 [0.098, 0.136] \\
 Go          &  40 & 0.931 [0.890, 0.967] & 0.094 [0.056, 0.140] \\
 C           &  23 & 0.703 [0.580, 0.816] & 0.166 [0.106, 0.236] \\
@@ -474,23 +511,23 @@ C++         &  10 & 0.702 [0.583, 0.835] & 0.257 [0.115, 0.447] \\
 
 \subsection{Observations}
 
-\paragraph{Recall is high at a tight 8k-token budget.} Pooled mean file recall is $0.855$ across 844 completed instances at $B{=}8000$. As a reference point, the published BM25 file-recall on SWE-bench at $B{=}13{,}000$ is $0.296$~\cite{jimenez2024swebench}, although the test sets are not identical---SWE-bench Verified, the directly comparable slice, has not yet completed in this run. We defer head-to-head numbers to the completed evaluation.
+\paragraph{Recall is high at a tight 8k-token budget.} Pooled mean file recall is $0.855$ across 845 completed instances at $B{=}8000$. Direct head-to-head against published baselines is deferred to the completed run; a BM25 baseline running the same protocol at the same budget on the same manifests is implemented (\texttt{benchmarks/baselines/bm25\_baseline.py}) and queued, and an Aider repo-map baseline (\texttt{benchmarks/baselines/aider\_baseline.py}) is scheduled to follow.
 
 \paragraph{Per-language pattern.} TypeScript ($0.944$) and Go ($0.931$) lead; Python ($0.780$), C ($0.703$), and C++ ($0.702$) trail. The C/C++ samples are too small ($n{=}23$ and $n{=}10$) to draw firm conclusions; the Python gap is consistent with the hypothesis that dynamic dispatch and metaprogramming weaken the symbol-reference heuristic (limitations discussed in Section~\ref{sec:scoring}). The TypeScript advantage tracks the language's static type information enriching the dependency graph.
 
 \paragraph{Precision is uniformly low ($\approx 0.12$).} The current selector packs files until the budget is exhausted; on small gold sets ($\sim 1$--$3$ files per instance) this produces many true-negative selections that depress precision. This is a methodological artifact, not a flaw: at fixed budget, recall is the load-bearing metric and precision is constrained by $|G|/k$. We report precision for completeness but do not optimize against it.
 
-\subsection{What is Missing}
+\subsection{Limitations of the Current Empirical Snapshot}
 
-The following items are paper-blocking and tracked in our project TODO; they will be present in the final version of this section:
+The numbers in this section reflect a partial v1 run. The following items are scheduled work, not deferred future work, and will be incorporated into the next version of this section before submission:
 
 \begin{itemize}
-    \item \textbf{SWE-bench Verified completion.} The third test manifest is still in queue; final pooled $n$ will be $\sim 1500$.
-    \item \textbf{Baseline comparisons.} BM25 (rank-bm25 over patch identifiers, file-level) and Aider repo-map are implemented (\texttt{benchmarks/baselines/}); BM25 is queued to run after the diffctx run completes, Aider scheduled for the following day. Paired-bootstrap CI on the diffctx-vs-baseline delta and Wilcoxon $p$-values are wired through \texttt{render\_comparison\_table}.
-    \item \textbf{Scoring-mode ablation.} Section~\ref{sec:ego} predicts that PPR with high $\alpha$ approximates EGO; this hypothesis requires running the same manifest at $\mathrm{scoring}{=}\mathrm{ppr}$, $\mathrm{ego}$, and the internal $\mathrm{bm25}$ mode. Only $\mathrm{hybrid}$ has been evaluated to date.
-    \item \textbf{Token-efficiency claims.} The current \texttt{used\_tokens} field is zero in v1 results due to a key-mapping bug in the eval-side wrapper; recall and precision are unaffected, but ``recall per actual token'' cannot be computed until the wrapper is fixed and the relevant rows are re-emitted.
-    \item \textbf{Budget curve.} v1 fixed $B{=}8000$. A budget sweep across $\{8\mathrm{k}, 16\mathrm{k}, 32\mathrm{k}\}$ is required to support any ``smaller budget suffices'' claim.
-    \item \textbf{Per-future timeout.} The runner's per-future timeout does not enforce in single-worker mode (bulk \texttt{as\_completed} timeout); $\sim$2\% of instances exceed the configured 180\,s, increasing wall-clock but not corrupting results.
+    \item \textbf{SWE-bench Verified completion.} The third test manifest is in queue; final pooled $n$ will be $\sim 1500$.
+    \item \textbf{Baseline comparisons.} BM25 over patch identifiers (\texttt{benchmarks/baselines/bm25\_baseline.py}) is queued to run after the diffctx run completes. Aider repo-map (\texttt{benchmarks/baselines/aider\_baseline.py}) is scheduled to follow. The comparison table will report paired-bootstrap CI on per-instance recall deltas and Wilcoxon signed-rank $p$-values via \texttt{render\_comparison\_table}.
+    \item \textbf{Scoring-mode ablation across the four modes.} Section~\ref{sec:ego} predicts that PPR at high restart probability $\alpha$ approximates bounded-radius EGO. This requires running each of $\mathrm{scoring} \in \{\mathrm{hybrid}, \mathrm{ppr}, \mathrm{ego}, \mathrm{bm25}_{\text{internal}}\}$ on the same manifests. Only $\mathrm{hybrid}$ has been evaluated to date; the remaining three modes are queued. To control compute, the ablation is planned on a stratified subset rather than the full 1500 instances per mode; $(\tau, \beta_{\mathrm{core}})$ are held at the hybrid-optimal values, with per-mode re-tuning recorded as a sensitivity question.
+    \item \textbf{Budget curve.} v1 fixes $B{=}8000$. A budget sweep across $\{8000, 16000, 32000\}$ is required to support any claim about budget efficiency. The sweep will be paired with the \texttt{used\_tokens} fix below so the curve plots recall against actual measured token usage rather than nominal budget.
+    \item \textbf{Token-efficiency reporting.} The \texttt{used\_tokens} field is zero in v1 results due to a key-mapping bug in the eval-side wrapper (\texttt{benchmarks/diffctx\_eval\_fn.py} reads a key that the pipeline does not emit). Recall and precision are unaffected by this bug; ``recall per actual token'' cannot be computed until the wrapper is corrected and the affected rows re-emitted.
+    \item \textbf{Per-future timeout.} The runner's per-future timeout does not enforce in single-worker mode because \texttt{concurrent.futures.as\_completed} applies a bulk deadline rather than per-call. About 2\% of instances exceed the configured 180\,s; this increases wall-clock but does not corrupt results.
 \end{itemize}
 
 \newpage
@@ -517,11 +554,23 @@ While we provide operational ranges for parameters ($\alpha$, $\tau$, edge weigh
 \newpage
 \section{Conclusion}
 
-We have presented a theoretical framework for diff context selection based on budgeted submodular maximization over code property graphs. The formulation unifies structural and lexical signals, leverages well-studied optimization techniques, and offers adaptive stopping criteria based on marginal utility. The proposed evaluation methodology operationalizes the latent notion of understanding through dependency coverage and fault localization proxies.
+We have presented diffctx, a framework for diff-aware code context selection that casts the problem as budgeted submodular maximization on a typed dependency graph. The formulation unifies structural and lexical signals under a single submodular objective, leverages well-studied lazy-greedy optimization techniques, and admits an adaptive stopping heuristic based on marginal utility. A pluggable scoring abstraction (PPR, EGO, BM25, Hybrid) allows the same selection algorithm to be instantiated with different relevance signals without changing the optimization machinery.
 
-Key theoretical contributions: (1) proof that max-coverage utility with nondecreasing aggregation is submodular, (2) clear delineation between cardinality and knapsack constraint guarantees, (3) explicit acknowledgment of heuristic components (adaptive stopping, symbol reference edges).
+Key contributions: (1) submodularity of the max-coverage utility under nondecreasing aggregation, with explicit constant-factor approximation guarantees ($\frac{1}{2}(1-1/e)$ via modified-greedy on the knapsack form, $(1-1/e)$ via Boltzmann reweighting on the matroid form); (2) a typed-edge dependency graph with per-category treatment (hub-suppression exemption for semantic, structural, and test edges); (3) interim empirical results (Section~\ref{sec:prelim-results}) showing pooled file recall $0.855$ at $B{=}8000$ on 845 multi-language instances under the hybrid scoring mode, with the rest of the protocol --- baseline comparisons, scoring-mode ablation, budget curve --- scheduled and tracked.
 
-This work establishes the theoretical foundation for context-aware code analysis tools. Empirical validation on benchmark datasets will quantify the practical benefits over existing approaches and guide parameter calibration for diverse codebases.
+\subsection{Future Work}
+\label{sec:future-work}
+
+\paragraph{Additional behavioral proxies.} The current evaluation uses file-level recall against an annotated golden set. Three complementary proxies are natural extensions:
+\begin{itemize}
+    \item \textbf{Dependency coverage recall.} For a diff $\Delta$, define $\mathrm{Coverage}(C, \Delta) = |\{d \in \mathrm{deps}(\Delta) : \exists f \in C, d \text{ resolves in } f\}| / |\mathrm{deps}(\Delta)|$, where $\mathrm{deps}(\Delta)$ is the set of definitions of modified symbols, call targets, callers, types in signatures, and covering tests. This complements file recall by measuring whether the selected context resolves the symbols that appear in the diff~\cite{parnin2011automated}.
+    \item \textbf{Co-change recall.} For commits where files $A$ and $B$ change together, input only $A$'s diff and measure whether $B$ appears in $C$. Co-change has a 30--40\% incidental-coupling false-positive rate~\cite{hassan2004predicting}; the proxy is meaningful only after filtering to semantic modifications ($\geq 5$ substantive lines).
+    \item \textbf{Fault-localization accuracy.} Given $(\Delta, C)$, an LLM-based or human evaluator ranks suspicious lines for root-cause identification, scored by Mean Reciprocal Rank and Precision@$k$~\cite{parnin2011automated}.
+\end{itemize}
+
+\paragraph{Edge-weight calibration on labeled corpora.} Section~\ref{sec:weight-calibration} fixes $w_\tau$ at literature-derived priors. A larger labeled corpus (e.g., a sweep across all six benchmarks combined) would enable the full $|T|$-dimensional calibration of $w_\tau$, with the formulation already laid out there. Richer parameterizations (per-edge MLP over edge-context features) become tractable once labeled data scales further.
+
+\paragraph{Backward dependencies and dynamic dispatch.} The current PPR formulation propagates relevance along forward edges. For change-understanding, callers of modified functions are often more important than callees; reverse-edge or graph-transpose PPR is a direct extension. The Python recall gap ($0.780$ vs.\ $0.944$ for TypeScript, Section~\ref{sec:prelim-results}) is consistent with the dynamic-dispatch limitation discussed in the limitations and motivates per-language semantic resolvers.
 
 \newpage
 \section*{Acknowledgments}
