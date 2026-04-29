@@ -372,6 +372,31 @@ reproducible across upstream pushes):
 | `MultiSWEBench{,Mini,Flash}Adapter` | `bytedance-research/Multi-SWE-bench` (configs: `default`, `mini`, `flash`) |
 | `ContextBenchAdapter` | `Contextbench/ContextBench` (configs: `default`, `contextbench_verified`) |
 
+## Calibration pipeline
+
+Top-down: a single CLI per phase, each consuming the previous phase's output.
+All four scripts live in `benchmarks/` and read manifests from
+`benchmarks/manifests/v1/` produced by `build_splits.py`.
+
+| Phase | Script | Input | Output |
+|---|---|---|---|
+| Build splits | `python -m benchmarks.build_splits` | adapters | `manifests/v1/{calibration,validation,test_*}.txt` + `SPLIT_REPORT.md` |
+| One-off run | `python -m benchmarks.run_eval --manifest M --tau X --core-budget-fraction Y --out R.json` | manifest | per-instance results JSON |
+| 2D grid sweep | `python -m benchmarks.calibrate --manifest calibration.txt --tau 0.04,0.08,0.12,0.16 --core-budget-fraction 0.5,0.6,0.7,0.8 --out results/calibration/v1` | calibration manifest | `grid_results.json`, `top_candidates.json`, `grid_report.md` |
+| Validation pass | `python -m benchmarks.select_final --candidates top_candidates.json --manifest validation.txt --out final_choice.json` | top-K candidates + validation manifest | `final_choice.json` (winner + per-benchmark scores) |
+| Final eval | `python -m benchmarks.run_final_eval --winner final_choice.json --manifests-dir manifests/v1 --out results/final/v1` | winner + every test manifest | per-test-set JSONs + `PAPER_TABLE.md` |
+
+The objective at sweep time is `min(per_benchmark file_recall)` —
+generalization-friendly. Tie-breaking on `top_k_trials` prefers the trial
+with lower mean tokens (cheaper context wins under equal recall).
+
+`benchmarks/diffctx_eval_fn.py` is the only file that bridges the adapter
+layer to the actual diffctx pipeline: `make_diffctx_eval_fn(repos_dir)`
+returns an `EvalFn(instance, params) -> EvalResult` that clones the repo,
+applies the gold patch as a commit, sets the env vars from `params.to_env()`,
+calls `build_diff_context`, computes metrics via `UniversalEvaluator`, and
+reverts. Tests pass a stub `EvalFn` and never touch this module.
+
 ## Calibration vs evaluation split
 
 To prevent contamination between hyperparameter calibration (e.g.
