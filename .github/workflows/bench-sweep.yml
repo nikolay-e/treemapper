@@ -1,0 +1,357 @@
+name: bench-sweep
+
+# Multi-runner parallel sweep across method × budget × test_set.
+#
+# Trigger via workflow_dispatch. Each cell runs as an independent job
+# in the prebuilt treemapper-bench Docker container; all metrics
+# (per-instance file_recall, file_precision, used_tokens, elapsed,
+# fragment_count, latency breakdown, status, error) are written to a
+# JSONL checkpoint that is uploaded as an artifact AND committed to the
+# bench-results/sweep branch so nothing is lost when artifacts expire.
+
+on:
+  workflow_dispatch:
+    inputs:
+      manifests_subdir:
+        description: 'Manifests subdir under benchmarks/manifests/'
+        default: 'v1'
+        required: true
+      timeout_per_instance:
+        description: 'Per-instance timeout in seconds'
+        default: '600'
+        required: true
+      tau:
+        description: 'diffctx tau (stopping threshold)'
+        default: '0.12'
+      core_budget_fraction:
+        description: 'diffctx core budget fraction'
+        default: '0.5'
+      results_branch:
+        description: 'Branch where raw artifacts are committed'
+        default: 'bench-results/sweep'
+
+permissions:
+  contents: write
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_REF: ghcr.io/${{ github.repository_owner }}/treemapper-bench:latest
+
+jobs:
+  # ============================================================================
+  # 1. Compute a stable sweep_id used as the directory name for raw artifacts
+  # ============================================================================
+  prep:
+    runs-on: ubuntu-latest
+    outputs:
+      sweep_id: ${{ steps.id.outputs.sweep_id }}
+      ts: ${{ steps.id.outputs.ts }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: id
+        run: |
+          ts=$(date -u +%Y%m%dT%H%M%SZ)
+          sha=$(git rev-parse --short HEAD)
+          echo "sweep_id=sweep-${ts}-${sha}" >> "$GITHUB_OUTPUT"
+          echo "ts=${ts}" >> "$GITHUB_OUTPUT"
+
+  # ============================================================================
+  # 2. The cell matrix. 5 methods × 5 budgets × 3 test sets = 75 base.
+  #    Excludes drop nonsensical combinations (B=-1 for non-diffctx baselines).
+  #    Each cell is one runner; max-parallel: 256 (GH caps to its own concurrency
+  #    limit, typically 20 for free public-repo Linux runners — they queue and
+  #    drain naturally).
+  # ============================================================================
+  sweep:
+    needs: prep
+    strategy:
+      fail-fast: false
+      max-parallel: 256
+      matrix:
+        method: [ppr, ego, hybrid, bm25, aider]
+        budget: [-1, 0, 32000, 64000, 128000]
+        test_set: [contextbench_verified, polybench500, swebench_verified]
+        exclude:
+          # External BM25 baseline has no concept of unlimited budget.
+          - { method: bm25, budget: -1 }
+          # Aider repo-map is inherently budget-bounded by token packing.
+          - { method: aider, budget: -1 }
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/treemapper-bench:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      CELL_TAG: ${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
+      CELL_DIR: results/sweep/${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
+      MANIFESTS_DIR: benchmarks/manifests/${{ inputs.manifests_subdir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cell start metadata
+        run: |
+          mkdir -p "${CELL_DIR}"
+          cat > "${CELL_DIR}/metadata.json" <<JSON
+          {
+            "sweep_id": "${{ needs.prep.outputs.sweep_id }}",
+            "cell": {
+              "method": "${{ matrix.method }}",
+              "budget": ${{ matrix.budget }},
+              "test_set": "${{ matrix.test_set }}",
+              "tau": ${{ inputs.tau }},
+              "core_budget_fraction": ${{ inputs.core_budget_fraction }}
+            },
+            "git": {
+              "sha": "${{ github.sha }}",
+              "ref": "${{ github.ref }}",
+              "actor": "${{ github.actor }}"
+            },
+            "started_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "runner": {
+              "os": "${RUNNER_OS}",
+              "arch": "${RUNNER_ARCH}",
+              "name": "${RUNNER_NAME}",
+              "image": "${IMAGE_REF}"
+            }
+          }
+          JSON
+
+      - name: System info dump
+        run: |
+          {
+            echo "=== uname -a ==="; uname -a
+            echo; echo "=== /proc/cpuinfo (1 core) ==="; awk '/^processor/{p++} p<2' /proc/cpuinfo
+            echo; echo "=== /proc/meminfo (head) ==="; head -5 /proc/meminfo
+            echo; echo "=== df -h ==="; df -h
+            echo; echo "=== python ==="; python --version
+            echo; echo "=== pip freeze (head 30) ==="; pip freeze 2>/dev/null | head -30 || true
+            echo; echo "=== rustc ==="; rustc --version 2>/dev/null || echo "no rustc"
+            echo; echo "=== cargo ==="; cargo --version 2>/dev/null || echo "no cargo"
+            echo; echo "=== git ==="; git --version
+          } > "${CELL_DIR}/system_info.log" 2>&1 || true
+
+      - name: Build per-cell single-test-set manifest dir
+        run: |
+          mkdir -p /tmp/manifest_one
+          cp "${MANIFESTS_DIR}/test_${{ matrix.test_set }}.txt" /tmp/manifest_one/
+
+      - name: Resolve baseline + scoring
+        id: cfg
+        run: |
+          method="${{ matrix.method }}"
+          case "$method" in
+            ppr|ego|hybrid)
+              echo "baseline=diffctx" >> "$GITHUB_OUTPUT"
+              echo "scoring=$method" >> "$GITHUB_OUTPUT"
+              ;;
+            bm25)
+              echo "baseline=bm25" >> "$GITHUB_OUTPUT"
+              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              ;;
+            aider)
+              echo "baseline=aider_fair" >> "$GITHUB_OUTPUT"
+              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Build winner.json
+        run: |
+          cat > /tmp/winner.json <<JSON
+          {
+            "winner": {
+              "tau": ${{ inputs.tau }},
+              "core_budget_fraction": ${{ inputs.core_budget_fraction }},
+              "budget": ${{ matrix.budget }},
+              "scoring": "${{ steps.cfg.outputs.scoring }}",
+              "extra_env": {}
+            }
+          }
+          JSON
+
+      - name: Run cell (logged to run.log)
+        timeout-minutes: 330
+        run: |
+          set -o pipefail
+          python -m benchmarks.run_final_eval \
+            --baseline "${{ steps.cfg.outputs.baseline }}" \
+            --winner /tmp/winner.json \
+            --manifests-dir /tmp/manifest_one \
+            --workers 2 \
+            --timeout-per-instance "${{ inputs.timeout_per_instance }}" \
+            --min-memory-gb 4 \
+            --min-disk-gb 5 \
+            --out "${CELL_DIR}" 2>&1 | tee "${CELL_DIR}/run.log"
+
+      - name: Per-instance metric summary (always)
+        if: always()
+        run: |
+          ckpt="${CELL_DIR}/${{ matrix.test_set }}.checkpoint.jsonl"
+          if [ -f "${ckpt}" ]; then
+            python - <<PY > "${CELL_DIR}/cell_summary.json"
+          import json, statistics
+          rows = []
+          with open("${ckpt}") as f:
+              for line in f:
+                  line = line.strip()
+                  if line:
+                      rows.append(json.loads(line))
+          n = len(rows)
+          if n == 0:
+              print(json.dumps({"n": 0}))
+          else:
+              recall = [r.get("file_recall", 0) for r in rows]
+              precision = [r.get("file_precision", 0) for r in rows]
+              elapsed = [r.get("elapsed_seconds", 0) for r in rows]
+              tokens = [r.get("used_tokens", 0) for r in rows]
+              ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
+              statuses = {}
+              for r in rows:
+                  s = (r.get("extra") or {}).get("status", "missing")
+                  statuses[s] = statuses.get(s, 0) + 1
+              out = {
+                  "n": n,
+                  "ok": ok,
+                  "ok_pct": 100.0 * ok / n if n else 0.0,
+                  "statuses": statuses,
+                  "file_recall": {
+                      "mean": statistics.fmean(recall),
+                      "median": statistics.median(recall),
+                      "p25": sorted(recall)[max(0, n*1//4-1)],
+                      "p75": sorted(recall)[min(n-1, n*3//4)],
+                  },
+                  "file_precision": {"mean": statistics.fmean(precision)},
+                  "elapsed_seconds": {
+                      "mean": statistics.fmean(elapsed),
+                      "max": max(elapsed),
+                      "total": sum(elapsed),
+                  },
+                  "used_tokens": {
+                      "mean": statistics.fmean(tokens),
+                      "max": max(tokens),
+                  },
+              }
+              print(json.dumps(out, indent=2))
+          PY
+            cat "${CELL_DIR}/cell_summary.json"
+          else
+              echo '{"error": "no checkpoint produced", "expected_path": "'${ckpt}'"}' \
+                  > "${CELL_DIR}/cell_summary.json"
+              ls -la "${CELL_DIR}" || true
+          fi
+
+      - name: Append cell-end metadata
+        if: always()
+        run: |
+          end_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Merge end fields onto metadata.json (jq guaranteed in container).
+          if command -v jq >/dev/null 2>&1; then
+              tmp=$(mktemp)
+              jq --arg end "${end_ts}" --arg status "${{ job.status }}" --arg disk "$(df -h / | tail -1)" \
+                  '. + {ended_at_utc: $end, exit_status: $status, runner_disk_at_end: $disk}' \
+                  "${CELL_DIR}/metadata.json" > "${tmp}" \
+                && mv "${tmp}" "${CELL_DIR}/metadata.json"
+          fi
+          cat "${CELL_DIR}/metadata.json"
+
+      - name: Upload cell artifact (90-day retention)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cell-${{ matrix.method }}-b${{ matrix.budget }}-${{ matrix.test_set }}
+          path: ${{ env.CELL_DIR }}/
+          retention-days: 90
+          if-no-files-found: warn
+
+  # ============================================================================
+  # 3. Aggregate all cells into per-cell summary table + raw artifact archive.
+  #    Commits raw artifacts to a dedicated branch so nothing is lost when
+  #    GH Actions artifact retention expires.
+  # ============================================================================
+  aggregate:
+    needs: [prep, sweep]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install numpy scipy
+
+      - name: Download all cell artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all_cells
+          pattern: cell-*
+
+      - name: Aggregate per-cell summaries
+        run: |
+          mkdir -p aggregated
+          python -m benchmarks.aggregate_sweep \
+            --cells-dir all_cells \
+            --sweep-id "${{ needs.prep.outputs.sweep_id }}" \
+            --out aggregated/
+
+      - name: Show aggregate summary
+        run: |
+          echo "=== aggregated/ ==="
+          ls -la aggregated/
+          echo
+          echo "=== aggregated/SWEEP_TABLE.md ==="
+          cat aggregated/SWEEP_TABLE.md || true
+          echo
+          echo "=== aggregated/grand_summary.json (head 80) ==="
+          head -80 aggregated/grand_summary.json || true
+
+      - name: Upload aggregated tables (1-year retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-aggregated-${{ needs.prep.outputs.sweep_id }}
+          path: aggregated/
+          retention-days: 365
+
+      - name: Commit raw artifacts to results branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BR: ${{ inputs.results_branch }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          # Use a sibling clone so we don't have to detach the workspace.
+          git clone --depth 1 --branch main \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
+            sidecar
+          cd sidecar
+          # Fetch existing results branch if it exists, else create it from a clean orphan.
+          if git ls-remote --heads origin "${BR}" | grep -q "${BR}"; then
+            git fetch origin "${BR}":"${BR}"
+            git checkout "${BR}"
+          else
+            git checkout --orphan "${BR}"
+            git rm -rf . 2>/dev/null || true
+          fi
+          mkdir -p "${{ needs.prep.outputs.sweep_id }}"
+          cp -r ../aggregated "${{ needs.prep.outputs.sweep_id }}/aggregated"
+          cp -r ../all_cells "${{ needs.prep.outputs.sweep_id }}/cells"
+          # README index
+          cat > "${{ needs.prep.outputs.sweep_id }}/README.md" <<EOF
+          # Sweep ${{ needs.prep.outputs.sweep_id }}
+          - Triggered: ${{ needs.prep.outputs.ts }}
+          - Source SHA: ${{ github.sha }}
+          - Manifests: ${{ inputs.manifests_subdir }}
+          - tau=${{ inputs.tau }}, core_budget_fraction=${{ inputs.core_budget_fraction }}
+          - Per-instance timeout: ${{ inputs.timeout_per_instance }}s
+
+          See \`aggregated/SWEEP_TABLE.md\` and \`cells/\` for raw per-instance JSONL checkpoints.
+          EOF
+          git add -A
+          git commit -m "sweep ${{ needs.prep.outputs.sweep_id }} (source ${{ github.sha }})" || echo "nothing to commit"
+          git push -u origin "${BR}"

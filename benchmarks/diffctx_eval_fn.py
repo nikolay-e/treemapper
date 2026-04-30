@@ -11,10 +11,39 @@ import os
 import time
 from pathlib import Path
 
+import tiktoken
+
 from benchmarks.adapters import BenchmarkInstance, GoldenFragment
 from benchmarks.adapters.base import EvalResult
 from benchmarks.adapters.evaluator import SelectionOutput, UniversalEvaluator
 from benchmarks.adapters.runner import RunParams
+
+_TOKEN_ENC = tiktoken.get_encoding("o200k_base")
+
+
+def _compute_used_tokens(output: dict) -> int:
+    """Recover used_tokens from diffctx pipeline output.
+
+    The Rust binding (pybridge.rs) does not expose per-fragment token_count
+    or a top-level token_count aggregate. We support a forward-compatible
+    path: if the pipeline ever adds either key we use it; otherwise we
+    re-tokenize the fragment contents Python-side. This keeps recall and
+    precision unaffected (they are computed from selected_files) and makes
+    used_tokens reflect actual encoder cost.
+    """
+    aggregate = output.get("token_count")
+    if isinstance(aggregate, int) and aggregate > 0:
+        return aggregate
+    total = 0
+    for f in output.get("fragments", []) or []:
+        per_frag = f.get("token_count")
+        if isinstance(per_frag, int) and per_frag > 0:
+            total += per_frag
+            continue
+        content = f.get("content")
+        if isinstance(content, str) and content:
+            total += len(_TOKEN_ENC.encode(content, disallowed_special=()))
+    return total
 
 
 def _output_fragments(output: dict) -> tuple[GoldenFragment, ...]:
@@ -97,15 +126,22 @@ def make_diffctx_eval_fn(repos_dir: Path):
                 result.extra["status"] = "diffctx_fail"
                 return result
             fragments = _output_fragments(output)
+            used_tokens = _compute_used_tokens(output)
             selection = SelectionOutput(
                 selected_files=_selected_files(fragments),
                 selected_fragments=fragments,
-                used_tokens=int(output.get("token_count", 0) or 0),
+                used_tokens=used_tokens,
                 elapsed_seconds=elapsed,
             )
             result = evaluator.evaluate(instance, selection, budget=params.budget)
+            result.used_tokens = used_tokens
             result.extra["status"] = "ok"
             result.extra["language"] = instance.language
+            result.extra["fragment_count"] = len(fragments)
+            latency = output.get("latency") or {}
+            if latency:
+                result.extra["latency_total_ms"] = latency.get("total_ms")
+                result.extra["latency_breakdown"] = {k: v for k, v in latency.items() if k != "total_ms"}
             return result
         finally:
             for k, v in prior_env.items():
