@@ -10,32 +10,22 @@ name: bench-sweep
 # bench-results/sweep branch so nothing is lost when artifacts expire.
 
 on:
-  workflow_dispatch:
-    inputs:
-      manifests_subdir:
-        description: 'Manifests subdir under benchmarks/manifests/'
-        default: 'v1'
-        required: true
-      timeout_per_instance:
-        description: 'Per-instance timeout in seconds'
-        default: '600'
-        required: true
-      tau:
-        description: 'diffctx tau (stopping threshold)'
-        default: '0.12'
-      core_budget_fraction:
-        description: 'diffctx core budget fraction'
-        default: '0.5'
-      results_branch:
-        description: 'Branch where raw artifacts are committed'
-        default: 'bench-results/sweep'
+  workflow_dispatch: {}
 
 permissions:
   contents: read
 
+# Sweep parameters are hardcoded so the workflow runs with a single
+# zero-input click. To change a parameter, edit this env block and commit.
+# Per-cell knobs (method, budget, test_set) are the matrix below.
 env:
   REGISTRY: ghcr.io
   IMAGE_REF: ghcr.io/${{ github.repository_owner }}/treemapper-bench:latest
+  MANIFESTS_SUBDIR: v1
+  TIMEOUT_PER_INSTANCE: '600'
+  TAU: '0.12'
+  CORE_BUDGET_FRACTION: '0.5'
+  RESULTS_BRANCH: bench-results/sweep
 
 jobs:
   # ============================================================================
@@ -89,14 +79,14 @@ jobs:
     env:
       CELL_TAG: ${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
       CELL_DIR: results/sweep/${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
-      MANIFESTS_DIR: benchmarks/manifests/${{ inputs.manifests_subdir }}
+      MANIFESTS_DIR: benchmarks/manifests/${{ env.MANIFESTS_SUBDIR }}
       # Quote inputs into env so heredocs/shell can reference them as
       # ordinary shell vars without GitHub-Actions template interpolation
       # opening a script-injection seam.
-      INPUT_TAU: ${{ inputs.tau }}
-      INPUT_CBF: ${{ inputs.core_budget_fraction }}
-      INPUT_TIMEOUT: ${{ inputs.timeout_per_instance }}
-      INPUT_MANIFESTS_SUBDIR: ${{ inputs.manifests_subdir }}
+      INPUT_TAU: ${{ env.TAU }}
+      INPUT_CBF: ${{ env.CORE_BUDGET_FRACTION }}
+      INPUT_TIMEOUT: ${{ env.TIMEOUT_PER_INSTANCE }}
+      INPUT_MANIFESTS_SUBDIR: ${{ env.MANIFESTS_SUBDIR }}
     steps:
       - uses: actions/checkout@v4
 
@@ -334,14 +324,14 @@ jobs:
       - name: Commit raw artifacts to results branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BR: ${{ inputs.results_branch }}
+          BR: ${{ env.RESULTS_BRANCH }}
           REPO: ${{ github.repository }}
           SWEEP_ID: ${{ needs.prep.outputs.sweep_id }}
           TS: ${{ needs.prep.outputs.ts }}
-          INPUT_TAU: ${{ inputs.tau }}
-          INPUT_CBF: ${{ inputs.core_budget_fraction }}
-          INPUT_TIMEOUT: ${{ inputs.timeout_per_instance }}
-          INPUT_MANIFESTS_SUBDIR: ${{ inputs.manifests_subdir }}
+          INPUT_TAU: ${{ env.TAU }}
+          INPUT_CBF: ${{ env.CORE_BUDGET_FRACTION }}
+          INPUT_TIMEOUT: ${{ env.TIMEOUT_PER_INSTANCE }}
+          INPUT_MANIFESTS_SUBDIR: ${{ env.MANIFESTS_SUBDIR }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
