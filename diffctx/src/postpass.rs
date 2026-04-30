@@ -7,47 +7,8 @@ use crate::config::selection::RESCUE;
 use crate::fragmentation::create_whole_file_fragment;
 use crate::git::CatFileBatch;
 use crate::graph::Graph;
+use crate::interval::IntervalIndex;
 use crate::types::{Fragment, FragmentId};
-
-struct IntervalIndex {
-    by_path: FxHashMap<Arc<str>, Vec<(u32, u32)>>,
-    ids: FxHashSet<FragmentId>,
-}
-
-impl IntervalIndex {
-    fn new() -> Self {
-        Self {
-            by_path: FxHashMap::default(),
-            ids: FxHashSet::default(),
-        }
-    }
-
-    fn add(&mut self, frag: &Fragment) {
-        self.ids.insert(frag.id.clone());
-        let intervals = self.by_path.entry(frag.id.path.clone()).or_default();
-        let pair = (frag.start_line(), frag.end_line());
-        let pos = intervals
-            .binary_search_by(|p| p.0.cmp(&pair.0).then(p.1.cmp(&pair.1)))
-            .unwrap_or_else(|i| i);
-        intervals.insert(pos, pair);
-    }
-
-    fn overlaps(&self, frag: &Fragment) -> bool {
-        let intervals = match self.by_path.get(&frag.id.path) {
-            Some(i) => i,
-            None => return false,
-        };
-        for &(start, end) in intervals {
-            if start == frag.start_line() && end == frag.end_line() {
-                continue;
-            }
-            if end >= frag.start_line() && start <= frag.end_line() {
-                return true;
-            }
-        }
-        false
-    }
-}
 
 fn find_dangling_semantic_names(
     selected: &[Fragment],

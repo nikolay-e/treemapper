@@ -6,6 +6,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::config::limits::UTILITY;
 use crate::config::selection::SELECTION;
+use crate::interval::IntervalIndex;
 use crate::types::{Fragment, FragmentId};
 use crate::utility::needs::InformationNeed;
 use crate::utility::scoring::{
@@ -42,68 +43,6 @@ pub struct SelectionResult {
     pub reason: SelectionReason,
     pub used_tokens: u32,
     pub utility: f64,
-}
-
-struct IntervalIndex {
-    by_path: FxHashMap<Arc<str>, Vec<(u32, u32)>>,
-    ids: FxHashSet<FragmentId>,
-}
-
-impl IntervalIndex {
-    fn new() -> Self {
-        Self {
-            by_path: FxHashMap::default(),
-            ids: FxHashSet::default(),
-        }
-    }
-
-    fn add(&mut self, frag_id: &FragmentId) {
-        self.ids.insert(frag_id.clone());
-        let intervals = self.by_path.entry(frag_id.path.clone()).or_default();
-        let item = (frag_id.start_line, frag_id.end_line);
-        let pos = intervals.binary_search(&item).unwrap_or_else(|e| e);
-        intervals.insert(pos, item);
-    }
-
-    fn contains(&self, frag_id: &FragmentId) -> bool {
-        self.ids.contains(frag_id)
-    }
-
-    fn overlaps(&self, frag: &Fragment) -> bool {
-        let intervals = match self.by_path.get(&frag.id.path) {
-            Some(v) => v,
-            None => return false,
-        };
-        let upper = intervals.partition_point(|&(s, _)| s <= frag.end_line());
-        for i in 0..upper {
-            let (start, end) = intervals[i];
-            if start == frag.start_line() && end == frag.end_line() {
-                continue;
-            }
-            if end >= frag.start_line() {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn is_superset_of(&self, frag: &Fragment) -> bool {
-        let intervals = match self.by_path.get(&frag.id.path) {
-            Some(v) => v,
-            None => return false,
-        };
-        let upper = intervals.partition_point(|&(s, _)| s <= frag.start_line());
-        for i in 0..upper {
-            let (start, end) = intervals[i];
-            if start == frag.start_line() && end == frag.end_line() {
-                continue;
-            }
-            if start <= frag.start_line() && frag.end_line() <= end {
-                return true;
-            }
-        }
-        false
-    }
 }
 
 struct HeapEntry {
@@ -246,7 +185,7 @@ fn select_core_fragments(
                     && core_used + sig.token_count <= core_budget
                 {
                     state.selected.push(sig.clone());
-                    state.selected_ids.add(&sig.id);
+                    state.selected_ids.add_id(&sig.id);
                     state.remaining_budget = state.remaining_budget.saturating_sub(sig.token_count);
                     core_used += sig.token_count;
                     let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
@@ -257,7 +196,7 @@ fn select_core_fragments(
         }
 
         state.selected.push(frag.clone());
-        state.selected_ids.add(&frag.id);
+        state.selected_ids.add_id(&frag.id);
         state.remaining_budget = state.remaining_budget.saturating_sub(frag.token_count);
         core_used += frag.token_count;
         let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
@@ -430,7 +369,7 @@ fn run_greedy_loop_heap(
         }
 
         state.selected.push(best_frag.clone());
-        state.selected_ids.add(&best_frag.id);
+        state.selected_ids.add_id(&best_frag.id);
         state.remaining_budget = state.remaining_budget.saturating_sub(best_frag.token_count);
         let rel_score = rel.get(&best_frag.id).copied().unwrap_or(0.0);
         apply_fragment(&best_frag, rel_score, needs, &mut state.utility_state);
@@ -586,7 +525,7 @@ pub fn lazy_greedy_select(
 
     let mut base_selected_ids = IntervalIndex::new();
     for f in &base_selected {
-        base_selected_ids.add(&f.id);
+        base_selected_ids.add_id(&f.id);
     }
 
     let (best_singleton, best_gain) = find_best_singleton(
