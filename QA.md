@@ -161,3 +161,61 @@
   `Vec<(PathBuf, String)>` BEFORE applying the cap) and tree-sitter
   parse trees, NOT lexical similarity. Lexical fixes only show up on
   repos with many fragments + dense term overlap.
+
+## Local pre-commit Environment
+
+- Repo uses `.venv/bin/python`. `pip install -e .` and `maturin develop`
+  must be invoked via `python -m pip` and `python -m maturin` (or after
+  `source .venv/bin/activate`); `maturin` from homebrew installs into the
+  wrong env and `_diffctx` won't be importable
+- `import-linter` pre-commit hook depends on `treemapper` being importable
+  from the venv — requires `_diffctx` to be built (`maturin develop --release
+  --features python`). Don't `SKIP=lint-imports` — fix the env.
+- `name-tests-test` hook treats every `tests/**/*.py` as a candidate test
+  and demands `test_*.py` naming. Add fixture dirs to its `exclude:` regex
+  in `.pre-commit-config.yaml`. Currently excluded: `diffctx/tests/fixtures/garbage/.*\.py`
+
+## Cargo features and `dep:` syntax
+
+- Optional tree-sitter grammars are split into `lang-core` (top-15) and
+  `lang-extra` (long-tail) features in `diffctx/Cargo.toml`. Default is
+  `["lang-core", "lang-extra"]` so `cargo build` is unchanged
+- **WATCH OUT**: `feature = ["dep:tree-sitter-X"]` SUPPRESSES the auto-feature
+  named `tree-sitter-X`. `#[cfg(feature = "tree-sitter-X")]` will then
+  evaluate to false and the language won't load. Use bare names without
+  `dep:` so the auto-feature is preserved
+- Adding a new grammar: bump optional dep in `[dependencies]`, append to the
+  matching feature list (`lang-core` or `lang-extra`) WITHOUT `dep:` prefix,
+  add `#[cfg]`-gated insert in `tree_sitter_strategy.rs::LANGUAGE_CACHE`
+
+## actionlint context restrictions
+
+- `${{ env.X }}` is BANNED inside `env:` blocks at any level (workflow, job,
+  step). Available contexts inside `env:` are: github, inputs, matrix,
+  needs, secrets, vars
+- Fix: inline literal values, or read `$X` from shell scripts in `run:` (the
+  surrounding env vars from outer scope are inherited as shell vars)
+
+## SonarCloud exclusions
+
+- `sonar.exclusions=diffctx/tests/fixtures/garbage/**` — fixture files
+  intentionally have unused params (S1172) and dead code; they simulate
+  "fake real code" as negative-test distractors
+
+## Cognitive Complexity Backlog
+
+`python:S3776` issues that cross the 15 threshold and weren't refactored in
+this QA pass (touching benchmark code = regression risk on v1 results):
+
+- `benchmarks/baselines/aider_baseline.py:112` (28→15)
+- `benchmarks/baselines/aider_baseline.py:135` (23→15)
+- `benchmarks/baselines/bm25_baseline.py:41` (32→15)
+- `benchmarks/aggregate_sweep.py:100` (23→15)
+- `benchmarks/adapters/multi_swebench.py:100` (17→15)
+- `benchmarks/diffctx_eval_fn.py:70` (18→15)
+- `benchmarks/adapters/evaluator.py:49` (32→15)
+- `scripts/bake_bench_cache.py:72` (16→15)
+
+Tactic from earlier passes (already in this file): extract `_collect_result`
+helpers and `_print_*_header`/`_print_*_dump` blocks. Pair with v2 evaluation
+re-run so any drift is caught.
