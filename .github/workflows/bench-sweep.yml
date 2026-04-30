@@ -31,8 +31,7 @@ on:
         default: 'bench-results/sweep'
 
 permissions:
-  contents: write
-  packages: read
+  contents: read
 
 env:
   REGISTRY: ghcr.io
@@ -65,6 +64,9 @@ jobs:
   # ============================================================================
   sweep:
     needs: prep
+    permissions:
+      contents: read
+      packages: read
     strategy:
       fail-fast: false
       max-parallel: 256
@@ -88,6 +90,13 @@ jobs:
       CELL_TAG: ${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
       CELL_DIR: results/sweep/${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
       MANIFESTS_DIR: benchmarks/manifests/${{ inputs.manifests_subdir }}
+      # Quote inputs into env so heredocs/shell can reference them as
+      # ordinary shell vars without GitHub-Actions template interpolation
+      # opening a script-injection seam.
+      INPUT_TAU: ${{ inputs.tau }}
+      INPUT_CBF: ${{ inputs.core_budget_fraction }}
+      INPUT_TIMEOUT: ${{ inputs.timeout_per_instance }}
+      INPUT_MANIFESTS_SUBDIR: ${{ inputs.manifests_subdir }}
     steps:
       - uses: actions/checkout@v4
 
@@ -101,8 +110,8 @@ jobs:
               "method": "${{ matrix.method }}",
               "budget": ${{ matrix.budget }},
               "test_set": "${{ matrix.test_set }}",
-              "tau": ${{ inputs.tau }},
-              "core_budget_fraction": ${{ inputs.core_budget_fraction }}
+              "tau": ${INPUT_TAU},
+              "core_budget_fraction": ${INPUT_CBF}
             },
             "git": {
               "sha": "${{ github.sha }}",
@@ -162,28 +171,32 @@ jobs:
           cat > /tmp/winner.json <<JSON
           {
             "winner": {
-              "tau": ${{ inputs.tau }},
-              "core_budget_fraction": ${{ inputs.core_budget_fraction }},
+              "tau": ${INPUT_TAU},
+              "core_budget_fraction": ${INPUT_CBF},
               "budget": ${{ matrix.budget }},
-              "scoring": "${{ steps.cfg.outputs.scoring }}",
+              "scoring": "${SCORING}",
               "extra_env": {}
             }
           }
           JSON
+        env:
+          SCORING: ${{ steps.cfg.outputs.scoring }}
 
       - name: Run cell (logged to run.log)
         timeout-minutes: 330
         run: |
           set -o pipefail
           python -m benchmarks.run_final_eval \
-            --baseline "${{ steps.cfg.outputs.baseline }}" \
+            --baseline "${BASELINE}" \
             --winner /tmp/winner.json \
             --manifests-dir /tmp/manifest_one \
             --workers 2 \
-            --timeout-per-instance "${{ inputs.timeout_per_instance }}" \
+            --timeout-per-instance "${INPUT_TIMEOUT}" \
             --min-memory-gb 4 \
             --min-disk-gb 5 \
             --out "${CELL_DIR}" 2>&1 | tee "${CELL_DIR}/run.log"
+        env:
+          BASELINE: ${{ steps.cfg.outputs.baseline }}
 
       - name: Per-instance metric summary (always)
         if: always()
@@ -342,16 +355,23 @@ jobs:
           cp -r ../aggregated "${{ needs.prep.outputs.sweep_id }}/aggregated"
           cp -r ../all_cells "${{ needs.prep.outputs.sweep_id }}/cells"
           # README index
-          cat > "${{ needs.prep.outputs.sweep_id }}/README.md" <<EOF
-          # Sweep ${{ needs.prep.outputs.sweep_id }}
-          - Triggered: ${{ needs.prep.outputs.ts }}
-          - Source SHA: ${{ github.sha }}
-          - Manifests: ${{ inputs.manifests_subdir }}
-          - tau=${{ inputs.tau }}, core_budget_fraction=${{ inputs.core_budget_fraction }}
-          - Per-instance timeout: ${{ inputs.timeout_per_instance }}s
+          cat > "${SWEEP_ID}/README.md" <<EOF
+          # Sweep ${SWEEP_ID}
+          - Triggered: ${TS}
+          - Source SHA: ${GITHUB_SHA}
+          - Manifests: ${INPUT_MANIFESTS_SUBDIR}
+          - tau=${INPUT_TAU}, core_budget_fraction=${INPUT_CBF}
+          - Per-instance timeout: ${INPUT_TIMEOUT}s
 
           See \`aggregated/SWEEP_TABLE.md\` and \`cells/\` for raw per-instance JSONL checkpoints.
           EOF
           git add -A
-          git commit -m "sweep ${{ needs.prep.outputs.sweep_id }} (source ${{ github.sha }})" || echo "nothing to commit"
+          git commit -m "sweep ${SWEEP_ID} (source ${GITHUB_SHA})" || echo "nothing to commit"
           git push -u origin "${BR}"
+        env:
+          SWEEP_ID: ${{ needs.prep.outputs.sweep_id }}
+          TS: ${{ needs.prep.outputs.ts }}
+          INPUT_TAU: ${{ inputs.tau }}
+          INPUT_CBF: ${{ inputs.core_budget_fraction }}
+          INPUT_TIMEOUT: ${{ inputs.timeout_per_instance }}
+          INPUT_MANIFESTS_SUBDIR: ${{ inputs.manifests_subdir }}
