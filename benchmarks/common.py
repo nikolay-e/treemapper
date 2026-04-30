@@ -197,24 +197,28 @@ def ensure_repo(
     if not cache_dir:
         return None
     repo_dir = target_dir / repo_name.replace("/", "__")
-    if repo_dir.exists():
-        _remove_stale_locks(_git_dir_for_repo(repo_dir))
-        run_cmd(["git", "-C", str(repo_dir), "clean", "-fd"], check=False, timeout=30)
-        r = run_cmd(
-            ["git", "-C", str(repo_dir), "checkout", "--force", base_commit],
-            check=False,
-            timeout=checkout_timeout,
-        )
-    else:
-        with _bare_repo_lock(cache_dir):
+    # Both branches share the bare cache and may race on `git worktree add`,
+    # `git clean`, and the worktree's index lock when multiple workers operate
+    # on the same repo concurrently. The whole block runs under the bare-cache
+    # lock to make `--workers 2+` correct.
+    with _bare_repo_lock(cache_dir):
+        if repo_dir.exists():
+            _remove_stale_locks(_git_dir_for_repo(repo_dir))
+            run_cmd(["git", "-C", str(repo_dir), "clean", "-fd"], check=False, timeout=30)
+            r = run_cmd(
+                ["git", "-C", str(repo_dir), "checkout", "--force", base_commit],
+                check=False,
+                timeout=checkout_timeout,
+            )
+        else:
             run_cmd(["git", "-C", str(cache_dir), "worktree", "prune"], check=False, timeout=30)
             r = run_cmd(
                 ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
                 check=False,
                 timeout=checkout_timeout,
             )
-        if r.returncode == 0:
-            _apply_perf_config(repo_dir)
+            if r.returncode == 0:
+                _apply_perf_config(repo_dir)
     if r.returncode != 0:
         print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: {r.stderr[:200]}")
         return None

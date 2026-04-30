@@ -38,10 +38,14 @@ def _make_eval_fn(baseline: str, repo_root: Path, request_timeout: float):
         from benchmarks.baselines.bm25_baseline import make_bm25_eval_fn
 
         return make_bm25_eval_fn(repo_root)
-    if baseline == "aider":
+    if baseline in {"aider", "aider_fair"}:
         from benchmarks.baselines.aider_baseline import make_aider_eval_fn
 
-        return make_aider_eval_fn(repo_root, request_timeout=request_timeout)
+        return make_aider_eval_fn(repo_root, request_timeout=request_timeout, aider_mode="fair")
+    if baseline == "aider_oracle":
+        from benchmarks.baselines.aider_baseline import make_aider_eval_fn
+
+        return make_aider_eval_fn(repo_root, request_timeout=request_timeout, aider_mode="oracle")
     raise ValueError(f"unknown baseline: {baseline}")
 
 
@@ -68,10 +72,10 @@ def main() -> int:
     p.add_argument("--min-disk-gb", type=float, default=50.0)
     p.add_argument(
         "--baseline",
-        choices=["diffctx", "bm25", "aider"],
+        choices=["diffctx", "bm25", "aider", "aider_fair", "aider_oracle"],
         default="diffctx",
         help="Which method to evaluate. Non-diffctx baselines ignore τ/cbf/scoring "
-        "(budget is the only RunParam they consume).",
+        "(budget is the only RunParam they consume). 'aider' is alias for 'aider_fair'.",
     )
     args = p.parse_args()
 

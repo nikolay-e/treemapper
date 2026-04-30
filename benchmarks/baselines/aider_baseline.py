@@ -109,7 +109,47 @@ class _AiderProcess:
             self._proc = None
 
 
-def make_aider_eval_fn(repos_dir: Path, request_timeout: float = 300.0):
+def _patch_visible_paths(patch: str) -> set[str]:
+    """File paths that already appear as text inside the patch (diff/+++/---/rename headers).
+    These are the same paths a downstream LLM would see in the patch text.
+    """
+    out: set[str] = set()
+    for line in patch.splitlines():
+        for prefix in ("--- a/", "+++ b/", "diff --git a/", "rename from ", "rename to "):
+            if line.startswith(prefix):
+                tail = line[len(prefix) :].strip()
+                if prefix == "diff --git a/":
+                    parts = tail.split(" b/", 1)
+                    if len(parts) == 2:
+                        out.add(parts[0].strip())
+                        out.add(parts[1].strip())
+                elif prefix in ("--- a/", "+++ b/"):
+                    if tail and tail not in {"/dev/null"}:
+                        out.add(tail)
+                else:
+                    if tail:
+                        out.add(tail)
+    return out
+
+
+def make_aider_eval_fn(
+    repos_dir: Path,
+    request_timeout: float = 300.0,
+    aider_mode: str = "fair",
+):
+    """Aider eval_fn factory.
+
+    aider_mode:
+      - "fair": mentioned_fnames restricted to file paths that appear in the
+        patch text itself (the same information diffctx receives from the
+        unified diff). This is the headline-comparable mode.
+      - "oracle": mentioned_fnames populated from instance.gold_files. Not a
+        baseline; an upper-bound stress test reflecting what Aider would do
+        if a perfect oracle named the gold files in advance.
+    """
+    if aider_mode not in {"fair", "oracle"}:
+        raise ValueError(f"aider_mode must be 'fair' or 'oracle', got {aider_mode!r}")
+
     from benchmarks.common import apply_as_commit, ensure_repo, reset_to_parent
 
     evaluator = UniversalEvaluator()
@@ -137,7 +177,10 @@ def make_aider_eval_fn(repos_dir: Path, request_timeout: float = 300.0):
             apply_as_commit(repo_dir, instance.gold_patch, "aider-baseline-gold")
             t0 = time.perf_counter()
             other_files = _walk_other_files(repo_dir)
-            mentioned_fnames = sorted(instance.gold_files)
+            if aider_mode == "oracle":
+                mentioned_fnames = sorted(instance.gold_files)
+            else:  # fair
+                mentioned_fnames = sorted(_patch_visible_paths(instance.gold_patch))
             mentioned_idents = sorted(extract_idents_from_patch(instance.gold_patch))
 
             payload: dict[str, Any] = {

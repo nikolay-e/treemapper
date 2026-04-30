@@ -30,10 +30,18 @@ def build_diff_context(
 ) -> dict[str, Any]:
     from _diffctx import build_diff_context as _rust_build
 
-    if budget_tokens is not None and budget_tokens < 0:
-        effective_budget: int | None = _UNLIMITED_BUDGET
-    elif budget_tokens == 0 or budget_tokens is None:
-        effective_budget = None
+    # Budget semantics:
+    #   None:                   pipeline default (None passes through to Rust as no cap)
+    #   budget_tokens < 0:      "unlimited" (10M-token soft ceiling, used as the recall ceiling
+    #                            sanity bound in evaluation matrices)
+    #   budget_tokens == 0:     "no context" (recall floor; only the diff itself, no expansion)
+    #   budget_tokens > 0:      explicit cap
+    if budget_tokens is None:
+        effective_budget: int | None = None
+    elif budget_tokens < 0:
+        effective_budget = _UNLIMITED_BUDGET
+    elif budget_tokens == 0:
+        effective_budget = 0
     else:
         effective_budget = budget_tokens
 
