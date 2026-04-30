@@ -104,8 +104,9 @@ jobs:
         env:
           DIFFCTX_YAML_CASES_LIMIT: "20"
         run: |
-          cargo test --release
+          cargo test --lib
           cargo build --release
+          cargo test --release --test yaml_cases
 
       - name: Run diffctx YAML test suite
         working-directory: diffctx

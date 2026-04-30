@@ -48,7 +48,7 @@ def make_bm25_eval_fn(repos_dir: Path):
         from rank_bm25 import BM25Okapi
     except ImportError as e:
         raise RuntimeError(
-            "rank-bm25 not installed; expected to be in requirements-bench.lock. " "Run: pip install rank-bm25"
+            "rank-bm25 not installed; expected to be in requirements-bench.lock. Run: pip install rank-bm25"
         ) from e
 
     evaluator = UniversalEvaluator()

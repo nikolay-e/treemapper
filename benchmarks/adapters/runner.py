@@ -163,17 +163,36 @@ def run_eval_set(
         if checkpoint_path is not None:
             append_checkpoint(checkpoint_path, r)
 
-    if not pending:
-        return results
+    if pending:
+        if workers <= 1 or len(pending) <= 1:
+            _run_serial(pending, eval_fn, params, _record)
+        else:
+            _run_parallel(pending, eval_fn, params, workers, timeout_per_instance, _record)
 
-    if workers <= 1 or len(pending) <= 1:
-        for inst in pending:
-            try:
-                _record(eval_fn(inst, params))
-            except Exception as e:
-                _record(_failure_result(inst, params, "error", f"{type(e).__name__}: {e}"))
-        return results
+    return results
 
+
+def _run_serial(
+    pending: list[BenchmarkInstance],
+    eval_fn: EvalFn,
+    params: RunParams,
+    record: Callable[[EvalResult], None],
+) -> None:
+    for inst in pending:
+        try:
+            record(eval_fn(inst, params))
+        except Exception as e:
+            record(_failure_result(inst, params, "error", f"{type(e).__name__}: {e}"))
+
+
+def _run_parallel(
+    pending: list[BenchmarkInstance],
+    eval_fn: EvalFn,
+    params: RunParams,
+    workers: int,
+    timeout_per_instance: float,
+    record: Callable[[EvalResult], None],
+) -> None:
     from concurrent.futures import (
         ThreadPoolExecutor,
         as_completed,
@@ -184,8 +203,6 @@ def run_eval_set(
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(eval_fn, inst, params): inst for inst in pending}
-        # Generous outer deadline: timeout * ceil(len/workers) covers the
-        # serialised case if workers all hang together.
         outer_deadline = time.monotonic() + timeout_per_instance * max(1, (len(pending) + workers - 1) // workers)
         completed: set[str] = set()
         try:
@@ -198,12 +215,9 @@ def run_eval_set(
                 except Exception as e:
                     r = _failure_result(inst, params, "error", f"{type(e).__name__}: {e}")
                 completed.add(inst.instance_id)
-                _record(r)
+                record(r)
         except FuturesTimeoutError:
             for inst in futures.values():
                 if inst.instance_id not in completed:
-                    _record(_failure_result(inst, params, "timeout", "exceeded global deadline"))
-        # Cancel any pending futures; running threads are abandoned.
+                    record(_failure_result(inst, params, "timeout", "exceeded global deadline"))
         pool.shutdown(wait=False, cancel_futures=True)
-
-    return results

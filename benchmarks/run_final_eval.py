@@ -118,9 +118,8 @@ def main() -> int:
     lang_agg = aggregate_by_language(all_results)
     lang_table = render_language_table(lang_agg)
 
-    header = f"# Final evaluation — {args.baseline}\n\n" f"Method: **{args.baseline}**, budget={params.budget}" + (
-        f", τ={params.tau}, cbf={params.core_budget_fraction}, scoring={params.scoring}" if args.baseline == "diffctx" else ""
-    )
+    extra = f", τ={params.tau}, cbf={params.core_budget_fraction}, scoring={params.scoring}" if args.baseline == "diffctx" else ""
+    header = f"# Final evaluation — {args.baseline}\n\nMethod: **{args.baseline}**, budget={params.budget}{extra}"
     summary = "\n\n".join(
         [
             header,

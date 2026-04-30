@@ -90,7 +90,7 @@ class _MultiSWEBenchAdapterBase(BenchmarkAdapter):
                 break
             except (DatasetGenerationError, TypeError, ValueError) as e:
                 print(
-                    f"[WARN] {self.name}: stream stopped early at row {n} " f"({type(e).__name__}: {str(e)[:200]})",
+                    f"[WARN] {self.name}: stream stopped early at row {n} ({type(e).__name__}: {str(e)[:200]})",
                     file=sys.stderr,
                 )
                 break

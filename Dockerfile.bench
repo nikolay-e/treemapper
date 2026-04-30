@@ -53,6 +53,7 @@ WORKDIR /build/diffctx
 COPY diffctx/Cargo.toml diffctx/Cargo.lock diffctx/pyproject.toml ./
 COPY diffctx/src ./src
 COPY diffctx/python ./python
+COPY diffctx/tests ./tests
 
 RUN set -eux; \
     TGT=$(cat /target_triple); \
