@@ -977,6 +977,7 @@ fn find_lang_config(path: &str) -> Option<&'static LangConfig> {
 }
 
 static LANGUAGE_CACHE: Lazy<FxHashMap<&'static str, Language>> = Lazy::new(|| {
+    #[allow(unused_mut)]
     let mut m: FxHashMap<&'static str, Language> = FxHashMap::default();
 
     #[cfg(feature = "tree-sitter-python")]

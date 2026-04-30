@@ -102,6 +102,7 @@ optional-dependencies.full = [
   "treemapper[tree-sitter]",
 ]
 optional-dependencies.mcp = [
+  "anyio>=4.5,<5.0",
   "mcp>=1.27,<2.0",
 ]
 optional-dependencies.nlp = [

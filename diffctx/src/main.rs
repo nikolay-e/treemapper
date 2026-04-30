@@ -23,7 +23,7 @@ struct Cli {
     #[arg(long, default_value = "yaml")]
     format: String,
 
-    #[arg(long)]
+    #[arg(long = "diff")]
     diff_ref: Option<String>,
 
     #[arg(long, default_value_t = DEFAULT_PPR_ALPHA)]
