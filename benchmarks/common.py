@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import re
@@ -176,6 +175,11 @@ def _git_dir_for_repo(repo_dir: Path) -> Path:
 
 @contextlib.contextmanager
 def _bare_repo_lock(cache_dir: Path):
+    # `fcntl` is POSIX-only; benchmark runners are not supported on Windows,
+    # but tests that import this module's pure helpers (e.g. `patch_files`)
+    # must still be importable on win32. Keep the import inside the lock fn.
+    import fcntl
+
     lock_path = cache_dir / ".bench-worktree.lock"
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
     try:

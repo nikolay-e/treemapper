@@ -88,6 +88,34 @@
 - Public `api/issues/search?projectKeys=nikolay-e_TreeMapper&statuses=OPEN`
   works without auth for OPEN issues. Token only needed for hotspot
   state changes / false-positive transitions.
+- Token lives in macOS Keychain under service `sonarqube-token` (40 chars).
+  Auth via `Authorization: Bearer <token>` (NOT basic auth). Use
+  `--data-urlencode key=value` for hotspot/issue mutations.
+- Quality gate ERROR conditions for treemapper after a paper-heavy push are
+  usually `new_reliability_rating>1` (driven by S3516 BLOCKER bugs) and
+  `new_security_hotspots_reviewed<100%`. Hotspots are bulk-resolvable in
+  one loop over `/api/hotspots/search?status=TO_REVIEW` — set Safe with
+  per-rule comments (S1313 instance-id false positive, S2245 seeded PRNG,
+  docker S6471 internal image, S7637 tag-pin policy). Hotspots resolved
+  this way DO clear the gate condition immediately on next refresh.
+
+## SonarCloud Recurring Patterns (paper/benchmark commits)
+
+- `python:S3516` BLOCKER on entry-points and orchestrators: appears when a
+  function has multiple `return X` statements all of the same name (e.g.
+  `return results`) — refactor into single tail-return by extracting
+  per-branch helpers, NOT by collapsing branches.
+- `python:S5799` MAJOR (implicit string concat / missing comma): black
+  often line-splits long f-strings into adjacent literals (`"..." "..."`).
+  Merge into one literal — keep flake8 / ruff aligned with this rule by
+  not relying on implicit concat for readability.
+- `python:S1244` MAJOR (float `==`): use `pytest.approx`, not `math.isclose`,
+  because the codebase already imports pytest in every test module.
+- `python:S1186` CRITICAL (empty methods): for duck-typed stubs (e.g.
+  Aider IO interface) add a one-line docstring describing the no-op —
+  `pass` alone is flagged.
+- `python:S1192` CRITICAL (literal duplication ≥3): extract module-private
+  `_TWO_COL_DIVIDER` style constant; keep adjacent to imports.
 
 ## CI Build of Rust Extension
 
@@ -100,6 +128,15 @@
   fail at the build step before any test runs.
 - Cache cargo per-(os, python-version) — same cargo target dir compiled with
   different Python ABIs collides if the key doesn't include python-version.
+- `panic = "abort"` in `[profile.release]` is INCOMPATIBLE with
+  `cargo test --release` — the test harness force-uses unwind, dependencies
+  get abort, link fails. Keep abort for production safety but split CI:
+  `cargo test --lib` (dev profile, harness happy) +
+  `cargo build --release` + `cargo test --release --test yaml_cases`
+  (integration tests with `harness = false` work in release).
+- Bench Dockerfile that copies `diffctx/Cargo.toml` MUST also copy
+  `diffctx/tests/` whenever Cargo.toml declares any `[[test]]` entry —
+  manifest parser validates path before any build step.
 
 ## YAML Case Runner (cargo integration test)
 

@@ -76,7 +76,7 @@ rustc-hash = "2"
 similar = "2"
 glob = "0.3"
 smallvec = "1"
-pyo3 = { version = "0.24", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.24", features = ["extension-module", "abi3-py310"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
