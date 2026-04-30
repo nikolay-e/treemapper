@@ -79,14 +79,11 @@ jobs:
     env:
       CELL_TAG: ${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
       CELL_DIR: results/sweep/${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
-      MANIFESTS_DIR: benchmarks/manifests/${{ env.MANIFESTS_SUBDIR }}
-      # Quote inputs into env so heredocs/shell can reference them as
-      # ordinary shell vars without GitHub-Actions template interpolation
-      # opening a script-injection seam.
-      INPUT_TAU: ${{ env.TAU }}
-      INPUT_CBF: ${{ env.CORE_BUDGET_FRACTION }}
-      INPUT_TIMEOUT: ${{ env.TIMEOUT_PER_INSTANCE }}
-      INPUT_MANIFESTS_SUBDIR: ${{ env.MANIFESTS_SUBDIR }}
+      MANIFESTS_DIR: benchmarks/manifests/v1
+      INPUT_TAU: '0.12'
+      INPUT_CBF: '0.5'
+      INPUT_TIMEOUT: '600'
+      INPUT_MANIFESTS_SUBDIR: v1
     steps:
       - uses: actions/checkout@v4
 
@@ -324,14 +321,14 @@ jobs:
       - name: Commit raw artifacts to results branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BR: ${{ env.RESULTS_BRANCH }}
+          BR: bench-results/sweep
           REPO: ${{ github.repository }}
           SWEEP_ID: ${{ needs.prep.outputs.sweep_id }}
           TS: ${{ needs.prep.outputs.ts }}
-          INPUT_TAU: ${{ env.TAU }}
-          INPUT_CBF: ${{ env.CORE_BUDGET_FRACTION }}
-          INPUT_TIMEOUT: ${{ env.TIMEOUT_PER_INSTANCE }}
-          INPUT_MANIFESTS_SUBDIR: ${{ env.MANIFESTS_SUBDIR }}
+          INPUT_TAU: '0.12'
+          INPUT_CBF: '0.5'
+          INPUT_TIMEOUT: '600'
+          INPUT_MANIFESTS_SUBDIR: v1
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'

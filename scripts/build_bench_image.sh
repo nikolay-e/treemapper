@@ -34,15 +34,15 @@ docker buildx inspect --bootstrap >/dev/null
 
 CACHE_FROM_ARGS=()
 CACHE_TO_ARGS=()
-if [ -n "$CACHE_REF" ]; then
+if [[ -n "$CACHE_REF" ]]; then
   CACHE_FROM_ARGS+=(--cache-from "type=registry,ref=$CACHE_REF")
   CACHE_TO_ARGS+=(--cache-to "type=registry,ref=$CACHE_REF,mode=max,image-manifest=true,oci-mediatypes=true")
 fi
 
 OUTPUT_ARGS=()
-if [ "$PUSH" = "1" ]; then
+if [[ "$PUSH" == "1" ]]; then
   OUTPUT_ARGS+=(--push)
-elif [ "$(echo "$PLATFORMS" | tr ',' '\n' | wc -l)" = "1" ]; then
+elif [[ "$(echo "$PLATFORMS" | tr ',' '\n' | wc -l)" == "1" ]]; then
   # Single platform — load to local docker daemon
   OUTPUT_ARGS+=(--load)
 else
