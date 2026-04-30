@@ -198,7 +198,10 @@ fn load_all_cases(dir: &Path) -> Vec<(PathBuf, TestCase)> {
             continue;
         }
 
-        locked_eprintln(&format!("WARN: cannot parse {}", path.display()));
+        panic!(
+            "test fixture {} did not match TestCase | Vec<TestCase> | TestsWrapper schema",
+            path.display()
+        );
     }
 
     cases.sort_by(|a, b| a.1.name.cmp(&b.1.name));

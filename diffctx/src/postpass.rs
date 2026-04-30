@@ -45,18 +45,13 @@ fn pick_best_fragment<'a>(
     candidates: &[&'a Fragment],
     selected_ids: &FxHashSet<FragmentId>,
 ) -> Option<&'a Fragment> {
-    if candidates.iter().any(|c| selected_ids.contains(&c.id)) {
-        return None;
-    }
-    let full: Vec<&&Fragment> = candidates
+    let available: Vec<&&'a Fragment> = candidates
         .iter()
-        .filter(|f| !f.kind.is_signature())
+        .filter(|c| !selected_ids.contains(&c.id))
         .collect();
-    let sig: Vec<&&Fragment> = candidates
-        .iter()
-        .filter(|f| f.kind.is_signature())
-        .collect();
-    full.first().or(sig.first()).map(|f| **f)
+    let full = available.iter().find(|f| !f.kind.is_signature()).copied();
+    let sig = available.iter().find(|f| f.kind.is_signature()).copied();
+    full.or(sig).map(|f| *f)
 }
 
 fn pick_smallest_fitting(

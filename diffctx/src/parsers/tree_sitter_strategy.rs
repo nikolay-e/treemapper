@@ -430,9 +430,9 @@ const LANG_CONFIGS: &[LangConfig] = &[
         ts_name: "haskell",
         definition_types: &[
             "function",
-            "type_alias",
+            "type_synomym",
             "newtype",
-            "adt",
+            "data_type",
             "class",
             "instance",
             "signature",
@@ -443,9 +443,9 @@ const LANG_CONFIGS: &[LangConfig] = &[
         ts_name: "haskell",
         definition_types: &[
             "function",
-            "type_alias",
+            "type_synomym",
             "newtype",
-            "adt",
+            "data_type",
             "class",
             "instance",
             "signature",
@@ -466,17 +466,13 @@ const LANG_CONFIGS: &[LangConfig] = &[
     LangConfig {
         extension: ".lua",
         ts_name: "lua",
-        definition_types: &[
-            "function_declaration",
-            "local_function",
-            "function_definition_statement",
-        ],
+        definition_types: &["function_declaration", "function_definition"],
     },
     // --- R ---
     LangConfig {
         extension: ".r",
         ts_name: "r",
-        definition_types: &["function_definition", "left_assignment"],
+        definition_types: &["function_definition"],
     },
     // --- OCaml ---
     LangConfig {
@@ -529,7 +525,14 @@ const LANG_CONFIGS: &[LangConfig] = &[
     LangConfig {
         extension: ".zig",
         ts_name: "zig",
-        definition_types: &["FnDecl", "ContainerDecl", "TestDecl", "VarDecl"],
+        definition_types: &[
+            "function_declaration",
+            "test_declaration",
+            "variable_declaration",
+            "struct_declaration",
+            "enum_declaration",
+            "union_declaration",
+        ],
     },
     // --- Clojure ---
     LangConfig {
@@ -594,7 +597,7 @@ const LANG_CONFIGS: &[LangConfig] = &[
         extension: ".dart",
         ts_name: "dart",
         definition_types: &[
-            "class_definition",
+            "class_declaration",
             "function_signature",
             "method_signature",
             "enum_declaration",

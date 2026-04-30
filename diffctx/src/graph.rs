@@ -370,20 +370,19 @@ fn apply_hub_suppression(
 
     let mut degrees_sorted: Vec<u32> = in_degree.iter().copied().filter(|&d| d > 0).collect();
     degrees_sorted.sort_unstable();
-    let d_median = if degrees_sorted.is_empty() {
+    let d_p95 = if degrees_sorted.is_empty() {
         0.0
     } else {
-        let mid = degrees_sorted.len() / 2;
-        if degrees_sorted.len() % 2 == 0 {
-            (degrees_sorted[mid - 1] as f64 + degrees_sorted[mid] as f64) / 2.0
-        } else {
-            degrees_sorted[mid] as f64
-        }
+        let n = degrees_sorted.len();
+        let idx = ((n as f64 * 0.95).ceil() as usize)
+            .saturating_sub(1)
+            .min(n - 1);
+        degrees_sorted[idx] as f64
     };
 
     for i in 0..edge_list.len() {
         let dst_deg = in_degree[dst_indices[i] as usize] as f64;
-        if dst_deg > d_median && !is_exempt[i] {
+        if dst_deg > d_p95 && !is_exempt[i] {
             let divisor = dst_deg.ln_1p().max(1.0);
             edge_weights[i] /= divisor;
         }

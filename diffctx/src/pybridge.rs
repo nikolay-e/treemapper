@@ -206,7 +206,8 @@ fn build_diff_context_native(
     scoring_mode: &str,
     timeout: u64,
 ) -> PyResult<DiffContextResult> {
-    let mode = ScoringMode::from_str(scoring_mode);
+    let mode =
+        ScoringMode::from_str(scoring_mode).map_err(pyo3::exceptions::PyValueError::new_err)?;
     let path = Path::new(root_dir);
 
     pipeline::build_diff_context(
@@ -264,7 +265,8 @@ fn build_diff_context<'py>(
         tracing::warn!("whitelist_file is not yet implemented in Rust backend, ignored");
     }
 
-    let mode = ScoringMode::from_str(scoring_mode);
+    let mode =
+        ScoringMode::from_str(scoring_mode).map_err(pyo3::exceptions::PyValueError::new_err)?;
     let path = Path::new(root_dir);
     let range = if diff_range.is_empty() {
         None
