@@ -98,7 +98,7 @@ def _parse_artifact(name: str) -> tuple[str | None, int | None, str | None]:
 
 
 def render_sweep_table(cells: list[dict]) -> str:
-    """Render a method × budget grid per test set."""
+    """Render a method x budget grid per test set."""
     by_set: dict[str, dict[tuple[str, int], dict]] = defaultdict(dict)
     methods: set[str] = set()
     budgets: set[int] = set()
