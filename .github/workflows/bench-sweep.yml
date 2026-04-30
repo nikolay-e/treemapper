@@ -76,9 +76,9 @@ jobs:
         test_set: [contextbench_verified, polybench500, swebench_verified]
         exclude:
           # External BM25 baseline has no concept of unlimited budget.
-          - { method: bm25, budget: -1 }
+          - {method: bm25, budget: -1}
           # Aider repo-map is inherently budget-bounded by token packing.
-          - { method: aider, budget: -1 }
+          - {method: aider, budget: -1}
     runs-on: ubuntu-latest
     timeout-minutes: 350
     container:
@@ -250,7 +250,7 @@ jobs:
           PY
             cat "${CELL_DIR}/cell_summary.json"
           else
-              echo '{"error": "no checkpoint produced", "expected_path": "'${ckpt}'"}' \
+              printf '{"error": "no checkpoint produced", "expected_path": "%s"}\n' "${ckpt}" \
                   > "${CELL_DIR}/cell_summary.json"
               ls -la "${CELL_DIR}" || true
           fi
@@ -335,12 +335,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BR: ${{ inputs.results_branch }}
+          REPO: ${{ github.repository }}
+          SWEEP_ID: ${{ needs.prep.outputs.sweep_id }}
+          TS: ${{ needs.prep.outputs.ts }}
+          INPUT_TAU: ${{ inputs.tau }}
+          INPUT_CBF: ${{ inputs.core_budget_fraction }}
+          INPUT_TIMEOUT: ${{ inputs.timeout_per_instance }}
+          INPUT_MANIFESTS_SUBDIR: ${{ inputs.manifests_subdir }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           # Use a sibling clone so we don't have to detach the workspace.
           git clone --depth 1 --branch main \
-            "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" \
             sidecar
           cd sidecar
           # Fetch existing results branch if it exists, else create it from a clean orphan.
@@ -351,9 +358,9 @@ jobs:
             git checkout --orphan "${BR}"
             git rm -rf . 2>/dev/null || true
           fi
-          mkdir -p "${{ needs.prep.outputs.sweep_id }}"
-          cp -r ../aggregated "${{ needs.prep.outputs.sweep_id }}/aggregated"
-          cp -r ../all_cells "${{ needs.prep.outputs.sweep_id }}/cells"
+          mkdir -p "${SWEEP_ID}"
+          cp -r ../aggregated "${SWEEP_ID}/aggregated"
+          cp -r ../all_cells "${SWEEP_ID}/cells"
           # README index
           cat > "${SWEEP_ID}/README.md" <<EOF
           # Sweep ${SWEEP_ID}
@@ -368,10 +375,3 @@ jobs:
           git add -A
           git commit -m "sweep ${SWEEP_ID} (source ${GITHUB_SHA})" || echo "nothing to commit"
           git push -u origin "${BR}"
-        env:
-          SWEEP_ID: ${{ needs.prep.outputs.sweep_id }}
-          TS: ${{ needs.prep.outputs.ts }}
-          INPUT_TAU: ${{ inputs.tau }}
-          INPUT_CBF: ${{ inputs.core_budget_fraction }}
-          INPUT_TIMEOUT: ${{ inputs.timeout_per_instance }}
-          INPUT_MANIFESTS_SUBDIR: ${{ inputs.manifests_subdir }}

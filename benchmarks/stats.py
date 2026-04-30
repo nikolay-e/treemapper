@@ -89,11 +89,11 @@ def bh_fdr(p_values: Iterable[float], q: float = 0.10) -> list[dict]:
     n = len(ps)
     if n == 0:
         return []
-    order = sorted(range(n), key=lambda i: ps[i])
+    order_desc = sorted(range(n), key=lambda i: ps[i], reverse=True)
     p_adj = [0.0] * n
     # Step-up: walk from largest to smallest, maintain running min of p*(n/rank).
     running_min = 1.0
-    for rev_rank, idx in enumerate(reversed(order)):
+    for rev_rank, idx in enumerate(order_desc):
         rank = n - rev_rank
         adj = ps[idx] * n / rank
         if adj > 1.0:
