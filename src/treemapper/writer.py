@@ -373,24 +373,15 @@ def _write_to_file_path(output_file: Path, writer: Callable[[TextIO], None]) -> 
             os.fsync(f.fileno())
         os.replace(tmp_path, output_file)
     except PermissionError:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        Path(tmp_path).unlink(missing_ok=True)
         logger.error("Unable to write to file '%s': permission denied", output_file)
         raise
     except OSError as e:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        Path(tmp_path).unlink(missing_ok=True)
         logger.error("Unable to write to file '%s': %s", output_file, e)
         raise
     except BaseException:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        Path(tmp_path).unlink(missing_ok=True)
         raise
 
 
