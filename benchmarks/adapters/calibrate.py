@@ -169,9 +169,9 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
     layout produced by `evaluate_grid` so the existing aggregator,
     `top_k_trials`, and `render_grid_report` work unchanged.
     """
-    import multiprocessing as mp
-    from concurrent.futures import ProcessPoolExecutor, as_completed
-    from concurrent.futures.process import BrokenProcessPool
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+    from pebble import ProcessExpired, ProcessPool
 
     from benchmarks.adapters.runner import (
         _load_existing_results,
@@ -202,115 +202,78 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
 
     from benchmarks.common import _init_worker
 
-    def _make_pool() -> ProcessPoolExecutor:
-        ctx = mp.get_context("spawn")
-        p = ProcessPoolExecutor(
-            max_workers=workers,
-            mp_context=ctx,
-            max_tasks_per_child=40,
-            initializer=_init_worker,
-        )
-        list(p.map(int, range(workers)))
-        return p
-
     def _record_per_cell(per_cell_results: list[tuple[RunParams, EvalResult]]) -> None:
         for params, result in per_cell_results:
             lbl = params.label()
             ckpt = ckpts.get(lbl)
             if ckpt is not None:
-                status = (result.extra or {}).get("status", "")
-                err = str((result.extra or {}).get("error", ""))
-                # Persist timeouts even though they surface via BPP — they
-                # are deterministic per instance and must not retry forever.
-                if status == "timeout" or "BrokenProcessPool" not in err:
-                    append_checkpoint(ckpt, result)
+                append_checkpoint(ckpt, result)
             results_by_cell[lbl].append(result)
 
-    def _drain(pool: ProcessPoolExecutor) -> None:
-        import time as _time
-
+    def _drain(pool: ProcessPool) -> None:
+        # Pebble enforces per-task timeout via SIGTERM/SIGKILL on the
+        # individual worker, then spawns a replacement — the pool itself
+        # stays healthy. This replaces the previous threading.Timer +
+        # os._exit(137) approach that permanently broke
+        # ProcessPoolExecutor and cascaded one slow instance into pool-
+        # wide failure (every queued task got BPP'd before it ran).
         futures: dict = {}
-        submit_times: dict[str, float] = {}
-        submit_failed: list[tuple[BenchmarkInstance, list[RunParams]]] = []
         for inst, params_list in pending:
-            for attempt in range(3):
-                try:
-                    submit_times[inst.instance_id] = _time.monotonic()
-                    futures[pool.submit(eval_all_cells_fn, inst, params_list)] = (inst, params_list)
-                    break
-                except BrokenProcessPool:
-                    # The kill switch from a previous task left a worker
-                    # mid-respawn; ProcessPoolExecutor itself spawns a
-                    # replacement on the next submit. Brief sleep + retry
-                    # avoids forcing a full pool rebuild for one dead worker.
-                    if attempt == 2:
-                        submit_failed.append((inst, params_list))
-                        break
-                    _time.sleep(0.1)
-        outer_deadline = _time.monotonic() + timeout_per_instance * len(points) * max(1, (len(pending) + workers - 1) // workers)
-        completed: set[str] = set()
-        try:
-            for future in as_completed(
-                futures,
-                timeout=max(0.0, outer_deadline - _time.monotonic()),
-            ):
-                inst, params_list = futures[future]
-                try:
-                    per_cell = future.result(timeout=0)
-                except BrokenProcessPool:
-                    # Worker death (typically from our os._exit kill switch).
-                    # Treat elapsed-near-deadline as timeout so a pathological
-                    # instance is checkpointed and not retried forever.
-                    # Shorter elapsed => transient (submitted just before
-                    # an earlier task killed the worker); record as error.
-                    elapsed = _time.monotonic() - submit_times.get(inst.instance_id, 0.0)
-                    if elapsed >= timeout_per_instance * 0.9:
-                        per_cell = [
-                            (
-                                p,
-                                _failure_eval(
-                                    inst,
-                                    p,
-                                    "timeout",
-                                    f"killed after {timeout_per_instance}s (elapsed {elapsed:.1f}s)",
-                                ),
-                            )
-                            for p in params_list
-                        ]
-                    else:
-                        per_cell = [(p, _failure_eval(inst, p, "error", "BrokenProcessPool: worker died")) for p in params_list]
-                except Exception as e:
-                    per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
-                completed.add(inst.instance_id)
-                _record_per_cell(per_cell)
-        except BrokenProcessPool:
-            # Self-healing pool — log nothing here; per-future BPP handler
-            # above already recorded the dead instance, and ProcessPoolExecutor
-            # spawns replacement workers on the next submission cycle.
-            pass
-        for inst, params_list in submit_failed:
-            _record_per_cell([(p, _failure_eval(inst, p, "error", "BrokenProcessPool: submit failed")) for p in params_list])
+            future = pool.schedule(
+                eval_all_cells_fn,
+                args=(inst, params_list),
+                # Pebble's timeout is wall-clock for the whole task. The
+                # task encompasses ensure_repo + apply_as_commit + heavy
+                # diffctx + N selections; budget generously since git
+                # ops on big repos (vscode, mui) eat 10-30s of pure I/O.
+                timeout=timeout_per_instance + 30.0,
+            )
+            futures[future] = (inst, params_list)
 
-    pool: ProcessPoolExecutor | None = _make_pool() if workers > 1 else None
-    try:
-        if pending and pool is not None:
-            # Single drain pass; ProcessPoolExecutor self-heals dead
-            # workers via spawn-on-next-submit, so we no longer rebuild
-            # the whole pool every time the kill switch fires (that
-            # rebuild was 30-60s of dead time per BPP and turned every
-            # legitimate per-instance timeout into a cell-wide cascade).
+        for future, (inst, params_list) in futures.items():
+            try:
+                per_cell = future.result()
+            except FuturesTimeoutError:
+                # Pebble's overall task deadline (rare safety net — covers
+                # genuinely hung git ops past timeout_per_instance + 30s).
+                per_cell = [
+                    (p, _failure_eval(inst, p, "timeout", f"pebble killed after {timeout_per_instance + 30.0:.0f}s"))
+                    for p in params_list
+                ]
+            except ProcessExpired as e:
+                # exitcode 137 == os._exit(137) from our narrow algorithm
+                # kill switch (timer in diffctx_eval_fn around build_diff_context).
+                # Anything else is a genuine crash.
+                if e.exitcode == 137:
+                    per_cell = [
+                        (p, _failure_eval(inst, p, "timeout", f"diffctx exceeded {timeout_per_instance:.0f}s budget"))
+                        for p in params_list
+                    ]
+                else:
+                    per_cell = [
+                        (p, _failure_eval(inst, p, "error", f"ProcessExpired exitcode={e.exitcode}")) for p in params_list
+                    ]
+            except Exception as e:
+                per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
+            _record_per_cell(per_cell)
+
+    if pending and workers > 1:
+        # Pebble pool tolerates per-task SIGKILL on timeout — replacement
+        # workers spawn automatically, the pool itself never breaks.
+        with ProcessPool(
+            max_workers=workers,
+            max_tasks=40,
+            initializer=_init_worker,
+        ) as pool:
             _drain(pool)
-        elif pending and pool is None:
-            # workers == 1: serial fallback
-            for inst, params_list in pending:
-                try:
-                    per_cell = eval_all_cells_fn(inst, params_list)
-                except Exception as e:
-                    per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
-                _record_per_cell(per_cell)
-    finally:
-        if pool is not None:
-            pool.shutdown(wait=False, cancel_futures=True)
+    elif pending:
+        # workers == 1: serial fallback (no timeout enforcement)
+        for inst, params_list in pending:
+            try:
+                per_cell = eval_all_cells_fn(inst, params_list)
+            except Exception as e:
+                per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
+            _record_per_cell(per_cell)
 
     out: list[TrialResult] = []
     for i, params in enumerate(points):
