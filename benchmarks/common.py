@@ -212,73 +212,73 @@ def ensure_repo(
     return repo_dir
 
 
-def _patch_target_files(patch_text: str) -> set[str]:
-    """Extract target file paths from a unified diff (the +++ b/<path>
-    lines, /dev/null excluded). Used to verify post-apply that git
-    actually committed the patch's changes and not stale worktree state.
-    """
-    out: set[str] = set()
-    for line in patch_text.splitlines():
-        if line.startswith("+++ b/"):
-            p = line[6:].strip()
-            if p and p != "/dev/null":
-                out.add(p)
-        elif line.startswith("--- a/"):
-            p = line[6:].strip()
-            if p and p != "/dev/null":
-                out.add(p)
-    return out
-
-
 def apply_as_commit(repo_dir: Path, patch_text: str, message: str = "bench") -> bool:
-    """Apply ``patch_text`` as a single commit on top of HEAD and verify
-    the resulting ``HEAD~1..HEAD`` diff matches the patch's declared
-    target files. Returns False on any of: apply error, post-apply
-    file-set mismatch (``git apply --3way`` is permissive enough to
-    silently accept fuzzy / wrong applies on dirty worktrees, which
-    silently corrupts every downstream metric in the benchmark).
+    """Apply ``patch_text`` as a real commit on top of HEAD.
 
-    The verification is symmetric-difference vs.\\ a permissive subset:
-    we require the committed file set to be a *non-empty* subset of the
-    patch's declared targets. Extra files in HEAD (e.g.\\ leftover
-    untracked from a previous instance) are rejected; missing files
-    (patch declared file not in commit) are also rejected.
+    Two failure modes were observed in production and are now defended:
+
+    1. **`git commit` silently fails when no `user.email` / `user.name`
+       is configured.** Subprocess returncode is non-zero but the
+       previous code passed `check=False`, so HEAD never advanced. The
+       worktree's existing HEAD is then a `base_commit` -- often a
+       merge commit from SWE-bench data -- and any downstream
+       ``HEAD~1..HEAD`` query returns the merge's own diff (against an
+       arbitrary first-parent), which has nothing to do with the gold
+       patch. This corrupted ~53% of swebench_verified measurements.
+       Fix: pass `-c user.name=... -c user.email=...` inline, and
+       check the commit's exit code explicitly.
+
+    2. **`git apply --3way` fuzzy-merges and silently produces
+       wrong-content commits.** Removed -- only strict
+       ``git apply --index`` is used. If the strict apply fails the
+       instance is reported as unrecoverable.
+
+    Returns False on apply error, commit error, or empty commit
+    (HEAD didn't advance). Caller should flag these as
+    ``status="apply_fail"`` and exclude from metrics.
     """
-    expected = _patch_target_files(patch_text)
     with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as f:
         f.write(patch_text)
         patch_path = f.name
     try:
         r = run_cmd(["git", "-C", str(repo_dir), "apply", "--index", patch_path], check=False)
         if r.returncode != 0:
-            # `--3way` is intentionally NOT used as a fallback here.
-            # Empirically (May 2026), --3way silently produced commits
-            # whose name-only diff bore no resemblance to the gold
-            # patch on ~53% of swebench_verified instances, generating
-            # fake zero-recall measurements for those. If the strict
-            # apply fails, the instance is unrecoverable in the
-            # benchmark and must be flagged.
             print(f"  APPLY FAIL: {r.stderr[:300]}")
             return False
-        run_cmd(
-            ["git", "-C", str(repo_dir), "commit", "-m", message, "--allow-empty", "--no-verify"],
-            check=False,
-        )
 
-        # Post-apply verification: which files actually got committed?
-        diff_r = run_cmd(
-            ["git", "-C", str(repo_dir), "diff", "--name-only", "HEAD~1..HEAD"],
+        # Snapshot HEAD before commit so we can verify it advances.
+        before = run_cmd(
+            ["git", "-C", str(repo_dir), "rev-parse", "HEAD"],
+            check=False,
+        ).stdout.strip()
+
+        commit_r = run_cmd(
+            [
+                "git",
+                "-c",
+                "user.name=diffctx-bench",
+                "-c",
+                "user.email=bench@diffctx.local",
+                "-C",
+                str(repo_dir),
+                "commit",
+                "-m",
+                message,
+                "--no-verify",
+            ],
             check=False,
         )
-        committed = {ln.strip() for ln in diff_r.stdout.splitlines() if ln.strip()}
-        if expected and committed != expected:
-            extra = committed - expected
-            missing = expected - committed
-            print(
-                f"  APPLY VERIFY FAIL: committed={sorted(committed)[:5]} "
-                f"expected={sorted(expected)[:5]} "
-                f"extra_n={len(extra)} missing_n={len(missing)}"
-            )
+        if commit_r.returncode != 0:
+            print(f"  COMMIT FAIL: {commit_r.stderr[:300]}")
+            return False
+
+        after = run_cmd(
+            ["git", "-C", str(repo_dir), "rev-parse", "HEAD"],
+            check=False,
+        ).stdout.strip()
+        if before == after:
+            # HEAD didn't move -- commit silently no-op'd. Treat as failure.
+            print(f"  COMMIT NOOP: HEAD still at {before[:12]}")
             return False
         return True
     finally:
