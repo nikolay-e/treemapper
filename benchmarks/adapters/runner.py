@@ -213,15 +213,18 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
     )
 
     def _drain(active_pool: ProcessPoolExecutor) -> None:
+        from concurrent.futures import CancelledError
         from concurrent.futures.process import BrokenProcessPool
 
         futures: dict = {}
         submit_failed: list[BenchmarkInstance] = []
+        pool_broken = False
         for inst in pending:
             try:
                 futures[active_pool.submit(eval_fn, inst, params)] = inst
             except BrokenProcessPool:
                 submit_failed.extend([inst, *pending[pending.index(inst) + 1 :]])
+                pool_broken = True
                 break
         outer_deadline = time.monotonic() + timeout_per_instance * max(1, (len(pending) + workers - 1) // workers)
         completed: set[str] = set()
@@ -230,10 +233,11 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
                 inst = futures[future]
                 try:
                     r = future.result(timeout=0)
-                except FuturesTimeoutError:
+                except (FuturesTimeoutError, CancelledError):
                     r = _failure_result(inst, params, "timeout", f"after {timeout_per_instance}s")
                 except BrokenProcessPool:
                     r = _failure_result(inst, params, "error", "BrokenProcessPool: worker died")
+                    pool_broken = True
                 except Exception as e:
                     r = _failure_result(inst, params, "error", f"{type(e).__name__}: {e}")
                 completed.add(inst.instance_id)
@@ -243,12 +247,13 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
                 if inst.instance_id not in completed:
                     record(_failure_result(inst, params, "timeout", "exceeded global deadline"))
         except BrokenProcessPool:
+            pool_broken = True
             for inst in futures.values():
                 if inst.instance_id not in completed:
                     record(_failure_result(inst, params, "error", "BrokenProcessPool: worker died"))
         for inst in submit_failed:
             record(_failure_result(inst, params, "error", "BrokenProcessPool: submit failed"))
-        if submit_failed or any(inst.instance_id not in completed for inst in futures.values()):
+        if pool_broken:
             raise BrokenProcessPool("pool degraded mid-cell")
 
     if pool is not None:

@@ -186,51 +186,6 @@ impl FragmentIterator {
 #[pyfunction]
 #[pyo3(signature = (
     root_dir,
-    diff_range = None,
-    budget_tokens = None,
-    alpha = DEFAULT_PPR_ALPHA,
-    tau = DEFAULT_STOPPING_THRESHOLD,
-    no_content = false,
-    full = false,
-    scoring_mode = "hybrid",
-    timeout = DEFAULT_PIPELINE_TIMEOUT_SECONDS,
-))]
-fn build_diff_context_native(
-    py: Python<'_>,
-    root_dir: &str,
-    diff_range: Option<&str>,
-    budget_tokens: Option<u32>,
-    alpha: f64,
-    tau: f64,
-    no_content: bool,
-    full: bool,
-    scoring_mode: &str,
-    timeout: u64,
-) -> PyResult<DiffContextResult> {
-    let mode =
-        ScoringMode::from_str(scoring_mode).map_err(pyo3::exceptions::PyValueError::new_err)?;
-    let path = Path::new(root_dir);
-
-    py.allow_threads(|| {
-        pipeline::build_diff_context(
-            path,
-            diff_range,
-            budget_tokens,
-            alpha,
-            tau,
-            no_content,
-            full,
-            mode,
-            timeout,
-        )
-    })
-    .map(DiffContextResult::from)
-    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
-}
-
-#[pyfunction]
-#[pyo3(signature = (
-    root_dir,
     diff_range,
     budget_tokens = None,
     alpha = DEFAULT_PPR_ALPHA,
@@ -598,7 +553,6 @@ fn graph_summary<'py>(
 #[pymodule]
 pub fn _diffctx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_diff_context, m)?)?;
-    m.add_function(wrap_pyfunction!(build_diff_context_native, m)?)?;
     m.add_function(wrap_pyfunction!(get_language_for_file, m)?)?;
     m.add_function(wrap_pyfunction!(count_tokens, m)?)?;
     m.add_function(wrap_pyfunction!(build_project_graph, m)?)?;

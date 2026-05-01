@@ -172,7 +172,7 @@ impl BM25Discovery {
             }
             let idf_val = idf.get(t).copied().unwrap_or(0.0);
             s += idf_val * (freq * BM25.k1)
-                / (freq + BM25.doc_len_factor * (1.0 - BM25.b + BM25.b * dl / avgdl));
+                / (freq + BM25.k1 * (1.0 - BM25.b + BM25.b * dl / avgdl));
         }
         s
     }

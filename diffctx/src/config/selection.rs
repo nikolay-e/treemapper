@@ -4,7 +4,6 @@ use crate::config::env_overrides::{read_env_fraction, read_env_u32};
 pub struct SelectionConfig {
     pub core_budget_fraction: f64,
     pub r_cap_min: f64,
-    pub stopping_threshold: f64,
 }
 
 impl Default for SelectionConfig {
@@ -12,7 +11,6 @@ impl Default for SelectionConfig {
         Self {
             core_budget_fraction: 0.70,
             r_cap_min: 0.01,
-            stopping_threshold: 0.08,
         }
     }
 }
@@ -55,7 +53,6 @@ pub fn selection() -> SelectionConfig {
     SelectionConfig {
         core_budget_fraction: read_env_fraction("DIFFCTX_OP_SELECTION_CORE_BUDGET_FRACTION", 0.70),
         r_cap_min: read_env_fraction("DIFFCTX_OP_SELECTION_R_CAP_MIN", 0.01),
-        stopping_threshold: read_env_fraction("DIFFCTX_OP_SELECTION_STOPPING_THRESHOLD", 0.08),
     }
 }
 

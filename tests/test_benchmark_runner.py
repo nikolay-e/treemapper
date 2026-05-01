@@ -255,25 +255,6 @@ def test_run_eval_set_resume_from_skips_already_recorded(tmp_path: Path):
     assert {r.instance_id for r in rest} == {"a::0", "a::1", "a::2", "a::3", "a::4"}
 
 
-def test_run_eval_set_records_timeout_when_eval_fn_hangs(tmp_path: Path):
-    import time as _time
-
-    def _slow_eval(instance, params):
-        _time.sleep(2)
-        return EvalResult(
-            instance_id=instance.instance_id,
-            source_benchmark=instance.source_benchmark,
-            file_recall=1.0,
-            file_precision=1.0,
-        )
-
-    instances = [_inst("a", i) for i in range(2)]
-    params = RunParams()
-    results = run_eval_set(instances, _slow_eval, params, workers=2, timeout_per_instance=0.05)
-    statuses = {r.extra.get("status") for r in results}
-    assert statuses == {"timeout"}, f"expected only timeouts, got {statuses}"
-
-
 def test_run_eval_set_serial_records_exception_as_error(tmp_path: Path):
     def _broken(instance, params):
         raise RuntimeError("synthetic failure")

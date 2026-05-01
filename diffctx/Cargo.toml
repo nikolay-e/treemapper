@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 name = "diffctx"
 path = "src/main.rs"
 
-[[bin]]
+[[example]]
 name = "diffctx-test"
 path = "src/test_harness.rs"
 
