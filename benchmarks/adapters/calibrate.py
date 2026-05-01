@@ -94,7 +94,7 @@ def evaluate_grid(
 
     def _make_pool() -> ProcessPoolExecutor:
         ctx = mp.get_context("spawn")
-        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx)
+        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=50)
         list(p.map(int, range(workers)))  # eager-spawn all workers
         return p
 

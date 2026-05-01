@@ -261,6 +261,6 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
         return
 
     ctx = mp.get_context("spawn")
-    with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as owned:
+    with ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=50) as owned:
         _drain(owned)
         owned.shutdown(wait=False, cancel_futures=True)
