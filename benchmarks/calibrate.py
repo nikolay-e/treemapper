@@ -18,12 +18,17 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from benchmarks.adapters.calibrate import GridSpec, evaluate_grid, render_grid_report, top_k_trials
+from benchmarks.adapters.calibrate import (
+    GridSpec,
+    evaluate_grid_cached,
+    render_grid_report,
+    top_k_trials,
+)
 from benchmarks.adapters.runner import filter_instances_by_manifest, read_manifest
 from benchmarks.adapters.runtime_probe import probe_resources, report_and_maybe_exit
 from benchmarks.build_splits import default_calibration_pool_adapters, default_test_adapters
 from benchmarks.common import repos_dir as default_repos_dir
-from benchmarks.diffctx_eval_fn import make_diffctx_eval_fn
+from benchmarks.diffctx_eval_fn import make_diffctx_eval_all_cells_fn
 
 
 def _parse_floats(s: str) -> tuple[float, ...]:
@@ -108,7 +113,7 @@ def main() -> int:
 
     _prewarm_bare_clones(instances)
 
-    eval_fn = make_diffctx_eval_fn(repo_root)
+    eval_all_cells_fn = make_diffctx_eval_all_cells_fn(repo_root)
     args.out.mkdir(parents=True, exist_ok=True)
     checkpoint_dir = args.out / "checkpoints"
 
@@ -119,10 +124,10 @@ def main() -> int:
             f"min(per_benchmark file_recall) = {trial.score:.4f}"
         )
 
-    trials = evaluate_grid(
+    trials = evaluate_grid_cached(
         spec,
         instances,
-        eval_fn,
+        eval_all_cells_fn,
         workers=args.workers,
         on_trial=_on_trial,
         timeout_per_instance=args.timeout_per_instance,

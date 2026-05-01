@@ -149,3 +149,151 @@ def _pool_eval(repos_dir_str: str, instance: BenchmarkInstance, params: RunParam
 
 def make_diffctx_eval_fn(repos_dir: Path):
     return functools.partial(_pool_eval, str(repos_dir))
+
+
+def _build_eval_result_from_output(
+    output: dict,
+    instance: BenchmarkInstance,
+    params: RunParams,
+    elapsed: float,
+    evaluator: UniversalEvaluator,
+) -> EvalResult:
+    if output is None:
+        result = EvalResult(
+            instance_id=instance.instance_id,
+            source_benchmark=instance.source_benchmark,
+            file_recall=0.0,
+            file_precision=0.0,
+            budget=params.budget,
+            elapsed_seconds=elapsed,
+        )
+        result.extra["status"] = "diffctx_fail"
+        return result
+    fragments = _output_fragments(output)
+    used_tokens = _compute_used_tokens(output)
+    selection = SelectionOutput(
+        selected_files=_selected_files(fragments),
+        selected_fragments=fragments,
+        used_tokens=used_tokens,
+        elapsed_seconds=elapsed,
+    )
+    result = evaluator.evaluate(instance, selection, budget=params.budget)
+    result.used_tokens = used_tokens
+    result.extra["status"] = "ok"
+    result.extra["language"] = instance.language
+    result.extra["fragment_count"] = len(fragments)
+    latency = output.get("latency") or {}
+    if latency:
+        result.extra["latency_total_ms"] = latency.get("total_ms")
+        result.extra["latency_breakdown"] = {k: v for k, v in latency.items() if k != "total_ms"}
+    return result
+
+
+def pool_eval_all_cells(
+    repos_dir_str: str,
+    instance: BenchmarkInstance,
+    params_list: list[RunParams],
+) -> list[tuple[RunParams, EvalResult]]:
+    """Compute the heavy `ScoredState` ONCE for the instance, then run
+    every (`tau`, `core_budget_fraction`) cell against it cheaply.
+
+    Returns one (params, result) tuple per input params. The orchestrator
+    demuxes these into per-cell checkpoints. This is the ProcessPool
+    worker entry point — the entire ScoredState lives only inside this
+    process and is dropped before return; only EvalResults cross the
+    pickle boundary.
+    """
+    from benchmarks.common import apply_as_commit, ensure_repo, reset_to_parent
+    from treemapper.diffctx.pipeline import compute_scored_state, select_with_params
+
+    if not params_list:
+        return []
+
+    worktree_dir, evaluator = _ensure_worker_state(repos_dir_str)
+
+    repo_url = str(instance.extra.get("repo_url") or f"https://github.com/{instance.repo}")
+    repo_dir = ensure_repo(repo_url, instance.repo, instance.base_commit, worktree_dir)
+    if repo_dir is None:
+        return [
+            (
+                p,
+                _failure_result(instance, p, "clone_fail", "ensure_repo returned None"),
+            )
+            for p in params_list
+        ]
+
+    # All params in a sweep share scoring_mode (BM25/PPR/Ego/Hybrid is a
+    # discovery-and-scoring choice, not a (τ, cbf) one). Use the first.
+    scoring_mode = params_list[0].scoring
+
+    out: list[tuple[RunParams, EvalResult]] = []
+    try:
+        apply_as_commit(repo_dir, instance.gold_patch, "diffctx-eval-gold")
+
+        t_heavy_start = time.perf_counter()
+        try:
+            state = compute_scored_state(
+                repo_dir,
+                "HEAD~1..HEAD",
+                scoring_mode=scoring_mode,
+            )
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            return [(p, _failure_result(instance, p, "diffctx_fail", err)) for p in params_list]
+        heavy_elapsed = time.perf_counter() - t_heavy_start
+
+        for params in params_list:
+            prior_env = {k: os.environ.get(k) for k in params.to_env()}
+            try:
+                for k, v in params.to_env().items():
+                    os.environ[k] = v
+                t_select_start = time.perf_counter()
+                output = select_with_params(
+                    state,
+                    budget_tokens=params.budget,
+                    tau=params.tau,
+                )
+                select_elapsed = time.perf_counter() - t_select_start
+                # Charge the heavy cost to the first cell only — subsequent
+                # cells reuse the cached state, so they only pay select cost.
+                charged = heavy_elapsed + select_elapsed if not out else select_elapsed
+                result = _build_eval_result_from_output(output, instance, params, charged, evaluator)
+                out.append((params, result))
+            finally:
+                for k, v in prior_env.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+    finally:
+        try:
+            reset_to_parent(repo_dir)
+        except Exception:
+            pass
+
+    return out
+
+
+def _failure_result(
+    instance: BenchmarkInstance,
+    params: RunParams,
+    status: str,
+    error: str,
+) -> EvalResult:
+    r = EvalResult(
+        instance_id=instance.instance_id,
+        source_benchmark=instance.source_benchmark,
+        file_recall=0.0,
+        file_precision=0.0,
+        budget=params.budget,
+    )
+    r.extra["status"] = status
+    r.extra["error"] = error
+    r.extra["language"] = instance.language
+    return r
+
+
+def make_diffctx_eval_all_cells_fn(repos_dir: Path):
+    """Sibling of `make_diffctx_eval_fn` for the inverted orchestrator
+    (one task = one instance × N cells)."""
+    return functools.partial(pool_eval_all_cells, str(repos_dir))

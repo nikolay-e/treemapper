@@ -10,8 +10,13 @@ use crate::config::limits::{
 };
 use crate::git::GitError as RustGitError;
 use crate::mode::ScoringMode;
-use crate::pipeline;
+use crate::pipeline::{self, ScoredState};
 use crate::render::{DiffContextOutput, FragmentEntry};
+
+#[pyclass(unsendable)]
+pub struct PyScoredState {
+    inner: Arc<ScoredState>,
+}
 
 create_exception!(_diffctx, GitError, pyo3::exceptions::PyException);
 
@@ -301,6 +306,112 @@ fn build_diff_context<'py>(
 }
 
 #[pyfunction]
+#[pyo3(signature = (
+    root_dir,
+    diff_range,
+    alpha = DEFAULT_PPR_ALPHA,
+    scoring_mode = "hybrid",
+    timeout = DEFAULT_PIPELINE_TIMEOUT_SECONDS,
+))]
+fn compute_scored_state(
+    py: Python<'_>,
+    root_dir: &str,
+    diff_range: &str,
+    alpha: f64,
+    scoring_mode: &str,
+    timeout: u64,
+) -> PyResult<PyScoredState> {
+    let mode =
+        ScoringMode::from_str(scoring_mode).map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let path = Path::new(root_dir);
+    let range = if diff_range.is_empty() {
+        None
+    } else {
+        Some(diff_range)
+    };
+    let state = py
+        .allow_threads(|| pipeline::compute_scored_state(path, range, alpha, mode, timeout))
+        .map_err(map_pipeline_err)?;
+    Ok(PyScoredState {
+        inner: Arc::new(state),
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (
+    state,
+    budget_tokens = None,
+    tau = DEFAULT_STOPPING_THRESHOLD,
+    no_content = false,
+))]
+fn select_with_params<'py>(
+    py: Python<'py>,
+    state: &PyScoredState,
+    budget_tokens: Option<u32>,
+    tau: f64,
+    no_content: bool,
+) -> PyResult<Bound<'py, PyDict>> {
+    let inner = state.inner.clone();
+    let output = py.allow_threads(move || {
+        if inner.all_fragments.is_empty() {
+            return DiffContextOutput {
+                name: inner
+                    .root_dir
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| inner.root_dir.to_string_lossy().to_string()),
+                output_type: "diff_context".to_string(),
+                fragment_count: 0,
+                fragments: Vec::new(),
+                latency: None,
+            };
+        }
+        pipeline::select_with_params(&inner, budget_tokens, tau, no_content)
+    });
+    diff_context_output_to_dict(py, &output)
+}
+
+fn diff_context_output_to_dict<'py>(
+    py: Python<'py>,
+    output: &DiffContextOutput,
+) -> PyResult<Bound<'py, PyDict>> {
+    let dict = PyDict::new(py);
+    dict.set_item("name", &output.name)?;
+    dict.set_item("type", "diff_context")?;
+    dict.set_item("fragment_count", output.fragment_count)?;
+
+    let frag_list = PyList::empty(py);
+    for entry in &output.fragments {
+        let frag_dict = PyDict::new(py);
+        frag_dict.set_item("path", &entry.path)?;
+        frag_dict.set_item("lines", &entry.lines)?;
+        frag_dict.set_item("kind", &entry.kind)?;
+        if let Some(ref s) = entry.symbol {
+            frag_dict.set_item("symbol", s)?;
+        }
+        if let Some(ref c) = entry.content {
+            frag_dict.set_item("content", c.as_ref())?;
+        }
+        frag_list.append(frag_dict)?;
+    }
+    dict.set_item("fragments", frag_list)?;
+
+    let latency = PyDict::new(py);
+    if let Some(ref lb) = output.latency {
+        let r = |v: f64| (v * 10.0).round() / 10.0;
+        latency.set_item("parse_changed_ms", r(lb.parse_changed_ms))?;
+        latency.set_item("universe_walk_ms", r(lb.universe_walk_ms))?;
+        latency.set_item("discovery_ms", r(lb.discovery_ms))?;
+        latency.set_item("parse_discovered_ms", r(lb.parse_discovered_ms))?;
+        latency.set_item("tokenization_ms", r(lb.tokenization_ms))?;
+        latency.set_item("scoring_selection_ms", r(lb.scoring_selection_ms))?;
+        latency.set_item("total_ms", r(lb.total_ms))?;
+    }
+    dict.set_item("latency", latency)?;
+    Ok(dict)
+}
+
+#[pyfunction]
 fn get_language_for_file(path: &str) -> Option<String> {
     crate::languages::get_language_for_file(path).map(|s| s.to_string())
 }
@@ -564,6 +675,9 @@ fn graph_summary<'py>(
 #[pymodule]
 pub fn _diffctx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_diff_context, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_scored_state, m)?)?;
+    m.add_function(wrap_pyfunction!(select_with_params, m)?)?;
+    m.add_class::<PyScoredState>()?;
     m.add_function(wrap_pyfunction!(get_language_for_file, m)?)?;
     m.add_function(wrap_pyfunction!(count_tokens, m)?)?;
     m.add_function(wrap_pyfunction!(build_project_graph, m)?)?;
