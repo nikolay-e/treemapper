@@ -127,7 +127,7 @@ def main() -> int:
         print(
             f"[{idx + 1}/{total}] τ={trial.params.tau:.4f} "
             f"cbf={trial.params.core_budget_fraction:.4f} → "
-            f"min(per_benchmark file_recall) = {trial.score:.4f}"
+            f"min={trial.score:.4f}  mean={trial.score_mean:.4f}"
         )
 
     trials = evaluate_grid_cached(
@@ -153,6 +153,7 @@ def main() -> int:
             {
                 "params": asdict(t.params),
                 "score": t.score,
+                "score_mean": t.score_mean,
                 "per_benchmark": t.per_benchmark,
             }
             for t in trials
@@ -161,11 +162,15 @@ def main() -> int:
     (args.out / "grid_results.json").write_text(json.dumps(payload, indent=2, default=str))
 
     top = top_k_trials(trials, k=args.top_k)
-    top_payload = {"top_k": args.top_k, "candidates": [asdict(t.params) for t in top]}
+    top_payload = {
+        "top_k": args.top_k,
+        "candidates": [asdict(t.params) for t in top],
+        "candidate_scores": [{"params": asdict(t.params), "score_min": t.score, "score_mean": t.score_mean} for t in top],
+    }
     (args.out / "top_candidates.json").write_text(json.dumps(top_payload, indent=2, default=str))
-    print(f"\nTop {args.top_k} candidates by min(per_benchmark file_recall):")
+    print(f"\nTop {args.top_k} candidates by min(per_benchmark file_recall) [mean shown for cherry-pick check]:")
     for t in top:
-        print(f"  τ={t.params.tau} cbf={t.params.core_budget_fraction} score={t.score:.4f}")
+        print(f"  τ={t.params.tau} cbf={t.params.core_budget_fraction}" f"  min={t.score:.4f}  mean={t.score_mean:.4f}")
     return 0
 
 

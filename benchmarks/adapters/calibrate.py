@@ -55,6 +55,17 @@ class TrialResult:
             return 0.0
         return min(agg.get("file_recall", 0.0) for agg in self.per_benchmark.values())
 
+    @property
+    def score_mean(self) -> float:
+        """Macro-mean recall across benchmarks. Reported alongside
+        `score` (= min) so the paper can show that the selected cell
+        wins by both — defending against a "cherry-picked min" critique
+        when the surface is flat."""
+        if not self.per_benchmark:
+            return 0.0
+        recalls = [agg.get("file_recall", 0.0) for agg in self.per_benchmark.values()]
+        return sum(recalls) / len(recalls) if recalls else 0.0
+
 
 TrialCallback = Callable[[int, int, "TrialResult"], None]
 

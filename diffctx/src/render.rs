@@ -58,6 +58,13 @@ pub struct LatencyBreakdown {
     pub nodes_capped: usize,
     /// The K value applied for the per-source cap.
     pub max_out_edges_per_node: usize,
+    /// PPR push iteration was truncated by `max_pushes_cap` before
+    /// convergence. When true, `rel_scores` are biased toward seeds
+    /// and absolute file_recall on this instance should be flagged
+    /// in post-analysis. Always false for non-PPR scoring modes.
+    pub ppr_truncated: bool,
+    pub ppr_forward_pushes: usize,
+    pub ppr_backward_pushes: usize,
 }
 
 #[derive(Serialize, Clone)]

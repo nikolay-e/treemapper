@@ -306,6 +306,9 @@ fn build_diff_context<'py>(
         latency.set_item("edges_dropped_by_cap", lb.edges_dropped_by_cap)?;
         latency.set_item("nodes_capped", lb.nodes_capped)?;
         latency.set_item("max_out_edges_per_node", lb.max_out_edges_per_node)?;
+        latency.set_item("ppr_truncated", lb.ppr_truncated)?;
+        latency.set_item("ppr_forward_pushes", lb.ppr_forward_pushes)?;
+        latency.set_item("ppr_backward_pushes", lb.ppr_backward_pushes)?;
     } else {
         latency.set_item("total_ms", (total_ms * 10.0).round() / 10.0)?;
     }
@@ -424,6 +427,9 @@ fn diff_context_output_to_dict<'py>(
         latency.set_item("edges_dropped_by_cap", lb.edges_dropped_by_cap)?;
         latency.set_item("nodes_capped", lb.nodes_capped)?;
         latency.set_item("max_out_edges_per_node", lb.max_out_edges_per_node)?;
+        latency.set_item("ppr_truncated", lb.ppr_truncated)?;
+        latency.set_item("ppr_forward_pushes", lb.ppr_forward_pushes)?;
+        latency.set_item("ppr_backward_pushes", lb.ppr_backward_pushes)?;
     }
     dict.set_item("latency", latency)?;
     Ok(dict)

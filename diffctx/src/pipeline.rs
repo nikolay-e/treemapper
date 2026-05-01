@@ -432,6 +432,9 @@ pub fn select_with_params(
         edges_dropped_by_cap: cap_stats.edges_dropped_by_cap,
         nodes_capped: cap_stats.nodes_capped,
         max_out_edges_per_node: cap_stats.max_out_edges_per_node,
+        ppr_truncated: state.scoring_result.ppr_truncated,
+        ppr_forward_pushes: state.scoring_result.ppr_forward_pushes,
+        ppr_backward_pushes: state.scoring_result.ppr_backward_pushes,
     });
     output
 }
@@ -496,6 +499,9 @@ fn empty_scored_state(root_dir: PathBuf) -> ScoredState {
             rel_scores: FxHashMap::default(),
             filtered_fragments: Vec::new(),
             graph: crate::graph::Graph::new(),
+            ppr_truncated: false,
+            ppr_forward_pushes: 0,
+            ppr_backward_pushes: 0,
         },
         needs: Vec::new(),
         changed_files: Vec::new(),
