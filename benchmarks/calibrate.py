@@ -170,7 +170,7 @@ def main() -> int:
     (args.out / "top_candidates.json").write_text(json.dumps(top_payload, indent=2, default=str))
     print(f"\nTop {args.top_k} candidates by min(per_benchmark file_recall) [mean shown for cherry-pick check]:")
     for t in top:
-        print(f"  τ={t.params.tau} cbf={t.params.core_budget_fraction}" f"  min={t.score:.4f}  mean={t.score_mean:.4f}")
+        print(f"  τ={t.params.tau} cbf={t.params.core_budget_fraction}  min={t.score:.4f}  mean={t.score_mean:.4f}")
     return 0
 
 
