@@ -1,15 +1,26 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use pyo3::create_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use crate::config::limits::{
     DEFAULT_PIPELINE_TIMEOUT_SECONDS, DEFAULT_PPR_ALPHA, DEFAULT_STOPPING_THRESHOLD,
 };
+use crate::git::GitError as RustGitError;
 use crate::mode::ScoringMode;
 use crate::pipeline;
 use crate::render::{DiffContextOutput, FragmentEntry};
+
+create_exception!(_diffctx, GitError, pyo3::exceptions::PyException);
+
+fn map_pipeline_err(e: anyhow::Error) -> PyErr {
+    if let Some(git_err) = e.downcast_ref::<RustGitError>() {
+        return GitError::new_err(git_err.to_string());
+    }
+    pyo3::exceptions::PyRuntimeError::new_err(e.to_string())
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -247,7 +258,7 @@ fn build_diff_context<'py>(
                 timeout,
             )
         })
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+        .map_err(map_pipeline_err)?;
     let total_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     let dict = PyDict::new(py);
@@ -569,6 +580,7 @@ pub fn _diffctx(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyProjectGraph>()?;
     m.add_class::<PyQuotientGraph>()?;
     m.add_class::<PyModuleMetrics>()?;
+    m.add("GitError", m.py().get_type::<GitError>())?;
     Ok(())
 }
 

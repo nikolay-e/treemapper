@@ -49,7 +49,15 @@ pub enum GitError {
 pub type Result<T> = std::result::Result<T, GitError>;
 
 fn validate_diff_range(diff_range: &str) -> Result<()> {
-    if !SAFE_RANGE_RE.is_match(diff_range.trim()) {
+    let trimmed = diff_range.trim();
+    // Reject leading-dot ranges like `..origin/main` (audit X16): the regex
+    // character class allows `.`, so a string of only dots/identifier-chars
+    // passes as a "ref" before being rejected by git itself with a less
+    // informative `fatal: ambiguous argument`. Surface the dedicated error.
+    if trimmed.starts_with('.') || trimmed.starts_with('/') {
+        return Err(GitError::InvalidRange(diff_range.to_string()));
+    }
+    if !SAFE_RANGE_RE.is_match(trimmed) {
         return Err(GitError::InvalidRange(diff_range.to_string()));
     }
     Ok(())
