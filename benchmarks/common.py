@@ -212,18 +212,74 @@ def ensure_repo(
     return repo_dir
 
 
+def _patch_target_files(patch_text: str) -> set[str]:
+    """Extract target file paths from a unified diff (the +++ b/<path>
+    lines, /dev/null excluded). Used to verify post-apply that git
+    actually committed the patch's changes and not stale worktree state.
+    """
+    out: set[str] = set()
+    for line in patch_text.splitlines():
+        if line.startswith("+++ b/"):
+            p = line[6:].strip()
+            if p and p != "/dev/null":
+                out.add(p)
+        elif line.startswith("--- a/"):
+            p = line[6:].strip()
+            if p and p != "/dev/null":
+                out.add(p)
+    return out
+
+
 def apply_as_commit(repo_dir: Path, patch_text: str, message: str = "bench") -> bool:
+    """Apply ``patch_text`` as a single commit on top of HEAD and verify
+    the resulting ``HEAD~1..HEAD`` diff matches the patch's declared
+    target files. Returns False on any of: apply error, post-apply
+    file-set mismatch (``git apply --3way`` is permissive enough to
+    silently accept fuzzy / wrong applies on dirty worktrees, which
+    silently corrupts every downstream metric in the benchmark).
+
+    The verification is symmetric-difference vs.\\ a permissive subset:
+    we require the committed file set to be a *non-empty* subset of the
+    patch's declared targets. Extra files in HEAD (e.g.\\ leftover
+    untracked from a previous instance) are rejected; missing files
+    (patch declared file not in commit) are also rejected.
+    """
+    expected = _patch_target_files(patch_text)
     with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as f:
         f.write(patch_text)
         patch_path = f.name
     try:
         r = run_cmd(["git", "-C", str(repo_dir), "apply", "--index", patch_path], check=False)
         if r.returncode != 0:
-            r = run_cmd(["git", "-C", str(repo_dir), "apply", "--index", "--3way", patch_path], check=False)
-            if r.returncode != 0:
-                print(f"  APPLY FAIL: {r.stderr[:300]}")
-                return False
-        run_cmd(["git", "-C", str(repo_dir), "commit", "-m", message, "--allow-empty", "--no-verify"], check=False)
+            # `--3way` is intentionally NOT used as a fallback here.
+            # Empirically (May 2026), --3way silently produced commits
+            # whose name-only diff bore no resemblance to the gold
+            # patch on ~53% of swebench_verified instances, generating
+            # fake zero-recall measurements for those. If the strict
+            # apply fails, the instance is unrecoverable in the
+            # benchmark and must be flagged.
+            print(f"  APPLY FAIL: {r.stderr[:300]}")
+            return False
+        run_cmd(
+            ["git", "-C", str(repo_dir), "commit", "-m", message, "--allow-empty", "--no-verify"],
+            check=False,
+        )
+
+        # Post-apply verification: which files actually got committed?
+        diff_r = run_cmd(
+            ["git", "-C", str(repo_dir), "diff", "--name-only", "HEAD~1..HEAD"],
+            check=False,
+        )
+        committed = {ln.strip() for ln in diff_r.stdout.splitlines() if ln.strip()}
+        if expected and committed != expected:
+            extra = committed - expected
+            missing = expected - committed
+            print(
+                f"  APPLY VERIFY FAIL: committed={sorted(committed)[:5]} "
+                f"expected={sorted(expected)[:5]} "
+                f"extra_n={len(extra)} missing_n={len(missing)}"
+            )
+            return False
         return True
     finally:
         os.unlink(patch_path)
