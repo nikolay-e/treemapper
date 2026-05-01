@@ -4,7 +4,7 @@ Example::
 
     python -m benchmarks.run_eval \\
         --manifest benchmarks/manifests/v1/calibration.txt \\
-        --tau 0.08 --core-budget-fraction 0.70 --budget 8000 \\
+        --tau 0.12 --core-budget-fraction 0.5 --budget 8000 \\
         --workers 7 \\
         --out results/eval_calibration_t008_c070.json
 """
@@ -31,8 +31,8 @@ def _all_default_adapters() -> tuple[BenchmarkAdapter, ...]:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--manifest", type=Path, required=True)
-    p.add_argument("--tau", type=float, default=0.08)
-    p.add_argument("--core-budget-fraction", type=float, default=0.70)
+    p.add_argument("--tau", type=float, default=0.12)
+    p.add_argument("--core-budget-fraction", type=float, default=0.5)
     p.add_argument("--budget", type=int, default=8000)
     p.add_argument("--scoring", default="hybrid")
     p.add_argument("--workers", type=int, default=1)

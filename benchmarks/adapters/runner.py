@@ -19,8 +19,11 @@ class RunParams:
     near-zero effect). Anything else can be threaded through `extra_env`.
     """
 
-    tau: float = 0.08
-    core_budget_fraction: float = 0.70
+    # Calibrated v1 (2119 instances, 4 benchmarks, pebble-fixed pool):
+    # winner (tau, cbf) = (0.12, 0.5) at min(per_benchmark file_recall)
+    # = 0.1092. Surface is flat (top-3 within 0.001) — robust default.
+    tau: float = 0.12
+    core_budget_fraction: float = 0.5
     budget: int = 8000
     scoring: str = "hybrid"
     extra_env: dict[str, str] = field(default_factory=dict)

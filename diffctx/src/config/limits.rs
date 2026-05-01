@@ -32,7 +32,10 @@ impl Default for AlgorithmLimits {
 }
 
 pub const DEFAULT_PPR_ALPHA: f64 = 0.60;
-pub const DEFAULT_STOPPING_THRESHOLD: f64 = 0.08;
+/// Calibrated on v1 manifest (2119 instances, 4 benchmarks). Winner
+/// of (tau, cbf) grid = (0.12, 0.5) at min(per_benchmark file_recall)
+/// = 0.1092. Top-3 within 0.001 — surface is flat, choice is robust.
+pub const DEFAULT_STOPPING_THRESHOLD: f64 = 0.12;
 pub const DEFAULT_PIPELINE_TIMEOUT_SECONDS: u64 = 300;
 pub const DEFAULT_BUDGET_TOKENS: u32 = 4096;
 

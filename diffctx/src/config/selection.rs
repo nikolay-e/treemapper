@@ -9,7 +9,13 @@ pub struct SelectionConfig {
 impl Default for SelectionConfig {
     fn default() -> Self {
         Self {
-            core_budget_fraction: 0.70,
+            // Calibrated on the v1 manifest (2119 instances across
+            // SWE-bench Lite, PolyBench, Multi-SWE-bench, ContextBench)
+            // with the pebble-fixed pool. Winner of the (tau, cbf) grid
+            // = (0.12, 0.5) at min(per_benchmark file_recall) = 0.1092.
+            // Surface is flat (top-3 within 0.001), so the choice is
+            // robust rather than tuned to a sharp optimum.
+            core_budget_fraction: 0.5,
             r_cap_min: 0.01,
         }
     }
@@ -51,7 +57,7 @@ impl Default for BoltzmannConfig {
 
 pub fn selection() -> SelectionConfig {
     SelectionConfig {
-        core_budget_fraction: read_env_fraction("DIFFCTX_OP_SELECTION_CORE_BUDGET_FRACTION", 0.70),
+        core_budget_fraction: read_env_fraction("DIFFCTX_OP_SELECTION_CORE_BUDGET_FRACTION", 0.5),
         r_cap_min: read_env_fraction("DIFFCTX_OP_SELECTION_R_CAP_MIN", 0.01),
     }
 }
