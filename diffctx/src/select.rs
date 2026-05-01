@@ -43,6 +43,11 @@ pub struct SelectionResult {
     pub reason: SelectionReason,
     pub used_tokens: u32,
     pub utility: f64,
+    /// Greedy iterations actually executed (number of `apply_fragment`
+    /// calls in `run_greedy_loop_heap`). Diagnoses lazy-heap blowup:
+    /// expected ≈ output size, pathological ≫ output size when
+    /// stale-version rejections dominate.
+    pub greedy_iters: usize,
 }
 
 struct HeapEntry {
@@ -337,11 +342,13 @@ fn run_greedy_loop_heap(
     needs: &[InformationNeed],
     tau: f64,
     _initial_budget: u32,
-) -> (usize, f64) {
+) -> (usize, f64, usize) {
     let mut current_version = 0u32;
     let mut peak_density: f64 = 0.0;
+    let mut loop_iters: usize = 0;
 
     while !heap.is_empty() && state.remaining_budget > 0 {
+        loop_iters += 1;
         let (best_frag, best_density, new_version) = find_best_candidate_heap(
             heap,
             current_version,
@@ -376,7 +383,7 @@ fn run_greedy_loop_heap(
     }
 
     let threshold = tau * peak_density;
-    (state.selected.len(), threshold)
+    (state.selected.len(), threshold, loop_iters)
 }
 
 fn setup_and_select_core(
@@ -468,6 +475,7 @@ pub fn lazy_greedy_select(
             reason: SelectionReason::NoCandidates,
             used_tokens: 0,
             utility: 0.0,
+            greedy_iters: 0,
         };
     }
 
@@ -488,6 +496,7 @@ pub fn lazy_greedy_select(
             reason: SelectionReason::BudgetExhausted,
             used_tokens: used,
             utility: utility_value(&state.utility_state),
+            greedy_iters: 0,
         };
     }
 
@@ -511,7 +520,7 @@ pub fn lazy_greedy_select(
         &mut id_to_frag,
     );
 
-    let (_, threshold) = run_greedy_loop_heap(
+    let (_, threshold, greedy_iters) = run_greedy_loop_heap(
         &mut heap,
         &id_to_frag,
         &mut state,
@@ -548,6 +557,7 @@ pub fn lazy_greedy_select(
                 reason: SelectionReason::BestSingleton,
                 used_tokens: used,
                 utility: singleton_utility,
+                greedy_iters,
             };
         }
     }
@@ -570,5 +580,6 @@ pub fn lazy_greedy_select(
         reason,
         used_tokens: used,
         utility: greedy_utility,
+        greedy_iters,
     }
 }

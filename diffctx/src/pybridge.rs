@@ -297,6 +297,11 @@ fn build_diff_context<'py>(
         latency.set_item("tokenization_ms", r(lb.tokenization_ms))?;
         latency.set_item("scoring_selection_ms", r(lb.scoring_selection_ms))?;
         latency.set_item("total_ms", r(lb.total_ms))?;
+        latency.set_item("scoring_ms", r(lb.scoring_ms))?;
+        latency.set_item("selection_ms", r(lb.selection_ms))?;
+        latency.set_item("candidate_count", lb.candidate_count)?;
+        latency.set_item("edge_count", lb.edge_count)?;
+        latency.set_item("greedy_iters", lb.greedy_iters)?;
     } else {
         latency.set_item("total_ms", (total_ms * 10.0).round() / 10.0)?;
     }
@@ -406,6 +411,11 @@ fn diff_context_output_to_dict<'py>(
         latency.set_item("tokenization_ms", r(lb.tokenization_ms))?;
         latency.set_item("scoring_selection_ms", r(lb.scoring_selection_ms))?;
         latency.set_item("total_ms", r(lb.total_ms))?;
+        latency.set_item("scoring_ms", r(lb.scoring_ms))?;
+        latency.set_item("selection_ms", r(lb.selection_ms))?;
+        latency.set_item("candidate_count", lb.candidate_count)?;
+        latency.set_item("edge_count", lb.edge_count)?;
+        latency.set_item("greedy_iters", lb.greedy_iters)?;
     }
     dict.set_item("latency", latency)?;
     Ok(dict)

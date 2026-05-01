@@ -26,8 +26,30 @@ pub struct LatencyBreakdown {
     pub discovery_ms: f64,
     pub parse_discovered_ms: f64,
     pub tokenization_ms: f64,
+    /// Combined scoring + selection time. Kept for backward
+    /// compatibility with the existing checkpoint schema; the split
+    /// values below are the new diagnostic signal.
     pub scoring_selection_ms: f64,
     pub total_ms: f64,
+    /// Heavy-phase scoring only (PPR/EGO/BM25 + edge construction +
+    /// graph build), excludes the selection stage.
+    pub scoring_ms: f64,
+    /// Selection stage only (lazy greedy / Boltzmann + post-passes).
+    pub selection_ms: f64,
+    /// Size of the candidate fragment universe handed to the scoring
+    /// strategy (after fragment generation + signature variants but
+    /// before per-strategy filtering). Surfaces blowup on large repos —
+    /// pathological scoring time is correlated with this number, not
+    /// with `fragment_count` (which is the *output* size after
+    /// selection).
+    pub candidate_count: usize,
+    /// Edge count of the typed dependency graph used by PPR/EGO. Zero
+    /// for BM25 mode (no graph built).
+    pub edge_count: usize,
+    /// Number of greedy iterations actually executed (selected non-core
+    /// fragments). Bounded by `selected.len() - core.len()`. Pairs with
+    /// `selection_ms` to spot lazy-heap blowup vs. genuine large output.
+    pub greedy_iters: usize,
 }
 
 #[derive(Serialize, Clone)]

@@ -43,7 +43,7 @@ def main() -> int:
         default=None,
         help="Where to cache cloned repositories (default: $CB_REPOS_DIR or ~/.cache/contextbench_repos)",
     )
-    p.add_argument("--timeout-per-instance", type=float, default=300.0)
+    p.add_argument("--timeout-per-instance", type=float, default=20.0)
     p.add_argument("--resume-from", type=Path, default=None, help="Skip instance_ids in this JSONL checkpoint.")
     p.add_argument("--checkpoint", type=Path, default=None, help="Append each result to this JSONL as it completes.")
     p.add_argument("--min-memory-gb", type=float, default=16.0, help="Pre-flight memory probe threshold.")

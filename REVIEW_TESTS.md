@@ -827,11 +827,122 @@ Must-fix this week.
 
 Из ~70 findings реальных must-fix для submission paper — **5**. Остальные — управляемый debt; pattern-based primitives закроют ~30 за счёт 5 мелких рефакторов.
 
+---
+
+## Re-run 2026-04-30 — Round 1 (incremental)
+
+Eight new R1 sonnet agents ran today against the same scope. Below are the **non-duplicate** findings — issues not already covered by the canonical R1/R2/R3 above. Severity uses the same rubric.
+
+### New 🔴 Critical
+
+**X1 — `GitError` is dead code; Rust raises `PyRuntimeError`, MCP catches `GitError`** ✅
+- File:line: `src/treemapper/diffctx/__init__.py:6` (defines `GitError`); `src/treemapper/mcp/server.py:52` (`except GitError`); `diffctx/src/pybridge.rs:224,287` (raises `PyRuntimeError`).
+- Scenario: User passes a bad revision through MCP. The `try…except GitError` block never fires; `PyRuntimeError` propagates as a generic FastMCP `ToolError` with no `"Try 'HEAD~1..HEAD'…"` hint. `test_mcp.py::test_invalid_diff_range` only checks `pytest.raises(ToolError)` without message, so the dead branch passes CI.
+- Why no test catches it: existing test never asserts on the error message text.
+
+**X2 — `_diffctx` ImportError path is untested; pip-install without wheel = raw traceback**
+- File:line: `src/treemapper/diffctx/pipeline.py` (deferred import), `src/treemapper/tokens.py:6`, `src/treemapper/diffctx/graph_analytics.py:5-17`, `src/treemapper/diffctx/graph_export.py:5-11` — module-level imports of `_diffctx`.
+- Scenario: User installs `treemapper` without the compiled extension (wrong Python ABI, source dist). First call to any diff feature crashes with raw `ImportError`. No graceful fallback message.
+
+**X3 — PPR push-budget cap silently truncates BFS on large repos** ✅
+- File:line: `diffctx/src/ppr.rs:75` — `max_pushes = (n * PPR.push_scale_factor).min(PPR.max_pushes_cap)`; line ~149 re-normalizes the score vector after early termination.
+- Scenario: Monorepo (≥20k fragments). Cap fires; propagation halts before mass reaches distant-but-relevant fragments; re-normalization disguises the truncation. User sees plausible rankings that omit the actually-relevant code.
+- Why it matters: paper integrity at scale. No yaml case has a repo big enough to hit the cap.
+
+**X4 — Hybrid mode flips algorithm at exactly 50 candidate files**
+- File:line: `diffctx/src/mode.rs:93-119` — `n_candidate_files ≤ 50` ⇒ PPR + low_relevance_filter; `> 50` ⇒ Ego-graph.
+- Scenario: Mid-size project sits near the 50-file threshold. Adding/removing a single file flips scoring algorithms; user sees non-monotonic context changes between runs. Boundary (49/50/51) is exercised by no yaml case.
+
+**X5 — `CochangeEdgeBuilder` is structurally dead in 100% of yaml tests** ✅
+- File:line: `diffctx/src/edges/history/cochange.rs:112` — `if *count < COCHANGE.min_count { continue }`; `COCHANGE.min_count ≥ 2`. Test harness in `diffctx/tests/yaml_cases.rs` creates a repo with exactly two commits (initial + change), so every co-change pair count is 1 — always below threshold.
+- Scenario: A regression in pair counting, log-scale weighting, or `max_files_per_commit` skip would never be caught. The entire history-edge category has zero coverage.
+
+**X6 — `IntervalIndex::overlaps` treats shared boundary line as overlap** ✅
+- File:line: `diffctx/src/interval.rs` — `if end >= frag.start_line() { return true; }` triggers when `end == start_line` (back-to-back fragments sharing a single boundary line, valid in compact Rust/Go/Scala).
+- Scenario: A hunk touching the last line of function A causes function B (starting on that same line) to be permanently excluded from selection. Silently missing context.
+
+**X7 — `DIFFCTX_OP_EGO_PER_HOP_DECAY` is a dead env knob** ✅
+- File:line: `diffctx/src/config/scoring.rs:22` reads it into `EgoScoringConfig.per_hop_decay`. `diffctx/src/scoring.rs:112` calls `g.ego_graph(core_ids, self.max_depth)` — the decay parameter is **never passed** to `graph.rs:198::ego_graph(...)`.
+- Scenario: Operator tunes `DIFFCTX_OP_EGO_PER_HOP_DECAY=0.5` for a calibration sweep; observable behavior is unchanged; data is silently meaningless. Any paper figure using this knob has zero variance from changing it.
+
+**X8 — Directory symlinks are silently dropped (Python tree mode)** ✅
+- File:line: `src/treemapper/tree.py:172` — `if entry.is_symlink() or not entry.exists(): logger.debug(...); return None`. All symlinks (including dir-symlinks the user explicitly placed inside the repo) skipped without warning.
+- Scenario: User keeps `vendor/` or `shared/` as a symlinked dir. `treemapper .` silently omits all of it. No warning is emitted; existing test only verifies that a *file* symlink is absent.
+
+### New 🟡 Warning (selected)
+
+**X9 — UTF-16-LE/BE and UTF-8-with-BOM files**: `tree.py:231-247` only tests CP1251 fallback; UTF-16 files become `<unreadable content: not utf-8>` if `charset-normalizer` isn't installed. (`tests/test_basic.py::test_unicode_content_and_encoding_errors`).
+
+**X10 — NFC vs NFD path round-trip on macOS**: HFS+/APFS returns NFD from `iterdir()`; PyYAML serializes as-is; downstream NFC lookups silently fail. Untested.
+
+**X11 — `LexicalEdgeBuilder` zero-edge fallback when all changed identifiers are short**: `diffctx/src/edges/similarity/lexical.rs:96-104` — drops identifiers shorter than `query_min_identifier_length` (=3). A Go diff using `i`, `ok`, `err`, `db` produces zero lexical edges. Algorithm's recovery behavior is untested.
+
+**X12 — `SiblingEdgeBuilder` breaks on backslash paths**: `diffctx/src/edges/structural/sibling.rs:20-27` uses `Path::new().parent()` without normalizing separators; `src\utils.rs` has no Unix parent → both files bucket under `""`, no sibling edges. No yaml case uses backslash paths.
+
+**X13 — R extractor silently drops `.Rmd`, `.qmd`, `.rnw` files**: `diffctx/src/edges/semantic/r_lang.rs:13-16` — `is_r_file` only matches `.r` and `.rmd`. Quarto and Sweave notebooks produce no edges.
+
+**X14 — `ScoringMode::Ppr`, `Ego`, `Bm25` have zero integration coverage**: every yaml test invocation in `diffctx/tests/yaml_cases.rs:240` and `diffctx/src/test_harness.rs:126` hardcodes `ScoringMode::Hybrid`. The three other modes differ in discovery and filtering paths and are never exercised end-to-end.
+
+**X15 — Pure `git mv` (rename, no content change) → empty output**: `diffctx/src/git.rs::parse_diff` only collects hunks from `@@` lines. A bare `git mv` produces no `@@` lines → empty hunks → empty seeds → PPR emits nothing.
+
+**X16 — `SAFE_RANGE_RE` accepts leading-dot ranges (`..origin/main`)** ✅: `diffctx/src/git.rs:31` regex `^[a-zA-Z0-9_.^~/@{}\-]+(\.\.\.?[a-zA-Z0-9_.^~/@{}\-]*)?$` — `.` is inside the character class, so `..origin/main` passes validation, then git rejects it at subprocess time with raw `fatal: ambiguous argument` rather than the designed `InvalidRange` error.
+
+**X17 — Merge-commit combined-diff `@@@` headers silently ignored**: `diffctx/src/git.rs::HUNK_RE` matches `^@@ -` only; `@@@` (three-parent combined diff) is dropped. Files modified only inside a merge commit produce no hunk seeds.
+
+**X18 — YAML literal block strips trailing whitespace**: `src/treemapper/writer.py:76-81` emits `|2`-indented blocks; PyYAML strips trailing spaces from each line on `safe_load`. Markdown line-break (`text  \n`) and indented-docstring constructs silently mutate on round-trip. Distinct from O1 (which is about line-level newlines).
+
+**X19 — `count_tokens` returns `u32`, casts via `as u32`**: `diffctx/src/tokenizer.rs:16` — silent overflow possible on very large inputs. `diffctx/src/pybridge.rs:335` forwards the same `u32`.
+
+**X20 — `print_token_summary` bypasses `--quiet`**: `src/treemapper/tokens.py:47-48` — `print(..., file=sys.stderr)` ignores the quiet flag. Untested.
+
+### New 🔵 Note
+
+**X21 — `to_yaml`/`to_json` on `DiffContextResult` silently return empty string on serde failure** (`diffctx/src/pybridge.rs:103,108` — `unwrap_or_default()`). MCP clients receive `""` with no error.
+
+**X22 — `forward_blend=0.0` env value silently inverts ranking direction** (`diffctx/src/config/limits.rs:142`; `ppr.rs:146`). Clamped to `[0,1]` but no degeneracy guard at the endpoints.
+
+**X23 — `.scss` parsed with CSS grammar; `$var:…` produces ERROR-dominated tree** (`diffctx/src/parsers/tree_sitter_strategy.rs:407-416`). Only one SCSS yaml case exists and it passes via raw-anchor matching, not symbol extraction.
+
+### False Positive from this re-run
+
+- **F22** ("zero yaml test cases exist") — verified false: `find tests/cases/diff -name '*.yaml' | wc -l` = **2723**. The agent misread the harness path. Discard.
+
+---
+
+## Re-run 2026-04-30 — Updated Verdict
+
+The 2026-04-28 verdict's top 5 (E1, R2-T1, R2-P1, E2, M2) re-verified against current source — all still real. The re-run surfaces eight additional 🔴 worth pulling forward:
+
+### Updated must-fix-this-week (additions to prior list)
+
+- **X3 (PPR push cap silent truncation)** — same paper-integrity class as E1; clamp + emit a `truncated_at_pushes` counter.
+- **X4 (Hybrid 50-file boundary)** — add yaml cases at 49/50/51 candidate files asserting algorithmic determinism near boundary.
+- **X5 (CochangeEdgeBuilder dead in 100% of yaml tests)** — add at least one yaml case with ≥2 commits per file pair so the entire history-edge category has any coverage at all.
+- **X6 (IntervalIndex shared-boundary overlap)** — fix to `end > start_line` (strict) and add adjacency yaml case.
+- **X7 (`EGO_PER_HOP_DECAY` dead knob)** — plumb through to `graph.ego_graph` or remove from config; add a determinism test that toggles the knob.
+- **X1 (GitError dead code)** — register `GitError` as a `create_exception!` in `pybridge.rs` so the MCP `except GitError` actually fires; add MCP test asserting the helpful message text.
+- **X8 (directory symlinks silently dropped)** — emit `tracing::warn` and add option `--follow-symlinks`; add test case with a directory symlink in the tree.
+- **X14 (`ScoringMode::Ppr/Ego/Bm25` no integration coverage)** — parameterize at least one yaml case across all four modes to confirm non-Hybrid paths produce non-empty output.
+
+### Self-verification (re-read source, ✅ = confirmed)
+
+- ✅ X1 verified at `src/treemapper/mcp/server.py:52` + `diffctx/src/pybridge.rs:224,287`.
+- ✅ X3 verified at `diffctx/src/ppr.rs:75`.
+- ✅ X5 verified at `diffctx/src/edges/history/cochange.rs:112` (`min_count` filter); harness at `diffctx/tests/yaml_cases.rs` creates exactly two commits.
+- ✅ X6 verified at `diffctx/src/interval.rs` — `end >= frag.start_line()` confirmed.
+- ✅ X7 verified at `diffctx/src/config/scoring.rs:22` (env read) + `diffctx/src/scoring.rs:112` (`g.ego_graph(core_ids, self.max_depth)` — no decay arg) + `diffctx/src/graph.rs:198` (`ego_graph` signature).
+- ✅ X8 verified at `src/treemapper/tree.py:172`.
+- ✅ X16 verified — `SAFE_RANGE_RE` at `diffctx/src/git.rs:31` includes `.` in character class.
+- ❌ **F22 false positive removed.**
+
+---
+
 ## Audit Log
 
-- Date: 2026-04-28
+- Date: 2026-04-28 (initial), 2026-04-30 (re-run)
 - Project: /Users/nikolay/treemapper
 - Skill: /review-tests
-- Total findings: 8 R1 sections × ~5 findings = ~40 R1 + ~6 R2.3 missed = ~46 raw; after R2 calibration: 5 must-fix, ~30 deferrable, ~10 false positives
-- Severity (final, post-R4): 🔴 5 (E1, R2-T1, R2-P1, E2, M2), 🟡 ~25, 🔵 ~15
-- Agents used: 8 + 4 + 2 + 1 = 15
+- Initial: 8 R1 sections × ~5 findings = ~40 R1 + ~6 R2.3 missed = ~46 raw; after R2 calibration: 5 must-fix, ~30 deferrable, ~10 false positives.
+- Re-run: 8 R1 sonnet agents, ~45 raw findings; after de-duplication against prior audit: 23 genuinely new (X1–X23), 1 false positive (F22).
+- Severity (post-R4 combined): 🔴 13 (E1, R2-T1, R2-P1, E2, M2, X1, X3, X4, X5, X6, X7, X8, X14), 🟡 ~30, 🔵 ~20.
+- Agents used: 8 + 4 + 2 + 1 = 15 (initial); 8 R1 + 1 R4 self-verification = 9 (re-run; R2/R3 reused since the 5 structural patterns from initial still hold).

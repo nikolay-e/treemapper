@@ -30,6 +30,7 @@ pub fn boltzmann_select(
             reason: SelectionReason::NoCandidates,
             used_tokens: 0,
             utility: 0.0,
+            greedy_iters: 0,
         };
     }
 
@@ -79,11 +80,13 @@ pub fn boltzmann_select(
         selected.push(f);
     }
 
+    let final_count = selected.len();
     SelectionResult {
         selected,
         reason,
         used_tokens: used,
         utility: total_utility,
+        greedy_iters: final_count,
     }
 }
 

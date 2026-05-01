@@ -48,7 +48,7 @@ def main() -> int:
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--repos-dir", type=Path, default=None)
-    p.add_argument("--timeout-per-instance", type=float, default=300.0)
+    p.add_argument("--timeout-per-instance", type=float, default=20.0)
     p.add_argument("--min-memory-gb", type=float, default=16.0)
     p.add_argument("--min-disk-gb", type=float, default=50.0)
     p.add_argument("--checkpoint-dir", type=Path, default=None)

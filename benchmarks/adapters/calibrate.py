@@ -65,7 +65,7 @@ def evaluate_grid(
     eval_fn: EvalFn,
     workers: int = 1,
     on_trial: TrialCallback | None = None,
-    timeout_per_instance: float = 300.0,
+    timeout_per_instance: float = 20.0,
     checkpoint_dir: Path | None = None,
 ) -> list[TrialResult]:
     """Run every grid point, return per-trial aggregates.
@@ -145,7 +145,7 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
     eval_all_cells_fn: EvalAllCellsFn,
     workers: int = 1,
     on_trial: TrialCallback | None = None,
-    timeout_per_instance: float = 300.0,
+    timeout_per_instance: float = 20.0,
     checkpoint_dir: Path | None = None,
 ) -> list[TrialResult]:
     """Inverted-loop calibration: outer = instance, inner = grid cells.
@@ -195,7 +195,7 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
 
     def _make_pool() -> ProcessPoolExecutor:
         ctx = mp.get_context("spawn")
-        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=20)
+        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=40)
         list(p.map(int, range(workers)))
         return p
 
@@ -204,38 +204,66 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
             lbl = params.label()
             ckpt = ckpts.get(lbl)
             if ckpt is not None:
+                status = (result.extra or {}).get("status", "")
                 err = str((result.extra or {}).get("error", ""))
-                if "BrokenProcessPool" not in err:
+                # Persist timeouts even though they surface via BPP — they
+                # are deterministic per instance and must not retry forever.
+                if status == "timeout" or "BrokenProcessPool" not in err:
                     append_checkpoint(ckpt, result)
             results_by_cell[lbl].append(result)
 
     def _drain(pool: ProcessPoolExecutor) -> None:
+        import time as _time
+
         futures: dict = {}
+        submit_times: dict[str, float] = {}
         submit_failed: list[tuple[BenchmarkInstance, list[RunParams]]] = []
         pool_broken = False
         for inst, params_list in pending:
             try:
-                futures[pool.submit(eval_all_cells_fn, inst, params_list)] = (inst, params_list)
+                submit_times[inst.instance_id] = _time.monotonic()
+                futures[
+                    pool.submit(
+                        _run_cells_with_kill_switch,
+                        eval_all_cells_fn,
+                        inst,
+                        params_list,
+                        timeout_per_instance,
+                    )
+                ] = (inst, params_list)
             except BrokenProcessPool:
                 idx = pending.index((inst, params_list))
                 submit_failed.extend(pending[idx:])
                 pool_broken = True
                 break
-        outer_deadline = __import__("time").monotonic() + timeout_per_instance * len(points) * max(
-            1, (len(pending) + workers - 1) // workers
-        )
+        outer_deadline = _time.monotonic() + timeout_per_instance * len(points) * max(1, (len(pending) + workers - 1) // workers)
         completed: set[str] = set()
         try:
             for future in as_completed(
                 futures,
-                timeout=max(0.0, outer_deadline - __import__("time").monotonic()),
+                timeout=max(0.0, outer_deadline - _time.monotonic()),
             ):
                 inst, params_list = futures[future]
                 try:
                     per_cell = future.result(timeout=0)
                 except BrokenProcessPool:
-                    pool_broken = True
-                    per_cell = [(p, _failure_eval(inst, p, "error", "BrokenProcessPool: worker died")) for p in params_list]
+                    elapsed = _time.monotonic() - submit_times.get(inst.instance_id, 0.0)
+                    if elapsed >= timeout_per_instance * 0.9:
+                        per_cell = [
+                            (
+                                p,
+                                _failure_eval(
+                                    inst,
+                                    p,
+                                    "timeout",
+                                    f"killed after {timeout_per_instance}s (elapsed {elapsed:.1f}s)",
+                                ),
+                            )
+                            for p in params_list
+                        ]
+                    else:
+                        pool_broken = True
+                        per_cell = [(p, _failure_eval(inst, p, "error", "BrokenProcessPool: worker died")) for p in params_list]
                 except Exception as e:
                     per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
                 completed.add(inst.instance_id)
@@ -294,6 +322,30 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
         if on_trial is not None:
             on_trial(i, len(points), trial)
     return out
+
+
+def _run_cells_with_kill_switch(
+    eval_all_cells_fn: EvalAllCellsFn,
+    instance: BenchmarkInstance,
+    params_list: list[RunParams],
+    timeout_s: float,
+) -> list[tuple[RunParams, EvalResult]]:
+    """Worker-side hard timeout for the cached calibration path. The whole
+    `compute_scored_state + N selections` task must finish inside the
+    deadline; otherwise `os._exit(137)` kills the worker and the pool
+    spawns a replacement. Selection cost is sub-second per cell, so the
+    deadline is effectively a budget on the heavy scoring phase.
+    """
+    import os
+    import threading
+
+    timer = threading.Timer(timeout_s, lambda: os._exit(137))
+    timer.daemon = True
+    timer.start()
+    try:
+        return eval_all_cells_fn(instance, params_list)
+    finally:
+        timer.cancel()
 
 
 def _failure_eval(

@@ -11,6 +11,31 @@ from benchmarks.adapters.base import BenchmarkAdapter, BenchmarkInstance, EvalRe
 EvalFn = Callable[[BenchmarkInstance, "RunParams"], EvalResult]
 
 
+def _run_with_kill_switch(
+    eval_fn: EvalFn,
+    instance: BenchmarkInstance,
+    params: RunParams,
+    timeout_s: float,
+) -> EvalResult:
+    """Worker-side hard timeout. A daemon thread arms `os._exit(137)` after
+    `timeout_s`; if the Rust pipeline blocks past the deadline (releasing
+    the GIL via `py.allow_threads`), this kills the worker process
+    unconditionally. The pool detects `BrokenProcessPool` and spawns a
+    replacement, so a single pathological instance no longer monopolizes
+    a worker slot for hours.
+    """
+    import os
+    import threading
+
+    timer = threading.Timer(timeout_s, lambda: os._exit(137))
+    timer.daemon = True
+    timer.start()
+    try:
+        return eval_fn(instance, params)
+    finally:
+        timer.cancel()
+
+
 @dataclass(frozen=True)
 class RunParams:
     """Parameters for one diffctx evaluation pass.
@@ -74,10 +99,18 @@ def read_checkpoint(path: Path) -> set[str]:
 
 
 def append_checkpoint(path: Path, result: EvalResult) -> None:
-    """Append one result as a JSONL row. Atomic per-line on POSIX."""
+    """Append one result as a JSONL row. fsync after each write so a
+    `os._exit(137)` kill in a sibling worker cannot leave a half-written
+    last line that breaks `jq` / line iteration on resume.
+    """
+    import os as _os
+
     path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(asdict(result), default=str) + "\n"
     with path.open("a") as f:
-        f.write(json.dumps(asdict(result), default=str) + "\n")
+        f.write(line)
+        f.flush()
+        _os.fsync(f.fileno())
 
 
 def _load_existing_results(path: Path, allowed_ids: set[str]) -> list[EvalResult]:
@@ -138,7 +171,7 @@ def run_eval_set(
     eval_fn: EvalFn,
     params: RunParams,
     workers: int = 1,
-    timeout_per_instance: float = 300.0,
+    timeout_per_instance: float = 20.0,
     resume_from: Path | None = None,
     checkpoint_path: Path | None = None,
     pool: object | None = None,
@@ -147,10 +180,11 @@ def run_eval_set(
 
     - `workers > 1` uses a process pool (spawn context) so workers do
       not share the GIL; otherwise sequential.
-    - `timeout_per_instance` records a `status="timeout"` failure for any
-      future that does not return within the deadline. The hung worker
-      process is left to finish on its own; pool shutdown does not wait
-      for it.
+    - `timeout_per_instance` is enforced worker-side via a daemon timer
+      that calls `os._exit(137)` if the deadline passes — the pool then
+      respawns the killed worker. This bounds calibration wall-clock at
+      `timeout_per_instance * ceil(n / workers)` even on pathological
+      instances (e.g. PPR convergence blow-up on huge graphs).
     - `resume_from` (JSONL path): instance_ids already present in that file
       are skipped — re-running after a crash continues where it left off.
     - `checkpoint_path` (JSONL path): each completed result is appended
@@ -167,8 +201,14 @@ def run_eval_set(
         # Pool-level transient failures (BrokenProcessPool) must NOT be
         # persisted: on retry the orchestrator rebuilds the pool and these
         # instances should be re-evaluated, not skipped via the resume set.
+        # EXCEPTION: status=="timeout" results — even though the kill switch
+        # surfaces them via BrokenProcessPool, they are deterministic per
+        # instance (the same input would hit the same deadline again) and
+        # MUST be checkpointed to prevent an infinite retry loop on a
+        # pathological repository.
+        status = (r.extra or {}).get("status", "")
         err = str((r.extra or {}).get("error", ""))
-        if "BrokenProcessPool" in err:
+        if status != "timeout" and "BrokenProcessPool" in err:
             return
         append_checkpoint(checkpoint_path, r)
 
@@ -212,16 +252,18 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
         TimeoutError as FuturesTimeoutError,
     )
 
-    def _drain(active_pool: ProcessPoolExecutor) -> None:
+    def _drain(active_pool: ProcessPoolExecutor) -> None:  # noqa: C901
         from concurrent.futures import CancelledError
         from concurrent.futures.process import BrokenProcessPool
 
         futures: dict = {}
+        submit_times: dict[str, float] = {}
         submit_failed: list[BenchmarkInstance] = []
         pool_broken = False
         for inst in pending:
             try:
-                futures[active_pool.submit(eval_fn, inst, params)] = inst
+                submit_times[inst.instance_id] = time.monotonic()
+                futures[active_pool.submit(_run_with_kill_switch, eval_fn, inst, params, timeout_per_instance)] = inst
             except BrokenProcessPool:
                 submit_failed.extend([inst, *pending[pending.index(inst) + 1 :]])
                 pool_broken = True
@@ -236,8 +278,25 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
                 except (FuturesTimeoutError, CancelledError):
                     r = _failure_result(inst, params, "timeout", f"after {timeout_per_instance}s")
                 except BrokenProcessPool:
-                    r = _failure_result(inst, params, "error", "BrokenProcessPool: worker died")
-                    pool_broken = True
+                    # The kill switch arms `os._exit(137)` at the deadline,
+                    # which surfaces here as BrokenProcessPool. Distinguish
+                    # timeout-induced death from a genuine pool crash by
+                    # elapsed wall-clock — within 90% of the deadline the
+                    # likely cause is our timer. Persist as "timeout" (not
+                    # "error") so the checkpoint records it and a retry
+                    # loop does not re-evaluate the same pathological
+                    # instance forever.
+                    elapsed = time.monotonic() - submit_times.get(inst.instance_id, 0.0)
+                    if elapsed >= timeout_per_instance * 0.9:
+                        r = _failure_result(
+                            inst,
+                            params,
+                            "timeout",
+                            f"killed after {timeout_per_instance}s (elapsed {elapsed:.1f}s)",
+                        )
+                    else:
+                        r = _failure_result(inst, params, "error", "BrokenProcessPool: worker died")
+                        pool_broken = True
                 except Exception as e:
                     r = _failure_result(inst, params, "error", f"{type(e).__name__}: {e}")
                 completed.add(inst.instance_id)

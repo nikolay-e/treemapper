@@ -367,6 +367,7 @@ pub fn select_with_params(
         }
     };
 
+    let selection_iters = selection_result.greedy_iters;
     let mut selected = selection_result.selected;
 
     postpass::coherence_post_pass(
@@ -421,6 +422,11 @@ pub fn select_with_params(
         tokenization_ms: state.heavy_latency_ms.tokenization,
         scoring_selection_ms: state.heavy_latency_ms.scoring + select_ms,
         total_ms,
+        scoring_ms: state.heavy_latency_ms.scoring,
+        selection_ms: select_ms,
+        candidate_count: state.scoring_result.filtered_fragments.len(),
+        edge_count: state.scoring_result.graph.edge_count(),
+        greedy_iters: selection_iters,
     });
     output
 }
