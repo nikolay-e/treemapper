@@ -76,6 +76,14 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+      options: >-
+        --cpus 48
+        --memory 180g
+        --memory-swap 180g
+        --shm-size 32g
+        --pids-limit -1
+        --ulimit nofile=1048576:1048576
+        --ulimit nproc=65535:65535
     env:
       CELL_TAG: ${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
       CELL_DIR: results/sweep/${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
