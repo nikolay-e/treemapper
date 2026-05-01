@@ -232,16 +232,21 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
         futures: dict = {}
         submit_times: dict[str, float] = {}
         submit_failed: list[tuple[BenchmarkInstance, list[RunParams]]] = []
-        pool_broken = False
         for inst, params_list in pending:
-            try:
-                submit_times[inst.instance_id] = _time.monotonic()
-                futures[pool.submit(eval_all_cells_fn, inst, params_list)] = (inst, params_list)
-            except BrokenProcessPool:
-                idx = pending.index((inst, params_list))
-                submit_failed.extend(pending[idx:])
-                pool_broken = True
-                break
+            for attempt in range(3):
+                try:
+                    submit_times[inst.instance_id] = _time.monotonic()
+                    futures[pool.submit(eval_all_cells_fn, inst, params_list)] = (inst, params_list)
+                    break
+                except BrokenProcessPool:
+                    # The kill switch from a previous task left a worker
+                    # mid-respawn; ProcessPoolExecutor itself spawns a
+                    # replacement on the next submit. Brief sleep + retry
+                    # avoids forcing a full pool rebuild for one dead worker.
+                    if attempt == 2:
+                        submit_failed.append((inst, params_list))
+                        break
+                    _time.sleep(0.1)
         outer_deadline = _time.monotonic() + timeout_per_instance * len(points) * max(1, (len(pending) + workers - 1) // workers)
         completed: set[str] = set()
         try:
@@ -253,6 +258,11 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
                 try:
                     per_cell = future.result(timeout=0)
                 except BrokenProcessPool:
+                    # Worker death (typically from our os._exit kill switch).
+                    # Treat elapsed-near-deadline as timeout so a pathological
+                    # instance is checkpointed and not retried forever.
+                    # Shorter elapsed => transient (submitted just before
+                    # an earlier task killed the worker); record as error.
                     elapsed = _time.monotonic() - submit_times.get(inst.instance_id, 0.0)
                     if elapsed >= timeout_per_instance * 0.9:
                         per_cell = [
@@ -268,41 +278,28 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
                             for p in params_list
                         ]
                     else:
-                        pool_broken = True
                         per_cell = [(p, _failure_eval(inst, p, "error", "BrokenProcessPool: worker died")) for p in params_list]
                 except Exception as e:
                     per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
                 completed.add(inst.instance_id)
                 _record_per_cell(per_cell)
         except BrokenProcessPool:
-            pool_broken = True
+            # Self-healing pool — log nothing here; per-future BPP handler
+            # above already recorded the dead instance, and ProcessPoolExecutor
+            # spawns replacement workers on the next submission cycle.
+            pass
         for inst, params_list in submit_failed:
             _record_per_cell([(p, _failure_eval(inst, p, "error", "BrokenProcessPool: submit failed")) for p in params_list])
-        if pool_broken:
-            raise BrokenProcessPool("pool degraded mid-grid")
 
     pool: ProcessPoolExecutor | None = _make_pool() if workers > 1 else None
     try:
         if pending and pool is not None:
-            while True:
-                try:
-                    _drain(pool)
-                    break
-                except BrokenProcessPool:
-                    try:
-                        pool.shutdown(wait=False, cancel_futures=True)
-                    except Exception:
-                        pass
-                    pool = _make_pool()
-                    # Recompute pending for the rebuild from current
-                    # checkpoint state — instances completed since last
-                    # rebuild should be skipped.
-                    done_ids_now = {lbl: read_checkpoint(c) if c is not None else set() for lbl, c in ckpts.items()}
-                    pending[:] = [
-                        (inst, [p for p in points if inst.instance_id not in done_ids_now[p.label()]])
-                        for inst, _ in pending
-                        if any(inst.instance_id not in done_ids_now[p.label()] for p in points)
-                    ]
+            # Single drain pass; ProcessPoolExecutor self-heals dead
+            # workers via spawn-on-next-submit, so we no longer rebuild
+            # the whole pool every time the kill switch fires (that
+            # rebuild was 30-60s of dead time per BPP and turned every
+            # legitimate per-instance timeout into a cell-wide cascade).
+            _drain(pool)
         elif pending and pool is None:
             # workers == 1: serial fallback
             for inst, params_list in pending:

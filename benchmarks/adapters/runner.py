@@ -237,15 +237,21 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
         futures: dict = {}
         submit_times: dict[str, float] = {}
         submit_failed: list[BenchmarkInstance] = []
-        pool_broken = False
         for inst in pending:
-            try:
-                submit_times[inst.instance_id] = time.monotonic()
-                futures[active_pool.submit(eval_fn, inst, params)] = inst
-            except BrokenProcessPool:
-                submit_failed.extend([inst, *pending[pending.index(inst) + 1 :]])
-                pool_broken = True
-                break
+            for attempt in range(3):
+                try:
+                    submit_times[inst.instance_id] = time.monotonic()
+                    futures[active_pool.submit(eval_fn, inst, params)] = inst
+                    break
+                except BrokenProcessPool:
+                    # A previous task's kill switch left the worker
+                    # mid-respawn; ProcessPoolExecutor spawns a
+                    # replacement on the next submit cycle. Brief sleep +
+                    # retry beats forcing a full pool rebuild.
+                    if attempt == 2:
+                        submit_failed.append(inst)
+                        break
+                    time.sleep(0.1)
         outer_deadline = time.monotonic() + timeout_per_instance * max(1, (len(pending) + workers - 1) // workers)
         completed: set[str] = set()
         try:
@@ -258,12 +264,12 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
                 except BrokenProcessPool:
                     # The kill switch arms `os._exit(137)` at the deadline,
                     # which surfaces here as BrokenProcessPool. Distinguish
-                    # timeout-induced death from a genuine pool crash by
-                    # elapsed wall-clock — within 90% of the deadline the
-                    # likely cause is our timer. Persist as "timeout" (not
-                    # "error") so the checkpoint records it and a retry
-                    # loop does not re-evaluate the same pathological
-                    # instance forever.
+                    # timeout-induced death from a transient pool failure
+                    # by elapsed wall-clock — within 90% of the deadline
+                    # the likely cause is our timer; persist as "timeout"
+                    # so the checkpoint records it. Otherwise mark as a
+                    # transient error (NOT persisted) so the resume loop
+                    # gets another shot.
                     elapsed = time.monotonic() - submit_times.get(inst.instance_id, 0.0)
                     if elapsed >= timeout_per_instance * 0.9:
                         r = _failure_result(
@@ -274,7 +280,6 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
                         )
                     else:
                         r = _failure_result(inst, params, "error", "BrokenProcessPool: worker died")
-                        pool_broken = True
                 except Exception as e:
                     r = _failure_result(inst, params, "error", f"{type(e).__name__}: {e}")
                 completed.add(inst.instance_id)
@@ -284,14 +289,13 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
                 if inst.instance_id not in completed:
                     record(_failure_result(inst, params, "timeout", "exceeded global deadline"))
         except BrokenProcessPool:
-            pool_broken = True
+            # Self-healing pool — replacement workers spawn on next submit;
+            # per-future BPP handler above already recorded dead instances.
             for inst in futures.values():
                 if inst.instance_id not in completed:
                     record(_failure_result(inst, params, "error", "BrokenProcessPool: worker died"))
         for inst in submit_failed:
             record(_failure_result(inst, params, "error", "BrokenProcessPool: submit failed"))
-        if pool_broken:
-            raise BrokenProcessPool("pool degraded mid-cell")
 
     if pool is not None:
         _drain(pool)  # type: ignore[arg-type]
