@@ -413,6 +413,7 @@ pub fn select_with_params(
         + state.heavy_latency_ms.scoring
         + select_ms;
 
+    let cap_stats = state.scoring_result.graph.cap_stats;
     let mut output = render::build_diff_context_output(&state.root_dir, &selected, no_content);
     output.latency = Some(render::LatencyBreakdown {
         parse_changed_ms: state.heavy_latency_ms.parse_changed,
@@ -427,6 +428,10 @@ pub fn select_with_params(
         candidate_count: state.scoring_result.filtered_fragments.len(),
         edge_count: state.scoring_result.graph.edge_count(),
         greedy_iters: selection_iters,
+        edges_before_cap: cap_stats.edges_before_cap,
+        edges_dropped_by_cap: cap_stats.edges_dropped_by_cap,
+        nodes_capped: cap_stats.nodes_capped,
+        max_out_edges_per_node: cap_stats.max_out_edges_per_node,
     });
     output
 }

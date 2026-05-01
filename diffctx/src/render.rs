@@ -50,6 +50,14 @@ pub struct LatencyBreakdown {
     /// fragments). Bounded by `selected.len() - core.len()`. Pairs with
     /// `selection_ms` to spot lazy-heap blowup vs. genuine large output.
     pub greedy_iters: usize,
+    /// Edge count after merge + hub suppression, before per-source cap.
+    pub edges_before_cap: usize,
+    /// Edges discarded by the per-source top-K cap.
+    pub edges_dropped_by_cap: usize,
+    /// Source nodes whose outgoing edge list was truncated by the cap.
+    pub nodes_capped: usize,
+    /// The K value applied for the per-source cap.
+    pub max_out_edges_per_node: usize,
 }
 
 #[derive(Serialize, Clone)]
