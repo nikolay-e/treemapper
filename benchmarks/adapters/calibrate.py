@@ -174,35 +174,40 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
 
     evaluator = UniversalEvaluator()
     points = list(spec.points())
+    # Index by `params.label()` because `RunParams.extra_env: dict` makes
+    # the dataclass unhashable — can't use the params object itself as a
+    # dict key. Labels are stable and uniquely identify a grid cell.
+    points_by_label: dict[str, RunParams] = {p.label(): p for p in points}
 
-    ckpts: dict[RunParams, Path | None] = {
-        p: (checkpoint_dir / f"{p.label()}.jsonl") if checkpoint_dir is not None else None for p in points
+    ckpts: dict[str, Path | None] = {
+        lbl: (checkpoint_dir / f"{lbl}.jsonl") if checkpoint_dir is not None else None for lbl in points_by_label
     }
-    done_ids: dict[RunParams, set[str]] = {p: read_checkpoint(c) if c is not None else set() for p, c in ckpts.items()}
-    results_by_cell: dict[RunParams, list[EvalResult]] = {
-        p: (_load_existing_results(c, done_ids[p]) if c is not None else []) for p, c in ckpts.items()
+    done_ids: dict[str, set[str]] = {lbl: read_checkpoint(c) if c is not None else set() for lbl, c in ckpts.items()}
+    results_by_cell: dict[str, list[EvalResult]] = {
+        lbl: (_load_existing_results(c, done_ids[lbl]) if c is not None else []) for lbl, c in ckpts.items()
     }
 
     pending: list[tuple[BenchmarkInstance, list[RunParams]]] = []
     for inst in instances:
-        needed = [p for p in points if inst.instance_id not in done_ids[p]]
+        needed = [p for p in points if inst.instance_id not in done_ids[p.label()]]
         if needed:
             pending.append((inst, needed))
 
     def _make_pool() -> ProcessPoolExecutor:
         ctx = mp.get_context("spawn")
-        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=50)
+        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=20)
         list(p.map(int, range(workers)))
         return p
 
     def _record_per_cell(per_cell_results: list[tuple[RunParams, EvalResult]]) -> None:
         for params, result in per_cell_results:
-            ckpt = ckpts.get(params)
+            lbl = params.label()
+            ckpt = ckpts.get(lbl)
             if ckpt is not None:
                 err = str((result.extra or {}).get("error", ""))
                 if "BrokenProcessPool" not in err:
                     append_checkpoint(ckpt, result)
-            results_by_cell[params].append(result)
+            results_by_cell[lbl].append(result)
 
     def _drain(pool: ProcessPoolExecutor) -> None:
         futures: dict = {}
@@ -258,11 +263,11 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
                     # Recompute pending for the rebuild from current
                     # checkpoint state — instances completed since last
                     # rebuild should be skipped.
-                    done_ids_now = {p: read_checkpoint(c) if c is not None else set() for p, c in ckpts.items()}
+                    done_ids_now = {lbl: read_checkpoint(c) if c is not None else set() for lbl, c in ckpts.items()}
                     pending[:] = [
-                        (inst, [p for p in points if inst.instance_id not in done_ids_now[p]])
+                        (inst, [p for p in points if inst.instance_id not in done_ids_now[p.label()]])
                         for inst, _ in pending
-                        if any(inst.instance_id not in done_ids_now[p] for p in points)
+                        if any(inst.instance_id not in done_ids_now[p.label()] for p in points)
                     ]
         elif pending and pool is None:
             # workers == 1: serial fallback
@@ -278,11 +283,12 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
 
     out: list[TrialResult] = []
     for i, params in enumerate(points):
-        agg = evaluator.aggregate_per_benchmark(results_by_cell[params])
+        cell_results = results_by_cell[params.label()]
+        agg = evaluator.aggregate_per_benchmark(cell_results)
         trial = TrialResult(
             params=params,
             per_benchmark=agg,
-            raw_results=tuple(results_by_cell[params]),
+            raw_results=tuple(cell_results),
         )
         out.append(trial)
         if on_trial is not None:
