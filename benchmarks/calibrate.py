@@ -113,6 +113,12 @@ def main() -> int:
 
     _prewarm_bare_clones(instances)
 
+    # Workers read DIFFCTX_BENCH_TIMEOUT_SEC to scope the kill switch
+    # to the diffctx call only (excluding git clone / worktree setup).
+    import os as _os
+
+    _os.environ["DIFFCTX_BENCH_TIMEOUT_SEC"] = str(args.timeout_per_instance)
+
     eval_all_cells_fn = make_diffctx_eval_all_cells_fn(repo_root)
     args.out.mkdir(parents=True, exist_ok=True)
     checkpoint_dir = args.out / "checkpoints"

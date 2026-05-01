@@ -65,6 +65,10 @@ def main() -> int:
     instances = list(filter_instances_by_manifest(adapters, manifest_ids))
     print(f"Validation set: {len(instances)} instances")
 
+    import os as _os
+
+    _os.environ["DIFFCTX_BENCH_TIMEOUT_SEC"] = str(args.timeout_per_instance)
+
     eval_fn = make_diffctx_eval_fn(repo_root)
     evaluator = UniversalEvaluator()
 

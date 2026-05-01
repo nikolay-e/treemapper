@@ -222,15 +222,7 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
         for inst, params_list in pending:
             try:
                 submit_times[inst.instance_id] = _time.monotonic()
-                futures[
-                    pool.submit(
-                        _run_cells_with_kill_switch,
-                        eval_all_cells_fn,
-                        inst,
-                        params_list,
-                        timeout_per_instance,
-                    )
-                ] = (inst, params_list)
+                futures[pool.submit(eval_all_cells_fn, inst, params_list)] = (inst, params_list)
             except BrokenProcessPool:
                 idx = pending.index((inst, params_list))
                 submit_failed.extend(pending[idx:])
@@ -322,30 +314,6 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
         if on_trial is not None:
             on_trial(i, len(points), trial)
     return out
-
-
-def _run_cells_with_kill_switch(
-    eval_all_cells_fn: EvalAllCellsFn,
-    instance: BenchmarkInstance,
-    params_list: list[RunParams],
-    timeout_s: float,
-) -> list[tuple[RunParams, EvalResult]]:
-    """Worker-side hard timeout for the cached calibration path. The whole
-    `compute_scored_state + N selections` task must finish inside the
-    deadline; otherwise `os._exit(137)` kills the worker and the pool
-    spawns a replacement. Selection cost is sub-second per cell, so the
-    deadline is effectively a budget on the heavy scoring phase.
-    """
-    import os
-    import threading
-
-    timer = threading.Timer(timeout_s, lambda: os._exit(137))
-    timer.daemon = True
-    timer.start()
-    try:
-        return eval_all_cells_fn(instance, params_list)
-    finally:
-        timer.cancel()
 
 
 def _failure_eval(

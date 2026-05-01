@@ -61,6 +61,37 @@ def _selected_files(fragments: tuple[GoldenFragment, ...]) -> frozenset[str]:
     return frozenset(f.path for f in fragments)
 
 
+def _read_diffctx_timeout_sec() -> float:
+    """Read the wall-clock budget for a single diffctx invocation from
+    the worker's environment. Set by the CLI orchestrators before pool
+    spawn; absent or <=0 disables the timer (git/clone/setup operations
+    around the diffctx call are intentionally NOT covered).
+    """
+    raw = os.environ.get("DIFFCTX_BENCH_TIMEOUT_SEC", "")
+    try:
+        return float(raw) if raw else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _arm_diffctx_kill_switch(timeout_s: float):
+    """Arm a daemon timer that calls `os._exit(137)` after `timeout_s`
+    elapse. Used to bound the wall-clock cost of ONE diffctx call (heavy
+    scoring + selection); the surrounding `ensure_repo` / `apply_as_commit`
+    / `reset_to_parent` git operations are deliberately uninstrumented
+    because they are benchmark scaffolding, not part of the algorithm
+    under measurement.
+    """
+    import threading
+
+    if timeout_s <= 0:
+        return None
+    timer = threading.Timer(timeout_s, lambda: os._exit(137))
+    timer.daemon = True
+    timer.start()
+    return timer
+
+
 def _ensure_worker_state(repos_dir_str: str) -> tuple[Path, UniversalEvaluator]:
     state = _WORKER_STATE.get(repos_dir_str)
     if state is None:
@@ -98,13 +129,23 @@ def _pool_eval(repos_dir_str: str, instance: BenchmarkInstance, params: RunParam
         t0 = time.perf_counter()
         from treemapper.diffctx.pipeline import build_diff_context
 
-        output = build_diff_context(
-            repo_dir,
-            "HEAD~1..HEAD",
-            budget_tokens=params.budget,
-            scoring_mode=params.scoring,
-            tau=params.tau,
-        )
+        # Kill switch covers ONLY the diffctx call. Git ops above
+        # (ensure_repo, apply_as_commit) and reset_to_parent below run
+        # uninstrumented — `git worktree add` on huge repos (vscode,
+        # mui) takes 30-60s of pure filesystem I/O which is benchmark
+        # scaffolding, not the algorithm under measurement.
+        timer = _arm_diffctx_kill_switch(_read_diffctx_timeout_sec())
+        try:
+            output = build_diff_context(
+                repo_dir,
+                "HEAD~1..HEAD",
+                budget_tokens=params.budget,
+                scoring_mode=params.scoring,
+                tau=params.tau,
+            )
+        finally:
+            if timer is not None:
+                timer.cancel()
         elapsed = time.perf_counter() - t0
         if output is None:
             result = EvalResult(
@@ -231,6 +272,12 @@ def pool_eval_all_cells(
         apply_as_commit(repo_dir, instance.gold_patch, "diffctx-eval-gold")
 
         t_heavy_start = time.perf_counter()
+        # Kill switch around the heavy phase ONLY. Same rationale as
+        # `_pool_eval`: git ops outside this scope are scaffolding. The
+        # selection sub-loop below is sub-second per cell so a single
+        # heavy-phase deadline is sufficient.
+        bench_timeout = _read_diffctx_timeout_sec()
+        timer = _arm_diffctx_kill_switch(bench_timeout)
         try:
             state = compute_scored_state(
                 repo_dir,
@@ -240,6 +287,9 @@ def pool_eval_all_cells(
         except Exception as e:
             err = f"{type(e).__name__}: {e}"
             return [(p, _failure_result(instance, p, "diffctx_fail", err)) for p in params_list]
+        finally:
+            if timer is not None:
+                timer.cancel()
         heavy_elapsed = time.perf_counter() - t_heavy_start
 
         for params in params_list:
@@ -248,11 +298,20 @@ def pool_eval_all_cells(
                 for k, v in params.to_env().items():
                     os.environ[k] = v
                 t_select_start = time.perf_counter()
-                output = select_with_params(
-                    state,
-                    budget_tokens=params.budget,
-                    tau=params.tau,
-                )
+                # Each cell selection is sub-second on cached state, but
+                # arm a fresh timer per cell as a defense in depth: a
+                # pathological lazy-greedy regression on one cell should
+                # not poison the whole instance.
+                cell_timer = _arm_diffctx_kill_switch(bench_timeout)
+                try:
+                    output = select_with_params(
+                        state,
+                        budget_tokens=params.budget,
+                        tau=params.tau,
+                    )
+                finally:
+                    if cell_timer is not None:
+                        cell_timer.cancel()
                 select_elapsed = time.perf_counter() - t_select_start
                 # Charge the heavy cost to the first cell only — subsequent
                 # cells reuse the cached state, so they only pay select cost.
@@ -295,5 +354,5 @@ def _failure_result(
 
 def make_diffctx_eval_all_cells_fn(repos_dir: Path):
     """Sibling of `make_diffctx_eval_fn` for the inverted orchestrator
-    (one task = one instance × N cells)."""
+    (one task = one instance times N cells)."""
     return functools.partial(pool_eval_all_cells, str(repos_dir))

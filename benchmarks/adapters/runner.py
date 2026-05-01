@@ -11,31 +11,6 @@ from benchmarks.adapters.base import BenchmarkAdapter, BenchmarkInstance, EvalRe
 EvalFn = Callable[[BenchmarkInstance, "RunParams"], EvalResult]
 
 
-def _run_with_kill_switch(
-    eval_fn: EvalFn,
-    instance: BenchmarkInstance,
-    params: RunParams,
-    timeout_s: float,
-) -> EvalResult:
-    """Worker-side hard timeout. A daemon thread arms `os._exit(137)` after
-    `timeout_s`; if the Rust pipeline blocks past the deadline (releasing
-    the GIL via `py.allow_threads`), this kills the worker process
-    unconditionally. The pool detects `BrokenProcessPool` and spawns a
-    replacement, so a single pathological instance no longer monopolizes
-    a worker slot for hours.
-    """
-    import os
-    import threading
-
-    timer = threading.Timer(timeout_s, lambda: os._exit(137))
-    timer.daemon = True
-    timer.start()
-    try:
-        return eval_fn(instance, params)
-    finally:
-        timer.cancel()
-
-
 @dataclass(frozen=True)
 class RunParams:
     """Parameters for one diffctx evaluation pass.
@@ -180,11 +155,14 @@ def run_eval_set(
 
     - `workers > 1` uses a process pool (spawn context) so workers do
       not share the GIL; otherwise sequential.
-    - `timeout_per_instance` is enforced worker-side via a daemon timer
-      that calls `os._exit(137)` if the deadline passes — the pool then
-      respawns the killed worker. This bounds calibration wall-clock at
-      `timeout_per_instance * ceil(n / workers)` even on pathological
-      instances (e.g. PPR convergence blow-up on huge graphs).
+    - `timeout_per_instance` is the wall-clock budget for ONE diffctx
+      call. The actual kill switch is armed inside the eval_fn (see
+      `benchmarks/diffctx_eval_fn.py`) around `build_diff_context` /
+      `compute_scored_state` only — git ops (clone, worktree add,
+      apply_as_commit) run uninstrumented because they are benchmark
+      scaffolding, not the algorithm under measurement. The orchestrator
+      passes the deadline to workers via the `DIFFCTX_BENCH_TIMEOUT_SEC`
+      environment variable.
     - `resume_from` (JSONL path): instance_ids already present in that file
       are skipped — re-running after a crash continues where it left off.
     - `checkpoint_path` (JSONL path): each completed result is appended
@@ -263,7 +241,7 @@ def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode d
         for inst in pending:
             try:
                 submit_times[inst.instance_id] = time.monotonic()
-                futures[active_pool.submit(_run_with_kill_switch, eval_fn, inst, params, timeout_per_instance)] = inst
+                futures[active_pool.submit(eval_fn, inst, params)] = inst
             except BrokenProcessPool:
                 submit_failed.extend([inst, *pending[pending.index(inst) + 1 :]])
                 pool_broken = True

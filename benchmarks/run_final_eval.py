@@ -91,6 +91,11 @@ def main() -> int:
         return 1
 
     adapters = default_test_adapters() + default_calibration_pool_adapters()
+
+    import os as _os
+
+    _os.environ["DIFFCTX_BENCH_TIMEOUT_SEC"] = str(args.timeout_per_instance)
+
     eval_fn = _make_eval_fn(args.baseline, repo_root, request_timeout=args.timeout_per_instance)
 
     args.out.mkdir(parents=True, exist_ok=True)
