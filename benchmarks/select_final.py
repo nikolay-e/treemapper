@@ -45,7 +45,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--candidates", type=Path, required=True)
     p.add_argument("--manifest", type=Path, required=True)
-    p.add_argument("--workers", type=int, default=1)
+    p.add_argument("--workers", type=int, default=40)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--repos-dir", type=Path, default=None)
     p.add_argument("--timeout-per-instance", type=float, default=20.0)

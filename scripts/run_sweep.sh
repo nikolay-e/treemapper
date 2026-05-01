@@ -62,7 +62,7 @@ exec caffeinate -dimsu \
   --baseline "${BASELINE}" \
   --winner "${WINNER_JSON}" \
   --manifests-dir benchmarks/manifests/v1 \
-  --workers 2 \
+  --workers 40 \
   --timeout-per-instance 600 \
   --min-memory-gb 8 \
   --min-disk-gb 30 \
