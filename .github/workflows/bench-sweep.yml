@@ -69,7 +69,7 @@ jobs:
           - {method: bm25, budget: -1}
           # Aider repo-map is inherently budget-bounded by token packing.
           - {method: aider, budget: -1}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, large]
     timeout-minutes: 350
     container:
       image: ghcr.io/${{ github.repository_owner }}/treemapper-bench:latest
@@ -177,10 +177,10 @@ jobs:
             --baseline "${BASELINE}" \
             --winner /tmp/winner.json \
             --manifests-dir /tmp/manifest_one \
-            --workers 2 \
+            --workers 44 \
             --timeout-per-instance "${INPUT_TIMEOUT}" \
-            --min-memory-gb 4 \
-            --min-disk-gb 5 \
+            --min-memory-gb 32 \
+            --min-disk-gb 50 \
             --out "${CELL_DIR}" 2>&1 | tee "${CELL_DIR}/run.log"
         env:
           BASELINE: ${{ steps.cfg.outputs.baseline }}
