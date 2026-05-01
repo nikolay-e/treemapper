@@ -141,14 +141,16 @@ def run_eval_set(
     timeout_per_instance: float = 300.0,
     resume_from: Path | None = None,
     checkpoint_path: Path | None = None,
+    pool: object | None = None,
 ) -> list[EvalResult]:
     """Run `eval_fn(instance, params)` for every instance.
 
-    - `workers > 1` uses a thread pool; otherwise sequential.
+    - `workers > 1` uses a process pool (spawn context) so workers do
+      not share the GIL; otherwise sequential.
     - `timeout_per_instance` records a `status="timeout"` failure for any
       future that does not return within the deadline. The hung worker
-      thread is left running (Python cannot kill threads safely); pool
-      shutdown does not wait for it.
+      process is left to finish on its own; pool shutdown does not wait
+      for it.
     - `resume_from` (JSONL path): instance_ids already present in that file
       are skipped — re-running after a crash continues where it left off.
     - `checkpoint_path` (JSONL path): each completed result is appended
@@ -160,14 +162,21 @@ def run_eval_set(
 
     def _record(r: EvalResult) -> None:
         results.append(r)
-        if checkpoint_path is not None:
-            append_checkpoint(checkpoint_path, r)
+        if checkpoint_path is None:
+            return
+        # Pool-level transient failures (BrokenProcessPool) must NOT be
+        # persisted: on retry the orchestrator rebuilds the pool and these
+        # instances should be re-evaluated, not skipped via the resume set.
+        err = str((r.extra or {}).get("error", ""))
+        if "BrokenProcessPool" in err:
+            return
+        append_checkpoint(checkpoint_path, r)
 
     if pending:
         if workers <= 1 or len(pending) <= 1:
             _run_serial(pending, eval_fn, params, _record)
         else:
-            _run_parallel(pending, eval_fn, params, workers, timeout_per_instance, _record)
+            _run_parallel(pending, eval_fn, params, workers, timeout_per_instance, _record, pool=pool)
 
     return results
 
@@ -185,24 +194,35 @@ def _run_serial(
             record(_failure_result(inst, params, "error", f"{type(e).__name__}: {e}"))
 
 
-def _run_parallel(
+def _run_parallel(  # noqa: C901 — pool-shape branching + multi-failure-mode drain do not factor cleanly
     pending: list[BenchmarkInstance],
     eval_fn: EvalFn,
     params: RunParams,
     workers: int,
     timeout_per_instance: float,
     record: Callable[[EvalResult], None],
+    pool: object | None = None,
 ) -> None:
+    import multiprocessing as mp
     from concurrent.futures import (
-        ThreadPoolExecutor,
+        ProcessPoolExecutor,
         as_completed,
     )
     from concurrent.futures import (
         TimeoutError as FuturesTimeoutError,
     )
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(eval_fn, inst, params): inst for inst in pending}
+    def _drain(active_pool: ProcessPoolExecutor) -> None:
+        from concurrent.futures.process import BrokenProcessPool
+
+        futures: dict = {}
+        submit_failed: list[BenchmarkInstance] = []
+        for inst in pending:
+            try:
+                futures[active_pool.submit(eval_fn, inst, params)] = inst
+            except BrokenProcessPool:
+                submit_failed.extend([inst, *pending[pending.index(inst) + 1 :]])
+                break
         outer_deadline = time.monotonic() + timeout_per_instance * max(1, (len(pending) + workers - 1) // workers)
         completed: set[str] = set()
         try:
@@ -212,6 +232,8 @@ def _run_parallel(
                     r = future.result(timeout=0)
                 except FuturesTimeoutError:
                     r = _failure_result(inst, params, "timeout", f"after {timeout_per_instance}s")
+                except BrokenProcessPool:
+                    r = _failure_result(inst, params, "error", "BrokenProcessPool: worker died")
                 except Exception as e:
                     r = _failure_result(inst, params, "error", f"{type(e).__name__}: {e}")
                 completed.add(inst.instance_id)
@@ -220,4 +242,20 @@ def _run_parallel(
             for inst in futures.values():
                 if inst.instance_id not in completed:
                     record(_failure_result(inst, params, "timeout", "exceeded global deadline"))
-        pool.shutdown(wait=False, cancel_futures=True)
+        except BrokenProcessPool:
+            for inst in futures.values():
+                if inst.instance_id not in completed:
+                    record(_failure_result(inst, params, "error", "BrokenProcessPool: worker died"))
+        for inst in submit_failed:
+            record(_failure_result(inst, params, "error", "BrokenProcessPool: submit failed"))
+        if submit_failed or any(inst.instance_id not in completed for inst in futures.values()):
+            raise BrokenProcessPool("pool degraded mid-cell")
+
+    if pool is not None:
+        _drain(pool)  # type: ignore[arg-type]
+        return
+
+    ctx = mp.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as owned:
+        _drain(owned)
+        owned.shutdown(wait=False, cancel_futures=True)

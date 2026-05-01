@@ -244,7 +244,7 @@ pub fn build_diff_context(
                     &core_ids,
                     &scoring_result.rel_scores,
                     effective_budget,
-                    crate::config::selection::BOLTZMANN.calibration_tolerance,
+                    crate::config::selection::boltzmann().calibration_tolerance,
                 );
                 tracing::debug!("diffctx: boltzmann beta calibrated to {:.6e}", beta);
                 crate::utility::boltzmann_select(

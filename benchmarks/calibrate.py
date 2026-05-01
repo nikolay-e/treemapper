@@ -30,6 +30,30 @@ def _parse_floats(s: str) -> tuple[float, ...]:
     return tuple(float(p) for p in s.split(",") if p.strip())
 
 
+def _prewarm_bare_clones(instances) -> None:
+    """Clone every distinct repo serially before the parallel grid runs.
+
+    Cell 1 otherwise pays the full clone cost on its workers — when many
+    workers race on `_ensure_bare_cache` they all stall on the same git
+    operation and emit clone-fail spam. A single sequential warmup turns
+    that cold path into a one-time setup the grid never sees again.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from benchmarks.common import _ensure_bare_cache
+
+    seen: dict[str, str] = {}
+    for inst in instances:
+        if inst.repo in seen:
+            continue
+        url = str(inst.extra.get("repo_url") or f"https://github.com/{inst.repo}")
+        seen[inst.repo] = url
+    print(f"Pre-warming {len(seen)} bare clones...", flush=True)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda kv: _ensure_bare_cache(kv[1], kv[0]), seen.items()))
+    print("Pre-warm complete.", flush=True)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--manifest", type=Path, required=True)
@@ -81,6 +105,8 @@ def main() -> int:
         print(f"Subsampled {len(instances)} of {len(manifest_ids)} (seed={args.subsample_seed})")
     else:
         print(f"Resolved {len(instances)} / {len(manifest_ids)} instances")
+
+    _prewarm_bare_clones(instances)
 
     eval_fn = make_diffctx_eval_fn(repo_root)
     args.out.mkdir(parents=True, exist_ok=True)

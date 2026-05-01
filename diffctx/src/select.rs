@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::config::limits::UTILITY;
-use crate::config::selection::SELECTION;
+use crate::config::selection::selection;
 use crate::interval::IntervalIndex;
 use crate::types::{Fragment, FragmentId};
 use crate::utility::needs::InformationNeed;
@@ -114,7 +114,7 @@ fn compute_r_cap(
 
     if values.len() < 2 {
         return if let Some(&v) = values.first() {
-            v.max(SELECTION.r_cap_min)
+            v.max(selection().r_cap_min)
         } else {
             1.0
         };
@@ -165,7 +165,7 @@ fn select_core_fragments(
     budget_tokens: u32,
     sig_lookup: &FxHashMap<FragmentId, Fragment>,
 ) {
-    let core_budget = (budget_tokens as f64 * SELECTION.core_budget_fraction) as u32;
+    let core_budget = (budget_tokens as f64 * selection().core_budget_fraction) as u32;
     let mut core_used = 0u32;
 
     let mut sorted_core: Vec<&Fragment> = core_fragments.iter().collect();

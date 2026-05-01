@@ -196,6 +196,7 @@ impl FragmentIterator {
     timeout = DEFAULT_PIPELINE_TIMEOUT_SECONDS,
 ))]
 fn build_diff_context_native(
+    py: Python<'_>,
     root_dir: &str,
     diff_range: Option<&str>,
     budget_tokens: Option<u32>,
@@ -210,17 +211,19 @@ fn build_diff_context_native(
         ScoringMode::from_str(scoring_mode).map_err(pyo3::exceptions::PyValueError::new_err)?;
     let path = Path::new(root_dir);
 
-    pipeline::build_diff_context(
-        path,
-        diff_range,
-        budget_tokens,
-        alpha,
-        tau,
-        no_content,
-        full,
-        mode,
-        timeout,
-    )
+    py.allow_threads(|| {
+        pipeline::build_diff_context(
+            path,
+            diff_range,
+            budget_tokens,
+            alpha,
+            tau,
+            no_content,
+            full,
+            mode,
+            timeout,
+        )
+    })
     .map(DiffContextResult::from)
     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
 }
@@ -275,18 +278,21 @@ fn build_diff_context<'py>(
     };
 
     let start = std::time::Instant::now();
-    let output = pipeline::build_diff_context(
-        path,
-        range,
-        budget_tokens,
-        alpha,
-        tau,
-        no_content,
-        full,
-        mode,
-        timeout,
-    )
-    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+    let output = py
+        .allow_threads(|| {
+            pipeline::build_diff_context(
+                path,
+                range,
+                budget_tokens,
+                alpha,
+                tau,
+                no_content,
+                full,
+                mode,
+                timeout,
+            )
+        })
+        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
     let total_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     let dict = PyDict::new(py);

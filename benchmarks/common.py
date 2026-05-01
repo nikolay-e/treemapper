@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import re
@@ -173,23 +172,6 @@ def _git_dir_for_repo(repo_dir: Path) -> Path:
     return git_path
 
 
-@contextlib.contextmanager
-def _bare_repo_lock(cache_dir: Path):
-    # `fcntl` is POSIX-only; benchmark runners are not supported on Windows,
-    # but tests that import this module's pure helpers (e.g. `patch_files`)
-    # must still be importable on win32. Keep the import inside the lock fn.
-    import fcntl
-
-    lock_path = cache_dir / ".bench-worktree.lock"
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
-    finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
-
-
 def ensure_repo(
     repo_url: str,
     repo_name: str,
@@ -201,28 +183,29 @@ def ensure_repo(
     if not cache_dir:
         return None
     repo_dir = target_dir / repo_name.replace("/", "__")
-    # Both branches share the bare cache and may race on `git worktree add`,
-    # `git clean`, and the worktree's index lock when multiple workers operate
-    # on the same repo concurrently. The whole block runs under the bare-cache
-    # lock to make `--workers 2+` correct.
-    with _bare_repo_lock(cache_dir):
-        if repo_dir.exists():
-            _remove_stale_locks(_git_dir_for_repo(repo_dir))
-            run_cmd(["git", "-C", str(repo_dir), "clean", "-fd"], check=False, timeout=30)
-            r = run_cmd(
-                ["git", "-C", str(repo_dir), "checkout", "--force", base_commit],
-                check=False,
-                timeout=checkout_timeout,
-            )
-        else:
-            run_cmd(["git", "-C", str(cache_dir), "worktree", "prune"], check=False, timeout=30)
-            r = run_cmd(
-                ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
-                check=False,
-                timeout=checkout_timeout,
-            )
-            if r.returncode == 0:
-                _apply_perf_config(repo_dir)
+    # With per-PID `target_dir`, worktrees are isolated per worker process —
+    # `git clean`/`checkout` inside a worker's own worktree never collide with
+    # another worker. `git worktree add` against the shared bare cache is
+    # serialized by git's internal `.git/worktrees.lock`, so no userspace
+    # mutex is needed. Adding one here turns same-repo workers into a queue
+    # and tanks throughput on cells dominated by one or two repos.
+    if repo_dir.exists():
+        _remove_stale_locks(_git_dir_for_repo(repo_dir))
+        run_cmd(["git", "-C", str(repo_dir), "clean", "-fd"], check=False, timeout=30)
+        r = run_cmd(
+            ["git", "-C", str(repo_dir), "checkout", "--force", base_commit],
+            check=False,
+            timeout=checkout_timeout,
+        )
+    else:
+        run_cmd(["git", "-C", str(cache_dir), "worktree", "prune"], check=False, timeout=30)
+        r = run_cmd(
+            ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
+            check=False,
+            timeout=checkout_timeout,
+        )
+        if r.returncode == 0:
+            _apply_perf_config(repo_dir)
     if r.returncode != 0:
         print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: {r.stderr[:200]}")
         return None

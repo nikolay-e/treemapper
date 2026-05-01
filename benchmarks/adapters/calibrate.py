@@ -70,6 +70,12 @@ def evaluate_grid(
 ) -> list[TrialResult]:
     """Run every grid point, return per-trial aggregates.
 
+    A single `ProcessPoolExecutor` is held across all cells so workers do
+    not pay re-spawn cost between trials — CPU stays saturated through the
+    whole sweep instead of dipping for ~30s per cell while 40 workers boot.
+    `max_tasks_per_child` recycles workers periodically so per-instance
+    memory leaks do not accumulate across the full grid.
+
     `on_trial(idx, total, trial)` fires after each completed trial — the CLI
     uses it for progress logging without coupling the pure logic to stdout.
 
@@ -77,25 +83,53 @@ def evaluate_grid(
     `params.label()`; restarting the sweep skips instances already recorded
     inside each trial's checkpoint.
     """
+    import multiprocessing as mp
+    from concurrent.futures import ProcessPoolExecutor
+
     evaluator = UniversalEvaluator()
     points = list(spec.points())
     out: list[TrialResult] = []
-    for i, params in enumerate(points):
-        ckpt = (checkpoint_dir / f"{params.label()}.jsonl") if checkpoint_dir is not None else None
-        results = run_eval_set(
-            instances,
-            eval_fn,
-            params,
-            workers=workers,
-            timeout_per_instance=timeout_per_instance,
-            resume_from=ckpt,
-            checkpoint_path=ckpt,
-        )
-        agg = evaluator.aggregate_per_benchmark(results)
-        trial = TrialResult(params=params, per_benchmark=agg, raw_results=tuple(results))
-        out.append(trial)
-        if on_trial is not None:
-            on_trial(i, len(points), trial)
+
+    from concurrent.futures.process import BrokenProcessPool
+
+    def _make_pool() -> ProcessPoolExecutor:
+        ctx = mp.get_context("spawn")
+        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx)
+        list(p.map(int, range(workers)))  # eager-spawn all workers
+        return p
+
+    pool: ProcessPoolExecutor | None = _make_pool() if workers > 1 else None
+    try:
+        for i, params in enumerate(points):
+            ckpt = (checkpoint_dir / f"{params.label()}.jsonl") if checkpoint_dir is not None else None
+            while True:
+                try:
+                    results = run_eval_set(
+                        instances,
+                        eval_fn,
+                        params,
+                        workers=workers,
+                        timeout_per_instance=timeout_per_instance,
+                        resume_from=ckpt,
+                        checkpoint_path=ckpt,
+                        pool=pool,
+                    )
+                    break
+                except BrokenProcessPool:
+                    if pool is not None:
+                        try:
+                            pool.shutdown(wait=False, cancel_futures=True)
+                        except Exception:
+                            pass
+                    pool = _make_pool() if workers > 1 else None
+            agg = evaluator.aggregate_per_benchmark(results)
+            trial = TrialResult(params=params, per_benchmark=agg, raw_results=tuple(results))
+            out.append(trial)
+            if on_trial is not None:
+                on_trial(i, len(points), trial)
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
     return out
 
 
