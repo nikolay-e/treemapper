@@ -213,6 +213,11 @@ this QA pass (touching benchmark code = regression risk on v1 results):
 - `benchmarks/aggregate_sweep.py:100` (23→15)
 - `benchmarks/adapters/multi_swebench.py:100` (17→15)
 - `benchmarks/diffctx_eval_fn.py:70` (18→15)
+- `benchmarks/diffctx_eval_fn.py:241` (19→15)
+- `benchmarks/adapters/calibrate.py:73` (25→15) — `evaluate_grid` retry/pool loop
+- `benchmarks/adapters/calibrate.py:160` (40→15) — `evaluate_grid_cached`, already
+  `# noqa: C901` for ruff (orchestration with timeout/exception/checkpoint dispatch
+  does not factor cleanly without behavior change)
 - `benchmarks/adapters/evaluator.py:49` (32→15)
 - `scripts/bake_bench_cache.py:72` (16→15)
 
