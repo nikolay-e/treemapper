@@ -92,9 +92,16 @@ def evaluate_grid(
 
     from concurrent.futures.process import BrokenProcessPool
 
+    from benchmarks.common import _init_worker
+
     def _make_pool() -> ProcessPoolExecutor:
         ctx = mp.get_context("spawn")
-        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=50)
+        p = ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=ctx,
+            max_tasks_per_child=50,
+            initializer=_init_worker,
+        )
         list(p.map(int, range(workers)))  # eager-spawn all workers
         return p
 
@@ -193,9 +200,16 @@ def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + ret
         if needed:
             pending.append((inst, needed))
 
+    from benchmarks.common import _init_worker
+
     def _make_pool() -> ProcessPoolExecutor:
         ctx = mp.get_context("spawn")
-        p = ProcessPoolExecutor(max_workers=workers, mp_context=ctx, max_tasks_per_child=40)
+        p = ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=ctx,
+            max_tasks_per_child=40,
+            initializer=_init_worker,
+        )
         list(p.map(int, range(workers)))
         return p
 

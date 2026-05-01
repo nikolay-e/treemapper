@@ -85,6 +85,14 @@ def _arm_diffctx_kill_switch(timeout_s: float):
     import threading
 
     if timeout_s <= 0:
+        # Trace once per worker so we know whether the env propagated.
+        if not getattr(_arm_diffctx_kill_switch, "_warned_no_timeout", False):
+            print(
+                f"[worker pid={os.getpid()}] WARN: DIFFCTX_BENCH_TIMEOUT_SEC unset "
+                f"or <=0, timer disabled (raw value: {os.environ.get('DIFFCTX_BENCH_TIMEOUT_SEC', 'MISSING')!r})",
+                flush=True,
+            )
+            _arm_diffctx_kill_switch._warned_no_timeout = True  # type: ignore[attr-defined]
         return None
     timer = threading.Timer(timeout_s, lambda: os._exit(137))
     timer.daemon = True

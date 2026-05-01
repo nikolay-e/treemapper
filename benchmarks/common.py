@@ -302,11 +302,17 @@ def _init_worker() -> None:
 
     warnings.filterwarnings("ignore", category=SyntaxWarning)
 
-    os.environ.setdefault("RAYON_NUM_THREADS", os.environ.get("BENCH_RAYON_THREADS", "1"))
-    os.environ.setdefault("OMP_NUM_THREADS", "1")
-    os.environ.setdefault("MKL_NUM_THREADS", "1")
-    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    # Explicit assignment, not setdefault: parent may have inherited a
+    # different value (e.g. ambient RAYON_NUM_THREADS=24 from a shell
+    # profile) which would defeat the cap. With N workers each running
+    # Rayon at full core count, we get N x cores threads contending for
+    # the same cores — the calibration timeout breaks before the
+    # algorithm finishes.
+    os.environ["RAYON_NUM_THREADS"] = os.environ.get("BENCH_RAYON_THREADS", "1")
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     for mod in (
         "_diffctx",
