@@ -147,10 +147,20 @@ def _ensure_bare_cache(repo_url: str, repo_name: str) -> Path | None:
     url = repo_url or f"https://github.com/{repo_name}.git"
     r = run_cmd(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], check=False, timeout=600)
     if r.returncode != 0:
+        if cache_dir.exists():
+            return cache_dir
         print(f"  CLONE FAIL: {r.stderr[:200]}")
         return None
     _apply_perf_config(cache_dir)
     return cache_dir
+
+
+def _ensure_commit_present(cache_dir: Path, commit: str) -> bool:
+    r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-t", commit], check=False, timeout=30)
+    if r.returncode == 0:
+        return True
+    r = run_cmd(["git", "-C", str(cache_dir), "fetch", "--quiet", "origin", commit], check=False, timeout=600)
+    return r.returncode == 0
 
 
 def _remove_stale_locks(git_dir: Path) -> None:
@@ -198,12 +208,25 @@ def ensure_repo(
             timeout=checkout_timeout,
         )
     else:
+        if not _ensure_commit_present(cache_dir, base_commit):
+            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: commit not in cache and fetch failed")
+            return None
         run_cmd(["git", "-C", str(cache_dir), "worktree", "prune"], check=False, timeout=30)
         r = run_cmd(
             ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
             check=False,
             timeout=checkout_timeout,
         )
+        if r.returncode != 0:
+            import time
+
+            time.sleep(1)
+            run_cmd(["git", "-C", str(cache_dir), "worktree", "prune"], check=False, timeout=30)
+            r = run_cmd(
+                ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
+                check=False,
+                timeout=checkout_timeout,
+            )
         if r.returncode == 0:
             _apply_perf_config(repo_dir)
     if r.returncode != 0:
