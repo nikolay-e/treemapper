@@ -91,8 +91,8 @@ RUN pip install --no-cache-dir --no-deps -e .
 COPY benchmarks ./benchmarks
 COPY scripts/bake_bench_cache.py ./scripts/bake_bench_cache.py
 
-# /cache/contextbench_repos is populated at runtime via bind-mount from host
-# (see Dockerfile.bench-data + bench-sweep.yml cloud-init extraction).
+# /cache/contextbench_repos is populated at provision time via bake_bench_cache.py
+# running inside this image (see bench-sweep.yml cloud-init).
 ENV CB_REPOS_DIR=/cache/contextbench_repos
 ENV PYTHONUNBUFFERED=1
 
