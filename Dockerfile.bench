@@ -89,6 +89,7 @@ RUN pip install --no-cache-dir --no-deps -e .
 
 # Layer 5: Benchmarks code (changes most often)
 COPY benchmarks ./benchmarks
+COPY scripts/bake_bench_cache.py ./scripts/bake_bench_cache.py
 
 # /cache/contextbench_repos is populated at runtime via bind-mount from host
 # (see Dockerfile.bench-data + bench-sweep.yml cloud-init extraction).

@@ -98,16 +98,18 @@ jobs:
           useradd -m -s /bin/bash github
           usermod -aG docker github
           echo "${GH_TOKEN}" | docker login ghcr.io -u nikolay-e --password-stdin
-          nohup docker pull ghcr.io/nikolay-e/treemapper-bench:latest >> /var/log/docker-bench.log 2>&1 &
+          docker pull ghcr.io/nikolay-e/treemapper-bench:latest
           nohup bash -c '
-            docker pull ghcr.io/nikolay-e/treemapper-bench-data:latest
             mkdir -p /data/bench_repos
-            CID=$(docker create ghcr.io/nikolay-e/treemapper-bench-data:latest /bin/true)
-            docker cp "${CID}:/cache/contextbench_repos/." /data/bench_repos/
-            docker rm "${CID}"
+            docker run --rm \
+              -v /data/bench_repos:/cache/contextbench_repos \
+              -e BAKE_PARALLELISM=16 \
+              ghcr.io/nikolay-e/treemapper-bench:latest \
+              python /app/scripts/bake_bench_cache.py /cache/contextbench_repos \
+              >> /var/log/bake.log 2>&1
             touch /data/bench_repos/.ready
-            echo "[data] ready at $(date -u)" >> /var/log/docker-data.log
-          ' >> /var/log/docker-data.log 2>&1 &
+            echo "[bake] done at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/log/bake.log
+          ' >> /var/log/bake.log 2>&1 &
           curl -sL -o /tmp/runner.tar.gz \
             "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
           for N in 1 2 3 4; do
