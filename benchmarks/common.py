@@ -156,10 +156,16 @@ def _ensure_bare_cache(repo_url: str, repo_name: str) -> Path | None:
 
 
 def _ensure_commit_present(cache_dir: Path, commit: str) -> bool:
-    r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-t", commit], check=False, timeout=30)
+    tree_ref = f"{commit}^{{tree}}"
+    r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-e", tree_ref], check=False, timeout=30)
     if r.returncode == 0:
         return True
-    r = run_cmd(["git", "-C", str(cache_dir), "fetch", "--quiet", "origin", commit], check=False, timeout=600)
+    run_cmd(
+        ["git", "-C", str(cache_dir), "fetch", "--quiet", "--depth=1", "origin", commit],
+        check=False,
+        timeout=600,
+    )
+    r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-e", tree_ref], check=False, timeout=30)
     return r.returncode == 0
 
 
