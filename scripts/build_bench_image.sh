@@ -15,7 +15,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 IMAGE="${IMAGE:-treemapper-bench:latest}"
-PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
+PLATFORMS="${PLATFORMS:-linux/amd64}"
 PUSH="${PUSH:-0}"
 BAKE_DATASET="${BAKE_DATASET:-full}"
 BAKE_LIMIT="${BAKE_LIMIT:-0}"

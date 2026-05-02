@@ -12,6 +12,10 @@ name: bench-sweep
 on:
   workflow_dispatch: {}
 
+concurrency:
+  group: bench-sweep
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -26,6 +30,7 @@ env:
   TAU: '0.12'
   CORE_BUDGET_FRACTION: '0.5'
   RESULTS_BRANCH: bench-results/sweep
+  SERVER_TAG: bench-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   # ============================================================================
@@ -46,14 +51,123 @@ jobs:
           echo "ts=${ts}" >> "$GITHUB_OUTPUT"
 
   # ============================================================================
-  # 2. The cell matrix. 5 methods × 5 budgets × 3 test sets = 75 base.
+  # 2. Provision a Hetzner CCX63 server with 4 self-hosted runners.
+  # ============================================================================
+  provision:
+    needs: prep
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    outputs:
+      server_id: ${{ steps.create.outputs.server_id }}
+    steps:
+      - name: Create Hetzner CCX63 with 4 self-hosted runners
+        id: create
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          REPO: ${{ github.repository }}
+          SERVER_NAME: bench-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+
+          REG_TOKEN=$(curl -sf -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/actions/runners/registration-token" \
+            | jq -r '.token')
+
+          RUNNER_VER=$(curl -sf \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/actions/runner/releases/latest" \
+            | jq -r '.tag_name[1:]')
+
+          REPO_URL="https://github.com/${REPO}"
+
+          cat > /tmp/cloud-init.sh << ENDINIT
+          #!/bin/bash
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -y
+          apt-get install -y docker.io curl jq
+          systemctl enable docker && systemctl start docker
+          useradd -m -s /bin/bash github
+          usermod -aG docker github
+          curl -sL -o /tmp/runner.tar.gz \
+            "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
+          for N in 1 2 3 4; do
+            mkdir -p "/home/github/runner-\${N}"
+            tar xzf /tmp/runner.tar.gz -C "/home/github/runner-\${N}"
+            chown -R github:github "/home/github/runner-\${N}"
+            sudo -u github bash -c "
+              cd /home/github/runner-\${N} &&
+              ./config.sh \
+                --url '${REPO_URL}' \
+                --token '${REG_TOKEN}' \
+                --name '${SERVER_NAME}-\${N}' \
+                --labels 'self-hosted,large' \
+                --unattended \
+                --replace"
+            nohup sudo -u github bash -c \
+              "cd /home/github/runner-\${N} && ./run.sh" \
+              >> "/home/github/runner-\${N}/runner.log" 2>&1 &
+          done
+          ENDINIT
+
+          RESPONSE=$(curl -sf -X POST "https://api.hetzner.cloud/v1/servers" \
+            -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"name\": \"${SERVER_NAME}\",
+              \"server_type\": \"ccx63\",
+              \"image\": \"ubuntu-24.04\",
+              \"location\": \"nbg1\",
+              \"user_data\": $(python3 -c "import json,sys; print(json.dumps(open('/tmp/cloud-init.sh').read()))")
+            }")
+
+          SERVER_ID=$(echo "${RESPONSE}" | jq -r '.server.id')
+          echo "server_id=${SERVER_ID}" >> "${GITHUB_OUTPUT}"
+          echo "${SERVER_ID}" > server_id.txt
+          echo "Provisioned Hetzner CCX63 server_id=${SERVER_ID} name=${SERVER_NAME}"
+
+      - name: Upload server_id for cleanup workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: hetzner-server-id
+          path: server_id.txt
+          retention-days: 7
+
+      - name: Wait for all 4 runners to come online
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          REPO: ${{ github.repository }}
+          SERVER_NAME: bench-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          echo "Polling for 4 runners prefixed '${SERVER_NAME}'..."
+          DEADLINE=$((SECONDS + 900))
+          while [[ ${SECONDS} -lt ${DEADLINE} ]]; do
+            ONLINE=$(curl -sf \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              "https://api.github.com/repos/${REPO}/actions/runners?per_page=100" \
+              | jq --arg pfx "${SERVER_NAME}" \
+                '[.runners[] | select(.name | startswith($pfx)) | select(.status == "online")] | length')
+            echo "  Online runners: ${ONLINE}/4"
+            [[ "${ONLINE}" -ge 4 ]] && echo "All 4 runners ready." && exit 0
+            sleep 30
+          done
+          echo "ERROR: runners did not come online within 15 minutes." >&2
+          exit 1
+
+  # ============================================================================
+  # 3. The cell matrix. 5 methods × 5 budgets × 3 test sets = 75 base.
   #    Excludes drop nonsensical combinations (B=-1 for non-diffctx baselines).
   #    Each cell is one runner; max-parallel: 256 (GH caps to its own concurrency
   #    limit, typically 20 for free public-repo Linux runners — they queue and
   #    drain naturally).
   # ============================================================================
   sweep:
-    needs: prep
+    needs: [prep, provision]
     permissions:
       contents: read
       packages: read
@@ -77,10 +191,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
-        --cpus 48
-        --memory 180g
-        --memory-swap 180g
-        --shm-size 32g
+        --cpus 12
+        --memory 44g
+        --memory-swap 44g
+        --shm-size 8g
         --pids-limit -1
         --ulimit nofile=1048576:1048576
         --ulimit nproc=65535:65535
@@ -177,19 +291,72 @@ jobs:
         env:
           SCORING: ${{ steps.cfg.outputs.scoring }}
 
+      - name: Write checkpoint heartbeat script
+        run: |
+          cat > /tmp/heartbeat.py << 'PYEOF'
+          import os, sys, time, json, pathlib, urllib.request
+          CKPT = pathlib.Path("${{ env.CELL_DIR }}/${{ matrix.test_set }}.checkpoint.jsonl")
+          ARTIFACT_NAME = "heartbeat-${{ env.CELL_TAG }}"
+          def try_upload():
+              if not CKPT.exists():
+                  return
+              rt_url = os.environ.get("ACTIONS_RUNTIME_URL", "")
+              rt_tok = os.environ.get("ACTIONS_RUNTIME_TOKEN", "")
+              run_id = os.environ.get("GITHUB_RUN_ID", "")
+              if not (rt_url and rt_tok and run_id):
+                  return
+              payload = json.dumps({"type": "actions_storage", "name": ARTIFACT_NAME}).encode()
+              req = urllib.request.Request(
+                  f"{rt_url}_apis/pipelines/workflows/{run_id}/artifacts?api-version=6.0-preview",
+                  data=payload,
+                  headers={"Authorization": f"Bearer {rt_tok}", "Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      resp = json.loads(r.read())
+              except Exception as e:
+                  print(f"[heartbeat] create: {e}", file=sys.stderr, flush=True)
+                  return
+              container_url = resp.get("fileContainerResourceUrl", "")
+              if not container_url:
+                  return
+              blob = CKPT.read_bytes()
+              put_req = urllib.request.Request(
+                  f"{container_url}?itemPath={ARTIFACT_NAME}/checkpoint.jsonl",
+                  data=blob,
+                  headers={"Authorization": f"Bearer {rt_tok}", "Content-Type": "application/octet-stream"},
+                  method="PUT",
+              )
+              try:
+                  urllib.request.urlopen(put_req, timeout=120)
+                  print(f"[heartbeat] uploaded {len(blob)} bytes", flush=True)
+              except Exception as e:
+                  print(f"[heartbeat] put: {e}", file=sys.stderr, flush=True)
+          while True:
+              time.sleep(600)
+              try:
+                  try_upload()
+              except Exception as e:
+                  print(f"[heartbeat] loop: {e}", file=sys.stderr, flush=True)
+          PYEOF
+
       - name: Run cell (logged to run.log)
         timeout-minutes: 330
         run: |
           set -o pipefail
+          python3 /tmp/heartbeat.py >> "${CELL_DIR}/heartbeat.log" 2>&1 &
+          HEARTBEAT_PID=$!
           python -m benchmarks.run_final_eval \
             --baseline "${BASELINE}" \
             --winner /tmp/winner.json \
             --manifests-dir /tmp/manifest_one \
-            --workers 44 \
+            --workers 10 \
             --timeout-per-instance "${INPUT_TIMEOUT}" \
             --min-memory-gb 32 \
             --min-disk-gb 50 \
             --out "${CELL_DIR}" 2>&1 | tee "${CELL_DIR}/run.log"
+          kill "${HEARTBEAT_PID}" 2>/dev/null || true
         env:
           BASELINE: ${{ steps.cfg.outputs.baseline }}
 
@@ -274,7 +441,7 @@ jobs:
           if-no-files-found: warn
 
   # ============================================================================
-  # 3. Aggregate all cells into per-cell summary table + raw artifact archive.
+  # 4. Aggregate all cells into per-cell summary table + raw artifact archive.
   #    Commits raw artifacts to a dedicated branch so nothing is lost when
   #    GH Actions artifact retention expires.
   # ============================================================================
@@ -369,4 +536,12 @@ jobs:
           EOF
           git add -A
           git commit -m "sweep ${SWEEP_ID} (source ${GITHUB_SHA})" || echo "nothing to commit"
-          git push -u origin "${BR}"
+          for attempt in 1 2 3; do
+            echo "Push attempt ${attempt}/3..."
+            git pull --rebase origin "${BR}" 2>/dev/null || true
+            if git push -u origin "${BR}"; then
+              break
+            else
+              sleep 10
+            fi
+          done
