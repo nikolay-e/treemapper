@@ -97,6 +97,8 @@ jobs:
           chmod 600 /root/.ssh/authorized_keys
           useradd -m -s /bin/bash github
           usermod -aG docker github
+          echo "${GH_TOKEN}" | docker login ghcr.io -u nikolay-e --password-stdin
+          nohup docker pull ghcr.io/nikolay-e/treemapper-bench:latest >> /var/log/docker-pull.log 2>&1 &
           curl -sL -o /tmp/runner.tar.gz \
             "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
           for N in 1 2 3 4; do
