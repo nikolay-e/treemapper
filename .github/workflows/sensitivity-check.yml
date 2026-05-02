@@ -36,10 +36,11 @@ jobs:
         run: pip install -e ".[dev,tree-sitter]"
 
       - name: Run sensitivity check
+        env:
+          DIFF_RANGE: ${{ inputs.diff_range }}
+          BUDGET: ${{ inputs.budget }}
+          PARAMS: ${{ inputs.params }}
         run: |
-          DIFF_RANGE='${{ inputs.diff_range }}'
-          BUDGET='${{ inputs.budget }}'
-          PARAMS='${{ inputs.params }}'
           ARGS=(--diff "${DIFF_RANGE}" --budget "${BUDGET}")
           [[ -n "${PARAMS}" ]] && ARGS+=(--params "${PARAMS}")
           bash scripts/sensitivity_check.sh "${ARGS[@]}" | tee sensitivity_output.txt

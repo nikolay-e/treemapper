@@ -31,7 +31,7 @@ jobs:
             echo "No server_id.txt found — provision job may not have run. Nothing to delete."
             exit 0
           fi
-          SERVER_ID=$(cat server_id.txt | tr -d '[:space:]')
+          SERVER_ID=$(tr -d '[:space:]' < server_id.txt)
           if [[ -z "$SERVER_ID" || "$SERVER_ID" == "null" ]]; then
             echo "server_id is empty — nothing to delete."
             exit 0
@@ -58,8 +58,9 @@ jobs:
             "https://api.github.com/repos/${REPO}/actions/runners?per_page=100" \
             | jq -r '.runners[] | select(.status == "offline") | .id')
           for RID in $RUNNERS; do
-            curl -sf -X DELETE \
+            if curl -sf -X DELETE \
               -H "Authorization: Bearer ${GH_TOKEN}" \
-              "https://api.github.com/repos/${REPO}/actions/runners/${RID}" \
-              && echo "Removed offline runner $RID" || true
+              "https://api.github.com/repos/${REPO}/actions/runners/${RID}"; then
+              echo "Removed offline runner $RID"
+            fi
           done

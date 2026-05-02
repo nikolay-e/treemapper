@@ -16,9 +16,6 @@ concurrency:
   group: bench-sweep
   cancel-in-progress: false
 
-permissions:
-  contents: read
-
 # Sweep parameters are hardcoded so the workflow runs with a single
 # zero-input click. To change a parameter, edit this env block and commit.
 # Per-cell knobs (method, budget, test_set) are the matrix below.
@@ -38,6 +35,8 @@ jobs:
   # ============================================================================
   prep:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       sweep_id: ${{ steps.id.outputs.sweep_id }}
       ts: ${{ steps.id.outputs.ts }}
