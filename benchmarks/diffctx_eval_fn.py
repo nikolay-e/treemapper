@@ -238,20 +238,26 @@ def _build_eval_result_from_output(
     return result
 
 
+def _apply_params_env(params: RunParams) -> dict[str, str | None]:
+    prior = {k: os.environ.get(k) for k in params.to_env()}
+    for k, v in params.to_env().items():
+        os.environ[k] = v
+    return prior
+
+
+def _restore_params_env(prior: dict[str, str | None]) -> None:
+    for k, v in prior.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
 def pool_eval_all_cells(
     repos_dir_str: str,
     instance: BenchmarkInstance,
     params_list: list[RunParams],
 ) -> list[tuple[RunParams, EvalResult]]:
-    """Compute the heavy `ScoredState` ONCE for the instance, then run
-    every (`tau`, `core_budget_fraction`) cell against it cheaply.
-
-    Returns one (params, result) tuple per input params. The orchestrator
-    demuxes these into per-cell checkpoints. This is the ProcessPool
-    worker entry point — the entire ScoredState lives only inside this
-    process and is dropped before return; only EvalResults cross the
-    pickle boundary.
-    """
     from benchmarks.common import apply_as_commit, ensure_repo, reset_to_parent
     from treemapper.diffctx.pipeline import compute_scored_state, select_with_params
 
@@ -263,35 +269,18 @@ def pool_eval_all_cells(
     repo_url = str(instance.extra.get("repo_url") or f"https://github.com/{instance.repo}")
     repo_dir = ensure_repo(repo_url, instance.repo, instance.base_commit, worktree_dir)
     if repo_dir is None:
-        return [
-            (
-                p,
-                _failure_result(instance, p, "clone_fail", "ensure_repo returned None"),
-            )
-            for p in params_list
-        ]
+        return [(p, _failure_result(instance, p, "clone_fail", "ensure_repo returned None")) for p in params_list]
 
-    # All params in a sweep share scoring_mode (BM25/PPR/Ego/Hybrid is a
-    # discovery-and-scoring choice, not a (τ, cbf) one). Use the first.
     scoring_mode = params_list[0].scoring
-
     out: list[tuple[RunParams, EvalResult]] = []
     try:
         apply_as_commit(repo_dir, instance.gold_patch, "diffctx-eval-gold")
 
         t_heavy_start = time.perf_counter()
-        # Kill switch around the heavy phase ONLY. Same rationale as
-        # `_pool_eval`: git ops outside this scope are scaffolding. The
-        # selection sub-loop below is sub-second per cell so a single
-        # heavy-phase deadline is sufficient.
         bench_timeout = _read_diffctx_timeout_sec()
         timer = _arm_diffctx_kill_switch(bench_timeout)
         try:
-            state = compute_scored_state(
-                repo_dir,
-                "HEAD~1..HEAD",
-                scoring_mode=scoring_mode,
-            )
+            state = compute_scored_state(repo_dir, "HEAD~1..HEAD", scoring_mode=scoring_mode)
         except Exception as e:
             err = f"{type(e).__name__}: {e}"
             return [(p, _failure_result(instance, p, "diffctx_fail", err)) for p in params_list]
@@ -301,37 +290,21 @@ def pool_eval_all_cells(
         heavy_elapsed = time.perf_counter() - t_heavy_start
 
         for params in params_list:
-            prior_env = {k: os.environ.get(k) for k in params.to_env()}
+            prior_env = _apply_params_env(params)
             try:
-                for k, v in params.to_env().items():
-                    os.environ[k] = v
                 t_select_start = time.perf_counter()
-                # Each cell selection is sub-second on cached state, but
-                # arm a fresh timer per cell as a defense in depth: a
-                # pathological lazy-greedy regression on one cell should
-                # not poison the whole instance.
                 cell_timer = _arm_diffctx_kill_switch(bench_timeout)
                 try:
-                    output = select_with_params(
-                        state,
-                        budget_tokens=params.budget,
-                        tau=params.tau,
-                    )
+                    output = select_with_params(state, budget_tokens=params.budget, tau=params.tau)
                 finally:
                     if cell_timer is not None:
                         cell_timer.cancel()
                 select_elapsed = time.perf_counter() - t_select_start
-                # Charge the heavy cost to the first cell only — subsequent
-                # cells reuse the cached state, so they only pay select cost.
                 charged = heavy_elapsed + select_elapsed if not out else select_elapsed
                 result = _build_eval_result_from_output(output, instance, params, charged, evaluator)
                 out.append((params, result))
             finally:
-                for k, v in prior_env.items():
-                    if v is None:
-                        os.environ.pop(k, None)
-                    else:
-                        os.environ[k] = v
+                _restore_params_env(prior_env)
     finally:
         try:
             reset_to_parent(repo_dir)

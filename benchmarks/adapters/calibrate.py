@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from benchmarks.adapters.base import BenchmarkInstance, EvalResult
 from benchmarks.adapters.evaluator import UniversalEvaluator
@@ -70,6 +72,55 @@ class TrialResult:
 TrialCallback = Callable[[int, int, "TrialResult"], None]
 
 
+def _make_process_pool(workers: int) -> ProcessPoolExecutor:
+    import multiprocessing as mp
+
+    from benchmarks.common import _init_worker
+
+    ctx = mp.get_context("spawn")
+    p = ProcessPoolExecutor(
+        max_workers=workers,
+        mp_context=ctx,
+        max_tasks_per_child=50,
+        initializer=_init_worker,
+    )
+    list(p.map(int, range(workers)))
+    return p
+
+
+def _run_trial_with_retry(
+    instances: list[BenchmarkInstance],
+    eval_fn: EvalFn,
+    params: RunParams,
+    workers: int,
+    timeout_per_instance: float,
+    ckpt: Path | None,
+    pool: ProcessPoolExecutor | None,
+) -> tuple[list[EvalResult], ProcessPoolExecutor | None]:
+    from concurrent.futures.process import BrokenProcessPool
+
+    while True:
+        try:
+            results = run_eval_set(
+                instances,
+                eval_fn,
+                params,
+                workers=workers,
+                timeout_per_instance=timeout_per_instance,
+                resume_from=ckpt,
+                checkpoint_path=ckpt,
+                pool=pool,
+            )
+            return results, pool
+        except BrokenProcessPool:
+            if pool is not None:
+                try:
+                    pool.shutdown(wait=False, cancel_futures=True)
+                except Exception:
+                    pass
+            pool = _make_process_pool(workers) if workers > 1 else None
+
+
 def evaluate_grid(
     spec: GridSpec,
     instances: list[BenchmarkInstance],
@@ -79,67 +130,15 @@ def evaluate_grid(
     timeout_per_instance: float = 20.0,
     checkpoint_dir: Path | None = None,
 ) -> list[TrialResult]:
-    """Run every grid point, return per-trial aggregates.
-
-    A single `ProcessPoolExecutor` is held across all cells so workers do
-    not pay re-spawn cost between trials — CPU stays saturated through the
-    whole sweep instead of dipping for ~30s per cell while 40 workers boot.
-    `max_tasks_per_child` recycles workers periodically so per-instance
-    memory leaks do not accumulate across the full grid.
-
-    `on_trial(idx, total, trial)` fires after each completed trial — the CLI
-    uses it for progress logging without coupling the pure logic to stdout.
-
-    `checkpoint_dir`, when set, gets one JSONL per trial named after
-    `params.label()`; restarting the sweep skips instances already recorded
-    inside each trial's checkpoint.
-    """
-    import multiprocessing as mp
-    from concurrent.futures import ProcessPoolExecutor
-
     evaluator = UniversalEvaluator()
     points = list(spec.points())
     out: list[TrialResult] = []
 
-    from concurrent.futures.process import BrokenProcessPool
-
-    from benchmarks.common import _init_worker
-
-    def _make_pool() -> ProcessPoolExecutor:
-        ctx = mp.get_context("spawn")
-        p = ProcessPoolExecutor(
-            max_workers=workers,
-            mp_context=ctx,
-            max_tasks_per_child=50,
-            initializer=_init_worker,
-        )
-        list(p.map(int, range(workers)))  # eager-spawn all workers
-        return p
-
-    pool: ProcessPoolExecutor | None = _make_pool() if workers > 1 else None
+    pool: ProcessPoolExecutor | None = _make_process_pool(workers) if workers > 1 else None
     try:
         for i, params in enumerate(points):
             ckpt = (checkpoint_dir / f"{params.label()}.jsonl") if checkpoint_dir is not None else None
-            while True:
-                try:
-                    results = run_eval_set(
-                        instances,
-                        eval_fn,
-                        params,
-                        workers=workers,
-                        timeout_per_instance=timeout_per_instance,
-                        resume_from=ckpt,
-                        checkpoint_path=ckpt,
-                        pool=pool,
-                    )
-                    break
-                except BrokenProcessPool:
-                    if pool is not None:
-                        try:
-                            pool.shutdown(wait=False, cancel_futures=True)
-                        except Exception:
-                            pass
-                    pool = _make_pool() if workers > 1 else None
+            results, pool = _run_trial_with_retry(instances, eval_fn, params, workers, timeout_per_instance, ckpt, pool)
             agg = evaluator.aggregate_per_benchmark(results)
             trial = TrialResult(params=params, per_benchmark=agg, raw_results=tuple(results))
             out.append(trial)
@@ -155,150 +154,6 @@ EvalAllCellsFn = Callable[
     [BenchmarkInstance, list[RunParams]],
     list[tuple[RunParams, EvalResult]],
 ]
-
-
-def evaluate_grid_cached(  # noqa: C901 — pool teardown + per-cell demux + retry-on-BPP do not factor cleanly
-    spec: GridSpec,
-    instances: list[BenchmarkInstance],
-    eval_all_cells_fn: EvalAllCellsFn,
-    workers: int = 1,
-    on_trial: TrialCallback | None = None,
-    timeout_per_instance: float = 20.0,
-    checkpoint_dir: Path | None = None,
-) -> list[TrialResult]:
-    """Inverted-loop calibration: outer = instance, inner = grid cells.
-
-    Each ProcessPool task computes the heavy `ScoredState` ONCE per
-    instance, then runs all (`tau`, `core_budget_fraction`) cells against
-    it cheaply. Cuts wall time by ~12x for a 12-cell grid because the
-    expensive parse/fragment/discover/score work is no longer redone per
-    cell. State never crosses the pickle boundary — only the resulting
-    `EvalResult` list does — so ProcessPool is preserved and per-process
-    memory pressure is bounded.
-
-    Per-cell checkpoint files (`<params.label()>.jsonl`) match the
-    layout produced by `evaluate_grid` so the existing aggregator,
-    `top_k_trials`, and `render_grid_report` work unchanged.
-    """
-    from concurrent.futures import TimeoutError as FuturesTimeoutError
-
-    from pebble import ProcessExpired, ProcessPool
-
-    from benchmarks.adapters.runner import (
-        _load_existing_results,
-        append_checkpoint,
-        read_checkpoint,
-    )
-
-    evaluator = UniversalEvaluator()
-    points = list(spec.points())
-    # Index by `params.label()` because `RunParams.extra_env: dict` makes
-    # the dataclass unhashable — can't use the params object itself as a
-    # dict key. Labels are stable and uniquely identify a grid cell.
-    points_by_label: dict[str, RunParams] = {p.label(): p for p in points}
-
-    ckpts: dict[str, Path | None] = {
-        lbl: (checkpoint_dir / f"{lbl}.jsonl") if checkpoint_dir is not None else None for lbl in points_by_label
-    }
-    done_ids: dict[str, set[str]] = {lbl: read_checkpoint(c) if c is not None else set() for lbl, c in ckpts.items()}
-    results_by_cell: dict[str, list[EvalResult]] = {
-        lbl: (_load_existing_results(c, done_ids[lbl]) if c is not None else []) for lbl, c in ckpts.items()
-    }
-
-    pending: list[tuple[BenchmarkInstance, list[RunParams]]] = []
-    for inst in instances:
-        needed = [p for p in points if inst.instance_id not in done_ids[p.label()]]
-        if needed:
-            pending.append((inst, needed))
-
-    from benchmarks.common import _init_worker
-
-    def _record_per_cell(per_cell_results: list[tuple[RunParams, EvalResult]]) -> None:
-        for params, result in per_cell_results:
-            lbl = params.label()
-            ckpt = ckpts.get(lbl)
-            if ckpt is not None:
-                append_checkpoint(ckpt, result)
-            results_by_cell[lbl].append(result)
-
-    def _drain(pool: ProcessPool) -> None:
-        # Pebble enforces per-task timeout via SIGTERM/SIGKILL on the
-        # individual worker, then spawns a replacement — the pool itself
-        # stays healthy. This replaces the previous threading.Timer +
-        # os._exit(137) approach that permanently broke
-        # ProcessPoolExecutor and cascaded one slow instance into pool-
-        # wide failure (every queued task got BPP'd before it ran).
-        futures: dict = {}
-        for inst, params_list in pending:
-            future = pool.schedule(
-                eval_all_cells_fn,
-                args=(inst, params_list),
-                # Pebble's timeout is wall-clock for the whole task. The
-                # task encompasses ensure_repo + apply_as_commit + heavy
-                # diffctx + N selections; budget generously since git
-                # ops on big repos (vscode, mui) eat 10-30s of pure I/O.
-                timeout=timeout_per_instance + 30.0,
-            )
-            futures[future] = (inst, params_list)
-
-        for future, (inst, params_list) in futures.items():
-            try:
-                per_cell = future.result()
-            except FuturesTimeoutError:
-                # Pebble's overall task deadline (rare safety net — covers
-                # genuinely hung git ops past timeout_per_instance + 30s).
-                per_cell = [
-                    (p, _failure_eval(inst, p, "timeout", f"pebble killed after {timeout_per_instance + 30.0:.0f}s"))
-                    for p in params_list
-                ]
-            except ProcessExpired as e:
-                # exitcode 137 == os._exit(137) from our narrow algorithm
-                # kill switch (timer in diffctx_eval_fn around build_diff_context).
-                # Anything else is a genuine crash.
-                if e.exitcode == 137:
-                    per_cell = [
-                        (p, _failure_eval(inst, p, "timeout", f"diffctx exceeded {timeout_per_instance:.0f}s budget"))
-                        for p in params_list
-                    ]
-                else:
-                    per_cell = [
-                        (p, _failure_eval(inst, p, "error", f"ProcessExpired exitcode={e.exitcode}")) for p in params_list
-                    ]
-            except Exception as e:
-                per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
-            _record_per_cell(per_cell)
-
-    if pending and workers > 1:
-        # Pebble pool tolerates per-task SIGKILL on timeout — replacement
-        # workers spawn automatically, the pool itself never breaks.
-        with ProcessPool(
-            max_workers=workers,
-            max_tasks=40,
-            initializer=_init_worker,
-        ) as pool:
-            _drain(pool)
-    elif pending:
-        # workers == 1: serial fallback (no timeout enforcement)
-        for inst, params_list in pending:
-            try:
-                per_cell = eval_all_cells_fn(inst, params_list)
-            except Exception as e:
-                per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
-            _record_per_cell(per_cell)
-
-    out: list[TrialResult] = []
-    for i, params in enumerate(points):
-        cell_results = results_by_cell[params.label()]
-        agg = evaluator.aggregate_per_benchmark(cell_results)
-        trial = TrialResult(
-            params=params,
-            per_benchmark=agg,
-            raw_results=tuple(cell_results),
-        )
-        out.append(trial)
-        if on_trial is not None:
-            on_trial(i, len(points), trial)
-    return out
 
 
 def _failure_eval(
@@ -318,6 +173,125 @@ def _failure_eval(
     r.extra["error"] = error
     r.extra["language"] = instance.language
     return r
+
+
+def _record_cell_results(
+    per_cell_results: list[tuple[RunParams, EvalResult]],
+    ckpts: dict[str, Path | None],
+    results_by_cell: dict[str, list[EvalResult]],
+) -> None:
+    from benchmarks.adapters.runner import append_checkpoint
+
+    for params, result in per_cell_results:
+        lbl = params.label()
+        ckpt = ckpts.get(lbl)
+        if ckpt is not None:
+            append_checkpoint(ckpt, result)
+        results_by_cell[lbl].append(result)
+
+
+def _drain_pebble_pool(
+    pool: Any,
+    pending: list[tuple[BenchmarkInstance, list[RunParams]]],
+    eval_all_cells_fn: EvalAllCellsFn,
+    timeout_per_instance: float,
+    ckpts: dict[str, Path | None],
+    results_by_cell: dict[str, list[EvalResult]],
+) -> None:
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+    from pebble import ProcessExpired
+
+    futures: dict = {}
+    for inst, params_list in pending:
+        future = pool.schedule(
+            eval_all_cells_fn,
+            args=(inst, params_list),
+            timeout=timeout_per_instance + 30.0,
+        )
+        futures[future] = (inst, params_list)
+
+    for future, (inst, params_list) in futures.items():
+        try:
+            per_cell = future.result()
+        except FuturesTimeoutError:
+            per_cell = [
+                (p, _failure_eval(inst, p, "timeout", f"pebble killed after {timeout_per_instance + 30.0:.0f}s"))
+                for p in params_list
+            ]
+        except ProcessExpired as e:
+            if e.exitcode == 137:
+                per_cell = [
+                    (p, _failure_eval(inst, p, "timeout", f"diffctx exceeded {timeout_per_instance:.0f}s budget"))
+                    for p in params_list
+                ]
+            else:
+                per_cell = [(p, _failure_eval(inst, p, "error", f"ProcessExpired exitcode={e.exitcode}")) for p in params_list]
+        except Exception as e:
+            per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
+        _record_cell_results(per_cell, ckpts, results_by_cell)
+
+
+def _build_pending_list(
+    instances: list[BenchmarkInstance],
+    points: list[RunParams],
+    done_ids: dict[str, set[str]],
+) -> list[tuple[BenchmarkInstance, list[RunParams]]]:
+    pending = []
+    for inst in instances:
+        needed = [p for p in points if inst.instance_id not in done_ids[p.label()]]
+        if needed:
+            pending.append((inst, needed))
+    return pending
+
+
+def evaluate_grid_cached(
+    spec: GridSpec,
+    instances: list[BenchmarkInstance],
+    eval_all_cells_fn: EvalAllCellsFn,
+    workers: int = 1,
+    on_trial: TrialCallback | None = None,
+    timeout_per_instance: float = 20.0,
+    checkpoint_dir: Path | None = None,
+) -> list[TrialResult]:
+    from pebble import ProcessPool
+
+    from benchmarks.adapters.runner import _load_existing_results, read_checkpoint
+    from benchmarks.common import _init_worker
+
+    evaluator = UniversalEvaluator()
+    points = list(spec.points())
+    points_by_label: dict[str, RunParams] = {p.label(): p for p in points}
+
+    ckpts: dict[str, Path | None] = {
+        lbl: (checkpoint_dir / f"{lbl}.jsonl") if checkpoint_dir is not None else None for lbl in points_by_label
+    }
+    done_ids: dict[str, set[str]] = {lbl: read_checkpoint(c) if c is not None else set() for lbl, c in ckpts.items()}
+    results_by_cell: dict[str, list[EvalResult]] = {
+        lbl: (_load_existing_results(c, done_ids[lbl]) if c is not None else []) for lbl, c in ckpts.items()
+    }
+    pending = _build_pending_list(instances, points, done_ids)
+
+    if pending and workers > 1:
+        with ProcessPool(max_workers=workers, max_tasks=40, initializer=_init_worker) as pool:
+            _drain_pebble_pool(pool, pending, eval_all_cells_fn, timeout_per_instance, ckpts, results_by_cell)
+    elif pending:
+        for inst, params_list in pending:
+            try:
+                per_cell = eval_all_cells_fn(inst, params_list)
+            except Exception as e:
+                per_cell = [(p, _failure_eval(inst, p, "error", f"{type(e).__name__}: {e}")) for p in params_list]
+            _record_cell_results(per_cell, ckpts, results_by_cell)
+
+    out: list[TrialResult] = []
+    for i, params in enumerate(points):
+        cell_results = results_by_cell[params.label()]
+        agg = evaluator.aggregate_per_benchmark(cell_results)
+        trial = TrialResult(params=params, per_benchmark=agg, raw_results=tuple(cell_results))
+        out.append(trial)
+        if on_trial is not None:
+            on_trial(i, len(points), trial)
+    return out
 
 
 def top_k_trials(trials: Iterable[TrialResult], k: int = 3) -> list[TrialResult]:

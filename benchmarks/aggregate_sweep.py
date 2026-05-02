@@ -97,8 +97,24 @@ def _parse_artifact(name: str) -> tuple[str | None, int | None, str | None]:
     return (m.group("method"), budget, m.group("test_set"))
 
 
+_METHOD_ORDER = ["ppr", "ego", "hybrid", "bm25", "aider"]
+
+
+def _method_sort_key(method: str) -> int:
+    return _METHOD_ORDER.index(method) if method in _METHOD_ORDER else 99
+
+
+def _format_sweep_cell(cell: dict | None) -> str:
+    if not cell:
+        return "| --"
+    summary = cell["summary"]
+    fr = (summary.get("file_recall") or {}).get("mean")
+    n = summary.get("n", 0)
+    ok = summary.get("ok", 0)
+    return f"| n={n}" if fr is None else f"| {fr:.3f} (n={ok}/{n})"
+
+
 def render_sweep_table(cells: list[dict]) -> str:
-    """Render a method x budget grid per test set."""
     by_set: dict[str, dict[tuple[str, int], dict]] = defaultdict(dict)
     methods: set[str] = set()
     budgets: set[int] = set()
@@ -110,12 +126,7 @@ def render_sweep_table(cells: list[dict]) -> str:
         budgets.add(b)
         by_set[ts][(m, b)] = c
 
-    methods_sorted = sorted(
-        methods,
-        key=lambda x: (
-            ["ppr", "ego", "hybrid", "bm25", "aider"].index(x) if x in ["ppr", "ego", "hybrid", "bm25", "aider"] else 99
-        ),
-    )
+    methods_sorted = sorted(methods, key=_method_sort_key)
     budgets_sorted = sorted(budgets)
 
     lines: list[str] = ["# Sweep results — mean file recall (and ok-instance count)\n"]
@@ -126,21 +137,7 @@ def render_sweep_table(cells: list[dict]) -> str:
         lines.append(header)
         lines.append(sep)
         for m in methods_sorted:
-            row = [f"| **{m}** "]
-            for b in budgets_sorted:
-                cell = by_set[ts].get((m, b))
-                if not cell:
-                    row.append("| --")
-                    continue
-                summary = cell["summary"]
-                fr = (summary.get("file_recall") or {}).get("mean")
-                n = summary.get("n", 0)
-                ok = summary.get("ok", 0)
-                if fr is None:
-                    row.append(f"| n={n}")
-                else:
-                    row.append(f"| {fr:.3f} (n={ok}/{n})")
-            row.append("|")
+            row = [f"| **{m}** "] + [_format_sweep_cell(by_set[ts].get((m, b))) for b in budgets_sorted] + ["|"]
             lines.append("".join(row))
         lines.append("")
     return "\n".join(lines) + "\n"
