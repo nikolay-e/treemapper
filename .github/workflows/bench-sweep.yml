@@ -373,6 +373,7 @@ jobs:
 
       - name: Run cell (logged to run.log)
         timeout-minutes: 330
+        shell: bash
         run: |
           set -o pipefail
           python3 /tmp/heartbeat.py >> "${CELL_DIR}/heartbeat.log" 2>&1 &
