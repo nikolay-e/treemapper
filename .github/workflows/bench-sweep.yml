@@ -233,7 +233,7 @@ jobs:
 
       - name: Wait for shared repo cache
         run: |
-          until [[ -f /cache/contextbench_repos/.ready ]]; do
+          until [ -f /cache/contextbench_repos/.ready ]; do
             echo "Waiting for repo cache extraction to complete..."
             sleep 15
           done
