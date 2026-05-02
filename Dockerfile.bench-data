@@ -17,11 +17,9 @@ RUN pip install --no-cache-dir datasets
 
 COPY scripts/bake_bench_cache.py /tmp/bake_bench_cache.py
 
-ARG BAKE_DATASET=full
 ARG BAKE_LIMIT=0
 ARG BAKE_PARALLELISM=4
 ENV BAKE_PARALLELISM=${BAKE_PARALLELISM}
 
 RUN python3 /tmp/bake_bench_cache.py /cache/contextbench_repos \
-    --dataset "${BAKE_DATASET}" \
     $( [ "${BAKE_LIMIT}" -gt 0 ] && echo "--limit ${BAKE_LIMIT}" )

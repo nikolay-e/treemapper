@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Bake bench repo cache into a Docker layer.
 
-Reads ContextBench full dataset, enumerates unique (repo, base_commit) pairs,
-clones each repo as a bare mirror, and fetches each commit explicitly. Designed
-to run inside a Docker build stage so that the resulting /cache/contextbench_repos
-directory becomes a baked-in image layer (no clone at runtime).
+Clones all repos referenced by the three test-set datasets as bare mirrors
+and fetches every required commit. Designed to run inside a Docker build
+stage so that /cache/contextbench_repos becomes a baked-in image layer.
 
-Idempotent: skips clones that already exist, skips fetches that are already local.
-Runs clones in parallel for throughput.
+Datasets baked:
+  - Contextbench/ContextBench   (default config, train split)
+  - princeton-nlp/SWE-bench_Verified  (test split)
+  - AmazonScience/SWE-PolyBench_500   (test split)
+
+Idempotent: skips clones that already exist, skips commits already local.
 """
 
 from __future__ import annotations
@@ -23,16 +26,15 @@ CLONE_TIMEOUT_SECS = 1800
 FETCH_TIMEOUT_SECS = 600
 CLONE_PARALLELISM = int(os.environ.get("BAKE_PARALLELISM", "4"))
 
+DATASETS: list[tuple[str, str | None, str]] = [
+    ("Contextbench/ContextBench", "default", "train"),
+    ("princeton-nlp/SWE-bench_Verified", None, "test"),
+    ("AmazonScience/SWE-PolyBench_500", None, "test"),
+]
+
 
 def safe_name(repo: str) -> str:
     return repo.replace("/", "__")
-
-
-def repo_url_for(inst: dict) -> str:
-    url = inst.get("repo_url")
-    if url:
-        return url
-    return f"https://github.com/{inst['repo']}.git"
 
 
 def run(cmd: list[str], timeout: int) -> tuple[int, str]:
@@ -44,15 +46,13 @@ def run(cmd: list[str], timeout: int) -> tuple[int, str]:
 
 
 def clone_one(repo: str, url: str, target: Path) -> tuple[str, bool, str]:
-    safe = safe_name(repo)
-    cache_dir = target / safe
+    cache_dir = target / safe_name(repo)
     if cache_dir.exists():
         return repo, True, "exists"
     print(f"  CLONE {repo} <- {url}", flush=True)
     rc, err = run(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], CLONE_TIMEOUT_SECS)
     if rc != 0:
         return repo, False, err
-    # Disable gc so packs stay deterministic
     run(["git", "-C", str(cache_dir), "config", "gc.auto", "0"], 30)
     return repo, True, "cloned"
 
@@ -69,53 +69,76 @@ def fetch_one(repo: str, commit: str, target: Path) -> tuple[str, str, bool, str
     return repo, commit, rc == 0, err if rc != 0 else "fetched"
 
 
+def collect_repos_commits(
+    hf_path: str,
+    config: str | None,
+    split: str,
+    limit: int,
+) -> tuple[dict[str, str], set[tuple[str, str]]]:
+    from datasets import load_dataset
+
+    kwargs: dict = {"split": split}
+    if config:
+        kwargs["name"] = config
+    print(f"  Loading {hf_path} (config={config or 'default'}, split={split}) ...", flush=True)
+    ds = load_dataset(hf_path, **kwargs)
+    instances = list(ds)
+    if limit:
+        instances = instances[:limit]
+    repos: dict[str, str] = {}
+    commits: set[tuple[str, str]] = set()
+    for raw in instances:
+        inst = dict(raw)
+        repo = inst.get("repo") or inst.get("repo_name") or ""
+        if not repo:
+            continue
+        commit = inst.get("base_commit") or inst.get("commit") or ""
+        if not commit:
+            continue
+        if repo not in repos:
+            url = inst.get("repo_url") or f"https://github.com/{repo}.git"
+            repos[repo] = url
+        commits.add((repo, commit))
+    print(f"  → {len(repos)} unique repos, {len(commits)} unique commits", flush=True)
+    return repos, commits
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("target", type=Path, help="Target cache dir (e.g. /cache/contextbench_repos)")
-    ap.add_argument("--dataset", default="full", choices=["full", "verified"])
-    ap.add_argument("--limit", type=int, default=0, help="Optional cap on instances (0 = all)")
+    ap.add_argument("--limit", type=int, default=0, help="Cap instances per dataset (0 = all)")
     args = ap.parse_args()
 
     args.target.mkdir(parents=True, exist_ok=True)
 
-    print(f"Loading ContextBench/{args.dataset}...", flush=True)
-    from datasets import load_dataset
+    all_repos: dict[str, str] = {}
+    all_commits: set[tuple[str, str]] = set()
 
-    config = "contextbench_verified" if args.dataset == "verified" else "default"
-    ds = load_dataset("Contextbench/ContextBench", config, split="train")
-    instances = list(ds)
-    if args.limit:
-        instances = instances[: args.limit]
-    print(f"Loaded {len(instances)} instances", flush=True)
+    for hf_path, config, split in DATASETS:
+        repos, commits = collect_repos_commits(hf_path, config, split, args.limit)
+        all_repos.update(repos)
+        all_commits.update(commits)
 
-    repos: dict[str, str] = {}
-    commits: set[tuple[str, str]] = set()
-    for raw in instances:
-        inst: dict = dict(raw)  # type: ignore[arg-type]
-        repo = inst["repo"]
-        if repo not in repos:
-            repos[repo] = repo_url_for(inst)
-        commits.add((repo, inst["base_commit"]))
-
-    print(f"Unique repos: {len(repos)}, unique commits: {len(commits)}", flush=True)
+    print(
+        f"\nTotal: {len(all_repos)} unique repos, {len(all_commits)} unique commits",
+        flush=True,
+    )
     print(f"Cloning with parallelism={CLONE_PARALLELISM}", flush=True)
 
     failed_clones: list[tuple[str, str]] = []
     with ThreadPoolExecutor(max_workers=CLONE_PARALLELISM) as pool:
-        futs = {pool.submit(clone_one, r, u, args.target): r for r, u in repos.items()}
+        futs = {pool.submit(clone_one, r, u, args.target): r for r, u in all_repos.items()}
         for fut in as_completed(futs):
             repo, ok, msg = fut.result()
             if not ok:
                 failed_clones.append((repo, msg))
                 print(f"  CLONE FAIL {repo}: {msg}", flush=True)
 
-    print(f"\nClones: {len(repos) - len(failed_clones)}/{len(repos)} successful", flush=True)
-    if failed_clones:
-        print(f"  Failed: {[r for r, _ in failed_clones]}", flush=True)
+    print(f"\nClones: {len(all_repos) - len(failed_clones)}/{len(all_repos)} successful", flush=True)
 
     failed_fetches: list[tuple[str, str, str]] = []
     with ThreadPoolExecutor(max_workers=CLONE_PARALLELISM * 2) as pool:
-        futs = {pool.submit(fetch_one, r, c, args.target): (r, c) for r, c in commits}
+        futs = {pool.submit(fetch_one, r, c, args.target): (r, c) for r, c in all_commits}
         ok_count = 0
         for fut in as_completed(futs):
             repo, commit, ok, msg = fut.result()
@@ -124,16 +147,15 @@ def main() -> int:
             else:
                 failed_fetches.append((repo, commit, msg))
 
-    print(f"\nCommits: {ok_count}/{len(commits)} present", flush=True)
+    print(f"\nCommits: {ok_count}/{len(all_commits)} present", flush=True)
     if failed_fetches:
         print(f"  Failed fetches: {len(failed_fetches)}", flush=True)
         for r, c, m in failed_fetches[:10]:
             print(f"    {r}@{c[:12]}: {m}", flush=True)
 
-    print("\nCache size estimate:", flush=True)
+    print("\nCache size:", flush=True)
     subprocess.run(["du", "-sh", str(args.target)], check=False)
 
-    # Don't fail the build for partial cache — bench gracefully handles missing repos
     return 0
 
 
