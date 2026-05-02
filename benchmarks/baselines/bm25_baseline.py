@@ -176,11 +176,14 @@ def make_bm25_eval_fn(repos_dir: Path):
         ) from e
 
     evaluator = UniversalEvaluator()
-    worktree_dir = repos_dir / "worktrees"
-    worktree_dir.mkdir(parents=True, exist_ok=True)
+    worktrees_root = repos_dir / "worktrees"
     encoder = tiktoken.get_encoding("o200k_base")
 
     def eval_fn(instance: BenchmarkInstance, params: RunParams) -> EvalResult:
+        import os
+
+        worktree_dir = worktrees_root / f"w{os.getpid()}"
+        worktree_dir.mkdir(parents=True, exist_ok=True)
         return _bm25_eval(instance, params, evaluator, worktree_dir, encoder)
 
     return eval_fn

@@ -103,7 +103,9 @@ def _arm_diffctx_kill_switch(timeout_s: float):
 def _ensure_worker_state(repos_dir_str: str) -> tuple[Path, UniversalEvaluator]:
     state = _WORKER_STATE.get(repos_dir_str)
     if state is None:
-        worktree_dir = Path(repos_dir_str) / "worktrees" / f"w{os.getpid()}"
+        runner = os.environ.get("RUNNER_NAME", "").replace("-", "_").replace(" ", "_")
+        uid = f"{runner}_{os.getpid()}" if runner else str(os.getpid())
+        worktree_dir = Path(repos_dir_str) / "worktrees" / f"w{uid}"
         worktree_dir.mkdir(parents=True, exist_ok=True)
         evaluator = UniversalEvaluator()
         state = (worktree_dir, evaluator)

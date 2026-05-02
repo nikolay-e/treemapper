@@ -243,11 +243,14 @@ def make_aider_eval_fn(
         raise ValueError(f"aider_mode must be 'fair' or 'oracle', got {aider_mode!r}")
 
     evaluator = UniversalEvaluator()
-    worktree_dir = repos_dir / "worktrees"
-    worktree_dir.mkdir(parents=True, exist_ok=True)
+    worktrees_root = repos_dir / "worktrees"
     aider = _AiderProcess()
 
     def eval_fn(instance: BenchmarkInstance, params: RunParams) -> EvalResult:
+        import os
+
+        worktree_dir = worktrees_root / f"w{os.getpid()}"
+        worktree_dir.mkdir(parents=True, exist_ok=True)
         return _aider_eval(instance, params, evaluator, worktree_dir, aider, request_timeout, aider_mode)
 
     eval_fn.shutdown = aider.shutdown  # type: ignore[attr-defined]

@@ -28,6 +28,7 @@ CLONE_PARALLELISM = int(os.environ.get("BAKE_PARALLELISM", "4"))
 
 DATASETS: list[tuple[str, str | None, str]] = [
     ("Contextbench/ContextBench", "default", "train"),
+    ("Contextbench/ContextBench", "contextbench_verified", "train"),
     ("princeton-nlp/SWE-bench_Verified", None, "test"),
     ("AmazonScience/SWE-PolyBench_500", None, "test"),
 ]
