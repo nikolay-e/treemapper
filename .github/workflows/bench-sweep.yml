@@ -59,6 +59,7 @@ jobs:
       actions: write
     outputs:
       server_id: ${{ steps.create.outputs.server_id }}
+      server_ip: ${{ steps.create.outputs.server_ip }}
     steps:
       - name: Create Hetzner CCX63 with 4 self-hosted runners
         id: create
@@ -67,6 +68,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           REPO: ${{ github.repository }}
           SERVER_NAME: bench-${{ github.run_id }}-${{ github.run_attempt }}
+          BENCH_SSH_PUBLIC_KEY: ${{ secrets.BENCH_SSH_PUBLIC_KEY }}
         run: |
           set -euo pipefail
 
@@ -90,6 +92,9 @@ jobs:
           apt-get update -y
           apt-get install -y docker.io curl jq
           systemctl enable docker && systemctl start docker
+          mkdir -p /root/.ssh && chmod 700 /root/.ssh
+          echo "${BENCH_SSH_PUBLIC_KEY}" >> /root/.ssh/authorized_keys
+          chmod 600 /root/.ssh/authorized_keys
           useradd -m -s /bin/bash github
           usermod -aG docker github
           curl -sL -o /tmp/runner.tar.gz \
@@ -125,9 +130,13 @@ jobs:
             }")
 
           SERVER_ID=$(echo "${RESPONSE}" | jq -r '.server.id')
+          SERVER_IP=$(echo "${RESPONSE}" | jq -r '.server.public_net.ipv4.ip')
           echo "server_id=${SERVER_ID}" >> "${GITHUB_OUTPUT}"
+          echo "server_ip=${SERVER_IP}" >> "${GITHUB_OUTPUT}"
           echo "${SERVER_ID}" > server_id.txt
-          echo "Provisioned Hetzner CCX63 server_id=${SERVER_ID} name=${SERVER_NAME}"
+          echo "Provisioned Hetzner CCX63 server_id=${SERVER_ID} ip=${SERVER_IP} name=${SERVER_NAME}"
+          SSHCMD="ssh root@${SERVER_IP} -i <(security find-generic-password -s treemapper-bench-ssh-key -a \$USER -w)"
+          echo "SSH: ${SSHCMD}"
 
       - name: Upload server_id for cleanup workflow
         uses: actions/upload-artifact@v4
