@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1.7
+#
+# Data-only image: pre-baked bench repo cache (~20 GB).
+# Rebuilt only when datasets or the bake script change — not on every code push.
+# The CCX63 provision job extracts /cache/contextbench_repos to the host once,
+# then all sweep containers mount it via bind-mount.
+
+ARG PYTHON_VERSION=3.12
+
+FROM --platform=linux/amd64 python:${PYTHON_VERSION}-slim-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir datasets
+
+COPY scripts/bake_bench_cache.py /tmp/bake_bench_cache.py
+
+ARG BAKE_DATASET=full
+ARG BAKE_LIMIT=0
+ARG BAKE_PARALLELISM=4
+ENV BAKE_PARALLELISM=${BAKE_PARALLELISM}
+
+RUN python3 /tmp/bake_bench_cache.py /cache/contextbench_repos \
+    --dataset "${BAKE_DATASET}" \
+    $( [ "${BAKE_LIMIT}" -gt 0 ] && echo "--limit ${BAKE_LIMIT}" )

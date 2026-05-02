@@ -98,7 +98,16 @@ jobs:
           useradd -m -s /bin/bash github
           usermod -aG docker github
           echo "${GH_TOKEN}" | docker login ghcr.io -u nikolay-e --password-stdin
-          nohup docker pull ghcr.io/nikolay-e/treemapper-bench:latest >> /var/log/docker-pull.log 2>&1 &
+          nohup docker pull ghcr.io/nikolay-e/treemapper-bench:latest >> /var/log/docker-bench.log 2>&1 &
+          nohup bash -c '
+            docker pull ghcr.io/nikolay-e/treemapper-bench-data:latest
+            mkdir -p /data/bench_repos
+            CID=$(docker create ghcr.io/nikolay-e/treemapper-bench-data:latest /bin/true)
+            docker cp "${CID}:/cache/contextbench_repos/." /data/bench_repos/
+            docker rm "${CID}"
+            touch /data/bench_repos/.ready
+            echo "[data] ready at $(date -u)" >> /var/log/docker-data.log
+          ' >> /var/log/docker-data.log 2>&1 &
           curl -sL -o /tmp/runner.tar.gz \
             "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
           for N in 1 2 3 4; do
@@ -208,6 +217,7 @@ jobs:
         --pids-limit -1
         --ulimit nofile=1048576:1048576
         --ulimit nproc=65535:65535
+        -v /data/bench_repos:/cache/contextbench_repos
     env:
       CELL_TAG: ${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
       CELL_DIR: results/sweep/${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
@@ -218,6 +228,14 @@ jobs:
       INPUT_MANIFESTS_SUBDIR: v1
     steps:
       - uses: actions/checkout@v4
+
+      - name: Wait for shared repo cache
+        run: |
+          until [[ -f /cache/contextbench_repos/.ready ]]; do
+            echo "Waiting for repo cache extraction to complete..."
+            sleep 15
+          done
+          echo "Repo cache ready."
 
       - name: Cell start metadata
         run: |
