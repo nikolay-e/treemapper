@@ -196,6 +196,29 @@
 - Fix: inline literal values, or read `$X` from shell scripts in `run:` (the
   surrounding env vars from outer scope are inherited as shell vars)
 
+## GitHub Actions security rules (SonarCloud)
+
+- `githubactions:S7630` BLOCKER: `${{ inputs.xxx }}` used directly in `run:`
+  block = script injection. Fix: assign each input to an `env:` key on the
+  step, then read via `${ENV_VAR}` in the shell. Never interpolate `inputs.*`
+  inline in shell.
+- `githubactions:S8264` MAJOR: workflow-level `permissions:` block must be
+  moved to individual job level. Each job already has or should have its own
+  `permissions:` key. Workflow-level is too broad.
+- `shellcheck SC2002`: `cat file | cmd` → `cmd < file` (useless cat)
+- `shellcheck SC2015`: `A && B || C` is not if-then-else; use `if A; then B; fi`
+
+## YAML heredoc indentation in GitHub Actions
+
+- Python/shell code inside a `run: |` heredoc must be indented to at least
+  10 spaces (matching block scalar indentation) — YAML strips those spaces
+  before passing to bash, so the script sees the code at column 0. Code at
+  0 spaces in the YAML file terminates the block scalar prematurely.
+- `PYEOF` heredoc terminator also needs 10 spaces of YAML indentation (becomes
+  column 0 in the shell script, correctly terminating the heredoc).
+- Use `<< 'PYEOF'` (quoted) to prevent bash expansion of Python f-strings and
+  GitHub Actions expressions are pre-expanded by GH before bash sees the script.
+
 ## SonarCloud exclusions
 
 - `sonar.exclusions=diffctx/tests/fixtures/garbage/**` — fixture files
