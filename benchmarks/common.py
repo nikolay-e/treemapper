@@ -71,14 +71,26 @@ def patch_files_detailed(patch: str) -> tuple[set[str], set[str], set[str]]:
             elif cur_a == cur_b and cur_a is not None:
                 modified.add(cur_a)
             elif cur_a is not None and cur_b is not None:
+                # Pure rename: old path is gone after the patch is applied,
+                # only the new path exists on the post-patch worktree.
+                deleted.add(cur_a)
                 modified.add(cur_b)
-                modified.add(cur_a)
     return added, deleted, modified
 
 
 def patch_files(patch: str) -> set[str]:
     added, deleted, modified = patch_files_detailed(patch)
     return added | deleted | modified
+
+
+def patch_files_at_head(patch: str) -> set[str]:
+    """Files present on disk after the patch is applied — gold for file-recall metrics.
+
+    Excludes pure deletions and old paths of pure renames, which no
+    retrieval algorithm running against HEAD can return.
+    """
+    added, _, modified = patch_files_detailed(patch)
+    return added | modified
 
 
 _SHARED_CACHE = Path(os.environ.get("CB_REPOS_DIR", str(Path.home() / ".cache" / "contextbench_repos")))

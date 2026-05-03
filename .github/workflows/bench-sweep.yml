@@ -574,6 +574,9 @@ jobs:
         env:
           SCORING: ${{ steps.cfg.outputs.scoring }}
 
+      - name: Install uv (required by aider baseline; safe no-op for others)
+        run: pip install --no-cache-dir uv
+
       - name: Write checkpoint heartbeat script
         run: |
           cat > /tmp/heartbeat.py << 'PYEOF'

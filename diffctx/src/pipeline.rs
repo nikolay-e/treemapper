@@ -137,16 +137,14 @@ pub fn compute_scored_state(
     }
 
     let deleted_files = git::get_deleted_files(&root_dir, diff_range)?;
-    let (renamed_old, pure_rename_new) = git::get_renamed_paths(
+    // Pure-rename old paths are gone from disk and cannot be fragmented; pure-rename new
+    // paths exist on HEAD and must remain candidates so seeds and discovery can find them.
+    let (renamed_old, _pure_rename_new) = git::get_renamed_paths(
         &root_dir,
         diff_range,
         GRAPH_FILTERING.git_rename_similarity_threshold,
     )?;
-    let excluded: FxHashSet<PathBuf> = deleted_files
-        .into_iter()
-        .chain(renamed_old)
-        .chain(pure_rename_new)
-        .collect();
+    let excluded: FxHashSet<PathBuf> = deleted_files.into_iter().chain(renamed_old).collect();
     let changed_files: Vec<PathBuf> = changed_files
         .into_iter()
         .filter(|f| {

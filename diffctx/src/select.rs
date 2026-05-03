@@ -171,6 +171,9 @@ fn select_core_fragments(
     sig_lookup: &FxHashMap<FragmentId, Fragment>,
 ) {
     let core_budget = (budget_tokens as f64 * selection().core_budget_fraction) as u32;
+    // Counter for cores placed; the first pass keeps `core_used <= core_budget`,
+    // but the rescue pass below intentionally allows it to exceed `core_budget`
+    // up to `budget_tokens`. Don't assume the tighter bound past this scope.
     let mut core_used = 0u32;
 
     let mut sorted_core: Vec<&Fragment> = core_fragments.iter().collect();
@@ -180,7 +183,17 @@ fn select_core_fragments(
         rb.total_cmp(&ra)
     });
 
-    for frag in sorted_core {
+    let place_fragment =
+        |frag: &Fragment, core_used: &mut u32, state: &mut SelectionState, rel_score: f64| {
+            state.selected.push(frag.clone());
+            state.selected_ids.add_id(&frag.id);
+            state.remaining_budget = state.remaining_budget.saturating_sub(frag.token_count);
+            *core_used += frag.token_count;
+            apply_fragment(frag, rel_score, needs, &mut state.utility_state);
+        };
+
+    let mut skipped: Vec<&Fragment> = Vec::new();
+    for frag in &sorted_core {
         if state.selected_ids.is_superset_of(frag) {
             continue;
         }
@@ -189,23 +202,45 @@ fn select_core_fragments(
                 if !state.selected_ids.contains(&sig.id)
                     && core_used + sig.token_count <= core_budget
                 {
-                    state.selected.push(sig.clone());
-                    state.selected_ids.add_id(&sig.id);
-                    state.remaining_budget = state.remaining_budget.saturating_sub(sig.token_count);
-                    core_used += sig.token_count;
                     let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
-                    apply_fragment(sig, rel_score, needs, &mut state.utility_state);
+                    place_fragment(sig, &mut core_used, state, rel_score);
+                    continue;
                 }
             }
+            skipped.push(frag);
             continue;
         }
 
-        state.selected.push(frag.clone());
-        state.selected_ids.add_id(&frag.id);
-        state.remaining_budget = state.remaining_budget.saturating_sub(frag.token_count);
-        core_used += frag.token_count;
         let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
-        apply_fragment(frag, rel_score, needs, &mut state.utility_state);
+        place_fragment(frag, &mut core_used, state, rel_score);
+    }
+
+    // Bug #2 fix: cores that didn't fit the core_budget reservation must not be
+    // demoted to ordinary greedy candidates without a chance to be placed first.
+    // Sweep skipped cores cheapest-first against the *full* remaining budget
+    // (not just the core slice) so seeds aren't dropped purely because the
+    // highest-relevance core happened to be heavy.
+    if !skipped.is_empty() {
+        skipped.sort_by(|a, b| a.token_count.cmp(&b.token_count));
+        for frag in skipped {
+            if state.remaining_budget == 0 {
+                break;
+            }
+            if state.selected_ids.is_superset_of(frag) {
+                continue;
+            }
+            if frag.token_count <= state.remaining_budget {
+                let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
+                place_fragment(frag, &mut core_used, state, rel_score);
+            } else if let Some(sig) = sig_lookup.get(&frag.id) {
+                if !state.selected_ids.contains(&sig.id)
+                    && sig.token_count <= state.remaining_budget
+                {
+                    let rel_score = rel.get(&frag.id).copied().unwrap_or(0.0);
+                    place_fragment(sig, &mut core_used, state, rel_score);
+                }
+            }
+        }
     }
 }
 
