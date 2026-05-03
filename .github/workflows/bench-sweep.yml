@@ -205,7 +205,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        method: [ppr, bm25, aider]
+        method: [ppr, ego, bm25, aider]
         budget: [64000]
         test_set: [swebench_verified]
     runs-on: ubuntu-latest
@@ -299,6 +299,9 @@ jobs:
           JSON
         env:
           SCORING: ${{ steps.cfg.outputs.scoring }}
+
+      - name: Install uv (required by aider baseline)
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh && echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run cell (smoke — 5 instances)
         timeout-minutes: 50
