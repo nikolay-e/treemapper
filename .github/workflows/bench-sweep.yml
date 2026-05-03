@@ -103,10 +103,11 @@ jobs:
             mkdir -p /data/bench_repos
             BAKE_LOG=/data/bench_repos/bake.log
             if docker run --rm \
+              --entrypoint python3 \
               -v /data/bench_repos:/cache/contextbench_repos \
               -e BAKE_PARALLELISM=16 \
               ghcr.io/nikolay-e/treemapper-bench:latest \
-              python /app/scripts/bake_bench_cache.py /cache/contextbench_repos \
+              /app/scripts/bake_bench_cache.py /cache/contextbench_repos \
               >> "\${BAKE_LOG}" 2>&1; then
               touch /data/bench_repos/.ready
               echo "[bake] OK at \$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "\${BAKE_LOG}"
