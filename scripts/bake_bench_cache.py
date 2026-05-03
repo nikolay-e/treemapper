@@ -65,6 +65,23 @@ def _purge(cache_dir: Path) -> None:
     shutil.rmtree(cache_dir, ignore_errors=True)
 
 
+_PERF_CONFIG = (
+    ("gc.auto", "0"),
+    ("feature.manyFiles", "true"),
+    ("index.version", "4"),
+    ("core.fsmonitor", "false"),
+)
+
+
+def _apply_perf_config(cache_dir: Path) -> None:
+    for key, value in _PERF_CONFIG:
+        subprocess.run(
+            ["git", "-C", str(cache_dir), "config", key, value],
+            capture_output=True,
+            timeout=10,
+        )
+
+
 def clone_one(repo: str, url: str, target: Path) -> tuple[str, bool, str]:
     cache_dir = target / safe_name(repo)
     if cache_dir.exists():
@@ -73,26 +90,37 @@ def clone_one(repo: str, url: str, target: Path) -> tuple[str, bool, str]:
         print(f"  CORRUPT cache for {repo}, removing and recloning", flush=True)
         _purge(cache_dir)
 
-    print(f"  CLONE {repo} <- {url}", flush=True)
-    try:
-        r = subprocess.run(
-            ["git", "clone", "--bare", "--filter=blob:none", url, str(cache_dir)],
-            capture_output=True,
-            timeout=CLONE_TIMEOUT_SECS,
-        )
-    except subprocess.TimeoutExpired:
-        _purge(cache_dir)
-        return repo, False, f"timeout after {CLONE_TIMEOUT_SECS}s"
+    last_err = ""
+    for attempt in range(1, NETWORK_RETRY_ATTEMPTS + 1):
+        print(f"  CLONE {repo} <- {url} (attempt {attempt})", flush=True)
+        try:
+            r = subprocess.run(
+                ["git", "clone", "--bare", url, str(cache_dir)],
+                capture_output=True,
+                timeout=CLONE_TIMEOUT_SECS,
+            )
+        except subprocess.TimeoutExpired:
+            _purge(cache_dir)
+            last_err = f"timeout after {CLONE_TIMEOUT_SECS}s"
+            if attempt < NETWORK_RETRY_ATTEMPTS:
+                time.sleep(NETWORK_RETRY_BACKOFF_SECS * (2 ** (attempt - 1)))
+            continue
 
-    if r.returncode != 0:
-        _purge(cache_dir)
-        return repo, False, r.stderr.decode("utf-8", "replace")[:500]
+        if r.returncode != 0:
+            _purge(cache_dir)
+            last_err = r.stderr.decode("utf-8", "replace")[:500]
+            if attempt < NETWORK_RETRY_ATTEMPTS:
+                time.sleep(NETWORK_RETRY_BACKOFF_SECS * (2 ** (attempt - 1)))
+            continue
 
-    if not _is_valid_bare(cache_dir):
-        _purge(cache_dir)
-        return repo, False, "post-clone validation failed"
+        if not _is_valid_bare(cache_dir):
+            _purge(cache_dir)
+            return repo, False, "post-clone validation failed"
 
-    return repo, True, "cloned"
+        _apply_perf_config(cache_dir)
+        return repo, True, "cloned"
+
+    return repo, False, last_err
 
 
 def fetch_one(repo: str, commit: str, target: Path) -> tuple[str, str, bool, str]:
@@ -200,22 +228,24 @@ def main() -> int:
     print("\nCache size:", flush=True)
     subprocess.run(["du", "-sh", str(args.target)], check=False)
 
+    import json
+
+    manifest_path = args.target / ".bake_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "failed_clones": [{"repo": r, "error": m} for r, m in failed_clones],
+                "failed_fetches": [{"repo": r, "commit": c, "error": m} for r, c, m in failed_fetches],
+                "ok_repos": sorted(set(all_repos) - {r for r, _ in failed_clones}),
+            },
+            indent=2,
+        )
+    )
+
     if failed_clones or failed_fetches:
         print(
             f"BAKE FAILED: clones={len(failed_clones)} fetches={len(failed_fetches)}",
             flush=True,
-        )
-        import json
-
-        failed_path = args.target / "_bake_failures.json"
-        failed_path.write_text(
-            json.dumps(
-                {
-                    "failed_clones": sorted(failed_clones),
-                    "failed_fetches": sorted(failed_fetches),
-                },
-                indent=2,
-            )
         )
         return 1
     return 0
