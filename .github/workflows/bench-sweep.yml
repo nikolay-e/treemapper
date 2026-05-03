@@ -101,6 +101,7 @@ jobs:
           mkdir -p /root/.ssh && chmod 700 /root/.ssh
           echo "${BENCH_SSH_PUBLIC_KEY}" >> /root/.ssh/authorized_keys
           chmod 600 /root/.ssh/authorized_keys
+          chage -M -1 root
           useradd -m -s /bin/bash github
           usermod -aG docker github
           echo "${GH_TOKEN}" | docker login ghcr.io -u nikolay-e --password-stdin
