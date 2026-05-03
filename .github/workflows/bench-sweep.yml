@@ -269,6 +269,7 @@ jobs:
           echo "Repo cache ready."
 
       - name: Validate bake manifest and purge known-bad repos
+        shell: bash
         run: |
           set -euo pipefail
           MANIFEST=/cache/contextbench_repos/.bake_manifest.json
