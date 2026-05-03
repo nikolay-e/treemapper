@@ -41,7 +41,7 @@ jobs:
       sweep_id: ${{ steps.id.outputs.sweep_id }}
       ts: ${{ steps.id.outputs.ts }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: id
         run: |
           ts=$(date -u +%Y%m%dT%H%M%SZ)
@@ -159,7 +159,7 @@ jobs:
           echo "SSH: ${SSHCMD}"
 
       - name: Upload server_id for cleanup workflow
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hetzner-server-id
           path: server_id.txt
@@ -236,7 +236,7 @@ jobs:
       INPUT_TIMEOUT: '600'
       INPUT_MANIFESTS_SUBDIR: v1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cell start metadata (write FIRST, before any failure point)
         run: |
@@ -508,7 +508,7 @@ jobs:
 
       - name: Upload cell artifact (90-day retention)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cell-${{ matrix.method }}-b${{ matrix.budget }}-${{ matrix.test_set }}
           path: ${{ env.CELL_DIR }}/
@@ -527,9 +527,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -537,7 +537,7 @@ jobs:
         run: pip install numpy scipy
 
       - name: Download all cell artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: all_cells
           pattern: cell-*
@@ -562,7 +562,7 @@ jobs:
           head -80 aggregated/grand_summary.json || true
 
       - name: Upload aggregated tables (1-year retention)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sweep-aggregated-${{ needs.prep.outputs.sweep_id }}
           path: aggregated/
