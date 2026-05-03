@@ -414,7 +414,7 @@ jobs:
       max-parallel: 256
       matrix:
         method: [ppr, ego, hybrid, bm25, aider]
-        budget: [-1, 0, 32000, 64000, 128000]
+        budget: [-1, 8000, 16000, 32000, 64000, 128000]
         test_set: [contextbench_verified, polybench500, swebench_verified]
         exclude:
           - {method: bm25, budget: -1}
