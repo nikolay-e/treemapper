@@ -205,7 +205,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        method: [ppr]
+        method: [ppr, bm25, aider]
         budget: [64000]
         test_set: [swebench_verified]
     runs-on: ubuntu-latest
