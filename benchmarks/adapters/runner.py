@@ -175,6 +175,20 @@ def _log_non_ok_result(r: EvalResult, status: str, err: str) -> None:
     print(f"[WARN] {r.instance_id} status={status}{detail} error={err}", flush=True)
 
 
+def _maybe_checkpoint(path: Path | None, r: EvalResult, status: str, err: str) -> None:
+    if path is None:
+        return
+    # Pool-level transient failures (BrokenProcessPool) must NOT be persisted:
+    # on retry the orchestrator rebuilds the pool and these instances should be
+    # re-evaluated, not skipped via the resume set.
+    # EXCEPTION: status=="timeout" is deterministic per-instance (the same input
+    # would hit the same deadline again) and MUST be checkpointed to prevent an
+    # infinite retry loop on a pathological repository.
+    if status != "timeout" and "BrokenProcessPool" in err:
+        return
+    append_checkpoint(path, r)
+
+
 def run_eval_set(
     instances: list[BenchmarkInstance],
     eval_fn: EvalFn,
@@ -212,16 +226,7 @@ def run_eval_set(
         err = str((r.extra or {}).get("error", ""))
         if status not in ("ok", "empty_query", "empty_corpus") and (status or err):
             _log_non_ok_result(r, status, err)
-        # Pool-level transient failures (BrokenProcessPool) must NOT be
-        # persisted: on retry the orchestrator rebuilds the pool and these
-        # instances should be re-evaluated, not skipped via the resume set.
-        # EXCEPTION: status=="timeout" results — even though the kill switch
-        # surfaces them via BrokenProcessPool, they are deterministic per
-        # instance (the same input would hit the same deadline again) and
-        # MUST be checkpointed to prevent an infinite retry loop on a
-        # pathological repository.
-        if checkpoint_path is not None and (status == "timeout" or "BrokenProcessPool" not in err):
-            append_checkpoint(checkpoint_path, r)
+        _maybe_checkpoint(checkpoint_path, r, status, err)
 
     if pending:
         if workers <= 1 or len(pending) <= 1:
