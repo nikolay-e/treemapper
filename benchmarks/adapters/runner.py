@@ -176,6 +176,13 @@ def run_eval_set(
 
     def _record(r: EvalResult) -> None:
         results.append(r)
+        status = (r.extra or {}).get("status", "")
+        err = str((r.extra or {}).get("error", ""))
+        if status not in ("ok", "empty_query", "empty_corpus"):
+            print(
+                f"[WARN] {r.instance_id} status={status} error={err[:200]}",
+                flush=True,
+            )
         if checkpoint_path is None:
             return
         # Pool-level transient failures (BrokenProcessPool) must NOT be
@@ -186,8 +193,6 @@ def run_eval_set(
         # instance (the same input would hit the same deadline again) and
         # MUST be checkpointed to prevent an infinite retry loop on a
         # pathological repository.
-        status = (r.extra or {}).get("status", "")
-        err = str((r.extra or {}).get("error", ""))
         if status != "timeout" and "BrokenProcessPool" in err:
             return
         append_checkpoint(checkpoint_path, r)
