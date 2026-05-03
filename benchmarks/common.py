@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
@@ -8,6 +9,8 @@ import subprocess
 import tempfile
 import time
 import uuid
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 WORKERS = int(os.environ.get("BENCH_WORKERS", "11"))
@@ -141,6 +144,18 @@ def warm_cache(instances: list[dict]) -> None:
     print(f"  Cache warm: {len(repos_to_clone)} repos", flush=True)
 
 
+@contextmanager
+def _cache_lock(cache_dir: Path) -> Generator[None, None, None]:
+    lock_path = cache_dir.parent / f".{cache_dir.name}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w") as fd:
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+
+
 def _purge_cache_dir(cache_dir: Path) -> None:
     shutil.rmtree(cache_dir, ignore_errors=True)
 
@@ -158,24 +173,33 @@ def _clone_bare(url: str, cache_dir: Path, attempts: int = 3, base_backoff: floa
     return False
 
 
+def _is_bare_valid(cache_dir: Path) -> bool:
+    r = subprocess.run(
+        ["git", "-C", str(cache_dir), "rev-parse", "--verify", "HEAD"],
+        capture_output=True,
+        timeout=10,
+    )
+    return r.returncode == 0
+
+
 def _ensure_bare_cache(repo_url: str, repo_name: str) -> Path | None:
     safe_name = repo_name.replace("/", "__")
     cache_dir = _SHARED_CACHE / safe_name
-    if cache_dir.exists():
-        r = subprocess.run(
-            ["git", "-C", str(cache_dir), "rev-parse", "--verify", "HEAD"],
-            capture_output=True,
-            timeout=10,
-        )
-        if r.returncode == 0:
-            return cache_dir
-        print(f"[ensure_repo] corrupt bare {cache_dir}, recloning", flush=True)
-        _purge_cache_dir(cache_dir)
-    url = repo_url or f"https://github.com/{repo_name}.git"
-    if not _clone_bare(url, cache_dir):
-        return None
-    _apply_perf_config(cache_dir)
-    return cache_dir
+
+    if cache_dir.exists() and _is_bare_valid(cache_dir):
+        return cache_dir
+
+    with _cache_lock(cache_dir):
+        if cache_dir.exists():
+            if _is_bare_valid(cache_dir):
+                return cache_dir
+            print(f"[ensure_repo] corrupt bare {cache_dir}, recloning", flush=True)
+            _purge_cache_dir(cache_dir)
+        url = repo_url or f"https://github.com/{repo_name}.git"
+        if not _clone_bare(url, cache_dir):
+            return None
+        _apply_perf_config(cache_dir)
+        return cache_dir
 
 
 def _ensure_commit_present(cache_dir: Path, commit: str) -> bool:
@@ -183,13 +207,17 @@ def _ensure_commit_present(cache_dir: Path, commit: str) -> bool:
     r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-e", tree_ref], check=False, timeout=30)
     if r.returncode == 0:
         return True
-    run_cmd(
-        ["git", "-C", str(cache_dir), "fetch", "--quiet", "--depth=1", "origin", commit],
-        check=False,
-        timeout=600,
-    )
-    r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-e", tree_ref], check=False, timeout=30)
-    return r.returncode == 0
+    with _cache_lock(cache_dir):
+        r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-e", tree_ref], check=False, timeout=30)
+        if r.returncode == 0:
+            return True
+        run_cmd(
+            ["git", "-C", str(cache_dir), "fetch", "--quiet", "--depth=1", "origin", commit],
+            check=False,
+            timeout=600,
+        )
+        r = run_cmd(["git", "-C", str(cache_dir), "cat-file", "-e", tree_ref], check=False, timeout=30)
+        return r.returncode == 0
 
 
 def _remove_stale_locks(git_dir: Path) -> None:

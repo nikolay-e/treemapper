@@ -101,14 +101,19 @@ jobs:
           docker pull ghcr.io/nikolay-e/treemapper-bench:latest
           nohup bash -c '
             mkdir -p /data/bench_repos
-            docker run --rm \
+            if docker run --rm \
               -v /data/bench_repos:/cache/contextbench_repos \
               -e BAKE_PARALLELISM=16 \
               ghcr.io/nikolay-e/treemapper-bench:latest \
               python /app/scripts/bake_bench_cache.py /cache/contextbench_repos \
-              >> /var/log/bake.log 2>&1
-            touch /data/bench_repos/.ready
-            echo "[bake] done at \$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/log/bake.log
+              >> /var/log/bake.log 2>&1; then
+              touch /data/bench_repos/.ready
+              echo "[bake] OK at \$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/log/bake.log
+            else
+              rc=\$?
+              touch /data/bench_repos/.bake_failed
+              echo "[bake] FAILED rc=\${rc} at \$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/log/bake.log
+            fi
           ' >> /var/log/bake.log 2>&1 &
           curl -sL -o /tmp/runner.tar.gz \
             "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
@@ -262,11 +267,18 @@ jobs:
 
       - name: Wait for shared repo cache
         run: |
-          until [ -f /cache/contextbench_repos/.ready ]; do
+          while true; do
+            if [ -f /cache/contextbench_repos/.bake_failed ]; then
+              echo "ERROR: bake job failed — sweep aborted. Check /var/log/bake.log on the runner host."
+              exit 1
+            fi
+            if [ -f /cache/contextbench_repos/.ready ]; then
+              echo "Repo cache ready."
+              break
+            fi
             echo "Waiting for repo cache extraction to complete..."
             sleep 15
           done
-          echo "Repo cache ready."
 
       - name: Validate bake manifest and purge known-bad repos
         shell: bash
