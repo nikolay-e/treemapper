@@ -17,14 +17,18 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-CLONE_TIMEOUT_SECS = 1800
-FETCH_TIMEOUT_SECS = 600
+CLONE_TIMEOUT_SECS = 3600
+FETCH_TIMEOUT_SECS = 900
 CLONE_PARALLELISM = int(os.environ.get("BAKE_PARALLELISM", "4"))
+NETWORK_RETRY_ATTEMPTS = 3
+NETWORK_RETRY_BACKOFF_SECS = 5
 
 DATASETS: list[tuple[str, str | None, str]] = [
     ("Contextbench/ContextBench", "default", "train"),
@@ -46,16 +50,40 @@ def run(cmd: list[str], timeout: int) -> tuple[int, str]:
         return 124, f"timeout after {timeout}s"
 
 
+def is_bare_cache_valid(cache_dir: Path) -> bool:
+    if not cache_dir.exists():
+        return False
+    rc, _ = run(["git", "-C", str(cache_dir), "rev-parse", "--git-dir"], 30)
+    if rc != 0:
+        return False
+    rc, _ = run(["git", "-C", str(cache_dir), "rev-parse", "HEAD"], 30)
+    return rc == 0
+
+
+def purge_cache_dir(cache_dir: Path) -> None:
+    shutil.rmtree(cache_dir, ignore_errors=True)
+
+
 def clone_one(repo: str, url: str, target: Path) -> tuple[str, bool, str]:
     cache_dir = target / safe_name(repo)
     if cache_dir.exists():
-        return repo, True, "exists"
-    print(f"  CLONE {repo} <- {url}", flush=True)
-    rc, err = run(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], CLONE_TIMEOUT_SECS)
-    if rc != 0:
-        return repo, False, err
-    run(["git", "-C", str(cache_dir), "config", "gc.auto", "0"], 30)
-    return repo, True, "cloned"
+        if is_bare_cache_valid(cache_dir):
+            return repo, True, "exists"
+        print(f"  PURGE corrupt cache {repo}", flush=True)
+        purge_cache_dir(cache_dir)
+
+    last_err = ""
+    for attempt in range(1, NETWORK_RETRY_ATTEMPTS + 1):
+        print(f"  CLONE {repo} <- {url} (attempt {attempt})", flush=True)
+        rc, err = run(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], CLONE_TIMEOUT_SECS)
+        if rc == 0:
+            run(["git", "-C", str(cache_dir), "config", "gc.auto", "0"], 30)
+            return repo, True, "cloned"
+        last_err = err
+        purge_cache_dir(cache_dir)
+        if attempt < NETWORK_RETRY_ATTEMPTS:
+            time.sleep(NETWORK_RETRY_BACKOFF_SECS * (2 ** (attempt - 1)))
+    return repo, False, last_err
 
 
 def fetch_one(repo: str, commit: str, target: Path) -> tuple[str, str, bool, str]:
@@ -65,9 +93,18 @@ def fetch_one(repo: str, commit: str, target: Path) -> tuple[str, str, bool, str
     rc, _ = run(["git", "-C", str(cache_dir), "cat-file", "-t", commit], 30)
     if rc == 0:
         return repo, commit, True, "have"
-    print(f"  FETCH {repo}@{commit[:12]}", flush=True)
-    rc, err = run(["git", "-C", str(cache_dir), "fetch", "--quiet", "origin", commit], FETCH_TIMEOUT_SECS)
-    return repo, commit, rc == 0, err if rc != 0 else "fetched"
+    last_err = ""
+    for attempt in range(1, NETWORK_RETRY_ATTEMPTS + 1):
+        print(f"  FETCH {repo}@{commit[:12]} (attempt {attempt})", flush=True)
+        rc, err = run(["git", "-C", str(cache_dir), "fetch", "--quiet", "origin", commit], FETCH_TIMEOUT_SECS)
+        if rc == 0:
+            return repo, commit, True, "fetched"
+        last_err = err
+        if "unadvertised object" in err or "not our ref" in err or "couldn't find remote ref" in err.lower():
+            return repo, commit, False, f"unreachable_commit: {err}"
+        if attempt < NETWORK_RETRY_ATTEMPTS:
+            time.sleep(NETWORK_RETRY_BACKOFF_SECS * (2 ** (attempt - 1)))
+    return repo, commit, False, last_err
 
 
 def collect_repos_commits(
@@ -78,11 +115,8 @@ def collect_repos_commits(
 ) -> tuple[dict[str, str], set[tuple[str, str]]]:
     from datasets import load_dataset
 
-    kwargs: dict = {"split": split}
-    if config:
-        kwargs["name"] = config
     print(f"  Loading {hf_path} (config={config or 'default'}, split={split}) ...", flush=True)
-    ds = load_dataset(hf_path, **kwargs)
+    ds = load_dataset(hf_path, name=config, split=split) if config else load_dataset(hf_path, split=split)
     instances = list(ds)
     if limit:
         instances = instances[:limit]
@@ -127,10 +161,10 @@ def main() -> int:
     print(f"Cloning with parallelism={CLONE_PARALLELISM}", flush=True)
 
     failed_clones: list[tuple[str, str]] = []
-    with ThreadPoolExecutor(max_workers=CLONE_PARALLELISM) as pool:
-        futs = {pool.submit(clone_one, r, u, args.target): r for r, u in all_repos.items()}
-        for fut in as_completed(futs):
-            repo, ok, msg = fut.result()
+    with ThreadPoolExecutor(max_workers=CLONE_PARALLELISM) as clone_pool:
+        clone_futs = {clone_pool.submit(clone_one, r, u, args.target): r for r, u in all_repos.items()}
+        for clone_fut in as_completed(clone_futs):
+            repo, ok, msg = clone_fut.result()
             if not ok:
                 failed_clones.append((repo, msg))
                 print(f"  CLONE FAIL {repo}: {msg}", flush=True)
@@ -138,11 +172,11 @@ def main() -> int:
     print(f"\nClones: {len(all_repos) - len(failed_clones)}/{len(all_repos)} successful", flush=True)
 
     failed_fetches: list[tuple[str, str, str]] = []
-    with ThreadPoolExecutor(max_workers=CLONE_PARALLELISM * 2) as pool:
-        futs = {pool.submit(fetch_one, r, c, args.target): (r, c) for r, c in all_commits}
-        ok_count = 0
-        for fut in as_completed(futs):
-            repo, commit, ok, msg = fut.result()
+    ok_count = 0
+    with ThreadPoolExecutor(max_workers=CLONE_PARALLELISM * 2) as fetch_pool:
+        fetch_futs = {fetch_pool.submit(fetch_one, r, c, args.target): (r, c) for r, c in all_commits}
+        for fetch_fut in as_completed(fetch_futs):
+            repo, commit, ok, msg = fetch_fut.result()
             if ok:
                 ok_count += 1
             else:
@@ -157,6 +191,32 @@ def main() -> int:
     print("\nCache size:", flush=True)
     subprocess.run(["du", "-sh", str(args.target)], check=False)
 
+    manifest_path = args.target / ".bake_manifest.json"
+    import json
+
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "failed_clones": [{"repo": r, "error": m} for r, m in failed_clones],
+                "failed_fetches": [{"repo": r, "commit": c, "error": m} for r, c, m in failed_fetches],
+                "ok_repos": sorted(set(all_repos) - {r for r, _ in failed_clones}),
+            },
+            indent=2,
+        )
+    )
+    print(f"Bake manifest: {manifest_path}", flush=True)
+
+    if failed_clones:
+        print(
+            f"BAKE FAILED: {len(failed_clones)} clone failures (failed_fetches={len(failed_fetches)})",
+            flush=True,
+        )
+        return 1
+    if failed_fetches:
+        print(
+            f"BAKE WARNING: {len(failed_fetches)} unreachable commits (likely force-pushed/deleted upstream)",
+            flush=True,
+        )
     return 0
 
 

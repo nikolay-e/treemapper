@@ -108,7 +108,7 @@ jobs:
               python /app/scripts/bake_bench_cache.py /cache/contextbench_repos \
               >> /var/log/bake.log 2>&1
             touch /data/bench_repos/.ready
-            echo "[bake] done at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/log/bake.log
+            echo "[bake] done at \$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /var/log/bake.log
           ' >> /var/log/bake.log 2>&1 &
           curl -sL -o /tmp/runner.tar.gz \
             "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
@@ -231,15 +231,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Wait for shared repo cache
-        run: |
-          until [ -f /cache/contextbench_repos/.ready ]; do
-            echo "Waiting for repo cache extraction to complete..."
-            sleep 15
-          done
-          echo "Repo cache ready."
-
-      - name: Cell start metadata
+      - name: Cell start metadata (write FIRST, before any failure point)
         run: |
           mkdir -p "${CELL_DIR}"
           cat > "${CELL_DIR}/metadata.json" <<JSON
@@ -263,9 +255,44 @@ jobs:
               "arch": "${RUNNER_ARCH}",
               "name": "${RUNNER_NAME}",
               "image": "${IMAGE_REF}"
-            }
+            },
+            "stage": "started"
           }
           JSON
+
+      - name: Wait for shared repo cache
+        run: |
+          until [ -f /cache/contextbench_repos/.ready ]; do
+            echo "Waiting for repo cache extraction to complete..."
+            sleep 15
+          done
+          echo "Repo cache ready."
+
+      - name: Validate bake manifest and purge known-bad repos
+        run: |
+          set -euo pipefail
+          MANIFEST=/cache/contextbench_repos/.bake_manifest.json
+          if [ ! -f "${MANIFEST}" ]; then
+            echo "WARN: no .bake_manifest.json found — proceeding without preflight purge"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json, shutil
+          from pathlib import Path
+          base = Path("/cache/contextbench_repos")
+          manifest = json.loads((base / ".bake_manifest.json").read_text())
+          purged = []
+          for entry in manifest.get("failed_clones", []):
+              repo = entry["repo"]
+              cache_dir = base / repo.replace("/", "__")
+              if cache_dir.exists():
+                  shutil.rmtree(cache_dir, ignore_errors=True)
+                  purged.append(repo)
+          print(f"Purged {len(purged)} bake-failed repos: {purged[:10]}{'...' if len(purged) > 10 else ''}")
+          fc = len(manifest.get("failed_clones", []))
+          ff = len(manifest.get("failed_fetches", []))
+          print(f"Bake manifest: failed_clones={fc} failed_fetches={ff}")
+          PY
 
       - name: System info dump
         run: |

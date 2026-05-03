@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from pathlib import Path
 
@@ -139,17 +141,43 @@ def warm_cache(instances: list[dict]) -> None:
     print(f"  Cache warm: {len(repos_to_clone)} repos", flush=True)
 
 
+def _is_bare_cache_valid(cache_dir: Path) -> bool:
+    if not cache_dir.exists():
+        return False
+    r = run_cmd(["git", "-C", str(cache_dir), "rev-parse", "--git-dir"], check=False, timeout=30)
+    if r.returncode != 0:
+        return False
+    r = run_cmd(["git", "-C", str(cache_dir), "rev-parse", "HEAD"], check=False, timeout=30)
+    return r.returncode == 0
+
+
+def _purge_cache_dir(cache_dir: Path) -> None:
+    shutil.rmtree(cache_dir, ignore_errors=True)
+
+
+def _clone_bare(url: str, cache_dir: Path, attempts: int = 3, base_backoff: float = 5.0) -> bool:
+    for attempt in range(1, attempts + 1):
+        r = run_cmd(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], check=False, timeout=900)
+        if r.returncode == 0:
+            return True
+        _purge_cache_dir(cache_dir)
+        if attempt < attempts:
+            time.sleep(base_backoff * (2 ** (attempt - 1)))
+        else:
+            print(f"  CLONE FAIL {url}: {r.stderr[:200]}")
+    return False
+
+
 def _ensure_bare_cache(repo_url: str, repo_name: str) -> Path | None:
     safe_name = repo_name.replace("/", "__")
     cache_dir = _SHARED_CACHE / safe_name
     if cache_dir.exists():
-        return cache_dir
-    url = repo_url or f"https://github.com/{repo_name}.git"
-    r = run_cmd(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], check=False, timeout=600)
-    if r.returncode != 0:
-        if cache_dir.exists():
+        if _is_bare_cache_valid(cache_dir):
             return cache_dir
-        print(f"  CLONE FAIL: {r.stderr[:200]}")
+        print(f"  PURGE corrupt bare cache {repo_name}", flush=True)
+        _purge_cache_dir(cache_dir)
+    url = repo_url or f"https://github.com/{repo_name}.git"
+    if not _clone_bare(url, cache_dir):
         return None
     _apply_perf_config(cache_dir)
     return cache_dir
@@ -188,6 +216,17 @@ def _git_dir_for_repo(repo_dir: Path) -> Path:
     return git_path
 
 
+def _try_worktree_add(
+    cache_dir: Path, repo_dir: Path, base_commit: str, checkout_timeout: int
+) -> subprocess.CompletedProcess[str]:
+    run_cmd(["git", "-C", str(cache_dir), "worktree", "prune", "--expire=now"], check=False, timeout=30)
+    return run_cmd(
+        ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
+        check=False,
+        timeout=checkout_timeout,
+    )
+
+
 def ensure_repo(
     repo_url: str,
     repo_name: str,
@@ -198,13 +237,14 @@ def ensure_repo(
     cache_dir = _ensure_bare_cache(repo_url, repo_name)
     if not cache_dir:
         return None
+    # Per-worker isolated worktree path. `target_dir` is already per-worker
+    # (UUID-keyed via `worker_dir`), so reusing the deterministic path inside
+    # it across instances of the same repo is safe and saves a worktree add.
+    # If reuse fails, fall through to a fresh UUID-suffixed path so we never
+    # collide with a stale `worktrees/` registration in the shared bare cache.
+    # `git worktree add` against that bare cache is serialized by git's own
+    # `.git/worktrees.lock`; no userspace mutex needed.
     repo_dir = target_dir / repo_name.replace("/", "__")
-    # With per-PID `target_dir`, worktrees are isolated per worker process —
-    # `git clean`/`checkout` inside a worker's own worktree never collide with
-    # another worker. `git worktree add` against the shared bare cache is
-    # serialized by git's internal `.git/worktrees.lock`, so no userspace
-    # mutex is needed. Adding one here turns same-repo workers into a queue
-    # and tanks throughput on cells dominated by one or two repos.
     if repo_dir.exists():
         _remove_stale_locks(_git_dir_for_repo(repo_dir))
         run_cmd(["git", "-C", str(repo_dir), "clean", "-fd"], check=False, timeout=30)
@@ -213,31 +253,36 @@ def ensure_repo(
             check=False,
             timeout=checkout_timeout,
         )
-    else:
-        if not _ensure_commit_present(cache_dir, base_commit):
-            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: commit not in cache and fetch failed")
-            return None
-        run_cmd(["git", "-C", str(cache_dir), "worktree", "prune"], check=False, timeout=30)
-        r = run_cmd(
-            ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
-            check=False,
-            timeout=checkout_timeout,
-        )
-        if r.returncode != 0:
-            import time
-
-            time.sleep(1)
-            run_cmd(["git", "-C", str(cache_dir), "worktree", "prune"], check=False, timeout=30)
-            r = run_cmd(
-                ["git", "-C", str(cache_dir), "worktree", "add", "--detach", "--force", str(repo_dir), base_commit],
-                check=False,
-                timeout=checkout_timeout,
-            )
         if r.returncode == 0:
-            _apply_perf_config(repo_dir)
-    if r.returncode != 0:
-        print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: {r.stderr[:200]}")
+            return repo_dir
+        print(f"  RESET worktree {repo_name} ({r.stderr[:120]})", flush=True)
+        _purge_cache_dir(repo_dir)
+
+    if not _ensure_commit_present(cache_dir, base_commit):
+        print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit (not in cache and fetch failed)")
         return None
+
+    r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
+    if r.returncode != 0:
+        time.sleep(1)
+        _purge_cache_dir(repo_dir)
+        repo_dir = target_dir / f"{repo_name.replace('/', '__')}__{uuid.uuid4().hex[:8]}"
+        r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
+    if r.returncode != 0:
+        print(f"  RECLONE bare cache {repo_name} after worktree fail: {r.stderr[:200]}", flush=True)
+        _purge_cache_dir(cache_dir)
+        cache_dir = _ensure_bare_cache(repo_url, repo_name)
+        if not cache_dir:
+            return None
+        if not _ensure_commit_present(cache_dir, base_commit):
+            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit after reclone")
+            return None
+        _purge_cache_dir(repo_dir)
+        r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
+        if r.returncode != 0:
+            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: {r.stderr[:200]}")
+            return None
+    _apply_perf_config(repo_dir)
     return repo_dir
 
 
@@ -275,7 +320,6 @@ def apply_as_commit(repo_dir: Path, patch_text: str, message: str = "bench") -> 
             print(f"  APPLY FAIL: {r.stderr[:300]}")
             return False
 
-        # Snapshot HEAD before commit so we can verify it advances.
         before = run_cmd(
             ["git", "-C", str(repo_dir), "rev-parse", "HEAD"],
             check=False,

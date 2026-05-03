@@ -237,6 +237,8 @@ module = [
   "treemapper.diffctx.edges",
   "treemapper.diffctx.edges.*",
   "treemapper.diffctx.embeddings",
+  "charset_normalizer",
+  "datasets",
 ]
 ignore_missing_imports = true
 
