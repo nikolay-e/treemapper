@@ -141,16 +141,6 @@ def warm_cache(instances: list[dict]) -> None:
     print(f"  Cache warm: {len(repos_to_clone)} repos", flush=True)
 
 
-def _is_bare_cache_valid(cache_dir: Path) -> bool:
-    if not cache_dir.exists():
-        return False
-    r = run_cmd(["git", "-C", str(cache_dir), "rev-parse", "--git-dir"], check=False, timeout=30)
-    if r.returncode != 0:
-        return False
-    r = run_cmd(["git", "-C", str(cache_dir), "rev-parse", "HEAD"], check=False, timeout=30)
-    return r.returncode == 0
-
-
 def _purge_cache_dir(cache_dir: Path) -> None:
     shutil.rmtree(cache_dir, ignore_errors=True)
 
@@ -172,9 +162,14 @@ def _ensure_bare_cache(repo_url: str, repo_name: str) -> Path | None:
     safe_name = repo_name.replace("/", "__")
     cache_dir = _SHARED_CACHE / safe_name
     if cache_dir.exists():
-        if _is_bare_cache_valid(cache_dir):
+        r = subprocess.run(
+            ["git", "-C", str(cache_dir), "rev-parse", "--verify", "HEAD"],
+            capture_output=True,
+            timeout=10,
+        )
+        if r.returncode == 0:
             return cache_dir
-        print(f"  PURGE corrupt bare cache {repo_name}", flush=True)
+        print(f"[ensure_repo] corrupt bare {cache_dir}, recloning", flush=True)
         _purge_cache_dir(cache_dir)
     url = repo_url or f"https://github.com/{repo_name}.git"
     if not _clone_bare(url, cache_dir):
@@ -237,6 +232,19 @@ def ensure_repo(
     cache_dir = _ensure_bare_cache(repo_url, repo_name)
     if not cache_dir:
         return None
+
+    # Unconditional cleanup of orphan worktrees from previously killed processes.
+    # No-op on a clean cache; rescues worktree/<name>/locked after SIGKILL/OOM.
+    subprocess.run(
+        ["git", "-C", str(cache_dir), "worktree", "prune", "--expire=now"],
+        capture_output=True,
+        timeout=30,
+    )
+
+    if not _ensure_commit_present(cache_dir, base_commit):
+        print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit (not in cache and fetch failed)")
+        return None
+
     # Per-worker isolated worktree path. `target_dir` is already per-worker
     # (UUID-keyed via `worker_dir`), so reusing the deterministic path inside
     # it across instances of the same repo is safe and saves a worktree add.
@@ -257,10 +265,6 @@ def ensure_repo(
             return repo_dir
         print(f"  RESET worktree {repo_name} ({r.stderr[:120]})", flush=True)
         _purge_cache_dir(repo_dir)
-
-    if not _ensure_commit_present(cache_dir, base_commit):
-        print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit (not in cache and fetch failed)")
-        return None
 
     r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
     if r.returncode != 0:
