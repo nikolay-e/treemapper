@@ -242,12 +242,17 @@ def main() -> int:
         )
     )
 
-    if failed_clones or failed_fetches:
+    if failed_clones:
         print(
-            f"BAKE FAILED: clones={len(failed_clones)} fetches={len(failed_fetches)}",
+            f"BAKE FAILED: {len(failed_clones)} clone failures (fetch failures={len(failed_fetches)})",
             flush=True,
         )
         return 1
+    if failed_fetches:
+        print(
+            f"BAKE WARNING: {len(failed_fetches)} unreachable commits (force-pushed/deleted upstream) — sweep will skip these instances",
+            flush=True,
+        )
     return 0
 
 
