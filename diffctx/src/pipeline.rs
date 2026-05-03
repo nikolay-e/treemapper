@@ -552,27 +552,26 @@ fn create_discovery(config: &PipelineConfig) -> Box<dyn DiscoveryStrategy> {
 }
 
 fn build_file_cache(candidate_files: &[PathBuf]) -> FxHashMap<PathBuf, String> {
-    let mut entries: Vec<(PathBuf, String)> = candidate_files
-        .par_iter()
-        .filter_map(|f| {
-            let meta = f.metadata().ok()?;
-            if meta.len() as usize > LIMITS.max_file_size {
-                return None;
-            }
-            let content = std::fs::read_to_string(f).ok()?;
-            Some((f.clone(), content))
-        })
-        .collect();
-    entries.sort_by(|a, b| a.0.cmp(&b.0));
-
+    // Stream files one at a time to avoid materialising all content before the cap.
+    // Previous par_iter().collect() allocated the full eligible corpus into an
+    // intermediate Vec before truncating — on repos with thousands of files this
+    // caused peak memory far above max_cache_bytes.
+    let mut sorted = candidate_files.to_vec();
+    sorted.sort();
     let mut cache: FxHashMap<PathBuf, String> = FxHashMap::default();
     let mut cache_bytes = 0usize;
-    for (path, content) in entries {
+    for path in sorted {
         if cache_bytes > GRAPH_FILTERING.max_cache_bytes {
             break;
         }
-        cache_bytes += content.len();
-        cache.insert(path, content);
+        let Ok(meta) = path.metadata() else { continue };
+        if meta.len() as usize > LIMITS.max_file_size {
+            continue;
+        }
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            cache_bytes += content.len();
+            cache.insert(path, content);
+        }
     }
     cache
 }
