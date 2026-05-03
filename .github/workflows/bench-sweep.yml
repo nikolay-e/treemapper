@@ -414,7 +414,10 @@ jobs:
       max-parallel: 256
       matrix:
         method: [ppr, ego, hybrid, bm25, aider]
-        budget: [-1, 8000, 16000, 32000, 64000, 128000]
+        # B=0 is a recall-floor sanity bound (must report ≈ 0); B=-1 is the
+        # unlimited-budget ceiling. The 5 paying budgets {8k, 16k, 32k, 64k, 128k}
+        # form the budget curve referenced in STATS_PLAN.md.
+        budget: [-1, 0, 8000, 16000, 32000, 64000, 128000]
         test_set: [contextbench_verified, polybench500, swebench_verified]
         exclude:
           - {method: bm25, budget: -1}
