@@ -312,7 +312,7 @@ jobs:
             --baseline "${BASELINE}" \
             --winner /tmp/winner.json \
             --manifests-dir /tmp/manifest_one \
-            --workers 2 \
+            --workers 1 \
             --limit 5 \
             --timeout-per-instance "${INPUT_TIMEOUT}" \
             --min-memory-gb 2 \
