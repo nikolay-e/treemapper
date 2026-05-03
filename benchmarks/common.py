@@ -301,13 +301,12 @@ def ensure_repo(
         repo_dir = target_dir / f"{repo_name.replace('/', '__')}__{uuid.uuid4().hex[:8]}"
         r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
     if r.returncode != 0:
-        print(f"  RECLONE bare cache {repo_name} after worktree fail: {r.stderr[:200]}", flush=True)
-        _purge_cache_dir(cache_dir)
+        print(f"  worktree add failed for {repo_name}, retrying via _ensure_bare_cache: {r.stderr[:200]}", flush=True)
         cache_dir = _ensure_bare_cache(repo_url, repo_name)
         if not cache_dir:
             return None
         if not _ensure_commit_present(cache_dir, base_commit):
-            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit after reclone")
+            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit after retry")
             return None
         _purge_cache_dir(repo_dir)
         r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
