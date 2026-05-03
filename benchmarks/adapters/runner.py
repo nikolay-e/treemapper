@@ -6,6 +6,7 @@ import time as _time
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 
 from benchmarks.adapters.base import BenchmarkAdapter, BenchmarkInstance, EvalResult
 
@@ -151,8 +152,6 @@ def _handle_process_expired(
     e: object,
 ) -> EvalResult:
     ec = getattr(e, "exitcode", None)
-    if ec == 137:
-        return _failure_result(inst, params, "timeout", "diffctx exceeded budget (exitcode=137)")
     try:
         sig_name = _signal.Signals(-ec).name if ec is not None and ec < 0 else str(ec)
     except (ValueError, TypeError):
@@ -247,7 +246,7 @@ def _run_serial(
 
 
 def _resolve_future(
-    future: object,
+    future: Any,
     inst: BenchmarkInstance,
     params: RunParams,
     timeout_per_instance: float,
@@ -258,7 +257,7 @@ def _resolve_future(
     from pebble import ProcessExpired
 
     try:
-        return future.result()  # type: ignore[union-attr]
+        return future.result()
     except FuturesTimeoutError:
         return _failure_result(inst, params, "timeout", f"pebble killed after {pebble_timeout:.0f}s")
     except ProcessExpired as e:
