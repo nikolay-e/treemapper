@@ -320,3 +320,23 @@ jobs:
           cache-to: >-
             type=registry,ref=ghcr.io/${{ github.repository_owner }}/treemapper-bench:buildcache,
             mode=max,image-manifest=true,oci-mediatypes=true
+
+  # ============================================================================
+  # Trigger smoke bench sweep after image is built and tests pass
+  # ============================================================================
+  smoke-bench:
+    name: Trigger smoke sweep
+    needs: [test, bench-image]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch bench-sweep (smoke)
+        run: |
+          gh workflow run bench-sweep.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            --field mode=smoke
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
