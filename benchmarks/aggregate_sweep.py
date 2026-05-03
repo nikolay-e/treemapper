@@ -152,6 +152,9 @@ def write_csv(cells: list[dict], path: Path) -> None:
         "n_ok",
         "mean_file_recall",
         "mean_file_precision",
+        "mean_fragment_recall",
+        "mean_line_f1",
+        "n_with_fragment_gold",
         "mean_used_tokens",
         "mean_elapsed_seconds",
         "git_sha",
@@ -162,6 +165,8 @@ def write_csv(cells: list[dict], path: Path) -> None:
         w.writeheader()
         for c in cells:
             s = c["summary"]
+            frag_block = s.get("fragment_recall") or {}
+            line_block = s.get("line_f1") or {}
             row = {
                 "method": c["method"],
                 "budget": c["budget"],
@@ -170,6 +175,9 @@ def write_csv(cells: list[dict], path: Path) -> None:
                 "n_ok": s.get("ok", 0),
                 "mean_file_recall": (s.get("file_recall") or {}).get("mean"),
                 "mean_file_precision": (s.get("file_precision") or {}).get("mean"),
+                "mean_fragment_recall": frag_block.get("mean"),
+                "mean_line_f1": line_block.get("mean"),
+                "n_with_fragment_gold": frag_block.get("n_with_gold"),
                 "mean_used_tokens": (s.get("used_tokens") or {}).get("mean"),
                 "mean_elapsed_seconds": (s.get("elapsed_seconds") or {}).get("mean"),
                 "git_sha": (c["metadata"].get("git") or {}).get("sha"),

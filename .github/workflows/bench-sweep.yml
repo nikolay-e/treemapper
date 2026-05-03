@@ -343,6 +343,12 @@ jobs:
               precision = [r.get("file_precision", 0) for r in rows]
               elapsed = [r.get("elapsed_seconds", 0) for r in rows]
               tokens = [r.get("used_tokens", 0) for r in rows]
+              # fragment_recall / line_f1 are populated only when the dataset
+              # ships gold_fragments (ContextBench, PolyBench when CST nodes
+              # exist); skip nulls so the aggregator gets honest means rather
+              # than zero-padded ones.
+              frag_recall = [r["fragment_recall"] for r in rows if r.get("fragment_recall") is not None]
+              line_f1 = [r["line_f1"] for r in rows if r.get("line_f1") is not None]
               ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
               statuses = {}
               errors = {}
@@ -364,6 +370,14 @@ jobs:
                       "median": statistics.median(recall),
                   },
                   "file_precision": {"mean": statistics.fmean(precision)},
+                  "fragment_recall": (
+                      {"mean": statistics.fmean(frag_recall), "n_with_gold": len(frag_recall)}
+                      if frag_recall else None
+                  ),
+                  "line_f1": (
+                      {"mean": statistics.fmean(line_f1), "n_with_gold": len(line_f1)}
+                      if line_f1 else None
+                  ),
                   "elapsed_seconds": {"mean": statistics.fmean(elapsed), "total": sum(elapsed)},
                   "used_tokens": {"mean": statistics.fmean(tokens)},
               }
@@ -411,7 +425,9 @@ jobs:
       packages: read
     strategy:
       fail-fast: false
-      max-parallel: 256
+      # 4 self-hosted runners on the CCX63 host; the queue can only drain at
+      # that rate anyway, so cap the matrix-level parallelism to match.
+      max-parallel: 4
       matrix:
         method: [ppr, ego, hybrid, bm25, aider]
         # B=0 is a recall-floor sanity bound (must report ≈ 0); B=-1 is the
@@ -671,6 +687,12 @@ jobs:
               precision = [r.get("file_precision", 0) for r in rows]
               elapsed = [r.get("elapsed_seconds", 0) for r in rows]
               tokens = [r.get("used_tokens", 0) for r in rows]
+              # fragment_recall / line_f1 are populated only when the dataset
+              # ships gold_fragments (ContextBench, PolyBench when CST nodes
+              # exist); skip nulls so the aggregator gets honest means rather
+              # than zero-padded ones.
+              frag_recall = [r["fragment_recall"] for r in rows if r.get("fragment_recall") is not None]
+              line_f1 = [r["line_f1"] for r in rows if r.get("line_f1") is not None]
               ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
               statuses = {}
               errors = {}
@@ -694,6 +716,14 @@ jobs:
                       "p75": sorted(recall)[min(n-1, n*3//4)],
                   },
                   "file_precision": {"mean": statistics.fmean(precision)},
+                  "fragment_recall": (
+                      {"mean": statistics.fmean(frag_recall), "n_with_gold": len(frag_recall)}
+                      if frag_recall else None
+                  ),
+                  "line_f1": (
+                      {"mean": statistics.fmean(line_f1), "n_with_gold": len(line_f1)}
+                      if line_f1 else None
+                  ),
                   "elapsed_seconds": {
                       "mean": statistics.fmean(elapsed),
                       "max": max(elapsed),
