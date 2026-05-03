@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import re
@@ -9,6 +8,11 @@ import subprocess
 import tempfile
 import time
 import uuid
+
+try:
+    import fcntl as _fcntl
+except ImportError:
+    _fcntl = None  # type: ignore[assignment]
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -149,11 +153,13 @@ def _cache_lock(cache_dir: Path) -> Generator[None, None, None]:
     lock_path = cache_dir.parent / f".{cache_dir.name}.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "w") as fd:
-        fcntl.flock(fd.fileno(), fcntl.LOCK_EX)
+        if _fcntl is not None:
+            _fcntl.flock(fd.fileno(), _fcntl.LOCK_EX)
         try:
             yield
         finally:
-            fcntl.flock(fd.fileno(), fcntl.LOCK_UN)
+            if _fcntl is not None:
+                _fcntl.flock(fd.fileno(), _fcntl.LOCK_UN)
 
 
 def _purge_cache_dir(cache_dir: Path) -> None:

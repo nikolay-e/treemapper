@@ -145,6 +145,37 @@ def _failure_result(
     return r
 
 
+def _handle_process_expired(
+    inst: BenchmarkInstance,
+    params: RunParams,
+    e: object,
+) -> EvalResult:
+    ec = getattr(e, "exitcode", None)
+    if ec == 137:
+        return _failure_result(inst, params, "timeout", "diffctx exceeded budget (exitcode=137)")
+    try:
+        sig_name = _signal.Signals(-ec).name if ec is not None and ec < 0 else str(ec)
+    except (ValueError, TypeError):
+        sig_name = str(ec)
+    if ec == -9:
+        status = "oom_kill"
+    elif ec is not None and ec < 0:
+        status = "signal_kill"
+    else:
+        status = "error"
+    msg = f"ProcessExpired signal={sig_name} exitcode={ec} repo={inst.repo}"
+    print(f"[WARN] {inst.instance_id} {msg}", flush=True)
+    return _failure_result(inst, params, status, msg)
+
+
+def _log_non_ok_result(r: EvalResult, status: str, err: str) -> None:
+    lang = (r.extra or {}).get("language", "")
+    t_clone = (r.extra or {}).get("t_clone_s", "")
+    detail = f" lang={lang}" if lang else ""
+    detail += f" t_clone={t_clone}s" if t_clone else ""
+    print(f"[WARN] {r.instance_id} status={status}{detail} error={err}", flush=True)
+
+
 def run_eval_set(
     instances: list[BenchmarkInstance],
     eval_fn: EvalFn,
@@ -178,19 +209,10 @@ def run_eval_set(
 
     def _record(r: EvalResult) -> None:
         results.append(r)
-        status = (r.extra or {}).get("status", "")
+        status = str((r.extra or {}).get("status", ""))
         err = str((r.extra or {}).get("error", ""))
-        if status not in ("ok", "empty_query", "empty_corpus"):
-            lang = (r.extra or {}).get("language", "")
-            t_clone = (r.extra or {}).get("t_clone_s", "")
-            detail = f" lang={lang}" if lang else ""
-            detail += f" t_clone={t_clone}s" if t_clone else ""
-            print(
-                f"[WARN] {r.instance_id} status={status}{detail} error={err}",
-                flush=True,
-            )
-        if checkpoint_path is None:
-            return
+        if status not in ("ok", "empty_query", "empty_corpus") and (status or err):
+            _log_non_ok_result(r, status, err)
         # Pool-level transient failures (BrokenProcessPool) must NOT be
         # persisted: on retry the orchestrator rebuilds the pool and these
         # instances should be re-evaluated, not skipped via the resume set.
@@ -199,9 +221,8 @@ def run_eval_set(
         # instance (the same input would hit the same deadline again) and
         # MUST be checkpointed to prevent an infinite retry loop on a
         # pathological repository.
-        if status != "timeout" and "BrokenProcessPool" in err:
-            return
-        append_checkpoint(checkpoint_path, r)
+        if checkpoint_path is not None and (status == "timeout" or "BrokenProcessPool" not in err):
+            append_checkpoint(checkpoint_path, r)
 
     if pending:
         if workers <= 1 or len(pending) <= 1:
@@ -223,6 +244,36 @@ def _run_serial(
             record(eval_fn(inst, params))
         except Exception as e:
             record(_failure_result(inst, params, "error", f"{type(e).__name__}: {e}"))
+
+
+def _resolve_future(
+    future: object,
+    inst: BenchmarkInstance,
+    params: RunParams,
+    timeout_per_instance: float,
+    pebble_timeout: float,
+) -> EvalResult:
+    from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+    from pebble import ProcessExpired
+
+    try:
+        return future.result()  # type: ignore[union-attr]
+    except FuturesTimeoutError:
+        return _failure_result(inst, params, "timeout", f"pebble killed after {pebble_timeout:.0f}s")
+    except ProcessExpired as e:
+        # exitcode 137 == os._exit(137) from the narrow algorithm kill switch.
+        # Persist as timeout so the checkpoint records it.
+        if e.exitcode == 137:
+            return _failure_result(inst, params, "timeout", f"diffctx exceeded {timeout_per_instance:.0f}s budget")
+        return _handle_process_expired(inst, params, e)
+    except Exception as e:
+        tb = getattr(e, "traceback", None)
+        err_msg = f"{type(e).__name__}: {e}"
+        if tb:
+            print(f"[worker-traceback] {inst.instance_id}:\n{tb}", flush=True)
+            err_msg = f"{err_msg} | traceback: {tb[-500:]}"
+        return _failure_result(inst, params, "error", err_msg)
 
 
 def _run_parallel(
@@ -247,9 +298,7 @@ def _run_parallel(
     running calibrator) is ignored by this code path; it is kept in
     the signature for API stability with `run_eval_set`.
     """
-    from concurrent.futures import TimeoutError as FuturesTimeoutError
-
-    from pebble import ProcessExpired, ProcessPool
+    from pebble import ProcessPool
 
     from benchmarks.common import _init_worker
 
@@ -284,55 +333,17 @@ def _run_parallel(
     ) as pp:
         futures: dict = {}
         for inst in pending:
-            future = pp.schedule(eval_fn, args=(inst, params), timeout=pebble_timeout)
+            future = pp.schedule(eval_fn, args=[inst, params], timeout=pebble_timeout)
             futures[future] = inst
 
         for future, inst in futures.items():
-            try:
-                r = future.result()
-            except FuturesTimeoutError:
-                r = _failure_result(
-                    inst,
-                    params,
-                    "timeout",
-                    f"pebble killed after {pebble_timeout:.0f}s",
-                )
-            except ProcessExpired as e:
-                # exitcode 137 == os._exit(137) from the narrow algorithm
-                # kill switch in eval_fn. Persist as timeout so the
-                # checkpoint records it; otherwise treat as a genuine
-                # crash (transient — not persisted by upstream _record).
-                if e.exitcode == 137:
-                    r = _failure_result(
-                        inst,
-                        params,
-                        "timeout",
-                        f"diffctx exceeded {timeout_per_instance:.0f}s budget",
-                    )
-                else:
-                    ec = e.exitcode
-                    try:
-                        sig_name = _signal.Signals(-ec).name if ec is not None and ec < 0 else str(ec)
-                    except (ValueError, TypeError):
-                        sig_name = str(ec)
-                    status = "oom_kill" if ec == -9 else "signal_kill" if ec is not None and ec < 0 else "error"
-                    msg = f"ProcessExpired signal={sig_name} exitcode={ec} repo={inst.repo}"
-                    print(f"[WARN] {inst.instance_id} {msg}", flush=True)
-                    r = _failure_result(inst, params, status, msg)
-            except Exception as e:
-                tb = getattr(e, "traceback", None)
-                err_msg = f"{type(e).__name__}: {e}"
-                if tb:
-                    print(f"[worker-traceback] {inst.instance_id}:\n{tb}", flush=True)
-                    err_msg = f"{err_msg} | traceback: {tb[-500:]}"
-                r = _failure_result(inst, params, "error", err_msg)
-            record(r)
+            record(_resolve_future(future, inst, params, timeout_per_instance, pebble_timeout))
             _completed += 1
             _now = _time.monotonic()
             if _now - _t_last_progress >= 30.0:
                 _elapsed = _now - _t_start
                 print(
-                    f"[progress] {_completed}/{_total} ({100.0 * _completed / _total:.0f}%)" f" elapsed={_elapsed:.0f}s",
+                    f"[progress] {_completed}/{_total} ({100.0 * _completed / _total:.0f}%) elapsed={_elapsed:.0f}s",
                     flush=True,
                 )
                 _t_last_progress = _now
