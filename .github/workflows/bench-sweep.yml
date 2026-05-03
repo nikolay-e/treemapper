@@ -2,23 +2,28 @@ name: bench-sweep
 
 # Multi-runner parallel sweep across method × budget × test_set.
 #
-# Trigger via workflow_dispatch. Each cell runs as an independent job
-# in the prebuilt treemapper-bench Docker container; all metrics
-# (per-instance file_recall, file_precision, used_tokens, elapsed,
-# fragment_count, latency breakdown, status, error) are written to a
-# JSONL checkpoint that is uploaded as an artifact AND committed to the
-# bench-results/sweep branch so nothing is lost when artifacts expire.
+# Two modes (select at dispatch):
+#   smoke — GitHub-hosted ubuntu-latest, 1 cell (ppr×64000×swebench_verified),
+#            5 instances, no Hetzner provisioning. Quick sanity check.
+#   full  — Hetzner CCX63 (4 × self-hosted runners), complete 5×5×3 matrix,
+#            baked repo cache. Production sweep.
+#
+# Trigger via workflow_dispatch. Results are committed to bench-results/sweep.
 
-on:
-  workflow_dispatch: {}
+'on':
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'smoke = GH Actions, 5 instances | full = Hetzner CCX63, complete sweep'
+        required: true
+        default: smoke
+        type: choice
+        options: [smoke, full]
 
 concurrency:
   group: bench-sweep
   cancel-in-progress: false
 
-# Sweep parameters are hardcoded so the workflow runs with a single
-# zero-input click. To change a parameter, edit this env block and commit.
-# Per-cell knobs (method, budget, test_set) are the matrix below.
 env:
   REGISTRY: ghcr.io
   IMAGE_REF: ghcr.io/${{ github.repository_owner }}/treemapper-bench:latest
@@ -50,10 +55,11 @@ jobs:
           echo "ts=${ts}" >> "$GITHUB_OUTPUT"
 
   # ============================================================================
-  # 2. Provision a Hetzner CCX63 server with 4 self-hosted runners.
+  # 2. Provision Hetzner CCX63 — full mode only
   # ============================================================================
   provision:
     needs: prep
+    if: inputs.mode == 'full'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -188,14 +194,204 @@ jobs:
           exit 1
 
   # ============================================================================
-  # 3. The cell matrix. 5 methods × 5 budgets × 3 test sets = 75 base.
-  #    Excludes drop nonsensical combinations (B=-1 for non-diffctx baselines).
-  #    Each cell is one runner; max-parallel: 256 (GH caps to its own concurrency
-  #    limit, typically 20 for free public-repo Linux runners — they queue and
-  #    drain naturally).
+  # 3a. Smoke sweep — ubuntu-latest, minimal matrix, 5 instances, no bake cache
   # ============================================================================
-  sweep:
+  sweep-smoke:
+    needs: [prep]
+    if: inputs.mode == 'smoke'
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        method: [ppr]
+        budget: [64000]
+        test_set: [swebench_verified]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/treemapper-bench:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: >-
+        --cpus 2
+        --memory 6g
+        --memory-swap 6g
+    env:
+      CELL_TAG: ${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
+      CELL_DIR: results/sweep/${{ matrix.method }}_b${{ matrix.budget }}_${{ matrix.test_set }}
+      MANIFESTS_DIR: benchmarks/manifests/v1
+      INPUT_TAU: '0.12'
+      INPUT_CBF: '0.5'
+      INPUT_TIMEOUT: '120'
+      INPUT_MANIFESTS_SUBDIR: v1
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cell start metadata
+        run: |
+          mkdir -p "${CELL_DIR}"
+          cat > "${CELL_DIR}/metadata.json" <<JSON
+          {
+            "sweep_id": "${{ needs.prep.outputs.sweep_id }}",
+            "mode": "smoke",
+            "cell": {
+              "method": "${{ matrix.method }}",
+              "budget": ${{ matrix.budget }},
+              "test_set": "${{ matrix.test_set }}",
+              "tau": ${INPUT_TAU},
+              "core_budget_fraction": ${INPUT_CBF}
+            },
+            "git": {
+              "sha": "${{ github.sha }}",
+              "ref": "${{ github.ref }}",
+              "actor": "${{ github.actor }}"
+            },
+            "started_at_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "runner": {
+              "os": "${RUNNER_OS}",
+              "arch": "${RUNNER_ARCH}",
+              "name": "${RUNNER_NAME}",
+              "image": "${IMAGE_REF}"
+            },
+            "stage": "started"
+          }
+          JSON
+
+      - name: Build per-cell manifest dir
+        run: |
+          mkdir -p /tmp/manifest_one
+          cp "${MANIFESTS_DIR}/test_${{ matrix.test_set }}.txt" /tmp/manifest_one/
+
+      - name: Resolve baseline + scoring
+        id: cfg
+        run: |
+          method="${{ matrix.method }}"
+          case "$method" in
+            ppr|ego|hybrid)
+              echo "baseline=diffctx" >> "$GITHUB_OUTPUT"
+              echo "scoring=$method" >> "$GITHUB_OUTPUT"
+              ;;
+            bm25)
+              echo "baseline=bm25" >> "$GITHUB_OUTPUT"
+              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              ;;
+            aider)
+              echo "baseline=aider_fair" >> "$GITHUB_OUTPUT"
+              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Build winner.json
+        run: |
+          cat > /tmp/winner.json <<JSON
+          {
+            "winner": {
+              "tau": ${INPUT_TAU},
+              "core_budget_fraction": ${INPUT_CBF},
+              "budget": ${{ matrix.budget }},
+              "scoring": "${SCORING}",
+              "extra_env": {}
+            }
+          }
+          JSON
+        env:
+          SCORING: ${{ steps.cfg.outputs.scoring }}
+
+      - name: Run cell (smoke — 5 instances)
+        timeout-minutes: 50
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m benchmarks.run_final_eval \
+            --baseline "${BASELINE}" \
+            --winner /tmp/winner.json \
+            --manifests-dir /tmp/manifest_one \
+            --workers 2 \
+            --limit 5 \
+            --timeout-per-instance "${INPUT_TIMEOUT}" \
+            --min-memory-gb 2 \
+            --min-disk-gb 5 \
+            --out "${CELL_DIR}" 2>&1 | tee "${CELL_DIR}/run.log"
+        env:
+          BASELINE: ${{ steps.cfg.outputs.baseline }}
+
+      - name: Per-instance metric summary (always)
+        if: always()
+        run: |
+          ckpt="${CELL_DIR}/${{ matrix.test_set }}.checkpoint.jsonl"
+          if [ -f "${ckpt}" ]; then
+            python - <<PY > "${CELL_DIR}/cell_summary.json"
+          import json, statistics
+          rows = []
+          with open("${ckpt}") as f:
+              for line in f:
+                  line = line.strip()
+                  if line:
+                      rows.append(json.loads(line))
+          n = len(rows)
+          if n == 0:
+              print(json.dumps({"n": 0}))
+          else:
+              recall = [r.get("file_recall", 0) for r in rows]
+              precision = [r.get("file_precision", 0) for r in rows]
+              elapsed = [r.get("elapsed_seconds", 0) for r in rows]
+              tokens = [r.get("used_tokens", 0) for r in rows]
+              ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
+              statuses = {}
+              for r in rows:
+                  s = (r.get("extra") or {}).get("status", "missing")
+                  statuses[s] = statuses.get(s, 0) + 1
+              out = {
+                  "n": n,
+                  "ok": ok,
+                  "ok_pct": 100.0 * ok / n if n else 0.0,
+                  "statuses": statuses,
+                  "file_recall": {
+                      "mean": statistics.fmean(recall),
+                      "median": statistics.median(recall),
+                  },
+                  "file_precision": {"mean": statistics.fmean(precision)},
+                  "elapsed_seconds": {"mean": statistics.fmean(elapsed), "total": sum(elapsed)},
+                  "used_tokens": {"mean": statistics.fmean(tokens)},
+              }
+              print(json.dumps(out, indent=2))
+          PY
+            cat "${CELL_DIR}/cell_summary.json"
+          else
+            printf '{"error": "no checkpoint produced", "expected_path": "%s"}\n' "${ckpt}" \
+              > "${CELL_DIR}/cell_summary.json"
+          fi
+
+      - name: Append cell-end metadata
+        if: always()
+        run: |
+          end_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          if command -v jq >/dev/null 2>&1; then
+            tmp=$(mktemp)
+            jq --arg end "${end_ts}" --arg status "${{ job.status }}" \
+              '. + {ended_at_utc: $end, exit_status: $status}' \
+              "${CELL_DIR}/metadata.json" > "${tmp}" \
+            && mv "${tmp}" "${CELL_DIR}/metadata.json"
+          fi
+
+      - name: Upload cell artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cell-${{ matrix.method }}-b${{ matrix.budget }}-${{ matrix.test_set }}
+          path: ${{ env.CELL_DIR }}/
+          retention-days: 30
+          if-no-files-found: warn
+
+  # ============================================================================
+  # 3b. Full sweep — Hetzner CCX63, complete 5×5×3 matrix, baked repo cache
+  # ============================================================================
+  sweep-full:
     needs: [prep, provision]
+    if: inputs.mode == 'full'
     permissions:
       contents: read
       packages: read
@@ -207,9 +403,7 @@ jobs:
         budget: [-1, 0, 32000, 64000, 128000]
         test_set: [contextbench_verified, polybench500, swebench_verified]
         exclude:
-          # External BM25 baseline has no concept of unlimited budget.
           - {method: bm25, budget: -1}
-          # Aider repo-map is inherently budget-bounded by token packing.
           - {method: aider, budget: -1}
     runs-on: [self-hosted, large]
     timeout-minutes: 350
@@ -244,6 +438,7 @@ jobs:
           cat > "${CELL_DIR}/metadata.json" <<JSON
           {
             "sweep_id": "${{ needs.prep.outputs.sweep_id }}",
+            "mode": "full",
             "cell": {
               "method": "${{ matrix.method }}",
               "budget": ${{ matrix.budget }},
@@ -487,22 +682,21 @@ jobs:
           PY
             cat "${CELL_DIR}/cell_summary.json"
           else
-              printf '{"error": "no checkpoint produced", "expected_path": "%s"}\n' "${ckpt}" \
-                  > "${CELL_DIR}/cell_summary.json"
-              ls -la "${CELL_DIR}" || true
+            printf '{"error": "no checkpoint produced", "expected_path": "%s"}\n' "${ckpt}" \
+              > "${CELL_DIR}/cell_summary.json"
+            ls -la "${CELL_DIR}" || true
           fi
 
       - name: Append cell-end metadata
         if: always()
         run: |
           end_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          # Merge end fields onto metadata.json (jq guaranteed in container).
           if command -v jq >/dev/null 2>&1; then
-              tmp=$(mktemp)
-              jq --arg end "${end_ts}" --arg status "${{ job.status }}" --arg disk "$(df -h / | tail -1)" \
-                  '. + {ended_at_utc: $end, exit_status: $status, runner_disk_at_end: $disk}' \
-                  "${CELL_DIR}/metadata.json" > "${tmp}" \
-                && mv "${tmp}" "${CELL_DIR}/metadata.json"
+            tmp=$(mktemp)
+            jq --arg end "${end_ts}" --arg status "${{ job.status }}" --arg disk "$(df -h / | tail -1)" \
+              '. + {ended_at_utc: $end, exit_status: $status, runner_disk_at_end: $disk}' \
+              "${CELL_DIR}/metadata.json" > "${tmp}" \
+            && mv "${tmp}" "${CELL_DIR}/metadata.json"
           fi
           cat "${CELL_DIR}/metadata.json"
 
@@ -517,11 +711,9 @@ jobs:
 
   # ============================================================================
   # 4. Aggregate all cells into per-cell summary table + raw artifact archive.
-  #    Commits raw artifacts to a dedicated branch so nothing is lost when
-  #    GH Actions artifact retention expires.
   # ============================================================================
   aggregate:
-    needs: [prep, sweep]
+    needs: [prep, sweep-smoke, sweep-full]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -582,12 +774,10 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          # Use a sibling clone so we don't have to detach the workspace.
           git clone --depth 1 --branch main \
             "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" \
             sidecar
           cd sidecar
-          # Fetch existing results branch if it exists, else create it from a clean orphan.
           if git ls-remote --heads origin "${BR}" | grep -q "${BR}"; then
             git fetch origin "${BR}":"${BR}"
             git checkout "${BR}"
@@ -598,7 +788,6 @@ jobs:
           mkdir -p "${SWEEP_ID}"
           cp -r ../aggregated "${SWEEP_ID}/aggregated"
           cp -r ../all_cells "${SWEEP_ID}/cells"
-          # README index
           cat > "${SWEEP_ID}/README.md" <<EOF
           # Sweep ${SWEEP_ID}
           - Triggered: ${TS}
@@ -620,3 +809,54 @@ jobs:
               sleep 10
             fi
           done
+
+  # ============================================================================
+  # 5. Deregister runners and destroy Hetzner server — full mode only
+  # ============================================================================
+  cleanup:
+    needs: [sweep-full]
+    if: always() && inputs.mode == 'full'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Deregister self-hosted runners
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          REPO: ${{ github.repository }}
+          SERVER_NAME: bench-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          RUNNER_IDS=$(curl -sf \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/${REPO}/actions/runners?per_page=100" \
+            | jq --arg pfx "${SERVER_NAME}" \
+              '[.runners[] | select(.name | startswith($pfx)) | .id]')
+          echo "Runner IDs to remove: ${RUNNER_IDS}"
+          echo "${RUNNER_IDS}" | jq -r '.[]' | while read -r rid; do
+            echo "  Deleting runner ${rid}..."
+            curl -sf -X DELETE \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              "https://api.github.com/repos/${REPO}/actions/runners/${rid}" || true
+          done
+
+      - name: Download server_id artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: hetzner-server-id
+          path: /tmp/hetzner
+
+      - name: Delete Hetzner server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          set -euo pipefail
+          SERVER_ID=$(cat /tmp/hetzner/server_id.txt)
+          if [ -z "${SERVER_ID}" ] || [ "${SERVER_ID}" = "null" ]; then
+            echo "No server ID found — nothing to delete."
+            exit 0
+          fi
+          echo "Deleting Hetzner server ${SERVER_ID}..."
+          curl -sf -X DELETE "https://api.hetzner.cloud/v1/servers/${SERVER_ID}" \
+            -H "Authorization: Bearer ${HCLOUD_TOKEN}" || true
+          echo "Server ${SERVER_ID} deletion requested."

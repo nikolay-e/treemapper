@@ -70,6 +70,7 @@ def main() -> int:
     p.add_argument("--timeout-per-instance", type=float, default=20.0)
     p.add_argument("--min-memory-gb", type=float, default=16.0)
     p.add_argument("--min-disk-gb", type=float, default=50.0)
+    p.add_argument("--limit", type=int, default=0, help="Cap instances per manifest (0 = all)")
     p.add_argument(
         "--baseline",
         choices=["diffctx", "bm25", "aider", "aider_fair", "aider_oracle"],
@@ -105,6 +106,8 @@ def main() -> int:
         name = manifest_path.stem.removeprefix("test_")
         ids = read_manifest(manifest_path)
         instances = [i for i in filter_instances_by_manifest(adapters, ids) if i.source_benchmark == name]
+        if args.limit:
+            instances = instances[: args.limit]
         print(f"\n[{name}] {len(instances)} instances")
         ckpt = args.out / f"{name}.checkpoint.jsonl"
         results = run_eval_set(
