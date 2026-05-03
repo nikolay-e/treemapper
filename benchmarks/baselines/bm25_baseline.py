@@ -11,6 +11,7 @@ budget" has no number to compare against.
 
 from __future__ import annotations
 
+import functools
 import os
 import time
 from pathlib import Path
@@ -167,6 +168,15 @@ def _bm25_eval(
             pass
 
 
+def _pool_eval_bm25(repos_dir_str: str, instance: BenchmarkInstance, params: RunParams) -> EvalResult:
+    repos_dir = Path(repos_dir_str)
+    worktree_dir = repos_dir / "worktrees" / f"w{os.getpid()}"
+    worktree_dir.mkdir(parents=True, exist_ok=True)
+    evaluator = UniversalEvaluator()
+    encoder = tiktoken.get_encoding("o200k_base")
+    return _bm25_eval(instance, params, evaluator, worktree_dir, encoder)
+
+
 def make_bm25_eval_fn(repos_dir: Path):
     try:
         import rank_bm25 as _  # noqa: F401
@@ -174,16 +184,4 @@ def make_bm25_eval_fn(repos_dir: Path):
         raise RuntimeError(
             "rank-bm25 not installed; expected to be in requirements-bench.lock. Run: pip install rank-bm25"
         ) from e
-
-    evaluator = UniversalEvaluator()
-    worktrees_root = repos_dir / "worktrees"
-    encoder = tiktoken.get_encoding("o200k_base")
-
-    def eval_fn(instance: BenchmarkInstance, params: RunParams) -> EvalResult:
-        import os
-
-        worktree_dir = worktrees_root / f"w{os.getpid()}"
-        worktree_dir.mkdir(parents=True, exist_ok=True)
-        return _bm25_eval(instance, params, evaluator, worktree_dir, encoder)
-
-    return eval_fn
+    return functools.partial(_pool_eval_bm25, str(repos_dir))
