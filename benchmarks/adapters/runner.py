@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import signal as _signal
+import time as _time
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -179,8 +181,12 @@ def run_eval_set(
         status = (r.extra or {}).get("status", "")
         err = str((r.extra or {}).get("error", ""))
         if status not in ("ok", "empty_query", "empty_corpus"):
+            lang = (r.extra or {}).get("language", "")
+            t_clone = (r.extra or {}).get("t_clone_s", "")
+            detail = f" lang={lang}" if lang else ""
+            detail += f" t_clone={t_clone}s" if t_clone else ""
             print(
-                f"[WARN] {r.instance_id} status={status} error={err[:200]}",
+                f"[WARN] {r.instance_id} status={status}{detail} error={err}",
                 flush=True,
             )
         if checkpoint_path is None:
@@ -266,6 +272,11 @@ def _run_parallel(
     # timeout is the upper bound for git ops on huge repos.
     pebble_timeout = max(timeout_per_instance + 30.0, 60.0)
 
+    _t_start = _time.monotonic()
+    _t_last_progress = _t_start
+    _completed = 0
+    _total = len(pending)
+
     with ProcessPool(
         max_workers=workers,
         max_tasks=50,
@@ -299,12 +310,35 @@ def _run_parallel(
                         f"diffctx exceeded {timeout_per_instance:.0f}s budget",
                     )
                 else:
-                    r = _failure_result(
-                        inst,
-                        params,
-                        "error",
-                        f"ProcessExpired exitcode={e.exitcode}",
-                    )
+                    ec = e.exitcode
+                    try:
+                        sig_name = _signal.Signals(-ec).name if ec is not None and ec < 0 else str(ec)
+                    except (ValueError, TypeError):
+                        sig_name = str(ec)
+                    status = "oom_kill" if ec == -9 else "signal_kill" if ec is not None and ec < 0 else "error"
+                    msg = f"ProcessExpired signal={sig_name} exitcode={ec} repo={inst.repo}"
+                    print(f"[WARN] {inst.instance_id} {msg}", flush=True)
+                    r = _failure_result(inst, params, status, msg)
             except Exception as e:
-                r = _failure_result(inst, params, "error", f"{type(e).__name__}: {e}")
+                tb = getattr(e, "traceback", None)
+                err_msg = f"{type(e).__name__}: {e}"
+                if tb:
+                    print(f"[worker-traceback] {inst.instance_id}:\n{tb}", flush=True)
+                    err_msg = f"{err_msg} | traceback: {tb[-500:]}"
+                r = _failure_result(inst, params, "error", err_msg)
             record(r)
+            _completed += 1
+            _now = _time.monotonic()
+            if _now - _t_last_progress >= 30.0:
+                _elapsed = _now - _t_start
+                print(
+                    f"[progress] {_completed}/{_total} ({100.0 * _completed / _total:.0f}%)" f" elapsed={_elapsed:.0f}s",
+                    flush=True,
+                )
+                _t_last_progress = _now
+
+    _elapsed_total = _time.monotonic() - _t_start
+    print(
+        f"[progress] {_completed}/{_total} (100%) elapsed={_elapsed_total:.0f}s done",
+        flush=True,
+    )

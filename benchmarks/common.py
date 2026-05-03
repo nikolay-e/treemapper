@@ -106,7 +106,7 @@ def _clone_one_repo(args: tuple[str, str]) -> None:
     print(f"  Cloning {repo}...", flush=True)
     r = run_cmd(["git", "clone", "--quiet", "--bare", url, str(cache_dir)], check=False, timeout=600)
     if r.returncode != 0:
-        print(f"  CLONE FAIL {repo}: {r.stderr[:200]}")
+        print(f"  CLONE FAIL {repo}: {r.stderr}", flush=True)
         return
     _apply_perf_config(cache_dir)
 
@@ -169,7 +169,7 @@ def _clone_bare(url: str, cache_dir: Path, attempts: int = 3, base_backoff: floa
         if attempt < attempts:
             time.sleep(base_backoff * (2 ** (attempt - 1)))
         else:
-            print(f"  CLONE FAIL {url}: {r.stderr[:200]}")
+            print(f"  CLONE FAIL {url}: {r.stderr}", flush=True)
     return False
 
 
@@ -270,7 +270,7 @@ def ensure_repo(
     )
 
     if not _ensure_commit_present(cache_dir, base_commit):
-        print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit (not in cache and fetch failed)")
+        print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit (not in cache and fetch failed)", flush=True)
         return None
 
     # Per-worker isolated worktree path. `target_dir` is already per-worker
@@ -291,7 +291,7 @@ def ensure_repo(
         )
         if r.returncode == 0:
             return repo_dir
-        print(f"  RESET worktree {repo_name} ({r.stderr[:120]})", flush=True)
+        print(f"  RESET worktree {repo_name} ({r.stderr})", flush=True)
         _purge_cache_dir(repo_dir)
 
     r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
@@ -301,17 +301,17 @@ def ensure_repo(
         repo_dir = target_dir / f"{repo_name.replace('/', '__')}__{uuid.uuid4().hex[:8]}"
         r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
     if r.returncode != 0:
-        print(f"  worktree add failed for {repo_name}, retrying via _ensure_bare_cache: {r.stderr[:200]}", flush=True)
+        print(f"  worktree add failed for {repo_name}, retrying via _ensure_bare_cache: {r.stderr}", flush=True)
         cache_dir = _ensure_bare_cache(repo_url, repo_name)
         if not cache_dir:
             return None
         if not _ensure_commit_present(cache_dir, base_commit):
-            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit after retry")
+            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: unreachable_commit after retry", flush=True)
             return None
         _purge_cache_dir(repo_dir)
         r = _try_worktree_add(cache_dir, repo_dir, base_commit, checkout_timeout)
         if r.returncode != 0:
-            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: {r.stderr[:200]}")
+            print(f"  WORKTREE/CHECKOUT FAIL {base_commit[:12]}: {r.stderr}", flush=True)
             return None
     _apply_perf_config(repo_dir)
     return repo_dir

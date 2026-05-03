@@ -327,7 +327,7 @@ jobs:
           ckpt="${CELL_DIR}/${{ matrix.test_set }}.checkpoint.jsonl"
           if [ -f "${ckpt}" ]; then
             python - <<PY > "${CELL_DIR}/cell_summary.json"
-          import json, statistics
+          import json, statistics, sys
           rows = []
           with open("${ckpt}") as f:
               for line in f:
@@ -344,14 +344,20 @@ jobs:
               tokens = [r.get("used_tokens", 0) for r in rows]
               ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
               statuses = {}
+              errors = {}
               for r in rows:
                   s = (r.get("extra") or {}).get("status", "missing")
                   statuses[s] = statuses.get(s, 0) + 1
+                  if s not in ("ok",):
+                      err = str((r.get("extra") or {}).get("error", ""))
+                      if err:
+                          errors[err] = errors.get(err, 0) + 1
               out = {
                   "n": n,
                   "ok": ok,
                   "ok_pct": 100.0 * ok / n if n else 0.0,
                   "statuses": statuses,
+                  "errors": dict(sorted(errors.items(), key=lambda x: -x[1])[:10]),
                   "file_recall": {
                       "mean": statistics.fmean(recall),
                       "median": statistics.median(recall),
@@ -361,6 +367,10 @@ jobs:
                   "used_tokens": {"mean": statistics.fmean(tokens)},
               }
               print(json.dumps(out, indent=2))
+              if errors:
+                  print("\n=== ERROR BREAKDOWN ===", file=sys.stderr)
+                  for msg, cnt in sorted(errors.items(), key=lambda x: -x[1]):
+                      print(f"  [{cnt}x] {msg[:200]}", file=sys.stderr)
           PY
             cat "${CELL_DIR}/cell_summary.json"
           else
@@ -639,7 +649,7 @@ jobs:
           ckpt="${CELL_DIR}/${{ matrix.test_set }}.checkpoint.jsonl"
           if [ -f "${ckpt}" ]; then
             python - <<PY > "${CELL_DIR}/cell_summary.json"
-          import json, statistics
+          import json, statistics, sys
           rows = []
           with open("${ckpt}") as f:
               for line in f:
@@ -656,14 +666,20 @@ jobs:
               tokens = [r.get("used_tokens", 0) for r in rows]
               ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
               statuses = {}
+              errors = {}
               for r in rows:
                   s = (r.get("extra") or {}).get("status", "missing")
                   statuses[s] = statuses.get(s, 0) + 1
+                  if s not in ("ok",):
+                      err = str((r.get("extra") or {}).get("error", ""))
+                      if err:
+                          errors[err] = errors.get(err, 0) + 1
               out = {
                   "n": n,
                   "ok": ok,
                   "ok_pct": 100.0 * ok / n if n else 0.0,
                   "statuses": statuses,
+                  "errors": dict(sorted(errors.items(), key=lambda x: -x[1])[:10]),
                   "file_recall": {
                       "mean": statistics.fmean(recall),
                       "median": statistics.median(recall),
@@ -682,6 +698,10 @@ jobs:
                   },
               }
               print(json.dumps(out, indent=2))
+              if errors:
+                  print("\n=== ERROR BREAKDOWN ===", file=sys.stderr)
+                  for msg, cnt in sorted(errors.items(), key=lambda x: -x[1]):
+                      print(f"  [{cnt}x] {msg[:200]}", file=sys.stderr)
           PY
             cat "${CELL_DIR}/cell_summary.json"
           else
