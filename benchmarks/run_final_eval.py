@@ -67,6 +67,93 @@ def _load_winner(path: Path) -> RunParams:
     )
 
 
+def _sweep_dir(out: Path, name: str, depth: int | None) -> Path:
+    """Per-(manifest, depth) sweep subdirectory for budget-sharded checkpoints."""
+    base = out / f"{name}_budget_sweep"
+    if depth is not None:
+        base = base / f"L{depth}"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def _process_manifest(
+    manifest_path: Path,
+    adapters: Any,
+    args: argparse.Namespace,
+    params: RunParams,
+    budgets_list: list[int],
+    eval_fn: Any,
+    eval_all_cells_fn: Any,
+    depth: int | None,
+) -> list[Any]:
+    name = manifest_path.stem.removeprefix("test_")
+    ids = read_manifest(manifest_path)
+    instances = [i for i in filter_instances_by_manifest(adapters, ids) if i.source_benchmark == name]
+    if args.limit:
+        instances = instances[: args.limit]
+    depth_label = f" L={depth}" if depth is not None else ""
+    print(f"\n[{name}{depth_label}] {len(instances)} instances")
+
+    if eval_all_cells_fn is not None:
+        params_list = [
+            RunParams(
+                tau=params.tau,
+                core_budget_fraction=params.core_budget_fraction,
+                budget=b,
+                scoring=params.scoring,
+            )
+            for b in budgets_list
+        ]
+        ckpt_dir = _sweep_dir(args.out, name, depth)
+        results_by_budget = run_eval_set_multi_budget(
+            instances,
+            eval_all_cells_fn,
+            params_list,
+            workers=args.workers,
+            timeout_per_instance=args.timeout_per_instance,
+            resume_dir=ckpt_dir,
+            checkpoint_dir=ckpt_dir,
+        )
+        headline_budget = params.budget if params.budget in results_by_budget else budgets_list[-1]
+        return results_by_budget[headline_budget]
+
+    if len(budgets_list) > 1:
+        ckpt_dir = _sweep_dir(args.out, name, depth)
+        results_by_budget: dict[int, list[Any]] = {}
+        for b in budgets_list:
+            cell_params = RunParams(
+                tau=params.tau,
+                core_budget_fraction=params.core_budget_fraction,
+                budget=b,
+                scoring=params.scoring,
+            )
+            ckpt_b = ckpt_dir / f"b{b}.checkpoint.jsonl"
+            rs = run_eval_set(
+                instances,
+                eval_fn,
+                cell_params,
+                workers=args.workers,
+                timeout_per_instance=args.timeout_per_instance,
+                resume_from=ckpt_b,
+                checkpoint_path=ckpt_b,
+            )
+            results_by_budget[b] = rs
+        headline_budget = params.budget if params.budget in results_by_budget else budgets_list[-1]
+        return results_by_budget[headline_budget]
+
+    depth_suffix = f"_L{depth}" if depth is not None else ""
+    ckpt = args.out / f"{name}{depth_suffix}.checkpoint.jsonl"
+    return run_eval_set(
+        instances,
+        eval_fn,
+        params,
+        workers=args.workers,
+        timeout_per_instance=args.timeout_per_instance,
+        resume_from=ckpt,
+        checkpoint_path=ckpt,
+    )
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--winner", type=Path, required=True)
@@ -94,6 +181,19 @@ def main() -> int:
         "with compute_scored_state reuse across budgets (~5-7x faster than running "
         "each budget as a separate process). Output: <name>__b<budget>.checkpoint.jsonl. "
         "Empty (default): use winner.budget as a single cell with the legacy path.",
+    )
+    p.add_argument(
+        "--depths",
+        type=str,
+        default="",
+        help="Comma-separated EGO graph traversal depths (e.g. '0,1,2,3,4'). "
+        "When set with --baseline=diffctx and --scoring=ego, the orchestrator "
+        "loops over each depth as the outer axis and reuses --budgets within "
+        "each depth. Heavy phase (graph build + scoring) is re-run per depth "
+        "because rel_scores depend on the traversal radius; budgets within a "
+        "depth share scored state. Output: <name>_budget_sweep/L<depth>/b<budget>.checkpoint.jsonl. "
+        "Empty (default): single depth from MODE.ego_depth_extended (= 2 unless "
+        "DIFFCTX_OP_GRAPH_DEPTH is set in the calling shell).",
     )
     args = p.parse_args()
 
@@ -125,6 +225,13 @@ def main() -> int:
                 "looping per budget without compute_scored_state reuse."
             )
 
+    depths_list: list[int] = []
+    if args.depths.strip():
+        depths_list = [int(x.strip()) for x in args.depths.split(",") if x.strip()]
+        if args.baseline != "diffctx" or params.scoring != "ego":
+            print(f"--depths set but baseline={args.baseline} scoring={params.scoring}; " "depths only affect EGO. Ignoring.")
+            depths_list = []
+
     eval_fn = _make_eval_fn(args.baseline, repo_root, request_timeout=args.timeout_per_instance)
     eval_all_cells_fn = (
         make_diffctx_eval_all_cells_fn(repo_root) if args.baseline == "diffctx" and len(budgets_list) > 1 else None
@@ -133,88 +240,38 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     reports = []
     all_results = []
-    for manifest_path in manifests:
-        name = manifest_path.stem.removeprefix("test_")
-        ids = read_manifest(manifest_path)
-        instances = [i for i in filter_instances_by_manifest(adapters, ids) if i.source_benchmark == name]
-        if args.limit:
-            instances = instances[: args.limit]
-        print(f"\n[{name}] {len(instances)} instances")
 
-        if eval_all_cells_fn is not None:
-            # Multi-budget reuse path: compute_scored_state runs once per
-            # instance, select_with_params runs once per budget. The
-            # checkpoint files are sharded as <name>__b<budget>.checkpoint.jsonl
-            # so the existing aggregator picks them up unchanged.
-            params_list = [
-                RunParams(
-                    tau=params.tau,
-                    core_budget_fraction=params.core_budget_fraction,
-                    budget=b,
-                    scoring=params.scoring,
-                )
-                for b in budgets_list
-            ]
-            ckpt_dir = args.out / f"{name}_budget_sweep"
-            ckpt_dir.mkdir(parents=True, exist_ok=True)
-            results_by_budget = run_eval_set_multi_budget(
-                instances,
-                eval_all_cells_fn,
-                params_list,
-                workers=args.workers,
-                timeout_per_instance=args.timeout_per_instance,
-                resume_dir=ckpt_dir,
-                checkpoint_dir=ckpt_dir,
+    # When --depths is set, loop EGO traversal radius as the outer axis.
+    # Heavy phase (graph build + scoring) re-runs per depth because
+    # rel_scores depend on radius; budgets within a depth share scored state.
+    # When --depths is empty, the depth is whatever DIFFCTX_OP_GRAPH_DEPTH
+    # the parent shell set (default 2 from MODE.ego_depth_extended).
+    loop_depths: list[int | None] = list(depths_list) if depths_list else [None]
+    for depth in loop_depths:
+        if depth is not None:
+            _os.environ["DIFFCTX_OP_GRAPH_DEPTH"] = str(depth)
+            print(f"\n=== Sweep depth L={depth} (DIFFCTX_OP_GRAPH_DEPTH={depth}) ===")
+        for manifest_path in manifests:
+            results = _process_manifest(
+                manifest_path=manifest_path,
+                adapters=adapters,
+                args=args,
+                params=params,
+                budgets_list=budgets_list,
+                eval_fn=eval_fn,
+                eval_all_cells_fn=eval_all_cells_fn,
+                depth=depth,
             )
-            # Pick the single "headline" budget (winner) for the per-manifest
-            # aggregation; per-budget JSONLs land in the sweep subdir.
-            headline_budget = params.budget if params.budget in results_by_budget else budgets_list[-1]
-            results = results_by_budget[headline_budget]
-        elif len(budgets_list) > 1:
-            # Multi-budget loop for non-diffctx baselines. No reuse, but
-            # uniform output schema with the diffctx path.
-            results = []
-            ckpt_dir = args.out / f"{name}_budget_sweep"
-            ckpt_dir.mkdir(parents=True, exist_ok=True)
-            results_by_budget: dict[int, list[Any]] = {}
-            for b in budgets_list:
-                cell_params = RunParams(
-                    tau=params.tau,
-                    core_budget_fraction=params.core_budget_fraction,
-                    budget=b,
-                    scoring=params.scoring,
-                )
-                ckpt_b = ckpt_dir / f"b{b}.checkpoint.jsonl"
-                rs = run_eval_set(
-                    instances,
-                    eval_fn,
-                    cell_params,
-                    workers=args.workers,
-                    timeout_per_instance=args.timeout_per_instance,
-                    resume_from=ckpt_b,
-                    checkpoint_path=ckpt_b,
-                )
-                results_by_budget[b] = rs
-            headline_budget = params.budget if params.budget in results_by_budget else budgets_list[-1]
-            results = results_by_budget[headline_budget]
-        else:
-            ckpt = args.out / f"{name}.checkpoint.jsonl"
-            results = run_eval_set(
-                instances,
-                eval_fn,
-                params,
-                workers=args.workers,
-                timeout_per_instance=args.timeout_per_instance,
-                resume_from=ckpt,
-                checkpoint_path=ckpt,
-            )
-
-        for r in results:
-            r.extra.setdefault("benchmark_manifest", name)
-        all_results.extend(results)
-        report = aggregate_test_set(name, results)
-        reports.append(report)
-        (args.out / f"{name}.json").write_text(json.dumps([asdict(r) for r in results], indent=2, default=str))
+            name = manifest_path.stem.removeprefix("test_")
+            for r in results:
+                r.extra.setdefault("benchmark_manifest", name)
+                if depth is not None:
+                    r.extra.setdefault("ego_depth", depth)
+            all_results.extend(results)
+            report = aggregate_test_set(name, results)
+            reports.append(report)
+            depth_suffix = f"_L{depth}" if depth is not None else ""
+            (args.out / f"{name}{depth_suffix}.json").write_text(json.dumps([asdict(r) for r in results], indent=2, default=str))
 
     paper_table = render_paper_table(reports)
     lang_agg = aggregate_by_language(all_results)

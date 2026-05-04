@@ -45,13 +45,15 @@ Current approaches to context selection suffer from fundamental limitations. Fix
 
 We address this gap by formalizing diff context selection as \textbf{budgeted submodular maximization} over Code Property Graphs. Our key insight is that ``understanding a change'' can be operationalized as covering explanatory concepts---definitions, call targets, type signatures, impacted tests---that propagate through structural dependencies with diminishing returns.
 
+\paragraph{Task scope: post-hoc diff understanding.} We address \emph{post-hoc diff understanding}: a patch $\Delta$ is given as input, and the task is to retrieve a compact set of explanatory code fragments needed to review or reason about that patch within a token budget. This is distinct from \emph{pre-solution issue resolution} (the standard SWE-bench setup), where an agent must produce $\Delta$ from a problem statement without seeing the gold patch. The benchmarks in Section~\ref{sec:eval} are repurposed from issue-resolution datasets: we use their gold patches as known diffs against which file-level retrieval is scored, never as a target an agent must generate. The patch is on the input side; the recall metric measures whether the retrieved context covers the files the patch touches and the dependency neighborhood needed to interpret them.
+
 \paragraph{Contributions.}
 \begin{enumerate}
     \item A formal problem statement casting context selection as budgeted utility maximization over a partition matroid on multi-resolution fragments. We do not claim a new approximation algorithm; we use known optimization structure to make context selection explicit, analyzable, and extensible. An ``algorithm $\times$ constraint $\times$ guarantee'' table (Table~\ref{tab:algo-constraint-guarantee}) separates the deployed heuristic from analyzable variants and from the submodular concept-coverage extension
     \item A typed-edge dependency-graph framework with per-category extraction and treatment (e.g., hub-suppression exemption), generalizing flat code-graph approaches
     \item A pluggable relevance-scoring abstraction $\hat{w}(f, \Delta)$ where three algorithm families (bounded ego-network expansion, Personalized PageRank, BM25) instantiate the abstract signal under a single retrieval framework
     \item An evaluation protocol using file-level recall against annotated golden contexts at a fixed token budget on multi-language software-engineering benchmarks, with paired-bootstrap statistical comparison against external baselines (BM25 over patch identifiers; Aider repo-map)
-    \item A reference implementation supporting 42 programming languages and configuration formats (Appendix~\ref{sec:impl-inventory})
+    \item A reference implementation with tree-sitter parsing for 42 source and configuration formats and dedicated semantic edge builders for 36 of them (Appendix~\ref{sec:impl-inventory}). Of these, eight (Python, JavaScript, TypeScript, Java, Go, Rust, C, C++) appear in the empirical evaluation with $n{\geq}10$ instances; the rest are supported but unvalidated at scale (Section~\ref{sec:impl-inventory}, Table~\ref{tab:language-support})
 \end{enumerate}
 
 \newpage
@@ -792,24 +794,34 @@ The following tactics are useful in practice but lack strong theoretical or empi
 \section{Language Support}
 \label{sec:impl-inventory}
 
-The reference implementation provides dedicated tree-sitter extraction for 42 languages, grouped by domain. Languages without dedicated extractors fall back to a generic strategy (paragraph-level fragmentation for prose-like content, statement-level for code-like content).
+The reference implementation includes tree-sitter parsing for 42 source and configuration formats and dedicated semantic edge builders for 36 of them. Coverage is uneven: a handful of languages have been used extensively in the evaluation; most others are present at the parser/edge-builder level but unvalidated against a benchmark of meaningful size. Table~\ref{tab:language-support} groups languages by tier of empirical exercise so the contribution and the open work are not conflated.
 
 \begin{table}[h]
 \centering
 \small
-\begin{tabular}{lp{8.5cm}}
+\begin{tabular}{lp{9.5cm}}
 \toprule
-\textbf{Group} & \textbf{Languages} \\
+\textbf{Tier} & \textbf{Languages} \\
 \midrule
-General-purpose & Python, JavaScript, TypeScript (incl.\ JSX/TSX), Go, Rust, Java, Kotlin, C, C++, C\#, Ruby, PHP, Swift, Scala \\
-Functional      & Haskell, Elixir, Erlang, OCaml, Clojure, Julia, F\# \\
-Scripting       & Lua, R, Perl, Bash/Zsh/Fish/Ksh, Dart, Groovy, Objective-C \\
-Markup/Data     & HTML, CSS/SCSS/LESS, YAML, JSON, GraphQL, HCL/Terraform, CMake, Make, Nix \\
-Domain-specific & Cargo (Rust), Bazel, dbt, OpenAPI, Prisma, Protobuf, SQL, Ansible \\
-Generic fallback & Markdown, plain text, TOML, dotfiles, unparsed sources \\
+Tier 1 — empirically validated ($n{\geq}10$ in evaluation) &
+Python ($n{=}891$), TypeScript ($n{=}191$), JavaScript ($n{=}185$),
+Java ($n{=}140$), Go ($n{=}40$), C ($n{=}23$), Rust ($n{=}20$), C++ ($n{=}10$) \\
+\midrule
+Tier 2 — semantic edge builders, no large-scale empirical validation &
+C\#, Kotlin, Ruby, PHP, Swift, Scala (general-purpose);
+Haskell, Elixir, Erlang, OCaml, Clojure, Julia (functional);
+Lua, R, Perl, Bash/Zsh/Fish/Ksh, Dart, Groovy, Objective-C (scripting);
+HTML, CSS/SCSS/LESS, GraphQL, HCL/Terraform, CMake, Make, Nix (markup/build);
+Cargo, Bazel, dbt, OpenAPI, Prisma, Protobuf, SQL, Ansible (domain) \\
+\midrule
+Tier 3 — parser only, structural fragmentation without semantic edges &
+YAML, JSON, TOML \\
+\midrule
+Generic fallback &
+Markdown, plain text, dotfiles, unparsed sources (paragraph or statement fragmentation) \\
 \bottomrule
 \end{tabular}
-\caption{Languages supported by the reference implementation. General-purpose and functional languages have full semantic edge builders (call/import resolution, type references); markup and data formats use schema-aware extractors where applicable.}
+\caption{Tiered coverage of the reference implementation. Tier 1 has both edge builders and per-language recall numbers in Table~\ref{tab:prelim-lang}. Tier 2 implements the same edge builders but is not exercised against a benchmark of meaningful size in this paper; its inclusion is a code-level claim, not an empirical one. Tier 3 supplies parsing only — sufficient to fragment files for selection but not to draw structural edges. Treat the count of supported formats as an implementation upper bound; only Tier 1 carries empirical evidence.}
 \label{tab:language-support}
 \end{table}
 
