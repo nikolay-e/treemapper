@@ -16,6 +16,7 @@ import argparse
 import json
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from benchmarks.adapters.evaluator import UniversalEvaluator
 from benchmarks.adapters.final_eval import (
@@ -24,11 +25,17 @@ from benchmarks.adapters.final_eval import (
     render_language_table,
     render_paper_table,
 )
-from benchmarks.adapters.runner import RunParams, filter_instances_by_manifest, read_manifest, run_eval_set
+from benchmarks.adapters.runner import (
+    RunParams,
+    filter_instances_by_manifest,
+    read_manifest,
+    run_eval_set,
+    run_eval_set_multi_budget,
+)
 from benchmarks.adapters.runtime_probe import probe_resources, report_and_maybe_exit
 from benchmarks.build_splits import default_calibration_pool_adapters, default_test_adapters
 from benchmarks.common import repos_dir as default_repos_dir
-from benchmarks.diffctx_eval_fn import make_diffctx_eval_fn
+from benchmarks.diffctx_eval_fn import make_diffctx_eval_all_cells_fn, make_diffctx_eval_fn
 
 
 def _make_eval_fn(baseline: str, repo_root: Path, request_timeout: float):
@@ -78,6 +85,16 @@ def main() -> int:
         help="Which method to evaluate. Non-diffctx baselines ignore τ/cbf/scoring "
         "(budget is the only RunParam they consume). 'aider' is alias for 'aider_fair'.",
     )
+    p.add_argument(
+        "--budgets",
+        type=str,
+        default="",
+        help="Comma-separated budgets (e.g. '-1,0,8000,16000,32000,64000,128000'). "
+        "When set with --baseline=diffctx, runs the full grid in a single sweep "
+        "with compute_scored_state reuse across budgets (~5-7x faster than running "
+        "each budget as a separate process). Output: <name>__b<budget>.checkpoint.jsonl. "
+        "Empty (default): use winner.budget as a single cell with the legacy path.",
+    )
     args = p.parse_args()
 
     repo_root = args.repos_dir or default_repos_dir()
@@ -97,7 +114,21 @@ def main() -> int:
 
     _os.environ["DIFFCTX_BENCH_TIMEOUT_SEC"] = str(args.timeout_per_instance)
 
+    budgets_list: list[int] = []
+    if args.budgets.strip():
+        budgets_list = [int(x.strip()) for x in args.budgets.split(",") if x.strip()]
+        if args.baseline != "diffctx":
+            # The reuse optimization is diffctx-specific; bm25/aider have no
+            # shared state across budgets. Fall back to per-budget loops.
+            print(
+                f"--budgets set with non-diffctx baseline ({args.baseline}); "
+                "looping per budget without compute_scored_state reuse."
+            )
+
     eval_fn = _make_eval_fn(args.baseline, repo_root, request_timeout=args.timeout_per_instance)
+    eval_all_cells_fn = (
+        make_diffctx_eval_all_cells_fn(repo_root) if args.baseline == "diffctx" and len(budgets_list) > 1 else None
+    )
 
     args.out.mkdir(parents=True, exist_ok=True)
     reports = []
@@ -109,16 +140,75 @@ def main() -> int:
         if args.limit:
             instances = instances[: args.limit]
         print(f"\n[{name}] {len(instances)} instances")
-        ckpt = args.out / f"{name}.checkpoint.jsonl"
-        results = run_eval_set(
-            instances,
-            eval_fn,
-            params,
-            workers=args.workers,
-            timeout_per_instance=args.timeout_per_instance,
-            resume_from=ckpt,
-            checkpoint_path=ckpt,
-        )
+
+        if eval_all_cells_fn is not None:
+            # Multi-budget reuse path: compute_scored_state runs once per
+            # instance, select_with_params runs once per budget. The
+            # checkpoint files are sharded as <name>__b<budget>.checkpoint.jsonl
+            # so the existing aggregator picks them up unchanged.
+            params_list = [
+                RunParams(
+                    tau=params.tau,
+                    core_budget_fraction=params.core_budget_fraction,
+                    budget=b,
+                    scoring=params.scoring,
+                )
+                for b in budgets_list
+            ]
+            ckpt_dir = args.out / f"{name}_budget_sweep"
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
+            results_by_budget = run_eval_set_multi_budget(
+                instances,
+                eval_all_cells_fn,
+                params_list,
+                workers=args.workers,
+                timeout_per_instance=args.timeout_per_instance,
+                resume_dir=ckpt_dir,
+                checkpoint_dir=ckpt_dir,
+            )
+            # Pick the single "headline" budget (winner) for the per-manifest
+            # aggregation; per-budget JSONLs land in the sweep subdir.
+            headline_budget = params.budget if params.budget in results_by_budget else budgets_list[-1]
+            results = results_by_budget[headline_budget]
+        elif len(budgets_list) > 1:
+            # Multi-budget loop for non-diffctx baselines. No reuse, but
+            # uniform output schema with the diffctx path.
+            results = []
+            ckpt_dir = args.out / f"{name}_budget_sweep"
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
+            results_by_budget: dict[int, list[Any]] = {}
+            for b in budgets_list:
+                cell_params = RunParams(
+                    tau=params.tau,
+                    core_budget_fraction=params.core_budget_fraction,
+                    budget=b,
+                    scoring=params.scoring,
+                )
+                ckpt_b = ckpt_dir / f"b{b}.checkpoint.jsonl"
+                rs = run_eval_set(
+                    instances,
+                    eval_fn,
+                    cell_params,
+                    workers=args.workers,
+                    timeout_per_instance=args.timeout_per_instance,
+                    resume_from=ckpt_b,
+                    checkpoint_path=ckpt_b,
+                )
+                results_by_budget[b] = rs
+            headline_budget = params.budget if params.budget in results_by_budget else budgets_list[-1]
+            results = results_by_budget[headline_budget]
+        else:
+            ckpt = args.out / f"{name}.checkpoint.jsonl"
+            results = run_eval_set(
+                instances,
+                eval_fn,
+                params,
+                workers=args.workers,
+                timeout_per_instance=args.timeout_per_instance,
+                resume_from=ckpt,
+                checkpoint_path=ckpt,
+            )
+
         for r in results:
             r.extra.setdefault("benchmark_manifest", name)
         all_results.extend(results)
