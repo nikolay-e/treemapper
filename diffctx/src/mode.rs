@@ -1,5 +1,5 @@
 use crate::config::limits::PPR;
-use crate::config::mode::MODE;
+use crate::config::mode::mode as mode_config;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScoringMode {
@@ -62,13 +62,14 @@ pub struct PipelineConfig {
 
 impl PipelineConfig {
     pub fn from_mode(mode: ScoringMode) -> Self {
+        let m = mode_config();
         match mode {
             ScoringMode::Ppr => Self {
                 discovery: DiscoveryKind::Ensemble,
                 scoring: ScoringKind::Ppr,
                 low_relevance_filter: false,
-                bm25_top_k: MODE.bm25_top_k_primary,
-                ego_depth: MODE.ego_depth_default,
+                bm25_top_k: m.bm25_top_k_primary,
+                ego_depth: m.ego_depth_default,
                 ppr_alpha: PPR.alpha,
                 objective: ObjectiveMode::Submodular,
             },
@@ -76,8 +77,8 @@ impl PipelineConfig {
                 discovery: DiscoveryKind::Ensemble,
                 scoring: ScoringKind::Ego,
                 low_relevance_filter: false,
-                bm25_top_k: MODE.bm25_top_k_primary,
-                ego_depth: MODE.ego_depth_extended,
+                bm25_top_k: m.bm25_top_k_primary,
+                ego_depth: m.ego_depth_extended,
                 ppr_alpha: PPR.alpha,
                 objective: ObjectiveMode::Submodular,
             },
@@ -85,8 +86,8 @@ impl PipelineConfig {
                 discovery: DiscoveryKind::Ensemble,
                 scoring: ScoringKind::Bm25,
                 low_relevance_filter: false,
-                bm25_top_k: MODE.bm25_top_k_off,
-                ego_depth: MODE.ego_depth_default,
+                bm25_top_k: m.bm25_top_k_off,
+                ego_depth: m.ego_depth_default,
                 ppr_alpha: PPR.alpha,
                 objective: ObjectiveMode::Submodular,
             },
