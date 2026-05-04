@@ -193,7 +193,8 @@ def main() -> int:
         "because rel_scores depend on the traversal radius; budgets within a "
         "depth share scored state. Output: <name>_budget_sweep/L<depth>/b<budget>.checkpoint.jsonl. "
         "Empty (default): single depth from MODE.ego_depth_extended (= 2 unless "
-        "DIFFCTX_OP_GRAPH_DEPTH is set in the calling shell).",
+        "DIFFCTX_OP_GRAPH_DEPTH is set in the calling shell). Non-EGO scoring "
+        "modes ignore --depths (PPR uses alpha; BM25 has no graph traversal).",
     )
     args = p.parse_args()
 

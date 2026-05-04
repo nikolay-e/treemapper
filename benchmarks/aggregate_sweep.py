@@ -1,13 +1,17 @@
 """Aggregate per-cell sweep artifacts into one summary JSON + markdown table.
 
 Input layout (from `actions/download-artifact@v4` with pattern=cell-*):
-    <cells-dir>/cell-<method>-b<budget>-<test_set>/
+    <cells-dir>/cell-<method>-b<budget>-L<depth>-<test_set>/
         metadata.json
         cell_summary.json
         <test_set>.checkpoint.jsonl
         <test_set>.json
         run.log
         system_info.log
+
+Legacy layout `cell-<method>-b<budget>-<test_set>/` is still parsed (depth=-1
+sentinel meaning "method does not consume depth") so old artifact dumps
+remain readable.
 
 Output:
     <out>/grand_summary.json   — every cell's metadata + summary in one file
@@ -63,12 +67,14 @@ def collect_cells(cells_dir: Path) -> list[dict]:
         ckpts = sorted(cell_root.glob("*.checkpoint.jsonl"))
         rows = _load_jsonl(ckpts[0]) if ckpts else []
         cell_info = meta.get("cell") or {}
+        parsed = _parse_artifact(cell_root.name)
         cells.append(
             {
                 "artifact_dir": cell_root.name,
-                "method": cell_info.get("method") or _parse_artifact(cell_root.name)[0],
-                "budget": cell_info.get("budget") if cell_info.get("budget") is not None else _parse_artifact(cell_root.name)[1],
-                "test_set": cell_info.get("test_set") or _parse_artifact(cell_root.name)[2],
+                "method": cell_info.get("method") or parsed[0],
+                "budget": cell_info.get("budget") if cell_info.get("budget") is not None else parsed[1],
+                "depth": cell_info.get("depth") if cell_info.get("depth") is not None else parsed[2],
+                "test_set": cell_info.get("test_set") or parsed[3],
                 "metadata": meta,
                 "summary": summary,
                 "n_instances": len(rows),
@@ -78,23 +84,42 @@ def collect_cells(cells_dir: Path) -> list[dict]:
     return cells
 
 
-_ARTIFACT_RE = __import__("re").compile(r"^cell-(?P<method>[a-zA-Z0-9_]+)-b(?P<budget>-?\d+)-(?P<test_set>.+)$")
+# New artifact layout: cell-<method>-b<budget>-L<depth>-<test_set>
+_ARTIFACT_RE_WITH_DEPTH = __import__("re").compile(
+    r"^cell-(?P<method>[a-zA-Z0-9_]+)-b(?P<budget>-?\d+)-L(?P<depth>-?\d+)-(?P<test_set>.+)$"
+)
+# Legacy artifact layout: cell-<method>-b<budget>-<test_set> (no depth segment)
+_ARTIFACT_RE_LEGACY = __import__("re").compile(r"^cell-(?P<method>[a-zA-Z0-9_]+)-b(?P<budget>-?\d+)-(?P<test_set>.+)$")
 
 
-def _parse_artifact(name: str) -> tuple[str | None, int | None, str | None]:
-    """Best-effort parse of a cell-<method>-b<budget>-<test_set> directory name.
+def _parse_artifact(name: str) -> tuple[str | None, int | None, int | None, str | None]:
+    """Parse a `cell-<method>-b<budget>-L<depth>-<test_set>` directory name.
 
-    Used as a fallback when metadata.json was not produced (e.g., the cell
-    crashed before the metadata step ran).
+    Returns (method, budget, depth, test_set). For legacy artifacts that
+    predate the depth axis, depth resolves to -1 (the sentinel meaning
+    "method does not consume depth"). Used as a fallback when
+    `metadata.json` was not produced (e.g., the cell crashed before the
+    metadata step ran).
     """
-    m = _ARTIFACT_RE.match(name)
+    m = _ARTIFACT_RE_WITH_DEPTH.match(name)
+    if m:
+        try:
+            budget = int(m.group("budget"))
+        except ValueError:
+            budget = None
+        try:
+            depth: int | None = int(m.group("depth"))
+        except ValueError:
+            depth = None
+        return (m.group("method"), budget, depth, m.group("test_set"))
+    m = _ARTIFACT_RE_LEGACY.match(name)
     if not m:
-        return (None, None, None)
+        return (None, None, None, None)
     try:
         budget = int(m.group("budget"))
     except ValueError:
         budget = None
-    return (m.group("method"), budget, m.group("test_set"))
+    return (m.group("method"), budget, -1, m.group("test_set"))
 
 
 _METHOD_ORDER = ["ppr", "ego", "bm25", "aider"]
@@ -147,6 +172,7 @@ def write_csv(cells: list[dict], path: Path) -> None:
     fields = [
         "method",
         "budget",
+        "depth",
         "test_set",
         "n_instances",
         "n_ok",
@@ -170,6 +196,7 @@ def write_csv(cells: list[dict], path: Path) -> None:
             row = {
                 "method": c["method"],
                 "budget": c["budget"],
+                "depth": c.get("depth"),
                 "test_set": c["test_set"],
                 "n_instances": s.get("n", c["n_instances"]),
                 "n_ok": s.get("ok", 0),
