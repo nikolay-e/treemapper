@@ -89,6 +89,13 @@ def _process_manifest(
     name = manifest_path.stem.removeprefix("test_")
     ids = read_manifest(manifest_path)
     instances = [i for i in filter_instances_by_manifest(adapters, ids) if i.source_benchmark == name]
+    # Sort by (repo, base_commit) so consecutive worker tasks reuse the same
+    # git worktree — `ensure_repo` keeps a per-worker worktree path keyed on
+    # repo_name and skips the worktree-add when the same repo lands twice in
+    # a row. SWE-bench-style benchmarks have ~12 instances per repo on
+    # average; this saves on the order of (n_unique_repos x worktree_add_cost)
+    # per cell, which is several minutes for large repos like django/keras.
+    instances.sort(key=lambda i: (i.repo, i.base_commit))
     if args.limit:
         instances = instances[: args.limit]
     depth_label = f" L={depth}" if depth is not None else ""
