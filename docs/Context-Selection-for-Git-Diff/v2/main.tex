@@ -647,6 +647,28 @@ $-1$ ($\infty$) & 1500 & 0.855 [0.838, 0.871] & 169{,}083 \\
 \end{tabular}}
 \end{table}
 
+For comparison, Table~\ref{tab:aider-budget-curve} reports the same budget sweep for the Aider repo-map fair-input baseline. The $16\times$ budget gap between the two protocols at the headline crossover is informative: diffctx-EGO at $B{=}8000$ achieves pooled recall $0.833$, while Aider at $B{=}128{,}000$ reaches only $0.719$; the lexical/structural primitives Aider's repo-map builds on do not appear to compensate for the absence of typed-edge propagation even when granted an order-of-magnitude larger token budget.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Budget curve for the Aider repo-map fair-input baseline at the same instance-level inputs. Per-benchmark recall and pooled recall with 95\% percentile bootstrap CIs ($B{=}10{,}000$ resamples, seed=42), intent-to-treat over $n{=}500$ per test set ($n{=}1500$ pooled). $B{=}0$ is the recall-floor sanity bound; $B{=}-1$ is excluded as Aider does not accept an unlimited-budget directive.}
+\label{tab:aider-budget-curve}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrllll}
+\toprule
+\textbf{Budget $B$} & \textbf{n} & \textbf{ContextBench Verified} & \textbf{PolyBench-500} & \textbf{SWE-bench Verified} & \textbf{Pooled} \\
+\midrule
+$0$         & 1500 & 0.000 & 0.000 & 0.000 & 0.000 \\
+$8{,}000$   & 1500 & 0.432 [0.396, 0.468] & 0.284 [0.249, 0.320] & 0.657 [0.617, 0.698] & 0.457 [0.434, 0.481] \\
+$16{,}000$  & 1500 & 0.509 [0.474, 0.544] & 0.356 [0.319, 0.394] & 0.766 [0.730, 0.801] & 0.544 [0.521, 0.567] \\
+$32{,}000$  & 1500 & 0.601 [0.566, 0.637] & 0.401 [0.363, 0.440] & 0.839 [0.806, 0.869] & 0.614 [0.591, 0.636] \\
+$64{,}000$  & 1500 & 0.662 [0.627, 0.696] & 0.455 [0.416, 0.495] & 0.897 [0.870, 0.921] & 0.671 [0.649, 0.693] \\
+$128{,}000$ & 1500 & 0.714 [0.680, 0.747] & 0.527 [0.489, 0.566] & 0.916 [0.892, 0.938] & 0.719 [0.698, 0.739] \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
 \subsection{Limitations of the Current Empirical Snapshot}
 \label{sec:limitations}
 
@@ -686,7 +708,7 @@ While we provide operational ranges for parameters ($\alpha$, $\tau$, edge weigh
 
 We have presented diffctx, a framework for diff-aware code context selection that formulates the problem as budgeted utility maximization over multi-resolution fragments on a typed dependency graph. The deployed system uses a modular relevance objective with lazy-greedy budgeted selection and engineering heuristics, including an adaptive stopping rule based on marginal utility. A pluggable scoring abstraction (EGO, PPR, BM25) allows the same selection algorithm to be instantiated with different relevance signals without changing the optimization machinery; bounded ego-network expansion (EGO) is the deployed default, motivated empirically by the ablation in Section~\ref{sec:prelim-results}. We do not claim a new approximation algorithm; we use known optimization structure to make context selection explicit, analyzable, and extensible.
 
-Key contributions: (1) an explicit ``algorithm $\times$ constraint $\times$ guarantee'' map (Table~\ref{tab:algo-constraint-guarantee}) that separates the deployed heuristic from analyzable variants of the framework, with the submodular concept-coverage extension (Section~\ref{sec:utility}) treated as a generalization, not as the deployed default; (2) a typed-edge dependency graph with per-category treatment (hub-suppression exemption for semantic, structural, and test edges); (3) empirical results (Section~\ref{sec:prelim-results}) showing pooled file recall $0.833$ [95\% CI $0.816, 0.850$] at $B{=}8000$ on 1500 multi-language instances under the deployed-default EGO scoring mode (per-benchmark recall: SWE-bench Verified $0.913$, PolyBench-500 $0.847$, ContextBench Verified $0.739$), and paired-bootstrap comparisons against two same-budget baselines: against external BM25-over-patch-identifiers, pooled $\Delta = +0.267$ [$+0.245, +0.290$], one-sided Wilcoxon $p \approx 4 \times 10^{-86}$; against Aider repo-map (fair-input mode), pooled $\Delta = +0.376$ [$+0.348, +0.403$], $p < 10^{-94}$ ($n{=}1500$ in both); a three-mode scoring ablation (EGO, PPR, external BM25 reference at $B{=}8000$) showing EGO $\geq$ PPR $>$ BM25 with EGO and PPR both $\sim$25 points above the lexical baseline pooled; and a budget curve $B \in \{0, 8\mathrm{k}, 16\mathrm{k}, 32\mathrm{k}, 64\mathrm{k}, 128\mathrm{k}, -1\}$ showing recall reaches $0.833$ at $B{=}8000$ and saturates by $B{=}128\mathrm{k}$ (asymptote $0.855$ at $B{=}{-1}$).
+Key contributions: (1) an explicit ``algorithm $\times$ constraint $\times$ guarantee'' map (Table~\ref{tab:algo-constraint-guarantee}) that separates the deployed heuristic from analyzable variants of the framework, with the submodular concept-coverage extension (Section~\ref{sec:utility}) treated as a generalization, not as the deployed default; (2) a typed-edge dependency graph with per-category treatment (hub-suppression exemption for semantic, structural, and test edges); (3) empirical results (Section~\ref{sec:prelim-results}) showing pooled file recall $0.833$ [95\% CI $0.816, 0.850$] at $B{=}8000$ on 1500 multi-language instances under the deployed-default EGO scoring mode (per-benchmark recall: SWE-bench Verified $0.913$, PolyBench-500 $0.847$, ContextBench Verified $0.739$), and paired-bootstrap comparisons against two same-budget baselines: against external BM25-over-patch-identifiers, pooled $\Delta = +0.267$ [$+0.245, +0.290$], one-sided Wilcoxon $p \approx 4 \times 10^{-86}$; against Aider repo-map (fair-input mode), pooled $\Delta = +0.376$ [$+0.348, +0.403$], $p < 10^{-94}$ ($n{=}1500$ in both). The Aider budget curve (Table~\ref{tab:aider-budget-curve}) shows that even at $B{=}128{,}000$ pooled Aider recall reaches only $0.719$, below the diffctx-EGO recall of $0.833$ at the $16\times$ smaller $B{=}8000$ budget. We further report a three-mode scoring ablation (EGO, PPR, external BM25 reference at $B{=}8000$) showing EGO $\geq$ PPR $>$ BM25 with EGO and PPR both $\sim$25 points above the lexical baseline pooled; and a budget curve $B \in \{0, 8\mathrm{k}, 16\mathrm{k}, 32\mathrm{k}, 64\mathrm{k}, 128\mathrm{k}, -1\}$ showing recall reaches $0.833$ at $B{=}8000$ and saturates by $B{=}128\mathrm{k}$ (asymptote $0.855$ at $B{=}{-1}$).
 
 \subsection{Future Work}
 \label{sec:future-work}
