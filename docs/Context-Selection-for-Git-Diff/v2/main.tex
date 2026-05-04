@@ -27,7 +27,7 @@
   \texttt{https://github.com/nikolay-e/treemapper}
 }
 
-\date{January 2025}
+\date{May 2026}
 
 \begin{document}
 \maketitle
@@ -70,7 +70,7 @@ Monotone submodular maximization admits efficient greedy approximations~\cite{ne
 Recent work explores retrieval-augmented generation for code tasks, typically using embedding similarity or BM25 over code chunks. Our approach differs by grounding retrieval in explicit dependency structure rather than purely lexical or semantic similarity, and by providing a principled utility function for budget allocation.
 
 \paragraph{Repository-Level Context Tools.}
-Aider~\cite{aider2023repomap} proposes a related repository-mapping approach using Personalized PageRank over tree-sitter-extracted definition--reference graphs, with binary-search packing under a token budget. Our framework differs in three respects: (i) we formalize selection as budgeted submodular maximization with explicit $(1-1/e)$ guarantees rather than heuristic packing, (ii) we introduce a typed edge taxonomy with per-category treatment (e.g., hub-suppression exemption for semantic, structural, and test edges), and (iii) we treat scoring as a pluggable component, comparing PPR, ego-network expansion, and lexical baselines empirically. Sourcegraph Cody~\cite{hartman2024recsys} formalizes code retrieval as a multi-stage RecSys pipeline with complementary retrievers (keyword, embedding, graph), but does not commit to a formal optimization framework. RepoMapper~\cite{repomapper2024} replicates Aider's PageRank approach as an MCP server.
+Aider~\cite{aider2023repomap} proposes a related repository-mapping approach using Personalized PageRank over tree-sitter-extracted definition--reference graphs, with binary-search packing under a token budget. Our framework differs in three respects: (i) we formalize selection as budgeted utility maximization over a partition matroid with multi-resolution fragments, identify analyzable variants of the formulation whose approximation guarantees are known, and clearly separate the deployed heuristic from those analyzable variants, rather than presenting a heuristic packing without the formulation; (ii) we introduce a typed edge taxonomy with per-category treatment (e.g., hub-suppression exemption for semantic, structural, and test edges), and (iii) we treat scoring as a pluggable component, comparing PPR, ego-network expansion, and lexical baselines empirically. Sourcegraph Cody~\cite{hartman2024recsys} formalizes code retrieval as a multi-stage RecSys pipeline with complementary retrievers (keyword, embedding, graph), but does not commit to a formal optimization framework. RepoMapper~\cite{repomapper2024} replicates Aider's PageRank approach as an MCP server.
 
 \paragraph{Concurrent Work on Submodular Code Context.}
 Concurrent work by Arafat~\cite{arafat2025citation} explores submodular packing for citation-grounded comprehension on conversational queries over Python repositories, combining BM25, dense embeddings, and graph expansion via import relations; their evaluation reports completeness improvements over plain greedy via submodular packing. Our work differs in three concrete respects: (i) diff-aware setting with explicit core edit set $E_0$ and budget reservation, versus their conversational query setting; (ii) typed edge taxonomy with ten categories and per-category treatment, versus their flat graph; (iii) explicit matroid--knapsack analysis with temperature reweighting, versus their direct submodular maximization over a single retrieved candidate set. The two works are complementary and together support the broader case for submodular formulations in code context selection.
@@ -240,13 +240,13 @@ The framework of Section~\ref{sec:problem} is agnostic to the choice of $\hat{w}
 \subsubsection{Personalized PageRank}
 \label{sec:ppr}
 
-We compute relevance scores via random walk with restart from core edits $E_0$:
+We compute relevance scores via random walk with restart from core edits $E_0$. Let $s$ denote the restart distribution: $s(v) = 1/|E_0|$ for $v \in E_0$ and $s(v) = 0$ otherwise; $s$ is a probability distribution by construction. The PPR fixed point is then
 \begin{equation}
-    R_{\mathrm{PPR}}(v) = (1-\alpha) \cdot \delta(v \in E_0) + \alpha \cdot \sum_{(u \to v) \in \mathcal{E}} R_{\mathrm{PPR}}(u) \cdot \frac{w_{uv}}{\text{deg}_{\text{out}}(u)}
+    R_{\mathrm{PPR}}(v) = (1-\alpha) \cdot s(v) + \alpha \cdot \sum_{(u \to v) \in \mathcal{E}} R_{\mathrm{PPR}}(u) \cdot \frac{w_{uv}}{\text{deg}_{\text{out}}(u)}
 \end{equation}
 where $\text{deg}_{\text{out}}(u) = \sum_{u \to x} w_{ux}$ is the weighted out-degree, ensuring outgoing transition probabilities sum to 1.
 
-The damping factor $\alpha \in [0.5, 0.65]$ controls locality. With continuation probability $\alpha$, walk length follows a geometric distribution with mean $1/(1-\alpha)$. For $\alpha = 0.6$, walks average $2.5$ steps before restarting. This provides sharper locality than web search ($\alpha = 0.85$, mean $\approx 6.7$), appropriate for the tighter dependency structure of code graphs. Convergence occurs when $\|R^{(t+1)} - R^{(t)}\|_1 < 10^{-4}$, typically within tens of iterations~\cite{lofgren2014fast}.
+The damping factor $\alpha \in [0.5, 0.65]$ controls locality. With continuation probability $\alpha$, the number of \emph{traversed edges} per walk before a restart follows a geometric distribution on $\{0, 1, 2, \ldots\}$ with mean $\alpha / (1 - \alpha)$; equivalently, the number of \emph{visited nodes} (including the seed) is $1/(1-\alpha)$.\footnote{Both quantities are reported in the literature; we adopt the edge-based convention throughout for consistency with the transition-matrix formulation.} For $\alpha = 0.6$ this gives $1.5$ traversed edges (or $2.5$ visited nodes) before restart, sharper locality than web search ($\alpha = 0.85$, $\approx 5.7$ edges), appropriate for the tighter dependency structure of code graphs. Convergence occurs when $\|R^{(t+1)} - R^{(t)}\|_1 < 10^{-4}$, typically within tens of iterations~\cite{lofgren2014fast}.
 
 \textbf{Locality interpretation:} In sparse code graphs with moderate branching, relevance decays approximately with graph distance, but the relationship is not strictly exponential on weighted directed graphs. Hub nodes with high in-degree can accumulate disproportionate mass regardless of semantic relevance, motivating the hub-suppression mechanism of Section~\ref{sec:tdg}.
 
@@ -333,7 +333,7 @@ The Boltzmann reformulation reduces the matroid+knapsack problem to a family of 
 \end{equation}
 where features $\phi$ include diff token cost, fragment count, candidate-set size, graph density, and core-edit cost share. The predictor $f_\theta$ would be trained to minimize $|\mathrm{cost}(C^*(\beta)) - B|$ on a validation corpus, with auxiliary recall floor against golden sets.
 
-In the present work we describe the mechanism and implement deterministic calibration; we do not learn $f_\theta$. The implementation selects $\beta$ per-instance via binary search over a logarithmic grid satisfying $|\mathrm{cost}(C^*(\beta)) - B| < \varepsilon$, which requires no training data. Replacement of binary search with a learned regression model is left to follow-up evaluation. Temperature calibration is the mechanism through which the matroid-only $(1-1/e)$ guarantee is recovered; the calibration mechanism affects budget targeting accuracy, not optimization theory.
+In the present work we describe the mechanism and implement deterministic calibration; we do not learn $f_\theta$. The implementation selects $\beta$ per-instance via binary search over a logarithmic grid satisfying $|\mathrm{cost}(C^*(\beta)) - B| < \varepsilon$, which requires no training data. Replacement of binary search with a learned regression model is left to follow-up evaluation. Temperature calibration is a Lagrangian relaxation that affects budget targeting accuracy; it does not by itself recover any approximation guarantee on the original budgeted problem, and we do not claim such a recovery. The matroid-only $(1-1/e)$ row in Table~\ref{tab:algo-constraint-guarantee} refers to continuous greedy on the matroid-only relaxation, not to the Boltzmann reweighting deployed here.
 
 \subsection{Submodular Extension via Concept Coverage}
 \label{sec:utility}
@@ -513,7 +513,7 @@ Table~\ref{tab:prelim-bench} reports per-benchmark file-level recall and precisi
 \begin{table}[h]
 \centering
 \small
-\caption{Per-benchmark file-level metrics, scoring=hybrid, $B{=}8000$ tokens, with 95\% percentile bootstrap CIs ($B{=}10{,}000$ resamples, seed=42). Status \texttt{ok} excludes \texttt{clone\_fail} and execution errors. Macro and micro averages coincide because each test set has $n{=}500$.}
+\caption{Per-benchmark file-level metrics, scoring=hybrid, $B{=}8000$ tokens, with 95\% percentile bootstrap CIs ($B{=}10{,}000$ resamples, seed=42). Reported as \emph{intent-to-treat}: recall and precision are computed over all $n{=}500$ instances per test set, with \texttt{clone\_fail} and execution-error rows contributing recall $0$. The \texttt{ok\%} column reports the fraction of instances where the pipeline produced a non-error selection; an \emph{ok-only} sensitivity analysis (recall computed over the \texttt{ok\%} subset) is reported in the appendix and changes the headline by less than the CI half-width on every test set. Macro and micro averages coincide because each test set has $n{=}500$.}
 \label{tab:prelim-bench}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lrllr}
@@ -614,12 +614,12 @@ Section~\ref{sec:ego} predicts that PPR with high restart probability $\alpha$ a
 \begin{table}[h]
 \centering
 \small
-\caption{Scoring-mode ablation at $B{=}8000$, hybrid-optimal operational hyperparameters. File recall with 95\% percentile bootstrap CIs. \emph{BM25 (internal)} is the BM25 instantiation of $\hat{w}(f, \Delta)$ inside the diffctx pipeline (uses the framework's fragmentation, partition matroid, and lazy-greedy budgeted selection); it is distinct from the external file-level BM25 baseline of Table~\ref{tab:prelim-baselines} which packs whole files in BM25 rank order and is therefore not directly comparable.}
+\caption{Scoring-mode ablation at $B{=}8000$, hybrid-optimal operational hyperparameters. File recall with 95\% percentile bootstrap CIs over $n{=}500$ instances per test set, intent-to-treat. The first three columns are graph-based scoring instantiations of $\hat{w}(f, \Delta)$ inside the diffctx pipeline. The fourth column reproduces the external whole-file BM25 baseline of Table~\ref{tab:prelim-baselines} as a reference point at the same budget; an internal-BM25 instantiation (BM25 fragments inside the framework's selection machinery, distinct from whole-file packing) is implemented in \texttt{src/scoring.rs::BM25Scoring} but was not run as a separate sweep cell in this version and is left as future work.}
 \label{tab:prelim-ablation}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lrllll}
 \toprule
-\textbf{Test set} & \textbf{n} & \textbf{Hybrid} & \textbf{PPR} & \textbf{EGO} & \textbf{BM25 (internal)} \\
+\textbf{Test set} & \textbf{n} & \textbf{Hybrid} & \textbf{PPR} & \textbf{EGO} & \textbf{BM25 (ext.\ ref.)} \\
 \midrule
 ContextBench Verified            & 500   & 0.735 [0.704, 0.765] & 0.708 [0.677, 0.738] & 0.739 [0.708, 0.769] & 0.485 [0.451, 0.519] \\
 PolyBench-500                    & 500   & 0.847 [0.818, 0.876] & 0.846 [0.817, 0.875] & 0.847 [0.818, 0.876] & 0.672 [0.640, 0.704] \\
@@ -629,7 +629,7 @@ SWE-bench Verified               & 500   & 0.913 [0.889, 0.936] & 0.913 [0.889, 
 \end{tabular}}
 \end{table}
 
-The ablation reveals two structural facts. First, on SWE-bench Verified all three graph-based modes (Hybrid, PPR, EGO) report identical recall ($0.913$) at every budget from $8000$ to $-1$ (Table~\ref{tab:prelim-budget}); this saturation is consistent with a gold-set composition in which seed coverage by patch identifiers already accounts for the bulk of returnable mass, and the scoring objective only re-orders ties. Second, on the two benchmarks where scoring matters (ContextBench Verified, PolyBench-500), EGO and Hybrid are statistically indistinguishable while PPR trails them by $\sim$3 points on ContextBench Verified; this is consistent with the prediction in Section~\ref{sec:ego} that bounded-radius EGO captures the bulk of relevance for diff-aware selection without the additional global mass that PPR distributes. The internal BM25 instantiation (BM25 fragments inside the framework's selection machinery) trails the graph-based modes by $20$--$25$ points on every benchmark, isolating the contribution of the graph-based scoring component from the rest of the framework.
+The ablation reveals two structural facts. First, on SWE-bench Verified all three graph-based modes (Hybrid, PPR, EGO) report identical recall ($0.913$) at every budget from $8000$ to $-1$ (Table~\ref{tab:prelim-budget}); this saturation is consistent with a gold-set composition in which seed coverage by patch identifiers already accounts for the bulk of returnable mass, and the scoring objective only re-orders ties. Second, on the two benchmarks where scoring matters (ContextBench Verified, PolyBench-500), EGO and Hybrid are statistically indistinguishable while PPR trails them by $\sim$3 points on ContextBench Verified; this is consistent with the prediction in Section~\ref{sec:ego} that bounded-radius EGO captures the bulk of relevance for diff-aware selection without the additional global mass that PPR distributes. We do not yet present an internal-BM25 ablation that would isolate the contribution of the graph-based scoring component from the framework's selection machinery (fragmentation, partition matroid, lazy-greedy stopping) at constant inputs; that ablation is the natural next experiment and is treated as future work.
 
 \subsection{Budget Curve}
 \label{sec:prelim-budget}
