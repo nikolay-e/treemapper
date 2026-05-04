@@ -271,17 +271,17 @@ jobs:
         run: |
           method="${{ matrix.method }}"
           case "$method" in
-            ppr|ego|hybrid)
+            ppr|ego)
               echo "baseline=diffctx" >> "$GITHUB_OUTPUT"
               echo "scoring=$method" >> "$GITHUB_OUTPUT"
               ;;
             bm25)
               echo "baseline=bm25" >> "$GITHUB_OUTPUT"
-              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              echo "scoring=ego" >> "$GITHUB_OUTPUT"
               ;;
             aider)
               echo "baseline=aider_fair" >> "$GITHUB_OUTPUT"
-              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              echo "scoring=ego" >> "$GITHUB_OUTPUT"
               ;;
           esac
 
@@ -429,7 +429,7 @@ jobs:
       # that rate anyway, so cap the matrix-level parallelism to match.
       max-parallel: 4
       matrix:
-        method: [ppr, ego, hybrid, bm25, aider]
+        method: [ppr, ego, bm25, aider]
         # B=0 is a recall-floor sanity bound (must report ≈ 0); B=-1 is the
         # unlimited-budget ceiling. The 5 paying budgets {8k, 16k, 32k, 64k, 128k}
         # form the budget curve referenced in STATS_PLAN.md.
@@ -563,17 +563,17 @@ jobs:
         run: |
           method="${{ matrix.method }}"
           case "$method" in
-            ppr|ego|hybrid)
+            ppr|ego)
               echo "baseline=diffctx" >> "$GITHUB_OUTPUT"
               echo "scoring=$method" >> "$GITHUB_OUTPUT"
               ;;
             bm25)
               echo "baseline=bm25" >> "$GITHUB_OUTPUT"
-              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              echo "scoring=ego" >> "$GITHUB_OUTPUT"
               ;;
             aider)
               echo "baseline=aider_fair" >> "$GITHUB_OUTPUT"
-              echo "scoring=hybrid" >> "$GITHUB_OUTPUT"
+              echo "scoring=ego" >> "$GITHUB_OUTPUT"
               ;;
           esac
 

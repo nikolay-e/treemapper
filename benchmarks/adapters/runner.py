@@ -28,7 +28,7 @@ class RunParams:
     tau: float = 0.12
     core_budget_fraction: float = 0.5
     budget: int = 8000
-    scoring: str = "hybrid"
+    scoring: str = "ego"
     extra_env: dict[str, str] = field(default_factory=dict)
 
     def to_env(self) -> dict[str, str]:

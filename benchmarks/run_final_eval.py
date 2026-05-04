@@ -56,7 +56,7 @@ def _load_winner(path: Path) -> RunParams:
         tau=float(w["tau"]),
         core_budget_fraction=float(w["core_budget_fraction"]),
         budget=int(w.get("budget", 8000)),
-        scoring=str(w.get("scoring", "hybrid")),
+        scoring=str(w.get("scoring", "ego")),
     )
 
 

@@ -179,7 +179,7 @@ pub fn compute_scored_state(
 
     let file_cache = build_file_cache(&all_candidate_files);
     let mode = scoring_mode;
-    let mut config = PipelineConfig::from_mode(mode, all_candidate_files.len());
+    let mut config = PipelineConfig::from_mode(mode);
     if let Ok(s) = std::env::var("DIFFCTX_OBJECTIVE") {
         config.objective = crate::mode::ObjectiveMode::from_str(&s);
     }
@@ -487,7 +487,7 @@ fn build_diff_context_full(
 }
 
 fn empty_scored_state(root_dir: PathBuf) -> ScoredState {
-    let config = PipelineConfig::from_mode(ScoringMode::Hybrid, 0);
+    let config = PipelineConfig::from_mode(ScoringMode::Ego);
     ScoredState {
         root_dir,
         config,

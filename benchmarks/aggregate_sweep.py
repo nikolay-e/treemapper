@@ -97,7 +97,7 @@ def _parse_artifact(name: str) -> tuple[str | None, int | None, str | None]:
     return (m.group("method"), budget, m.group("test_set"))
 
 
-_METHOD_ORDER = ["ppr", "ego", "hybrid", "bm25", "aider"]
+_METHOD_ORDER = ["ppr", "ego", "bm25", "aider"]
 
 
 def _method_sort_key(method: str) -> int:
