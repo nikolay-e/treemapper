@@ -535,6 +535,41 @@ jobs:
             sleep 15
           done
 
+      - name: Reclaim disk — purge stale per-worker worktrees and prune bare caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=/cache/contextbench_repos
+          echo "--- Disk before cleanup ---"
+          df -h "${base}" || true
+          du -sh "${base}/worktrees" 2>/dev/null || echo "  (no worktrees dir)"
+          # 1. Drop per-worker worktrees from previous cells. Each cell forks
+          #    fresh worker processes (new PIDs -> new w<pid> dirs), so the
+          #    worktrees from the prior cell on this runner are dead weight.
+          #    Without this, the 20-50 GB of expanded worktrees accumulates
+          #    cell-by-cell and eventually ENOSPC's the runner.
+          rm -rf "${base}/worktrees" || true
+          # 2. For every bare cache, prune the stale worktree registrations
+          #    that point at directories we just removed. Safe and idempotent.
+          for repo_cache in "${base}"/*/; do
+            if [ -d "${repo_cache}/.git" ] || [ -f "${repo_cache}/HEAD" ]; then
+              git -C "${repo_cache}" worktree prune --expire=now 2>/dev/null || true
+            fi
+          done
+          # 3. Sanity check: refuse to start if we have less than 30 GB free.
+          #    Worktrees for a single cell can run 5-15 GB; 30 GB headroom
+          #    keeps us off the edge.
+          avail_kb=$(df --output=avail "${base}" | tail -1 | tr -d ' ')
+          avail_gb=$((avail_kb / 1024 / 1024))
+          echo "--- Disk after cleanup: ${avail_gb} GB available ---"
+          df -h "${base}"
+          if [ "${avail_gb}" -lt 30 ]; then
+            msg="Less than 30 GB free on /cache/contextbench_repos —"
+            msg="${msg} bake cache is too big for this CCX63 disk."
+            echo "::error::${msg}" >&2
+            exit 1
+          fi
+
       - name: Validate bake manifest and purge known-bad repos
         shell: bash
         run: |
@@ -798,6 +833,25 @@ jobs:
           path: ${{ env.CELL_DIR }}/
           retention-days: 90
           if-no-files-found: warn
+
+      - name: Reclaim disk — drop this cell's per-worker worktrees
+        if: always()
+        shell: bash
+        run: |
+          set -e
+          base=/cache/contextbench_repos
+          # Defense-in-depth: also clean up at the END of each cell so a
+          # crash on the NEXT cell's preflight doesn't leave the runner in
+          # an ENOSPC state. The next cell's start-of-run reclaim does the
+          # same thing; doing it here too keeps the disk usable even if
+          # that cell never starts.
+          rm -rf "${base}/worktrees" || true
+          for repo_cache in "${base}"/*/; do
+            if [ -d "${repo_cache}/.git" ] || [ -f "${repo_cache}/HEAD" ]; then
+              git -C "${repo_cache}" worktree prune --expire=now 2>/dev/null || true
+            fi
+          done
+          df -h "${base}" || true
 
   # ============================================================================
   # 4. Aggregate all cells into per-cell summary table + raw artifact archive.
