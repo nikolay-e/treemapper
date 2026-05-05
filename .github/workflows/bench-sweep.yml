@@ -535,39 +535,61 @@ jobs:
             sleep 15
           done
 
-      - name: Reclaim disk — purge stale per-worker worktrees and prune bare caches
+      - name: Reclaim disk — purge own runner's worktrees, prune bare caches
         shell: bash
         run: |
           set -euo pipefail
           base=/cache/contextbench_repos
+          # `_ensure_worker_state` names worktrees `worktrees/w<runner>_<pid>/`
+          # using `RUNNER_NAME` (with `-` and space mapped to `_`). Four
+          # self-hosted runners share `/data/bench_repos` on the CCX63 host,
+          # so a blanket `rm -rf worktrees/` would corrupt concurrent cells
+          # on the other runners. Restrict to dirs prefixed with our own
+          # runner name so cleanup is single-runner-scoped.
+          runner_slug="$(printf '%s' "${RUNNER_NAME:-unknown}" | tr ' -' '__')"
           echo "--- Disk before cleanup ---"
           df -h "${base}" || true
           du -sh "${base}/worktrees" 2>/dev/null || echo "  (no worktrees dir)"
-          # 1. Drop per-worker worktrees from previous cells. Each cell forks
-          #    fresh worker processes (new PIDs -> new w<pid> dirs), so the
-          #    worktrees from the prior cell on this runner are dead weight.
-          #    Without this, the 20-50 GB of expanded worktrees accumulates
-          #    cell-by-cell and eventually ENOSPC's the runner.
-          rm -rf "${base}/worktrees" || true
-          # 2. For every bare cache, prune the stale worktree registrations
-          #    that point at directories we just removed. Safe and idempotent.
+          echo "  runner_slug=${runner_slug}"
+          # 1. Drop only THIS runner's accumulated worktree dirs from prior
+          #    cells. Concurrent cells on other runners (different PIDs and
+          #    different RUNNER_NAME prefixes) are untouched.
+          if [ -d "${base}/worktrees" ]; then
+            find "${base}/worktrees" -mindepth 1 -maxdepth 1 -type d \
+              -name "w${runner_slug}_*" -prune -exec rm -rf {} + 2>/dev/null || true
+          fi
+          # 2. Prune dangling worktree registrations on every bare cache.
+          #    Idempotent and safe even when other runners have live
+          #    registrations: `git worktree prune` only drops entries whose
+          #    target directory is missing.
           for repo_cache in "${base}"/*/; do
             if [ -d "${repo_cache}/.git" ] || [ -f "${repo_cache}/HEAD" ]; then
               git -C "${repo_cache}" worktree prune --expire=now 2>/dev/null || true
             fi
           done
-          # 3. Sanity check: refuse to start if we have less than 30 GB free.
-          #    Worktrees for a single cell can run 5-15 GB; 30 GB headroom
-          #    keeps us off the edge.
+          # 3. Sanity check: a single cell on a large repo (angular, AutoGPT,
+          #    transformers) can grow worktrees to 50-100 GB. With 4 cells
+          #    running concurrently on the same physical disk we want at
+          #    least ~150 GB headroom (4 cells x ~35 GB peak typical, plus
+          #    swap and other infrastructure). Run #49 hit ENOSPC at ~310 GB
+          #    free at cell start, so 150 GB is the conservative floor.
           avail_kb=$(df --output=avail "${base}" | tail -1 | tr -d ' ')
           avail_gb=$((avail_kb / 1024 / 1024))
           echo "--- Disk after cleanup: ${avail_gb} GB available ---"
           df -h "${base}"
-          if [ "${avail_gb}" -lt 30 ]; then
-            msg="Less than 30 GB free on /cache/contextbench_repos —"
-            msg="${msg} bake cache is too big for this CCX63 disk."
-            echo "::error::${msg}" >&2
-            exit 1
+          if [ "${avail_gb}" -lt 150 ]; then
+            msg="Less than 150 GB free on /cache/contextbench_repos after"
+            msg="${msg} cleanup. Other runners may be holding live worktrees;"
+            msg="${msg} retrying in 60s in case they are about to release."
+            echo "::warning::${msg}" >&2
+            sleep 60
+            avail_kb=$(df --output=avail "${base}" | tail -1 | tr -d ' ')
+            avail_gb=$((avail_kb / 1024 / 1024))
+            echo "--- Disk after retry wait: ${avail_gb} GB ---"
+            if [ "${avail_gb}" -lt 100 ]; then
+              echo "::error::Disk still tight (${avail_gb} GB); aborting cell." >&2
+              exit 1
+            fi
           fi
 
       - name: Validate bake manifest and purge known-bad repos
@@ -840,12 +862,15 @@ jobs:
         run: |
           set -e
           base=/cache/contextbench_repos
-          # Defense-in-depth: also clean up at the END of each cell so a
-          # crash on the NEXT cell's preflight doesn't leave the runner in
-          # an ENOSPC state. The next cell's start-of-run reclaim does the
-          # same thing; doing it here too keeps the disk usable even if
-          # that cell never starts.
-          rm -rf "${base}/worktrees" || true
+          runner_slug="$(printf '%s' "${RUNNER_NAME:-unknown}" | tr ' -' '__')"
+          # Defense-in-depth: clean up at the END of each cell so a crash
+          # on the NEXT cell's preflight doesn't leave the runner ENOSPC'd.
+          # Scoped to this runner only — the other 3 self-hosted runners
+          # on this CCX63 share the disk and may have live worktrees.
+          if [ -d "${base}/worktrees" ]; then
+            find "${base}/worktrees" -mindepth 1 -maxdepth 1 -type d \
+              -name "w${runner_slug}_*" -prune -exec rm -rf {} + 2>/dev/null || true
+          fi
           for repo_cache in "${base}"/*/; do
             if [ -d "${repo_cache}/.git" ] || [ -f "${repo_cache}/HEAD" ]; then
               git -C "${repo_cache}" worktree prune --expire=now 2>/dev/null || true
