@@ -342,6 +342,44 @@ fn find_best_singleton(
     (best_singleton, best_gain)
 }
 
+/// Paper-aligned strict Khuller H₁: `argmax_{f ∈ F, |f| ≤ B} U({f})`.
+/// Iterates the FULL ground set (including core), gates on the FULL
+/// budget B (not the residual after partial-core packing), and evaluates
+/// each candidate as a lone selection against an empty utility state.
+///
+/// This is the comparator that, together with the greedy chain, gives
+/// the `(1-1/e)/2` approximation guarantee from Khuller-Moss-Naor 1999
+/// for monotone submodular maximization under a knapsack constraint.
+/// Restricting H₁ to `non_core` with budget `B − cost(packed_core)`
+/// (the prior `find_best_singleton`) is a strict relaxation that
+/// excludes any single high-utility fragment with `|f| > B − β_core·B`.
+fn find_best_singleton_full_set(
+    fragments: &[Fragment],
+    budget_tokens: u32,
+    rel: &FxHashMap<FragmentId, f64>,
+    needs: &[InformationNeed],
+    empty_state: &UtilityState,
+) -> (Option<Fragment>, f64) {
+    let mut best = None;
+    let mut best_gain = 0.0;
+    for f in fragments {
+        if f.token_count == 0 || f.token_count > budget_tokens {
+            continue;
+        }
+        let gain = marginal_gain(
+            f,
+            rel.get(&f.id).copied().unwrap_or(0.0),
+            needs,
+            empty_state,
+        );
+        if gain > best_gain {
+            best_gain = gain;
+            best = Some(f.clone());
+        }
+    }
+    (best, best_gain)
+}
+
 fn init_selection_state(
     core_ids: &FxHashSet<FragmentId>,
     rel: &FxHashMap<FragmentId, f64>,
@@ -581,20 +619,45 @@ pub fn lazy_greedy_select(
         &base_state,
     );
 
+    let empty_state = init_selection_state(core_ids, rel, budget_tokens, file_importance);
+    let (full_singleton, full_singleton_gain) = find_best_singleton_full_set(
+        &fragments,
+        budget_tokens,
+        rel,
+        needs,
+        &empty_state.utility_state,
+    );
+
+    let mut best_alt_utility = greedy_utility;
+    let mut best_alt: Option<(Vec<Fragment>, u32)> = None;
+
     if let Some(ref singleton) = best_singleton {
-        let singleton_utility = utility_value(&base_state) + best_gain;
-        if singleton_utility > greedy_utility {
+        let u = utility_value(&base_state) + best_gain;
+        if u > best_alt_utility {
+            best_alt_utility = u;
             let used = budget_tokens - (base_budget - singleton.token_count);
-            let mut selected = base_selected.clone();
-            selected.push(singleton.clone());
-            return SelectionResult {
-                selected,
-                reason: SelectionReason::BestSingleton,
-                used_tokens: used,
-                utility: singleton_utility,
-                greedy_iters,
-            };
+            let mut sel = base_selected.clone();
+            sel.push(singleton.clone());
+            best_alt = Some((sel, used));
         }
+    }
+
+    if let Some(ref full) = full_singleton {
+        let u = utility_value(&empty_state.utility_state) + full_singleton_gain;
+        if u > best_alt_utility {
+            best_alt_utility = u;
+            best_alt = Some((vec![full.clone()], full.token_count));
+        }
+    }
+
+    if let Some((sel, used)) = best_alt {
+        return SelectionResult {
+            selected: sel,
+            reason: SelectionReason::BestSingleton,
+            used_tokens: used,
+            utility: best_alt_utility,
+            greedy_iters,
+        };
     }
 
     let used = budget_tokens - state.remaining_budget;
