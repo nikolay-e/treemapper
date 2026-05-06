@@ -83,6 +83,37 @@ def patch_files(patch: str) -> set[str]:
     return added | deleted | modified
 
 
+def patch_size_metrics(patch: str) -> dict[str, int]:
+    """Lightweight per-instance descriptive numbers extracted from a unified diff.
+
+    Used by the evaluator to stamp `n_changed_files`, `n_hunks`, and
+    `diff_size_lines` into `EvalResult.extra` so cell aggregators can
+    stratify recall by patch difficulty without re-parsing the diff.
+    """
+    added, deleted, modified = patch_files_detailed(patch)
+    n_changed = len(added | deleted | modified)
+    n_hunks = 0
+    n_added_lines = 0
+    n_removed_lines = 0
+    for line in patch.splitlines():
+        if line.startswith("@@ "):
+            n_hunks += 1
+        elif line.startswith("+") and not line.startswith("+++"):
+            n_added_lines += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            n_removed_lines += 1
+    return {
+        "n_changed_files": n_changed,
+        "n_added_files": len(added),
+        "n_deleted_files": len(deleted),
+        "n_modified_files": len(modified),
+        "n_hunks": n_hunks,
+        "diff_added_lines": n_added_lines,
+        "diff_removed_lines": n_removed_lines,
+        "diff_size_lines": n_added_lines + n_removed_lines,
+    }
+
+
 def patch_files_at_head(patch: str) -> set[str]:
     """Files present on disk after the patch is applied — gold for file-recall metrics.
 

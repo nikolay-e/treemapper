@@ -308,6 +308,182 @@ def _aggregate_languages(cells: list[dict]) -> dict[tuple[str, int, int], dict[s
     return finalized
 
 
+def render_pipeline_tables(cells: list[dict]) -> str:
+    """Latency breakdown + graph stats — only emitted when at least one cell has them."""
+    if not cells:
+        return ""
+    valid = [c for c in cells if c["method"] and c["budget"] is not None and c["test_set"]]
+    by_cfg: dict[tuple[str, int, int], list[dict]] = defaultdict(list)
+    for c in valid:
+        by_cfg[(c["method"], c["budget"], c.get("depth") or -1)].append(c)
+
+    def has_field(field: str) -> bool:
+        for c in valid:
+            lb = (c.get("summary") or {}).get("latency_breakdown") or {}
+            if field in lb:
+                return True
+        return False
+
+    def mean_of(cells_for_cfg, getter) -> float | None:
+        vals = [v for v in (_cell_metric(c, getter) for c in cells_for_cfg) if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    def fmt(v: float | None, ndigits: int = 1) -> str:
+        return f"{v:.{ndigits}f}" if v is not None else "—"
+
+    cfgs = sorted(by_cfg.keys(), key=lambda k: (_method_sort_key(k[0]), int(k[1]), int(k[2])))
+
+    out: list[str] = []
+
+    if has_field("scoring_ms") or has_field("discovery_ms"):
+        out.append("\n## Pipeline latency breakdown (median, ms)")
+        out.append("")
+        out.append("| method | budget | depth | parse | discover | tokenize | scoring | selection |")
+        out.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+        for cfg in cfgs:
+            cs = by_cfg[cfg]
+            parse = mean_of(cs, lambda s: s["latency_breakdown"]["parse_changed_ms"]["median"])
+            discov = mean_of(cs, lambda s: s["latency_breakdown"]["discovery_ms"]["median"])
+            token = mean_of(cs, lambda s: s["latency_breakdown"]["tokenization_ms"]["median"])
+            scoring = mean_of(cs, lambda s: s["latency_breakdown"]["scoring_ms"]["median"])
+            selection = mean_of(cs, lambda s: s["latency_breakdown"]["selection_ms"]["median"])
+            out.append(
+                f"| **{cfg[0]}** | {cfg[1]} | {cfg[2]} | "
+                f"{fmt(parse)} | {fmt(discov)} | {fmt(token)} | {fmt(scoring)} | {fmt(selection)} |"
+            )
+
+    if has_field("edge_count"):
+        out.append("\n## Graph size — edges and pushes (median per instance)")
+        out.append("")
+        out.append("| method | budget | depth | candidates | edges | edges_dropped | nodes_capped | ppr_fwd | ppr_bwd |")
+        out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+        for cfg in cfgs:
+            cs = by_cfg[cfg]
+            cand = mean_of(cs, lambda s: s["latency_breakdown"]["candidate_count"]["median"])
+            edges = mean_of(cs, lambda s: s["latency_breakdown"]["edge_count"]["median"])
+            dropped = mean_of(cs, lambda s: s["latency_breakdown"]["edges_dropped_by_cap"]["median"])
+            nodes_capped = mean_of(cs, lambda s: s["latency_breakdown"]["nodes_capped"]["median"])
+            ppr_fwd = mean_of(cs, lambda s: s["latency_breakdown"]["ppr_forward_pushes"]["median"])
+            ppr_bwd = mean_of(cs, lambda s: s["latency_breakdown"]["ppr_backward_pushes"]["median"])
+            out.append(
+                f"| **{cfg[0]}** | {cfg[1]} | {cfg[2]} | "
+                f"{fmt(cand, 0)} | {fmt(edges, 0)} | {fmt(dropped, 0)} | {fmt(nodes_capped, 0)} | "
+                f"{fmt(ppr_fwd, 0)} | {fmt(ppr_bwd, 0)} |"
+            )
+
+    return "\n".join(out) + "\n" if out else ""
+
+
+def _avg_recall_for_bucket(cells_for_cfg: list[dict], strat_key: str, bucket: str) -> float | None:
+    vals: list[float] = []
+    ns: list[float] = []
+    for c in cells_for_cfg:
+        strat = ((c.get("summary") or {}).get(strat_key) or {}).get(bucket)
+        if strat:
+            vals.append(float(strat["file_recall"]))
+            ns.append(float(strat["n"]))
+    if not vals:
+        return None
+    total_n = sum(ns)
+    return sum(v * n for v, n in zip(vals, ns)) / total_n if total_n else None
+
+
+def _render_strata_section(
+    cfgs: list[tuple[str, int, int]],
+    by_cfg: dict[tuple[str, int, int], list[dict]],
+    title: str,
+    note: str,
+    strat_key: str,
+    buckets: tuple[str, ...],
+) -> list[str]:
+    out: list[str] = ["", f"## {title}", "", note, ""]
+    out.append("| method | budget | depth | " + " | ".join(buckets) + " |")
+    out.append("|---|---:|---:|" + "---:|" * len(buckets))
+    for cfg in cfgs:
+        cs = by_cfg[cfg]
+        row = [f"**{cfg[0]}**", str(cfg[1]), str(cfg[2])]
+        for bucket in buckets:
+            v = _avg_recall_for_bucket(cs, strat_key, bucket)
+            row.append(f"{v:.3f}" if v is not None else "—")
+        out.append("| " + " | ".join(row) + " |")
+    return out
+
+
+def render_stratification_tables(cells: list[dict]) -> str:
+    """Recall stratified by |gold| bucket and by difficulty ratio.
+
+    The most informative cross-cut: shows whether a method's headline number is
+    driven by easy single-file instances or whether it actually scales with diff
+    size and gold cardinality.
+    """
+    if not cells:
+        return ""
+    valid = [c for c in cells if c["method"] and c["budget"] is not None and c["test_set"]]
+    if not valid:
+        return ""
+    have_gold_strata = any((c.get("summary") or {}).get("recall_by_gold_size") for c in valid)
+    have_ratio_strata = any((c.get("summary") or {}).get("recall_by_difficulty_ratio") for c in valid)
+    if not have_gold_strata and not have_ratio_strata:
+        return ""
+
+    by_cfg: dict[tuple[str, int, int], list[dict]] = defaultdict(list)
+    for c in valid:
+        by_cfg[(c["method"], c["budget"], c.get("depth") or -1)].append(c)
+    cfgs = sorted(by_cfg.keys(), key=lambda k: (_method_sort_key(k[0]), int(k[1]), int(k[2])))
+
+    out: list[str] = []
+    if have_gold_strata:
+        out.extend(
+            _render_strata_section(
+                cfgs,
+                by_cfg,
+                "Recall stratified by |gold| (file count)",
+                "Buckets reflect how many files the gold patch touches; method must scale across all of them to be useful.",
+                "recall_by_gold_size",
+                ("1", "2-3", "4-7", "8-15", "16+"),
+            )
+        )
+    if have_ratio_strata:
+        out.extend(
+            _render_strata_section(
+                cfgs,
+                by_cfg,
+                "Recall stratified by difficulty ratio |gold|/|changed|",
+                "Ratio≈1 means gold is the diff itself (trivial). Ratio>1 means real retrieval is needed.",
+                "recall_by_difficulty_ratio",
+                ("≤1.0", "1.0-1.5", "1.5-2.0", "2.0-3.0", "3.0+"),
+            )
+        )
+    return "\n".join(out) + "\n" if out else ""
+
+
+def render_gold_characterization(cells: list[dict]) -> str:
+    """Per-test-set gold descriptors — emitted once per dataset, not per cell."""
+    by_set: dict[str, dict] = {}
+    for c in cells:
+        ts = c["test_set"]
+        if ts is None:
+            continue
+        gc = (c.get("summary") or {}).get("gold_characterization") or {}
+        if not gc:
+            continue
+        if ts not in by_set:
+            by_set[ts] = gc
+    if not by_set:
+        return ""
+    out: list[str] = ["\n## Gold characterization (per dataset, from any cell)"]
+    out.append("")
+    out.append("| dataset | %single-file | %multi-file | %whole-file | %zero-gold |")
+    out.append("|---|---:|---:|---:|---:|")
+    for ts in sorted(by_set):
+        gc = by_set[ts]
+        out.append(
+            f"| {ts} | {gc.get('single_file_pct', 0):.1f} | {gc.get('multi_file_pct', 0):.1f} | "
+            f"{gc.get('whole_file_pct', 0):.1f} | {gc.get('zero_gold_pct', 0):.1f} |"
+        )
+    return "\n".join(out) + "\n"
+
+
 def render_per_language_tables(cells: list[dict], top_n: int = 7) -> str:
     """Per-language breakdown for each (method, budget, depth) configuration.
 
@@ -470,7 +646,14 @@ def main() -> int:
         ],
     }
     (args.out / "grand_summary.json").write_text(json.dumps(grand, indent=2, default=str))
-    sweep_md = render_sweep_table(cells) + render_headline_tables(cells) + render_per_language_tables(cells)
+    sweep_md = (
+        render_sweep_table(cells)
+        + render_headline_tables(cells)
+        + render_pipeline_tables(cells)
+        + render_stratification_tables(cells)
+        + render_gold_characterization(cells)
+        + render_per_language_tables(cells)
+    )
     (args.out / "SWEEP_TABLE.md").write_text(sweep_md)
     write_csv(cells, args.out / "cell_index.csv")
     print(f"Wrote: {args.out / 'grand_summary.json'}")

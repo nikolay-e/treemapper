@@ -23,6 +23,45 @@ from pathlib import Path
 
 _F_BETAS: tuple[float, ...] = (0.5, 1.0, 2.0)
 
+_GOLD_BUCKETS: tuple[tuple[str, int, int | None], ...] = (
+    ("1", 1, 1),
+    ("2-3", 2, 3),
+    ("4-7", 4, 7),
+    ("8-15", 8, 15),
+    ("16+", 16, None),
+)
+_RATIO_BUCKETS: tuple[tuple[str, float, float | None], ...] = (
+    ("≤1.0", 0.0, 1.0),
+    ("1.0-1.5", 1.0, 1.5),
+    ("1.5-2.0", 1.5, 2.0),
+    ("2.0-3.0", 2.0, 3.0),
+    ("3.0+", 3.0, None),
+)
+_LATENCY_BREAKDOWN_FIELDS: tuple[str, ...] = (
+    "parse_changed_ms",
+    "universe_walk_ms",
+    "discovery_ms",
+    "parse_discovered_ms",
+    "tokenization_ms",
+    "scoring_selection_ms",
+    "scoring_ms",
+    "selection_ms",
+    "candidate_count",
+    "edge_count",
+    "edges_before_cap",
+    "edges_dropped_by_cap",
+    "nodes_capped",
+    "ppr_forward_pushes",
+    "ppr_backward_pushes",
+    "greedy_iters",
+)
+_PATCH_FIELDS: tuple[str, ...] = (
+    "n_changed_files",
+    "n_hunks",
+    "diff_size_lines",
+    "n_gold_lines",
+)
+
 
 def _safe_div(num: float, denom: float) -> float:
     return num / denom if denom > 0 else 0.0
@@ -126,6 +165,138 @@ def _conditional_line_f1(rows: Sequence[dict]) -> dict[str, float] | None:
     return {"mean": statistics.fmean(cond), "n": float(len(cond))}
 
 
+def _stratified_recall(rows: Sequence[dict], key_extractor) -> dict[str, dict[str, float]] | None:
+    """Generic stratification: group rows by a numeric key, compute mean recall per bucket."""
+    out: dict[str, dict[str, float]] = {}
+    have_any = False
+    for label, lo, hi in _GOLD_BUCKETS:
+        bucket_rows = []
+        for r in rows:
+            val = key_extractor(r)
+            if val is None:
+                continue
+            if val < lo:
+                continue
+            if hi is not None and val > hi:
+                continue
+            bucket_rows.append(r)
+        if not bucket_rows:
+            continue
+        have_any = True
+        recalls = [float(r.get("file_recall") or 0.0) for r in bucket_rows]
+        precs = [float(r.get("file_precision") or 0.0) for r in bucket_rows]
+        out[label] = {
+            "n": float(len(bucket_rows)),
+            "file_recall": statistics.fmean(recalls),
+            "file_precision": statistics.fmean(precs),
+            "f1": _f_beta(statistics.fmean(precs), statistics.fmean(recalls), 1.0),
+            "f2": _f_beta(statistics.fmean(precs), statistics.fmean(recalls), 2.0),
+        }
+    return out if have_any else None
+
+
+def _stratified_recall_by_ratio(rows: Sequence[dict]) -> dict[str, dict[str, float]] | None:
+    out: dict[str, dict[str, float]] = {}
+    have_any = False
+    for label, lo, hi in _RATIO_BUCKETS:
+        bucket_rows = []
+        for r in rows:
+            val = (r.get("extra") or {}).get("gold_to_changed_ratio")
+            if val is None:
+                continue
+            v = float(val)
+            if v < lo:
+                continue
+            if hi is not None and v > hi:
+                continue
+            bucket_rows.append(r)
+        if not bucket_rows:
+            continue
+        have_any = True
+        recalls = [float(r.get("file_recall") or 0.0) for r in bucket_rows]
+        precs = [float(r.get("file_precision") or 0.0) for r in bucket_rows]
+        out[label] = {
+            "n": float(len(bucket_rows)),
+            "file_recall": statistics.fmean(recalls),
+            "file_precision": statistics.fmean(precs),
+            "f1": _f_beta(statistics.fmean(precs), statistics.fmean(recalls), 1.0),
+        }
+    return out if have_any else None
+
+
+def _gold_characterization(rows: Sequence[dict]) -> dict[str, float]:
+    """Aggregate gold-side descriptors for the test set: % single-file, % multi-file, % whole-file.
+
+    Returns empty dict if no row carries the gold flags (old checkpoints predating
+    the evaluator stamp). Callers should drop the section when empty.
+    """
+    n = len(rows)
+    if n == 0:
+        return {}
+    have_flags = any("is_single_file_gold" in (r.get("extra") or {}) for r in rows)
+    if not have_flags:
+        return {}
+    n_single = sum(1 for r in rows if (r.get("extra") or {}).get("is_single_file_gold"))
+    n_multi = sum(1 for r in rows if (r.get("extra") or {}).get("is_multi_file_gold"))
+    n_whole = sum(1 for r in rows if (r.get("extra") or {}).get("is_whole_file_gold"))
+    n_zero = sum(1 for r in rows if (float((r.get("extra") or {}).get("n_gold") or 0)) == 0)
+    return {
+        "single_file_pct": 100.0 * n_single / n,
+        "multi_file_pct": 100.0 * n_multi / n,
+        "whole_file_pct": 100.0 * n_whole / n,
+        "zero_gold_pct": 100.0 * n_zero / n,
+    }
+
+
+def _latency_breakdown(rows: Sequence[dict]) -> dict[str, dict[str, object]] | None:
+    """Aggregate diffctx LatencyBreakdown sub-fields. Empty dict when nothing emitted."""
+    out: dict[str, dict[str, object]] = {}
+    for field in _LATENCY_BREAKDOWN_FIELDS:
+        vals: list[float] = []
+        for r in rows:
+            ex = r.get("extra") or {}
+            lb = ex.get("latency_breakdown") or {}
+            if field in lb:
+                vals.append(float(lb[field]))
+        if vals:
+            out[field] = _percentile_block(vals)
+    return out if out else None
+
+
+def _patch_size_distributions(rows: Sequence[dict]) -> dict[str, dict[str, object]]:
+    """Aggregate patch-size descriptors stamped by the evaluator into extra."""
+    out: dict[str, dict[str, object]] = {}
+    for field in _PATCH_FIELDS:
+        vals = [float((r.get("extra") or {}).get(field, 0)) for r in rows if (r.get("extra") or {}).get(field) is not None]
+        if vals:
+            out[field] = _percentile_block(vals)
+    return out
+
+
+def _collect_cardinality(rows: Sequence[dict]) -> dict[str, list[float]]:
+    keys = ("n_selected", "n_gold", "fragment_count", "selected_to_gold_ratio", "gold_to_changed_ratio")
+    out: dict[str, list[float]] = {k: [] for k in keys}
+    for r in rows:
+        ex = r.get("extra") or {}
+        for k in keys:
+            if k in ex:
+                out[k].append(float(ex[k]))
+    return out
+
+
+def _collect_status_breakdown(rows: Sequence[dict]) -> tuple[dict[str, int], dict[str, int]]:
+    statuses: dict[str, int] = {}
+    errors: dict[str, int] = {}
+    for r in rows:
+        s = str((r.get("extra") or {}).get("status", "missing"))
+        statuses[s] = statuses.get(s, 0) + 1
+        if s != "ok":
+            err = str((r.get("extra") or {}).get("error", "")).strip()
+            if err:
+                errors[err] = errors.get(err, 0) + 1
+    return statuses, errors
+
+
 def compute_cell_summary(rows: Sequence[dict]) -> dict:
     n = len(rows)
     if n == 0:
@@ -140,29 +311,8 @@ def compute_cell_summary(rows: Sequence[dict]) -> dict:
     frag_precision = [float(r["fragment_precision"]) for r in rows if r.get("fragment_precision") is not None]
     line_f1 = [float(r["line_f1"]) for r in rows if r.get("line_f1") is not None]
 
-    # Cardinality proxies: prefer extra.n_selected / extra.n_gold (added in UniversalEvaluator),
-    # fall back to extra.fragment_count (legacy, fragments not files) when n_selected absent.
-    n_selected: list[float] = []
-    n_gold: list[float] = []
-    fragment_count: list[float] = []
-    for r in rows:
-        ex = r.get("extra") or {}
-        if "n_selected" in ex:
-            n_selected.append(float(ex["n_selected"]))
-        if "n_gold" in ex:
-            n_gold.append(float(ex["n_gold"]))
-        if "fragment_count" in ex:
-            fragment_count.append(float(ex["fragment_count"]))
-
-    statuses: dict[str, int] = {}
-    errors: dict[str, int] = {}
-    for r in rows:
-        s = str((r.get("extra") or {}).get("status", "missing"))
-        statuses[s] = statuses.get(s, 0) + 1
-        if s != "ok":
-            err = str((r.get("extra") or {}).get("error", "")).strip()
-            if err:
-                errors[err] = errors.get(err, 0) + 1
+    cardinality = _collect_cardinality(rows)
+    statuses, errors = _collect_status_breakdown(rows)
     ok = statuses.get("ok", 0)
 
     rec_block = _percentile_block(recall)
@@ -196,12 +346,20 @@ def compute_cell_summary(rows: Sequence[dict]) -> dict:
         "used_tokens": _percentile_block(tokens),
         "by_language": _by_language(rows),
     }
-    if n_selected:
-        out["n_selected"] = _percentile_block(n_selected)
-    if n_gold:
-        out["n_gold"] = _percentile_block(n_gold)
-    if fragment_count:
-        out["fragment_count"] = _percentile_block(fragment_count)
+    for key, values in cardinality.items():
+        if values:
+            out[key] = _percentile_block(values)
+
+    extras: list[tuple[str, object]] = [
+        ("patch_size", _patch_size_distributions(rows)),
+        ("gold_characterization", _gold_characterization(rows)),
+        ("recall_by_gold_size", _stratified_recall(rows, lambda r: float((r.get("extra") or {}).get("n_gold") or 0))),
+        ("recall_by_difficulty_ratio", _stratified_recall_by_ratio(rows)),
+        ("latency_breakdown", _latency_breakdown(rows)),
+    ]
+    for key, value in extras:
+        if value:
+            out[key] = value
     return out
 
 
