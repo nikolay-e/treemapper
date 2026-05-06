@@ -327,66 +327,7 @@ jobs:
         run: |
           ckpt="${CELL_DIR}/${{ matrix.test_set }}.checkpoint.jsonl"
           if [ -f "${ckpt}" ]; then
-            python - <<PY > "${CELL_DIR}/cell_summary.json"
-          import json, statistics, sys
-          rows = []
-          with open("${ckpt}") as f:
-              for line in f:
-                  line = line.strip()
-                  if line:
-                      rows.append(json.loads(line))
-          n = len(rows)
-          if n == 0:
-              print(json.dumps({"n": 0}))
-          else:
-              recall = [r.get("file_recall", 0) for r in rows]
-              precision = [r.get("file_precision", 0) for r in rows]
-              elapsed = [r.get("elapsed_seconds", 0) for r in rows]
-              tokens = [r.get("used_tokens", 0) for r in rows]
-              # fragment_recall / line_f1 are populated only when the dataset
-              # ships gold_fragments (ContextBench, PolyBench when CST nodes
-              # exist); skip nulls so the aggregator gets honest means rather
-              # than zero-padded ones.
-              frag_recall = [r["fragment_recall"] for r in rows if r.get("fragment_recall") is not None]
-              line_f1 = [r["line_f1"] for r in rows if r.get("line_f1") is not None]
-              ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
-              statuses = {}
-              errors = {}
-              for r in rows:
-                  s = (r.get("extra") or {}).get("status", "missing")
-                  statuses[s] = statuses.get(s, 0) + 1
-                  if s not in ("ok",):
-                      err = str((r.get("extra") or {}).get("error", ""))
-                      if err:
-                          errors[err] = errors.get(err, 0) + 1
-              out = {
-                  "n": n,
-                  "ok": ok,
-                  "ok_pct": 100.0 * ok / n if n else 0.0,
-                  "statuses": statuses,
-                  "errors": dict(sorted(errors.items(), key=lambda x: -x[1])[:10]),
-                  "file_recall": {
-                      "mean": statistics.fmean(recall),
-                      "median": statistics.median(recall),
-                  },
-                  "file_precision": {"mean": statistics.fmean(precision)},
-                  "fragment_recall": (
-                      {"mean": statistics.fmean(frag_recall), "n_with_gold": len(frag_recall)}
-                      if frag_recall else None
-                  ),
-                  "line_f1": (
-                      {"mean": statistics.fmean(line_f1), "n_with_gold": len(line_f1)}
-                      if line_f1 else None
-                  ),
-                  "elapsed_seconds": {"mean": statistics.fmean(elapsed), "total": sum(elapsed)},
-                  "used_tokens": {"mean": statistics.fmean(tokens)},
-              }
-              print(json.dumps(out, indent=2))
-              if errors:
-                  print("\n=== ERROR BREAKDOWN ===", file=sys.stderr)
-                  for msg, cnt in sorted(errors.items(), key=lambda x: -x[1]):
-                      print(f"  [{cnt}x] {msg[:200]}", file=sys.stderr)
-          PY
+            python -m benchmarks.cell_metrics --ckpt "${ckpt}" --out "${CELL_DIR}/cell_summary.json"
             cat "${CELL_DIR}/cell_summary.json"
           else
             printf '{"error": "no checkpoint produced", "expected_path": "%s"}\n' "${ckpt}" \
@@ -758,75 +699,7 @@ jobs:
         run: |
           ckpt="${CELL_DIR}/${{ matrix.test_set }}.checkpoint.jsonl"
           if [ -f "${ckpt}" ]; then
-            python - <<PY > "${CELL_DIR}/cell_summary.json"
-          import json, statistics, sys
-          rows = []
-          with open("${ckpt}") as f:
-              for line in f:
-                  line = line.strip()
-                  if line:
-                      rows.append(json.loads(line))
-          n = len(rows)
-          if n == 0:
-              print(json.dumps({"n": 0}))
-          else:
-              recall = [r.get("file_recall", 0) for r in rows]
-              precision = [r.get("file_precision", 0) for r in rows]
-              elapsed = [r.get("elapsed_seconds", 0) for r in rows]
-              tokens = [r.get("used_tokens", 0) for r in rows]
-              # fragment_recall / line_f1 are populated only when the dataset
-              # ships gold_fragments (ContextBench, PolyBench when CST nodes
-              # exist); skip nulls so the aggregator gets honest means rather
-              # than zero-padded ones.
-              frag_recall = [r["fragment_recall"] for r in rows if r.get("fragment_recall") is not None]
-              line_f1 = [r["line_f1"] for r in rows if r.get("line_f1") is not None]
-              ok = sum(1 for r in rows if (r.get("extra") or {}).get("status") == "ok")
-              statuses = {}
-              errors = {}
-              for r in rows:
-                  s = (r.get("extra") or {}).get("status", "missing")
-                  statuses[s] = statuses.get(s, 0) + 1
-                  if s not in ("ok",):
-                      err = str((r.get("extra") or {}).get("error", ""))
-                      if err:
-                          errors[err] = errors.get(err, 0) + 1
-              out = {
-                  "n": n,
-                  "ok": ok,
-                  "ok_pct": 100.0 * ok / n if n else 0.0,
-                  "statuses": statuses,
-                  "errors": dict(sorted(errors.items(), key=lambda x: -x[1])[:10]),
-                  "file_recall": {
-                      "mean": statistics.fmean(recall),
-                      "median": statistics.median(recall),
-                      "p25": sorted(recall)[max(0, n*1//4-1)],
-                      "p75": sorted(recall)[min(n-1, n*3//4)],
-                  },
-                  "file_precision": {"mean": statistics.fmean(precision)},
-                  "fragment_recall": (
-                      {"mean": statistics.fmean(frag_recall), "n_with_gold": len(frag_recall)}
-                      if frag_recall else None
-                  ),
-                  "line_f1": (
-                      {"mean": statistics.fmean(line_f1), "n_with_gold": len(line_f1)}
-                      if line_f1 else None
-                  ),
-                  "elapsed_seconds": {
-                      "mean": statistics.fmean(elapsed),
-                      "max": max(elapsed),
-                      "total": sum(elapsed),
-                  },
-                  "used_tokens": {
-                      "mean": statistics.fmean(tokens),
-                      "max": max(tokens),
-                  },
-              }
-              print(json.dumps(out, indent=2))
-              if errors:
-                  print("\n=== ERROR BREAKDOWN ===", file=sys.stderr)
-                  for msg, cnt in sorted(errors.items(), key=lambda x: -x[1]):
-                      print(f"  [{cnt}x] {msg[:200]}", file=sys.stderr)
-          PY
+            python -m benchmarks.cell_metrics --ckpt "${ckpt}" --out "${CELL_DIR}/cell_summary.json"
             cat "${CELL_DIR}/cell_summary.json"
           else
             printf '{"error": "no checkpoint produced", "expected_path": "%s"}\n' "${ckpt}" \

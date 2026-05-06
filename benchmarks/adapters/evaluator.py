@@ -143,11 +143,15 @@ class UniversalEvaluator:
             budget=budget,
             elapsed_seconds=output.elapsed_seconds,
         )
+        result.extra["n_selected"] = len(output.selected_files)
+        result.extra["n_gold"] = len(instance.gold_files)
         if instance.gold_fragments is not None and output.selected_fragments is not None:
             frag_r, frag_p = _fragment_metrics(output.selected_fragments, instance.gold_fragments)
             result.fragment_recall = frag_r
             result.fragment_precision = frag_p
             result.line_f1 = _line_f1(output.selected_fragments, instance.gold_fragments)
+            result.extra["n_selected_fragments"] = len(output.selected_fragments)
+            result.extra["n_gold_fragments"] = len(instance.gold_fragments)
         return result
 
     def aggregate_per_benchmark(self, results: Iterable[EvalResult]) -> dict[str, dict[str, float]]:

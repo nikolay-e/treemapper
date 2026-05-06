@@ -168,6 +168,183 @@ def render_sweep_table(cells: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _cell_metric(cell: dict, getter) -> float | None:
+    s = cell.get("summary") or {}
+    try:
+        return getter(s)
+    except (KeyError, TypeError, AttributeError):
+        return None
+
+
+def render_headline_tables(cells: list[dict]) -> str:
+    """Multi-section headline. F1/F2 + per-language + robustness + tokens/latency p95.
+
+    Each (method, budget, depth) line shows the mean across the three datasets the
+    cell was evaluated against, mirroring the headline format the team uses.
+    """
+    if not cells:
+        return ""
+
+    valid = [c for c in cells if c["method"] and c["budget"] is not None and c["test_set"]]
+    by_cfg: dict[tuple[str, int, int], list[dict]] = defaultdict(list)
+    for c in valid:
+        by_cfg[(c["method"], c["budget"], c.get("depth") or -1)].append(c)
+
+    def mean_of(cells_for_cfg, getter) -> float | None:
+        vals = [v for v in (_cell_metric(c, getter) for c in cells_for_cfg) if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    def fmt(v: float | None, ndigits: int = 4) -> str:
+        return f"{v:.{ndigits}f}" if v is not None else "—"
+
+    sorted_cfgs = sorted(by_cfg.keys(), key=lambda k: (_method_sort_key(k[0]), int(k[1]), int(k[2])))
+
+    out: list[str] = []
+    out.append("\n## Headline by F-beta (mean across datasets)")
+    out.append("")
+    out.append("| method | budget | depth | recall | precision | F0.5 | F1 | F2 | tokens p50 | tokens p95 |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for cfg in sorted_cfgs:
+        cs = by_cfg[cfg]
+        recall = mean_of(cs, lambda s: s["file_recall"]["mean"])
+        prec = mean_of(cs, lambda s: s["file_precision"]["mean"])
+        f1 = mean_of(cs, lambda s: s["file_fbeta"]["f1"]["mean"])
+        f2 = mean_of(cs, lambda s: s["file_fbeta"]["f2"]["mean"])
+        f05 = mean_of(cs, lambda s: s["file_fbeta"]["f0.5"]["mean"])
+        tk_p50 = mean_of(cs, lambda s: s["used_tokens"]["median"])
+        tk_p95 = mean_of(cs, lambda s: s["used_tokens"]["p95"])
+        out.append(
+            f"| **{cfg[0]}** | {cfg[1]} | {cfg[2]} | {fmt(recall)} | {fmt(prec)} | "
+            f"{fmt(f05)} | {fmt(f1)} | {fmt(f2)} | "
+            f"{fmt(tk_p50, 0)} | {fmt(tk_p95, 0)} |"
+        )
+
+    out.append("\n## Robustness — recall distribution (mean across datasets)")
+    out.append("")
+    out.append("| method | budget | depth | %perfect | %zero | %partial | recall std |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|")
+    for cfg in sorted_cfgs:
+        cs = by_cfg[cfg]
+        perfect = mean_of(cs, lambda s: s["file_recall"]["hist"]["perfect_pct"])
+        zero = mean_of(cs, lambda s: s["file_recall"]["hist"]["zero_pct"])
+        partial = mean_of(cs, lambda s: s["file_recall"]["hist"]["partial_pct"])
+        std = mean_of(cs, lambda s: s["file_recall"]["std"])
+        out.append(
+            f"| **{cfg[0]}** | {cfg[1]} | {cfg[2]} | " f"{fmt(perfect, 1)} | {fmt(zero, 1)} | {fmt(partial, 1)} | {fmt(std, 3)} |"
+        )
+
+    out.append("\n## Latency — elapsed_seconds across datasets")
+    out.append("")
+    out.append("| method | budget | depth | mean | p50 | p95 | p99 |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|")
+    for cfg in sorted_cfgs:
+        cs = by_cfg[cfg]
+        mean = mean_of(cs, lambda s: s["elapsed_seconds"]["mean"])
+        p50 = mean_of(cs, lambda s: s["elapsed_seconds"]["median"])
+        p95 = mean_of(cs, lambda s: s["elapsed_seconds"]["p95"])
+        p99 = mean_of(cs, lambda s: s["elapsed_seconds"]["p99"])
+        out.append(f"| **{cfg[0]}** | {cfg[1]} | {cfg[2]} | {fmt(mean, 2)} | {fmt(p50, 2)} | {fmt(p95, 2)} | {fmt(p99, 2)} |")
+
+    cardinality_present = any((c.get("summary") or {}).get("n_selected") for c in valid)
+    fragment_present = any((c.get("summary") or {}).get("fragment_count") for c in valid)
+    if cardinality_present or fragment_present:
+        out.append("\n## Selection cardinality (files / fragments)")
+        out.append("")
+        if cardinality_present:
+            out.append("| method | budget | depth | n_selected p50 | n_selected p95 | n_gold p50 |")
+            out.append("|---|---:|---:|---:|---:|---:|")
+            for cfg in sorted_cfgs:
+                cs = by_cfg[cfg]
+                n_sel_p50 = mean_of(cs, lambda s: s["n_selected"]["median"]) if cardinality_present else None
+                n_sel_p95 = mean_of(cs, lambda s: s["n_selected"]["p95"]) if cardinality_present else None
+                n_gold_p50 = mean_of(cs, lambda s: s["n_gold"]["median"]) if cardinality_present else None
+                out.append(
+                    f"| **{cfg[0]}** | {cfg[1]} | {cfg[2]} | "
+                    f"{fmt(n_sel_p50, 1)} | {fmt(n_sel_p95, 1)} | {fmt(n_gold_p50, 1)} |"
+                )
+        else:
+            out.append("| method | budget | depth | fragment_count p50 | p95 |")
+            out.append("|---|---:|---:|---:|---:|")
+            for cfg in sorted_cfgs:
+                cs = by_cfg[cfg]
+                fc_p50 = mean_of(cs, lambda s: s["fragment_count"]["median"])
+                fc_p95 = mean_of(cs, lambda s: s["fragment_count"]["p95"])
+                out.append(f"| **{cfg[0]}** | {cfg[1]} | {cfg[2]} | {fmt(fc_p50, 1)} | {fmt(fc_p95, 1)} |")
+
+    return "\n".join(out) + "\n"
+
+
+def _aggregate_languages(cells: list[dict]) -> dict[tuple[str, int, int], dict[str, dict[str, float]]]:
+    out: dict[tuple[str, int, int], dict[str, dict[str, float]]] = {}
+    for c in cells:
+        m, b, d = c["method"], c["budget"], c.get("depth") or -1
+        if m is None or b is None:
+            continue
+        cfg = (m, b, d)
+        per_lang = (c.get("summary") or {}).get("by_language") or {}
+        if not per_lang:
+            continue
+        bucket = out.setdefault(cfg, {})
+        for lang, agg in per_lang.items():
+            cur = bucket.setdefault(lang, {"n": 0.0, "recall_sum": 0.0, "precision_sum": 0.0, "f1_sum": 0.0, "f2_sum": 0.0})
+            n = float(agg.get("n", 0))
+            cur["n"] += n
+            cur["recall_sum"] += float(agg.get("file_recall", 0.0)) * n
+            cur["precision_sum"] += float(agg.get("file_precision", 0.0)) * n
+            cur["f1_sum"] += float(agg.get("f1", 0.0)) * n
+            cur["f2_sum"] += float(agg.get("f2", 0.0)) * n
+    finalized: dict[tuple[str, int, int], dict[str, dict[str, float]]] = {}
+    for cfg, langs in out.items():
+        finalized[cfg] = {
+            lang: {
+                "n": v["n"],
+                "file_recall": v["recall_sum"] / v["n"] if v["n"] else 0.0,
+                "file_precision": v["precision_sum"] / v["n"] if v["n"] else 0.0,
+                "f1": v["f1_sum"] / v["n"] if v["n"] else 0.0,
+                "f2": v["f2_sum"] / v["n"] if v["n"] else 0.0,
+            }
+            for lang, v in langs.items()
+        }
+    return finalized
+
+
+def render_per_language_tables(cells: list[dict], top_n: int = 7) -> str:
+    """Per-language breakdown for each (method, budget, depth) configuration.
+
+    Picks the top-N languages by total instance count across all configurations,
+    then prints a recall/F1/F2 row per (method, budget, depth) for each.
+    """
+    per_cfg = _aggregate_languages(cells)
+    if not per_cfg:
+        return ""
+
+    lang_counts: dict[str, float] = defaultdict(float)
+    for langs in per_cfg.values():
+        for lang, agg in langs.items():
+            lang_counts[lang] += agg["n"]
+    top_langs = [lang for lang, _ in sorted(lang_counts.items(), key=lambda x: -x[1])[:top_n]]
+
+    cfgs = sorted(per_cfg.keys(), key=lambda k: (_method_sort_key(k[0]), int(k[1]), int(k[2])))
+
+    out: list[str] = ["\n## Per-language headline (top languages by instance count)"]
+    out.append("")
+    out.append("Each cell shows `recall / F1 / F2` for that (method, budget, depth) on that language.")
+    out.append("")
+    out.append("| config | " + " | ".join(top_langs) + " |")
+    out.append("|---|" + "---|" * len(top_langs))
+    for cfg in cfgs:
+        langs = per_cfg[cfg]
+        cells_md: list[str] = [f"**{cfg[0]}** b={cfg[1]} L={cfg[2]}"]
+        for lang in top_langs:
+            agg = langs.get(lang)
+            if not agg or agg["n"] == 0:
+                cells_md.append("—")
+                continue
+            cells_md.append(f"{agg['file_recall']:.3f} / {agg['f1']:.3f} / {agg['f2']:.3f}")
+        out.append("| " + " | ".join(cells_md) + " |")
+    return "\n".join(out) + "\n"
+
+
 def write_csv(cells: list[dict], path: Path) -> None:
     fields = [
         "method",
@@ -178,11 +355,32 @@ def write_csv(cells: list[dict], path: Path) -> None:
         "n_ok",
         "mean_file_recall",
         "mean_file_precision",
+        "mean_file_f1",
+        "mean_file_f2",
+        "mean_file_f0_5",
         "mean_fragment_recall",
+        "mean_fragment_precision",
+        "mean_fragment_f1",
         "mean_line_f1",
+        "mean_line_f1_given_file_hit",
         "n_with_fragment_gold",
+        "recall_perfect_pct",
+        "recall_zero_pct",
+        "recall_partial_pct",
+        "recall_std",
+        "n_selected_p50",
+        "n_selected_p95",
+        "n_gold_p50",
+        "fragment_count_p50",
+        "fragment_count_p95",
         "mean_used_tokens",
+        "tokens_p50",
+        "tokens_p95",
+        "tokens_p99",
         "mean_elapsed_seconds",
+        "elapsed_p50",
+        "elapsed_p95",
+        "elapsed_p99",
         "git_sha",
         "started_at_utc",
     ]
@@ -191,8 +389,20 @@ def write_csv(cells: list[dict], path: Path) -> None:
         w.writeheader()
         for c in cells:
             s = c["summary"]
+            file_recall = s.get("file_recall") or {}
+            file_prec = s.get("file_precision") or {}
+            fbeta = s.get("file_fbeta") or {}
             frag_block = s.get("fragment_recall") or {}
+            frag_prec_block = s.get("fragment_precision") or {}
+            frag_fbeta = s.get("fragment_fbeta") or {}
             line_block = s.get("line_f1") or {}
+            line_cond = (line_block.get("conditional_on_file_hit") or {}) if line_block else {}
+            tokens = s.get("used_tokens") or {}
+            elapsed = s.get("elapsed_seconds") or {}
+            rec_hist = file_recall.get("hist") or {}
+            n_selected = s.get("n_selected") or {}
+            n_gold = s.get("n_gold") or {}
+            frag_count = s.get("fragment_count") or {}
             row = {
                 "method": c["method"],
                 "budget": c["budget"],
@@ -200,13 +410,34 @@ def write_csv(cells: list[dict], path: Path) -> None:
                 "test_set": c["test_set"],
                 "n_instances": s.get("n", c["n_instances"]),
                 "n_ok": s.get("ok", 0),
-                "mean_file_recall": (s.get("file_recall") or {}).get("mean"),
-                "mean_file_precision": (s.get("file_precision") or {}).get("mean"),
+                "mean_file_recall": file_recall.get("mean"),
+                "mean_file_precision": file_prec.get("mean"),
+                "mean_file_f1": (fbeta.get("f1") or {}).get("mean"),
+                "mean_file_f2": (fbeta.get("f2") or {}).get("mean"),
+                "mean_file_f0_5": (fbeta.get("f0.5") or {}).get("mean"),
                 "mean_fragment_recall": frag_block.get("mean"),
+                "mean_fragment_precision": frag_prec_block.get("mean"),
+                "mean_fragment_f1": (frag_fbeta.get("f1") or {}).get("mean") if frag_fbeta else None,
                 "mean_line_f1": line_block.get("mean"),
+                "mean_line_f1_given_file_hit": line_cond.get("mean"),
                 "n_with_fragment_gold": frag_block.get("n_with_gold"),
-                "mean_used_tokens": (s.get("used_tokens") or {}).get("mean"),
-                "mean_elapsed_seconds": (s.get("elapsed_seconds") or {}).get("mean"),
+                "recall_perfect_pct": rec_hist.get("perfect_pct"),
+                "recall_zero_pct": rec_hist.get("zero_pct"),
+                "recall_partial_pct": rec_hist.get("partial_pct"),
+                "recall_std": file_recall.get("std"),
+                "n_selected_p50": n_selected.get("median"),
+                "n_selected_p95": n_selected.get("p95"),
+                "n_gold_p50": n_gold.get("median"),
+                "fragment_count_p50": frag_count.get("median"),
+                "fragment_count_p95": frag_count.get("p95"),
+                "mean_used_tokens": tokens.get("mean"),
+                "tokens_p50": tokens.get("median"),
+                "tokens_p95": tokens.get("p95"),
+                "tokens_p99": tokens.get("p99"),
+                "mean_elapsed_seconds": elapsed.get("mean"),
+                "elapsed_p50": elapsed.get("median"),
+                "elapsed_p95": elapsed.get("p95"),
+                "elapsed_p99": elapsed.get("p99"),
                 "git_sha": (c["metadata"].get("git") or {}).get("sha"),
                 "started_at_utc": c["metadata"].get("started_at_utc"),
             }
@@ -239,7 +470,8 @@ def main() -> int:
         ],
     }
     (args.out / "grand_summary.json").write_text(json.dumps(grand, indent=2, default=str))
-    (args.out / "SWEEP_TABLE.md").write_text(render_sweep_table(cells))
+    sweep_md = render_sweep_table(cells) + render_headline_tables(cells) + render_per_language_tables(cells)
+    (args.out / "SWEEP_TABLE.md").write_text(sweep_md)
     write_csv(cells, args.out / "cell_index.csv")
     print(f"Wrote: {args.out / 'grand_summary.json'}")
     print(f"Wrote: {args.out / 'SWEEP_TABLE.md'}")
