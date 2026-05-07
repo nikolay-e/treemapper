@@ -23,20 +23,35 @@ from pathlib import Path
 
 _F_BETAS: tuple[float, ...] = (0.5, 1.0, 2.0)
 
+# Half-open buckets `[lo, hi)`. Values landing exactly on a boundary go to
+# the *higher* bucket (e.g. ratio==1.5 → "1.5-2.0"). Use `bucket_match()` —
+# the bucket constants below are the single source of truth, mirrored by
+# `stratified_analysis._RATIO_BUCKETS / _GOLD_BUCKETS` (which import these).
 _GOLD_BUCKETS: tuple[tuple[str, int, int | None], ...] = (
-    ("1", 1, 1),
-    ("2-3", 2, 3),
-    ("4-7", 4, 7),
-    ("8-15", 8, 15),
+    ("1", 1, 2),
+    ("2-3", 2, 4),
+    ("4-7", 4, 8),
+    ("8-15", 8, 16),
     ("16+", 16, None),
 )
 _RATIO_BUCKETS: tuple[tuple[str, float, float | None], ...] = (
-    ("≤1.0", 0.0, 1.0),
-    ("1.0-1.5", 1.0, 1.5),
-    ("1.5-2.0", 1.5, 2.0),
-    ("2.0-3.0", 2.0, 3.0),
-    ("3.0+", 3.0, None),
+    ("≤1.0", 0.0, 1.0 + 1e-9),  # [0, 1.0] — gold==diff is "trivial"
+    ("1.0-1.5", 1.0 + 1e-9, 1.5 + 1e-9),
+    ("1.5-2.0", 1.5 + 1e-9, 2.0 + 1e-9),
+    ("2.0-3.0", 2.0 + 1e-9, 3.0 + 1e-9),
+    ("3.0+", 3.0 + 1e-9, None),
 )
+
+
+def bucket_match(value: float, lo: float, hi: float | None) -> bool:
+    """Half-open membership test: `lo <= value < hi`. Open right when hi is None."""
+    if value < lo:
+        return False
+    if hi is None:
+        return True
+    return value < hi
+
+
 _LATENCY_BREAKDOWN_FIELDS: tuple[str, ...] = (
     "parse_changed_ms",
     "universe_walk_ms",
@@ -175,9 +190,7 @@ def _stratified_recall(rows: Sequence[dict], key_extractor) -> dict[str, dict[st
             val = key_extractor(r)
             if val is None:
                 continue
-            if val < lo:
-                continue
-            if hi is not None and val > hi:
+            if not bucket_match(float(val), float(lo), None if hi is None else float(hi)):
                 continue
             bucket_rows.append(r)
         if not bucket_rows:
@@ -204,10 +217,7 @@ def _stratified_recall_by_ratio(rows: Sequence[dict]) -> dict[str, dict[str, flo
             val = (r.get("extra") or {}).get("gold_to_changed_ratio")
             if val is None:
                 continue
-            v = float(val)
-            if v < lo:
-                continue
-            if hi is not None and v > hi:
+            if not bucket_match(float(val), lo, hi):
                 continue
             bucket_rows.append(r)
         if not bucket_rows:
