@@ -278,8 +278,8 @@ def test_unicode_content_and_encoding_errors(temp_project, run_mapper, caplog):
     assert binary_node is not None, "'binary.bin' not found"
     binary_content = binary_node.get("content", "")
     assert isinstance(binary_content, str)
-    assert binary_content.startswith("<unreadable content") or binary_content.startswith(
-        "<binary file:"
+    assert binary_content.startswith(
+        ("<unreadable content", "<binary file:")
     ), f"Binary file should be marked unreadable or binary, got: {binary_content!r}"
 
 

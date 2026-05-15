@@ -361,10 +361,10 @@ def _write_to_file_path(output_file: Path, writer: Callable[[TextIO], None]) -> 
     try:
         fd_int, tmp_path = tempfile.mkstemp(dir=output_file.parent, suffix=".tmp")
     except PermissionError:
-        logger.error("Unable to write to file '%s': permission denied", output_file)
+        logger.exception("Unable to write to file '%s': permission denied", output_file)
         raise
-    except OSError as e:
-        logger.error("Unable to write to file '%s': %s", output_file, e)
+    except OSError:
+        logger.exception("Unable to write to file '%s'", output_file)
         raise
     try:
         with open(fd_int, "w", encoding="utf-8") as f:
@@ -374,11 +374,11 @@ def _write_to_file_path(output_file: Path, writer: Callable[[TextIO], None]) -> 
         os.replace(tmp_path, output_file)
     except PermissionError:
         Path(tmp_path).unlink(missing_ok=True)
-        logger.error("Unable to write to file '%s': permission denied", output_file)
+        logger.exception("Unable to write to file '%s': permission denied", output_file)
         raise
-    except OSError as e:
+    except OSError:
         Path(tmp_path).unlink(missing_ok=True)
-        logger.error("Unable to write to file '%s': %s", output_file, e)
+        logger.exception("Unable to write to file '%s'", output_file)
         raise
     except BaseException:
         Path(tmp_path).unlink(missing_ok=True)

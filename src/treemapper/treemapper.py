@@ -40,8 +40,8 @@ def _build_diff_tree(args: ParsedArgs) -> dict[str, Any]:
             whitelist_file=args.whitelist_file,
             scoring_mode=getattr(args, "scoring", "ego"),
         )
-    except RuntimeError as e:
-        logger.error("%s", e)
+    except RuntimeError:
+        logger.exception("diff context build failed")
         sys.exit(1)
 
 
@@ -130,8 +130,8 @@ def _handle_clipboard(output_content: str, args: ParsedArgs) -> bool:
         if not args.quiet:
             print("Copied to clipboard", file=sys.stderr)
         return True
-    except ClipboardError as e:
-        logger.error("Clipboard unavailable: %s", e)
+    except ClipboardError:
+        logger.exception("Clipboard unavailable")
         return False
 
 
@@ -147,8 +147,8 @@ def _handle_output_file(output_content: str, args: ParsedArgs) -> None:
     except IsADirectoryError:
         logger.error("'%s' is a directory", args.output_file)
         sys.exit(1)
-    except OSError as e:
-        logger.error("Cannot write '%s': %s", args.output_file, e)
+    except OSError:
+        logger.exception("Cannot write '%s'", args.output_file)
         sys.exit(1)
 
 

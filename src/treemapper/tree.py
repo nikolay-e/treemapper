@@ -190,8 +190,8 @@ def _create_node(entry: Path, ctx: TreeBuildContext, current_depth: int, is_dir:
             node["content"] = _read_file_content(entry, ctx.max_file_bytes)
 
         return node
-    except OSError as e:
-        logger.error("Failed to create node for %s: %s", entry.name, e)
+    except OSError:
+        logger.exception("Failed to create node for %s", entry.name)
         return None
 
 
@@ -274,6 +274,6 @@ def _read_file_content(file_path: Path, max_file_bytes: int | None) -> str:
     except UnicodeDecodeError:
         logger.error("Cannot decode %s as UTF-8. Marking as unreadable.", file_path.name)
         return "<unreadable content: not utf-8>\n"
-    except OSError as e:
-        logger.error("Could not read %s: %s", file_path.name, e)
+    except OSError:
+        logger.exception("Could not read %s", file_path.name)
         return "<unreadable content>\n"
