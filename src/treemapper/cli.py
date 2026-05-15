@@ -11,7 +11,7 @@ from .version import __version__
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
+DEFAULT_MAX_FILE_BYTES = 256 * 1024  # 256 KB
 _DEFAULT_ALPHA = 0.60
 _DEFAULT_TAU = 0.08
 
@@ -314,7 +314,7 @@ def _build_main_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_MAX_FILE_BYTES,
         metavar="N",
-        help=f"Skip files larger than N bytes (default: {DEFAULT_MAX_FILE_BYTES // 1024 // 1024} MB)",
+        help=f"Truncate per-file content at N bytes (default: {DEFAULT_MAX_FILE_BYTES // 1024} KB). Use --no-file-size-limit to disable.",
     )
     parser.add_argument(
         "--no-file-size-limit",

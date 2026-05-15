@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from _diffctx import build_project_graph as _rust_build_project_graph
+from treemapper._diffctx import build_project_graph as _rust_build_project_graph
 
 ProjectGraph = Any  # opaque PyProjectGraph from the Rust extension
 

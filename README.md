@@ -51,8 +51,6 @@ pip install 'treemapper[mcp]'             # + MCP server for AI assistants
 
 ## Diff Context Mode
 
-**Paper:** [Context-Selection for Git Diff (Zenodo, 2026)](https://doi.org/10.5281/zenodo.18824580)
-
 Automatically finds the minimal set of code fragments needed to understand
 a change — imports, callers, type definitions, config dependencies — without
 dumping entire files. Understands 50+ file types.
@@ -83,6 +81,8 @@ below threshold τ, or at an explicit `--budget` token limit.
 | `--full`   | false   | Include all changed code, skip selection |
 | `--alpha`  | 0.60    | PPR damping factor                       |
 | `--tau`    | 0.08    | Convergence threshold                    |
+
+_Theory: [Context-Selection for Git Diff (Zenodo, 2026)](https://doi.org/10.5281/zenodo.18824580)._
 
 ## Usage
 

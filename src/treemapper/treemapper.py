@@ -50,6 +50,23 @@ def _root_display_name(root_dir: Any) -> str:
     return name if name else str(root_dir)
 
 
+_LARGE_OUTPUT_WARN_BYTES = 10 * 1024 * 1024
+
+
+def _warn_if_output_oversized(output_content: str, args: ParsedArgs) -> None:
+    if args.no_content or args.diff_range:
+        return
+    size_bytes = len(output_content.encode("utf-8"))
+    if size_bytes < _LARGE_OUTPUT_WARN_BYTES:
+        return
+    mb = size_bytes / (1024 * 1024)
+    print(
+        f"Warning: output is {mb:.1f} MB. For large repos try --no-content (structure only) "
+        f"or --diff RANGE (relevance-ranked context).",
+        file=sys.stderr,
+    )
+
+
 def _build_file_node(file_path: Path, base_dir: Path, no_content: bool, max_file_bytes: int | None) -> dict[str, Any]:
     from .tree import _read_file_content
 
@@ -248,6 +265,7 @@ def _run() -> None:
     output_content = tree_to_string(directory_tree, args.output_format)
     if not args.quiet:
         print_token_summary(output_content)
+        _warn_if_output_oversized(output_content, args)
 
     clipboard_ok = _handle_clipboard(output_content, args)
     _handle_output_file(output_content, args)

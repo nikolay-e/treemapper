@@ -220,7 +220,7 @@ def test_no_file_size_limit_includes_all(run_mapper, temp_project):
 def test_default_max_file_bytes_limit(temp_project):
     from treemapper.cli import DEFAULT_MAX_FILE_BYTES
 
-    assert DEFAULT_MAX_FILE_BYTES == 10 * 1024 * 1024
+    assert DEFAULT_MAX_FILE_BYTES == 256 * 1024
 
 
 def test_known_binary_extension_detected(run_mapper, temp_project):

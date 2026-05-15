@@ -11,7 +11,7 @@ from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
 
-from _diffctx import get_language_for_file
+from treemapper._diffctx import get_language_for_file
 
 logger = logging.getLogger(__name__)
 

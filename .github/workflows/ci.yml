@@ -122,10 +122,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.python-version == '3.14' }}
     permissions:
       contents: read
 
@@ -156,29 +155,25 @@ jobs:
           key: cargo-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('diffctx/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-py${{ matrix.python-version }}-
 
-      - name: Install Dependencies
+      - name: Install Python dev tools
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,full]"
-          pip install "maturin>=1,<2"
+          pip install "maturin>=1.10,<1.11"
 
-      - name: Build and install diffctx Rust extension
+      - name: Build and install treemapper (with Rust _diffctx)
         shell: bash
         env:
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
         run: |
-          cd diffctx
-          maturin build --release --out wheelhouse
-          pip install --force-reinstall --no-deps wheelhouse/*.whl
+          # maturin develop builds the Rust extension and installs the project editable.
+          # Use --extras for dev/tree-sitter so tests have all deps available.
+          maturin develop --release --extras dev,full
 
       - name: Run Tests with Coverage
         shell: bash
         run: |
           pytest -v --cov=src/treemapper --cov-report=xml \
-            --cov-report=term-missing --cov-branch --junitxml=test-results.xml \
-            --ignore=tests/test_graph.py \
-            --ignore=tests/test_graph_cli.py \
-            --ignore=tests/test_graph_export.py
+            --cov-report=term-missing --cov-branch --junitxml=test-results.xml
 
       - name: Coverage report with threshold
         run: |

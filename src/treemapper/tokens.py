@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 
-from _diffctx import count_tokens as _rust_count_tokens
+from treemapper._diffctx import count_tokens as _rust_count_tokens
 
 
 @dataclass

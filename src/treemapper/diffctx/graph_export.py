@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from _diffctx import (
+from treemapper._diffctx import (
     graph_summary as _rust_graph_summary,
 )
-from _diffctx import (
+from treemapper._diffctx import (
     graph_to_graphml_string as _rust_graph_to_graphml_string,
 )
-from _diffctx import (
+from treemapper._diffctx import (
     graph_to_json_string as _rust_graph_to_json_string,
 )
 
