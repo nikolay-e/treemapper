@@ -83,20 +83,17 @@ def _safe_div(num: float, denom: float) -> float:
 
 
 def _percentile(sorted_values: Sequence[float], q: float) -> float:
-    if not sorted_values:
+    n = len(sorted_values)
+    if n == 0:
         return 0.0
-    # Clamp out-of-range quantiles to the endpoints. The two branches below
-    # cover the boundary tails; the interior path is the only one that runs
-    # when 0 < q < 1 — keep them as independent guards (Sonar flow analysis
-    # mistakenly flags the upper guard as always-true after the lower guard
-    # exits; both are independent quantile-clamp conditions).
-    clamped_low = q <= 0
-    clamped_high = q >= 1
-    if clamped_low:
+    # Clamp q to [0, 1] explicitly so the boundary returns below are
+    # always reachable and Sonar's S2583 flow analysis doesn't fire.
+    clamped_q = max(0.0, min(1.0, q))
+    if clamped_q == 0.0:
         return float(sorted_values[0])
-    if clamped_high:
+    if clamped_q == 1.0:
         return float(sorted_values[-1])
-    pos = q * (len(sorted_values) - 1)
+    pos = clamped_q * (n - 1)
     lo = math.floor(pos)
     hi = math.ceil(pos)
     if lo == hi:
