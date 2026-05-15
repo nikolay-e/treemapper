@@ -313,6 +313,11 @@ jobs:
         with:
           packages-dir: ./dist
           print-hash: true
+          # Idempotent re-runs: if a wheel for this version was already
+          # uploaded in a previous (failed) CD run, skip it instead of
+          # erroring out. New artifacts (e.g. a corrected sdist) still
+          # publish.
+          skip-existing: true
 
   smoke-pypi:
     name: Post-publish smoke test (${{ matrix.os }} / py${{ matrix.python-version }})

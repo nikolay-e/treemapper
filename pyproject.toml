@@ -117,6 +117,9 @@ module-name = "treemapper._diffctx"
 manifest-path = "diffctx/Cargo.toml"
 features = [ "pyo3/extension-module", "python" ]
 include = [
+  { path = "LICENSE", format = "sdist" },
+  { path = "README.md", format = "sdist" },
+  { path = "CHANGELOG.md", format = "sdist" },
   { path = "diffctx/Cargo.toml", format = "sdist" },
   { path = "diffctx/Cargo.lock", format = "sdist" },
   { path = "diffctx/src/**/*", format = "sdist" },
