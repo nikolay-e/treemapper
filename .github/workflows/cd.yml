@@ -177,10 +177,9 @@ jobs:
             target: aarch64-unknown-linux-gnu
             maturin_target: aarch64
             manylinux: '2_28'
-          - runner: macos-13
-            target: x86_64-apple-darwin
-            maturin_target: x86_64
-            manylinux: 'off'
+          # NOTE: macos-13 (Intel) runner pool has multi-hour queue times on
+          # public projects. Apple Silicon (macos-14) wheel covers all modern
+          # Macs; Intel-Mac users can fall back to the sdist or Rosetta.
           - runner: macos-14
             target: aarch64-apple-darwin
             maturin_target: aarch64
