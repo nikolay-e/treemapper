@@ -86,13 +86,10 @@ def _percentile(sorted_values: Sequence[float], q: float) -> float:
     n = len(sorted_values)
     if n == 0:
         return 0.0
-    # Clamp q to [0, 1] explicitly so the boundary returns below are
-    # always reachable and Sonar's S2583 flow analysis doesn't fire.
+    # Clamp q to [0, 1]; the interpolation below naturally returns the
+    # first / last element when clamped_q is at the boundary (pos becomes
+    # 0 or n-1, so lo == hi and we short-circuit to sorted_values[lo]).
     clamped_q = max(0.0, min(1.0, q))
-    if clamped_q == 0.0:
-        return float(sorted_values[0])
-    if clamped_q == 1.0:
-        return float(sorted_values[-1])
     pos = clamped_q * (n - 1)
     lo = math.floor(pos)
     hi = math.ceil(pos)
