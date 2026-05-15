@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
@@ -582,7 +583,7 @@ def render_pooled_per_bucket_table(rows: list[dict], buckets: Sequence[str], tit
 
 def _fmt_p(p: float) -> str:
     """Render a probability for the markdown table; tiny values clamp to `<1e-10`."""
-    if p != p:  # NaN
+    if math.isnan(p):
         return "n/a"
     if p < 1e-10:
         return "<1e-10"
