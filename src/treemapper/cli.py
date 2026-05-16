@@ -16,6 +16,15 @@ _DEFAULT_ALPHA = 0.60
 _DEFAULT_TAU = 0.08
 
 
+class _Unset:
+    def __repr__(self) -> str:
+        return "<unset>"
+
+
+_UNSET: _Unset = _Unset()
+_DIFF_SENTINEL = "__TREEMAPPER_DIFF_BARE__"
+
+
 def _exit_error(message: str) -> NoReturn:
     print(f"Error: {message}", file=sys.stderr)
     sys.exit(1)
@@ -326,39 +335,43 @@ def _build_main_parser() -> argparse.ArgumentParser:
     diff_group.add_argument(
         "--diff",
         dest="diff_range",
+        nargs="?",
+        const=_DIFF_SENTINEL,
+        default=None,
         metavar="RANGE",
-        help="Git diff range (e.g., HEAD~1..HEAD, main..feature)",
+        help="Git diff range (e.g., HEAD~1..HEAD, main..feature). Bare --diff defaults to HEAD.",
     )
     diff_group.add_argument(
         "--budget",
         type=int,
-        default=None,
+        default=_UNSET,
         metavar="N",
         help="Token budget: 0=auto (default), -1=unlimited, N=fixed budget",
     )
     diff_group.add_argument(
         "--alpha",
         type=float,
-        default=_DEFAULT_ALPHA,
+        default=_UNSET,
         metavar="F",
         help="How tightly context clusters around changes, 0-1 (default: 0.60, higher = more focused)",
     )
     diff_group.add_argument(
         "--tau",
         type=float,
-        default=_DEFAULT_TAU,
+        default=_UNSET,
         metavar="F",
         help="Minimum relevance to include a fragment (default: 0.08, lower = more context)",
     )
     diff_group.add_argument(
         "--scoring",
         choices=["ppr", "ego", "bm25"],
-        default="ego",
+        default=_UNSET,
         help="Scoring mode: ego (bounded ego-network expansion, default), ppr (Personalized PageRank), bm25 (lexical fragment retrieval)",
     )
     diff_group.add_argument(
         "--full",
         action="store_true",
+        default=False,
         help="Include all changed code (skip smart selection algorithm)",
     )
     return parser
@@ -368,15 +381,15 @@ def _warn_diff_only_flags(args: argparse.Namespace) -> None:
     if args.diff_range:
         return
     used = []
-    if args.budget is not None:
+    if args.budget is not _UNSET:
         used.append("--budget")
-    if abs(args.alpha - _DEFAULT_ALPHA) > 1e-9:
+    if args.alpha is not _UNSET:
         used.append("--alpha")
-    if abs(args.tau - _DEFAULT_TAU) > 1e-9:
+    if args.tau is not _UNSET:
         used.append("--tau")
     if args.full:
         used.append("--full")
-    if args.scoring != "ego":
+    if args.scoring is not _UNSET:
         used.append("--scoring")
     if used:
         flags = ", ".join(used)
@@ -416,10 +429,20 @@ def _build_graph_parsed_args(args: argparse.Namespace) -> ParsedArgs:
 def _build_tree_parsed_args(args: argparse.Namespace) -> ParsedArgs:
     _validate_max_depth(args.max_depth)
     max_file_bytes = _validate_max_file_bytes(args.max_file_bytes, args.no_file_size_limit)
-    _validate_budget(args.budget)
-    _validate_alpha(args.alpha)
-    _validate_tau(args.tau)
+
+    budget = None if args.budget is _UNSET else args.budget
+    alpha = _DEFAULT_ALPHA if args.alpha is _UNSET else args.alpha
+    tau = _DEFAULT_TAU if args.tau is _UNSET else args.tau
+    scoring = "ego" if args.scoring is _UNSET else args.scoring
+
+    _validate_budget(budget)
+    _validate_alpha(alpha)
+    _validate_tau(tau)
     _warn_diff_only_flags(args)
+
+    diff_range = args.diff_range
+    if diff_range == _DIFF_SENTINEL:
+        diff_range = "HEAD"
 
     dirs, files = _expand_paths(args.paths)
     root_dir = dirs[0] if dirs else Path(".").resolve()
@@ -446,11 +469,11 @@ def _build_tree_parsed_args(args: argparse.Namespace) -> ParsedArgs:
         copy=args.copy,
         force_stdout=force_stdout,
         quiet=args.quiet,
-        diff_range=args.diff_range,
-        budget=args.budget,
-        alpha=args.alpha,
-        tau=args.tau,
-        scoring=args.scoring,
+        diff_range=diff_range,
+        budget=budget,
+        alpha=alpha,
+        tau=tau,
+        scoring=scoring,
         full_diff=args.full,
         extra_dirs=extra_dirs,
         extra_files=extra_files,

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import argparse
 import logging
+import subprocess
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -9,6 +11,12 @@ if TYPE_CHECKING:
     from .cli import ParsedArgs
 
 logger = logging.getLogger(__name__)
+
+_EXIT_RUNTIME = 1
+_EXIT_USAGE = 2
+_EXIT_ENVIRONMENT = 3
+_EXIT_INTERRUPTED = 130
+_EXIT_BROKEN_PIPE = 141
 
 
 def _configure_windows_utf8() -> None:
@@ -21,28 +29,70 @@ def _configure_windows_utf8() -> None:
         pass
 
 
+def _ensure_git_repo(root_dir: Path) -> None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=str(root_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except (OSError, FileNotFoundError) as exc:
+        print(
+            f"treemapper: --diff requires git to be installed and on PATH ({exc}); " "install git or run without --diff.",
+            file=sys.stderr,
+        )
+        sys.exit(_EXIT_ENVIRONMENT)
+    if result.returncode != 0:
+        print(
+            f"treemapper: --diff requires a git repository (cwd: {root_dir}); "
+            "run inside a working tree or pass --diff <range> with a valid git context.",
+            file=sys.stderr,
+        )
+        sys.exit(_EXIT_ENVIRONMENT)
+
+
+def _diff_result_is_empty(result: dict[str, Any]) -> bool:
+    count = result.get("fragment_count")
+    if isinstance(count, int):
+        return count == 0
+    fragments = result.get("fragments")
+    if isinstance(fragments, list):
+        return len(fragments) == 0
+    return False
+
+
+def _warn_empty_diff_result(result: dict[str, Any]) -> None:
+    if _diff_result_is_empty(result):
+        print(
+            "treemapper: diff produced no semantic context "
+            "(pure deletion, binary-only, or all files exceeded size cap); output empty.",
+            file=sys.stderr,
+        )
+
+
 def _build_diff_tree(args: ParsedArgs) -> dict[str, Any]:
     from .diffctx import build_diff_context
 
     if not args.diff_range:
         raise RuntimeError("diff_range is required in diff mode")
-    try:
-        return build_diff_context(
-            root_dir=args.root_dir,
-            diff_range=args.diff_range,
-            budget_tokens=args.budget,
-            alpha=args.alpha,
-            tau=args.tau,
-            no_content=args.no_content,
-            ignore_file=args.ignore_file,
-            no_default_ignores=args.no_default_ignores,
-            full=args.full_diff,
-            whitelist_file=args.whitelist_file,
-            scoring_mode=getattr(args, "scoring", "ego"),
-        )
-    except RuntimeError:
-        logger.exception("diff context build failed")
-        sys.exit(1)
+    _ensure_git_repo(args.root_dir)
+    result = build_diff_context(
+        root_dir=args.root_dir,
+        diff_range=args.diff_range,
+        budget_tokens=args.budget,
+        alpha=args.alpha,
+        tau=args.tau,
+        no_content=args.no_content,
+        ignore_file=args.ignore_file,
+        no_default_ignores=args.no_default_ignores,
+        full=args.full_diff,
+        whitelist_file=args.whitelist_file,
+        scoring_mode=getattr(args, "scoring", "ego"),
+    )
+    _warn_empty_diff_result(result)
+    return result
 
 
 def _root_display_name(root_dir: Any) -> str:
@@ -277,15 +327,51 @@ def _run() -> None:
         write_string_to_file(output_content, None, args.output_format)
 
 
+_KNOWN_RUNTIME_ERRORS: tuple[type[BaseException], ...] = (
+    FileNotFoundError,
+    IsADirectoryError,
+    NotADirectoryError,
+    PermissionError,
+    RuntimeError,
+)
+
+
+def _format_runtime_error(exc: BaseException) -> str:
+    msg = str(exc).strip()
+    return msg if msg else exc.__class__.__name__
+
+
+def _handle_unexpected_exception(exc: BaseException) -> int:
+    logger.debug("internal error", exc_info=exc)
+    print(
+        f"treemapper: internal error: {exc.__class__.__name__}: {_format_runtime_error(exc)}",
+        file=sys.stderr,
+    )
+    return _EXIT_RUNTIME
+
+
 def main() -> None:
     _configure_windows_utf8()
     try:
         _run()
+    except SystemExit:
+        raise
     except KeyboardInterrupt:
         print("\nInterrupted", file=sys.stderr)
-        sys.exit(130)
+        sys.exit(_EXIT_INTERRUPTED)
     except BrokenPipeError:
-        sys.exit(141)
+        sys.exit(_EXIT_BROKEN_PIPE)
+    except argparse.ArgumentError as exc:
+        print(f"treemapper: usage error: {_format_runtime_error(exc)}", file=sys.stderr)
+        sys.exit(_EXIT_USAGE)
+    except _KNOWN_RUNTIME_ERRORS as exc:
+        print(f"treemapper: {_format_runtime_error(exc)}", file=sys.stderr)
+        sys.exit(_EXIT_RUNTIME)
+    except OSError as exc:
+        print(f"treemapper: {_format_runtime_error(exc)}", file=sys.stderr)
+        sys.exit(_EXIT_RUNTIME)
+    except Exception as exc:
+        sys.exit(_handle_unexpected_exception(exc))
 
 
 if __name__ == "__main__":
