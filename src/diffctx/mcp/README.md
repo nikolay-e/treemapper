@@ -1,9 +1,9 @@
-# TreeMapper MCP Server
+# diffctx MCP Server
 
 ## Installation
 
 ```bash
-pip install treemapper[mcp]
+pip install diffctx[mcp]
 ```
 
 ## Client Configuration
@@ -15,8 +15,8 @@ Add to `~/.claude/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "treemapper": {
-      "command": "treemapper-mcp"
+    "diffctx": {
+      "command": "diffctx-mcp"
     }
   }
 }
@@ -29,8 +29,8 @@ Add to `~/.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "treemapper": {
-      "command": "treemapper-mcp"
+    "diffctx": {
+      "command": "diffctx-mcp"
     }
   }
 }
@@ -47,7 +47,7 @@ Add to `~/.continue/config.json`:
       {
         "transport": {
           "type": "stdio",
-          "command": "treemapper-mcp"
+          "command": "diffctx-mcp"
         }
       }
     ]
@@ -62,8 +62,8 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 ```json
 {
   "mcpServers": {
-    "treemapper": {
-      "command": "treemapper-mcp"
+    "diffctx": {
+      "command": "diffctx-mcp"
     }
   }
 }
@@ -76,9 +76,9 @@ Add to `~/.config/zed/settings.json`:
 ```json
 {
   "context_servers": {
-    "treemapper": {
+    "diffctx": {
       "command": {
-        "path": "treemapper-mcp"
+        "path": "diffctx-mcp"
       }
     }
   }
@@ -87,7 +87,7 @@ Add to `~/.config/zed/settings.json`:
 
 ## Environment Variables
 
-- `TREEMAPPER_ALLOWED_PATHS` — colon-separated list of directories the server is
+- `DIFFCTX_ALLOWED_PATHS` — colon-separated list of directories the server is
   allowed to access. When set, requests for repositories outside these paths are
   rejected.
 

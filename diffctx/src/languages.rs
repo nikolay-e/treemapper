@@ -181,7 +181,7 @@ pub static FILENAME_TO_LANGUAGE: Lazy<FxHashMap<&'static str, &'static str>> = L
         (".gitattributes", "gitattributes"),
         (".gitignore", "gitignore"),
         (".dockerignore", "gitignore"),
-        (".treemapperignore", "gitignore"),
+        (".diffctxignore", "gitignore"),
         (".npmrc", "ini"),
         (".yarnrc", "yaml"),
         (".prettierrc", "json"),

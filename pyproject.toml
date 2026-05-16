@@ -4,7 +4,7 @@ build-backend = "maturin"
 requires = [ "maturin>=1.10,<1.14" ]
 
 [project]
-name = "treemapper"
+name = "diffctx"
 version = "1.7.0"
 description = "Export codebase structure and contents for AI/LLM context"
 readme = "README.md"
@@ -60,6 +60,7 @@ optional-dependencies.dev = [
   "black>=23.0.0,<27.0",
   "charset-normalizer>=3.0,<4.0",
   "coverage>=7.0,<8.0",
+  "diffctx[tree-sitter]",
   "hypothesis>=6.0,<7.0",
   "import-linter>=2.0,<3.0",
   "mypy>=1.0,<3.0",
@@ -73,7 +74,6 @@ optional-dependencies.dev = [
   "radon>=6.0,<7.0",
   "ruff>=0.4,<1.0",
   "tiktoken>=0.9,<1.0",
-  "treemapper[tree-sitter]",
   "types-pyyaml>=6.0,<7.0",
 ]
 optional-dependencies.diffctx = [
@@ -81,7 +81,7 @@ optional-dependencies.diffctx = [
 ]
 optional-dependencies.full = [
   "charset-normalizer>=3.0,<4.0",
-  "treemapper[tree-sitter]",
+  "diffctx[tree-sitter]",
 ]
 optional-dependencies.mcp = [
   "anyio>=4.5,<5.0",
@@ -110,12 +110,12 @@ urls.Changelog = "https://github.com/nikolay-e/diffctx/releases"
 urls.Homepage = "https://github.com/nikolay-e/diffctx"
 urls.Issues = "https://github.com/nikolay-e/diffctx/issues"
 urls.Repository = "https://github.com/nikolay-e/diffctx"
-scripts.treemapper = "treemapper.treemapper:main"
-scripts.treemapper-mcp = "treemapper.mcp.__main__:main"
+scripts.diffctx = "diffctx.main:main"
+scripts.diffctx-mcp = "diffctx.mcp.__main__:main"
 
 [tool.maturin]
 python-source = "src"
-module-name = "treemapper._diffctx"
+module-name = "diffctx._diffctx"
 manifest-path = "diffctx/Cargo.toml"
 features = [ "pyo3/extension-module", "python" ]
 # Single-source the wheel version from diffctx/Cargo.toml [package].version.
@@ -162,7 +162,7 @@ run.omit = [
   "*/__pycache__/*",
   "*/tests/*",
 ]
-run.source = [ "treemapper" ]
+run.source = [ "diffctx" ]
 report.exclude_lines = [
   "@(abc\\.)?abstractmethod",
   "if __name__ == .__main__.:",
@@ -225,12 +225,12 @@ module = [
   "mcp.server",
   "mcp.server.fastmcp",
   "anyio",
-  "treemapper._diffctx",
+  "diffctx._diffctx",
   "_diffctx",
   "pathspec",
-  "treemapper.diffctx.edges",
-  "treemapper.diffctx.edges.*",
-  "treemapper.diffctx.embeddings",
+  "diffctx.diffctx.edges",
+  "diffctx.diffctx.edges.*",
+  "diffctx.diffctx.embeddings",
   "charset_normalizer",
   "datasets",
 ]
@@ -238,70 +238,70 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-  "treemapper.ignore",
-  "treemapper.tree",
-  "treemapper.diffctx.universe",
+  "diffctx.ignore",
+  "diffctx.tree",
+  "diffctx.diffctx.universe",
 ]
 disable_error_code = [ "type-arg" ]
 
 [[tool.mypy.overrides]]
-module = [ "treemapper.mcp.*" ]
+module = [ "diffctx.mcp.*" ]
 disallow_untyped_decorators = false
 
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "v$version"
-version_files = [ "src/treemapper/version.py:__version__" ]
+version_files = [ "src/diffctx/version.py:__version__" ]
 
 [tool.importlinter]
-root_package = "treemapper"
+root_package = "diffctx"
 
 [[tool.importlinter.contracts]]
 id = "no-cli-writer"
 name = "CLI should not import writer directly"
 type = "forbidden"
-source_modules = [ "treemapper.cli" ]
-forbidden_modules = [ "treemapper.writer" ]
+source_modules = [ "diffctx.cli" ]
+forbidden_modules = [ "diffctx.writer" ]
 
 [[tool.importlinter.contracts]]
 id = "no-tree-cli"
 name = "Tree building should not import CLI"
 type = "forbidden"
-source_modules = [ "treemapper.tree" ]
-forbidden_modules = [ "treemapper.cli" ]
+source_modules = [ "diffctx.tree" ]
+forbidden_modules = [ "diffctx.cli" ]
 
 [[tool.importlinter.contracts]]
 id = "no-diffctx-writer"
 name = "Diffctx should not import writer"
 type = "forbidden"
-source_modules = [ "treemapper.diffctx" ]
-forbidden_modules = [ "treemapper.writer" ]
+source_modules = [ "diffctx.diffctx" ]
+forbidden_modules = [ "diffctx.writer" ]
 
 [[tool.importlinter.contracts]]
 id = "no-mcp-cli"
 name = "MCP server must not import CLI"
 type = "forbidden"
-source_modules = [ "treemapper.mcp" ]
-forbidden_modules = [ "treemapper.cli", "treemapper.treemapper" ]
+source_modules = [ "diffctx.mcp" ]
+forbidden_modules = [ "diffctx.cli", "diffctx.main" ]
 
 [[tool.importlinter.contracts]]
 id = "no-writer-cli"
 name = "Writer should not import CLI"
 type = "forbidden"
-source_modules = [ "treemapper.writer" ]
-forbidden_modules = [ "treemapper.cli" ]
+source_modules = [ "diffctx.writer" ]
+forbidden_modules = [ "diffctx.cli" ]
 
 [[tool.importlinter.contracts]]
 id = "no-tree-writer"
 name = "Tree building should not import writer"
 type = "forbidden"
-source_modules = [ "treemapper.tree" ]
-forbidden_modules = [ "treemapper.writer" ]
+source_modules = [ "diffctx.tree" ]
+forbidden_modules = [ "diffctx.writer" ]
 
 [tool.mutmut]
-paths_to_mutate = [ "src/treemapper/" ]
+paths_to_mutate = [ "src/diffctx/" ]
 tests_dir = [ "tests/" ]
 do_not_mutate = [
-  "src/treemapper/diffctx/parsers/__init__.py",
-  "src/treemapper/diffctx/stopwords.py",
+  "src/diffctx/diffctx/parsers/__init__.py",
+  "src/diffctx/diffctx/stopwords.py",
 ]

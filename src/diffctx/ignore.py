@@ -8,9 +8,9 @@ import pathspec
 
 logger = logging.getLogger(__name__)
 
-TREEMAPPER_CONFIG_DIR = ".treemapper"
-TREEMAPPER_DIR_IGNORE = "ignore"
-TREEMAPPER_DIR_WHITELIST = "whitelist"
+DIFFCTX_CONFIG_DIR = ".diffctx"
+DIFFCTX_DIR_IGNORE = "ignore"
+DIFFCTX_DIR_WHITELIST = "whitelist"
 
 
 def read_ignore_file(file_path: Path) -> list[str]:
@@ -66,7 +66,7 @@ PRUNE_DIRS = frozenset(
         ".git",
         ".svn",
         ".hg",
-        ".treemapper",
+        ".diffctx",
         "__pycache__",
         "node_modules",
         ".npm",
@@ -126,7 +126,7 @@ def _collect_from_walk(root: Path, filenames_set: set[str], out: list[str]) -> N
             for line in read_ignore_file(ignore_dir / ignore_filename):
                 out.append(_process_ignore_line(line, rel))
 
-        config_ignore = ignore_dir / TREEMAPPER_CONFIG_DIR / TREEMAPPER_DIR_IGNORE
+        config_ignore = ignore_dir / DIFFCTX_CONFIG_DIR / DIFFCTX_DIR_IGNORE
         if config_ignore.is_file():
             for line in read_ignore_file(config_ignore):
                 out.append(_process_ignore_line(line, rel))
@@ -220,7 +220,7 @@ def _collect_parent_ignore_patterns(root: Path, ignore_filenames: list[str]) -> 
         for filename in ignore_filenames:
             _process_parent_ignore_file(current / filename, resolved_root, current, out)
 
-        config_ignore = current / TREEMAPPER_CONFIG_DIR / TREEMAPPER_DIR_IGNORE
+        config_ignore = current / DIFFCTX_CONFIG_DIR / DIFFCTX_DIR_IGNORE
         _process_parent_ignore_file(config_ignore, resolved_root, current, out)
 
         if is_git_root:
@@ -280,8 +280,8 @@ DEFAULT_IGNORE_PATTERNS = [
     # OS files
     "**/.DS_Store",
     "**/Thumbs.db",
-    # TreeMapper config and output files
-    "**/.treemapper/",
+    # diffctx config and output files
+    "**/.diffctx/",
     "**/tree.yaml",
     "**/tree.json",
     "**/tree.md",
@@ -326,7 +326,7 @@ def should_ignore(relative_path_str: str, combined_spec: pathspec.PathSpec) -> b
 def get_whitelist_spec(whitelist_file: Path | None, root_dir: Path | None = None) -> pathspec.PathSpec | None:
     effective_file = whitelist_file
     if not effective_file and root_dir:
-        config_whitelist = root_dir / TREEMAPPER_CONFIG_DIR / TREEMAPPER_DIR_WHITELIST
+        config_whitelist = root_dir / DIFFCTX_CONFIG_DIR / DIFFCTX_DIR_WHITELIST
         if config_whitelist.is_file():
             effective_file = config_whitelist
     if not effective_file:

@@ -2,19 +2,19 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     coupling_metrics as _rust_coupling_metrics,
 )
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     detect_cycles as _rust_detect_cycles,
 )
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     hotspots as _rust_hotspots,
 )
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     quotient_graph as _rust_quotient_graph,
 )
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     to_mermaid as _rust_to_mermaid,
 )
 

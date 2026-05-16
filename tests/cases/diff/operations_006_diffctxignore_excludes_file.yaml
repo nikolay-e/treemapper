@@ -1,4 +1,4 @@
-name: operations_006_treemapperignore_excludes_file
+name: operations_006_diffctxignore_excludes_file
 tags:
 - lang:python
 - change:multi_file
@@ -9,7 +9,7 @@ tags:
 - difficulty:easy
 repo:
   initial_files:
-    .treemapperignore: |
+    .diffctxignore: |
       *.tmp
       *.log
       build/
@@ -34,7 +34,7 @@ repo:
       def create_processor(base_dir: str = ".") -> FileProcessor:
           return FileProcessor(base_dir)
     cache.tmp: |
-      temporary cached data that should be ignored by treemapper
+      temporary cached data that should be ignored by diffctx
       session_id=abc123
       last_access=2024-01-01
     debug.log: |
@@ -75,7 +75,7 @@ repo:
           def count_files(self) -> int:
               return sum(1 for _ in self.scan() if _.is_file())
   changed_files:
-    .treemapperignore: |
+    .diffctxignore: |
       *.tmp
       *.log
       build/
@@ -103,7 +103,7 @@ repo:
       def create_processor(base_dir: str = ".") -> FileProcessor:
           return FileProcessor(base_dir)
     cache.tmp: |
-      temporary cached data that should be ignored by treemapper
+      temporary cached data that should be ignored by diffctx
       session_id=abc123
       last_access=2024-06-15
     debug.log: |

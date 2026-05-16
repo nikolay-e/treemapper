@@ -32,7 +32,7 @@ def compute_scored_state(
     """Heavy-phase compute, returns an opaque PyScoredState. Reuse it
     across many `select_with_params` calls to sweep a (tau, cbf) grid
     without re-doing parse/fragment/discover/score work."""
-    from treemapper._diffctx import compute_scored_state as _rust_compute
+    from diffctx._diffctx import compute_scored_state as _rust_compute
 
     return _rust_compute(
         str(root_dir),
@@ -50,7 +50,7 @@ def select_with_params(
     no_content: bool = False,
 ) -> dict[str, Any]:
     """Light-phase select+postpass+render against a precomputed state."""
-    from treemapper._diffctx import select_with_params as _rust_select
+    from diffctx._diffctx import select_with_params as _rust_select
 
     return _rust_select(  # type: ignore[no-any-return]
         state,
@@ -74,7 +74,7 @@ def build_diff_context(
     scoring_mode: str = "ego",
     timeout: int = _PIPELINE_TIMEOUT,
 ) -> dict[str, Any]:
-    from treemapper._diffctx import build_diff_context as _rust_build
+    from diffctx._diffctx import build_diff_context as _rust_build
 
     # Budget semantics:
     #   None:                   pipeline default (None passes through to Rust as no cap)

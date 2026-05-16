@@ -22,7 +22,7 @@ class _Unset:
 
 
 _UNSET: _Unset = _Unset()
-_DIFF_SENTINEL = "__TREEMAPPER_DIFF_BARE__"
+_DIFF_SENTINEL = "__DIFFCTX_DIFF_BARE__"
 
 
 def _exit_error(message: str) -> NoReturn:
@@ -132,11 +132,11 @@ def _resolve_output_file(output_file_arg: str | None, save: bool, output_format:
     return output_file, False
 
 
-def _find_in_treemapper_dir(arg: str, root_dir: Path, extra_exts: tuple[str, ...]) -> Path | None:
+def _find_in_diffctx_dir(arg: str, root_dir: Path, extra_exts: tuple[str, ...]) -> Path | None:
     if Path(arg).parent != Path("."):
         return None
     stem = Path(arg).stem if Path(arg).suffix else arg
-    base = root_dir / ".treemapper"
+    base = root_dir / ".diffctx"
     for name in (arg, *(f"{stem}{ext}" for ext in extra_exts if f"{stem}{ext}" != arg)):
         candidate = base / name
         if candidate.is_file():
@@ -147,7 +147,7 @@ def _find_in_treemapper_dir(arg: str, root_dir: Path, extra_exts: tuple[str, ...
 def _resolve_config_file(file_arg: str | None, root_dir: Path, extensions: tuple[str, ...], label: str) -> Path | None:
     if not file_arg:
         return None
-    found = _find_in_treemapper_dir(file_arg, root_dir, extensions)
+    found = _find_in_diffctx_dir(file_arg, root_dir, extensions)
     if found:
         return found
     resolved = Path(file_arg).resolve()
@@ -200,7 +200,7 @@ class ParsedArgs:
 
 DEFAULT_IGNORES_HELP = """
 Default ignored patterns (use --no-default-ignores to disable built-in patterns;
-project-level .gitignore and .treemapper/ignore still apply):
+project-level .gitignore and .diffctx/ignore still apply):
   .git/, .svn/, .hg/    Version control directories
   __pycache__/, *.py[cod], *.so, venv/, .venv/, .tox/, .nox/  Python
   node_modules/, .npm/  JavaScript/Node
@@ -217,19 +217,19 @@ project-level .gitignore and .treemapper/ignore still apply):
 
 Ignore files (hierarchical, like git):
   .gitignore            Standard git ignore patterns
-  .treemapper/ignore    TreeMapper-specific patterns
+  .diffctx/ignore    diffctx-specific patterns
 
 Whitelist files (auto-discovered):
-  .treemapper/whitelist  Include-only filter
+  .diffctx/whitelist  Include-only filter
 
 Examples:
-  treemapper .                    Map current directory to YAML
-  treemapper /path/to/project     Map a specific directory
-  treemapper . -f json            Output as JSON
-  treemapper . -f md --save       Save as tree.md
-  treemapper . --diff HEAD~1      Show context for last commit
-  treemapper . -c                 Copy output to clipboard
-  treemapper . --no-content       Structure only, no file contents
+  diffctx .                    Map current directory to YAML
+  diffctx /path/to/project     Map a specific directory
+  diffctx . -f json            Output as JSON
+  diffctx . -f md --save       Save as tree.md
+  diffctx . --diff HEAD~1      Show context for last commit
+  diffctx . -c                 Copy output to clipboard
+  diffctx . --no-content       Structure only, no file contents
 
 Output routing:
   Default:      stdout
@@ -248,7 +248,7 @@ def _build_shared_parser() -> argparse.ArgumentParser:
     shared.add_argument(
         "--no-default-ignores",
         action="store_true",
-        help="Disable built-in ignore patterns (project .gitignore and .treemapper/ignore still apply)",
+        help="Disable built-in ignore patterns (project .gitignore and .diffctx/ignore still apply)",
     )
     shared.add_argument("-c", "--copy", action="store_true", help="Copy to clipboard")
     shared.add_argument("-q", "--quiet", action="store_true", help="Suppress all non-error output")
@@ -263,7 +263,7 @@ def _build_shared_parser() -> argparse.ArgumentParser:
 
 def _build_graph_parser() -> argparse.ArgumentParser:
     graph_parser = argparse.ArgumentParser(
-        prog="treemapper graph",
+        prog="diffctx graph",
         description="Build and analyze the project dependency graph",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         parents=[_build_shared_parser()],
@@ -290,7 +290,7 @@ def _build_graph_parser() -> argparse.ArgumentParser:
 
 def _build_main_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="treemapper",
+        prog="diffctx",
         description=(
             "Generate a structured representation of a directory tree (YAML, JSON, text, or Markdown). "
             "Supports diff context mode (--diff) for intelligent code change analysis.\n\n"

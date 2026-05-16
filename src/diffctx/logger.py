@@ -1,6 +1,6 @@
 import logging
 
-PACKAGE_LOGGER_NAME = "treemapper"
+PACKAGE_LOGGER_NAME = "diffctx"
 
 _LOG_LEVEL_MAP = {
     "error": logging.ERROR,

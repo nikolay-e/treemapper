@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def _check_allowed(path: Path) -> None:
-    allowed = os.environ.get("TREEMAPPER_ALLOWED_PATHS")
+    allowed = os.environ.get("DIFFCTX_ALLOWED_PATHS")
     if not allowed:
         return
     allowed_paths = [Path(p).resolve() for p in allowed.split(os.pathsep) if p]

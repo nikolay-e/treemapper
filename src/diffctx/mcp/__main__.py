@@ -5,10 +5,10 @@ import sys
 
 def main() -> None:
     try:
-        from treemapper.mcp.server import run_server
+        from diffctx.mcp.server import run_server
     except ImportError:
         print(
-            "treemapper-mcp: missing optional dependencies for MCP server mode.\n" "Install with: pip install 'treemapper[mcp]'",
+            "diffctx-mcp: missing optional dependencies for MCP server mode.\n" "Install with: pip install 'diffctx[mcp]'",
             file=sys.stderr,
         )
         sys.exit(2)

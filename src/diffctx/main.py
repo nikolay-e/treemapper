@@ -40,13 +40,13 @@ def _ensure_git_repo(root_dir: Path) -> None:
         )
     except (OSError, FileNotFoundError) as exc:
         print(
-            f"treemapper: --diff requires git to be installed and on PATH ({exc}); " "install git or run without --diff.",
+            f"diffctx: --diff requires git to be installed and on PATH ({exc}); " "install git or run without --diff.",
             file=sys.stderr,
         )
         sys.exit(_EXIT_ENVIRONMENT)
     if result.returncode != 0:
         print(
-            f"treemapper: --diff requires a git repository (cwd: {root_dir}); "
+            f"diffctx: --diff requires a git repository (cwd: {root_dir}); "
             "run inside a working tree or pass --diff <range> with a valid git context.",
             file=sys.stderr,
         )
@@ -66,7 +66,7 @@ def _diff_result_is_empty(result: dict[str, Any]) -> bool:
 def _warn_empty_diff_result(result: dict[str, Any]) -> None:
     if _diff_result_is_empty(result):
         print(
-            "treemapper: diff produced no semantic context "
+            "diffctx: diff produced no semantic context "
             "(pure deletion, binary-only, or all files exceeded size cap); output empty.",
             file=sys.stderr,
         )
@@ -344,7 +344,7 @@ def _format_runtime_error(exc: BaseException) -> str:
 def _handle_unexpected_exception(exc: BaseException) -> int:
     logger.debug("internal error", exc_info=exc)
     print(
-        f"treemapper: internal error: {exc.__class__.__name__}: {_format_runtime_error(exc)}",
+        f"diffctx: internal error: {exc.__class__.__name__}: {_format_runtime_error(exc)}",
         file=sys.stderr,
     )
     return _EXIT_RUNTIME
@@ -362,13 +362,13 @@ def main() -> None:
     except BrokenPipeError:
         sys.exit(_EXIT_BROKEN_PIPE)
     except argparse.ArgumentError as exc:
-        print(f"treemapper: usage error: {_format_runtime_error(exc)}", file=sys.stderr)
+        print(f"diffctx: usage error: {_format_runtime_error(exc)}", file=sys.stderr)
         sys.exit(_EXIT_USAGE)
     except _KNOWN_RUNTIME_ERRORS as exc:
-        print(f"treemapper: {_format_runtime_error(exc)}", file=sys.stderr)
+        print(f"diffctx: {_format_runtime_error(exc)}", file=sys.stderr)
         sys.exit(_EXIT_RUNTIME)
     except OSError as exc:
-        print(f"treemapper: {_format_runtime_error(exc)}", file=sys.stderr)
+        print(f"diffctx: {_format_runtime_error(exc)}", file=sys.stderr)
         sys.exit(_EXIT_RUNTIME)
     except Exception as exc:
         sys.exit(_handle_unexpected_exception(exc))

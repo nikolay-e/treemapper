@@ -8,14 +8,14 @@ from pathlib import Path
 import anyio
 from mcp.server.fastmcp import FastMCP
 
-from treemapper.diffctx import GitError, build_diff_context
+from diffctx.diffctx import GitError, build_diff_context
 
 from .formatting import format_diff_context_as_markdown
 from .security import validate_dir_path, validate_repo_path
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("treemapper")
+mcp = FastMCP("diffctx")
 
 _DIFF_DESCRIPTION = (
     "PREFERRED tool for understanding git diffs. Returns the most relevant "
@@ -63,7 +63,7 @@ async def get_diff_context(
     content = format_diff_context_as_markdown(result)
 
     if clipboard:
-        from treemapper.clipboard import copy_to_clipboard
+        from diffctx.clipboard import copy_to_clipboard
 
         await anyio.to_thread.run_sync(lambda: copy_to_clipboard(content))
         frag_count = result.get("fragment_count", 0)
@@ -95,10 +95,10 @@ async def get_tree_map(
     max_file_bytes: int = 100_000,
     clipboard: bool = False,
 ) -> str:
-    from treemapper.ignore import get_ignore_specs, get_whitelist_spec
-    from treemapper.tokens import count_tokens
-    from treemapper.tree import TreeBuildContext, build_tree
-    from treemapper.writer import tree_to_string
+    from diffctx.ignore import get_ignore_specs, get_whitelist_spec
+    from diffctx.tokens import count_tokens
+    from diffctx.tree import TreeBuildContext, build_tree
+    from diffctx.writer import tree_to_string
 
     validated_path = validate_repo_path(repo_path)
     target = validated_path / subdirectory if subdirectory else validated_path
@@ -124,7 +124,7 @@ async def get_tree_map(
     token_info = count_tokens(content)
 
     if clipboard:
-        from treemapper.clipboard import copy_to_clipboard
+        from diffctx.clipboard import copy_to_clipboard
 
         await anyio.to_thread.run_sync(lambda: copy_to_clipboard(content))
         return f"Copied to clipboard ({token_info.count:,} tokens, {token_info.encoding})"
@@ -220,7 +220,7 @@ async def get_file_context(
         return content
 
     if clipboard and n_files > 0:
-        from treemapper.clipboard import copy_to_clipboard
+        from diffctx.clipboard import copy_to_clipboard
 
         await anyio.to_thread.run_sync(lambda: copy_to_clipboard(content))
         return f"Copied {n_files} files ({n_lines:,} lines) to clipboard"

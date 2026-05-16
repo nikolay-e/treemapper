@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from treemapper._diffctx import GitError
+from diffctx._diffctx import GitError
 
 from .pipeline import build_diff_context, compute_scored_state, select_with_params
 

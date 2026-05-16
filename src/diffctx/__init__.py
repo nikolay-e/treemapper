@@ -11,7 +11,7 @@ from .tree import TreeBuildContext, build_tree
 from .version import __version__
 from .writer import write_tree_json, write_tree_markdown, write_tree_text, write_tree_yaml
 
-logging.getLogger("treemapper").addHandler(logging.NullHandler())
+logging.getLogger("diffctx").addHandler(logging.NullHandler())
 
 __all__ = [
     "__version__",

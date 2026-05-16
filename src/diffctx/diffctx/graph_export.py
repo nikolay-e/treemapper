@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     graph_summary as _rust_graph_summary,
 )
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     graph_to_graphml_string as _rust_graph_to_graphml_string,
 )
-from treemapper._diffctx import (
+from diffctx._diffctx import (
     graph_to_json_string as _rust_graph_to_json_string,
 )
 
@@ -25,7 +25,7 @@ def graph_summary(pg: Any, top_n: int = 10) -> str:
     """Return a human-readable summary of the project graph.
 
     Wraps the Rust GraphSummary dict into the formatted text the previous
-    Python implementation produced (used by the `treemapper graph` CLI).
+    Python implementation produced (used by the `diffctx graph` CLI).
     """
     s = _rust_graph_summary(pg, top_n)
     lines = [
