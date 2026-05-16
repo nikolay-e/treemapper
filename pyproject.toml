@@ -5,7 +5,7 @@ requires = [ "maturin>=1.10,<1.14" ]
 
 [project]
 name = "treemapper"
-version = "1.6.1"
+version = "1.7.0"
 description = "Export codebase structure and contents for AI/LLM context"
 readme = "README.md"
 keywords = [
@@ -54,7 +54,6 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "numpy>=1.24,<3.0",
   "pathspec>=0.11,<2.0",
 ]
 optional-dependencies.dev = [
@@ -73,9 +72,12 @@ optional-dependencies.dev = [
   "pyyaml>=6.0.2,<8.0",
   "radon>=6.0,<7.0",
   "ruff>=0.4,<1.0",
-  "tiktoken==0.13.0",
+  "tiktoken>=0.9,<1.0",
   "treemapper[tree-sitter]",
   "types-pyyaml>=6.0,<7.0",
+]
+optional-dependencies.diffctx = [
+  "numpy>=1.24,<3.0",
 ]
 optional-dependencies.full = [
   "charset-normalizer>=3.0,<4.0",
@@ -104,18 +106,24 @@ optional-dependencies.tree-sitter = [
   "tree-sitter-swift>=0.0.1,<1.0",
   "tree-sitter-typescript>=0.21,<1.0",
 ]
-urls.Changelog = "https://github.com/nikolay-e/treemapper/releases"
-urls.Homepage = "https://github.com/nikolay-e/treemapper"
-urls.Issues = "https://github.com/nikolay-e/treemapper/issues"
-urls.Repository = "https://github.com/nikolay-e/treemapper"
+urls.Changelog = "https://github.com/nikolay-e/diffctx/releases"
+urls.Homepage = "https://github.com/nikolay-e/diffctx"
+urls.Issues = "https://github.com/nikolay-e/diffctx/issues"
+urls.Repository = "https://github.com/nikolay-e/diffctx"
 scripts.treemapper = "treemapper.treemapper:main"
-scripts.treemapper-mcp = "treemapper.mcp.server:run_server"
+scripts.treemapper-mcp = "treemapper.mcp.__main__:main"
 
 [tool.maturin]
 python-source = "src"
 module-name = "treemapper._diffctx"
 manifest-path = "diffctx/Cargo.toml"
 features = [ "pyo3/extension-module", "python" ]
+# Single-source the wheel version from diffctx/Cargo.toml [package].version.
+# Maturin >= 1.8 reads the Cargo manifest version when `[project].dynamic`
+# contains "version" and the explicit `[project].version` line is removed
+# (PEP 621). On the next release, replace `version = "..."` in [project] with
+# `dynamic = ["version"]` to activate single-sourcing. Until then, keep the
+# two versions manually aligned (Cargo.toml = pyproject.toml = 1.7.0).
 include = [
   { path = "LICENSE", format = "sdist" },
   { path = "README.md", format = "sdist" },
