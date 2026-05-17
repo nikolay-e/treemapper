@@ -24,11 +24,16 @@ lines outward and stops as soon as additional context stops paying for itself.
 ## Install (30 seconds)
 
 ```bash
-pip install diffctx                     # canonical
-pipx install diffctx                    # or: isolated, no venv needed
-pip install 'diffctx[tree-sitter]'      # + AST parsing for smarter diff context
-pip install 'diffctx[mcp]'              # + MCP server for AI assistants
+pipx install diffctx                    # recommended — isolated CLI, no venv needed
+pip install diffctx                     # or: into an active environment
+pipx install 'diffctx[tree-sitter]'     # + AST parsing for smarter diff context
+pipx install 'diffctx[mcp]'             # + MCP server for AI assistants
 ```
+
+> For everyday use, install once with `pipx` and call `diffctx` from any
+> directory. Do **not** `source` the project's `.venv` to run `diffctx` from
+> another repo — that runs a working-tree build and mutates the shell's
+> `PATH`/`PYTHONHOME` for every subsequent command.
 
 ```bash
 diffctx . --diff HEAD~1       # smart context for last commit → paste into Claude/ChatGPT
