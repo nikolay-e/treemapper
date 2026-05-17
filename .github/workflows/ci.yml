@@ -166,9 +166,9 @@ jobs:
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
         run: |
           # PEP 660 editable install — maturin builds the Rust extension and
-          # pip installs everything (diffctx + [dev,full] extras). Skip build
+          # pip installs everything (diffctx + [dev,full,mcp] extras). Skip build
           # isolation since we just installed maturin in this env.
-          pip install -e ".[dev,full]" --no-build-isolation
+          pip install -e ".[dev,full,mcp]" --no-build-isolation
 
       - name: Run Tests with Coverage
         shell: bash
