@@ -114,3 +114,23 @@ GitHub auto-redirects but the local origin must be updated:
 test fixture. Use it during code review to surface the same semantic
 context an external user would see — large diffs (>10k tokens) are normal
 for rebrand-class commits and should not be treated as regressions.
+
+## Local `which diffctx` Trap
+
+`/Users/nikolay/diffctx/.venv/bin` sits FIRST on `$PATH` when this project's
+venv is active (which happens automatically after the recovery flow above).
+That means a bare `diffctx ...` inside the working tree runs the working-tree
+build, NOT the pipx-published binary. For QA code-review steps, always use
+the absolute path `/Users/nikolay/.local/bin/diffctx` so the run matches what
+external users get. Tests, builds, and pre-commit need the venv binary; only
+the user-facing smoke / review step needs the pipx one.
+
+## Empty-Diff Warning Is Expected on Docs-Only HEAD
+
+`diffctx --diff` (bare, no range → defaults to HEAD per commit `f67efab0`)
+on a docs-only HEAD prints
+`diffctx: diff produced no semantic context (pure deletion, binary-only, or
+all files exceeded size cap); output empty.` and emits a 11-token YAML
+skeleton. Not a regression — this is the actionable-error contract from
+`f67efab0`. CLI smoke check should accept the warning and the empty
+`fragments:` list, NOT fail on it.
