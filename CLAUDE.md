@@ -32,12 +32,20 @@ treemapper (this repo)              diffctx (engine, PyPI dependency)
 - Entry points: `treemapper` → `treemapper.cli:main`,
   `treemapper-mcp` → `diffctx.mcp.__main__:main`.
 
-### Known cosmetic limitation
+### Known cosmetic limitations
 
-Because execution is delegated to `diffctx.main.main()`, `treemapper --help`
-renders examples using the `diffctx` program name. `treemapper --version` is
-correctly branded. A clean fix would be a public `diffctx.run(prog=...)` entry
-in the engine; until then the delegation is intentional to keep this layer DRY.
+Both stem from delegating execution to `diffctx` to stay DRY; both are
+display-only, not functional:
+
+- `treemapper --help` renders examples using the `diffctx` program name.
+  `treemapper --version` is correctly branded.
+- `treemapper-mcp` (run without the `[mcp]` extra) prints a `diffctx-mcp:`
+  install hint pointing at `diffctx[mcp]`. `treemapper[mcp]` installs the same
+  thing, so the hint works; the prefix is just the engine's.
+
+A clean fix for both would be public engine entries that accept an injected
+program name (`diffctx.run(prog=...)` / an mcp equivalent); until then the
+delegation is intentional.
 
 ## Dependency contract
 
