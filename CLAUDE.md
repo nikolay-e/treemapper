@@ -18,42 +18,40 @@ of that in this repo, stop — extend or fix `diffctx` instead.
 ```
 treemapper (this repo)              diffctx (engine, PyPI dependency)
   src/treemapper/
-    cli.py        ──delegates──▶    diffctx.main:main    (full CLI: tree, --diff, graph)
-    __init__.py   ──re-exports──▶   diffctx.{map_directory, build_diff_context, to_*}
-    version.py                       diffctx.mcp.__main__:main  (treemapper-mcp script)
+    cli.py        ──delegates──▶    diffctx.run(prog="treemapper", version=…)  (tree, --diff, graph)
+    mcp_main.py   ──delegates──▶    diffctx.mcp.__main__:main(prog=…, extra=…)  (treemapper-mcp)
+    __init__.py   ──re-exports──▶   diffctx.{map_directory, build_diff_context, run, to_*}
+    version.py
 ```
 
-- `cli.py` delegates execution to `diffctx.main.main()` so TreeMapper inherits
-  the entire engine CLI surface (tree mapping, `--diff`, the `graph`
-  subcommand) without re-declaring it. The only TreeMapper-specific behavior is
-  a `-v/--version` short-circuit that prints TreeMapper's own version.
+- `cli.py` calls `diffctx.run(argv, prog="treemapper", version=__version__)`
+  (added in diffctx 1.8.0), which runs the entire engine CLI surface (tree
+  mapping, `--diff`, the `graph` subcommand) under TreeMapper's own program
+  name and version — `--help`, `--version`, and error prefixes are all branded.
+  No CLI is re-declared here.
+- **Forward-compatible fallback:** if the installed `diffctx` predates 1.8.0
+  (no `run`), `cli.py` falls back to `diffctx.main.main()` plus a `--version`
+  short-circuit. Tree/`--diff`/`graph` still work; only `--help` and the MCP
+  hint show the `diffctx` name until the engine is upgraded. The fallback is
+  what lets TreeMapper ship against the currently-published `diffctx` (1.7.1).
+- `mcp_main.py` calls the engine MCP entry with `prog="treemapper-mcp"` /
+  `extra="treemapper[mcp]"` (also falls back gracefully on diffctx < 1.8).
 - `__init__.py` re-exports the public engine API so `import treemapper` mirrors
   `import diffctx` for library users.
 - Entry points: `treemapper` → `treemapper.cli:main`,
-  `treemapper-mcp` → `diffctx.mcp.__main__:main`.
-
-### Known cosmetic limitations
-
-Both stem from delegating execution to `diffctx` to stay DRY; both are
-display-only, not functional:
-
-- `treemapper --help` renders examples using the `diffctx` program name.
-  `treemapper --version` is correctly branded.
-- `treemapper-mcp` (run without the `[mcp]` extra) prints a `diffctx-mcp:`
-  install hint pointing at `diffctx[mcp]`. `treemapper[mcp]` installs the same
-  thing, so the hint works; the prefix is just the engine's.
-
-A clean fix for both would be public engine entries that accept an injected
-program name (`diffctx.run(prog=...)` / an mcp equivalent); until then the
-delegation is intentional.
+  `treemapper-mcp` → `treemapper.mcp_main:main`.
 
 ## Dependency contract
 
-- `diffctx>=1.7,<2.0`. Extras pass through: `treemapper[tree-sitter]`,
+- `diffctx>=1.7,<2.0`. Full branding needs `diffctx>=1.8.0` (the `run(prog=…)`
+  entry); against 1.7.1 the fallback path keeps everything functional. Once
+  diffctx 1.8.0 is published, the pin may be tightened to `>=1.8,<2.0` to drop
+  the fallback. Extras pass through: `treemapper[tree-sitter]`,
   `treemapper[mcp]`, `treemapper[full]` install the matching `diffctx` extras.
-- `cli.py` depends on `diffctx.main.main` — the engine's stable console-script
-  entry point. Avoid reaching into `diffctx`'s private (`_`-prefixed) helpers;
-  if you need something they expose, ask for a public engine API instead.
+- Depend only on diffctx's **public** API (`run`, `map_directory`,
+  `build_diff_context`, `to_*`, `mcp.__main__.main`). Never reach into
+  `_`-prefixed helpers; if you need something they expose, add a public engine
+  API in `diffctx` instead.
 
 ## Development
 

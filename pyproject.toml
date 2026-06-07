@@ -73,7 +73,7 @@ urls.Homepage = "https://github.com/nikolay-e/treemapper"
 urls.Issues = "https://github.com/nikolay-e/treemapper/issues"
 urls.Repository = "https://github.com/nikolay-e/treemapper"
 scripts.treemapper = "treemapper.cli:main"
-scripts.treemapper-mcp = "diffctx.mcp.__main__:main"
+scripts.treemapper-mcp = "treemapper.mcp_main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [ "src/treemapper" ]

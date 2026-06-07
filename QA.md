@@ -46,11 +46,22 @@ python3 -m venv /tmp/tm-clean
 ## Gotchas
 
 - **mypy hook scope**: `[tool.mypy]` is `files=["src"]`, but the
-  `mirrors-mypy` pre-commit hook defaults to all passed `.py` files and its
-  isolated env lacks pytest/types-pyyaml. Pin the hook with `files: ^src/` so
-  it matches the pyproject scope; tests are integration tests, not strict-typed.
+  `mirrors-mypy` pre-commit hook defaults to all passed `.py` files. Pin the
+  hook with `files: ^src/` so it matches the pyproject scope; tests are
+  integration tests, not strict-typed.
+- **mypy hook must NOT pin diffctx in `additional_dependencies`**: TreeMapper
+  develops against the unreleased diffctx 1.8.0 (`run`/branded mcp), but the
+  hook can only install the *published* diffctx (1.7.1), which lacks those
+  symbols → mypy version skew (`has no attribute run`). Leave diffctx out of
+  the hook and rely on `[[tool.mypy.overrides]] module=["diffctx.*"]
+  ignore_missing_imports = true` (hook → `Any`); the authoritative check is the
+  local/CI `mypy src` against the real installed diffctx. Re-add the pin only
+  after diffctx 1.8.0 is on PyPI.
+- **Branding is version-gated**: `--help` / `--version` / MCP-hint branding
+  needs `diffctx>=1.8.0`. Against published 1.7.1 the fallback path keeps
+  everything functional but `--help` and the mcp hint still show `diffctx`.
+  Verify full branding with the local editable diffctx (1.8.0); verify the
+  fallback with the clean-venv wheel install (pulls 1.7.1).
 - **Dev install pollutes the diffctx venv**: `pip install -e .` from inside the
   shared `diffctx/.venv` adds treemapper there. Harmless for diffctx tests
   (separate `testpaths`), but prefer a dedicated venv for treemapper dev.
-- **Known cosmetics** (display-only, see CLAUDE.md): `--help` shows the
-  `diffctx` prog name; `treemapper-mcp` install hint says `diffctx[mcp]`.

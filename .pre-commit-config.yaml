@@ -41,4 +41,3 @@ repos:
     hooks:
       - id: mypy
         files: ^src/
-        additional_dependencies: ["diffctx>=1.7,<2.0"]

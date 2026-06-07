@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `treemapper` now drives the engine through the public
+  `diffctx.run(prog="treemapper", version=…)` entry (diffctx 1.8.0), so
+  `--help`, `--version`, and error prefixes are branded as `treemapper`. The
+  `treemapper-mcp` install hint is likewise branded via the engine's
+  `prog`/`extra` parameters. Both paths fall back gracefully when an older
+  diffctx (< 1.8.0, e.g. the currently-published 1.7.1) is installed — the CLI
+  stays fully functional, only `--help`/MCP-hint naming reverts to `diffctx`
+  until the engine is upgraded.
+
 ## [2.0.0]
 
 ### Changed
