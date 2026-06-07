@@ -1,0 +1,112 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatchling>=1.25,<2.0" ]
+
+[project]
+name = "treemapper"
+version = "2.0.0"
+description = "Map a codebase to YAML/JSON/Markdown/text and select smart git-diff context for LLMs"
+readme = "README.md"
+keywords = [
+  "ai",
+  "claude",
+  "code-context",
+  "codebase",
+  "context-selection",
+  "diff-context",
+  "directory-tree",
+  "git-diff",
+  "json",
+  "llm",
+  "mcp",
+  "tree",
+  "yaml",
+]
+license = "Apache-2.0"
+authors = [
+  { name = "Nikolay Eremeev", email = "nikolay.eremeev@outlook.com" },
+]
+requires-python = ">=3.10"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development",
+  "Topic :: Software Development :: Version Control :: Git",
+  "Topic :: Utilities",
+  "Typing :: Typed",
+]
+dependencies = [
+  "diffctx>=1.7,<2.0",
+]
+optional-dependencies.dev = [
+  "black>=23.0.0,<27.0",
+  "mypy>=1.0,<3.0",
+  "pre-commit>=3.0,<5.0",
+  "pygit2>=1.12,<2.0",
+  "pytest>=7.0,<10.0",
+  "pytest-timeout>=2.1,<3.0",
+  "pytest-xdist>=3.0,<4.0",
+  "pyyaml>=6.0.2,<8.0",
+  "ruff>=0.4,<1.0",
+  "treemapper[tree-sitter]",
+  "types-pyyaml>=6.0,<7.0",
+]
+optional-dependencies.full = [
+  "diffctx[full]>=1.7,<2.0",
+]
+optional-dependencies.mcp = [
+  "diffctx[mcp]>=1.7,<2.0",
+]
+optional-dependencies.tree-sitter = [
+  "diffctx[tree-sitter]>=1.7,<2.0",
+]
+urls.Changelog = "https://github.com/nikolay-e/treemapper/releases"
+urls.Homepage = "https://github.com/nikolay-e/treemapper"
+urls.Issues = "https://github.com/nikolay-e/treemapper/issues"
+urls.Repository = "https://github.com/nikolay-e/treemapper"
+scripts.treemapper = "treemapper.cli:main"
+scripts.treemapper-mcp = "diffctx.mcp.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = [ "src/treemapper" ]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/treemapper",
+  "tests",
+  "README.md",
+  "CHANGELOG.md",
+  "LICENSE",
+]
+
+[tool.black]
+line-length = 130
+
+[tool.ruff]
+target-version = "py310"
+line-length = 130
+lint.select = [ "C901", "E", "F", "I", "N", "RUF", "UP", "W" ]
+lint.ignore = [ "E501" ]
+
+[tool.pytest.ini_options]
+testpaths = [ "tests" ]
+pythonpath = [ "src" ]
+addopts = "-n auto --dist worksteal"
+timeout = 30
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = [ "src" ]
+
+[[tool.mypy.overrides]]
+module = [ "diffctx.*" ]
+ignore_missing_imports = true
