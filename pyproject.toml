@@ -57,7 +57,7 @@ optional-dependencies.dev = [
   "pyyaml>=6.0.2,<8.0",
   "ruff>=0.4,<1.0",
   "treemapper[tree-sitter]",
-  "types-pyyaml>=6.0,<7.0",
+  "types-pyyaml>=6.0.12.20260518,<7.0",
 ]
 optional-dependencies.full = [
   "diffctx[full]>=1.7,<2.0",
