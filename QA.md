@@ -12,14 +12,16 @@ not duplicate here.
 | CLI smoke | yes | See CLI Smoke + Wheel E2E below |
 | Wheel build + clean-venv install | yes | The critical check — see below |
 | Code review | yes | Tiny surface (cli.py, __init__.py) |
-| CI status | not yet | No git remote / CI wired as of 2026-06-07 |
+| CI status | yes | `.github/workflows/ci.yml` runs `pytest` on push/PR. Installs the *published* diffctx (1.7.1), so it exercises the fallback path |
 | SonarCloud | no | `nikolay-e_treemapper` returns "Project not found" |
 | autoqa / K8s / browser / ZAP / backend | no | Pure CLI library, no HTTP/UI/cluster |
 
 ## What treemapper is
 
 Thin DRY wrapper over the `diffctx` engine (`diffctx>=1.7,<2.0`). `cli.py`
-delegates to `diffctx.main.main()`; `__init__.py` re-exports the public API.
+delegates to `diffctx.run(prog="treemapper", version=…)` (diffctx >= 1.8.0),
+falling back to `diffctx.main.main()` on older engines; `__init__.py`
+re-exports the public API.
 **Do not test engine algorithm quality here** (relevance filtering, garbage
 exclusion) — that belongs to diffctx's own suite. treemapper tests verify the
 wrapper contract: delegation works, `--version` is branded, formats render,
@@ -40,7 +42,7 @@ python3 -m venv /tmp/tm-clean
 /tmp/tm-clean/bin/treemapper . -f yaml
 /tmp/tm-clean/bin/treemapper . --diff HEAD~1
 /tmp/tm-clean/bin/treemapper graph .
-/tmp/tm-clean/bin/treemapper-mcp                         # graceful hint, exit 0, no traceback
+/tmp/tm-clean/bin/treemapper-mcp                         # graceful hint, no traceback (exit 2 when the mcp extra is absent — engine's exit code, not overridden)
 ```
 
 ## Gotchas

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import sys
 
+import diffctx
+
 from .version import __version__
 
-try:
-    from diffctx.main import run as _engine_run
-except ImportError:  # diffctx < 1.8 — no injectable-identity entry yet
-    _engine_run = None
+# diffctx < 1.8 has no injectable-identity run() — None drives the fallback path
+_engine_run = getattr(diffctx, "run", None)
 
 _VERSION_FLAGS = frozenset({"-v", "--version"})
 
