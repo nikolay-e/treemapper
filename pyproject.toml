@@ -44,7 +44,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "diffctx>=1.7,<2.0",
+  "diffctx>=1.8,<2.0",
 ]
 optional-dependencies.dev = [
   "mypy>=2.1.0,<3.0",
@@ -58,13 +58,13 @@ optional-dependencies.dev = [
   "types-pyyaml>=6.0.12.20260518,<7.0",
 ]
 optional-dependencies.full = [
-  "diffctx[full]>=1.7,<2.0",
+  "diffctx[full]>=1.8,<2.0",
 ]
 optional-dependencies.mcp = [
-  "diffctx[mcp]>=1.7,<2.0",
+  "diffctx[mcp]>=1.8,<2.0",
 ]
 optional-dependencies.tree-sitter = [
-  "diffctx[tree-sitter]>=1.7,<2.0",
+  "diffctx[tree-sitter]>=1.8,<2.0",
 ]
 urls.Changelog = "https://github.com/nikolay-e/treemapper/releases"
 urls.Homepage = "https://github.com/nikolay-e/treemapper"

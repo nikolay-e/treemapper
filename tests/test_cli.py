@@ -7,7 +7,6 @@ from pathlib import Path
 
 import yaml
 
-from treemapper import cli
 from treemapper.version import __version__
 
 from .conftest import CliResult, run_cli
@@ -19,13 +18,12 @@ def test_version_is_treemapper_branded() -> None:
     assert result.stdout.strip() == f"treemapper {__version__}"
 
 
-def test_help_renders_and_is_branded_when_engine_supports_it() -> None:
+def test_help_renders_and_is_treemapper_branded() -> None:
     result = run_cli(["--help"])
     assert result.exit_code == 0
     assert "--diff" in result.stdout
-    if cli._engine_run is not None:
-        assert "usage: treemapper" in result.stdout.lower()
-        assert "usage: diffctx" not in result.stdout.lower()
+    assert "usage: treemapper" in result.stdout.lower()
+    assert "usage: diffctx" not in result.stdout.lower()
 
 
 def test_yaml_tree_includes_files_and_content(sample_project: Path) -> None:

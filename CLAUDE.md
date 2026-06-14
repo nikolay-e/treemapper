@@ -29,13 +29,8 @@ treemapper (this repo)              diffctx (engine, PyPI dependency)
   mapping, `--diff`, the `graph` subcommand) under TreeMapper's own program
   name and version — `--help`, `--version`, and error prefixes are all branded.
   No CLI is re-declared here.
-- **Forward-compatible fallback:** if the installed `diffctx` predates 1.8.0
-  (no `run`), `cli.py` falls back to `diffctx.main.main()` plus a `--version`
-  short-circuit. Tree/`--diff`/`graph` still work; only `--help` and the MCP
-  hint show the `diffctx` name until the engine is upgraded. The fallback is
-  what lets TreeMapper ship against the currently-published `diffctx` (1.7.1).
 - `mcp_main.py` calls the engine MCP entry with `prog="treemapper-mcp"` /
-  `extra="treemapper[mcp]"` (also falls back gracefully on diffctx < 1.8).
+  `extra="treemapper[mcp]"`.
 - `__init__.py` re-exports the public engine API so `import treemapper` mirrors
   `import diffctx` for library users.
 - Entry points: `treemapper` → `treemapper.cli:main`,
@@ -43,11 +38,10 @@ treemapper (this repo)              diffctx (engine, PyPI dependency)
 
 ## Dependency contract
 
-- `diffctx>=1.7,<2.0`. Full branding needs `diffctx>=1.8.0` (the `run(prog=…)`
-  entry); against 1.7.1 the fallback path keeps everything functional. Once
-  diffctx 1.8.0 is published, the pin may be tightened to `>=1.8,<2.0` to drop
-  the fallback. Extras pass through: `treemapper[tree-sitter]`,
-  `treemapper[mcp]`, `treemapper[full]` install the matching `diffctx` extras.
+- `diffctx>=1.8,<2.0`. The `>=1.8` floor guarantees the `run(prog=…)` entry, so
+  `--help`/`--version`/errors are always branded as `treemapper` — no fallback
+  path. Extras pass through: `treemapper[tree-sitter]`, `treemapper[mcp]`,
+  `treemapper[full]` install the matching `diffctx` extras.
 - Depend only on diffctx's **public** API (`run`, `map_directory`,
   `build_diff_context`, `to_*`, `mcp.__main__.main`). Never reach into
   `_`-prefixed helpers; if you need something they expose, add a public engine
