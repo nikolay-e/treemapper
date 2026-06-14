@@ -155,14 +155,25 @@ Python API). Verified by reading `diffctx/ignore.py`, `tokens.py`, `main.py`.
   posture, not a frequency-of-complaint signal — rated 🟡, not 🔴.
 
 ### ROI ranking (impact / effort) — actionable for us
-1. ~~**Add secret filename patterns to diffctx default ignores** (#6)~~ — **DONE**
-   in diffctx `396b50bb` (Unreleased): default ignores now exclude `.env`/`.env.*`
-   (keeping `.env.example`/`.sample`/`.template`/`.dist`), `*.pem`/`*.key`/`*.pfx`/
-   `*.p12`/`*.keystore`/`*.jks`, and SSH private keys `id_rsa`/`id_dsa`/`id_ecdsa`/
-   `id_ed25519` (public `.pub` keys stay visible). 412 engine tests + a new
-   `test_default_secret_ignores` pass. **Delivery to treemapper users needs a
-   diffctx release + a `diffctx>=` pin bump here** (not yet done — release is an
-   outward/PyPI action awaiting go-ahead).
+1. **Secret leakage (#6)** — **PARTLY DONE** in diffctx `a7bc751c` (Unreleased).
+   Investigation found two things: (a) the `--diff` path applied **no** ignore
+   filtering at all (Rust backend: "not yet implemented"), so a changed key/`.env`
+   leaked verbatim — worse than tree mode; (b) the engine **deliberately** treats
+   a changed `.env` as legitimate change context (cases
+   `algorithm_003_fragment_env_file_change`, `fragments_021` *require* it).
+   - **Fixed:** private-key/keystore files (`*.pem`/`*.key`/`*.pfx`/`*.p12`/
+     `*.keystore`/`*.jks`, `id_rsa`/`id_dsa`/`id_ecdsa`/`id_ed25519`; public
+     `.pub` kept) are now excluded in **both** tree and `--diff` output — never
+     legitimate context. Provably zero regression (no test case contains such a
+     file); full Rust suite baseline unchanged (467 pre-existing relevance-frontier
+     fails, ±0), 413 Python tests pass, new `test_secret_ignores_diff` +
+     `test_default_private_key_ignores` added.
+   - **Open decision:** `.env` secret *values*. A blunt filename ignore would
+     hide legitimately-changed config and contradicts the engine's design; the
+     right fix is a content-based redaction pass (also catches secrets hardcoded
+     in `.py`/`.yaml`). Deferred pending product call.
+   - **Delivery to treemapper users** still needs a diffctx release + `diffctx>=`
+     pin bump here (outward/PyPI action, awaiting go-ahead).
 2. **README: lead with `--diff` smart context + exact token counts + Python API**
    (#1,#3,#7,#8) — *Easy*, all already shipped, just under-marketed.
 3. **Regression tests: nested-`.gitignore`, Windows recursion** (#5,#10) — *Easy*,
