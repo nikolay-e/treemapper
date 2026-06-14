@@ -51,7 +51,6 @@ optional-dependencies.dev = [
   "pre-commit>=3.0,<5.0",
   "pytest>=7.0,<10.0",
   "pytest-timeout>=2.4.0,<3.0",
-  "pytest-xdist>=3.8.0,<4.0",
   "pyyaml>=6.0.2,<8.0",
   "ruff>=0.4,<1.0",
   "treemapper[tree-sitter]",
@@ -97,7 +96,6 @@ lint.ignore = [ "E501" ]
 [tool.pytest.ini_options]
 testpaths = [ "tests" ]
 pythonpath = [ "src" ]
-addopts = "-n auto --dist worksteal"
 timeout = 30
 
 [tool.mypy]
