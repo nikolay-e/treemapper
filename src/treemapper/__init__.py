@@ -3,6 +3,7 @@ from __future__ import annotations
 from diffctx import (
     build_diff_context,
     map_directory,
+    run,
     to_json,
     to_markdown,
     to_text,
@@ -15,6 +16,7 @@ __all__ = [
     "__version__",
     "build_diff_context",
     "map_directory",
+    "run",
     "to_json",
     "to_markdown",
     "to_text",

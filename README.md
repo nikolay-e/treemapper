@@ -62,7 +62,7 @@ context = treemapper.build_diff_context(root_dir=".", diff_range="HEAD~1")
 ## Relationship to diffctx
 
 TreeMapper is the user-facing distribution; `diffctx` is the reusable engine.
-Pin compatibility is `diffctx>=1.7,<2.0`. If you are embedding the engine in
+Pin compatibility is `diffctx>=1.8,<2.0`. If you are embedding the engine in
 your own tool, depend on `diffctx` directly.
 
 ## License

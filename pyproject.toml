@@ -4,7 +4,7 @@ requires = [ "hatchling>=1.25,<2.0" ]
 
 [project]
 name = "treemapper"
-version = "2.0.0"
+dynamic = [ "version" ]
 description = "Map a codebase to YAML/JSON/Markdown/text and select smart git-diff context for LLMs"
 readme = "README.md"
 keywords = [
@@ -72,6 +72,9 @@ urls.Issues = "https://github.com/nikolay-e/treemapper/issues"
 urls.Repository = "https://github.com/nikolay-e/treemapper"
 scripts.treemapper = "treemapper.cli:main"
 scripts.treemapper-mcp = "treemapper.mcp_main:main"
+
+[tool.hatch.version]
+path = "src/treemapper/version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = [ "src/treemapper" ]
