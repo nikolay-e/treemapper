@@ -155,8 +155,14 @@ Python API). Verified by reading `diffctx/ignore.py`, `tokens.py`, `main.py`.
   posture, not a frequency-of-complaint signal — rated 🟡, not 🔴.
 
 ### ROI ranking (impact / effort) — actionable for us
-1. **Add secret filename patterns to diffctx default ignores** (#6) — *Easy,
-   engine-side*, closes our only real safety gap + a marketing differentiator.
+1. ~~**Add secret filename patterns to diffctx default ignores** (#6)~~ — **DONE**
+   in diffctx `396b50bb` (Unreleased): default ignores now exclude `.env`/`.env.*`
+   (keeping `.env.example`/`.sample`/`.template`/`.dist`), `*.pem`/`*.key`/`*.pfx`/
+   `*.p12`/`*.keystore`/`*.jks`, and SSH private keys `id_rsa`/`id_dsa`/`id_ecdsa`/
+   `id_ed25519` (public `.pub` keys stay visible). 412 engine tests + a new
+   `test_default_secret_ignores` pass. **Delivery to treemapper users needs a
+   diffctx release + a `diffctx>=` pin bump here** (not yet done — release is an
+   outward/PyPI action awaiting go-ahead).
 2. **README: lead with `--diff` smart context + exact token counts + Python API**
    (#1,#3,#7,#8) — *Easy*, all already shipped, just under-marketed.
 3. **Regression tests: nested-`.gitignore`, Windows recursion** (#5,#10) — *Easy*,
