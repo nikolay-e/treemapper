@@ -38,10 +38,12 @@ treemapper (this repo)              diffctx (engine, PyPI dependency)
 
 ## Dependency contract
 
-- `diffctx>=1.8,<2.0`. The `>=1.8` floor guarantees the `run(prog=…)` entry, so
-  `--help`/`--version`/errors are always branded as `treemapper` — no fallback
-  path. Extras pass through: `treemapper[tree-sitter]`, `treemapper[mcp]`,
-  `treemapper[full]` install the matching `diffctx` extras.
+- `diffctx>=1.9.1,<2.0`. The `>=1.9.1` floor guarantees the `run(prog=…)` entry
+  (so `--help`/`--version`/errors are always branded as `treemapper` — no
+  fallback path) and the diff-context orientation header + changed/context role
+  ordering shipped in diffctx 1.9.x. Extras pass through:
+  `treemapper[tree-sitter]`, `treemapper[mcp]`, `treemapper[full]` install the
+  matching `diffctx` extras.
 - Depend only on diffctx's **public** API (`run`, `map_directory`,
   `build_diff_context`, `to_*`, `mcp.__main__.main`). Never reach into
   `_`-prefixed helpers; if you need something they expose, add a public engine
