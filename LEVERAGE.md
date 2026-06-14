@@ -40,3 +40,35 @@ suite.
 - Net: the repo is near-optimal for leverage; the xdist removal is the only win.
 
 _Scouts/synthesis: folded (small scope, deterministic + measured checks)_
+
+## 2026-06-14 · b5483ca · full repo (src/, tests/, pyproject, CI, pre-commit, dependabot)
+
+### TL;DR
+Repo remains a near-optimal leverage result. The one prior actionable finding —
+pytest-xdist on a sub-1s suite — was **resolved** in `a64854a` (no `addopts`, no
+`pytest-xdist` dep remain). vulture finds zero dead code; no TODO/FIXME/commented
+blocks; 5 source files are still pure delegation with nothing to cut, dedupe, or
+reinvent. Tooling is already modern (ruff + ruff-format, uv CI, hatchling dynamic
+version, mypy --strict). Only two 🔵 nitpicks, neither worth the churn.
+
+### Notes (🔵 only — no action taken)
+1. 🔵 `tests/test_cli.py:78` `test_result_dataclass_shape` — tautological: asserts
+   `run_cli` (a test helper) returns its own `CliResult` dataclass, which every
+   other test already exercises via `.exit_code`/`.stdout`. Tests the harness, not
+   the product. Pure-subtraction deletion (~3 lines, no coverage loss) — left in
+   as it's harmless and arguably documents the harness contract.
+2. 🔵 `.github/workflows/ci.yml:36` `pytest tests/ -v --timeout=120` — the `tests/`
+   arg duplicates `[tool.pytest.ini_options] testpaths`; the `--timeout=120`
+   override of the config's `timeout=30` is intentional (slower CI). Trivial.
+
+### Already-good (calibration for future runs)
+- xdist removal landed; CI test job is now serial and fast across the 3.10–3.13
+  matrix. Single runtime dep (`diffctx`); extras pass through cleanly.
+- `ty` (astral type checker) still correctly NOT adopted — not at mypy parity / GA.
+
+### Total Estimated Savings
+- Lines deletable: ~3 (one tautological test, optional). Config removable: none.
+- Dependencies to add/remove: none. Tools to swap: none.
+- Net: nothing actionable — the repo is at the leverage floor for a thin wrapper.
+
+_Scouts/synthesis: folded (small unchanged scope, deterministic + vulture checks)_
