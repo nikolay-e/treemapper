@@ -121,3 +121,27 @@ Release is correct: code, workflow, and delegation against diffctx 1.9.1 all hol
 no fixes needed.
 
 _Scouts/synthesis: folded (small scope, deterministic + empirical CD evidence)_
+
+## 2026-06-14 · 83b989d · full repo (src/, pyproject, docs, CHANGELOG)
+
+### TL;DR
+Re-audit at HEAD. Source is **byte-identical** to the last clean run (970006c);
+only `CORRECTNESS.md` changed since. Stronger evidence this time: the dev venv
+now actually carries the pinned **diffctx 1.9.1** (was 1.8.1 before), so the
+delegation contract is verified against the exact shipped floor, not an older
+local copy. mypy --strict + ruff clean, 13 tests pass. No 🔴/🟡/🔵 defects.
+
+### Verification
+- `diffctx.run(argv, *, prog, version)` and `mcp.__main__.main(prog, extra)`
+  signatures match the calls in `cli.py:9` / `mcp_main.py:7` exactly.
+- `treemapper.run is diffctx.run`; all 7 re-exports identity-match diffctx.
+- `map_directory(".", no_content=False)` and
+  `build_diff_context(root_dir=".", diff_range="HEAD~1")` (README:56/59) run
+  against the real 1.9.1 signatures (`root_dir: Path` accepts str at runtime).
+- Docs consistent: README pin (`>=1.9.1,<2.0`, README:65) = pyproject;
+  CHANGELOG `[Unreleased]` empty, `[2.1.0]` accurate; no stale fallback claims.
+
+### Verdict
+Clean — code, delegation against diffctx 1.9.1, and docs all hold; no fixes.
+
+_Scouts/synthesis: folded (small scope, unchanged source, deterministic checks)_
