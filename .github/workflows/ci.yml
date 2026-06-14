@@ -10,6 +10,17 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v8.1.0
+      - run: uv pip install --system ".[dev]"
+      - run: pre-commit run --all-files --show-diff-on-failure
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -20,5 +31,6 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install ".[dev]"
+      - uses: astral-sh/setup-uv@v8.1.0
+      - run: uv pip install --system ".[dev]"
       - run: pytest tests/ -v --timeout=120

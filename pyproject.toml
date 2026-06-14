@@ -47,10 +47,8 @@ dependencies = [
   "diffctx>=1.7,<2.0",
 ]
 optional-dependencies.dev = [
-  "black>=23.0.0,<27.0",
   "mypy>=2.1.0,<3.0",
   "pre-commit>=3.0,<5.0",
-  "pygit2>=1.18.2,<2.0",
   "pytest>=7.0,<10.0",
   "pytest-timeout>=2.4.0,<3.0",
   "pytest-xdist>=3.8.0,<4.0",
@@ -86,9 +84,6 @@ include = [
   "CHANGELOG.md",
   "LICENSE",
 ]
-
-[tool.black]
-line-length = 130
 
 [tool.ruff]
 target-version = "py310"
