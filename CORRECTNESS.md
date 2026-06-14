@@ -83,3 +83,41 @@ Fixed in this run: `CHANGELOG.md [Unreleased]` rewritten to drop the false
 graceful-fallback claim and record the `>=1.8` hard floor / removed fallback.
 
 _Scouts/synthesis: folded (small scope, deterministic checks)_
+
+## 2026-06-14 · 970006c · release diff (cd.yml, version 2.1.0, diffctx pin >=1.9.1)
+
+### TL;DR
+Audit of the 2.1.0 release work (new `.github/workflows/cd.yml`, version bump,
+pin `diffctx>=1.9.1`). Clean: mypy --strict + ruff + 13 tests pass, cd.yml is
+valid YAML and **actionlint-clean**, and the delegation contract was re-verified
+against the **actually-shipped diffctx 1.9.1** (not memory) —
+`run(argv, *, prog, version)` and `mcp.__main__.main(prog, extra)` match the
+calls in `cli.py:9` / `mcp_main.py:7` exactly, `treemapper.run is diffctx.run`,
+all re-exports present. The workflow itself ran green end-to-end in production
+(prepare→build→publish→6× smoke), so its happy path is empirically correct, not
+just statically plausible. No 🔴/🟡 defects.
+
+### Notes
+1. 🔵 `cd.yml` `finalize-release.if` (mirrors diffctx): with
+   `publish_to_pypi=false`, publish+smoke are *skipped* (not failed), so finalize
+   still runs and would push the version commit + tag and create a GitHub
+   release — i.e. `publish_to_pypi=false` is not a true dry-run. In practice the
+   "Push commit and tag to main" step fails first under branch protection
+   (GH006), so nothing is actually mutated; manual finalize is the established
+   flow. Inherited from the proven diffctx workflow, not a regression. Left as-is.
+2. 🔵 `CLAUDE.md:41` says the `>=1.9.1` floor "guarantees the `run(prog=…)` entry"
+   — technically true (1.9.1 > the 1.8.0 that introduced it); the sentence also
+   correctly attributes the diff-context header/role ordering to diffctx 1.9.x.
+   Not misleading.
+
+### False Positives
+- `version.py` = `2.1.0` while local dev venv still has diffctx 1.8.1: the venv
+  wasn't reinstalled against the new pin; the *shipped* artifact resolves
+  `diffctx>=1.9.1` (verified: PyPI 2.1.0 `requires_dist` + fresh-install pulled
+  1.9.1). Not a defect.
+
+### Verdict
+Release is correct: code, workflow, and delegation against diffctx 1.9.1 all hold;
+no fixes needed.
+
+_Scouts/synthesis: folded (small scope, deterministic + empirical CD evidence)_
