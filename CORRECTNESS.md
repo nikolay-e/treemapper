@@ -47,3 +47,39 @@ All three fixed in this run: hatchling dynamic version, `run` added to
 pin corrected to `>=1.8,<2.0`.
 
 _Scouts/synthesis: folded (small scope, deterministic checks)_
+
+## 2026-06-14 · d4216b0 · full repo (src/, pyproject, docs, CHANGELOG)
+
+### TL;DR
+Re-audit after the previous run's three fixes landed in `d4216b0` — all three
+confirmed resolved (dynamic hatchling version; `run` re-exported in `__init__`
+and pinned by `test_run_is_the_engine_entry`; README pin = `>=1.8,<2.0`). Code
+is correct: mypy --strict + ruff clean, 13 integration tests pass, and every
+diffctx call (`run`, `mcp.__main__.main`, `map_directory`, `build_diff_context`,
+`to_*`) verified by signature inspection against installed diffctx 1.8.1. One
+new defect: a **lying CHANGELOG**.
+
+### Top Issues (fix immediately)
+1. 🟡 `CHANGELOG.md:16-19` — Lying changelog. The `[Unreleased]` entry claims
+   "Both paths fall back gracefully when an older diffctx (< 1.8.0 …) is
+   installed — the CLI stays fully functional, only `--help`/MCP-hint naming
+   reverts to `diffctx`." False twice over: (a) the fallback was deliberately
+   removed in commit `2dd1a9b` ("drop pre-1.8 fallback") — `cli.py:9` and
+   `mcp_main.py:7` call the engine directly with no try/except, so on a pre-1.8
+   diffctx they raise, not "stay fully functional"; (b) it is impossible anyway —
+   `pyproject.toml` pins `diffctx>=1.8,<2.0`. Rewrite to state the hard `>=1.8`
+   requirement (matches CLAUDE.md "no fallback path") and record the 1.7→1.8 pin
+   bump that this unreleased cycle actually made.
+
+### False Positives
+- `version.py` = `2.0.0` vs diffctx `1.8.1`: independent product versions, fine.
+
+### Verdict
+Code and delegation contract are correct; only fix needed is the false fallback
+claim in `CHANGELOG.md [Unreleased]`.
+
+### Resolution
+Fixed in this run: `CHANGELOG.md [Unreleased]` rewritten to drop the false
+graceful-fallback claim and record the `>=1.8` hard floor / removed fallback.
+
+_Scouts/synthesis: folded (small scope, deterministic checks)_
