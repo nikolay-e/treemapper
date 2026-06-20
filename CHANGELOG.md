@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-20
+
+### Changed
+
+- Bumped the dependency floor to `diffctx>=1.10.0,<2.0`. This pulls in the
+  diffctx 1.10 engine: the calibrated default `--tau` of 0.12 (tighter
+  diff-context selection by default), the 256 KB MCP file cap, and the
+  document/import edge correctness fixes. No treemapper API changes.
+
 ## [2.1.0] - 2026-06-14
 
 ### Changed
