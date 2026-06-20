@@ -72,3 +72,5 @@ version, mypy --strict). Only two 🔵 nitpicks, neither worth the churn.
 - Net: nothing actionable — the repo is at the leverage floor for a thin wrapper.
 
 _Scouts/synthesis: folded (small unchanged scope, deterministic + vulture checks)_
+
+- _Re-confirmed at `fd0bd3e` — leverage source byte-identical to `b5483ca` (only workflows gained `concurrency`). One new **VERIFY**: `pyproject.toml` `dev` extra self-references `treemapper[tree-sitter]` — gate: `pytest` passes with it dropped → if so remove the unused native dev dep. Scout "phantom-gate / CI runs on GitHub mirror not Forgejo" **ruled out** — Forgejo-source + GitHub-mirror-Actions is the deliberate workspace model, not a hole. No contradictions with prior runs (ty stance consistent). Collapsed to one line per the no-landfill rule._
