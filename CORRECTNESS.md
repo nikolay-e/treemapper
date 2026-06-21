@@ -123,3 +123,5 @@ no fixes needed.
 _Scouts/synthesis: folded (small scope, deterministic + empirical CD evidence)_
 
 - _Re-confirmed clean at `83b989d` — source byte-identical to `970006c` (dev venv now on the pinned diffctx 1.9.1); no change. Collapsed to one line per the no-landfill rule (a hollow "still clean" section adds no signal)._
+
+- _2026-06-21 · addressed the version-drift defect this audit predicted: the `prep 2.2.0` commit (314dd9c) bumped the diffctx floor + CHANGELOG to 2.2.0 but left `version.py` at `2.1.0`, so `--version`/PyPI would have shipped `2.1.0` under a `2.2.0` CHANGELOG. Fixed `version.py` → `2.2.0` (single-sourced via hatchling — wheel builds `treemapper-2.2.0`, clean-venv `--version` confirms). Also corrected pin drift in `README.md` and `CLAUDE.md` (`>=1.9.1` → `>=1.10.0`) and the stale `CHANGELOG` compare-links. 13 tests green against the real pinned diffctx 1.10.0._

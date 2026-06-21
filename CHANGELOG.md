@@ -58,6 +58,7 @@ Releases `1.0.0` through `1.6.1` shipped TreeMapper as a self-contained package;
 that lineage was renamed to `diffctx` at `diffctx` `1.7.0`. TreeMapper `2.0.0`
 re-establishes the `treemapper` name as the product layer on top of that engine.
 
-[Unreleased]: https://github.com/nikolay-e/treemapper/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/nikolay-e/treemapper/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/nikolay-e/treemapper/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/nikolay-e/treemapper/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/nikolay-e/treemapper/releases/tag/v2.0.0

@@ -74,3 +74,5 @@ version, mypy --strict). Only two 🔵 nitpicks, neither worth the churn.
 _Scouts/synthesis: folded (small unchanged scope, deterministic + vulture checks)_
 
 - _Re-confirmed at `fd0bd3e` — leverage source byte-identical to `b5483ca` (only workflows gained `concurrency`). One new **VERIFY**: `pyproject.toml` `dev` extra self-references `treemapper[tree-sitter]` — gate: `pytest` passes with it dropped → if so remove the unused native dev dep. Scout "phantom-gate / CI runs on GitHub mirror not Forgejo" **ruled out** — Forgejo-source + GitHub-mirror-Actions is the deliberate workspace model, not a hole. No contradictions with prior runs (ty stance consistent). Collapsed to one line per the no-landfill rule._
+
+- _2026-06-21 · resolved the open VERIFY (`b5483ca` re-confirm): `dev` extra's `treemapper[tree-sitter]` self-reference removed. Gate met — tests reference no tree-sitter symbols and 13 integration tests pass without the native AST grammars (tree-sitter only enriches engine-internal diff/graph quality, which this repo deliberately does not assert). `treemapper[tree-sitter]`/`[full]` extras still expose it to users; only the unused dev pull was dropped._

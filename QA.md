@@ -14,16 +14,16 @@ mypy `additional_dependencies` (published-deps-only) live in the skill's
 | CLI smoke | yes | See CLI Smoke + Wheel E2E below |
 | Wheel build + clean-venv install | yes | The critical check — see below |
 | Code review | yes | Tiny surface (cli.py, __init__.py) |
-| CI status | yes | `.github/workflows/ci.yml` runs `pytest`. Installs the *published* diffctx, so it exercises the fallback path |
+| CI status | yes | `.github/workflows/ci.yml` runs `pytest`. Installs the *published* diffctx, so it exercises the real dependency-resolution + delegation path |
 | SonarCloud | no | `nikolay-e_treemapper` returns "Project not found" |
 | autoqa / K8s / browser / ZAP / backend | no | Pure CLI library, no HTTP/UI/cluster |
 
 ## What treemapper is
 
-Thin DRY wrapper over the `diffctx` engine (`diffctx>=1.7,<2.0`). `cli.py`
-delegates to `diffctx.run(prog="treemapper", version=…)` (diffctx >= 1.8.0),
-falling back to `diffctx.main.main()` on older engines; `__init__.py`
-re-exports the public API.
+Thin DRY wrapper over the `diffctx` engine (`diffctx>=1.10.0,<2.0`). `cli.py`
+delegates to `diffctx.run(prog="treemapper", version=…)` — a hard requirement,
+no fallback (the pre-1.8 fallback path was removed); `__init__.py` re-exports
+the public API.
 **Do not test engine algorithm quality here** (relevance filtering, garbage
 exclusion) — that belongs to diffctx's own suite. treemapper tests verify the
 wrapper contract: delegation works, `--version` is branded, formats render,
@@ -39,8 +39,8 @@ clean venv must pull diffctx from the index, not the dev editable install:
 ```bash
 cd ~/treemapper && rm -rf dist && python -m build --wheel
 python3 -m venv /tmp/tm-clean
-/tmp/tm-clean/bin/pip install dist/treemapper-*.whl     # pulls diffctx + pathspec from PyPI
-/tmp/tm-clean/bin/treemapper --version                  # → treemapper 2.0.0
+/tmp/tm-clean/bin/pip install dist/treemapper-*.whl     # pulls diffctx (>=1.10.0) from PyPI
+/tmp/tm-clean/bin/treemapper --version                  # → treemapper 2.2.0
 # in a real git repo:
 /tmp/tm-clean/bin/treemapper . -f yaml
 /tmp/tm-clean/bin/treemapper . --diff HEAD~1
@@ -55,19 +55,16 @@ python3 -m venv /tmp/tm-clean
   files — pin the hook with `files: ^src/` so it matches the pyproject scope;
   tests are integration tests, not strict-typed.
 - **mypy hook must NOT pin diffctx in `additional_dependencies`** (see `/qa`
-  skill: Packaging QA — the hook can only install the *published* dep):
-  TreeMapper develops against the unreleased diffctx 1.8.0 (`run`/branded mcp),
-  but the hook can only install published diffctx (1.7.1), which lacks those
-  symbols → version skew (`has no attribute run`). Leave diffctx out of the hook
-  and rely on `[[tool.mypy.overrides]] module=["diffctx.*"]
-  ignore_missing_imports = true` (hook → `Any`); the authoritative check is the
-  local/CI `mypy src` against the real installed diffctx. Re-add the pin only
-  after diffctx 1.8.0 is on PyPI.
-- **Branding is version-gated**: `--help` / `--version` / MCP-hint branding
-  needs `diffctx>=1.8.0`. Against published 1.7.1 the fallback path keeps
-  everything functional but `--help` and the mcp hint still show `diffctx`.
-  Verify full branding with the local editable diffctx (1.8.0); verify the
-  fallback with the clean-venv wheel install (pulls 1.7.1).
+  skill: Packaging QA — the hook can only install the *published* dep): keep
+  diffctx out of the hook and rely on `[[tool.mypy.overrides]]
+  module=["diffctx.*"] ignore_missing_imports = true` (hook → `Any`); the
+  authoritative check is the local/CI `mypy src` against the real installed
+  diffctx, which is the published `>=1.10.0` engine that exposes every symbol
+  the wrapper calls (`run`, branded mcp).
+- **Branding is unconditional**: the `>=1.10.0` floor guarantees the
+  `run(prog=…, version=…)` entry, so `--help` / `--version` / errors / the MCP
+  hint are always branded as `treemapper`. There is no unbranded fallback path
+  to verify — any diffctx satisfying the pin brands correctly.
 - **Dev install pollutes the diffctx venv**: `pip install -e .` from inside the
   shared `diffctx/.venv` adds treemapper there. Harmless for diffctx tests
   (separate `testpaths`), but prefer a dedicated venv for treemapper dev.

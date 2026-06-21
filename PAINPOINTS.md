@@ -191,3 +191,5 @@ _Scouts/synthesis: 4 web-research scouts (Repomix · CLI cluster · web/URL clus
 · diff+format axis; a 5th category-wide scout rate-limited, its themes covered by
 the others) / synthesis folded into main agent with direct code verification of
 "our status" against diffctx 1.9.1._
+
+- _2026-06-21 · ROI #2 (README under-marketing) partly addressed: README "Python API" now shows `treemapper.run` and calls out **exact tiktoken token counts** (the #7/#2 strength), verified live in the clean-venv smoke (`442 tokens (o200k_base)`). Secret-redaction (#6) remains engine-side / awaiting a diffctx decision; large-repo benchmark (#9) and engine-quality regression tests (#5,#10) stay out of this thin wrapper per its "don't duplicate/test engine logic" charter._

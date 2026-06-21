@@ -57,12 +57,18 @@ tree = treemapper.map_directory(".", no_content=False)
 print(treemapper.to_yaml(tree))
 
 context = treemapper.build_diff_context(root_dir=".", diff_range="HEAD~1")
+
+# treemapper.run drives the full branded CLI from Python (same surface as the command)
+treemapper.run(["graph", "."], prog="treemapper", version=treemapper.__version__)
 ```
+
+Every run reports an **exact `tiktoken` token count** (not a `chars / 4`
+estimate), so you know the real context cost before you paste.
 
 ## Relationship to diffctx
 
 TreeMapper is the user-facing distribution; `diffctx` is the reusable engine.
-Pin compatibility is `diffctx>=1.9.1,<2.0`. If you are embedding the engine in
+Pin compatibility is `diffctx>=1.10.0,<2.0`. If you are embedding the engine in
 your own tool, depend on `diffctx` directly.
 
 ## License

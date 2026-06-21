@@ -85,3 +85,8 @@ graceful-hint behavior.
 None promoted. The only candidates (MCP integration-test coverage; asserting the 1.9 diff format
 in treemapper's own `--diff` test rather than just substring presence) are **test-coverage gaps,
 not product gaps** — they belong to `/review-tests`, so they are not recorded here as opportunities.
+
+## Run 2026-06-21 — both 🔵 findings closed
+
+- **README `run` omission** — addressed: README "Python API" now documents `treemapper.run(...)` explicitly (signature verified `run(argv, *, prog, version) -> None`).
+- **`treemapper-mcp` exit code** — moot: against the shipped engine (diffctx 1.10.0) `treemapper-mcp` with the `[mcp]` extra absent exits **2**, not 0. The earlier "exits 0" observation (audited at 1.9.1) no longer holds; the missing-dependency launch already signals failure to a supervisor. QA.md's exit-2 note is correct. No code change.
