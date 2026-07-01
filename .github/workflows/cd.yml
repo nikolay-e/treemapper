@@ -342,7 +342,7 @@ jobs:
           path: ./release-assets
 
       - name: Create GitHub Release with wheel and sdist assets
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v2
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
         with:
           tag_name: ${{ needs.prepare-version.outputs.tag_name }}
           name: Release ${{ needs.prepare-version.outputs.version }}
