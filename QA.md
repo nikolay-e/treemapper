@@ -68,6 +68,22 @@ python3 -m venv /tmp/tm-clean
 - **Dev install pollutes the diffctx venv**: `pip install -e .` from inside the
   shared `diffctx/.venv` adds treemapper there. Harmless for diffctx tests
   (separate `testpaths`), but prefer a dedicated venv for treemapper dev.
+- **`test_console_script_entry_point` fails locally without an editable
+  install**: `pytest`'s `pythonpath = ["src"]` config makes in-process
+  `import treemapper` work even with no install, but the test's own
+  `subprocess.run([sys.executable, "-m", "treemapper", ...])` spawns a real
+  Python process that does not inherit that pytest-only path — it needs
+  treemapper actually installed. `pip install -e ".[dev]"` before running the
+  suite locally; CI is unaffected (fresh venv always installs the package first).
+- **`ci.yml` had drifted to tag-pinned actions (`@v7`, `@v6`, `@v8.2.0`) while
+  `cd.yml`/`automerge.yml` were SHA-pinned** — inconsistent with this
+  workspace's SHA-pinning convention. Fixed by pinning to the SHA each tag
+  resolves to today, with the resolved version in the trailing comment (`actions
+  setup-python@v6` → `v6.3.0`, since `v6` is a floating major tag that had moved
+  past the `v6.2.0` pinned elsewhere in `cd.yml`). When auditing SHA pins,
+  always resolve `# <tag>` comment against `gh api repos/<owner>/<repo>/git/refs/tags/<tag>`
+  — dependabot bumps the SHA but does not always update a stale comment (caught
+  `softprops/action-gh-release` pinned to the 3.0.1 SHA but still commented `# v2`).
 
 ---
 
