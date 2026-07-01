@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-07-01
+
+### Changed
+
+- Bumped the dependency floor to `diffctx>=1.10.1,<2.0`. This pulls in a fix
+  that stops the postpass fallback from hiding real diff content in
+  `treemapper . --diff`. No treemapper API changes.
+
 ## [2.2.0] - 2026-06-20
 
 ### Changed
@@ -58,7 +66,8 @@ Releases `1.0.0` through `1.6.1` shipped TreeMapper as a self-contained package;
 that lineage was renamed to `diffctx` at `diffctx` `1.7.0`. TreeMapper `2.0.0`
 re-establishes the `treemapper` name as the product layer on top of that engine.
 
-[Unreleased]: https://github.com/nikolay-e/treemapper/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/nikolay-e/treemapper/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/nikolay-e/treemapper/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/nikolay-e/treemapper/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/nikolay-e/treemapper/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/nikolay-e/treemapper/releases/tag/v2.0.0

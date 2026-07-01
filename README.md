@@ -68,7 +68,7 @@ estimate), so you know the real context cost before you paste.
 ## Relationship to diffctx
 
 TreeMapper is the user-facing distribution; `diffctx` is the reusable engine.
-Pin compatibility is `diffctx>=1.10.0,<2.0`. If you are embedding the engine in
+Pin compatibility is `diffctx>=1.10.1,<2.0`. If you are embedding the engine in
 your own tool, depend on `diffctx` directly.
 
 ## License

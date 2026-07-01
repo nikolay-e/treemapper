@@ -20,7 +20,7 @@ mypy `additional_dependencies` (published-deps-only) live in the skill's
 
 ## What treemapper is
 
-Thin DRY wrapper over the `diffctx` engine (`diffctx>=1.10.0,<2.0`). `cli.py`
+Thin DRY wrapper over the `diffctx` engine (`diffctx>=1.10.1,<2.0`). `cli.py`
 delegates to `diffctx.run(prog="treemapper", version=…)` — a hard requirement,
 no fallback (the pre-1.8 fallback path was removed); `__init__.py` re-exports
 the public API.
@@ -39,8 +39,8 @@ clean venv must pull diffctx from the index, not the dev editable install:
 ```bash
 cd ~/treemapper && rm -rf dist && python -m build --wheel
 python3 -m venv /tmp/tm-clean
-/tmp/tm-clean/bin/pip install dist/treemapper-*.whl     # pulls diffctx (>=1.10.0) from PyPI
-/tmp/tm-clean/bin/treemapper --version                  # → treemapper 2.2.0
+/tmp/tm-clean/bin/pip install dist/treemapper-*.whl     # pulls diffctx (>=1.10.1) from PyPI
+/tmp/tm-clean/bin/treemapper --version                  # → treemapper 2.3.0
 # in a real git repo:
 /tmp/tm-clean/bin/treemapper . -f yaml
 /tmp/tm-clean/bin/treemapper . --diff HEAD~1
@@ -59,9 +59,9 @@ python3 -m venv /tmp/tm-clean
   diffctx out of the hook and rely on `[[tool.mypy.overrides]]
   module=["diffctx.*"] ignore_missing_imports = true` (hook → `Any`); the
   authoritative check is the local/CI `mypy src` against the real installed
-  diffctx, which is the published `>=1.10.0` engine that exposes every symbol
+  diffctx, which is the published `>=1.10.1` engine that exposes every symbol
   the wrapper calls (`run`, branded mcp).
-- **Branding is unconditional**: the `>=1.10.0` floor guarantees the
+- **Branding is unconditional**: the `>=1.10.1` floor guarantees the
   `run(prog=…, version=…)` entry, so `--help` / `--version` / errors / the MCP
   hint are always branded as `treemapper`. There is no unbranded fallback path
   to verify — any diffctx satisfying the pin brands correctly.
